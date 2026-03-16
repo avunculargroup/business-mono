@@ -1,0 +1,17 @@
+{
+  "name": "platform",
+  "private": true,
+  "scripts": {
+    "dev:agents": "turbo run dev --filter=@platform/agents",
+    "dev:web": "turbo run dev --filter=@platform/web",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:generate-types": "cd packages/db && npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "typescript": "^5.5"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
