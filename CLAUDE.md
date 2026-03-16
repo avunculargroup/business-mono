@@ -1,6 +1,6 @@
 # CLAUDE.md — Agent Platform Architecture
 
-This is the internal business platform for a Bitcoin Treasury Training & Consulting company. Two co-founders, pre-revenue, building an AI-powered operations platform.
+This is the internal business platform for Bitcoin Treasury Solutions. Two co-founders, pre-revenue, building an AI-powered operations platform.
 
 ## Monorepo Structure
 
