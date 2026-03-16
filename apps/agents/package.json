@@ -1,0 +1,26 @@
+{
+  "name": "@platform/agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mastra/core": "^0.10.0",
+    "@platform/db": "workspace:*",
+    "@platform/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.32.0",
+    "openai": "^4.68.0",
+    "@deepgram/sdk": "^3.9.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5",
+    "mastra": "^0.10.0"
+  }
+}
