@@ -1,0 +1,22 @@
+{
+  "name": "@platform/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "generate-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts"
+  },
+  "dependencies": {
+    "@platform/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5"
+  }
+}
