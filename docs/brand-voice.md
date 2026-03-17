@@ -7,7 +7,6 @@ For visual design implementation (colours, typography, components, spacing, CSS 
 ## Company Identity
 
 **Company name:** Bitcoin Treasury Solutions (BTS)
-**Platform name:** Bitcoin Treasury Guide
 
 **Mission (preferred version):** "We make Bitcoin work for businesses: education, payments infrastructure, and treasury management from strategy to custody."
 
