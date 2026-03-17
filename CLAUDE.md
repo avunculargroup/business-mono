@@ -1,6 +1,6 @@
 # CLAUDE.md — Agent Platform Architecture
 
-This is the internal business platform for Bitcoin Treasury Solutions. Two co-founders, pre-revenue, building an AI-powered operations platform.
+This is the internal business platform for Bitcoin Treasury Solutions (BTS) — a Bitcoin education, consulting, and treasury implementation company. Two co-founders, pre-revenue, building an AI-powered operations platform.
 
 ## Monorepo Structure
 
@@ -13,9 +13,11 @@ This is the internal business platform for Bitcoin Treasury Solutions. Two co-fo
 │   └── shared/          # Shared types, constants, utilities
 ├── docs/
 │   ├── agents/          # Individual agent specifications
+│   ├── brand-voice.md     # Brand voice, tone, terminology, Bitcoin stance (Content Creator source)
 │   ├── schema-changes.md  # Changelog: what changed from original schema and why
 │   └── webhooks.md
 ├── schema.sql           # Consolidated database schema (source of truth)
+├── DESIGN_BRIEF.md      # Visual design system — colours, typography, components, CSS tokens
 ├── CLAUDE.md            # This file (auto-read by Claude Code)
 ├── pnpm-workspace.yaml
 └── turbo.json
@@ -169,6 +171,8 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 ## Key Files
 
 - `schema.sql` — consolidated database schema (source of truth, run on fresh Supabase)
+- `DESIGN_BRIEF.md` — visual design system: colours, typography, components, spacing, CSS tokens. Source of truth for ALL UI implementation.
+- `docs/brand-voice.md` — brand voice, tone, terminology, Bitcoin stance. Source of truth for ALL content. References DESIGN_BRIEF for visual identity.
 - `docs/schema-changes.md` — changelog: what changed from original schema and why
 - `docs/webhooks.md` — webhook endpoint specs, payloads, authentication
 - `docs/agents/*.md` — individual agent specifications
@@ -176,3 +180,24 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 - `packages/db/src/client.ts` — Supabase client initialisation
 - `packages/db/src/rpc/` — RPC wrappers for vector search, graph traversal
 - `packages/shared/src/types.ts` — shared TypeScript types and enums
+
+## When Working On...
+
+Read the relevant docs BEFORE writing code. This saves rework.
+
+| Task | Read first |
+|------|-----------|
+| Any UI component, page, or styling | `DESIGN_BRIEF.md` — colours, typography, spacing, component specs, CSS tokens |
+| Content Creator agent, content tools, or draft generation | `docs/brand-voice.md` — tone, terminology, banned words, Bitcoin stance, content lengths |
+| Any agent (building, modifying, adding tools) | `docs/agents/{agent-name}.md` — triggers, capabilities, tools, schema deps, approval gates |
+| Simon specifically | `docs/agents/simon.md` — conflict detection flow, capacity awareness, morning briefing spec |
+| Webhook handlers or external service integration | `docs/webhooks.md` — payloads, authentication, handler logic |
+| Database changes, new tables, migrations | `schema.sql` (source of truth) + `docs/schema-changes.md` (rationale) |
+| Shared types or enums | `packages/shared/src/types.ts` — check if type already exists before creating |
+| Supabase queries, RPC functions, vector/graph search | `packages/db/src/rpc/` — check existing wrappers before writing raw queries |
+| UI copy, empty states, labels, microcopy | `docs/brand-voice.md` (UI Microcopy Rules section) + `DESIGN_BRIEF.md` (Voice & Microcopy section) |
+| Email or newsletter drafts/templates | `docs/brand-voice.md` — formality level (semi-formal), length (400-800 words), required/banned terminology |
+| Anything touching Bitcoin terminology | `docs/brand-voice.md` — capital B = network/protocol, lowercase b = currency/unit. Required and banned terms lists. |
+| New agent or capability | `docs/agents/simon.md` (capacity awareness) — update `platform_capabilities` table when adding new capabilities |
+
+**If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
