@@ -49,6 +49,7 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 │   └── shared/          # Shared TypeScript types, enums, constants
 ├── docs/
 │   ├── agents/          # Per-agent specification docs
+│   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
 │   ├── schema-changes.md
 │   └── webhooks.md
 ├── schema.sql           # Database schema — source of truth
@@ -148,6 +149,7 @@ cp apps/agents/.env.example apps/agents/.env
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
+| `pnpm --filter @platform/db seed:brand-voice` | Sync `docs/brand-voice.md` into `brand_assets` table |
 
 All commands are orchestrated through Turborepo, which handles build order and caching based on the dependency graph.
 
@@ -199,6 +201,16 @@ After any schema change, regenerate the TypeScript types:
 pnpm db:generate-types
 # generates packages/db/src/types/database.ts
 ```
+
+### Seeding brand assets
+
+The brand voice document (`docs/brand-voice.md`) is the source of truth for tone, terminology, and content style. To sync it into the `brand_assets` table:
+
+```bash
+pnpm --filter @platform/db seed:brand-voice
+```
+
+Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into sections and upserts them as `brand_assets` records (old versions are soft-deleted).
 
 ### Key tables
 
