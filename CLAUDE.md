@@ -10,7 +10,10 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 │   └── web/             # Next.js frontend (Vercel) — future
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
-│   └── shared/          # Shared types, constants, utilities
+│   ├── shared/          # Shared types, constants, utilities
+│   └── signal/          # TypeScript client for signal-cli REST API sidecar
+├── infra/
+│   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
 │   ├── agents/          # Individual agent specifications
 │   ├── brand-voice.md     # Brand voice, tone, terminology, Bitcoin stance (Content Creator source)
@@ -31,13 +34,14 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 
 - `@platform/db` — database client, generated types, migration SQL, Supabase RPC wrappers
 - `@platform/shared` — shared TypeScript types, constants, enums, utility functions
+- `@platform/signal` — typed HTTP client for signal-cli REST API sidecar
 - `@platform/agents` — Mastra agent server (not consumed by other packages)
 - `@platform/web` — Next.js frontend (not consumed by other packages)
 
 ### Import rules
 
-- `apps/agents` imports from `@platform/db` and `@platform/shared`
-- `apps/web` imports from `@platform/db` and `@platform/shared`
+- `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
+- `apps/web` imports from `@platform/db` and `@platform/shared` (NOT `@platform/signal`)
 - `packages/db` imports from `@platform/shared`
 - `packages/shared` imports from nothing (leaf package)
 - `apps/*` never import from each other
@@ -163,6 +167,7 @@ Future: pgRouting for path queries. SQL/PGQ when it lands in stable Postgres.
 - **Database tables**: snake_case, plural (`knowledge_items`)
 - **TypeScript files**: camelCase for modules, PascalCase for components/classes
 - **Env vars**: SCREAMING_SNAKE_CASE, prefixed by service (`TELNYX_API_KEY`)
+- **Railway internal URLs**: `http://{service-name}.railway.internal:{port}`
 
 ## Shared Types (`packages/shared`)
 
@@ -180,6 +185,8 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 - `packages/db/src/client.ts` — Supabase client initialisation
 - `packages/db/src/rpc/` — RPC wrappers for vector search, graph traversal
 - `packages/shared/src/types.ts` — shared TypeScript types and enums
+- `packages/signal/src/client.ts` — Signal CLI HTTP client
+- `infra/signal-cli/README.md` — sidecar deployment and registration instructions
 
 ## When Working On...
 
@@ -199,5 +206,6 @@ Read the relevant docs BEFORE writing code. This saves rework.
 | Email or newsletter drafts/templates | `docs/brand-voice.md` — formality level (semi-formal), length (400-800 words), required/banned terminology |
 | Anything touching Bitcoin terminology | `docs/brand-voice.md` — capital B = network/protocol, lowercase b = currency/unit. Required and banned terms lists. |
 | New agent or capability | `docs/agents/simon.md` (capacity awareness) — update `platform_capabilities` table when adding new capabilities |
+| Signal integration, Simon's messaging | `packages/signal/` (client API) + `infra/signal-cli/README.md` (deployment) |
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.

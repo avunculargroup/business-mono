@@ -1,0 +1,22 @@
+{
+  "name": "@platform/signal",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@platform/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5"
+  }
+}
