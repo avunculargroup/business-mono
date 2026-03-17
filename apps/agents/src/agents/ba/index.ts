@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core';
-import { DEFAULT_MODEL, MAX_CLARIFICATION_ROUNDS } from '@platform/shared';
+import { MAX_CLARIFICATION_ROUNDS } from '@platform/shared';
+import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
@@ -51,10 +52,7 @@ Before structuring requirements, query the Archivist's knowledge base for:
 export const ba = new Agent({
   name: 'ba',
   instructions: SYSTEM_PROMPT,
-  model: {
-    provider: 'ANTHROPIC',
-    name: DEFAULT_MODEL,
-  },
+  model: getModelConfig(),
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,

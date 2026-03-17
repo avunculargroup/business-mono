@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core';
-import { DEFAULT_MODEL } from '@platform/shared';
+import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { generateEmbedding } from '../../tools/openai.js';
 import { logActivity } from '../../tools/activity.js';
@@ -71,10 +71,7 @@ Every knowledge item saved, every search performed — log to agent_activity.`;
 export const archivist = new Agent({
   name: 'archivist',
   instructions: SYSTEM_PROMPT,
-  model: {
-    provider: 'ANTHROPIC',
-    name: DEFAULT_MODEL,
-  },
+  model: getModelConfig(),
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,

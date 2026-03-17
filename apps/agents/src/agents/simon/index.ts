@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core';
-import { DEFAULT_MODEL } from '@platform/shared';
+import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
@@ -79,10 +79,7 @@ Professional but warm. You are an EA, not a robot. You can handle banter. Keep r
 export const simon = new Agent({
   name: 'simon',
   instructions: SYSTEM_PROMPT,
-  model: {
-    provider: 'ANTHROPIC',
-    name: DEFAULT_MODEL,
-  },
+  model: getModelConfig(),
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,

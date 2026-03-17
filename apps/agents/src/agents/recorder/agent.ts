@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core';
-import { DEFAULT_MODEL } from '@platform/shared';
+import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 
@@ -28,10 +28,7 @@ Always return structured JSON matching the InteractionExtractedData shape.`;
 export const recorderAgent = new Agent({
   name: 'recorder',
   instructions: SYSTEM_PROMPT,
-  model: {
-    provider: 'ANTHROPIC',
-    name: DEFAULT_MODEL,
-  },
+  model: getModelConfig(),
   tools: {
     supabase_query: supabaseQuery,
     log_activity: logActivity,
