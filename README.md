@@ -46,7 +46,10 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 │   └── web/             # Next.js frontend — deployed to Vercel (future)
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
-│   └── shared/          # Shared TypeScript types, enums, constants
+│   ├── shared/          # Shared TypeScript types, enums, constants
+│   └── signal/          # Typed HTTP client for signal-cli REST API sidecar
+├── infra/
+│   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
 │   ├── agents/          # Per-agent specification docs
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
@@ -62,11 +65,12 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 ### Package dependency graph
 
 ```
-@platform/agents  →  @platform/db  →  @platform/shared
-@platform/web     →  @platform/db  →  @platform/shared
+@platform/agents  →  @platform/db     →  @platform/shared
+                  →  @platform/signal
+@platform/web     →  @platform/db     →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` does NOT import `@platform/signal`.
 
 ---
 
@@ -136,8 +140,8 @@ cp apps/agents/.env.example apps/agents/.env
 | `TELNYX_API_KEY` | Phone call recording ingestion |
 | `TELNYX_PUBLIC_KEY` | Webhook signature verification |
 | `ZOOM_WEBHOOK_SECRET_TOKEN` | Zoom webhook verification |
-| `SIGNAL_CLI_PATH` | Path to signal-cli binary |
-| `SIGNAL_PHONE_NUMBER` | Simon's dedicated Signal number |
+| `SIGNAL_CLI_API_URL` | signal-cli REST API URL (Railway private: `http://signal-cli.railway.internal:8080`, local: `http://localhost:8080`) |
+| `SIGNAL_CLI_NUMBER` | Simon's dedicated Signal number in E.164 format |
 | `PORT` | Server port (defaults to 3000; set automatically on Railway) |
 | `RAILWAY_PUBLIC_DOMAIN` | Public URL used when constructing webhook callback URLs |
 
