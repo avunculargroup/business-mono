@@ -49,6 +49,7 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 │   └── shared/          # Shared TypeScript types, enums, constants
 ├── docs/
 │   ├── agents/          # Per-agent specification docs
+│   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
 │   ├── schema-changes.md
 │   └── webhooks.md
 ├── schema.sql           # Database schema — source of truth
@@ -97,14 +98,20 @@ pnpm install
 cp apps/agents/.env.example apps/agents/.env
 # Fill in values — see Environment variables section below
 
-# 3. Apply the database schema to your Supabase project
-# (run against a fresh project or use migrations)
+# 3. Set up the database (choose one)
+#    Option A — Local (Supabase CLI):
+supabase init && supabase start
+psql $(supabase status -o env | grep DATABASE_URL | cut -d= -f2-) < schema.sql
+#    Option B — Remote (hosted Supabase project):
 psql $DATABASE_URL < schema.sql
 
-# 4. Generate TypeScript types from your Supabase schema
+# 4. Seed brand assets
+pnpm --filter @platform/db seed:brand-voice
+
+# 5. Generate TypeScript types from your Supabase schema
 pnpm db:generate-types
 
-# 5. Start the agent server in dev mode
+# 6. Start the agent server in dev mode
 pnpm dev:agents
 ```
 
@@ -148,6 +155,7 @@ cp apps/agents/.env.example apps/agents/.env
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
+| `pnpm --filter @platform/db seed:brand-voice` | Sync `docs/brand-voice.md` into `brand_assets` table |
 
 All commands are orchestrated through Turborepo, which handles build order and caching based on the dependency graph.
 
@@ -183,10 +191,57 @@ Mastra requires ES2022 modules — do not downgrade `module` or `target`.
 
 ## Database
 
-`schema.sql` at the repo root is the **source of truth**. To apply it to a fresh Supabase project:
+`schema.sql` at the repo root is the **source of truth**.
+
+### Remote setup (hosted Supabase project)
+
+Apply the schema directly to a hosted Supabase project:
 
 ```bash
 psql $DATABASE_URL < schema.sql
+```
+
+### Local setup (Supabase CLI)
+
+For local development using the Supabase CLI:
+
+```bash
+# 1. Install the CLI (if not already installed)
+brew install supabase/tap/supabase   # macOS
+# or: npm install -g supabase        # any platform
+
+# 2. Initialise Supabase in the repo (one-time — creates supabase/ directory)
+supabase init
+
+# 3. Start the local Supabase stack (Postgres, Auth, Storage, etc.)
+supabase start
+
+# 4. Apply the schema to the local database
+psql $(supabase status -o env | grep DATABASE_URL | cut -d= -f2-) < schema.sql
+
+# 5. Seed brand assets into the local database
+SUPABASE_URL=$(supabase status -o env | grep API_URL | cut -d= -f2-) \
+SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SERVICE_ROLE_KEY | cut -d= -f2-) \
+pnpm --filter @platform/db seed:brand-voice
+
+# 6. Generate TypeScript types from the local instance
+supabase gen types typescript --local > packages/db/src/types/database.ts
+```
+
+Use the local credentials in your `apps/agents/.env`:
+
+```bash
+# From `supabase status` output:
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
+```
+
+To stop and restart the local stack:
+
+```bash
+supabase stop          # stop (preserves data)
+supabase stop --no-backup  # stop and reset data
+supabase start         # start again
 ```
 
 See `docs/schema-changes.md` for a changelog of intentional deviations from any original schema.
@@ -199,6 +254,16 @@ After any schema change, regenerate the TypeScript types:
 pnpm db:generate-types
 # generates packages/db/src/types/database.ts
 ```
+
+### Seeding brand assets
+
+The brand voice document (`docs/brand-voice.md`) is the source of truth for tone, terminology, and content style. To sync it into the `brand_assets` table:
+
+```bash
+pnpm --filter @platform/db seed:brand-voice
+```
+
+Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into sections and upserts them as `brand_assets` records (old versions are soft-deleted).
 
 ### Key tables
 
