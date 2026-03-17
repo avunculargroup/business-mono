@@ -2,7 +2,8 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '@mastra/core';
-import { DEFAULT_MODEL, MAX_CONTENT_ITERATIONS, KNOWLEDGE_STALENESS_MONTHS } from '@platform/shared';
+import { MAX_CONTENT_ITERATIONS, KNOWLEDGE_STALENESS_MONTHS } from '@platform/shared';
+import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
@@ -116,10 +117,7 @@ Every draft must pass these self-checks before submission:
 export const contentCreator = new Agent({
   name: 'contentCreator',
   instructions: SYSTEM_PROMPT,
-  model: {
-    provider: 'ANTHROPIC',
-    name: DEFAULT_MODEL,
-  },
+  model: getModelConfig(),
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
