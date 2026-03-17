@@ -1,3 +1,302 @@
 # business-mono
-A mono repo for getting business done.
 
+Internal AI-powered operations platform for Bitcoin Treasury Solutions. Built on a hub-and-spoke agent architecture: a central coordinator (Simon) routes work to specialist agents, all sharing a Supabase database.
+
+---
+
+## Table of Contents
+
+- [Architecture overview](#architecture-overview)
+- [Monorepo structure](#monorepo-structure)
+- [Prerequisites](#prerequisites)
+- [Getting started](#getting-started)
+- [Environment variables](#environment-variables)
+- [Development](#development)
+- [Database](#database)
+- [Agents](#agents)
+- [Webhooks](#webhooks)
+- [Deployment](#deployment)
+- [Key conventions](#key-conventions)
+
+---
+
+## Architecture overview
+
+```
+Directors (Signal / Web UI)
+        ↕
+     Simon (coordinator agent)
+        ↕
+Specialist Agents: Recorder · Archivist · PM · BA · Content Creator
+        ↕
+  Supabase (shared Postgres + pgvector)
+```
+
+Simon is the only agent that talks to humans. Specialists never message directors directly. All agent actions are logged to `agent_activity` as an audit trail.
+
+The one exception: any agent may query the Archivist's knowledge base directly for read-only lookups without going through Simon.
+
+---
+
+## Monorepo structure
+
+```
+├── apps/
+│   ├── agents/          # Mastra AI agent server — deployed to Railway
+│   └── web/             # Next.js frontend — deployed to Vercel (future)
+├── packages/
+│   ├── db/              # Supabase client, generated types, RPC wrappers
+│   └── shared/          # Shared TypeScript types, enums, constants
+├── docs/
+│   ├── agents/          # Per-agent specification docs
+│   ├── schema-changes.md
+│   └── webhooks.md
+├── schema.sql           # Database schema — source of truth
+├── CLAUDE.md            # AI agent instructions
+├── tsconfig.base.json   # Base TypeScript config (extended by all packages)
+├── turbo.json
+└── pnpm-workspace.yaml
+```
+
+### Package dependency graph
+
+```
+@platform/agents  →  @platform/db  →  @platform/shared
+@platform/web     →  @platform/db  →  @platform/shared
+```
+
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies.
+
+---
+
+## Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Node.js | 20+ |
+| pnpm | 9.15.0 (enforced by `packageManager` field) |
+| Supabase CLI | latest |
+
+Install pnpm if needed:
+
+```bash
+npm install -g pnpm@9.15.0
+```
+
+---
+
+## Getting started
+
+```bash
+# 1. Clone and install
+git clone <repo-url>
+cd business-mono
+pnpm install
+
+# 2. Set up environment variables
+cp apps/agents/.env.example apps/agents/.env
+# Fill in values — see Environment variables section below
+
+# 3. Apply the database schema to your Supabase project
+# (run against a fresh project or use migrations)
+psql $DATABASE_URL < schema.sql
+
+# 4. Generate TypeScript types from your Supabase schema
+pnpm db:generate-types
+
+# 5. Start the agent server in dev mode
+pnpm dev:agents
+```
+
+---
+
+## Environment variables
+
+All secrets live in `apps/agents/.env`. Copy the example and fill in values:
+
+```bash
+cp apps/agents/.env.example apps/agents/.env
+```
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS — keep secret) |
+| `SUPABASE_PROJECT_ID` | Project ID for type generation |
+| `ANTHROPIC_API_KEY` | Claude API key — all agents use `claude-sonnet-4-5` |
+| `OPENAI_API_KEY` | Used for `text-embedding-3-small` (1536 dimensions) |
+| `DEEPGRAM_API_KEY` | Transcription via Nova-3 |
+| `TELNYX_API_KEY` | Phone call recording ingestion |
+| `TELNYX_PUBLIC_KEY` | Webhook signature verification |
+| `ZOOM_WEBHOOK_SECRET_TOKEN` | Zoom webhook verification |
+| `SIGNAL_CLI_PATH` | Path to signal-cli binary |
+| `SIGNAL_PHONE_NUMBER` | Simon's dedicated Signal number |
+| `PORT` | Server port (defaults to 3000; set automatically on Railway) |
+| `RAILWAY_PUBLIC_DOMAIN` | Public URL used when constructing webhook callback URLs |
+
+---
+
+## Development
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev:agents` | Start agent server in watch mode |
+| `pnpm dev:web` | Start Next.js frontend (when implemented) |
+| `pnpm build` | Build all packages and apps |
+| `pnpm typecheck` | Type-check all packages |
+| `pnpm lint` | Lint all packages |
+| `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
+
+All commands are orchestrated through Turborepo, which handles build order and caching based on the dependency graph.
+
+### Adding a new agent
+
+1. Create a directory under `apps/agents/src/agents/<name>/`.
+2. Decide the type: `Agent` (open-ended judgment) or `Workflow + Agent` (deterministic pipeline with reasoning steps).
+3. Implement tools in `tools.ts`, agent in `index.ts` (or `agent.ts` + `workflow.ts` for hybrids).
+4. Register the agent in `apps/agents/src/mastra/index.ts`.
+5. Add the agent to `platform_capabilities` table so Simon can route to it.
+6. Write a spec doc in `docs/agents/<name>.md`.
+
+### Adding a shared type or constant
+
+Add it to `packages/shared/src/types.ts` or `packages/shared/src/constants.ts` and export it from `packages/shared/src/index.ts`. Import via `@platform/shared`.
+
+### TypeScript config
+
+All packages extend `tsconfig.base.json`:
+
+```jsonc
+{
+  "target": "ES2022",
+  "module": "ES2022",
+  "moduleResolution": "bundler",
+  "strict": true
+}
+```
+
+Mastra requires ES2022 modules — do not downgrade `module` or `target`.
+
+---
+
+## Database
+
+`schema.sql` at the repo root is the **source of truth**. To apply it to a fresh Supabase project:
+
+```bash
+psql $DATABASE_URL < schema.sql
+```
+
+See `docs/schema-changes.md` for a changelog of intentional deviations from any original schema.
+
+### Regenerating types
+
+After any schema change, regenerate the TypeScript types:
+
+```bash
+pnpm db:generate-types
+# generates packages/db/src/types/database.ts
+```
+
+### Key tables
+
+| Table | Purpose |
+|-------|---------|
+| `agent_activity` | Audit trail — every agent action logged here |
+| `platform_capabilities` | Registry of what each agent can do |
+| `capacity_gaps` | Gaps Simon has identified between intended and actual capability |
+| `knowledge_items` | Archivist knowledge base with `VECTOR(1536)` embeddings (HNSW indexed) |
+| `knowledge_connections` | Graph edges between knowledge items |
+| `contacts` / `companies` | CRM core |
+| `tasks` / `projects` | Task and project tracking |
+| `requirements` | BA-structured requirements with user stories |
+| `content_items` | Content pipeline: idea → draft → review → approved → published |
+| `risk_register` | Risk tracking with severity × likelihood matrix |
+
+### RPC wrappers (`packages/db/src/rpc/`)
+
+| Function | Description |
+|----------|-------------|
+| `vectorSearch()` | Semantic similarity search over `knowledge_items` (pgvector HNSW) |
+| `graphTraverse()` | Graph traversal over `knowledge_connections` via recursive CTE |
+| `fulltextSearch()` | Postgres FTS over `knowledge_items.raw_content` |
+
+---
+
+## Agents
+
+Full specifications are in `docs/agents/`. Summary:
+
+| Agent | Type | Role |
+|-------|------|------|
+| **Simon** | Agent | Central coordinator. Only agent that communicates with directors via Signal. Detects conflicts, tracks capacity gaps, dispatches to specialists. |
+| **Recorder** | Workflow + Agent | Ingests phone (Telnyx) and video (Zoom) recordings, transcribes via Deepgram, extracts entities, syncs to CRM, proposes tasks. |
+| **Archivist** | Agent | Manages the knowledge base. Processes URLs and YouTube videos, maps connections, answers knowledge queries via hybrid search. |
+| **PM** | Workflow + Agent | Triages tasks from `agent_activity`, manages projects, tracks risks, monitors blocked tasks. |
+| **BA** | Agent | Elicits and structures requirements with multi-round clarification loops (Mastra suspend/resume). |
+| **Content Creator** | Agent | Drafts and iterates content, enforces brand consistency, adapts across formats. All publishing is human-approved. |
+
+### Approval philosophy
+
+Operations graduate from human-confirmed → batch approval → autonomous based on track record. The following are **always human-approved** regardless of track record:
+
+- Emails
+- Published content
+- CRM contact/company creation
+
+---
+
+## Webhooks
+
+The agent server exposes three webhook endpoints. Full payload specs and authentication details are in `docs/webhooks.md`.
+
+| Endpoint | Trigger |
+|----------|---------|
+| `POST /webhooks/telnyx` | Phone call recording ready (HMAC signature verified) |
+| `POST /webhooks/zoom` | Video recording ready |
+| `POST /webhooks/deepgram` | Transcription completed (multichannel) |
+
+All three feed into the Recorder workflow.
+
+---
+
+## Deployment
+
+### Agent server → Railway
+
+`apps/agents/railway.toml` is already configured:
+
+- **Build**: `pnpm install && pnpm --filter @platform/agents build`
+- **Start**: `node dist/index.js`
+- **Health check**: `GET /health` (30s timeout)
+- **Restart policy**: on failure, max 3 retries
+
+Set all environment variables (see above) in your Railway service settings.
+
+### Frontend → Vercel
+
+`apps/web` is not yet implemented. When ready, connect the `apps/web` directory to a Vercel project and set the same Supabase variables.
+
+### Database → Supabase
+
+1. Create a new Supabase project.
+2. Run `schema.sql` via the SQL editor or `psql`.
+3. Copy the project URL, service role key, and project ID into your `.env`.
+
+---
+
+## Key conventions
+
+| Thing | Convention | Example |
+|-------|------------|---------|
+| Package names | `@platform/{name}` | `@platform/db` |
+| Agent names in code | camelCase | `contentCreator` |
+| Tool names | snake_case | `supabase_query` |
+| Webhook routes | `/webhooks/{service}` | `/webhooks/telnyx` |
+| DB tables | snake_case, plural | `knowledge_items` |
+| TS files | camelCase modules, PascalCase components | `vectorSearch.ts` |
+| Env vars | `SCREAMING_SNAKE_CASE` with service prefix | `TELNYX_API_KEY` |
+| AI model | `anthropic/claude-sonnet-4-5` | all agents |
+| Embedding model | `text-embedding-3-small`, 1536 dims | Archivist, Recorder |
