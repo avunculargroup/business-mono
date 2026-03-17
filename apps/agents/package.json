@@ -14,6 +14,7 @@
     "@mastra/core": "^0.10.0",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
+    "@platform/signal": "workspace:*",
     "@anthropic-ai/sdk": "^0.32.0",
     "openai": "^4.68.0",
     "@deepgram/sdk": "^3.9.0",
