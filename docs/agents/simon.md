@@ -115,8 +115,8 @@ Mastra built-in memory + `agent_conversations` table. Thread-per-Signal-chat for
 
 - `supabase_query` — read any table/view
 - `web_search` — research queries
-- `signal_send` — send Signal message
-- `signal_receive` — receive/parse Signal messages
+- `signal_send` — send Signal message via `@platform/signal` client (calls signal-cli sidecar)
+- `signal_receive` — receive/parse incoming Signal messages via `@platform/signal` client
 - `email_draft` — compose email for director approval
 - `create_reminder` — create time-triggered reminder
 - `conflict_check` — check agent_activity for overlapping workflows
@@ -143,6 +143,14 @@ Mastra built-in memory + `agent_conversations` table. Thread-per-Signal-chat for
 | Set reminders | Auto | Stays auto |
 | Log capacity gap | Auto | Stays auto |
 | Suggest new capability | Auto | Stays auto (suggestions are cheap) |
+
+## Mastra Implementation
+
+**Signal Integration:** Simon uses `@platform/signal` to communicate via Signal.
+The `SignalClient` connects to the signal-cli REST API sidecar on Railway's private
+network. Messages are sent/received via HTTP — Simon never interacts with the
+Signal protocol directly. The sidecar handles encryption, key management, and
+protocol compliance.
 
 ## Failure Modes
 

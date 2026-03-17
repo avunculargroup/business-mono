@@ -1,0 +1,15 @@
+version: "3"
+services:
+  signal-cli-rest-api:
+    image: bbernhard/signal-cli-rest-api:latest
+    environment:
+      - MODE=json-rpc
+      - JSON_RPC_TRUST_NEW_IDENTITIES=on-first-use
+    ports:
+      - "8080:8080"
+    volumes:
+      - signal-cli-config:/home/.local/share/signal-cli
+    restart: always
+
+volumes:
+  signal-cli-config:
