@@ -56,6 +56,8 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 │   ├── schema-changes.md
 │   └── webhooks.md
 ├── schema.sql           # Database schema — source of truth
+├── Dockerfile           # Multi-stage build for Railway (pnpm + Turborepo)
+├── .dockerignore
 ├── CLAUDE.md            # AI agent instructions
 ├── tsconfig.base.json   # Base TypeScript config (extended by all packages)
 ├── turbo.json
@@ -129,21 +131,25 @@ All secrets live in `apps/agents/.env`. Copy the example and fill in values:
 cp apps/agents/.env.example apps/agents/.env
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS — keep secret) |
-| `SUPABASE_PROJECT_ID` | Project ID for type generation |
-| `ANTHROPIC_API_KEY` | Claude API key — all agents use `claude-sonnet-4-5` |
-| `OPENAI_API_KEY` | Used for `text-embedding-3-small` (1536 dimensions) |
-| `DEEPGRAM_API_KEY` | Transcription via Nova-3 |
-| `TELNYX_API_KEY` | Phone call recording ingestion |
-| `TELNYX_PUBLIC_KEY` | Webhook signature verification |
-| `ZOOM_WEBHOOK_SECRET_TOKEN` | Zoom webhook verification |
-| `SIGNAL_CLI_API_URL` | signal-cli REST API URL (Railway private: `http://signal-cli.railway.internal:8080`, local: `http://localhost:8080`) |
-| `SIGNAL_CLI_NUMBER` | Simon's dedicated Signal number in E.164 format |
-| `PORT` | Server port (defaults to 3000; set automatically on Railway) |
-| `RAILWAY_PUBLIC_DOMAIN` | Public URL used when constructing webhook callback URLs |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Your Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key (bypasses RLS — keep secret) |
+| `SUPABASE_PROJECT_ID` | Yes | Project ID for type generation |
+| `ANTHROPIC_API_KEY` | Yes* | Claude API key — all agents use `claude-sonnet-4-5` |
+| `OPENROUTER_API_KEY` | Yes* | Alternative to Anthropic direct — takes priority if set |
+| `OPENROUTER_MODEL` | No | Model override when using OpenRouter (default: `anthropic/claude-sonnet-4-5`) |
+| `OPENAI_API_KEY` | Yes | Used for `text-embedding-3-small` (1536 dimensions) |
+| `DEEPGRAM_API_KEY` | Yes | Transcription via Nova-3 |
+| `TELNYX_API_KEY` | Yes | Phone call recording ingestion |
+| `TELNYX_PUBLIC_KEY` | Yes | Webhook signature verification |
+| `ZOOM_WEBHOOK_SECRET_TOKEN` | Yes | Zoom webhook verification |
+| `SIGNAL_CLI_API_URL` | Yes | signal-cli REST API URL (Railway private: `http://signal-cli.railway.internal:8080`, local: `http://localhost:8080`) |
+| `SIGNAL_CLI_NUMBER` | Yes | Simon's dedicated Signal number in E.164 format |
+| `PORT` | No | Server port (defaults to 3000; set automatically on Railway) |
+| `RAILWAY_PUBLIC_DOMAIN` | Yes | Public URL used when constructing webhook callback URLs |
+
+*Set either `ANTHROPIC_API_KEY` (direct) or `OPENROUTER_API_KEY` (OpenRouter). If both are set, `OPENROUTER_API_KEY` takes priority.
 
 ---
 
@@ -335,14 +341,14 @@ All three feed into the Recorder workflow.
 
 ### Agent server → Railway
 
-`apps/agents/railway.toml` is already configured:
+`apps/agents/railway.toml` is already configured. The build uses a multi-stage `Dockerfile` at the monorepo root (pnpm + Turborepo — no nixpacks):
 
-- **Build**: `pnpm install && pnpm --filter @platform/agents build`
+- **Build**: Docker multi-stage — installs pnpm via corepack, runs `turbo build --filter=@platform/agents...` to build workspace deps in order, produces a minimal runtime image
 - **Start**: `node dist/index.js`
 - **Health check**: `GET /health` (30s timeout)
 - **Restart policy**: on failure, max 3 retries
 
-Set all environment variables (see above) in your Railway service settings.
+Set all environment variables (see above) in your Railway service settings. Ensure the Railway service's **Root Directory** is set to the repo root (not `apps/agents/`) so the Dockerfile build context includes all workspace packages.
 
 ### Frontend → Vercel
 
