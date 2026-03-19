@@ -20,8 +20,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 │   ├── schema-changes.md  # Changelog: what changed from original schema and why
 │   └── webhooks.md
 ├── schema.sql           # Consolidated database schema (source of truth)
-├── DESIGN_BRIEF.md      # Visual design system — colours, typography, components, CSS tokens
-├── CLAUDE.md            # This file (auto-read by Claude Code)
+├── CLAUDE.md            # This file (auto-read by Claude Code) — includes design system
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
@@ -176,8 +175,8 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 ## Key Files
 
 - `schema.sql` — consolidated database schema (source of truth, run on fresh Supabase)
-- `DESIGN_BRIEF.md` — visual design system: colours, typography, components, spacing, CSS tokens. Source of truth for ALL UI implementation.
-- `docs/brand-voice.md` — brand voice, tone, terminology, Bitcoin stance. Source of truth for ALL content. References DESIGN_BRIEF for visual identity.
+- `CLAUDE.md` — this file. Also contains the design system (colours, typography, components, spacing, CSS tokens) for all UI implementation.
+- `docs/brand-voice.md` — brand voice, tone, terminology, Bitcoin stance. Source of truth for ALL content. Visual identity values are in the Visual Identity section of that file for content reference; implementation specs live in this file's Design System section.
 - `docs/schema-changes.md` — changelog: what changed from original schema and why
 - `docs/webhooks.md` — webhook endpoint specs, payloads, authentication
 - `docs/agents/*.md` — individual agent specifications
@@ -194,7 +193,7 @@ Read the relevant docs BEFORE writing code. This saves rework.
 
 | Task | Read first |
 |------|-----------|
-| Any UI component, page, or styling | `DESIGN_BRIEF.md` — colours, typography, spacing, component specs, CSS tokens |
+| Any UI component, page, or styling | `CLAUDE.md` Design System section — colours, typography, spacing, component specs, CSS tokens |
 | Content Creator agent, content tools, or draft generation | `docs/brand-voice.md` — tone, terminology, banned words, Bitcoin stance, content lengths |
 | Any agent (building, modifying, adding tools) | `docs/agents/{agent-name}.md` — triggers, capabilities, tools, schema deps, approval gates |
 | Simon specifically | `docs/agents/simon.md` — conflict detection flow, capacity awareness, morning briefing spec |
@@ -202,10 +201,52 @@ Read the relevant docs BEFORE writing code. This saves rework.
 | Database changes, new tables, migrations | `schema.sql` (source of truth) + `docs/schema-changes.md` (rationale) |
 | Shared types or enums | `packages/shared/src/types.ts` — check if type already exists before creating |
 | Supabase queries, RPC functions, vector/graph search | `packages/db/src/rpc/` — check existing wrappers before writing raw queries |
-| UI copy, empty states, labels, microcopy | `docs/brand-voice.md` (UI Microcopy Rules section) + `DESIGN_BRIEF.md` (Voice & Microcopy section) |
+| UI copy, empty states, labels, microcopy | `docs/brand-voice.md` (UI Microcopy Rules section) |
 | Email or newsletter drafts/templates | `docs/brand-voice.md` — formality level (semi-formal), length (400-800 words), required/banned terminology |
 | Anything touching Bitcoin terminology | `docs/brand-voice.md` — capital B = network/protocol, lowercase b = currency/unit. Required and banned terms lists. |
 | New agent or capability | `docs/agents/simon.md` (capacity awareness) — update `platform_capabilities` table when adding new capabilities |
 | Signal integration, Simon's messaging | `packages/signal/` (client API) + `infra/signal-cli/README.md` (deployment) |
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
+
+## Design System
+
+Source of truth for all UI implementation in `apps/web`. When building any component, page, or styling, read this section first.
+
+> **Status:** `apps/web` is not yet built. This section will be expanded with full component specs, spacing scale, and CSS token definitions as the frontend is developed. The values below are definitive — add to them here rather than creating a separate design brief file.
+
+### Colour Palette
+
+| Role | Token | Hex | Usage |
+|------|-------|-----|-------|
+| Background | `--color-bg` | `#FAFAF8` | Primary page background — warm off-white |
+| Surface | `--color-surface` | `#FFFFFF` | Cards, panels, modals |
+| Surface subtle | `--color-surface-subtle` | `#F4F4F1` | Secondary sections, input backgrounds |
+| Border | `--color-border` | `#E8E6E0` | Dividers, card borders — warm grey |
+| Text primary | `--color-text` | `#1A1915` | Headings, body — near-black with warmth |
+| Text secondary | `--color-text-secondary` | `#6B6860` | Supporting text, labels, captions |
+| Gold accent | `--color-gold` | `#C9A84C` | Primary accent — CTAs, highlights, icons |
+| Gold light | `--color-gold-light` | `#F0E4C0` | Accent backgrounds, tags, badges |
+| Gold dark | `--color-gold-dark` | `#9A7A2E` | Hover states, pressed states |
+| Success | `--color-success` | `#3D7A5E` | Positive signals, completion states |
+| Destructive | `--color-destructive` | `#B04040` | Errors, destructive actions |
+
+**Palette principle:** Warm, not cold. No pure white backgrounds (`#FFFFFF` is surface only, not background) or pure black text. Gold is a refined accent — used sparingly so it feels earned. Light mode by default; dark mode is a future consideration.
+
+### Typography
+
+| Role | Family | Usage |
+|------|--------|-------|
+| Display / Headings | `Playfair Display` (serif) | Page titles, section headings — editorial, authoritative |
+| Body / UI | `DM Sans` (geometric sans) | Body copy, labels, navigation, buttons |
+| Monospace / Data | `JetBrains Mono` | Bitcoin amounts, percentages, numerical data, code |
+
+### Aesthetic
+
+Premium asset manager meets modern software (Stripe/Linear polish). Generous whitespace, gold accents used sparingly, typography doing the heavy lifting.
+
+**Never:** Crypto-native neon, dark mode by default, rocket emojis, purple gradients, clip-art icons, stock-photo energy.
+
+### CSS Tokens
+
+Define all colours and typography as CSS custom properties on `:root`. Use token names from the table above (e.g. `var(--color-gold)`). Do not hardcode hex values in component styles.
