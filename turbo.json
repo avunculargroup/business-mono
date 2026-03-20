@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@platform/agents#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".mastra/output/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
