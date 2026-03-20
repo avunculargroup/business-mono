@@ -28,10 +28,10 @@ FROM node:20-slim AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /repo/apps/agents/dist ./dist
+COPY --from=builder /repo/apps/agents/.mastra/output ./.mastra/output
 
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import=./.mastra/output/instrumentation.mjs", ".mastra/output/index.mjs"]
