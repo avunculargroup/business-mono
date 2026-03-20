@@ -6,7 +6,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 
 ```
 ├── apps/
-│   ├── agents/          # Mastra AI agent server (Railway)
+│   ├── agents/          # Mastra AI agents server (Railway)
 │   └── web/             # Next.js frontend (Vercel) — future
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
