@@ -2,7 +2,7 @@
 
 This document is loaded by the Content Creator agent before generating any content. It is the single source of truth for brand identity, tone, style rules, and Bitcoin positioning. Stored in `brand_assets` as active records.
 
-For visual design implementation (colours, typography, components, spacing, CSS tokens), see `DESIGN_BRIEF.md` — that is the source of truth for UI. This document governs voice, tone, and content.
+For visual design implementation (colours, typography, components, spacing, CSS tokens), see the **Design System** section of `CLAUDE.md`. This document governs voice, tone, and content; the Visual Identity section below is for content reference only.
 
 ## Company Identity
 
@@ -148,7 +148,7 @@ Warren Buffett, gold maximalists (Peter Schiff, Jim Rickards, Marc Faber), Jim C
 
 ## Visual Identity
 
-The full design system is in `DESIGN_BRIEF.md`. Key values here for content reference only — DESIGN_BRIEF.md is the source of truth for implementation.
+Key values for content reference only — do not use these for UI implementation. The authoritative design system (CSS tokens, component specs, spacing) is in the **Design System** section of `CLAUDE.md`.
 
 | Role | Hex | Usage |
 |------|-----|-------|
