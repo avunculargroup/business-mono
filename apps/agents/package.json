@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "mastra dev",
     "build": "mastra build",
-    "start": "node dist/index.js",
+    "start": "node --import=./.mastra/output/instrumentation.mjs .mastra/output/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
