@@ -11,7 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@mastra/core": "^0.10.0",
+    "@mastra/core": "^0.14.0",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",

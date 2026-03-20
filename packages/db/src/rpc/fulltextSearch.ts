@@ -23,7 +23,7 @@ export async function fulltextSearch(
 
   if (error) throw new Error(`Fulltext search failed: ${error.message}`);
 
-  return (data ?? []).map((item, index) => ({
+  return ((data as FulltextSearchResult[]) ?? []).map((item, index) => ({
     id: item.id,
     title: item.title,
     summary: item.summary,

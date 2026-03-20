@@ -16,7 +16,8 @@ export async function graphTraverse(
 ): Promise<GraphTraverseResult[]> {
   const { relationshipFilter = null, maxDepth = 3 } = options;
 
-  const { data, error } = await supabase.rpc('graph_traverse', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)('graph_traverse', {
     start_item_id: startItemId,
     relationship_filter: relationshipFilter,
     max_depth: maxDepth,

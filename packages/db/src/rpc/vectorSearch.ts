@@ -16,7 +16,8 @@ export async function vectorSearch(
 ): Promise<VectorSearchResult[]> {
   const { matchThreshold = 0.7, matchCount = 10 } = options;
 
-  const { data, error } = await supabase.rpc('vector_search', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)('vector_search', {
     query_embedding: queryEmbedding,
     match_threshold: matchThreshold,
     match_count: matchCount,
