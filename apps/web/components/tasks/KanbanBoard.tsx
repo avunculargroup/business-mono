@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useOptimistic, useTransition } from 'react';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { formatRelativeDate } from '@/lib/utils';
 import styles from './KanbanBoard.module.css';
@@ -24,14 +25,31 @@ const columns = [
 
 interface KanbanBoardProps {
   tasks: TaskRow[];
-  onStatusChange: (id: string, status: string) => void;
+  onStatusChange: (id: string, status: string) => Promise<{ error?: string } | void>;
 }
 
 export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+  const [optimisticTasks, setOptimisticStatus] = useOptimistic(
+    tasks,
+    (currentTasks, { id, status }: { id: string; status: string }) =>
+      currentTasks.map((t) => (t.id === id ? { ...t, status } : t))
+  );
+
   const handleDrop = (e: React.DragEvent, newStatus: string) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('text/plain');
-    if (taskId) onStatusChange(taskId, newStatus);
+    if (!taskId) return;
+
+    setError(null);
+    startTransition(async () => {
+      setOptimisticStatus({ id: taskId, status: newStatus });
+      const result = await onStatusChange(taskId, newStatus);
+      if (result && 'error' in result && result.error) {
+        setError(result.error);
+      }
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -43,51 +61,59 @@ export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
   };
 
   return (
-    <div className={styles.board}>
-      {columns.map((col) => {
-        const colTasks = tasks.filter((t) => t.status === col.key);
-        const isCollapsed = (col.key === 'done' || col.key === 'cancelled') && colTasks.length === 0;
+    <div>
+      {error && (
+        <div className={styles.error} role="alert">
+          Failed to update: {error}
+          <button onClick={() => setError(null)} className={styles.dismissError}>Dismiss</button>
+        </div>
+      )}
+      <div className={styles.board}>
+        {columns.map((col) => {
+          const colTasks = optimisticTasks.filter((t) => t.status === col.key);
+          const isCollapsed = (col.key === 'done' || col.key === 'cancelled') && colTasks.length === 0;
 
-        if (isCollapsed) return null;
+          if (isCollapsed) return null;
 
-        return (
-          <div
-            key={col.key}
-            className={styles.column}
-            onDrop={(e) => handleDrop(e, col.key)}
-            onDragOver={handleDragOver}
-          >
-            <div className={styles.columnHeader}>
-              <span className={styles.columnLabel}>{col.label}</span>
-              <span className={styles.columnCount}>{colTasks.length}</span>
-            </div>
-            <div className={styles.cards}>
-              {colTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={styles.card}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, task.id)}
-                >
-                  <span className={styles.cardTitle}>{task.title}</span>
-                  <div className={styles.cardMeta}>
-                    <PriorityChip priority={task.priority} />
-                    {task.assigned_to && (
-                      <span className={styles.assignee}>Assigned</span>
-                    )}
-                    {task.due_date && (
-                      <span className={styles.dueDate}>{formatRelativeDate(task.due_date)}</span>
+          return (
+            <div
+              key={col.key}
+              className={styles.column}
+              onDrop={(e) => handleDrop(e, col.key)}
+              onDragOver={handleDragOver}
+            >
+              <div className={styles.columnHeader}>
+                <span className={styles.columnLabel}>{col.label}</span>
+                <span className={styles.columnCount}>{colTasks.length}</span>
+              </div>
+              <div className={styles.cards}>
+                {colTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={styles.card}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, task.id)}
+                  >
+                    <span className={styles.cardTitle}>{task.title}</span>
+                    <div className={styles.cardMeta}>
+                      <PriorityChip priority={task.priority} />
+                      {task.assigned_to && (
+                        <span className={styles.assignee}>Assigned</span>
+                      )}
+                      {task.due_date && (
+                        <span className={styles.dueDate}>{formatRelativeDate(task.due_date)}</span>
+                      )}
+                    </div>
+                    {task.contact_id && (
+                      <span className={styles.contact}>Contact linked</span>
                     )}
                   </div>
-                  {task.contact_id && (
-                    <span className={styles.contact}>Contact linked</span>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

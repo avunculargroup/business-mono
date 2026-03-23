@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { updateContentStatus } from '@/app/actions/content';
 import Link from 'next/link';
@@ -38,12 +39,27 @@ interface ContentBoardProps {
 }
 
 export function ContentBoard({ items }: ContentBoardProps) {
-  const handleDrop = async (e: React.DragEvent, newStatus: string) => {
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+  const [optimisticItems, setOptimisticStatus] = useOptimistic(
+    items,
+    (currentItems, { id, status }: { id: string; status: string }) =>
+      currentItems.map((item) => (item.id === id ? { ...item, status } : item))
+  );
+
+  const handleDrop = (e: React.DragEvent, newStatus: string) => {
     e.preventDefault();
     const itemId = e.dataTransfer.getData('text/plain');
-    if (itemId) {
-      await updateContentStatus(itemId, newStatus);
-    }
+    if (!itemId) return;
+
+    setError(null);
+    startTransition(async () => {
+      setOptimisticStatus({ id: itemId, status: newStatus });
+      const result = await updateContentStatus(itemId, newStatus);
+      if (result && 'error' in result && result.error) {
+        setError(result.error);
+      }
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -55,45 +71,53 @@ export function ContentBoard({ items }: ContentBoardProps) {
   };
 
   return (
-    <div className={styles.board}>
-      {statusColumns.map((col) => {
-        const colItems = items.filter((i) => i.status === col.key);
-        return (
-          <div
-            key={col.key}
-            className={styles.column}
-            onDrop={(e) => handleDrop(e, col.key)}
-            onDragOver={handleDragOver}
-          >
-            <div className={styles.columnHeader}>
-              <span className={styles.columnLabel}>{col.label}</span>
-              <span className={styles.columnCount}>{colItems.length}</span>
+    <div>
+      {error && (
+        <div className={styles.error} role="alert">
+          Failed to update: {error}
+          <button onClick={() => setError(null)} className={styles.dismissError}>Dismiss</button>
+        </div>
+      )}
+      <div className={styles.board}>
+        {statusColumns.map((col) => {
+          const colItems = optimisticItems.filter((i) => i.status === col.key);
+          return (
+            <div
+              key={col.key}
+              className={styles.column}
+              onDrop={(e) => handleDrop(e, col.key)}
+              onDragOver={handleDragOver}
+            >
+              <div className={styles.columnHeader}>
+                <span className={styles.columnLabel}>{col.label}</span>
+                <span className={styles.columnCount}>{colItems.length}</span>
+              </div>
+              <div className={styles.cards}>
+                {colItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/content/${item.id}`}
+                    className={styles.card}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, item.id)}
+                  >
+                    <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
+                    <div className={styles.cardMeta}>
+                      <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
+                      {item.author_id && (
+                        <span className={styles.assignee}>Assigned</span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+                {colItems.length === 0 && (
+                  <p className={styles.emptyCol}>No items</p>
+                )}
+              </div>
             </div>
-            <div className={styles.cards}>
-              {colItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/content/${item.id}`}
-                  className={styles.card}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, item.id)}
-                >
-                  <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
-                  <div className={styles.cardMeta}>
-                    <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
-                    {item.author_id && (
-                      <span className={styles.assignee}>Assigned</span>
-                    )}
-                  </div>
-                </Link>
-              ))}
-              {colItems.length === 0 && (
-                <p className={styles.emptyCol}>No items</p>
-              )}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -150,7 +150,7 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
         <KanbanBoard
           tasks={initialTasks}
           onStatusChange={async (id, status) => {
-            await updateTaskStatus(id, status);
+            return await updateTaskStatus(id, status);
           }}
         />
       )}

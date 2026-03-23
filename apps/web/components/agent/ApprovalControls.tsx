@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useOptimistic, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { approveActivity } from '@/app/actions/approvals';
 import { useToast } from '@/providers/ToastProvider';
 import styles from './ApprovalControls.module.css';
@@ -12,20 +13,32 @@ interface ApprovalControlsProps {
 
 export function ApprovalControls({ activityId }: ApprovalControlsProps) {
   const [response, setResponse] = useState('');
-  const [loading, setLoading] = useState<'approve' | 'reject' | null>(null);
+  const [, startTransition] = useTransition();
+  const [optimisticStatus, setOptimisticStatus] = useOptimistic<'pending' | 'approved' | 'rejected'>('pending');
   const { success, error } = useToast();
 
-  const handleAction = async (action: 'approved' | 'rejected') => {
-    setLoading(action === 'approved' ? 'approve' : 'reject');
-    const result = await approveActivity(activityId, action, response || undefined);
-    setLoading(null);
-
-    if (result.error) {
-      error(result.error);
-    } else {
-      success(action === 'approved' ? 'Approved' : 'Rejected');
-    }
+  const handleAction = (action: 'approved' | 'rejected') => {
+    startTransition(async () => {
+      setOptimisticStatus(action);
+      const result = await approveActivity(activityId, action, response || undefined);
+      if (result.error) {
+        error(result.error);
+      } else {
+        success(action === 'approved' ? 'Approved' : 'Rejected');
+      }
+    });
   };
+
+  if (optimisticStatus !== 'pending') {
+    return (
+      <div className={styles.controls}>
+        <StatusChip
+          label={optimisticStatus === 'approved' ? 'Approved' : 'Rejected'}
+          color={optimisticStatus === 'approved' ? 'success' : 'destructive'}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.controls}>
@@ -33,7 +46,6 @@ export function ApprovalControls({ activityId }: ApprovalControlsProps) {
         <Button
           variant="primary"
           size="sm"
-          loading={loading === 'approve'}
           onClick={() => handleAction('approved')}
         >
           Approve all
@@ -41,7 +53,6 @@ export function ApprovalControls({ activityId }: ApprovalControlsProps) {
         <Button
           variant="destructive"
           size="sm"
-          loading={loading === 'reject'}
           onClick={() => handleAction('rejected')}
         >
           Reject all

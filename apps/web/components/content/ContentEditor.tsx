@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { updateContentStatus } from '@/app/actions/content';
@@ -34,21 +34,26 @@ interface ContentEditorProps {
 
 export function ContentEditor({ item }: ContentEditorProps) {
   const [body, setBody] = useState(item.body || '');
+  const [isPending, startTransition] = useTransition();
+  const [optimisticStatus, setOptimisticStatus] = useOptimistic(item.status);
   const { success, error } = useToast();
 
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
   const charCount = body.length;
 
-  const nextStep = statusFlow[item.status];
+  const nextStep = statusFlow[optimisticStatus];
 
-  const handleAdvance = async () => {
+  const handleAdvance = () => {
     if (!nextStep) return;
-    const result = await updateContentStatus(item.id, nextStep.next);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success(`Moved to ${nextStep.next}`);
-    }
+    startTransition(async () => {
+      setOptimisticStatus(nextStep.next);
+      const result = await updateContentStatus(item.id, nextStep.next);
+      if (result.error) {
+        error(result.error);
+      } else {
+        success(`Moved to ${nextStep.next}`);
+      }
+    });
   };
 
   return (
@@ -73,7 +78,7 @@ export function ContentEditor({ item }: ContentEditorProps) {
 
         <div className={styles.field}>
           <span className={styles.label}>Status</span>
-          <StatusChip label={item.status} color="neutral" />
+          <StatusChip label={optimisticStatus} color="neutral" />
         </div>
 
         {item.scheduled_for && (
@@ -94,7 +99,7 @@ export function ContentEditor({ item }: ContentEditorProps) {
         </div>
 
         {nextStep && (
-          <Button variant="primary" size="md" onClick={handleAdvance}>
+          <Button variant="primary" size="md" onClick={handleAdvance} loading={isPending}>
             {nextStep.label}
           </Button>
         )}
