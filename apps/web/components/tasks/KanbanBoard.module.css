@@ -1,0 +1,124 @@
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--color-destructive-subtle);
+  color: var(--color-destructive);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.dismissError {
+  background: none;
+  border: none;
+  color: var(--color-destructive);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
+.board {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-4);
+}
+
+.column {
+  min-width: 240px;
+  flex: 1;
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding: 0 var(--space-1);
+}
+
+.columnLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.columnCount {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-surface);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  cursor: grab;
+  transition: box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.cardTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.assignee {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.dueDate {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.contact {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 767px) {
+  .board {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .column {
+    min-width: 0;
+  }
+}

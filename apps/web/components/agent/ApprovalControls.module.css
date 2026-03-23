@@ -1,0 +1,37 @@
+.controls {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.responseRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.responseInput {
+  flex: 1;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.responseInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.15);
+}
+
+.responseInput::placeholder {
+  color: var(--color-text-tertiary);
+}

@@ -1,0 +1,84 @@
+.layout {
+  display: grid;
+  grid-template-columns: 35fr 65fr;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  max-width: var(--content-max-width);
+}
+
+@media (max-width: 767px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.notes {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.main {
+  min-width: 0;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+
+.contactList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.contactRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contactRow:last-child { border-bottom: none; }
+.contactRow:hover { background: var(--color-surface-subtle); }
+
+.contactName {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+.contactEmail {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.empty {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}

@@ -1,0 +1,23 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .main {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+}
+
+@media (max-width: 767px) {
+  .main {
+    margin-left: 0;
+    padding-bottom: 64px;
+  }
+}

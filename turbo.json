@@ -9,6 +9,10 @@
       "dependsOn": ["^build"],
       "outputs": [".mastra/output/**"]
     },
+    "@platform/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

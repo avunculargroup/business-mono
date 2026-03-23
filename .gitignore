@@ -4,8 +4,10 @@ node_modules/
 # Build outputs
 dist/
 build/
+.next/
 .turbo/
 .mastra/
+*.tsbuildinfo
 
 # Environment
 .env
