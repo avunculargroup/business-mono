@@ -111,3 +111,14 @@
   color: var(--color-text-tertiary);
   margin-top: var(--space-1);
 }
+
+@media (max-width: 767px) {
+  .board {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .column {
+    min-width: 0;
+  }
+}

@@ -36,10 +36,12 @@
 
 .sm .panel {
   width: 400px;
+  max-width: calc(100vw - var(--space-8));
 }
 
 .md .panel {
   width: 560px;
+  max-width: calc(100vw - var(--space-8));
 }
 
 .header {
