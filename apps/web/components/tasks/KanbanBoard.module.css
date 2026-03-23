@@ -1,3 +1,24 @@
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--color-destructive-subtle);
+  color: var(--color-destructive);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.dismissError {
+  background: none;
+  border: none;
+  color: var(--color-destructive);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  text-decoration: underline;
+}
+
 .board {
   display: flex;
   gap: var(--space-4);
