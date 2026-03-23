@@ -29,6 +29,7 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 
 COPY --from=builder /repo/apps/agents/.mastra/output ./.mastra/output
+COPY --from=builder /repo/docs ./docs
 
 ENV NODE_ENV=production
 
