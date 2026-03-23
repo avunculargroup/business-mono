@@ -10,8 +10,7 @@ import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { generateEmbedding } from '../../tools/openai.js';
 import { brandLookup } from './tools.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const brandVoicePath = resolve(__dirname, '../../../../../docs/brand-voice.md');
+const brandVoicePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../docs/brand-voice.md');
 const BRAND_VOICE = readFileSync(brandVoicePath, 'utf-8');
 
 const SYSTEM_PROMPT = `You are the Content Creator for Bitcoin Treasury Solutions (BTS).
