@@ -1,0 +1,41 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--header-height));
+  position: relative;
+}
+
+.thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.newMessages {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-raised);
+}
+
+.newMessages:hover {
+  background: var(--color-accent-hover);
+}

@@ -19,6 +19,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['team_members']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['team_members']['Insert']>;
+        Relationships: [];
       };
       companies: {
         Row: {
@@ -35,6 +36,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['companies']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['companies']['Insert']>;
+        Relationships: [];
       };
       contacts: {
         Row: {
@@ -55,6 +57,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['contacts']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['contacts']['Insert']>;
+        Relationships: [];
       };
       interactions: {
         Row: {
@@ -76,6 +79,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['interactions']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['interactions']['Insert']>;
+        Relationships: [];
       };
       projects: {
         Row: {
@@ -92,6 +96,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['projects']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['projects']['Insert']>;
+        Relationships: [];
       };
       tasks: {
         Row: {
@@ -113,6 +118,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['tasks']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['tasks']['Insert']>;
+        Relationships: [];
       };
       content_items: {
         Row: {
@@ -131,6 +137,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['content_items']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['content_items']['Insert']>;
+        Relationships: [];
       };
       brand_assets: {
         Row: {
@@ -143,6 +150,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['brand_assets']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['brand_assets']['Insert']>;
+        Relationships: [];
       };
       knowledge_items: {
         Row: {
@@ -163,6 +171,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['knowledge_items']['Row'], 'id' | 'created_at' | 'updated_at' | 'fts'> & { id?: string };
         Update: Partial<Database['public']['Tables']['knowledge_items']['Insert']>;
+        Relationships: [];
       };
       knowledge_connections: {
         Row: {
@@ -176,6 +185,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['knowledge_connections']['Row'], 'id' | 'created_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['knowledge_connections']['Insert']>;
+        Relationships: [];
       };
       requirements: {
         Row: {
@@ -197,6 +207,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['requirements']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['requirements']['Insert']>;
+        Relationships: [];
       };
       risk_register: {
         Row: {
@@ -214,6 +225,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['risk_register']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['risk_register']['Insert']>;
+        Relationships: [];
       };
       reminders: {
         Row: {
@@ -229,6 +241,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['reminders']['Row'], 'id' | 'created_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['reminders']['Insert']>;
+        Relationships: [];
       };
       agent_conversations: {
         Row: {
@@ -242,6 +255,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['agent_conversations']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['agent_conversations']['Insert']>;
+        Relationships: [];
       };
       agent_activity: {
         Row: {
@@ -262,6 +276,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['agent_activity']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['agent_activity']['Insert']>;
+        Relationships: [];
       };
       platform_capabilities: {
         Row: {
@@ -277,6 +292,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['platform_capabilities']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['platform_capabilities']['Insert']>;
+        Relationships: [];
       };
       capacity_gaps: {
         Row: {
@@ -292,6 +308,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['capacity_gaps']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['capacity_gaps']['Insert']>;
+        Relationships: [];
       };
       forms: {
         Row: {
@@ -305,6 +322,7 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['forms']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['forms']['Insert']>;
+        Relationships: [];
       };
       form_submissions: {
         Row: {
@@ -317,23 +335,29 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['form_submissions']['Row'], 'id' | 'created_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['form_submissions']['Insert']>;
+        Relationships: [];
       };
     };
     Views: {
       v_open_tasks: {
         Row: Record<string, unknown>;
+        Relationships: [];
       };
       v_recent_interactions: {
         Row: Record<string, unknown>;
+        Relationships: [];
       };
       v_contacts_overview: {
         Row: Record<string, unknown>;
+        Relationships: [];
       };
       v_unresolved_capacity_gaps: {
         Row: Record<string, unknown>;
+        Relationships: [];
       };
       v_active_capabilities: {
         Row: Record<string, unknown>;
+        Relationships: [];
       };
     };
     Functions: {
