@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Agent } from '@mastra/core';
@@ -10,8 +10,20 @@ import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { generateEmbedding } from '../../tools/openai.js';
 import { brandLookup } from './tools.js';
 
-const brandVoicePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../docs/brand-voice.md');
-const BRAND_VOICE = readFileSync(brandVoicePath, 'utf-8');
+function loadBrandVoice(): string {
+  const candidates = [
+    // Dev: 5 levels up from source file reaches monorepo root
+    resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../docs/brand-voice.md'),
+    // Production: CWD is /app, docs/ copied alongside .mastra/output/
+    resolve(process.cwd(), 'docs/brand-voice.md'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return readFileSync(p, 'utf-8');
+  }
+  throw new Error(`brand-voice.md not found. Tried: ${candidates.join(', ')}`);
+}
+
+const BRAND_VOICE = loadBrandVoice();
 
 const SYSTEM_PROMPT = `You are the Content Creator for Bitcoin Treasury Solutions (BTS).
 
