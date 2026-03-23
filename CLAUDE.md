@@ -16,11 +16,12 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
 │   ├── agents/          # Individual agent specifications
-│   ├── brand-voice.md     # Brand voice, tone, terminology, Bitcoin stance (Content Creator source)
+│   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance (content source of truth)
+│   ├── design-brief.md  # UI design system — colours, typography, components, tokens, IA (web source of truth)
 │   ├── schema-changes.md  # Changelog: what changed from original schema and why
 │   └── webhooks.md
 ├── schema.sql           # Consolidated database schema (source of truth)
-├── CLAUDE.md            # This file (auto-read by Claude Code) — includes design system
+├── CLAUDE.md            # This file — architecture, routing, conventions
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
@@ -45,12 +46,14 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 - `packages/shared` imports from nothing (leaf package)
 - `apps/*` never import from each other
 
+-----
+
 ## Tech Stack
 
 - **Frontend**: Next.js (`apps/web`) → Vercel
 - **Agent Server**: Mastra AI (`apps/agents`) → Railway — TypeScript, ES2022 modules
 - **Database**: Supabase (Postgres + pgvector + RLS)
-- **Communication**: Signal CLI (Simon's dedicated number)
+- **Communication**: Signal CLI (Simon’s dedicated number)
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
@@ -72,6 +75,8 @@ Mastra requires ES2022 modules. All packages extend `tsconfig.base.json`:
 }
 ```
 
+-----
+
 ## Architecture: Hub-and-Spoke
 
 Simon is the central coordinator. All other agents are specialists. Directors interact ONLY with Simon via Signal (future: also via `apps/web`). Specialists never message humans directly.
@@ -85,40 +90,47 @@ Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
 ### Inter-agent communication rules
 
 1. **Via Simon**: Simon dispatches work to specialists and relays results to directors. Default path.
-2. **Via database events**: Some agent outputs trigger other agents implicitly (e.g. Recorder proposes tasks → PM picks them up from `agent_activity`).
-3. **Read-only knowledge queries**: Any agent can query the Archivist's knowledge base directly without going through Simon. Only direct cross-agent call allowed.
+1. **Via database events**: Some agent outputs trigger other agents implicitly (e.g. Recorder proposes tasks → PM picks them up from `agent_activity`).
+1. **Read-only knowledge queries**: Any agent can query the Archivist’s knowledge base directly without going through Simon. Only direct cross-agent call allowed.
 
 ### Capacity awareness
 
 Simon maintains awareness of what the platform can and cannot do. Before routing any directive, Simon checks for capacity gaps across four dimensions: no agent for the task, missing tool on an existing agent, workload overload on the assignee, or broken capability chain across multiple agents. When a gap is found, Simon surfaces what CAN be done, what CANNOT, and recommends alternatives (manual workaround, defer, or build new capability). Gaps are logged to `capacity_gaps` table — patterns of recurring gaps tell the directors what to build next. Simon includes unresolved gaps in the morning briefing and proactively suggests new capabilities when gap patterns emerge. See `docs/agents/simon.md` for full spec.
 
+-----
+
 ## Agent Roster
 
-| Agent | Mastra Type | Spec | Primary Domain |
-|-------|-------------|------|----------------|
-| Simon | Agent | `docs/agents/simon.md` | Orchestration, Signal interface, conflict detection, capacity awareness |
-| Recorder | Workflow + Agent | `docs/agents/recorder.md` | Transcription, entity extraction, CRM sync |
-| Archivist | Agent | `docs/agents/archivist.md` | Knowledge management, hybrid search |
-| PM | Workflow + Agent | `docs/agents/pm.md` | Projects, tasks, risk tracking |
-| BA | Agent | `docs/agents/ba.md` | Requirements analysis, clarification loops |
-| Content Creator | Agent | `docs/agents/content-creator.md` | Content drafting, iteration, brand consistency |
+|Agent          |Mastra Type     |Spec                            |Primary Domain                                                         |
+|---------------|----------------|--------------------------------|-----------------------------------------------------------------------|
+|Simon          |Agent           |`docs/agents/simon.md`          |Orchestration, Signal interface, conflict detection, capacity awareness|
+|Recorder       |Workflow + Agent|`docs/agents/recorder.md`       |Transcription, entity extraction, CRM sync                             |
+|Archivist      |Agent           |`docs/agents/archivist.md`      |Knowledge management, hybrid search                                    |
+|PM             |Workflow + Agent|`docs/agents/pm.md`             |Projects, tasks, risk tracking                                         |
+|BA             |Agent           |`docs/agents/ba.md`             |Requirements analysis, clarification loops                             |
+|Content Creator|Agent           |`docs/agents/content-creator.md`|Content drafting, iteration, brand consistency                         |
 
 ### Agent vs Workflow decision
 
 - **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator.
-- **Workflow**: Deterministic pipelines with known steps. Recorder's transcription pipeline, PM's task triage.
+- **Workflow**: Deterministic pipelines with known steps. Recorder’s transcription pipeline, PM’s task triage.
 - **Hybrid** (Workflow + Agent): Core process is a workflow, but specific steps use agent reasoning.
+
+-----
 
 ## Approval Philosophy
 
 Every agent starts with maximum guardrails. Approval workflows graduate:
+
 1. **One-at-a-time** → human confirms each action
-2. **Batch approval** → human confirms a set of proposed actions
-3. **Autonomous** → agent acts, human is notified after
+1. **Batch approval** → human confirms a set of proposed actions
+1. **Autonomous** → agent acts, human is notified after
 
 Read-only operations are always auto-approved.
 Write operations start as human-confirmed and graduate based on track record.
 Emails and public content are ALWAYS human-approved (no graduation).
+
+-----
 
 ## Database (`packages/db`)
 
@@ -133,7 +145,7 @@ Key principles:
 - Supabase client initialised in `packages/db/src/client.ts`, imported by both apps
 - Generated types from Supabase CLI: `packages/db/src/types/database.ts`
 - RPC functions (graph traversal, semantic search): `packages/db/src/rpc/`
-- Simon's capacity check uses `platform_capabilities` and `capacity_gaps` tables
+- Simon’s capacity check uses `platform_capabilities` and `capacity_gaps` tables
 
 ### Type generation
 
@@ -141,21 +153,29 @@ Key principles:
 pnpm --filter @platform/db generate-types
 ```
 
+-----
+
 ## Webhook Endpoints
 
 All specs in `docs/webhooks.md`. The Mastra server (`apps/agents`) on Railway exposes:
+
 - `/webhooks/telnyx` — phone call recordings
 - `/webhooks/zoom` — video call recordings
 - `/webhooks/deepgram` — completed transcriptions
 
+-----
+
 ## Knowledge Layer
 
 Three complementary query strategies (all within Supabase, wrapped as RPC in `packages/db`):
+
 1. **pgvector**: Semantic similarity (HNSW on VECTOR(1536))
-2. **Recursive CTEs**: Graph traversal on `knowledge_connections`
-3. **Postgres FTS**: tsvector/tsquery on `knowledge_items.raw_content`
+1. **Recursive CTEs**: Graph traversal on `knowledge_connections`
+1. **Postgres FTS**: tsvector/tsquery on `knowledge_items.raw_content`
 
 Future: pgRouting for path queries. SQL/PGQ when it lands in stable Postgres.
+
+-----
 
 ## Naming Conventions
 
@@ -168,85 +188,72 @@ Future: pgRouting for path queries. SQL/PGQ when it lands in stable Postgres.
 - **Env vars**: SCREAMING_SNAKE_CASE, prefixed by service (`TELNYX_API_KEY`)
 - **Railway internal URLs**: `http://{service-name}.railway.internal:{port}`
 
+-----
+
 ## Shared Types (`packages/shared`)
 
 Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NOT duplicate types between apps.
 
+-----
+
 ## Key Files
 
-- `schema.sql` — consolidated database schema (source of truth, run on fresh Supabase)
-- `CLAUDE.md` — this file. Also contains the design system (colours, typography, components, spacing, CSS tokens) for all UI implementation.
-- `docs/brand-voice.md` — brand voice, tone, terminology, Bitcoin stance. Source of truth for ALL content. Visual identity values are in the Visual Identity section of that file for content reference; implementation specs live in this file's Design System section.
-- `docs/schema-changes.md` — changelog: what changed from original schema and why
-- `docs/webhooks.md` — webhook endpoint specs, payloads, authentication
-- `docs/agents/*.md` — individual agent specifications
-- `packages/db/src/types/database.ts` — generated Supabase types
-- `packages/db/src/client.ts` — Supabase client initialisation
-- `packages/db/src/rpc/` — RPC wrappers for vector search, graph traversal
-- `packages/shared/src/types.ts` — shared TypeScript types and enums
-- `packages/signal/src/client.ts` — Signal CLI HTTP client
-- `infra/signal-cli/README.md` — sidecar deployment and registration instructions
+|File                               |Purpose                                                                                                        |
+|-----------------------------------|---------------------------------------------------------------------------------------------------------------|
+|`schema.sql`                       |Consolidated database schema — source of truth, run on fresh Supabase                                          |
+|`CLAUDE.md`                        |This file — architecture, routing, naming conventions                                                          |
+|`docs/design-brief.md`             |**Web UI source of truth** — colours, typography, spacing, components, CSS tokens, IA, accessibility           |
+|`docs/brand-voice.md`              |**Content source of truth** — tone, terminology, Bitcoin stance, banned words, content lengths, microcopy rules|
+|`docs/schema-changes.md`           |Schema changelog — what changed from original and why (reference, not executable)                              |
+|`docs/webhooks.md`                 |Webhook endpoint specs, payloads, authentication                                                               |
+|`docs/agents/*.md`                 |Individual agent specifications                                                                                |
+|`packages/db/src/types/database.ts`|Generated Supabase types                                                                                       |
+|`packages/db/src/client.ts`        |Supabase client initialisation                                                                                 |
+|`packages/db/src/rpc/`             |RPC wrappers for vector search, graph traversal                                                                |
+|`packages/shared/src/types.ts`     |Shared TypeScript types and enums                                                                              |
+|`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
+|`infra/signal-cli/README.md`       |Sidecar deployment and registration instructions                                                               |
 
-## When Working On...
+-----
+
+## When Working On…
 
 Read the relevant docs BEFORE writing code. This saves rework.
 
-| Task | Read first |
-|------|-----------|
-| Any UI component, page, or styling | `CLAUDE.md` Design System section — colours, typography, spacing, component specs, CSS tokens |
-| Content Creator agent, content tools, or draft generation | `docs/brand-voice.md` — tone, terminology, banned words, Bitcoin stance, content lengths |
-| Any agent (building, modifying, adding tools) | `docs/agents/{agent-name}.md` — triggers, capabilities, tools, schema deps, approval gates |
-| Simon specifically | `docs/agents/simon.md` — conflict detection flow, capacity awareness, morning briefing spec |
-| Webhook handlers or external service integration | `docs/webhooks.md` — payloads, authentication, handler logic |
-| Database changes, new tables, migrations | `schema.sql` (source of truth) + `docs/schema-changes.md` (rationale) |
-| Shared types or enums | `packages/shared/src/types.ts` — check if type already exists before creating |
-| Supabase queries, RPC functions, vector/graph search | `packages/db/src/rpc/` — check existing wrappers before writing raw queries |
-| UI copy, empty states, labels, microcopy | `docs/brand-voice.md` (UI Microcopy Rules section) |
-| Email or newsletter drafts/templates | `docs/brand-voice.md` — formality level (semi-formal), length (400-800 words), required/banned terminology |
-| Anything touching Bitcoin terminology | `docs/brand-voice.md` — capital B = network/protocol, lowercase b = currency/unit. Required and banned terms lists. |
-| New agent or capability | `docs/agents/simon.md` (capacity awareness) — update `platform_capabilities` table when adding new capabilities |
-| Signal integration, Simon's messaging | `packages/signal/` (client API) + `infra/signal-cli/README.md` (deployment) |
+|Task                                                     |Read first                                                   |Why                                                                                           |
+|---------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+|Any UI component, page, or styling                       |`docs/design-brief.md`                                       |Colours, typography, spacing, component specs, layout pattern, CSS tokens, accessibility rules|
+|Agent activity feed or approval UI                       |`docs/design-brief.md` → Agent Activity Feed section         |`--color-agent-*` tokens, feed item anatomy, approval UX spec                                 |
+|Navigation, sidebar, or app shell layout                 |`docs/design-brief.md` → Layout Pattern + Navigation sections|Sidebar width, header height, responsive breakpoints, active states                           |
+|CSS tokens or custom properties                          |`docs/design-brief.md` → Design Tokens section               |Canonical token names — do not invent new ones or use raw hex values                          |
+|UI copy, empty states, labels, microcopy                 |`docs/brand-voice.md` → UI Microcopy Rules section           |Tone, action label patterns, banned phrases                                                   |
+|Content Creator agent, content tools, or draft generation|`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
+|Any agent (building, modifying, adding tools)            |`docs/agents/{agent-name}.md`                                |Triggers, capabilities, tools, schema deps, approval gates                                    |
+|Simon specifically                                       |`docs/agents/simon.md`                                       |Conflict detection flow, capacity awareness, morning briefing spec                            |
+|Webhook handlers or external service integration         |`docs/webhooks.md`                                           |Payloads, authentication, handler logic                                                       |
+|Database changes, new tables, migrations                 |`schema.sql` + `docs/schema-changes.md`                      |Schema is source of truth; changelog explains rationale                                       |
+|Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
+|Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
+|Email or newsletter drafts/templates                     |`docs/brand-voice.md`                                        |Formality level (semi-formal), length (400–800 words), required/banned terminology            |
+|Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit. Required and banned term lists.    |
+|New agent or capability                                  |`docs/agents/simon.md` (capacity awareness)                  |Update `platform_capabilities` table when adding new capabilities                             |
+|Signal integration, Simon’s messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 
-**If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
+**If in doubt, read `docs/brand-voice.md`.** It’s the most commonly needed reference after this file.
 
-## Design System
+### Source of truth boundaries
 
-Source of truth for all UI implementation in `apps/web`. When building any component, page, or styling, read this section first.
+These two files cover adjacent territory — know which one to reach for:
 
-> **Status:** `apps/web` is not yet built. This section will be expanded with full component specs, spacing scale, and CSS token definitions as the frontend is developed. The values below are definitive — add to them here rather than creating a separate design brief file.
+|Topic                                   |Source of truth       |
+|----------------------------------------|----------------------|
+|What the platform looks like            |`docs/design-brief.md`|
+|What the platform sounds like           |`docs/brand-voice.md` |
+|CSS token names and values              |`docs/design-brief.md`|
+|Banned words in copy                    |`docs/brand-voice.md` |
+|Component states and specs              |`docs/design-brief.md`|
+|Bitcoin terminology rules               |`docs/brand-voice.md` |
+|Visual identity (colours, type, spacing)|`docs/design-brief.md`|
+|Brand personality and tone              |`docs/brand-voice.md` |
 
-### Colour Palette
-
-| Role | Token | Hex | Usage |
-|------|-------|-----|-------|
-| Background | `--color-bg` | `#FAFAF8` | Primary page background — warm off-white |
-| Surface | `--color-surface` | `#FFFFFF` | Cards, panels, modals |
-| Surface subtle | `--color-surface-subtle` | `#F4F4F1` | Secondary sections, input backgrounds |
-| Border | `--color-border` | `#E8E6E0` | Dividers, card borders — warm grey |
-| Text primary | `--color-text` | `#1A1915` | Headings, body — near-black with warmth |
-| Text secondary | `--color-text-secondary` | `#6B6860` | Supporting text, labels, captions |
-| Gold accent | `--color-gold` | `#C9A84C` | Primary accent — CTAs, highlights, icons |
-| Gold light | `--color-gold-light` | `#F0E4C0` | Accent backgrounds, tags, badges |
-| Gold dark | `--color-gold-dark` | `#9A7A2E` | Hover states, pressed states |
-| Success | `--color-success` | `#3D7A5E` | Positive signals, completion states |
-| Destructive | `--color-destructive` | `#B04040` | Errors, destructive actions |
-
-**Palette principle:** Warm, not cold. No pure white backgrounds (`#FFFFFF` is surface only, not background) or pure black text. Gold is a refined accent — used sparingly so it feels earned. Light mode by default; dark mode is a future consideration.
-
-### Typography
-
-| Role | Family | Usage |
-|------|--------|-------|
-| Display / Headings | `Playfair Display` (serif) | Page titles, section headings — editorial, authoritative |
-| Body / UI | `DM Sans` (geometric sans) | Body copy, labels, navigation, buttons |
-| Monospace / Data | `JetBrains Mono` | Bitcoin amounts, percentages, numerical data, code |
-
-### Aesthetic
-
-Premium asset manager meets modern software (Stripe/Linear polish). Generous whitespace, gold accents used sparingly, typography doing the heavy lifting.
-
-**Never:** Crypto-native neon, dark mode by default, rocket emojis, purple gradients, clip-art icons, stock-photo energy.
-
-### CSS Tokens
-
-Define all colours and typography as CSS custom properties on `:root`. Use token names from the table above (e.g. `var(--color-gold)`). Do not hardcode hex values in component styles.
+If `docs/brand-voice.md` contains visual identity values (colours, hex codes), treat them as illustrative reference only — the implementation spec lives in `docs/design-brief.md`.
