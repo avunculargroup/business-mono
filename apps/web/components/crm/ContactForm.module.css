@@ -52,3 +52,9 @@
   font-size: var(--text-sm);
   color: var(--color-destructive);
 }
+
+@media (max-width: 767px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

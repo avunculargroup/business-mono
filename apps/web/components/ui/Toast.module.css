@@ -56,6 +56,20 @@
   background: var(--color-surface-subtle);
 }
 
+@media (max-width: 767px) {
+  .container {
+    bottom: calc(var(--space-4) + 56px);
+    left: var(--space-4);
+    right: var(--space-4);
+  }
+
+  .toast {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);

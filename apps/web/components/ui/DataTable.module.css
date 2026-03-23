@@ -2,6 +2,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--color-surface);
 }
 
@@ -96,4 +98,26 @@
 .pageBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+@media (max-width: 767px) {
+  .th,
+  .td {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .table {
+    min-width: 500px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .pageControls {
+    justify-content: center;
+  }
 }
