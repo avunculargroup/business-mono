@@ -1,6 +1,6 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "apps/agents/Dockerfile"
 
 [deploy]
 startCommand = "node --import=./.mastra/output/instrumentation.mjs .mastra/output/index.mjs"
