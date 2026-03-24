@@ -2,6 +2,7 @@ import { mastra } from './mastra/index.js';
 import { handleTelnyxWebhook } from './webhooks/telnyx.js';
 import { handleZoomWebhook } from './webhooks/zoom.js';
 import { handleDeepgramWebhook } from './webhooks/deepgram.js';
+import { startWebDirectivesListener } from './listeners/webDirectives.js';
 
 // Mastra serves its own HTTP server. We augment it with custom webhook routes.
 // In Railway, PORT is set automatically.
@@ -13,5 +14,8 @@ mastra.server?.addRoute('POST', '/webhooks/zoom', handleZoomWebhook);
 mastra.server?.addRoute('POST', '/webhooks/deepgram', handleDeepgramWebhook);
 
 await mastra.start({ port });
+
+// Subscribe to web directives via Supabase Realtime (no HTTP call needed)
+startWebDirectivesListener();
 
 console.log(`Agent server running on port ${port}`);
