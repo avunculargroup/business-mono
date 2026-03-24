@@ -33,16 +33,15 @@ export async function createInteraction(formData: FormData) {
   const { error } = await supabase.from('interactions').insert({
     contact_id: data.contact_id || null,
     company_id: data.company_id || null,
-    team_member_id: user?.id || null,
+    created_by: user?.id || null,
     type: data.type,
     direction: data.direction || null,
     summary: data.summary || null,
-    transcript: data.transcript || null,
+    raw_content: data.transcript || null,
     occurred_at: data.occurred_at || new Date().toISOString(),
     extracted_data: null,
     duration_seconds: null,
     source: data.source,
-    external_id: null,
   });
 
   if (error) return { error: error.message };
