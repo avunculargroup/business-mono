@@ -9,6 +9,7 @@ import { ApprovalCard } from './ApprovalCard';
 import { ComposeArea } from './ComposeArea';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { sendDirective } from '@/app/actions/simon';
 import { Bot } from 'lucide-react';
 import styles from './SimonThread.module.css';
 
@@ -16,8 +17,42 @@ interface SimonThreadProps {
   initialItems: ThreadItem[];
 }
 
+type ConvRow = {
+  signal_chat_id: string;
+  messages: unknown;
+};
+
+function parseConversationMessages(messages: unknown): ThreadItem[] {
+  if (!Array.isArray(messages)) return [];
+  return (messages as Array<{ role: string; content: string; source?: string; timestamp?: string }>).map((m) => ({
+    type: 'message' as const,
+    data: {
+      role: (m.role === 'user' ? 'director' : 'simon') as 'director' | 'simon',
+      content: m.content,
+      source: m.source,
+      timestamp: m.timestamp ?? new Date().toISOString(),
+    },
+  }));
+}
+
+function sortItems(items: ThreadItem[]): ThreadItem[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.type === 'message' ? a.data.timestamp : (a.data.created_at ?? '');
+    const bTime = b.type === 'message' ? b.data.timestamp : (b.data.created_at ?? '');
+    return new Date(aTime).getTime() - new Date(bTime).getTime();
+  });
+}
+
 export function SimonThread({ initialItems }: SimonThreadProps) {
-  const [items, setItems] = useState(initialItems);
+  const [messageItems, setMessageItems] = useState<ThreadItem[]>(() =>
+    initialItems.filter((i) => i.type === 'message')
+  );
+  const [approvalItems, setApprovalItems] = useState<ThreadItem[]>(() =>
+    initialItems.filter((i) => i.type === 'approval')
+  );
+
+  const items = sortItems([...messageItems, ...approvalItems]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -37,23 +72,23 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     if (atBottom) setHasNew(false);
   }, []);
 
-  // Auto-scroll when new items and at bottom
+  // Auto-scroll when new items arrive and user is at bottom
   useEffect(() => {
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    } else if (items.length > initialItems.length) {
+    } else {
       setHasNew(true);
     }
-  }, [items.length, isAtBottom, initialItems.length]);
+  }, [items.length, isAtBottom]);
 
-  // Real-time subscription for new agent activity
+  // Real-time: agent_activity (approval cards)
   useRealtimeSubscription(
     'agent_activity',
     useCallback((payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         const activity = payload.new as Database['public']['Tables']['agent_activity']['Row'];
         if (activity && activity.agent_name === 'simon') {
-          setItems((prev) => {
+          setApprovalItems((prev) => {
             const filtered = prev.filter(
               (item) => !(item.type === 'approval' && item.data.id === activity.id)
             );
@@ -64,6 +99,34 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     }, []),
     'agent_name=eq.simon'
   );
+
+  // Real-time: agent_conversations (Simon's responses)
+  useRealtimeSubscription(
+    'agent_conversations',
+    useCallback((payload) => {
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        const conv = payload.new as ConvRow;
+        if (conv?.signal_chat_id === 'web') {
+          setMessageItems(parseConversationMessages(conv.messages));
+        }
+      }
+    }, []),
+    'signal_chat_id=eq.web'
+  );
+
+  // Send handler: optimistic update + server action
+  const handleSend = useCallback(async (message: string) => {
+    const optimistic: ThreadItem = {
+      type: 'message',
+      data: {
+        role: 'director',
+        content: message,
+        timestamp: new Date().toISOString(),
+      },
+    };
+    setMessageItems((prev) => [...prev, optimistic]);
+    await sendDirective(message);
+  }, []);
 
   const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -80,7 +143,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
             description="Send a directive and Simon will coordinate the right agents to get it done."
           />
         </div>
-        <ComposeArea />
+        <ComposeArea onSend={handleSend} />
       </div>
     );
   }
@@ -108,7 +171,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
         </button>
       )}
 
-      <ComposeArea />
+      <ComposeArea onSend={handleSend} />
     </div>
   );
 }
