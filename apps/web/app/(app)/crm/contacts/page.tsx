@@ -18,7 +18,7 @@ export default async function ContactsPage() {
 
   const { data: teamMembers } = await supabase
     .from('team_members')
-    .select('id, name');
+    .select('id, full_name');
 
   return (
     <>

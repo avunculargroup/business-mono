@@ -25,7 +25,7 @@ interface ContactDetailProps {
     summary: string | null;
     occurred_at: string;
     source: string | null;
-    team_members: { name: string } | null;
+    team_members: { full_name: string } | null;
   }>;
   openTaskCount: number;
 }

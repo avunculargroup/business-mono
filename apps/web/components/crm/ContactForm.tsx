@@ -8,7 +8,7 @@ import styles from './ContactForm.module.css';
 
 interface ContactFormProps {
   companies: { id: string; name: string }[];
-  teamMembers: { id: string; name: string }[];
+  teamMembers: { id: string; full_name: string }[];
   onSuccess: () => void;
 }
 
@@ -90,7 +90,7 @@ export function ContactForm({ companies, teamMembers, onSuccess }: ContactFormPr
         <label className={styles.label}>Owner</label>
         <select name="owner_id" defaultValue={user.id} className={styles.select}>
           {teamMembers.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
+            <option key={m.id} value={m.id}>{m.full_name}</option>
           ))}
         </select>
       </div>

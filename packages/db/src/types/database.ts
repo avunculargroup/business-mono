@@ -10,7 +10,7 @@ export interface Database {
       team_members: {
         Row: {
           id: string;
-          name: string;
+          full_name: string;
           email: string;
           signal_number: string | null;
           role: string | null;

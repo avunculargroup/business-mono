@@ -27,7 +27,7 @@ interface ContactsListProps {
   initialContacts: ContactRow[];
   totalCount: number;
   companies: { id: string; name: string }[];
-  teamMembers: { id: string; name: string }[];
+  teamMembers: { id: string; full_name: string }[];
 }
 
 export function ContactsList({ initialContacts, totalCount, companies, teamMembers }: ContactsListProps) {
@@ -67,7 +67,7 @@ export function ContactsList({ initialContacts, totalCount, companies, teamMembe
       width: '15%',
       render: (row) => {
         const m = teamMembers.find((tm) => tm.id === row.owner_id);
-        return m?.name || '\u2014';
+        return m?.full_name || '\u2014';
       },
     },
     {
