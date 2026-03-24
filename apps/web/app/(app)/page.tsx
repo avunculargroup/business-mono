@@ -3,8 +3,8 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { AgentActivityCard } from '@/components/agent/AgentActivityCard';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { PipelineChip } from '@/components/ui/PipelineChip';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { QuickAdd } from '@/components/dashboard/QuickAdd';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -23,6 +23,10 @@ export default async function DashboardPage() {
     { data: recentActivity },
     { data: followUpContacts },
     { data: contentCounts },
+    { data: companies },
+    { data: teamMembers },
+    { data: activeProjects },
+    { data: allContacts },
   ] = await Promise.all([
     supabase
       .from('agent_activity')
@@ -52,6 +56,10 @@ export default async function DashboardPage() {
     supabase
       .from('content_items')
       .select('status'),
+    supabase.from('companies').select('id, name').order('name'),
+    supabase.from('team_members').select('id, full_name'),
+    supabase.from('projects').select('id, name').eq('status', 'active'),
+    supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
   ]);
 
   // Count content by status
@@ -172,10 +180,12 @@ export default async function DashboardPage() {
           {/* Quick-add */}
           <Card padding="sm">
             <div className={styles.quickAdd}>
-              <Button variant="ghost" size="sm">+ Contact</Button>
-              <Button variant="ghost" size="sm">+ Task</Button>
-              <Button variant="ghost" size="sm">+ Content idea</Button>
-              <Button variant="ghost" size="sm">+ Note</Button>
+              <QuickAdd
+                companies={companies || []}
+                teamMembers={teamMembers || []}
+                projects={activeProjects || []}
+                contacts={allContacts || []}
+              />
             </div>
           </Card>
         </div>

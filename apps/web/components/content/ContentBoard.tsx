@@ -2,7 +2,11 @@
 
 import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@/components/ui/StatusChip';
+import { Button } from '@/components/ui/Button';
+import { SlideOver } from '@/components/ui/SlideOver';
+import { ContentForm } from './ContentForm';
 import { updateContentStatus } from '@/app/actions/content';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import styles from './ContentBoard.module.css';
 
@@ -38,8 +42,9 @@ interface ContentBoardProps {
   teamMembers: { id: string; full_name: string }[];
 }
 
-export function ContentBoard({ items }: ContentBoardProps) {
+export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [, startTransition] = useTransition();
   const [optimisticItems, setOptimisticStatus] = useOptimistic(
     items,
@@ -72,6 +77,12 @@ export function ContentBoard({ items }: ContentBoardProps) {
 
   return (
     <div>
+      <div className={styles.toolbar}>
+        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+          <Plus size={16} strokeWidth={1.5} />
+          New content
+        </Button>
+      </div>
       {error && (
         <div className={styles.error} role="alert">
           Failed to update: {error}
@@ -118,6 +129,23 @@ export function ContentBoard({ items }: ContentBoardProps) {
           );
         })}
       </div>
+
+      <SlideOver
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="New content"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="content-form">Save</Button>
+          </>
+        }
+      >
+        <ContentForm
+          teamMembers={teamMembers}
+          onSuccess={() => setShowCreate(false)}
+        />
+      </SlideOver>
     </div>
   );
 }
