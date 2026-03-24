@@ -38,7 +38,6 @@ export async function createContact(formData: FormData) {
     bitcoin_literacy: data.bitcoin_literacy,
     owner_id: data.owner_id || null,
     notes: data.notes || null,
-    signal_number: null,
     source: data.source || 'manual',
   });
 
