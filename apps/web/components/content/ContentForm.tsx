@@ -49,7 +49,7 @@ export function ContentForm({ teamMembers, onSuccess }: ContentFormProps) {
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Author</label>
-          <select name="author_id" defaultValue={user.id} className={styles.select}>
+          <select name="created_by" defaultValue={user.id} className={styles.select}>
             <option value="">None</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
