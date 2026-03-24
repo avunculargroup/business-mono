@@ -45,7 +45,6 @@ export interface Database {
           last_name: string;
           email: string | null;
           phone: string | null;
-          signal_number: string | null;
           company_id: string | null;
           pipeline_stage: string;
           bitcoin_literacy: string;
