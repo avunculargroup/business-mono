@@ -52,7 +52,7 @@ export function ProjectForm({ teamMembers, onSuccess }: ProjectFormProps) {
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Owner</label>
-          <select name="owner_id" defaultValue={user.id} className={styles.select}>
+          <select name="created_by" defaultValue={user.id} className={styles.select}>
             <option value="">None</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
