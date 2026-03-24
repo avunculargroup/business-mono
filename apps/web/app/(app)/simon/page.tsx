@@ -12,11 +12,11 @@ export type ThreadItem =
 export default async function SimonPage() {
   const supabase = await createClient();
 
-  // Fetch Simon conversations
+  // Fetch Simon conversations (web channel uses signal_chat_id = 'web')
   const { data: conversations } = await supabase
     .from('agent_conversations')
     .select('*')
-    .eq('agent_name', 'simon')
+    .eq('signal_chat_id', 'web')
     .order('updated_at', { ascending: false })
     .limit(1);
 
