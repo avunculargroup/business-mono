@@ -1,3 +1,9 @@
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-6) 0;
+}
+
 .error {
   display: flex;
   align-items: center;
