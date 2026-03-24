@@ -26,10 +26,12 @@ export function startWebDirectivesListener(): void {
       'postgres_changes' as never,
       { event: '*', schema: 'public', table: 'agent_conversations' },
       async (payload: { eventType: string; new: ConvRow }) => {
+        console.log('[web-directives] Received event:', payload.eventType);
         if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
         const conv = payload.new;
         if (conv.signal_chat_id !== 'web') return;
+        console.log('[web-directives] Processing web conversation:', conv.id);
 
         const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
         const lastMessage = messages[messages.length - 1];
@@ -78,7 +80,10 @@ export function startWebDirectivesListener(): void {
         }
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      console.log('[web-directives] Subscription status:', status);
+      if (err) console.error('[web-directives] Subscription error:', err);
+    });
 
   console.log('Listening for web directives via Supabase Realtime');
 }
