@@ -83,6 +83,10 @@ export function startWebDirectivesListener(): void {
     .subscribe((status, err) => {
       console.log('[web-directives] Subscription status:', status);
       if (err) console.error('[web-directives] Subscription error:', err);
+      if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+        console.log('[web-directives] Reconnecting in 5s...');
+        setTimeout(() => startWebDirectivesListener(), 5000);
+      }
     });
 
   console.log('Listening for web directives via Supabase Realtime');
