@@ -44,20 +44,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
     if (error) return { success: false, error: error.message };
   }
 
-  // Trigger Simon agent — fire and forget so the UI doesn't wait
-  const agentsUrl = process.env['AGENTS_URL'] ?? 'http://localhost:3000';
-  const agentsApiKey = process.env['AGENTS_API_KEY'] ?? '';
-
-  fetch(`${agentsUrl}/api/simon/directive`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': agentsApiKey,
-    },
-    body: JSON.stringify({ message: trimmed }),
-  }).catch((err: unknown) => {
-    console.error('[sendDirective] Failed to trigger Simon agent:', err);
-  });
-
+  // The agents server listens to agent_conversations via Supabase Realtime
+  // and will trigger Simon automatically — nothing more needed here.
   return { success: true };
 }
