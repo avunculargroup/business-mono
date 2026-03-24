@@ -10,7 +10,7 @@ const contentSchema = z.object({
   body: z.string().optional(),
   status: z.string().default('idea'),
   scheduled_for: z.string().optional(),
-  author_id: z.string().uuid().optional().or(z.literal('')),
+  created_by: z.string().uuid().optional().or(z.literal('')),
 });
 
 export async function createContent(formData: FormData) {
@@ -27,10 +27,8 @@ export async function createContent(formData: FormData) {
     body: data.body || null,
     status: data.status,
     scheduled_for: data.scheduled_for || null,
-    author_id: data.author_id || null,
-    published_at: null,
-    knowledge_item_ids: null,
-    iteration_count: 0,
+    created_by: data.created_by || null,
+    source: 'manual',
   });
 
   if (error) return { error: error.message };
