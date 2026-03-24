@@ -30,7 +30,7 @@ interface TasksViewProps {
   initialTasks: TaskRow[];
   totalCount: number;
   projects: { id: string; name: string }[];
-  teamMembers: { id: string; name: string }[];
+  teamMembers: { id: string; full_name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
 }
 
@@ -81,7 +81,7 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
       width: '12%',
       render: (row) => {
         const m = teamMembers.find((tm) => tm.id === row.assigned_to);
-        return m?.name || '\u2014';
+        return m?.full_name || '\u2014';
       },
     },
     {

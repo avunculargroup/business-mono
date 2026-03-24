@@ -8,7 +8,7 @@ import styles from '@/components/crm/ContactForm.module.css';
 
 interface TaskFormProps {
   projects: { id: string; name: string }[];
-  teamMembers: { id: string; name: string }[];
+  teamMembers: { id: string; full_name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
   onSuccess: () => void;
 }
@@ -68,7 +68,7 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess }: TaskFor
           <label className={styles.label}>Assigned to</label>
           <select name="assigned_to" defaultValue={user.id} className={styles.select}>
             {teamMembers.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
+              <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>
         </div>
