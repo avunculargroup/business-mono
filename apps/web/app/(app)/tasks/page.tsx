@@ -18,7 +18,7 @@ export default async function TasksPage() {
 
   const { data: teamMembers } = await supabase
     .from('team_members')
-    .select('id, name');
+    .select('id, full_name');
 
   const { data: contacts } = await supabase
     .from('contacts')
