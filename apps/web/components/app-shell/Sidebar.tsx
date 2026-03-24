@@ -113,8 +113,8 @@ export function Sidebar({ pendingCount }: SidebarProps) {
             <span className={styles.navLabel}>Settings</span>
           </Link>
           <div className={styles.userRow}>
-            <div className={styles.avatar}>{getInitials(user.name)}</div>
-            <span className={styles.userName}>{user.name}</span>
+            <div className={styles.avatar}>{getInitials(user.full_name)}</div>
+            <span className={styles.userName}>{user.full_name}</span>
             <form action={logout}>
               <button type="submit" className={styles.signOut} title="Sign out">
                 <LogOut size={16} strokeWidth={1.5} />

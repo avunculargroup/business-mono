@@ -35,7 +35,7 @@ const typeColors: Record<string, 'accent' | 'success' | 'warning' | 'neutral'> =
 
 interface ContentBoardProps {
   items: ContentItem[];
-  teamMembers: { id: string; name: string }[];
+  teamMembers: { id: string; full_name: string }[];
 }
 
 export function ContentBoard({ items }: ContentBoardProps) {
