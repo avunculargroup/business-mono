@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ContentBoard } from '@/components/content/ContentBoard';
-import { Button } from '@/components/ui/Button';
-import { Plus } from 'lucide-react';
 
 export default async function ContentPage() {
   const supabase = await createClient();
@@ -18,12 +16,7 @@ export default async function ContentPage() {
 
   return (
     <>
-      <PageHeader title="Content Pipeline">
-        <Button variant="primary" size="sm">
-          <Plus size={16} strokeWidth={1.5} />
-          New content
-        </Button>
-      </PageHeader>
+      <PageHeader title="Content Pipeline" />
       <ContentBoard items={items || []} teamMembers={teamMembers || []} />
     </>
   );
