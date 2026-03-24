@@ -102,9 +102,15 @@ export const notifySpecialist = createTool({
         agent_name: 'simon',
         action: `Dispatch to ${ctx.agentName}: ${ctx.message}`,
         status: 'auto',
-        trigger_type: 'signal_message',
+        trigger_type: 'manual',
+        workflow_run_id: null,
+        entity_type: null,
+        entity_id: null,
         proposed_actions: [{ agent: ctx.agentName, message: ctx.message, context: ctx.context }],
-      } as never)
+        approved_actions: null,
+        clarifications: null,
+        notes: null,
+      })
       .select()
       .single();
 

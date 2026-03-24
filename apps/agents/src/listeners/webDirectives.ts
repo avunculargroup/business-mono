@@ -65,7 +65,14 @@ export function startWebDirectivesListener(): void {
             action: `Web directive: ${lastMessage.content.slice(0, 120)}`,
             status: 'auto',
             trigger_type: 'manual',
-          } as never);
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: null,
+            clarifications: null,
+            notes: null,
+          });
         } catch (err) {
           console.error('[web-directives] Simon processing error:', err);
         }
