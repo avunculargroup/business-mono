@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/utils';
 
 type TeamMemberRow = {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   role: string | null;
   signal_number: string | null;
@@ -19,14 +19,14 @@ export default async function TeamSettingsPage() {
   const { data: members } = await supabase
     .from('team_members')
     .select('*')
-    .order('name');
+    .order('full_name');
 
   const columns: Column<TeamMemberRow>[] = [
     {
       key: 'name',
       header: 'Name',
       width: '25%',
-      render: (row) => <span style={{ fontWeight: 500 }}>{row.name}</span>,
+      render: (row) => <span style={{ fontWeight: 500 }}>{row.full_name}</span>,
     },
     {
       key: 'email',
