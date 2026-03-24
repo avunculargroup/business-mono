@@ -478,6 +478,10 @@ CREATE TABLE agent_activity (
   workflow_run_id   TEXT,
   parent_activity_id UUID REFERENCES agent_activity(id) ON DELETE SET NULL,
 
+  -- Entity the action touched (for conflict detection)
+  entity_type       TEXT,
+  entity_id         TEXT,
+
   proposed_actions  JSONB DEFAULT '[]',
   approved_actions  JSONB DEFAULT '[]',
 
@@ -487,7 +491,10 @@ CREATE TABLE agent_activity (
   clarifications    JSONB DEFAULT '[]',
   -- Shape: [{ question, answer, resolved_at }]
 
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  notes             TEXT,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_agent_activity_agent ON agent_activity(agent_name);

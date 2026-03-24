@@ -31,8 +31,9 @@ export const logActivity = createTool({
         entity_id: context.entityId ?? null,
         proposed_actions: context.proposedActions ?? null,
         approved_actions: context.approvedActions ?? null,
+        clarifications: null,
         notes: context.notes ?? null,
-      } as never)
+      })
       .select()
       .single();
 
