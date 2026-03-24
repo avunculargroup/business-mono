@@ -1,5 +1,6 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 
 const WEB_CHAT_ID = 'web';
@@ -25,7 +26,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
   };
 
   if (conv?.id) {
-    const messages = [...((conv.messages as unknown[]) ?? []), directorMessage];
+    const messages = [...((conv.messages as Json[]) ?? []), directorMessage as Json];
     const { error } = await supabase
       .from('agent_conversations')
       .update({ messages, last_message_at: new Date().toISOString() })
