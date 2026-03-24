@@ -5,7 +5,11 @@ import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import styles from './ComposeArea.module.css';
 
-export function ComposeArea() {
+interface ComposeAreaProps {
+  onSend: (message: string) => Promise<void>;
+}
+
+export function ComposeArea({ onSend }: ComposeAreaProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -14,15 +18,15 @@ export function ComposeArea() {
     if (!message.trim() || sending) return;
     setSending(true);
 
-    // TODO: Implement server action to send directive to Simon
-    // For now, just clear the message
+    const text = message;
     setMessage('');
-    setSending(false);
-
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [message, sending]);
+
+    await onSend(text);
+    setSending(false);
+  }, [message, sending, onSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
