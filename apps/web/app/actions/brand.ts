@@ -26,7 +26,7 @@ export async function createBrandAsset(formData: FormData) {
     description: data.description || null,
     content: data.content || null,
     created_by: user?.id || null,
-  });
+  } as never);
 
   if (error) return { error: error.message };
 
