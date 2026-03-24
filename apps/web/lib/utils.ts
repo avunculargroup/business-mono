@@ -1,5 +1,4 @@
-export function getInitials(name: string | null | undefined): string {
-  if (!name) return '?';
+export function getInitials(name: string): string {
   return name
     .split(' ')
     .map((part) => part[0])
