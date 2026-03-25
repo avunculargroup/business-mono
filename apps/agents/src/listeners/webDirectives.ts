@@ -16,20 +16,39 @@ type ConvRow = {
   messages: unknown;
 };
 
+// Module-level state so reconnect logic is properly deduped across calls
+let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleReconnect(): void {
+  // Guard: only one reconnect timer at a time
+  if (reconnectTimer !== null) return;
+  console.log('[web-directives] Reconnecting in 5s...');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startWebDirectivesListener();
+  }, 5000);
+}
+
 /**
  * Subscribes to agent_conversations via Supabase Realtime.
  * When a new user message arrives on the web thread, Simon processes it
  * and writes the response back — no HTTP call between services needed.
  */
 export function startWebDirectivesListener(): void {
-  // Remove any existing channel with this name before (re)subscribing to avoid
-  // duplicate channel name collisions that cause TIMED_OUT loops.
-  const existing = supabase.getChannels().find((ch) => ch.topic === 'realtime:web-directives');
-  if (existing) {
-    void supabase.removeChannel(existing);
+  // Cancel any pending reconnect
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
 
-  supabase
+  // Clean up existing channel before creating a new one
+  if (currentChannel !== null) {
+    void supabase.removeChannel(currentChannel);
+    currentChannel = null;
+  }
+
+  currentChannel = supabase
     .channel('web-directives')
     .on(
       'postgres_changes' as never,
@@ -92,8 +111,11 @@ export function startWebDirectivesListener(): void {
       if (status === 'SUBSCRIBED') {
         console.log('Listening for web directives via Supabase Realtime');
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-        console.log('[web-directives] Reconnecting in 5s...');
-        setTimeout(() => startWebDirectivesListener(), 5000);
+        scheduleReconnect();
+      } else if (status === 'CLOSED') {
+        // CLOSED fires after TIMED_OUT tears down the channel — scheduleReconnect
+        // is a no-op if a timer is already pending, preventing duplicate reconnects.
+        scheduleReconnect();
       }
     });
 }
