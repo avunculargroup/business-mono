@@ -1,0 +1,171 @@
+import { supabase } from '@platform/db';
+import { pmAgent } from '../agents/pm/agent.js';
+import { pmWorkflow } from '../agents/pm/workflow.js';
+
+type ProposedAction = {
+  agent: string;
+  message: string;
+  context?: Record<string, unknown>;
+};
+
+type ActivityRow = {
+  id: string;
+  proposed_actions: unknown;
+};
+
+type WorkflowInput = {
+  title: string;
+  description?: string;
+  sourceActivityId?: string;
+  suggestedProjectId?: string;
+  suggestedAssignee?: string;
+  suggestedDueDate?: string;
+  suggestedPriority?: 'low' | 'medium' | 'high' | 'urgent';
+};
+
+// Module-level state so reconnect logic is properly deduped across calls
+let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleReconnect(): void {
+  if (reconnectTimer !== null) return;
+  console.log('[pm-listener] Reconnecting in 5s...');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startPMListener();
+  }, 5000);
+}
+
+/**
+ * Uses pmAgent to parse a free-text dispatch message into the structured
+ * input expected by pmWorkflow.
+ */
+async function parseDispatchToWorkflowInput(
+  message: string,
+  sourceActivityId: string,
+  context?: Record<string, unknown>,
+): Promise<WorkflowInput> {
+  const prompt = `Parse this task directive into structured fields for the PM workflow.
+
+Directive: ${message}
+${context ? `Additional context: ${JSON.stringify(context)}` : ''}
+
+Return ONLY a JSON object with these fields:
+{
+  "title": "short task title (required)",
+  "description": "fuller description (optional)",
+  "suggestedProjectId": "UUID if mentioned, else null",
+  "suggestedAssignee": "agent or person name if mentioned, else null",
+  "suggestedDueDate": "ISO date string if mentioned, else null",
+  "suggestedPriority": "low | medium | high | urgent — infer from tone/urgency, default medium"
+}`;
+
+  const result = await pmAgent.generate([{ role: 'user', content: prompt }]);
+
+  let parsed: Record<string, unknown> = { title: message.slice(0, 120) };
+  try {
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+  } catch { /* fall back to defaults */ }
+
+  return {
+    title: (parsed['title'] as string | undefined) ?? message.slice(0, 120),
+    description: (parsed['description'] as string | undefined) ?? undefined,
+    sourceActivityId,
+    suggestedProjectId: (parsed['suggestedProjectId'] as string | undefined) ?? undefined,
+    suggestedAssignee: (parsed['suggestedAssignee'] as string | undefined) ?? undefined,
+    suggestedDueDate: (parsed['suggestedDueDate'] as string | undefined) ?? undefined,
+    suggestedPriority: (parsed['suggestedPriority'] as WorkflowInput['suggestedPriority']) ?? undefined,
+  };
+}
+
+/**
+ * Subscribes to agent_activity via Supabase Realtime.
+ * When Simon dispatches to pm, parses the free-text message into structured
+ * workflow input and executes pmWorkflow.
+ */
+export function startPMListener(): void {
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  if (currentChannel !== null) {
+    void supabase.removeChannel(currentChannel);
+    currentChannel = null;
+  }
+
+  currentChannel = supabase
+    .channel('pm-dispatches')
+    .on(
+      'postgres_changes' as never,
+      { event: 'INSERT', schema: 'public', table: 'agent_activity' },
+      async (payload: { new: ActivityRow }) => {
+        const row = payload.new;
+        const proposed = Array.isArray(row.proposed_actions)
+          ? (row.proposed_actions as ProposedAction[])
+          : [];
+
+        const dispatch = proposed.find((a) => a.agent === 'pm');
+        if (!dispatch) return;
+
+        console.log(`[pm-listener] Dispatch received from activity ${row.id}`);
+
+        let workflowInput: WorkflowInput;
+        try {
+          workflowInput = await parseDispatchToWorkflowInput(
+            dispatch.message,
+            row.id,
+            dispatch.context,
+          );
+        } catch (err) {
+          console.error('[pm-listener] Failed to parse dispatch:', err);
+          await supabase.from('agent_activity').insert({
+            agent_name: 'pm',
+            action: `Error parsing dispatch from activity ${row.id}: ${String(err)}`,
+            status: 'error',
+            trigger_type: 'agent',
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: null,
+            clarifications: null,
+            notes: null,
+          });
+          return;
+        }
+
+        try {
+          const run = await pmWorkflow.execute({ inputData: workflowInput });
+          console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, run);
+        } catch (err) {
+          console.error('[pm-listener] PM workflow error:', err);
+          await supabase.from('agent_activity').insert({
+            agent_name: 'pm',
+            action: `Error executing workflow for dispatch from activity ${row.id}: ${String(err)}`,
+            status: 'error',
+            trigger_type: 'agent',
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: null,
+            clarifications: null,
+            notes: null,
+          });
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      console.log('[pm-listener] Subscription status:', status);
+      if (err) console.error('[pm-listener] Subscription error:', err);
+      if (status === 'SUBSCRIBED') {
+        console.log('Listening for PM dispatches via Supabase Realtime');
+      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+        scheduleReconnect();
+      } else if (status === 'CLOSED') {
+        scheduleReconnect();
+      }
+    });
+}
