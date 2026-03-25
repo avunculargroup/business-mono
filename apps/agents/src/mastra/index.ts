@@ -10,6 +10,7 @@ import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
 import { startWebDirectivesListener } from '../listeners/webDirectives.js';
+import { startSignalListener } from '../listeners/signalListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -37,3 +38,6 @@ export const mastra = new Mastra({
 
 // Start Supabase Realtime listener for web directives
 startWebDirectivesListener();
+
+// Start Signal polling loop
+startSignalListener();
