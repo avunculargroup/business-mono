@@ -620,7 +620,7 @@ CREATE POLICY "reminders_all" ON reminders
   FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "agent_conversations_all" ON agent_conversations
-  FOR ALL USING (auth.role() = 'authenticated');
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "agent_activity_all" ON agent_activity
   FOR ALL USING (auth.role() = 'authenticated');
