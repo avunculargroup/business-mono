@@ -6,6 +6,12 @@ Add an entry here whenever you modify `schema.sql`. Format: date, what changed, 
 
 ---
 
+## 2026-03-25 — Fix agent_conversations RLS policy for Supabase Realtime
+
+- **`agent_conversations_all` policy** — added `'service_role'` to the `auth.role()` check. Standard Supabase API calls bypass RLS when using the `service_role` key, but `postgres_changes` Realtime subscriptions perform their own authorization check using the JWT claim. `auth.role()` returns `'service_role'` for that key, which the `= 'authenticated'`-only policy rejected — causing the Realtime subscription to hang silently until timeout and never reach `SUBSCRIBED`.
+
+---
+
 ## 2026-03-19 — Initial schema
 
 Consolidated schema established. Key design decisions:

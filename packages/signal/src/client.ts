@@ -83,9 +83,21 @@ export class SignalClient {
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
+
     const connect = (): void => {
       if (stopped) return;
       ws = new WebSocket(`${wsUrl}/v1/receive/${encodeURIComponent(account)}`);
+
+      ws.addEventListener('open', () => {
+        // Send a ping every 30s to keep the connection alive through Railway's
+        // TCP idle timeout and any intermediate proxy/load-balancer timeouts.
+        pingInterval = setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.ping();
+          }
+        }, 30_000);
+      });
 
       ws.addEventListener('message', (event: MessageEvent) => {
         try {
@@ -103,6 +115,10 @@ export class SignalClient {
       });
 
       ws.addEventListener('close', () => {
+        if (pingInterval !== null) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
         ws = null;
         if (!stopped) {
           reconnectTimer = setTimeout(connect, 5_000);
@@ -117,6 +133,10 @@ export class SignalClient {
       if (reconnectTimer !== null) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
+      }
+      if (pingInterval !== null) {
+        clearInterval(pingInterval);
+        pingInterval = null;
       }
       ws?.close();
       ws = null;
