@@ -14,6 +14,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
     autoRefreshToken: false,
   },
   realtime: {
-    timeout: 30000,
+    timeout: 60000,
+    params: {
+      heartbeatIntervalMs: 15000,
+    },
   },
 });
