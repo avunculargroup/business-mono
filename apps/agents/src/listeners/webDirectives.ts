@@ -10,7 +10,9 @@ type ConvMessage = {
 
 type ConvRow = {
   id: string;
-  signal_chat_id: string;
+  thread_id: string;
+  agent_name: string;
+  participant_signal: string | null;
   messages: unknown;
 };
 
@@ -30,7 +32,7 @@ export function startWebDirectivesListener(): void {
         if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
         const conv = payload.new;
-        if (conv.signal_chat_id !== 'web') return;
+        if (conv.thread_id !== 'web') return;
         console.log('[web-directives] Processing web conversation:', conv.id);
 
         const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
@@ -56,10 +58,7 @@ export function startWebDirectivesListener(): void {
 
           await supabase
             .from('agent_conversations')
-            .update({
-              messages: [...messages, simonMessage],
-              last_message_at: new Date().toISOString(),
-            })
+            .update({ messages: [...messages, simonMessage] })
             .eq('id', conv.id);
 
           await supabase.from('agent_activity').insert({

@@ -9,7 +9,7 @@ const projectSchema = z.object({
   description: z.string().optional(),
   status: z.string().default('active'),
   priority: z.string().default('medium'),
-  created_by: z.string().uuid().optional().or(z.literal('')),
+  owner_id: z.string().uuid().optional().or(z.literal('')),
   target_date: z.string().optional(),
 });
 
@@ -26,8 +26,9 @@ export async function createProject(formData: FormData) {
     description: data.description || null,
     status: data.status,
     priority: data.priority,
-    created_by: data.created_by || null,
+    owner_id: data.owner_id || null,
     target_date: data.target_date || null,
+    completed_at: null,
   });
 
   if (error) return { error: error.message };

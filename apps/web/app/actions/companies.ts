@@ -31,6 +31,7 @@ export async function createCompany(formData: FormData) {
     website: data.website || null,
     linkedin_url: data.linkedin_url || null,
     notes: data.notes || null,
+    source: 'web',
   });
 
   if (error) return { error: error.message };

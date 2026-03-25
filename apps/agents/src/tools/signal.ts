@@ -1,12 +1,8 @@
 import { createTool } from '@mastra/core';
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import { SignalClient } from '@platform/signal';
 
-const execFileAsync = promisify(execFile);
-
-const SIGNAL_CLI = process.env['SIGNAL_CLI_PATH'] ?? 'signal-cli';
-const SIGNAL_NUMBER = process.env['SIGNAL_PHONE_NUMBER'] ?? '';
+const client = new SignalClient();
 
 export const signalSend = createTool({
   id: 'signal_send',
@@ -16,15 +12,11 @@ export const signalSend = createTool({
     message: z.string().describe('Message body to send'),
   }),
   execute: async ({ context }) => {
-    const { stdout, stderr } = await execFileAsync(SIGNAL_CLI, [
-      '-u', SIGNAL_NUMBER,
-      'send',
-      '-m', context.message,
-      context.recipient,
-    ]);
-
-    if (stderr) console.error('signal-cli stderr:', stderr);
-    return { sent: true, output: stdout };
+    const result = await client.sendMessage({
+      recipients: [context.recipient],
+      message: context.message,
+    });
+    return { sent: true, timestamp: result.timestamp };
   },
 });
 
@@ -33,21 +25,7 @@ export const signalReceive = createTool({
   description: 'Receive pending Signal messages',
   inputSchema: z.object({}),
   execute: async () => {
-    const { stdout } = await execFileAsync(SIGNAL_CLI, [
-      '-u', SIGNAL_NUMBER,
-      'receive',
-      '--output=json',
-    ]);
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const messages = lines.map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    }).filter(Boolean);
-
+    const messages = await client.receiveMessages();
     return { messages };
   },
 });
