@@ -1,4 +1,5 @@
 import { supabase } from '@platform/db';
+import type { CoreMessage } from 'ai';
 import { simon } from '../agents/simon/index.js';
 
 type ConvMessage = {
@@ -41,8 +42,8 @@ export function startWebDirectivesListener(): void {
         if (!lastMessage || lastMessage.role !== 'user') return;
 
         try {
-          const messagesForSimon = messages.map((m) => ({
-            role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+          const messagesForSimon: CoreMessage[] = messages.map((m) => ({
+            role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
             content: m.content,
           }));
 
