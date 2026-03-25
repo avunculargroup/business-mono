@@ -1,6 +1,7 @@
 import { SignalClient } from '@platform/signal';
 import type { IncomingMessage } from '@platform/signal';
 import { supabase } from '@platform/db';
+import type { CoreMessage } from 'ai';
 import { simon } from '../agents/simon/index.js';
 
 const client = new SignalClient();
@@ -63,8 +64,8 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   // Generate Simon's response
   let responseText: string;
   try {
-    const messagesForSimon = updatedMessages.map((m) => ({
-      role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+    const messagesForSimon: CoreMessage[] = updatedMessages.map((m) => ({
+      role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
       content: m.content,
     }));
 
