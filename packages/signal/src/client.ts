@@ -63,6 +63,63 @@ export class SignalClient {
     return this.request<IncomingMessage[]>('GET', `/v1/receive/${encodeURIComponent(this.account)}`);
   }
 
+  /**
+   * Subscribe to incoming Signal messages via WebSocket (required for json-rpc mode).
+   * The callback is called for each message as it arrives. Automatically reconnects
+   * on connection loss. Returns a cleanup function that stops the subscription.
+   */
+  subscribe(
+    onMessage: (msg: IncomingMessage) => Promise<void> | void,
+    onError?: (err: Error) => void,
+  ): () => void {
+    const wsUrl = this.baseUrl
+      .replace(/^http:\/\//, 'ws://')
+      .replace(/^https:\/\//, 'wss://');
+    const account = this.account;
+    let stopped = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = (): void => {
+      if (stopped) return;
+      ws = new WebSocket(`${wsUrl}/v1/receive/${encodeURIComponent(account)}`);
+
+      ws.addEventListener('message', (event: MessageEvent<string>) => {
+        try {
+          const msg = JSON.parse(event.data) as IncomingMessage;
+          Promise.resolve(onMessage(msg)).catch((err: unknown) => {
+            onError?.(err instanceof Error ? err : new Error(String(err)));
+          });
+        } catch (err) {
+          onError?.(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+
+      ws.addEventListener('error', () => {
+        onError?.(new Error('Signal WebSocket connection error'));
+      });
+
+      ws.addEventListener('close', () => {
+        ws = null;
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 5_000);
+        }
+      });
+    };
+
+    connect();
+
+    return () => {
+      stopped = true;
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      ws?.close();
+      ws = null;
+    };
+  }
+
   async listGroups(): Promise<SignalGroup[]> {
     return this.request<SignalGroup[]>('GET', `/v1/groups/${encodeURIComponent(this.account)}`);
   }
