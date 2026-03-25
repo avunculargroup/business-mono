@@ -245,10 +245,11 @@ export interface Database {
       agent_conversations: {
         Row: {
           id: string;
-          thread_id: string;
-          agent_name: string;
-          participant_signal: string | null;
+          signal_chat_id: string;
+          thread_type: string;
+          participant_ids: string[] | null;
           messages: Json;
+          last_message_at: string | null;
           created_at: string;
           updated_at: string;
         };

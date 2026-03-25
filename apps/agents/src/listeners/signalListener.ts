@@ -28,16 +28,15 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   let { data: conv } = await supabase
     .from('agent_conversations')
     .select('id, messages')
-    .eq('participant_signal', senderNumber)
+    .eq('signal_chat_id', senderNumber)
     .single();
 
   if (!conv) {
     const { data: created, error } = await supabase
       .from('agent_conversations')
       .insert({
-        thread_id: senderNumber,
-        agent_name: 'simon',
-        participant_signal: senderNumber,
+        signal_chat_id: senderNumber,
+        thread_type: 'direct',
         messages: [],
       })
       .select('id, messages')
