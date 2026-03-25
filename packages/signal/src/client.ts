@@ -11,6 +11,8 @@ import type {
   SignalContact,
   ReactionParams,
   AttachmentParams,
+  UpdateProfileParams,
+  ProfileInfo,
 } from './types.js';
 
 export class SignalClient {
@@ -146,6 +148,20 @@ export class SignalClient {
       base64_attachments: [
         `${params.contentType}:${params.filename}:${params.base64Attachment}`,
       ],
+    });
+  }
+
+  async getProfile(): Promise<ProfileInfo> {
+    return this.request<ProfileInfo>('GET', `/v1/profiles/${encodeURIComponent(this.account)}`);
+  }
+
+  async updateProfile(params: UpdateProfileParams): Promise<void> {
+    await this.request<void>('PUT', `/v1/profiles/${encodeURIComponent(this.account)}`, {
+      name: params.name,
+      ...(params.familyName !== undefined ? { family_name: params.familyName } : {}),
+      ...(params.about !== undefined ? { about: params.about } : {}),
+      ...(params.aboutEmoji !== undefined ? { about_emoji: params.aboutEmoji } : {}),
+      ...(params.base64Avatar !== undefined ? { base64_avatar: params.base64Avatar } : {}),
     });
   }
 }

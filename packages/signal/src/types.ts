@@ -62,3 +62,18 @@ export interface AttachmentParams {
   filename: string;
   contentType: string;
 }
+
+export interface UpdateProfileParams {
+  name?: string;           // given name (Signal API requires name even for partial updates)
+  familyName?: string;
+  about?: string;          // max ~140 chars
+  aboutEmoji?: string;     // single emoji
+  base64Avatar?: string;   // pre-encoded PNG/JPG
+}
+
+export interface ProfileInfo {
+  name?: string;
+  familyName?: string;
+  about?: string;
+  aboutEmoji?: string;
+}
