@@ -10,9 +10,8 @@ type ConvMessage = {
 
 type ConvRow = {
   id: string;
-  thread_id: string;
-  agent_name: string;
-  participant_signal: string | null;
+  signal_chat_id: string;
+  thread_type: string;
   messages: unknown;
 };
 
@@ -32,7 +31,7 @@ export function startWebDirectivesListener(): void {
         if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
         const conv = payload.new;
-        if (conv.thread_id !== 'web') return;
+        if (conv.signal_chat_id !== 'web') return;
         console.log('[web-directives] Processing web conversation:', conv.id);
 
         const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];

@@ -245,14 +245,15 @@ export interface Database {
       agent_conversations: {
         Row: {
           id: string;
-          thread_id: string;
-          agent_name: string;
-          participant_signal: string | null;
+          signal_chat_id: string;
+          thread_type: string;
+          participant_ids: string[] | null;
           messages: Json;
+          last_message_at: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['agent_conversations']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string };
+        Insert: Omit<Database['public']['Tables']['agent_conversations']['Row'], 'id' | 'created_at' | 'updated_at' | 'participant_ids' | 'last_message_at'> & { id?: string; participant_ids?: string[] | null; last_message_at?: string | null };
         Update: Partial<Database['public']['Tables']['agent_conversations']['Insert']>;
         Relationships: [];
       };
