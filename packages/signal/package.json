@@ -17,10 +17,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@platform/shared": "workspace:*"
+    "@platform/shared": "workspace:*",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.5"
   }
 }
