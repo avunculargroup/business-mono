@@ -3,7 +3,7 @@
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 
-const WEB_CHAT_ID = 'web';
+const WEB_THREAD_ID = 'web';
 
 export async function sendDirective(message: string): Promise<{ success: boolean; error?: string }> {
   const trimmed = message.trim();
@@ -15,7 +15,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
   const { data: conv } = await supabase
     .from('agent_conversations')
     .select('id, messages')
-    .eq('signal_chat_id', WEB_CHAT_ID)
+    .eq('thread_id', WEB_THREAD_ID)
     .maybeSingle();
 
   const directorMessage = {
@@ -29,19 +29,18 @@ export async function sendDirective(message: string): Promise<{ success: boolean
     const messages = [...((conv.messages as Json[]) ?? []), directorMessage as Json];
     const { error } = await supabase
       .from('agent_conversations')
-      .update({ messages, last_message_at: new Date().toISOString() })
+      .update({ messages })
       .eq('id', conv.id);
     if (error) return { success: false, error: error.message };
   } else {
     const { error } = await supabase
       .from('agent_conversations')
       .insert({
-        signal_chat_id: WEB_CHAT_ID,
-        thread_type: 'direct',
-        participant_ids: [],
+        thread_id: WEB_THREAD_ID,
+        agent_name: 'simon',
+        participant_signal: null,
         messages: [directorMessage],
-        last_message_at: new Date().toISOString(),
-      } as never);
+      });
     if (error) return { success: false, error: error.message };
   }
 

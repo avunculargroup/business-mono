@@ -37,15 +37,16 @@ async function poll(): Promise<void> {
       let { data: conv } = await supabase
         .from('agent_conversations')
         .select('id, messages')
-        .eq('signal_chat_id', senderNumber)
+        .eq('participant_signal', senderNumber)
         .single();
 
       if (!conv) {
         const { data: created, error } = await supabase
           .from('agent_conversations')
           .insert({
-            signal_chat_id: senderNumber,
-            thread_type: 'direct',
+            thread_id: senderNumber,
+            agent_name: 'simon',
+            participant_signal: senderNumber,
             messages: [],
           })
           .select('id, messages')
@@ -101,10 +102,7 @@ async function poll(): Promise<void> {
       // Persist conversation
       await supabase
         .from('agent_conversations')
-        .update({
-          messages: [...updatedMessages, simonMessage],
-          last_message_at: new Date().toISOString(),
-        })
+        .update({ messages: [...updatedMessages, simonMessage] })
         .eq('id', conv.id);
 
       // Audit log
