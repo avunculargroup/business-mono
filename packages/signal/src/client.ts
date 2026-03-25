@@ -1,6 +1,7 @@
 // Wraps signal-cli REST API (bbernhard/signal-cli-rest-api)
 // Base URL from env: SIGNAL_CLI_API_URL (default: http://signal-cli.railway.internal:8080)
 
+import WebSocket, { type MessageEvent } from 'ws';
 import type {
   SendMessageParams,
   SendGroupMessageParams,
@@ -84,9 +85,9 @@ export class SignalClient {
       if (stopped) return;
       ws = new WebSocket(`${wsUrl}/v1/receive/${encodeURIComponent(account)}`);
 
-      ws.addEventListener('message', (event: MessageEvent<string>) => {
+      ws.addEventListener('message', (event: MessageEvent) => {
         try {
-          const msg = JSON.parse(event.data) as IncomingMessage;
+          const msg = JSON.parse(event.data.toString()) as IncomingMessage;
           Promise.resolve(onMessage(msg)).catch((err: unknown) => {
             onError?.(err instanceof Error ? err : new Error(String(err)));
           });
