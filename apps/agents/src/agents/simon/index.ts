@@ -3,6 +3,7 @@ import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
+import { editSimonProfile } from '../../tools/edit-simon-profile.js';
 import {
   conflictCheck,
   capacityCheck,
@@ -70,6 +71,9 @@ When asked for a morning briefing, query:
 ### 8. URL intake
 When a director shares a URL, route it to the Archivist for processing.
 
+### 9. Profile updates
+When asked to update your Signal profile (name, bio, emoji, or avatar), use the edit_simon_profile tool. For direct human instructions, execute immediately and confirm what changed. For agent-proposed changes, present as an approval card first and wait for explicit human approval before executing.
+
 ## Memory
 You maintain conversation threads in agent_conversations. Each Signal conversation has its own thread_id. Always query conversation history before responding to maintain context.
 
@@ -104,5 +108,6 @@ export const simon = new Agent({
     email_draft: emailDraft,
     create_reminder: createReminder,
     web_search: webSearch,
+    edit_simon_profile: editSimonProfile,
   },
 });
