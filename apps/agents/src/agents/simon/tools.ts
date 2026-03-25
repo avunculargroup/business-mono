@@ -73,9 +73,8 @@ export const logCapacityGap = createTool({
       .from('capacity_gaps')
       .insert({
         gap_type: context.gapType as CapacityGapType,
-        description: context.description,
-        directive: context.directive ?? null,
-        agent_name: context.agentName ?? null,
+        directive_summary: context.directive ?? context.description,
+        details: context.description ?? null,
         resolved: false,
       } as never)
       .select()
@@ -92,7 +91,7 @@ export const notifySpecialist = createTool({
   inputSchema: z.object({
     agentName: z.enum(['recorder', 'archivist', 'pm', 'ba', 'content_creator']),
     message: z.string().describe('Instruction or context to send to the specialist'),
-    context: z.record(z.unknown()).optional().describe('Additional structured context'),
+    additionalContext: z.record(z.unknown()).optional().describe('Additional structured context'),
   }),
   execute: async ({ context: ctx }) => {
     // Log the dispatch to agent_activity
@@ -106,7 +105,7 @@ export const notifySpecialist = createTool({
         workflow_run_id: null,
         entity_type: null,
         entity_id: null,
-        proposed_actions: [{ agent: ctx.agentName, message: ctx.message, context: ctx.context }],
+        proposed_actions: [{ agent: ctx.agentName, message: ctx.message, context: ctx.additionalContext }],
         approved_actions: null,
         clarifications: null,
         notes: null,
