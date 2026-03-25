@@ -12,6 +12,8 @@ import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
 import { startWebDirectivesListener } from '../listeners/webDirectives.js';
 import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
+import { startBAListener } from '../listeners/baListener.js';
+import { startPMListener } from '../listeners/pmListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -45,3 +47,9 @@ startSignalListener();
 
 // Start Supabase Realtime listener for Content Creator dispatches
 startContentCreatorListener();
+
+// Start Supabase Realtime listener for BA dispatches
+startBAListener();
+
+// Start Supabase Realtime listener for PM dispatches
+startPMListener();
