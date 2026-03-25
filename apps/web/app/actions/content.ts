@@ -27,7 +27,10 @@ export async function createContent(formData: FormData) {
     body: data.body || null,
     status: data.status,
     scheduled_for: data.scheduled_for || null,
+    published_at: null,
     author_id: data.author_id || null,
+    knowledge_item_ids: null,
+    iteration_count: 0,
   });
 
   if (error) return { error: error.message };
