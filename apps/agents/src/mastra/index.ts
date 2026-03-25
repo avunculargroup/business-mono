@@ -11,6 +11,7 @@ import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
 import { startWebDirectivesListener } from '../listeners/webDirectives.js';
 import { startSignalListener } from '../listeners/signalListener.js';
+import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -41,3 +42,6 @@ startWebDirectivesListener();
 
 // Start Signal polling loop
 startSignalListener();
+
+// Start Supabase Realtime listener for Content Creator dispatches
+startContentCreatorListener();
