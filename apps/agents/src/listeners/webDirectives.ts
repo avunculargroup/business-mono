@@ -22,6 +22,13 @@ type ConvRow = {
  * and writes the response back — no HTTP call between services needed.
  */
 export function startWebDirectivesListener(): void {
+  // Remove any existing channel with this name before (re)subscribing to avoid
+  // duplicate channel name collisions that cause TIMED_OUT loops.
+  const existing = supabase.getChannels().find((ch) => ch.topic === 'realtime:web-directives');
+  if (existing) {
+    void supabase.removeChannel(existing);
+  }
+
   supabase
     .channel('web-directives')
     .on(
@@ -82,11 +89,11 @@ export function startWebDirectivesListener(): void {
     .subscribe((status, err) => {
       console.log('[web-directives] Subscription status:', status);
       if (err) console.error('[web-directives] Subscription error:', err);
-      if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+      if (status === 'SUBSCRIBED') {
+        console.log('Listening for web directives via Supabase Realtime');
+      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
         console.log('[web-directives] Reconnecting in 5s...');
         setTimeout(() => startWebDirectivesListener(), 5000);
       }
     });
-
-  console.log('Listening for web directives via Supabase Realtime');
 }
