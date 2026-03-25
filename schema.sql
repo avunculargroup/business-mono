@@ -463,6 +463,9 @@ CREATE TRIGGER agent_conversations_updated_at
 
 CREATE INDEX idx_agent_conv_chat ON agent_conversations(signal_chat_id);
 
+ALTER TABLE agent_conversations REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
+
 
 -- Audit trail for all agent actions
 CREATE TABLE agent_activity (

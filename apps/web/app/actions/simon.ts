@@ -15,7 +15,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
   const { data: conv } = await supabase
     .from('agent_conversations')
     .select('id, messages')
-    .eq('thread_id', WEB_THREAD_ID)
+    .eq('signal_chat_id', WEB_THREAD_ID)
     .maybeSingle();
 
   const directorMessage = {
@@ -36,9 +36,8 @@ export async function sendDirective(message: string): Promise<{ success: boolean
     const { error } = await supabase
       .from('agent_conversations')
       .insert({
-        thread_id: WEB_THREAD_ID,
-        agent_name: 'simon',
-        participant_signal: null,
+        signal_chat_id: WEB_THREAD_ID,
+        thread_type: 'direct',
         messages: [directorMessage],
       });
     if (error) return { success: false, error: error.message };
