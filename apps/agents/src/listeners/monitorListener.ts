@@ -7,9 +7,9 @@ async function runMonitorCheck(mastra: Mastra): Promise<void> {
   console.log('[monitor-listener] Running scheduled monitor check...');
 
   try {
-    const { start } = mastra.getWorkflow('monitorResearch').createRun();
-    const run = await start({ inputData: { triggered_at: new Date().toISOString() } });
-    console.log('[monitor-listener] Monitor check completed:', run);
+    const run = await mastra.getWorkflow('monitorResearch').createRunAsync();
+    const result = await run.start({ inputData: { triggered_at: new Date().toISOString() } });
+    console.log('[monitor-listener] Monitor check completed:', result);
   } catch (err) {
     console.error('[monitor-listener] Monitor check error:', err);
   }
