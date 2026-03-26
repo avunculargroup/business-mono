@@ -21,3 +21,6 @@ build/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Supabase
+supabase/.temp/
