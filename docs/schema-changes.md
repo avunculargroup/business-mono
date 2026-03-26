@@ -6,6 +6,13 @@ Add an entry here whenever you modify `schema.sql`. Format: date, what changed, 
 
 ---
 
+## 2026-03-26 — Fix Realtime RLS policies and add created_at to v_open_tasks
+
+- **`agent_conversations_all` + `agent_activity_all` policies** — migration `002` applies the `service_role` fix (recorded in the 2026-03-25 entry) that was added to `schema.sql` but never deployed as a migration. Without this, all `postgres_changes` Realtime subscriptions hang at TIMED_OUT because the Realtime server rejects the service_role JWT via `auth.role() = 'authenticated'`-only policies.
+- **`v_open_tasks` view** — added `t.created_at` to the SELECT list. Simon's `supabase_query` tool orders this view by `created_at`; the missing column caused a hard error on every capacity-check query.
+
+---
+
 ## 2026-03-26 — Add research_monitors table for Researcher agent
 
 - **`research_monitors` table** — stores scheduled research monitoring topics for the Researcher agent. Each monitor has a `subject`, an array of `search_queries` to run on each check, a `frequency` (daily/weekly/fortnightly), and a `last_digest` field storing a prose summary of the previous result for semantic change comparison. The `notify_signal` and `notify_agent` fields control how changes are surfaced. Supports the Researcher's `purpose: 'monitor'` workflow — a cron-triggered process queries due monitors, runs web searches, and compares current findings against the prior digest to detect material changes.

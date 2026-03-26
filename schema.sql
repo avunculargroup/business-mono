@@ -688,6 +688,7 @@ CREATE VIEW v_open_tasks AS
     t.reminder_at,
     t.source,
     t.parent_task_id,
+    t.created_at,
     tm.full_name AS assigned_to_name,
     c.first_name || ' ' || c.last_name AS related_contact_name,
     p.name AS project_name
