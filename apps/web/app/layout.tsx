@@ -2,8 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'BTS Internal Platform',
-  description: 'Bitcoin Treasury Solutions — Internal Operations Platform',
+  title: 'BTS HQ - Internal Operations',
+  description: 'BTS HQ - Internal Operations',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

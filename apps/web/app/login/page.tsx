@@ -14,7 +14,7 @@ function LoginForm() {
 
   return (
     <div className={styles.card}>
-      <h1 className={styles.cardTitle}>Internal Platform</h1>
+      <h1 className={styles.cardTitle}>Internal Operations</h1>
       <form action={formAction}>
         <input type="hidden" name="redirect" value={redirectTo} />
         <div className={styles.field}>
@@ -54,7 +54,7 @@ export default function LoginPage() {
       <div>
         <div className={styles.logo}>
           <BtsLogo size={48} />
-          <div className={styles.logoMark}>BTS</div>
+          <div className={styles.logoMark}>Headquarters</div>
           <div className={styles.logoCaption}>Bitcoin Treasury Solutions</div>
         </div>
         <Suspense fallback={<div className={styles.card}><h1 className={styles.cardTitle}>Loading...</h1></div>}>
