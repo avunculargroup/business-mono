@@ -147,9 +147,9 @@ export function startPMListener(mastra: Mastra): void {
         }
 
         try {
-          const { start } = mastra.getWorkflow('pm').createRun();
-          const run = await start({ inputData: workflowInput });
-          console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, run);
+          const run = await mastra.getWorkflow('pm').createRunAsync();
+          const result = await run.start({ inputData: workflowInput });
+          console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, result);
         } catch (err) {
           console.error('[pm-listener] PM workflow error:', err);
           await supabase.from('agent_activity').insert({
