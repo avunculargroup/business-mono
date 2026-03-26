@@ -1,11 +1,17 @@
 -- ============================================================
--- INTERNAL BUSINESS PLATFORM — SUPABASE SCHEMA v2
--- Bitcoin Treasury Training & Consulting
+-- INITIAL SCHEMA MIGRATION
 -- ============================================================
--- READ-ONLY REFERENCE — do not execute directly against a live database.
--- Execution source of truth: supabase/migrations/
--- Migrations are applied automatically on push to main via .github/workflows/migrate.yml
--- Keep this file up to date as a consolidated human-readable snapshot.
+-- This migration captures the full schema as established on 2026-03-19.
+-- It is written idempotently so it can be applied to an existing database
+-- that was previously set up via the manual schema.sql approach.
+--
+-- Idempotency strategy:
+--   Tables:   CREATE TABLE IF NOT EXISTS
+--   Indexes:  CREATE INDEX IF NOT EXISTS
+--   Triggers: CREATE OR REPLACE TRIGGER (Postgres 14+)
+--   Views:    CREATE OR REPLACE VIEW
+--   Policies: DROP POLICY IF EXISTS + CREATE POLICY
+--   Other:    Exception handlers where needed
 -- ============================================================
 
 
@@ -34,7 +40,7 @@ $$ LANGUAGE plpgsql;
 -- TEAM MEMBERS
 -- ============================================================
 
-CREATE TABLE team_members (
+CREATE TABLE IF NOT EXISTS team_members (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name     TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'founder',
@@ -47,7 +53,7 @@ CREATE TABLE team_members (
 -- CRM
 -- ============================================================
 
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
   industry      TEXT,
@@ -61,12 +67,12 @@ CREATE TABLE companies (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER companies_updated_at
+CREATE OR REPLACE TRIGGER companies_updated_at
   BEFORE UPDATE ON companies
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 
-CREATE TABLE contacts (
+CREATE TABLE IF NOT EXISTS contacts (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id      UUID REFERENCES companies(id) ON DELETE SET NULL,
   first_name      TEXT NOT NULL,
@@ -92,16 +98,16 @@ CREATE TABLE contacts (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER contacts_updated_at
+CREATE OR REPLACE TRIGGER contacts_updated_at
   BEFORE UPDATE ON contacts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_contacts_company ON contacts(company_id);
-CREATE INDEX idx_contacts_pipeline ON contacts(pipeline_stage);
-CREATE INDEX idx_contacts_owner ON contacts(owner_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_company  ON contacts(company_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_pipeline ON contacts(pipeline_stage);
+CREATE INDEX IF NOT EXISTS idx_contacts_owner    ON contacts(owner_id);
 
 
-CREATE TABLE interactions (
+CREATE TABLE IF NOT EXISTS interactions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id      UUID REFERENCES contacts(id) ON DELETE CASCADE,
   company_id      UUID REFERENCES companies(id) ON DELETE SET NULL,
@@ -128,20 +134,20 @@ CREATE TABLE interactions (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER interactions_updated_at
+CREATE OR REPLACE TRIGGER interactions_updated_at
   BEFORE UPDATE ON interactions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_interactions_contact ON interactions(contact_id);
-CREATE INDEX idx_interactions_occurred ON interactions(occurred_at DESC);
-CREATE INDEX idx_interactions_type ON interactions(type);
+CREATE INDEX IF NOT EXISTS idx_interactions_contact  ON interactions(contact_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_occurred ON interactions(occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interactions_type     ON interactions(type);
 
 
 -- ============================================================
 -- TASKS & PROJECTS
 -- ============================================================
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name              TEXT NOT NULL,
   description       TEXT,
@@ -156,12 +162,12 @@ CREATE TABLE projects (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER projects_updated_at
+CREATE OR REPLACE TRIGGER projects_updated_at
   BEFORE UPDATE ON projects
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id            UUID REFERENCES projects(id) ON DELETE SET NULL,
   parent_task_id        UUID REFERENCES tasks(id) ON DELETE SET NULL,
@@ -192,22 +198,22 @@ CREATE TABLE tasks (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER tasks_updated_at
+CREATE OR REPLACE TRIGGER tasks_updated_at
   BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_tasks_assigned ON tasks(assigned_to);
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_due ON tasks(due_date);
-CREATE INDEX idx_tasks_project ON tasks(project_id);
-CREATE INDEX idx_tasks_parent ON tasks(parent_task_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned  ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_status    ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due       ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_project   ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent    ON tasks(parent_task_id);
 
 
 -- ============================================================
 -- CONTENT PIPELINE
 -- ============================================================
 
-CREATE TABLE content_items (
+CREATE TABLE IF NOT EXISTS content_items (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title           TEXT,
   body            TEXT,
@@ -234,19 +240,19 @@ CREATE TABLE content_items (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER content_items_updated_at
+CREATE OR REPLACE TRIGGER content_items_updated_at
   BEFORE UPDATE ON content_items
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_content_status ON content_items(status);
-CREATE INDEX idx_content_type ON content_items(type);
+CREATE INDEX IF NOT EXISTS idx_content_status ON content_items(status);
+CREATE INDEX IF NOT EXISTS idx_content_type   ON content_items(type);
 
 
 -- ============================================================
 -- BRAND HUB
 -- ============================================================
 
-CREATE TABLE brand_assets (
+CREATE TABLE IF NOT EXISTS brand_assets (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
   type          TEXT NOT NULL
@@ -261,7 +267,7 @@ CREATE TABLE brand_assets (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER brand_assets_updated_at
+CREATE OR REPLACE TRIGGER brand_assets_updated_at
   BEFORE UPDATE ON brand_assets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
@@ -270,7 +276,7 @@ CREATE TRIGGER brand_assets_updated_at
 -- KNOWLEDGE BASE (Archivist)
 -- ============================================================
 
-CREATE TABLE knowledge_items (
+CREATE TABLE IF NOT EXISTS knowledge_items (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title             TEXT NOT NULL,
   source_url        TEXT,
@@ -292,20 +298,20 @@ CREATE TABLE knowledge_items (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER knowledge_items_updated_at
+CREATE OR REPLACE TRIGGER knowledge_items_updated_at
   BEFORE UPDATE ON knowledge_items
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_knowledge_items_embedding ON knowledge_items USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_knowledge_items_fts ON knowledge_items USING gin(fts);
-CREATE INDEX idx_knowledge_items_stance ON knowledge_items(stance);
-CREATE INDEX idx_knowledge_items_source_type ON knowledge_items(source_type);
-CREATE INDEX idx_knowledge_items_topic_tags ON knowledge_items USING gin(topic_tags);
+CREATE INDEX IF NOT EXISTS idx_knowledge_items_embedding   ON knowledge_items USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_knowledge_items_fts         ON knowledge_items USING gin(fts);
+CREATE INDEX IF NOT EXISTS idx_knowledge_items_stance      ON knowledge_items(stance);
+CREATE INDEX IF NOT EXISTS idx_knowledge_items_source_type ON knowledge_items(source_type);
+CREATE INDEX IF NOT EXISTS idx_knowledge_items_topic_tags  ON knowledge_items USING gin(topic_tags);
 
 
 -- Graph edges — adjacency list for recursive CTE traversal
 -- Future-compatible with pgRouting (source/target/cost) and SQL/PGQ (VERTEX/EDGE)
-CREATE TABLE knowledge_connections (
+CREATE TABLE IF NOT EXISTS knowledge_connections (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source_item_id    UUID NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
   target_item_id    UUID NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
@@ -317,16 +323,16 @@ CREATE TABLE knowledge_connections (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_kc_source ON knowledge_connections(source_item_id);
-CREATE INDEX idx_kc_target ON knowledge_connections(target_item_id);
-CREATE INDEX idx_kc_relationship ON knowledge_connections(relationship);
+CREATE INDEX IF NOT EXISTS idx_kc_source       ON knowledge_connections(source_item_id);
+CREATE INDEX IF NOT EXISTS idx_kc_target       ON knowledge_connections(target_item_id);
+CREATE INDEX IF NOT EXISTS idx_kc_relationship ON knowledge_connections(relationship);
 
 
 -- ============================================================
 -- FORMS
 -- ============================================================
 
-CREATE TABLE forms (
+CREATE TABLE IF NOT EXISTS forms (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
   slug          TEXT UNIQUE NOT NULL,
@@ -338,12 +344,12 @@ CREATE TABLE forms (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER forms_updated_at
+CREATE OR REPLACE TRIGGER forms_updated_at
   BEFORE UPDATE ON forms
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 
-CREATE TABLE form_submissions (
+CREATE TABLE IF NOT EXISTS form_submissions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   form_id       UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
   data          JSONB NOT NULL DEFAULT '{}',
@@ -352,15 +358,15 @@ CREATE TABLE form_submissions (
   contact_id    UUID REFERENCES contacts(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_form_submissions_form ON form_submissions(form_id);
-CREATE INDEX idx_form_submissions_submitted ON form_submissions(submitted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_form      ON form_submissions(form_id);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_submitted ON form_submissions(submitted_at DESC);
 
 
 -- ============================================================
 -- REQUIREMENTS (BA Agent)
 -- ============================================================
 
-CREATE TABLE requirements (
+CREATE TABLE IF NOT EXISTS requirements (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id            UUID REFERENCES projects(id) ON DELETE SET NULL,
   task_id               UUID REFERENCES tasks(id) ON DELETE SET NULL,
@@ -381,19 +387,19 @@ CREATE TABLE requirements (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER requirements_updated_at
+CREATE OR REPLACE TRIGGER requirements_updated_at
   BEFORE UPDATE ON requirements
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_requirements_project ON requirements(project_id);
-CREATE INDEX idx_requirements_status ON requirements(status);
+CREATE INDEX IF NOT EXISTS idx_requirements_project ON requirements(project_id);
+CREATE INDEX IF NOT EXISTS idx_requirements_status  ON requirements(status);
 
 
 -- ============================================================
 -- RISK REGISTER (PM Agent)
 -- ============================================================
 
-CREATE TABLE risk_register (
+CREATE TABLE IF NOT EXISTS risk_register (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id      UUID REFERENCES projects(id) ON DELETE SET NULL,
   title           TEXT NOT NULL,
@@ -409,19 +415,19 @@ CREATE TABLE risk_register (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER risk_register_updated_at
+CREATE OR REPLACE TRIGGER risk_register_updated_at
   BEFORE UPDATE ON risk_register
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_risk_project ON risk_register(project_id);
-CREATE INDEX idx_risk_status ON risk_register(status);
+CREATE INDEX IF NOT EXISTS idx_risk_project ON risk_register(project_id);
+CREATE INDEX IF NOT EXISTS idx_risk_status  ON risk_register(status);
 
 
 -- ============================================================
 -- REMINDERS (Simon, Recorder)
 -- ============================================================
 
-CREATE TABLE reminders (
+CREATE TABLE IF NOT EXISTS reminders (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title              TEXT NOT NULL,
   description        TEXT,
@@ -437,8 +443,8 @@ CREATE TABLE reminders (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_reminders_remind_at ON reminders(remind_at) WHERE status = 'pending';
-CREATE INDEX idx_reminders_assigned ON reminders(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_reminders_assigned  ON reminders(assigned_to);
 
 
 -- ============================================================
@@ -446,7 +452,7 @@ CREATE INDEX idx_reminders_assigned ON reminders(assigned_to);
 -- ============================================================
 
 -- Conversation threads between Simon and directors
-CREATE TABLE agent_conversations (
+CREATE TABLE IF NOT EXISTS agent_conversations (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   signal_chat_id  TEXT NOT NULL,
   thread_type     TEXT NOT NULL CHECK (thread_type IN ('group', 'direct')),
@@ -458,25 +464,32 @@ CREATE TABLE agent_conversations (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER agent_conversations_updated_at
+CREATE OR REPLACE TRIGGER agent_conversations_updated_at
   BEFORE UPDATE ON agent_conversations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_agent_conv_chat ON agent_conversations(signal_chat_id);
+CREATE INDEX IF NOT EXISTS idx_agent_conv_chat ON agent_conversations(signal_chat_id);
 
 ALTER TABLE agent_conversations REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- table already in publication, nothing to do
+END;
+$$;
 
 
 -- Audit trail for all agent actions
-CREATE TABLE agent_activity (
+CREATE TABLE IF NOT EXISTS agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name        TEXT NOT NULL,
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
+                    CHECK (status IN ('pending', 'approved', 'rejected', 'auto')),
 
-  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled', 'agent')),
+  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled')),
   trigger_ref       TEXT,
 
   workflow_run_id   TEXT,
@@ -501,21 +514,14 @@ CREATE TABLE agent_activity (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_agent_activity_agent ON agent_activity(agent_name);
-CREATE INDEX idx_agent_activity_status ON agent_activity(status);
-CREATE INDEX idx_agent_activity_created ON agent_activity(created_at DESC);
-CREATE INDEX idx_agent_activity_parent ON agent_activity(parent_activity_id);
-
-CREATE TRIGGER agent_activity_updated_at
-  BEFORE UPDATE ON agent_activity
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-ALTER TABLE agent_activity REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
+CREATE INDEX IF NOT EXISTS idx_agent_activity_agent   ON agent_activity(agent_name);
+CREATE INDEX IF NOT EXISTS idx_agent_activity_status  ON agent_activity(status);
+CREATE INDEX IF NOT EXISTS idx_agent_activity_created ON agent_activity(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_activity_parent  ON agent_activity(parent_activity_id);
 
 
 -- Registry of what the platform can do (Simon's capacity awareness)
-CREATE TABLE platform_capabilities (
+CREATE TABLE IF NOT EXISTS platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name      TEXT NOT NULL,
   capability      TEXT NOT NULL,
@@ -528,16 +534,16 @@ CREATE TABLE platform_capabilities (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER platform_capabilities_updated_at
+CREATE OR REPLACE TRIGGER platform_capabilities_updated_at
   BEFORE UPDATE ON platform_capabilities
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_capabilities_agent ON platform_capabilities(agent_name);
-CREATE INDEX idx_capabilities_status ON platform_capabilities(status);
+CREATE INDEX IF NOT EXISTS idx_capabilities_agent  ON platform_capabilities(agent_name);
+CREATE INDEX IF NOT EXISTS idx_capabilities_status ON platform_capabilities(status);
 
 
 -- Log of directives Simon couldn't fully fulfil
-CREATE TABLE capacity_gaps (
+CREATE TABLE IF NOT EXISTS capacity_gaps (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   directive_summary   TEXT NOT NULL,
   gap_type            TEXT NOT NULL
@@ -550,15 +556,15 @@ CREATE TABLE capacity_gaps (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_capacity_gaps_resolved ON capacity_gaps(resolved) WHERE resolved = FALSE;
-CREATE INDEX idx_capacity_gaps_type ON capacity_gaps(gap_type);
+CREATE INDEX IF NOT EXISTS idx_capacity_gaps_resolved ON capacity_gaps(resolved) WHERE resolved = FALSE;
+CREATE INDEX IF NOT EXISTS idx_capacity_gaps_type     ON capacity_gaps(gap_type);
 
 
 -- ============================================================
 -- RESEARCH MONITORS
 -- ============================================================
 
-CREATE TABLE research_monitors (
+CREATE TABLE IF NOT EXISTS research_monitors (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subject         TEXT NOT NULL,
   context         TEXT,
@@ -576,11 +582,11 @@ CREATE TABLE research_monitors (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER research_monitors_updated_at
+CREATE OR REPLACE TRIGGER research_monitors_updated_at
   BEFORE UPDATE ON research_monitors
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_research_monitors_next_run ON research_monitors(next_run_at)
+CREATE INDEX IF NOT EXISTS idx_research_monitors_next_run ON research_monitors(next_run_at)
   WHERE is_active = TRUE;
 
 
@@ -610,6 +616,29 @@ ALTER TABLE capacity_gaps         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_monitors     ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated team members can read and write everything
+-- Using DROP + CREATE for idempotency (CREATE POLICY IF NOT EXISTS not supported in Postgres)
+DROP POLICY IF EXISTS "team_members_all"           ON team_members;
+DROP POLICY IF EXISTS "companies_all"              ON companies;
+DROP POLICY IF EXISTS "contacts_all"               ON contacts;
+DROP POLICY IF EXISTS "interactions_all"           ON interactions;
+DROP POLICY IF EXISTS "projects_all"               ON projects;
+DROP POLICY IF EXISTS "tasks_all"                  ON tasks;
+DROP POLICY IF EXISTS "content_items_all"          ON content_items;
+DROP POLICY IF EXISTS "brand_assets_all"           ON brand_assets;
+DROP POLICY IF EXISTS "knowledge_items_all"        ON knowledge_items;
+DROP POLICY IF EXISTS "knowledge_connections_all"  ON knowledge_connections;
+DROP POLICY IF EXISTS "forms_all"                  ON forms;
+DROP POLICY IF EXISTS "form_submissions_read"      ON form_submissions;
+DROP POLICY IF EXISTS "form_submissions_insert"    ON form_submissions;
+DROP POLICY IF EXISTS "requirements_all"           ON requirements;
+DROP POLICY IF EXISTS "risk_register_all"          ON risk_register;
+DROP POLICY IF EXISTS "reminders_all"              ON reminders;
+DROP POLICY IF EXISTS "agent_conversations_all"    ON agent_conversations;
+DROP POLICY IF EXISTS "agent_activity_all"         ON agent_activity;
+DROP POLICY IF EXISTS "platform_capabilities_all"  ON platform_capabilities;
+DROP POLICY IF EXISTS "capacity_gaps_all"          ON capacity_gaps;
+DROP POLICY IF EXISTS "research_monitors_all"      ON research_monitors;
+
 CREATE POLICY "team_members_all" ON team_members
   FOR ALL USING (auth.role() = 'authenticated');
 
@@ -662,7 +691,7 @@ CREATE POLICY "agent_conversations_all" ON agent_conversations
   FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "agent_activity_all" ON agent_activity
-  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
+  FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "platform_capabilities_all" ON platform_capabilities
   FOR ALL USING (auth.role() = 'authenticated');
@@ -678,7 +707,7 @@ CREATE POLICY "research_monitors_all" ON research_monitors
 -- VIEWS FOR AGENT CONTEXT QUERIES
 -- ============================================================
 
-CREATE VIEW v_open_tasks AS
+CREATE OR REPLACE VIEW v_open_tasks AS
   SELECT
     t.id,
     t.title,
@@ -699,7 +728,7 @@ CREATE VIEW v_open_tasks AS
   WHERE t.status NOT IN ('done', 'cancelled');
 
 
-CREATE VIEW v_recent_interactions AS
+CREATE OR REPLACE VIEW v_recent_interactions AS
   SELECT
     i.id,
     i.type,
@@ -719,7 +748,7 @@ CREATE VIEW v_recent_interactions AS
   ORDER BY i.occurred_at DESC;
 
 
-CREATE VIEW v_contacts_overview AS
+CREATE OR REPLACE VIEW v_contacts_overview AS
   SELECT
     c.id,
     c.first_name || ' ' || c.last_name AS full_name,
@@ -739,7 +768,7 @@ CREATE VIEW v_contacts_overview AS
 
 
 -- Unresolved capacity gaps for Simon's morning briefing
-CREATE VIEW v_unresolved_capacity_gaps AS
+CREATE OR REPLACE VIEW v_unresolved_capacity_gaps AS
   SELECT
     id,
     directive_summary,
@@ -753,7 +782,7 @@ CREATE VIEW v_unresolved_capacity_gaps AS
 
 
 -- Active platform capabilities for Simon's capacity check
-CREATE VIEW v_active_capabilities AS
+CREATE OR REPLACE VIEW v_active_capabilities AS
   SELECT
     agent_name,
     capability,
@@ -763,16 +792,3 @@ CREATE VIEW v_active_capabilities AS
   FROM platform_capabilities
   WHERE status = 'active'
   ORDER BY agent_name, capability;
-
-
--- ============================================================
--- SEED: RESEARCHER CAPABILITIES
--- ============================================================
-
-INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_required, notes) VALUES
-  ('researcher', 'web_search',             'active', 'phase_1', ARRAY['search_web'],                   'Tavily Search API — 1,000 searches/month free tier'),
-  ('researcher', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
-  ('researcher', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
-  ('researcher', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
-  ('researcher', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
-ON CONFLICT DO NOTHING;
