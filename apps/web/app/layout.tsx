@@ -1,6 +1,7 @@
 import './globals.css';
+import type { Metadata } from 'next';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'BTS Internal Platform',
   description: 'Bitcoin Treasury Solutions — Internal Operations Platform',
 };
