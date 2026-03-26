@@ -1,6 +1,6 @@
+import type { Mastra } from '@mastra/core';
 import { supabase } from '@platform/db';
 import { pmAgent } from '../agents/pm/agent.js';
-import { pmWorkflow } from '../agents/pm/workflow.js';
 
 type ProposedAction = {
   agent: string;
@@ -29,6 +29,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let isIntentionalClose = false;
 let reconnectAttempt = 0;
 let hasEverSubscribed = false;
+let mastraInstance: Mastra | null = null;
 
 function scheduleReconnect(): void {
   if (reconnectTimer !== null) return;
@@ -38,7 +39,7 @@ function scheduleReconnect(): void {
   console.log(`[pm-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    startPMListener();
+    if (mastraInstance) startPMListener(mastraInstance);
   }, delay);
 }
 
@@ -90,7 +91,9 @@ Return ONLY a JSON object with these fields:
  * When Simon dispatches to pm, parses the free-text message into structured
  * workflow input and executes pmWorkflow.
  */
-export function startPMListener(): void {
+export function startPMListener(mastra: Mastra): void {
+  mastraInstance = mastra;
+
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -144,7 +147,7 @@ export function startPMListener(): void {
         }
 
         try {
-          const run = await pmWorkflow.execute({ inputData: workflowInput });
+          const run = await mastra.getWorkflow('pm').execute(workflowInput);
           console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, run);
         } catch (err) {
           console.error('[pm-listener] PM workflow error:', err);
