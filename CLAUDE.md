@@ -135,7 +135,7 @@ Emails and public content are ALWAYS human-approved (no graduation).
 
 ## Database (`packages/db`)
 
-The consolidated schema is in `schema.sql` at the repo root — this is the **source of truth**. Run it fresh on a new Supabase project to create all tables, indexes, RLS policies, and views. `docs/schema-changes.md` is a changelog explaining what changed from the original schema and why (kept for reference, not for execution).
+Schema changes are managed via the **Supabase CLI migration workflow**. Migration files in `supabase/migrations/` are the **execution source of truth** and are applied automatically on push to `main` via `.github/workflows/migrate.yml`. `schema.sql` at the repo root is a human-readable consolidated reference only — do not execute it directly against a live database. `docs/schema-changes.md` is a changelog explaining what changed and why. See `packages/db/MIGRATIONS.md` for the full developer workflow (how to create and apply new migrations).
 
 Key principles:
 
@@ -201,7 +201,9 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 
 |File                               |Purpose                                                                                                        |
 |-----------------------------------|---------------------------------------------------------------------------------------------------------------|
-|`schema.sql`                       |Consolidated database schema — source of truth, run on fresh Supabase                                          |
+|`schema.sql`                       |Consolidated database schema — human-readable reference only (not executable; use `supabase/migrations/`)      |
+|`supabase/migrations/`             |Migration files — applied sequentially to the live DB via `supabase db push` (auto on push to `main`)          |
+|`packages/db/MIGRATIONS.md`       |Developer workflow — how to create and apply schema migrations                                                 |
 |`CLAUDE.md`                        |This file — architecture, routing, naming conventions                                                          |
 |`docs/design-brief.md`             |**Web UI source of truth** — colours, typography, spacing, components, CSS tokens, IA, accessibility           |
 |`docs/brand-voice.md`              |**Content source of truth** — tone, terminology, Bitcoin stance, banned words, content lengths, microcopy rules|
@@ -232,7 +234,7 @@ Read the relevant docs BEFORE writing code. This saves rework.
 |Any agent (building, modifying, adding tools)            |`docs/agents/{agent-name}.md`                                |Triggers, capabilities, tools, schema deps, approval gates                                    |
 |Simon specifically                                       |`docs/agents/simon.md`                                       |Conflict detection flow, capacity awareness, morning briefing spec                            |
 |Webhook handlers or external service integration         |`docs/webhooks.md`                                           |Payloads, authentication, handler logic                                                       |
-|Database changes, new tables, migrations                 |`schema.sql` + `docs/schema-changes.md`                      |Schema is source of truth; changelog explains rationale                                       |
+|Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth; see MIGRATIONS.md for the full workflow|
 |Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
 |Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
 |Email or newsletter drafts/templates                     |`docs/brand-voice.md`                                        |Formality level (semi-formal), length (400–800 words), required/banned terminology            |

@@ -1,8 +1,20 @@
 # Schema Changes
 
-Changelog of intentional deviations from any reference schema, and rationale for design decisions in the current `schema.sql`.
+Changelog of schema changes and design decisions.
 
-Add an entry here whenever you modify `schema.sql`. Format: date, what changed, why.
+Add an entry here whenever you create a new migration file. Format: date, what changed, why.
+
+---
+
+## 2026-03-26 — Adopt Supabase CLI migration workflow with CI/CD auto-apply
+
+- **Migration tooling adopted** — schema changes are now managed via the Supabase CLI. Migration files live in `supabase/migrations/` and are applied automatically on push to `main` via `.github/workflows/migrate.yml` (`supabase db push`). No manual SQL execution required.
+- **Baseline migration** — `20260319000000_initial_schema.sql` captures the full schema as of the 2026-03-19 initial setup. Written idempotently (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE TRIGGER/VIEW`, `DROP POLICY IF EXISTS` + `CREATE POLICY`) so it can be safely applied to the existing live database.
+- **Source-on-contacts migration** — `20260319000001_add_source_to_contacts.sql` records the `source` column addition as a discrete migration step (`ADD COLUMN IF NOT EXISTS` for idempotency against the baseline).
+- **`schema.sql` role change** — `schema.sql` at the repo root is now a human-readable consolidated reference only. Do not execute it directly. The migration sequence in `supabase/migrations/` is the authoritative execution source of truth.
+- **`supabase/seed.sql`** — the `platform_capabilities` INSERT block moved from `schema.sql` into `supabase/seed.sql`. Supabase CLI applies this automatically on `db reset` for local dev.
+- **New scripts** — `db:migrate`, `db:diff`, `db:pull`, `db:reset` added to `packages/db/package.json` and mirrored at the root.
+- **Developer workflow** — see `packages/db/MIGRATIONS.md` for the full day-to-day process.
 
 ---
 
