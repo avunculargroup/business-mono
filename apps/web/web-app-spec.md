@@ -586,7 +586,7 @@ The full audit log. Every action every agent has ever taken or proposed.
 
 **Filters (in page header):**
 
-- Agent (multi-select: Simon / Recorder / Archivist / PM / BA / Content Creator)
+- Agent (multi-select: Simon / Recorder / Archivist / PM / BA / Content Creator / Researcher)
 - Status (multi-select: pending / approved / rejected / auto)
 - Trigger type (call_transcript / signal_message / manual / scheduled)
 - Date range
@@ -597,7 +597,7 @@ Same structure as the approval cards in the Simon thread (see above), but displa
 
 Each item:
 
-- Agent name + icon (each agent has a distinct Lucide icon assigned — Simon: `Bot`, Recorder: `Mic`, Archivist: `Archive`, PM: `ClipboardList`, BA: `Search`, Content Creator: `PenTool`)
+- Agent name + icon (each agent has a distinct Lucide icon assigned — Simon: `Bot`, Recorder: `Mic`, Archivist: `Archive`, PM: `ClipboardList`, BA: `Search`, Content Creator: `PenTool`, Researcher: `Globe`)
 - Action summary
 - Trigger context
 - Proposed actions list

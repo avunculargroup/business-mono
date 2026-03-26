@@ -4,8 +4,10 @@ import { simon } from '../agents/simon/index.js';
 import { archivist } from '../agents/archivist/index.js';
 import { ba } from '../agents/ba/index.js';
 import { contentCreator } from '../agents/contentCreator/index.js';
+import { researcher } from '../agents/researcher/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
+import { monitorResearchWorkflow } from '../agents/researcher/workflow.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -14,6 +16,7 @@ import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
+import { startMonitorListener } from '../listeners/monitorListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -25,10 +28,12 @@ export const mastra = new Mastra({
     archivist,
     ba,
     contentCreator,
+    researcher,
   },
   workflows: {
     recorder: recorderWorkflow,
     pm: pmWorkflow,
+    monitorResearch: monitorResearchWorkflow,
   },
   server: {
     apiRoutes: [
@@ -53,3 +58,6 @@ startBAListener();
 
 // Start Supabase Realtime listener for PM dispatches
 startPMListener();
+
+// Start hourly monitor check for research monitors
+startMonitorListener();

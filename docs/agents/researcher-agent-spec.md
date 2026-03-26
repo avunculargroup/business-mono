@@ -1,9 +1,9 @@
 # The Researcher — Agent Specification
 
 **Agent name:** The Researcher  
-**Status:** Specced, not yet built  
-**Position in roster:** Agent 7 (specialist)  
-**Last updated:** 2026-03-22
+**Status:** Built
+**Position in roster:** Agent 7 (specialist)
+**Last updated:** 2026-03-26
 
 ---
 
@@ -11,7 +11,7 @@
 
 The Researcher is a specialist agent responsible for acquiring, verifying, and structuring information from the open web. It serves other agents and human team members as a shared intelligence layer — handling everything from quick fact verification to deep multi-hop research and ongoing topic monitoring.
 
-Unlike the other six agents (which are primarily *writers* — producing records, tasks, and content), The Researcher is a *reader and synthesiser*. It does not own any primary database tables directly. It feeds The Archivist's knowledge base, enriches Simon's context mid-workflow, and produces structured briefs for the Content Creator.
+Unlike the other agents (which are primarily *writers* — producing records, tasks, and content), The Researcher is a *reader and synthesiser*. It does not own any primary database tables directly. It feeds The Archivist's knowledge base, enriches Simon's context mid-workflow, and produces structured briefs for the Content Creator.
 
 ---
 
