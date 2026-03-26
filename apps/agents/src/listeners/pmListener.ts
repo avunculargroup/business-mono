@@ -147,7 +147,8 @@ export function startPMListener(mastra: Mastra): void {
         }
 
         try {
-          const run = await mastra.getWorkflow('pm').execute(workflowInput);
+          const { start } = mastra.getWorkflow('pm').createRun();
+          const run = await start({ inputData: workflowInput });
           console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, run);
         } catch (err) {
           console.error('[pm-listener] PM workflow error:', err);
