@@ -109,10 +109,11 @@ Simon maintains awareness of what the platform can and cannot do. Before routing
 |PM             |Workflow + Agent|`docs/agents/pm.md`             |Projects, tasks, risk tracking                                         |
 |BA             |Agent           |`docs/agents/ba.md`             |Requirements analysis, clarification loops                             |
 |Content Creator|Agent           |`docs/agents/content-creator.md`|Content drafting, iteration, brand consistency                         |
+|Researcher     |Agent           |`docs/agents/researcher-agent-spec.md`|Web research, fact verification, URL ingestion, topic monitoring|
 
 ### Agent vs Workflow decision
 
-- **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator.
+- **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator, Researcher.
 - **Workflow**: Deterministic pipelines with known steps. Recorder’s transcription pipeline, PM’s task triage.
 - **Hybrid** (Workflow + Agent): Core process is a workflow, but specific steps use agent reasoning.
 

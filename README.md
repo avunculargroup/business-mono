@@ -27,7 +27,7 @@ Directors (Signal / Web UI)
         ↕
      Simon (coordinator agent)
         ↕
-Specialist Agents: Recorder · Archivist · PM · BA · Content Creator
+Specialist Agents: Recorder · Archivist · PM · BA · Content Creator · Researcher
         ↕
   Supabase (shared Postgres + pgvector)
 ```
@@ -148,8 +148,12 @@ cp apps/agents/.env.example apps/agents/.env
 | `SIGNAL_CLI_NUMBER` | Yes | Simon's dedicated Signal number in E.164 format |
 | `PORT` | No | Server port (defaults to 3000; set automatically on Railway) |
 | `RAILWAY_PUBLIC_DOMAIN` | Yes | Public URL used when constructing webhook callback URLs |
+| `TAVILY_API_KEY` | No** | Tavily Search API key — Researcher agent web search (free tier: 1,000/month) |
+| `FIRECRAWL_API_KEY` | No** | Firecrawl API key — Researcher agent structured crawling (free tier: 500/month) |
 
 *Set either `ANTHROPIC_API_KEY` (direct) or `OPENROUTER_API_KEY` (OpenRouter). If both are set, `OPENROUTER_API_KEY` takes priority.
+
+**Required only if the Researcher agent's `search_web` or `crawl_structured` tools are used.
 
 ---
 
@@ -289,6 +293,7 @@ Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into 
 | `requirements` | BA-structured requirements with user stories |
 | `content_items` | Content pipeline: idea → draft → review → approved → published |
 | `risk_register` | Risk tracking with severity × likelihood matrix |
+| `research_monitors` | Scheduled research monitoring — subjects, search queries, digests, notification routing |
 
 ### RPC wrappers (`packages/db/src/rpc/`)
 
@@ -312,6 +317,7 @@ Full specifications are in `docs/agents/`. Summary:
 | **PM** | Workflow + Agent | Triages tasks from `agent_activity`, manages projects, tracks risks, monitors blocked tasks. |
 | **BA** | Agent | Elicits and structures requirements with multi-round clarification loops (Mastra suspend/resume). |
 | **Content Creator** | Agent | Drafts and iterates content, enforces brand consistency, adapts across formats. All publishing is human-approved. |
+| **Researcher** | Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds Archivist knowledge base. |
 
 ### Approval philosophy
 
