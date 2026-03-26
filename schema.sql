@@ -473,9 +473,9 @@ CREATE TABLE agent_activity (
   agent_name        TEXT NOT NULL,
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'approved', 'rejected', 'auto')),
+                    CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
 
-  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled')),
+  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled', 'agent')),
   trigger_ref       TEXT,
 
   workflow_run_id   TEXT,
@@ -504,6 +504,13 @@ CREATE INDEX idx_agent_activity_agent ON agent_activity(agent_name);
 CREATE INDEX idx_agent_activity_status ON agent_activity(status);
 CREATE INDEX idx_agent_activity_created ON agent_activity(created_at DESC);
 CREATE INDEX idx_agent_activity_parent ON agent_activity(parent_activity_id);
+
+CREATE TRIGGER agent_activity_updated_at
+  BEFORE UPDATE ON agent_activity
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE agent_activity REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 
 
 -- Registry of what the platform can do (Simon's capacity awareness)
@@ -654,7 +661,7 @@ CREATE POLICY "agent_conversations_all" ON agent_conversations
   FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "agent_activity_all" ON agent_activity
-  FOR ALL USING (auth.role() = 'authenticated');
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "platform_capabilities_all" ON platform_capabilities
   FOR ALL USING (auth.role() = 'authenticated');
