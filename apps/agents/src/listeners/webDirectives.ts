@@ -19,15 +19,20 @@ type ConvRow = {
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isIntentionalClose = false;
+let reconnectAttempt = 0;
+let hasEverSubscribed = false;
 
 function scheduleReconnect(): void {
-  // Guard: only one reconnect timer at a time
   if (reconnectTimer !== null) return;
-  console.log('[web-directives] Reconnecting in 5s...');
+  reconnectAttempt += 1;
+  const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
+  const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
+  console.log(`[web-directives] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     startWebDirectivesListener();
-  }, 5000);
+  }, delay);
 }
 
 /**
@@ -44,6 +49,7 @@ export function startWebDirectivesListener(): void {
 
   // Clean up existing channel before creating a new one
   if (currentChannel !== null) {
+    isIntentionalClose = true;
     void supabase.removeChannel(currentChannel);
     currentChannel = null;
   }
@@ -109,12 +115,16 @@ export function startWebDirectivesListener(): void {
       console.log('[web-directives] Subscription status:', status);
       if (err) console.error('[web-directives] Subscription error:', err);
       if (status === 'SUBSCRIBED') {
-        console.log('Listening for web directives via Supabase Realtime');
+        hasEverSubscribed = true;
+        reconnectAttempt = 0;
+        console.log('[web-directives] Listening for web directives via Supabase Realtime');
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
         scheduleReconnect();
       } else if (status === 'CLOSED') {
-        // CLOSED fires after TIMED_OUT tears down the channel — scheduleReconnect
-        // is a no-op if a timer is already pending, preventing duplicate reconnects.
+        if (isIntentionalClose) {
+          isIntentionalClose = false;
+          return;
+        }
         scheduleReconnect();
       }
     });
