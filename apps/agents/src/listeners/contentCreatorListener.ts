@@ -16,14 +16,20 @@ type ActivityRow = {
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isIntentionalClose = false;
+let reconnectAttempt = 0;
+let hasEverSubscribed = false;
 
 function scheduleReconnect(): void {
   if (reconnectTimer !== null) return;
-  console.log('[content-creator-listener] Reconnecting in 5s...');
+  reconnectAttempt += 1;
+  const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
+  const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
+  console.log(`[content-creator-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     startContentCreatorListener();
-  }, 5000);
+  }, delay);
 }
 
 /**
@@ -38,6 +44,7 @@ export function startContentCreatorListener(): void {
   }
 
   if (currentChannel !== null) {
+    isIntentionalClose = true;
     void supabase.removeChannel(currentChannel);
     currentChannel = null;
   }
@@ -103,10 +110,16 @@ export function startContentCreatorListener(): void {
       console.log('[content-creator-listener] Subscription status:', status);
       if (err) console.error('[content-creator-listener] Subscription error:', err);
       if (status === 'SUBSCRIBED') {
-        console.log('Listening for Content Creator dispatches via Supabase Realtime');
+        hasEverSubscribed = true;
+        reconnectAttempt = 0;
+        console.log('[content-creator-listener] Listening for Content Creator dispatches via Supabase Realtime');
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
         scheduleReconnect();
       } else if (status === 'CLOSED') {
+        if (isIntentionalClose) {
+          isIntentionalClose = false;
+          return;
+        }
         scheduleReconnect();
       }
     });
