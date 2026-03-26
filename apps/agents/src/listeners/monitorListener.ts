@@ -1,14 +1,14 @@
+import type { Mastra } from '@mastra/core';
 import { MONITOR_CHECK_INTERVAL_MS } from '@platform/shared';
-import { monitorResearchWorkflow } from '../agents/researcher/workflow.js';
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
-async function runMonitorCheck(): Promise<void> {
+async function runMonitorCheck(mastra: Mastra): Promise<void> {
   console.log('[monitor-listener] Running scheduled monitor check...');
 
   try {
-    const run = await monitorResearchWorkflow.execute({
-      inputData: { triggered_at: new Date().toISOString() },
+    const run = await mastra.getWorkflow('monitorResearch').execute({
+      triggered_at: new Date().toISOString(),
     });
     console.log('[monitor-listener] Monitor check completed:', run);
   } catch (err) {
@@ -20,7 +20,7 @@ async function runMonitorCheck(): Promise<void> {
  * Starts an hourly interval that triggers the monitor research workflow.
  * Checks for research_monitors where next_run_at <= NOW().
  */
-export function startMonitorListener(): void {
+export function startMonitorListener(mastra: Mastra): void {
   if (intervalHandle !== null) {
     clearInterval(intervalHandle);
   }
@@ -30,9 +30,9 @@ export function startMonitorListener(): void {
   );
 
   // Run once immediately on startup, then on interval
-  void runMonitorCheck();
+  void runMonitorCheck(mastra);
 
   intervalHandle = setInterval(() => {
-    void runMonitorCheck();
+    void runMonitorCheck(mastra);
   }, MONITOR_CHECK_INTERVAL_MS);
 }
