@@ -547,6 +547,36 @@ CREATE INDEX idx_capacity_gaps_type ON capacity_gaps(gap_type);
 
 
 -- ============================================================
+-- RESEARCH MONITORS
+-- ============================================================
+
+CREATE TABLE research_monitors (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject         TEXT NOT NULL,
+  context         TEXT,
+  search_queries  TEXT[] NOT NULL,
+  frequency       TEXT NOT NULL DEFAULT 'weekly'
+                  CHECK (frequency IN ('daily', 'weekly', 'fortnightly')),
+  next_run_at     TIMESTAMPTZ NOT NULL,
+  last_run_at     TIMESTAMPTZ,
+  last_digest     TEXT,
+  notify_signal   BOOLEAN NOT NULL DEFAULT TRUE,
+  notify_agent    TEXT,
+  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by      UUID REFERENCES team_members(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER research_monitors_updated_at
+  BEFORE UPDATE ON research_monitors
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_research_monitors_next_run ON research_monitors(next_run_at)
+  WHERE is_active = TRUE;
+
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 
@@ -569,6 +599,7 @@ ALTER TABLE agent_conversations   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_activity        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE platform_capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE capacity_gaps         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_monitors     ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated team members can read and write everything
 CREATE POLICY "team_members_all" ON team_members
@@ -629,6 +660,9 @@ CREATE POLICY "platform_capabilities_all" ON platform_capabilities
   FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "capacity_gaps_all" ON capacity_gaps
+  FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "research_monitors_all" ON research_monitors
   FOR ALL USING (auth.role() = 'authenticated');
 
 
@@ -721,3 +755,16 @@ CREATE VIEW v_active_capabilities AS
   FROM platform_capabilities
   WHERE status = 'active'
   ORDER BY agent_name, capability;
+
+
+-- ============================================================
+-- SEED: RESEARCHER CAPABILITIES
+-- ============================================================
+
+INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_required, notes) VALUES
+  ('researcher', 'web_search',             'active', 'phase_1', ARRAY['search_web'],                   'Tavily Search API — 1,000 searches/month free tier'),
+  ('researcher', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
+  ('researcher', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
+  ('researcher', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
+  ('researcher', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
+ON CONFLICT DO NOTHING;
