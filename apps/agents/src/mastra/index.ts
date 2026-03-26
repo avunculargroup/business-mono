@@ -57,7 +57,7 @@ startContentCreatorListener();
 startBAListener();
 
 // Start Supabase Realtime listener for PM dispatches
-startPMListener();
+startPMListener(mastra);
 
 // Start hourly monitor check for research monitors
-startMonitorListener();
+startMonitorListener(mastra);
