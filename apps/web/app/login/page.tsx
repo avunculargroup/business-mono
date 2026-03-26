@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { login } from '@/app/actions/auth';
+import { BtsLogo } from '@/components/app-shell/BtsLogo';
 import styles from './login.module.css';
 
 function LoginForm() {
@@ -52,6 +53,7 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div>
         <div className={styles.logo}>
+          <BtsLogo size={48} />
           <div className={styles.logoMark}>BTS</div>
           <div className={styles.logoCaption}>Bitcoin Treasury Solutions</div>
         </div>
