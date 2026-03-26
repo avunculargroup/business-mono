@@ -94,6 +94,7 @@ export const AgentName = {
   PM: 'pm',
   BA: 'ba',
   CONTENT_CREATOR: 'content_creator',
+  RESEARCHER: 'researcher',
 } as const;
 export type AgentName = (typeof AgentName)[keyof typeof AgentName];
 
@@ -267,4 +268,118 @@ export interface SignalMessage {
   body: string;
   timestamp: string;
   attachments?: Array<{ contentType: string; filename: string; size: number }>;
+}
+
+// ============================================================
+// Research Agent — Contracts
+// ============================================================
+
+export const ResearchPurpose = {
+  VERIFY: 'verify',
+  SUMMARISE: 'summarise',
+  DEEP_RESEARCH: 'deep_research',
+  INGEST_URL: 'ingest_url',
+  MONITOR: 'monitor',
+} as const;
+export type ResearchPurpose = (typeof ResearchPurpose)[keyof typeof ResearchPurpose];
+
+export const ResearchRequester = {
+  SIMON: 'simon',
+  ARCHIVIST: 'archivist',
+  CONTENT_CREATOR: 'content_creator',
+  HUMAN: 'human',
+} as const;
+export type ResearchRequester = (typeof ResearchRequester)[keyof typeof ResearchRequester];
+
+export const ResearchUrgency = {
+  SYNC: 'sync',
+  ASYNC: 'async',
+} as const;
+export type ResearchUrgency = (typeof ResearchUrgency)[keyof typeof ResearchUrgency];
+
+export const VerificationVerdict = {
+  CONFIRMED: 'confirmed',
+  REFUTED: 'refuted',
+  UNVERIFIABLE: 'unverifiable',
+  PARTIAL: 'partial',
+} as const;
+export type VerificationVerdict = (typeof VerificationVerdict)[keyof typeof VerificationVerdict];
+
+export const ResearchConfidence = {
+  HIGH: 'high',
+  MEDIUM: 'medium',
+  LOW: 'low',
+} as const;
+export type ResearchConfidence = (typeof ResearchConfidence)[keyof typeof ResearchConfidence];
+
+export const MonitorFrequency = {
+  DAILY: 'daily',
+  WEEKLY: 'weekly',
+  FORTNIGHTLY: 'fortnightly',
+} as const;
+export type MonitorFrequency = (typeof MonitorFrequency)[keyof typeof MonitorFrequency];
+
+export interface ResearchSource {
+  url: string;
+  title: string;
+  excerpt: string;
+  retrieved_at: string;
+}
+
+export interface ResearchBrief {
+  purpose: ResearchPurpose;
+  requester: ResearchRequester;
+  subject: string;
+  context?: string;
+  url?: string;
+  monitor_id?: string;
+  urgency: ResearchUrgency;
+  outputSchema?: Record<string, unknown>;
+}
+
+export interface ResearchVerification {
+  verdict: VerificationVerdict;
+  confidence: ResearchConfidence;
+  summary: string;
+  sources: ResearchSource[];
+}
+
+export interface ResearchSummary {
+  headline: string;
+  body: string;
+  key_points: string[];
+  sources: ResearchSource[];
+  relevance_note?: string;
+}
+
+export interface ResearchMonitorResult {
+  has_changed: boolean;
+  change_summary?: string;
+  prior_digest: string;
+  current_digest: string;
+  sources: ResearchSource[];
+}
+
+export interface ResearchIngestion {
+  url: string;
+  title: string;
+  clean_markdown: string;
+  extracted_at: string;
+}
+
+export interface ResearchMetadata {
+  completed_at: string;
+  tool_calls_made: number;
+  search_provider: 'tavily';
+  duration_ms: number;
+}
+
+export interface ResearchResult {
+  brief: ResearchBrief;
+  purpose: ResearchPurpose;
+  verification?: ResearchVerification;
+  summary?: ResearchSummary;
+  monitor?: ResearchMonitorResult;
+  ingestion?: ResearchIngestion;
+  metadata: ResearchMetadata;
 }

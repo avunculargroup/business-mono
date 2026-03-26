@@ -22,3 +22,12 @@ export const KNOWLEDGE_STALENESS_MONTHS = 6;
 
 // PM risk detection: task blocked threshold (days)
 export const BLOCKED_TASK_THRESHOLD_DAYS = 3;
+
+// Researcher: Tavily free tier monthly limit
+export const TAVILY_MONTHLY_LIMIT = 1000;
+
+// Researcher: Firecrawl free tier monthly limit
+export const FIRECRAWL_MONTHLY_LIMIT = 500;
+
+// Researcher: monitor check interval (ms) — 1 hour
+export const MONITOR_CHECK_INTERVAL_MS = 60 * 60 * 1000;
