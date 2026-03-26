@@ -17,6 +17,7 @@ import {
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
 import { getInitials } from '@/lib/utils';
+import { BtsLogo } from './BtsLogo';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -53,8 +54,11 @@ export function Sidebar({ pendingCount }: SidebarProps) {
     <>
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <span className={styles.logoMark}>BTS</span>
-          <span className={styles.logoCaption}>Internal</span>
+          <BtsLogo size={28} />
+          <div className={styles.logoText}>
+            <span className={styles.logoMark}>BTS</span>
+            <span className={styles.logoCaption}>Internal</span>
+          </div>
         </div>
 
         <nav className={styles.nav}>
