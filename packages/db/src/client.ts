@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types/database.js';
+import WebSocket from 'ws';
 
 const supabaseUrl = process.env['SUPABASE_URL'];
 const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
@@ -15,8 +16,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   },
   realtime: {
     timeout: 60000,
-    params: {
-      heartbeatIntervalMs: 15000,
-    },
+    heartbeatIntervalMs: 15000,
+    // Node.js 20 has no native WebSocket; provide ws so Supabase Realtime
+    // uses a real WebSocket instead of falling back to HTTP LongPoll.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    transport: WebSocket as any,
   },
 });
