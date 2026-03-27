@@ -1,7 +1,7 @@
 import { createWorkflow, createStep } from '@mastra/core';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
-import { recorderAgent } from './agent.js';
+import { roger } from './agent.js';
 import { telnyxDownload } from './tools.js';
 import { deepgramTranscribe } from '../../tools/deepgram.js';
 import { logActivity } from '../../tools/activity.js';
@@ -129,7 +129,7 @@ Transcript: ${inputData.transcript}
 
 Return a JSON object mapping speaker labels to names: { "Channel 0": "Alice", "Channel 1": "Bob Smith" }`;
 
-    const response = await recorderAgent.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate([{ role: 'user', content: prompt }]);
     let speakerMap: Record<string, string> = {};
 
     try {
@@ -179,7 +179,7 @@ Return a JSON object with:
 - commitments: Array of { who, what, by_when?, context }
 - mentioned_entities: Array of { name, type: "person"|"company"|"org", confidence }`;
 
-    const response = await recorderAgent.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate([{ role: 'user', content: prompt }]);
     let extractedData: Record<string, unknown> = {};
 
     try {
@@ -236,7 +236,7 @@ Existing companies: ${JSON.stringify(companies)}
 
 Return JSON: { "matches": [{ "entity_name": "...", "type": "contact"|"company", "record_id": "...", "confidence": 0.95, "is_new": false }] }`;
 
-    const response = await recorderAgent.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate([{ role: 'user', content: prompt }]);
     let allMatches: Array<Record<string, unknown>> = [];
 
     try {

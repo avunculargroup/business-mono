@@ -89,7 +89,7 @@ export const notifySpecialist = createTool({
   id: 'notify_specialist',
   description: 'Dispatch a task or context to a specialist agent',
   inputSchema: z.object({
-    agentName: z.enum(['recorder', 'archivist', 'pm', 'ba', 'content_creator']),
+    agentName: z.enum(['roger', 'archie', 'petra', 'bruno', 'charlie', 'rex']),
     message: z.string().describe('Instruction or context to send to the specialist'),
     additionalContext: z.record(z.unknown()).optional().describe('Additional structured context'),
   }),

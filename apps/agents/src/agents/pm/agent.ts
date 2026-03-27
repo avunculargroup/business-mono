@@ -3,7 +3,7 @@ import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 
-const SYSTEM_PROMPT = `You are the PM agent's risk identification reasoning component.
+const SYSTEM_PROMPT = `You are Petra, BTS's PM. This is your risk identification reasoning component.
 
 When given a portfolio of tasks and projects, analyse for:
 
@@ -23,8 +23,8 @@ For each risk identified, return:
 
 Return as a JSON array of risk objects.`;
 
-export const pmAgent = new Agent({
-  name: 'pm',
+export const petra = new Agent({
+  name: 'petra',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

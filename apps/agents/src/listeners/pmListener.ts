@@ -1,6 +1,6 @@
 import type { Mastra } from '@mastra/core';
 import { supabase } from '@platform/db';
-import { pmAgent } from '../agents/pm/agent.js';
+import { petra } from '../agents/pm/agent.js';
 
 type ProposedAction = {
   agent: string;
@@ -69,7 +69,7 @@ Return ONLY a JSON object with these fields:
   "suggestedPriority": "low | medium | high | urgent — infer from tone/urgency, default medium"
 }`;
 
-  const result = await pmAgent.generate([{ role: 'user', content: prompt }]);
+  const result = await petra.generate([{ role: 'user', content: prompt }]);
 
   let parsed: Record<string, unknown> = { title: message.slice(0, 120) };
   try {
@@ -116,7 +116,7 @@ export function startPMListener(mastra: Mastra): void {
           ? (row.proposed_actions as ProposedAction[])
           : [];
 
-        const dispatch = proposed.find((a) => a.agent === 'pm');
+        const dispatch = proposed.find((a) => a.agent === 'petra');
         if (!dispatch) return;
 
         console.log(`[pm-listener] Dispatch received from activity ${row.id}`);
@@ -131,7 +131,7 @@ export function startPMListener(mastra: Mastra): void {
         } catch (err) {
           console.error('[pm-listener] Failed to parse dispatch:', err);
           await supabase.from('agent_activity').insert({
-            agent_name: 'pm',
+            agent_name: 'petra',
             action: `Error parsing dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
@@ -153,7 +153,7 @@ export function startPMListener(mastra: Mastra): void {
         } catch (err) {
           console.error('[pm-listener] PM workflow error:', err);
           await supabase.from('agent_activity').insert({
-            agent_name: 'pm',
+            agent_name: 'petra',
             action: `Error executing workflow for dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
