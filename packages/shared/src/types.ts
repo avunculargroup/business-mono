@@ -89,12 +89,12 @@ export type InteractionSource = (typeof InteractionSource)[keyof typeof Interact
 
 export const AgentName = {
   SIMON: 'simon',
-  RECORDER: 'recorder',
-  ARCHIVIST: 'archivist',
-  PM: 'pm',
-  BA: 'ba',
-  CONTENT_CREATOR: 'content_creator',
-  RESEARCHER: 'researcher',
+  ROGER: 'roger',
+  ARCHIE: 'archie',
+  PETRA: 'petra',
+  BRUNO: 'bruno',
+  CHARLIE: 'charlie',
+  REX: 'rex',
 } as const;
 export type AgentName = (typeof AgentName)[keyof typeof AgentName];
 
@@ -285,8 +285,8 @@ export type ResearchPurpose = (typeof ResearchPurpose)[keyof typeof ResearchPurp
 
 export const ResearchRequester = {
   SIMON: 'simon',
-  ARCHIVIST: 'archivist',
-  CONTENT_CREATOR: 'content_creator',
+  ARCHIVIST: 'archie',
+  CHARLIE: 'charlie',
   HUMAN: 'human',
 } as const;
 export type ResearchRequester = (typeof ResearchRequester)[keyof typeof ResearchRequester];

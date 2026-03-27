@@ -3,7 +3,7 @@ import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 
-const SYSTEM_PROMPT = `You are the Recorder agent's reasoning component. You handle three analytical steps in the transcription pipeline:
+const SYSTEM_PROMPT = `You are Roger, BTS's Recorder. You handle three analytical steps in the transcription pipeline:
 
 1. **Speaker identification**: Given a transcript and participant info, determine who is speaking on each channel/speaker label. For Telnyx dual-channel: Channel 0 = director (team member), Channel 1 = external contact. For Zoom: match Deepgram speaker labels against known participants.
 
@@ -25,8 +25,8 @@ Flag any match with confidence < 0.8 for human review.
 
 Always return structured JSON matching the InteractionExtractedData shape.`;
 
-export const recorderAgent = new Agent({
-  name: 'recorder',
+export const roger = new Agent({
+  name: 'roger',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

@@ -1,6 +1,6 @@
 import { supabase } from '@platform/db';
 import type { CoreMessage } from 'ai';
-import { ba } from '../agents/ba/index.js';
+import { bruno } from '../agents/ba/index.js';
 
 type ProposedAction = {
   agent: string;
@@ -60,7 +60,7 @@ export function startBAListener(): void {
           ? (row.proposed_actions as ProposedAction[])
           : [];
 
-        const dispatch = proposed.find((a) => a.agent === 'ba');
+        const dispatch = proposed.find((a) => a.agent === 'bruno');
         if (!dispatch) return;
 
         console.log(`[ba-listener] Dispatch received from activity ${row.id}`);
@@ -69,12 +69,12 @@ export function startBAListener(): void {
 
         let responseText: string;
         try {
-          const result = await ba.generate(messages);
+          const result = await bruno.generate(messages);
           responseText = result.text;
         } catch (err) {
           console.error('[ba-listener] BA error:', err);
           await supabase.from('agent_activity').insert({
-            agent_name: 'ba',
+            agent_name: 'bruno',
             action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
@@ -90,7 +90,7 @@ export function startBAListener(): void {
         }
 
         await supabase.from('agent_activity').insert({
-          agent_name: 'ba',
+          agent_name: 'bruno',
           action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
           status: 'auto',
           trigger_type: 'agent',

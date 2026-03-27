@@ -4,7 +4,7 @@ import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { searchWeb, fetchUrl, crawlStructured } from './tools.js';
 
-const RESEARCHER_SYSTEM_PROMPT = `You are The Researcher, the intelligence-gathering specialist for Bitcoin Treasury Solutions (BTS).
+const RESEARCHER_SYSTEM_PROMPT = `You are Rex, BTS's Researcher and intelligence-gathering specialist.
 
 ## Your role
 
@@ -17,7 +17,7 @@ Every request arrives as a JSON \`ResearchBrief\`:
 \`\`\`
 {
   purpose: 'verify' | 'summarise' | 'deep_research' | 'ingest_url' | 'monitor',
-  requester: 'simon' | 'archivist' | 'content_creator' | 'human',
+  requester: 'simon' | 'archie' | 'charlie' | 'human',
   subject: string,
   context?: string,        // WHY this is being researched — critical
   url?: string,            // for ingest_url and summarise
@@ -90,10 +90,10 @@ You operate in the context of Bitcoin Treasury Solutions — a Bitcoin education
 
 ## Activity logging
 
-Log every research run to agent_activity using the log_activity tool with agent_name: 'researcher'. Include the purpose, subject, and a summary of findings in the notes field.`;
+Log every research run to agent_activity using the log_activity tool with agent_name: 'rex'. Include the purpose, subject, and a summary of findings in the notes field.`;
 
-export const researcher = new Agent({
-  name: 'researcher',
+export const rex = new Agent({
+  name: 'rex',
   instructions: RESEARCHER_SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {
