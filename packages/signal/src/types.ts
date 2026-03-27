@@ -64,24 +64,7 @@ export interface AttachmentParams {
 }
 
 export interface UpdateProfileParams {
-  name?: string;           // given name (Signal API requires name even for partial updates)
-  familyName?: string;
+  name: string;            // given name — required by signal-cli REST API
   about?: string;          // max ~140 chars
-  aboutEmoji?: string;     // single emoji
   base64Avatar?: string;   // pre-encoded PNG/JPG
-}
-
-export interface ProfileInfo {
-  name?: string;
-  familyName?: string;
-  about?: string;
-  aboutEmoji?: string;
-}
-
-/** Raw shape returned by signal-cli REST API (snake_case field names) */
-export interface RawProfileInfo {
-  name?: string;
-  family_name?: string;
-  about?: string;
-  about_emoji?: string;
 }

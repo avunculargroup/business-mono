@@ -12,8 +12,6 @@ import type {
   ReactionParams,
   AttachmentParams,
   UpdateProfileParams,
-  ProfileInfo,
-  RawProfileInfo,
 } from './types.js';
 
 export class SignalClient {
@@ -172,22 +170,10 @@ export class SignalClient {
     });
   }
 
-  async getProfile(): Promise<ProfileInfo> {
-    const raw = await this.request<RawProfileInfo>('GET', `/v1/profiles/${encodeURIComponent(this.account)}`);
-    return {
-      name: raw.name,
-      familyName: raw.family_name,
-      about: raw.about,
-      aboutEmoji: raw.about_emoji,
-    };
-  }
-
   async updateProfile(params: UpdateProfileParams): Promise<void> {
     await this.request<void>('PUT', `/v1/profiles/${encodeURIComponent(this.account)}`, {
       name: params.name,
-      ...(params.familyName !== undefined ? { family_name: params.familyName } : {}),
       ...(params.about !== undefined ? { about: params.about } : {}),
-      ...(params.aboutEmoji !== undefined ? { about_emoji: params.aboutEmoji } : {}),
       ...(params.base64Avatar !== undefined ? { base64_avatar: params.base64Avatar } : {}),
     });
   }
