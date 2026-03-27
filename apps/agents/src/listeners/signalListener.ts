@@ -32,6 +32,14 @@ async function resolveSenderName(phoneNumber: string | null | undefined, signalI
     if (member) return member.full_name;
   }
 
+  // No phone number (Signal "hide number" feature) — try Signal UUID lookup
+  const { data: contactByUuid } = await supabase
+    .from('contacts')
+    .select('first_name, last_name')
+    .eq('signal_uuid', signalId)
+    .single();
+  if (contactByUuid) return `${contactByUuid.first_name} ${contactByUuid.last_name}`;
+
   // Fall back: if it looks like a UUID (no + prefix), label it unknown
   if (!signalId.startsWith('+')) return 'unknown contact';
   return signalId;
