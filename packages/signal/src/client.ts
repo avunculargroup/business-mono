@@ -13,6 +13,7 @@ import type {
   AttachmentParams,
   UpdateProfileParams,
   ProfileInfo,
+  RawProfileInfo,
 } from './types.js';
 
 export class SignalClient {
@@ -172,7 +173,13 @@ export class SignalClient {
   }
 
   async getProfile(): Promise<ProfileInfo> {
-    return this.request<ProfileInfo>('GET', `/v1/profiles/${encodeURIComponent(this.account)}`);
+    const raw = await this.request<RawProfileInfo>('GET', `/v1/profiles/${encodeURIComponent(this.account)}`);
+    return {
+      name: raw.name,
+      familyName: raw.family_name,
+      about: raw.about,
+      aboutEmoji: raw.about_emoji,
+    };
   }
 
   async updateProfile(params: UpdateProfileParams): Promise<void> {
