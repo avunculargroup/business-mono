@@ -26,17 +26,19 @@ type WorkflowInput = {
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let isIntentionalClose = false;
 let reconnectAttempt = 0;
 let hasEverSubscribed = false;
 let mastraInstance: Mastra | null = null;
 
-function scheduleReconnect(): void {
+function scheduleReconnect(reason?: string): void {
   if (reconnectTimer !== null) return;
   reconnectAttempt += 1;
   const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
   const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
-  console.log(`[pm-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s`);
+  console.log(
+    `[pm-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s` +
+    (reason ? ` (${reason})` : '')
+  );
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     if (mastraInstance) startPMListener(mastraInstance);
@@ -100,12 +102,10 @@ export function startPMListener(mastra: Mastra): void {
   }
 
   if (currentChannel !== null) {
-    isIntentionalClose = true;
     void supabase.removeChannel(currentChannel);
-    currentChannel = null;
   }
 
-  currentChannel = supabase
+  const channel = supabase
     .channel('pm-dispatches')
     .on(
       'postgres_changes' as never,
@@ -169,6 +169,8 @@ export function startPMListener(mastra: Mastra): void {
       }
     )
     .subscribe((status, err) => {
+      if (channel !== currentChannel) return;
+
       console.log('[pm-listener] Subscription status:', status);
       if (err) console.error('[pm-listener] Subscription error:', err);
       if (status === 'SUBSCRIBED') {
@@ -176,13 +178,11 @@ export function startPMListener(mastra: Mastra): void {
         reconnectAttempt = 0;
         console.log('[pm-listener] Listening for PM dispatches via Supabase Realtime');
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-        scheduleReconnect();
+        scheduleReconnect(err ? String(err) : status);
       } else if (status === 'CLOSED') {
-        if (isIntentionalClose) {
-          isIntentionalClose = false;
-          return;
-        }
-        scheduleReconnect();
+        scheduleReconnect('CLOSED');
       }
     });
+
+  currentChannel = channel;
 }
