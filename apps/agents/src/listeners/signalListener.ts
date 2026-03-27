@@ -13,17 +13,52 @@ type ConvMessage = {
   source?: string;
 };
 
+async function resolveSenderName(phoneNumber: string | null | undefined, signalId: string): Promise<string> {
+  // Try phone number lookup in contacts
+  if (phoneNumber) {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('first_name, last_name')
+      .eq('phone', phoneNumber)
+      .single();
+    if (contact) return `${contact.first_name} ${contact.last_name}`;
+
+    // Try team members by signal_number
+    const { data: member } = await supabase
+      .from('team_members')
+      .select('full_name')
+      .eq('signal_number', phoneNumber)
+      .single();
+    if (member) return member.full_name;
+  }
+
+  // No phone number (Signal "hide number" feature) — try Signal UUID lookup
+  const { data: contactByUuid } = await supabase
+    .from('contacts')
+    .select('first_name, last_name')
+    .eq('signal_uuid', signalId)
+    .single();
+  if (contactByUuid) return `${contactByUuid.first_name} ${contactByUuid.last_name}`;
+
+  // Fall back: if it looks like a UUID (no + prefix), label it unknown
+  if (!signalId.startsWith('+')) return 'unknown contact';
+  return signalId;
+}
+
 async function handleMessage(envelope: IncomingMessage): Promise<void> {
   const dm = envelope.envelope.dataMessage;
   if (!dm?.message) return; // skip receipts, typing indicators, etc.
 
-  const senderNumber = envelope.envelope.sourceNumber || envelope.envelope.source;
+  const sourceNumber = envelope.envelope.sourceNumber;
+  const senderNumber = sourceNumber || envelope.envelope.source;
   if (!senderNumber) return;
 
   const userMessage = dm.message.trim();
   if (!userMessage) return;
 
-  console.log(`[signal-listener] Message from ${senderNumber}: ${userMessage.slice(0, 80)}`);
+  const senderName = await resolveSenderName(sourceNumber, senderNumber);
+
+  console.log(`[signal-listener] Message from ${senderName} (${senderNumber}): ${userMessage.slice(0, 80)}`);
 
   // Get or create conversation thread keyed by sender's phone number
   let { data: conv } = await supabase
@@ -103,7 +138,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   // Audit log
   await supabase.from('agent_activity').insert({
     agent_name: 'simon',
-    action: `Signal message from ${senderNumber}: ${userMessage.slice(0, 120)}`,
+    action: `Signal message from ${senderName}: ${userMessage.slice(0, 120)}`,
     status: 'auto',
     trigger_type: 'manual',
     workflow_run_id: null,
