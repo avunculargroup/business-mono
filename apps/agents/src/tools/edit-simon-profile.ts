@@ -170,15 +170,30 @@ export const editSimonProfile = createTool({
     const allWarnings = [...warnings, ...verificationWarnings];
     const verified = verificationWarnings.length === 0 && profileAfter !== undefined;
 
-    console.log(`${LOG_TAG} Profile update complete. Fields: [${updatedFields.join(', ')}], verified: ${verified}`);
+    // Distinguish "verification ran and found a mismatch" (definitive failure)
+    // from "verification couldn't run" (uncertain — optimistically report success).
+    const definitivelyFailed = verificationWarnings.some(
+      (w) =>
+        w.startsWith('name:') ||
+        w.startsWith('familyName:') ||
+        w.startsWith('about:') ||
+        w.startsWith('aboutEmoji:'),
+    );
+
+    const success = !definitivelyFailed;
+
+    console.log(
+      `${LOG_TAG} Profile update complete. Fields: [${updatedFields.join(', ')}], verified: ${verified}, success: ${success}`,
+    );
 
     return {
-      success: true,
+      success,
       updatedFields,
       ...(profileBefore ? { before: profileBefore } : {}),
       ...(profileAfter ? { after: profileAfter } : {}),
       verified,
       ...(allWarnings.length ? { warnings: allWarnings } : {}),
+      ...(!success ? { error: `Profile update did not take effect. ${verificationWarnings.join('; ')}` } : {}),
     };
   },
 });

@@ -71,6 +71,10 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 
     const result = await simon.generate(messagesForSimon);
     responseText = result.text;
+    console.log(
+      `[signal-listener] Simon response (${responseText.length} chars):`,
+      responseText.slice(0, 300),
+    );
   } catch (err) {
     console.error('[signal-listener] Simon error:', err);
     return;
