@@ -1,7 +1,7 @@
 import { createWorkflow, createStep } from '@mastra/core';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
-import { pmAgent } from './agent.js';
+import { petra } from './agent.js';
 
 // ─── Step 1: Triage incoming task proposal ─────────────────────────────────
 const triageTask = createStep({
@@ -46,7 +46,7 @@ Active projects: ${JSON.stringify(projects)}
 Return JSON: { "project_id": "uuid or null", "assignee": "name or null", "due_date": "ISO date or null", "priority": "low|medium|high|urgent", "requires_approval": true|false }
 requires_approval should be true only for the first 10 task creations in each project.`;
 
-    const response = await pmAgent.generate([{ role: 'user', content: prompt }]);
+    const response = await petra.generate([{ role: 'user', content: prompt }]);
     let triage: Record<string, unknown> = {
       project_id: inputData.suggestedProjectId ?? null,
       assignee: inputData.suggestedAssignee ?? null,
@@ -161,7 +161,7 @@ Active projects: ${JSON.stringify(projects)}
 
 Identify risks and return a JSON array of risk objects.`;
 
-    const response = await pmAgent.generate([{ role: 'user', content: prompt }]);
+    const response = await petra.generate([{ role: 'user', content: prompt }]);
     let risks: Array<Record<string, unknown>> = [];
 
     try {

@@ -11,7 +11,7 @@ import {
   fulltextSearchTool,
 } from './tools.js';
 
-const SYSTEM_PROMPT = `You are the Archivist, the knowledge management specialist for Bitcoin Treasury Solutions.
+const SYSTEM_PROMPT = `You are Archie, BTS's Archivist and knowledge management specialist.
 
 ## Your role
 You maintain the company's knowledge base — a structured, searchable repository of articles, research, YouTube transcripts, reports, and internal documents. You are the ONLY agent that can be called directly by other agents without going through Simon.
@@ -68,8 +68,8 @@ Flag items older than 6 months as potentially stale when returning search result
 ## Always log activity
 Every knowledge item saved, every search performed — log to agent_activity.`;
 
-export const archivist = new Agent({
-  name: 'archivist',
+export const archie = new Agent({
+  name: 'archie',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

@@ -471,7 +471,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
 -- Audit trail for all agent actions
 CREATE TABLE agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_name        TEXT NOT NULL,
+  agent_name        TEXT NOT NULL
+                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex')),
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
@@ -517,7 +518,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 -- Registry of what the platform can do (Simon's capacity awareness)
 CREATE TABLE platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_name      TEXT NOT NULL,
+  agent_name      TEXT NOT NULL
+                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex')),
   capability      TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
                   CHECK (status IN ('active', 'planned', 'unavailable')),
@@ -770,9 +772,9 @@ CREATE VIEW v_active_capabilities AS
 -- ============================================================
 
 INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_required, notes) VALUES
-  ('researcher', 'web_search',             'active', 'phase_1', ARRAY['search_web'],                   'Tavily Search API — 1,000 searches/month free tier'),
-  ('researcher', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
-  ('researcher', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
-  ('researcher', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
-  ('researcher', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
+  ('rex', 'web_search',             'active', 'phase_1', ARRAY['search_web'],                   'Tavily Search API — 1,000 searches/month free tier'),
+  ('rex', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
+  ('rex', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
+  ('rex', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
+  ('rex', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
 ON CONFLICT DO NOTHING;

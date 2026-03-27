@@ -1,7 +1,7 @@
 import { createWorkflow, createStep } from '@mastra/core';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
-import { researcher } from './index.js';
+import { rex } from './index.js';
 
 import type { ResearchBrief, ResearchResult } from '@platform/shared';
 
@@ -125,7 +125,7 @@ const runMonitorChecks = createStep({
       };
 
       try {
-        const response = await researcher.generate([
+        const response = await rex.generate([
           { role: 'user', content: JSON.stringify(brief) },
         ]);
 
@@ -223,7 +223,7 @@ const updateAndNotify = createStep({
 
         // Log change detection to agent_activity
         await supabase.from('agent_activity').insert({
-          agent_name: 'researcher',
+          agent_name: 'rex',
           action: `Monitor change detected: ${result.subject}`,
           status: 'auto',
           trigger_type: 'scheduled',

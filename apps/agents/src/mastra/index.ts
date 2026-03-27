@@ -1,10 +1,10 @@
 import { Mastra } from '@mastra/core';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
-import { archivist } from '../agents/archivist/index.js';
-import { ba } from '../agents/ba/index.js';
-import { contentCreator } from '../agents/contentCreator/index.js';
-import { researcher } from '../agents/researcher/index.js';
+import { archie } from '../agents/archivist/index.js';
+import { bruno } from '../agents/ba/index.js';
+import { charlie } from '../agents/contentCreator/index.js';
+import { rex } from '../agents/researcher/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { monitorResearchWorkflow } from '../agents/researcher/workflow.js';
@@ -25,10 +25,10 @@ const honoHandler = (fn: (req: Request) => Promise<Response>) =>
 export const mastra = new Mastra({
   agents: {
     simon,
-    archivist,
-    ba,
-    contentCreator,
-    researcher,
+    archie,
+    bruno,
+    charlie,
+    rex,
   },
   workflows: {
     recorder: recorderWorkflow,
