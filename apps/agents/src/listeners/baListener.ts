@@ -16,16 +16,18 @@ type ActivityRow = {
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let isIntentionalClose = false;
 let reconnectAttempt = 0;
 let hasEverSubscribed = false;
 
-function scheduleReconnect(): void {
+function scheduleReconnect(reason?: string): void {
   if (reconnectTimer !== null) return;
   reconnectAttempt += 1;
   const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
   const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
-  console.log(`[ba-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s`);
+  console.log(
+    `[ba-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s` +
+    (reason ? ` (${reason})` : '')
+  );
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     startBAListener();
@@ -44,12 +46,10 @@ export function startBAListener(): void {
   }
 
   if (currentChannel !== null) {
-    isIntentionalClose = true;
     void supabase.removeChannel(currentChannel);
-    currentChannel = null;
   }
 
-  currentChannel = supabase
+  const channel = supabase
     .channel('ba-dispatches')
     .on(
       'postgres_changes' as never,
@@ -107,6 +107,8 @@ export function startBAListener(): void {
       }
     )
     .subscribe((status, err) => {
+      if (channel !== currentChannel) return;
+
       console.log('[ba-listener] Subscription status:', status);
       if (err) console.error('[ba-listener] Subscription error:', err);
       if (status === 'SUBSCRIBED') {
@@ -114,13 +116,11 @@ export function startBAListener(): void {
         reconnectAttempt = 0;
         console.log('[ba-listener] Listening for BA dispatches via Supabase Realtime');
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-        scheduleReconnect();
+        scheduleReconnect(err ? String(err) : status);
       } else if (status === 'CLOSED') {
-        if (isIntentionalClose) {
-          isIntentionalClose = false;
-          return;
-        }
-        scheduleReconnect();
+        scheduleReconnect('CLOSED');
       }
     });
+
+  currentChannel = channel;
 }
