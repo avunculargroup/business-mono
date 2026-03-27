@@ -17,7 +17,8 @@ export const editSimonProfile = createTool({
     avatarPath: z.string().optional().describe('Absolute path to a PNG/JPG image file'),
   }),
   execute: async ({ context }) => {
-    if (process.env['ALLOW_PROFILE_EDITS'] !== 'true') {
+    const allowProfileEdits = (process.env['ALLOW_PROFILE_EDITS'] ?? '').replace(/^["']|["']$/g, '');
+    if (allowProfileEdits !== 'true') {
       console.warn(`${LOG_TAG} Profile edits disabled (ALLOW_PROFILE_EDITS !== 'true')`);
       return {
         success: false,
