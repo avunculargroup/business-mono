@@ -35,6 +35,15 @@
   color: var(--color-text-tertiary);
 }
 
+.actionPrefix {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+}
+
 .action {
   font-size: 14px;
   color: var(--color-text-primary);
