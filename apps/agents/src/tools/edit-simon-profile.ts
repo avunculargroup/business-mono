@@ -10,23 +10,13 @@ const LOG_TAG = '[edit-simon-profile]';
 
 export const editSimonProfile = createTool({
   id: 'edit_simon_profile',
-  description: "Update Simon's Signal profile (name, bio, avatar). Requires ALLOW_PROFILE_EDITS=true env var.",
+  description: "Update Simon's Signal profile (name, bio, avatar).",
   inputSchema: z.object({
     name: z.string().describe('Signal display name (given name) — always required'),
     about: z.string().max(140).optional().describe('Profile bio / status text (max 140 chars)'),
     avatarPath: z.string().optional().describe('Absolute path to a PNG/JPG image file'),
   }),
   execute: async ({ context }) => {
-    const allowProfileEdits = (process.env['ALLOW_PROFILE_EDITS'] ?? '').replace(/^["']|["']$/g, '');
-    if (allowProfileEdits !== 'true') {
-      console.warn(`${LOG_TAG} Profile edits disabled (ALLOW_PROFILE_EDITS !== 'true')`);
-      return {
-        success: false,
-        updatedFields: [] as string[],
-        error: 'Profile edits are disabled. Set ALLOW_PROFILE_EDITS=true to enable.',
-      };
-    }
-
     const { name, about, avatarPath } = context;
 
     console.log(`${LOG_TAG} Starting profile update — fields requested:`, {
@@ -68,6 +58,25 @@ export const editSimonProfile = createTool({
       console.log(`${LOG_TAG} Avatar encoded: ${imageBuffer.length} bytes from ${avatarPath}`);
     }
 
+    // Verify account is registered in signal-cli before attempting update
+    const signalNumber = process.env['SIGNAL_CLI_NUMBER'] ?? '';
+    let registeredAccounts: string[] = [];
+    try {
+      registeredAccounts = await client.getAccounts();
+      console.log(`${LOG_TAG} Registered accounts in signal-cli:`, registeredAccounts);
+    } catch (err) {
+      console.warn(`${LOG_TAG} Could not fetch accounts list (non-fatal):`, err);
+    }
+
+    if (registeredAccounts.length > 0 && !registeredAccounts.includes(signalNumber)) {
+      console.error(`${LOG_TAG} Account mismatch! SIGNAL_CLI_NUMBER=${signalNumber} not in registered accounts:`, registeredAccounts);
+      return {
+        success: false,
+        updatedFields: [] as string[],
+        error: `Account mismatch: SIGNAL_CLI_NUMBER (${signalNumber}) is not registered in signal-cli. Registered accounts: ${registeredAccounts.join(', ')}`,
+      };
+    }
+
     // Perform the update
     console.log(`${LOG_TAG} Calling updateProfile:`, JSON.stringify({
       name,
@@ -101,6 +110,7 @@ export const editSimonProfile = createTool({
     return {
       success: true,
       updatedFields,
+      registeredAccount: registeredAccounts[0] ?? signalNumber,
       ...(warnings.length ? { warnings } : {}),
     };
   },
