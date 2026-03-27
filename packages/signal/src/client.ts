@@ -177,4 +177,8 @@ export class SignalClient {
       ...(params.base64Avatar !== undefined ? { base64_avatar: params.base64Avatar } : {}),
     });
   }
+
+  async getAccounts(): Promise<string[]> {
+    return this.request<string[]>('GET', '/v1/accounts');
+  }
 }
