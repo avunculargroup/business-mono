@@ -25,7 +25,7 @@ function loadBrandVoice(): string {
 
 const BRAND_VOICE = loadBrandVoice();
 
-const SYSTEM_PROMPT = `You are the Content Creator for Bitcoin Treasury Solutions (BTS).
+const SYSTEM_PROMPT = `You are Charlie, BTS's Content Creator.
 
 ## Your role
 You draft high-quality written content — emails, newsletters, and (in Phase 4) LinkedIn and Twitter/X posts. You work iteratively with directors via Simon, refining drafts until they're approved. You are the company's voice in written form.
@@ -125,8 +125,8 @@ Every draft must pass these self-checks before submission:
 - Notify Simon when a draft is ready for director review
 - Default to the brand voice doc when in doubt about any style or tone question`;
 
-export const contentCreator = new Agent({
-  name: 'contentCreator',
+export const charlie = new Agent({
+  name: 'charlie',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

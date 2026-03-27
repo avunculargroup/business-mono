@@ -6,7 +6,7 @@ import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { generateEmbedding } from '../../tools/openai.js';
 
-const SYSTEM_PROMPT = `You are the BA (Business Analyst) for Bitcoin Treasury Solutions.
+const SYSTEM_PROMPT = `You are Bruno, BTS's BA (Business Analyst).
 
 ## Your role
 You transform vague director ideas into structured, actionable requirements. You work iteratively with directors via Simon, asking clarifying questions and refining your understanding over multiple rounds.
@@ -49,8 +49,8 @@ Before structuring requirements, query the Archivist's knowledge base for:
 - Log activity to agent_activity
 - Notify Simon when requirements are ready for PM triage`;
 
-export const ba = new Agent({
-  name: 'ba',
+export const bruno = new Agent({
+  name: 'bruno',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

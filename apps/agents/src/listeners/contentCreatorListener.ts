@@ -1,6 +1,6 @@
 import { supabase } from '@platform/db';
 import type { CoreMessage } from 'ai';
-import { contentCreator } from '../agents/contentCreator/index.js';
+import { charlie } from '../agents/contentCreator/index.js';
 
 type ProposedAction = {
   agent: string;
@@ -36,7 +36,7 @@ function scheduleReconnect(reason?: string): void {
 
 /**
  * Subscribes to agent_activity via Supabase Realtime.
- * When Simon dispatches to content_creator, invokes contentCreator.generate()
+ * When Simon dispatches to charlie, invokes contentCreator.generate()
  * with the provided message and logs the result back to agent_activity.
  */
 export function startContentCreatorListener(): void {
@@ -60,7 +60,7 @@ export function startContentCreatorListener(): void {
           ? (row.proposed_actions as ProposedAction[])
           : [];
 
-        const dispatch = proposed.find((a) => a.agent === 'content_creator');
+        const dispatch = proposed.find((a) => a.agent === 'charlie');
         if (!dispatch) return;
 
         console.log(`[content-creator-listener] Dispatch received from activity ${row.id}`);
@@ -69,12 +69,12 @@ export function startContentCreatorListener(): void {
 
         let responseText: string;
         try {
-          const result = await contentCreator.generate(messages);
+          const result = await charlie.generate(messages);
           responseText = result.text;
         } catch (err) {
           console.error('[content-creator-listener] Content Creator error:', err);
           await supabase.from('agent_activity').insert({
-            agent_name: 'content_creator',
+            agent_name: 'charlie',
             action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
@@ -90,7 +90,7 @@ export function startContentCreatorListener(): void {
         }
 
         await supabase.from('agent_activity').insert({
-          agent_name: 'content_creator',
+          agent_name: 'charlie',
           action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
           status: 'auto',
           trigger_type: 'agent',
