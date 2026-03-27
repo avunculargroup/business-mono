@@ -77,3 +77,11 @@ export interface ProfileInfo {
   about?: string;
   aboutEmoji?: string;
 }
+
+/** Raw shape returned by signal-cli REST API (snake_case field names) */
+export interface RawProfileInfo {
+  name?: string;
+  family_name?: string;
+  about?: string;
+  about_emoji?: string;
+}
