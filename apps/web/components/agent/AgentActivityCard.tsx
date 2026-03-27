@@ -13,8 +13,55 @@ interface AgentActivityCardProps {
   compact?: boolean;
 }
 
+type ParsedAction = {
+  prefix: string | null;
+  message: string;
+};
+
+const AGENT_LABELS: Record<string, string> = {
+  pm: 'PM',
+  ba: 'BA',
+  recorder: 'Recorder',
+  archivist: 'Archivist',
+  content_creator: 'Content Creator',
+};
+
+function parseAction(action: string): ParsedAction {
+  // "Signal message from Name: message"
+  const signalMatch = action.match(/^Signal message from (.+?):\s*([\s\S]+)$/);
+  if (signalMatch) {
+    return { prefix: `Signal from ${signalMatch[1]}`, message: signalMatch[2] };
+  }
+
+  // "Dispatch to agent: message"
+  const dispatchMatch = action.match(/^Dispatch to (\w+):\s*([\s\S]+)$/);
+  if (dispatchMatch) {
+    const agentKey = dispatchMatch[1];
+    const label = AGENT_LABELS[agentKey] ?? agentKey.charAt(0).toUpperCase() + agentKey.slice(1);
+    return { prefix: `→ ${label}`, message: dispatchMatch[2] };
+  }
+
+  // "Web directive: message"
+  const webMatch = action.match(/^Web directive:\s*([\s\S]+)$/i);
+  if (webMatch) {
+    return { prefix: 'Web directive', message: webMatch[1] };
+  }
+
+  return { prefix: null, message: action };
+}
+
+const TRIGGER_LABELS: Record<string, string> = {
+  call_transcript: 'Call transcript',
+  signal_message: 'Signal message',
+  scheduled: 'Scheduled',
+  agent: 'Agent',
+};
+
 export function AgentActivityCard({ activity, compact }: AgentActivityCardProps) {
   const proposedActions = (activity.proposed_actions as Array<{ description: string; entity_type?: string; entity_id?: string }>) || [];
+  const { prefix, message } = parseAction(activity.action);
+
+  const triggerLabel = activity.trigger_type ? TRIGGER_LABELS[activity.trigger_type] : null;
 
   const borderClass =
     activity.status === 'pending'
@@ -32,10 +79,11 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
         <span className={styles.timestamp}>{formatDateTime(activity.created_at)}</span>
       </div>
 
-      <p className={styles.action}>{activity.action}</p>
+      {prefix && <p className={styles.actionPrefix}>{prefix}</p>}
+      <p className={styles.action}>{message}</p>
 
-      {activity.trigger_type && (
-        <p className={styles.trigger}>Triggered by: {activity.trigger_type}</p>
+      {triggerLabel && (
+        <p className={styles.trigger}>Triggered by: {triggerLabel}</p>
       )}
 
       {proposedActions.length > 0 && !compact && (
