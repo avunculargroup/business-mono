@@ -40,7 +40,15 @@ const fetchDueMonitors = createStep({
       .order('next_run_at', { ascending: true })
       .limit(10);
 
-    if (error) throw new Error(`Failed to fetch monitors: ${(error as { message: string }).message}`);
+    if (error) {
+      const msg = (error as { message: string }).message;
+      // Table doesn't exist yet — migration pending. Skip gracefully.
+      if (msg.includes('research_monitors')) {
+        console.warn('[monitor-workflow] research_monitors table not found — migration pending, skipping');
+        return { monitors: [] };
+      }
+      throw new Error(`Failed to fetch monitors: ${msg}`);
+    }
 
     type MonitorRow = Record<string, unknown>;
     return {
