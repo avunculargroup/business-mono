@@ -35,7 +35,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   const { data: tasks } = await supabase
     .from('tasks')
     .select('id, title, status, priority, due_date')
-    .eq('contact_id', id)
+    .eq('related_contact_id', id)
     .in('status', ['todo', 'in_progress', 'blocked']);
 
   return (
