@@ -21,7 +21,7 @@ type TaskRow = {
   status: string;
   priority: string;
   due_date: string | null;
-  contact_id: string | null;
+  related_contact_id: string | null;
   project_id: string | null;
   assigned_to: string | null;
 };
@@ -71,7 +71,7 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
       header: 'Contact',
       width: '15%',
       render: (row) => {
-        const c = contacts.find((ct) => ct.id === row.contact_id);
+        const c = contacts.find((ct) => ct.id === row.related_contact_id);
         return c ? `${c.first_name} ${c.last_name}` : '\u2014';
       },
     },
