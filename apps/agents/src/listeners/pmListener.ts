@@ -1,5 +1,7 @@
 import type { Mastra } from '@mastra/core';
-import { supabase } from '@platform/db';
+import { createRealtimeClient } from '@platform/db';
+
+const supabase = createRealtimeClient();
 import { petra } from '../agents/pm/agent.js';
 
 type ProposedAction = {

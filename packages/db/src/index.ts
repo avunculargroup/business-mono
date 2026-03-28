@@ -1,4 +1,4 @@
-export { supabase } from './client.js';
+export { supabase, createRealtimeClient } from './client.js';
 export type { Database, Json } from './types/database.js';
 export { vectorSearch } from './rpc/vectorSearch.js';
 export { graphTraverse } from './rpc/graphTraverse.js';
