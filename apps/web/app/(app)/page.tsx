@@ -105,7 +105,7 @@ export default async function DashboardPage() {
                   <div key={task.id} className={styles.taskRow}>
                     <div className={styles.taskInfo}>
                       <Link href={`/tasks/${task.id}`} className={styles.taskTitle}>{task.title}</Link>
-                      {task.contact_id && (
+                      {task.related_contact_id && (
                         <span className={styles.taskContact}>Contact linked</span>
                       )}
                     </div>
