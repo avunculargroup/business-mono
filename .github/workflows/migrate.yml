@@ -25,11 +25,22 @@ jobs:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
-      - name: Repair stale migration versions from duplicate-timestamp fix
+      - name: Repair remote-only migration versions
         run: |
-          supabase migration repair --status reverted 20260327000001 2>/dev/null || true
+          # Find any remote versions that have no local file and mark them reverted.
+          # This handles stale entries from renamed/removed migration files so that
+          # supabase db push does not abort with "Remote migration versions not found".
+          MIGRATION_OUTPUT=$(supabase migration list 2>&1) || true
+          ALL_VERSIONS=$(echo "$MIGRATION_OUTPUT" | grep -oE '[0-9]{14}' | sort -u)
+          for version in $ALL_VERSIONS; do
+            if ! ls supabase/migrations/${version}_*.sql >/dev/null 2>&1; then
+              echo "Repairing remote-only version: $version"
+              supabase migration repair --status reverted "$version" 2>&1 || true
+            fi
+          done
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Apply migrations
