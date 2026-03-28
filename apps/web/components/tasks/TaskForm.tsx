@@ -54,7 +54,7 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess }: TaskFor
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Contact</label>
-          <select name="related_contact_id" className={styles.select}>
+          <select name="contact_id" className={styles.select}>
             <option value="">None</option>
             {contacts.map((c) => (
               <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
