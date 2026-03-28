@@ -104,7 +104,7 @@ export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
                         <span className={styles.dueDate}>{formatRelativeDate(task.due_date)}</span>
                       )}
                     </div>
-                    {task.contact_id && (
+                    {task.related_contact_id && (
                       <span className={styles.contact}>Contact linked</span>
                     )}
                   </div>
