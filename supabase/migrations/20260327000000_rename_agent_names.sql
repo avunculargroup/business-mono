@@ -21,16 +21,6 @@ UPDATE platform_capabilities SET agent_name = 'bruno'   WHERE agent_name = 'ba';
 UPDATE platform_capabilities SET agent_name = 'charlie' WHERE agent_name = 'content_creator';
 UPDATE platform_capabilities SET agent_name = 'rex'     WHERE agent_name = 'researcher';
 
--- ── capacity_gaps ────────────────────────────────────────────────────────────
--- agent_name is optional on this table but update any existing rows for consistency
-
-UPDATE capacity_gaps SET agent_name = 'roger'   WHERE agent_name = 'recorder';
-UPDATE capacity_gaps SET agent_name = 'archie'  WHERE agent_name = 'archivist';
-UPDATE capacity_gaps SET agent_name = 'petra'   WHERE agent_name = 'pm';
-UPDATE capacity_gaps SET agent_name = 'bruno'   WHERE agent_name = 'ba';
-UPDATE capacity_gaps SET agent_name = 'charlie' WHERE agent_name = 'content_creator';
-UPDATE capacity_gaps SET agent_name = 'rex'     WHERE agent_name = 'researcher';
-
 -- ── CHECK constraints ────────────────────────────────────────────────────────
 -- Wrapped in DO blocks so the migration is idempotent (safe to re-run if the
 -- constraint was already created by a previous manual schema setup).
