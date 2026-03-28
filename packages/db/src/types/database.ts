@@ -107,7 +107,7 @@ export interface Database {
           status: string;
           priority: string;
           assigned_to: string | null;
-          contact_id: string | null;
+          related_contact_id: string | null;
           due_date: string | null;
           completed_at: string | null;
           source: string | null;
