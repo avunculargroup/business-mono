@@ -32,11 +32,31 @@ UPDATE capacity_gaps SET agent_name = 'charlie' WHERE agent_name = 'content_crea
 UPDATE capacity_gaps SET agent_name = 'rex'     WHERE agent_name = 'researcher';
 
 -- ── CHECK constraints ────────────────────────────────────────────────────────
+-- Wrapped in DO blocks so the migration is idempotent (safe to re-run if the
+-- constraint was already created by a previous manual schema setup).
 
-ALTER TABLE agent_activity
-  ADD CONSTRAINT agent_activity_agent_name_check
-  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_activity_agent_name_check'
+      AND conrelid = 'agent_activity'::regclass
+  ) THEN
+    ALTER TABLE agent_activity
+      ADD CONSTRAINT agent_activity_agent_name_check
+      CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex'));
+  END IF;
+END $$;
 
-ALTER TABLE platform_capabilities
-  ADD CONSTRAINT platform_capabilities_agent_name_check
-  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'platform_capabilities_agent_name_check'
+      AND conrelid = 'platform_capabilities'::regclass
+  ) THEN
+    ALTER TABLE platform_capabilities
+      ADD CONSTRAINT platform_capabilities_agent_name_check
+      CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex'));
+  END IF;
+END $$;
