@@ -1,4 +1,6 @@
-import { supabase } from '@platform/db';
+import { createRealtimeClient } from '@platform/db';
+
+const supabase = createRealtimeClient();
 import type { CoreMessage } from 'ai';
 import { bruno } from '../agents/ba/index.js';
 

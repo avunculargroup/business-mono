@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+const realtimeConfig = {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
@@ -22,4 +22,15 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     transport: WebSocket as any,
   },
-});
+} as const;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, realtimeConfig);
+
+/**
+ * Creates a new Supabase client with its own WebSocket connection.
+ * Use this in Realtime listeners so each listener's reconnect logic is isolated —
+ * calling removeChannel() on one client won't drop other listeners' subscriptions.
+ */
+export function createRealtimeClient() {
+  return createClient<Database>(supabaseUrl, supabaseKey, realtimeConfig);
+}
