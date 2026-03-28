@@ -41,10 +41,10 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
               <Link href={`/projects/${task.project_id}`}>View project</Link>
             </div>
           )}
-          {task.contact_id && (
+          {task.related_contact_id && (
             <div className={styles.field}>
               <span className={styles.label}>Contact</span>
-              <Link href={`/crm/contacts/${task.contact_id}`}>View contact</Link>
+              <Link href={`/crm/contacts/${task.related_contact_id}`}>View contact</Link>
             </div>
           )}
           {task.assigned_to && (
