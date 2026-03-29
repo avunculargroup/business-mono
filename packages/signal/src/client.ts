@@ -12,6 +12,7 @@ import type {
   ReactionParams,
   AttachmentParams,
   UpdateProfileParams,
+  ProfileUpdateResult,
 } from './types.js';
 
 export class SignalClient {
@@ -170,12 +171,23 @@ export class SignalClient {
     });
   }
 
-  async updateProfile(params: UpdateProfileParams): Promise<void> {
-    await this.request<void>('PUT', `/v1/profiles/${encodeURIComponent(this.account)}`, {
-      name: params.name,
-      ...(params.about !== undefined ? { about: params.about } : {}),
-      ...(params.base64Avatar !== undefined ? { base64_avatar: params.base64Avatar } : {}),
+  async updateProfile(params: UpdateProfileParams): Promise<ProfileUpdateResult> {
+    const res = await fetch(`${this.baseUrl}/v1/profiles/${encodeURIComponent(this.account)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: params.name,
+        ...(params.about !== undefined ? { about: params.about } : {}),
+        ...(params.base64Avatar !== undefined ? { base64_avatar: params.base64Avatar } : {}),
+      }),
     });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`signal-cli API error ${res.status}: ${text}`);
+    }
+
+    return { httpStatus: res.status };
   }
 
   async getAccounts(): Promise<string[]> {

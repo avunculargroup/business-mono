@@ -84,12 +84,15 @@ export const editSimonProfile = createTool({
       ...(base64Avatar !== undefined ? { avatar: '(base64 omitted)' } : {}),
     }));
 
+    let httpStatus: number;
     try {
-      await client.updateProfile({
+      const result = await client.updateProfile({
         name,
         ...(about !== undefined ? { about } : {}),
         ...(base64Avatar !== undefined ? { base64Avatar } : {}),
       });
+      httpStatus = result.httpStatus;
+      console.log(`${LOG_TAG} updateProfile returned HTTP ${httpStatus}`);
     } catch (err) {
       console.error(`${LOG_TAG} updateProfile API call failed:`, err);
       return {
@@ -99,18 +102,45 @@ export const editSimonProfile = createTool({
       };
     }
 
+    // Verify update via contacts self-lookup
+    let verified = false;
+    let verificationWarning: string | undefined;
+    try {
+      const contacts = await client.getContacts();
+      const self = contacts.find(c => c.number === signalNumber);
+      if (!self) {
+        verificationWarning = 'Self-contact not found in contacts list — cannot verify profile state';
+        console.warn(`${LOG_TAG} ${verificationWarning}`);
+      } else {
+        const profileName = self.profile?.given_name ?? self.profile_name ?? self.name;
+        if (profileName === name) {
+          verified = true;
+          console.log(`${LOG_TAG} Verification passed: profile name matches "${name}"`);
+        } else {
+          verificationWarning = `Profile read-back mismatch: expected "${name}", got "${profileName}"`;
+          console.warn(`${LOG_TAG} ${verificationWarning}`);
+        }
+      }
+    } catch (err) {
+      verificationWarning = `Could not verify profile update: ${err instanceof Error ? err.message : String(err)}`;
+      console.warn(`${LOG_TAG} ${verificationWarning}`);
+    }
+
     const updatedFields = [
       'name',
       ...(about !== undefined ? ['about'] : []),
       ...(avatarPath ? ['avatar'] : []),
     ];
 
-    console.log(`${LOG_TAG} Profile update complete. Fields: [${updatedFields.join(', ')}]`);
+    console.log(`${LOG_TAG} Profile update complete. Fields: [${updatedFields.join(', ')}], verified: ${verified}`);
 
     return {
       success: true,
+      httpStatus,
+      verified,
       updatedFields,
       registeredAccount: registeredAccounts[0] ?? signalNumber,
+      ...(verificationWarning ? { verificationWarning } : {}),
       ...(warnings.length ? { warnings } : {}),
     };
   },
