@@ -17,6 +17,7 @@ Every specialist agent has a **playful first name** used consistently across the
 | `bruno` | Bruno | The BA — data extraction, pattern analysis, structured insight |
 | `charlie` | Charlie | Content Creator — drafts, LinkedIn posts, newsletters, ideas |
 | `rex` | Rex | The Researcher — web search, market intelligence, monitors |
+| `della` | Della | Relationship Manager — CRM, customer understanding, pipeline advice |
 
 The **Canonical ID** is the `agent_name` value used in the `agent_activity` table and Mastra agent registration. The **Display Name** is what appears everywhere a human can see it.
 
@@ -49,7 +50,7 @@ The `agent_name` column in `agent_activity` must use canonical IDs only. No lega
 
 ```sql
 -- Valid agent_name values (add as a CHECK constraint if desired)
-CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex'))
+CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della'))
 ```
 
 Consider adding this constraint to the `agent_activity` table in the next schema revision.
@@ -83,6 +84,7 @@ Your specialist team:
 - Bruno analyses data and extracts structured insight
 - Charlie creates all content — posts, drafts, newsletters
 - Rex researches markets, monitors topics, hunts down information
+- Della manages relationships, understands customers, and keeps the CRM sharp
 
 Always refer to them by first name when talking to the user.
 Never say "the content agent" — say "Charlie".
@@ -106,6 +108,7 @@ export const AGENT_REGISTRY: Record<string, { displayName: string; role: string 
   bruno:   { displayName: 'Bruno',   role: 'The BA' },
   charlie: { displayName: 'Charlie', role: 'Content Creator' },
   rex:     { displayName: 'Rex',     role: 'The Researcher' },
+  della:   { displayName: 'Della',   role: 'Relationship Manager' },
 };
 
 // Usage in AgentActivityCard component

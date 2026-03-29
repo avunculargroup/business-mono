@@ -6,4 +6,5 @@ export const AGENT_REGISTRY: Record<string, { displayName: string; role: string;
   bruno:   { displayName: 'Bruno',   role: 'The BA',          roleId: 'ba' },
   charlie: { displayName: 'Charlie', role: 'Content Creator', roleId: 'content_creator' },
   rex:     { displayName: 'Rex',     role: 'The Researcher',  roleId: 'researcher' },
+  della:   { displayName: 'Della',   role: 'Relationship Manager', roleId: 'relationship_manager' },
 };
