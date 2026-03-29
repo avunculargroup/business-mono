@@ -43,9 +43,21 @@ export interface SignalGroup {
   members: string[];
 }
 
+export interface ContactProfile {
+  given_name: string;
+  lastname: string;         // API uses "lastname" not "family_name"
+  about: string;
+  has_avatar: boolean;
+  last_updated_timestamp: number;
+}
+
 export interface SignalContact {
   number: string;
+  uuid?: string;
   name: string;
+  profile_name?: string;
+  username?: string;
+  profile?: ContactProfile;
 }
 
 export interface ReactionParams {
@@ -67,4 +79,8 @@ export interface UpdateProfileParams {
   name: string;            // given name — required by signal-cli REST API
   about?: string;          // max ~140 chars
   base64Avatar?: string;   // pre-encoded PNG/JPG
+}
+
+export interface ProfileUpdateResult {
+  httpStatus: number;
 }

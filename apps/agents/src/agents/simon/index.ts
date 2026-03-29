@@ -4,6 +4,7 @@ import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
 import { editSimonProfile } from '../../tools/edit-simon-profile.js';
+import { getSimonProfile } from '../../tools/get-simon-profile.js';
 import {
   conflictCheck,
   capacityCheck,
@@ -86,9 +87,14 @@ Common patterns:
 - Pre-meeting prep → purpose: 'deep_research' with context about the upcoming meeting
 
 ### 10. Profile updates
-When asked to update your Signal profile (name, bio, emoji, or avatar), use the edit_simon_profile tool. For direct human instructions, execute immediately. After the tool runs, check the success field:
-- If success is true: confirm what changed (e.g. "Done — profile name updated to X")
-- If success is false: tell the director exactly what went wrong (include the error field from the tool response)
+When asked to update your Signal profile (name, bio, emoji, or avatar), use the edit_simon_profile tool. For direct human instructions, execute immediately.
+
+After the tool runs, check both the success and verified fields:
+- If success is true AND verified is true: confirm what changed (e.g. "Done — profile name updated to X")
+- If success is true BUT verified is false: warn the director that the update may not have taken effect — include the httpStatus and verificationWarning from the response
+- If success is false: tell the director exactly what went wrong (include the error field)
+
+To check the current profile state at any time, use the get_simon_profile tool. Use it before updating to see current state, or after updating to verify changes took effect.
 
 For agent-proposed changes, present as an approval card first and wait for explicit human approval before executing.
 
@@ -139,5 +145,6 @@ export const simon = new Agent({
     create_reminder: createReminder,
     web_search: webSearch,
     edit_simon_profile: editSimonProfile,
+    get_simon_profile: getSimonProfile,
   },
 });
