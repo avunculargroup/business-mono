@@ -98,3 +98,14 @@
     transform: rotate(360deg);
   }
 }
+
+@media (max-width: 767px) {
+  .sm {
+    min-height: 44px;
+    padding: 0 var(--space-4);
+  }
+
+  .md {
+    min-height: 44px;
+  }
+}

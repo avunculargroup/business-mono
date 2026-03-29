@@ -38,3 +38,9 @@
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
 }
+
+@media (max-width: 767px) {
+  .bubble {
+    max-width: 90%;
+  }
+}
