@@ -71,6 +71,19 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 767px) {
+  .close {
+    padding: var(--space-2);
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .panel {
+    width: 100vw;
+  }
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);

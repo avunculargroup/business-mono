@@ -39,3 +39,13 @@
 .newMessages:hover {
   background: var(--color-accent-hover);
 }
+
+@media (max-width: 767px) {
+  .thread {
+    padding: var(--space-4);
+  }
+
+  .newMessages {
+    bottom: 80px;
+  }
+}
