@@ -183,6 +183,7 @@ CREATE TABLE tasks (
   source                TEXT DEFAULT 'manual'
                         CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'pm_agent', 'ba_agent', 'content_agent', 'signal')),
   source_interaction_id UUID REFERENCES interactions(id) ON DELETE SET NULL,
+  source_activity_id    UUID REFERENCES agent_activity(id) ON DELETE SET NULL,
 
   related_contact_id    UUID REFERENCES contacts(id) ON DELETE SET NULL,
 

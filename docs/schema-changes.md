@@ -6,6 +6,13 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-03-29 — Add source_activity_id to tasks
+
+- **`tasks.source_activity_id`** — new nullable FK column referencing `agent_activity(id)`. The PM workflow (`pmListener`) passes the `agent_activity.id` of the Simon dispatch row as `sourceActivityId` when creating tasks; the column was missing, causing every PM-triggered task creation to fail with "Could not find the 'source_activity_id' column". Note: `source_interaction_id` (FK to `interactions`) remains for tasks created from call/meeting interactions — these are semantically distinct audit links.
+- **Index** — `idx_tasks_source_activity` added for efficient reverse-lookup.
+
+---
+
 ## 2026-03-26 — Adopt Supabase CLI migration workflow with CI/CD auto-apply
 
 - **Migration tooling adopted** — schema changes are now managed via the Supabase CLI. Migration files live in `supabase/migrations/` and are applied automatically on push to `main` via `.github/workflows/migrate.yml` (`supabase db push`). No manual SQL execution required.
