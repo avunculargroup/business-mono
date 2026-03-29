@@ -111,7 +111,7 @@ export interface Database {
           due_date: string | null;
           completed_at: string | null;
           source: string | null;
-          source_activity_id: string | null;
+          source_interaction_id: string | null;
           created_at: string;
           updated_at: string;
         };
