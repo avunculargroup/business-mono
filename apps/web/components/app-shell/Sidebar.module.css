@@ -197,6 +197,7 @@
   z-index: var(--z-sticky);
   justify-content: space-around;
   align-items: center;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .tab {

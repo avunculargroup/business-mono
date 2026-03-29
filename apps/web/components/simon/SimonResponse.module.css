@@ -36,3 +36,9 @@
   color: var(--color-text-tertiary);
   margin-top: var(--space-1);
 }
+
+@media (max-width: 767px) {
+  .bubble {
+    max-width: 90%;
+  }
+}

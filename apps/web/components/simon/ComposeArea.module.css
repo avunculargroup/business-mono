@@ -47,3 +47,14 @@
   margin-left: auto;
   margin-right: auto;
 }
+
+@media (max-width: 767px) {
+  .compose {
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + var(--safe-area-bottom, 0px));
+  }
+
+  .textarea {
+    font-size: 16px;
+  }
+}
