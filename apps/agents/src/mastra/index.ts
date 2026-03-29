@@ -5,6 +5,7 @@ import { archie } from '../agents/archivist/index.js';
 import { bruno } from '../agents/ba/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { rex } from '../agents/researcher/index.js';
+import { della } from '../agents/relationshipManager/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { monitorResearchWorkflow } from '../agents/researcher/workflow.js';
@@ -17,6 +18,7 @@ import { startContentCreatorListener } from '../listeners/contentCreatorListener
 import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startMonitorListener } from '../listeners/monitorListener.js';
+import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -29,6 +31,7 @@ export const mastra = new Mastra({
     bruno,
     charlie,
     rex,
+    della,
   },
   workflows: {
     recorder: recorderWorkflow,
@@ -61,3 +64,6 @@ startPMListener(mastra);
 
 // Start hourly monitor check for research monitors
 startMonitorListener(mastra);
+
+// Start Supabase Realtime listener for Relationship Manager dispatches
+startRelationshipManagerListener();
