@@ -12,6 +12,13 @@
   }
 }
 
+@media (max-width: 767px) {
+  .grid {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+}
+
 .left, .right {
   display: flex;
   flex-direction: column;
