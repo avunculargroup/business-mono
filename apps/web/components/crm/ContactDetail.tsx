@@ -14,7 +14,7 @@ interface ContactDetailProps {
     email: string | null;
     phone: string | null;
     pipeline_stage: string;
-    bitcoin_literacy: string;
+    bitcoin_literacy: string | null;
     notes: string | null;
     companies: { id: string; name: string } | null;
   };
@@ -36,7 +36,7 @@ export function ContactDetail({ contact, interactions, openTaskCount }: ContactD
       <aside className={styles.profile}>
         <div className={styles.section}>
           <PipelineChip stage={contact.pipeline_stage} />
-          <StatusChip label={contact.bitcoin_literacy} color="neutral" />
+          <StatusChip label={contact.bitcoin_literacy ?? 'unknown'} color="neutral" />
           {openTaskCount > 0 && (
             <StatusChip label={`${openTaskCount} open task${openTaskCount !== 1 ? 's' : ''}`} color="accent" />
           )}

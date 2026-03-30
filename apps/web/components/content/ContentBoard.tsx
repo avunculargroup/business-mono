@@ -12,11 +12,11 @@ import styles from './ContentBoard.module.css';
 
 type ContentItem = {
   id: string;
-  title: string;
+  title: string | null;
   type: string;
   status: string;
   scheduled_for: string | null;
-  author_id: string | null;
+  created_by: string | null;
 };
 
 const statusColumns = [
@@ -115,7 +115,7 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
                     <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
                     <div className={styles.cardMeta}>
                       <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
-                      {item.author_id && (
+                      {item.created_by && (
                         <span className={styles.assignee}>Assigned</span>
                       )}
                     </div>

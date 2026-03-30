@@ -13,10 +13,11 @@ export async function handleDeepgramWebhook(req: Request): Promise<Response> {
   // Build speaker-labelled transcript
   const transcript = buildTranscript(results);
 
-  // Resume the suspended Recorder workflow instance that's waiting on this request_id
-  await mastra.getWorkflow('recorder').resume({
-    resumeId: requestId,
-    context: {
+  // Resume the suspended Recorder workflow run that's waiting on this request_id
+  const workflow = mastra.getWorkflow('recorder');
+  const run = await workflow.createRunAsync({ runId: requestId });
+  await run.resume({
+    resumeData: {
       transcript,
       requestId,
       channels: results.channels,

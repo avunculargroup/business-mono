@@ -10,7 +10,7 @@ import styles from './ContentEditor.module.css';
 
 type ContentItem = {
   id: string;
-  title: string;
+  title: string | null;
   type: string;
   status: string;
   body: string | null;

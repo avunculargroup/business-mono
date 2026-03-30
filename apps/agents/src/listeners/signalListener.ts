@@ -85,7 +85,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     conv = created;
   }
 
-  const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
+  const messages: ConvMessage[] = Array.isArray(conv.messages) ? (conv.messages as unknown as ConvMessage[]) : [];
 
   const newUserMessage: ConvMessage = {
     role: 'user',

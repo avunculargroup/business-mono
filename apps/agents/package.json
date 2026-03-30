@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mastra/core": "^0.14.0",
+    "hono": "^4.12.8",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",

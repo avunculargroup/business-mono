@@ -45,11 +45,14 @@ export async function handleTelnyxWebhook(req: Request): Promise<Response> {
   const { call_control_id, recording_urls } = event.data.payload;
 
   // Trigger Recorder workflow
+  const recordingUrl = recording_urls?.mp3 ?? recording_urls?.wav;
+  if (!recordingUrl) return new Response('No recording URL in payload', { status: 400 });
+
   const recorderRun = await mastra.getWorkflow('recorder').createRunAsync();
   await recorderRun.start({ inputData: {
     source: 'telnyx',
     callControlId: call_control_id,
-    recordingUrl: recording_urls?.mp3 ?? recording_urls?.wav,
+    recordingUrl,
     channels: 'dual',
   } });
 

@@ -276,6 +276,10 @@ export const monitorResearchWorkflow = createWorkflow({
   inputSchema: z.object({
     triggered_at: z.string(),
   }),
+  outputSchema: z.object({
+    updated: z.number(),
+    changes_detected: z.number(),
+  }),
 })
   .then(fetchDueMonitors)
   .then(runMonitorChecks)

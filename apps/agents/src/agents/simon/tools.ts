@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
+import type { Json } from '@platform/db';
 import { CapacityGapType } from '@platform/shared';
 
 export const conflictCheck = createTool({
@@ -105,7 +106,7 @@ export const notifySpecialist = createTool({
         workflow_run_id: null,
         entity_type: null,
         entity_id: null,
-        proposed_actions: [{ agent: ctx.agentName, message: ctx.message, context: ctx.additionalContext }],
+        proposed_actions: [{ agent: ctx.agentName, message: ctx.message, context: ctx.additionalContext ?? null }] as Json,
         approved_actions: null,
         clarifications: null,
         notes: null,
