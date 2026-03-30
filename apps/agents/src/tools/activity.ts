@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
+import type { Json } from '@platform/db';
 import { AgentActivityStatus } from '@platform/shared';
 
 export const logActivity = createTool({
@@ -29,8 +30,8 @@ export const logActivity = createTool({
         workflow_run_id: context.workflowRunId ?? null,
         entity_type: context.entityType ?? null,
         entity_id: context.entityId ?? null,
-        proposed_actions: context.proposedActions ?? null,
-        approved_actions: context.approvedActions ?? null,
+        proposed_actions: (context.proposedActions ?? null) as Json,
+        approved_actions: (context.approvedActions ?? null) as Json,
         clarifications: null,
         notes: context.notes ?? null,
       })

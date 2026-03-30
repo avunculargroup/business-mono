@@ -43,7 +43,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         {project.description && <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>{project.description}</p>}
 
         <div style={{ display: 'flex', gap: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-6)' }}>
-          {project.owner_id && <span>Owner assigned</span>}
+          {project.created_by && <span>Owner assigned</span>}
           {project.target_date && <span>Target: {formatDate(project.target_date)}</span>}
           <span>Created: {formatDate(project.created_at)}</span>
         </div>

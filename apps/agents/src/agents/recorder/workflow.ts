@@ -31,7 +31,7 @@ const ingestAudio = createStep({
     let externalId: string | undefined;
 
     if (inputData.source === 'telnyx' && inputData.callControlId) {
-      const result = await telnyxDownload.execute({
+      const result = await telnyxDownload.execute!({
         context: {
           recordingUrl: inputData.recordingUrl,
           callControlId: inputData.callControlId,
@@ -39,7 +39,7 @@ const ingestAudio = createStep({
         runId: '',
         mastra: undefined as never,
         runtimeContext: undefined as never,
-      });
+      }) as { audioUrl: string; callControlId: string };
       audioUrl = result.audioUrl;
       externalId = result.callControlId;
     } else if (inputData.source === 'zoom') {
@@ -70,7 +70,7 @@ const transcribeAudio = createStep({
     const multichannel = inputData.channels === 'dual';
     const callbackUrl = `${DEEPGRAM_CALLBACK_BASE}/webhooks/deepgram`;
 
-    const result = await deepgramTranscribe.execute({
+    const result = await deepgramTranscribe.execute!({
       context: {
         audioUrl: inputData.audioUrl,
         callbackUrl,
@@ -80,7 +80,7 @@ const transcribeAudio = createStep({
       runId: '',
       mastra: undefined as never,
       runtimeContext: undefined as never,
-    });
+    }) as { requestId: string };
 
     // Suspend — workflow will be resumed by the Deepgram webhook handler
     const resumeData = await suspend({ requestId: result.requestId });
@@ -304,7 +304,7 @@ const createInteraction = createStep({
     if (error) throw new Error(`Failed to create interaction: ${error.message}`);
     const interactionId = (data as { id: string }).id;
 
-    await logActivity.execute({
+    await logActivity.execute!({
       context: {
         agentName: 'recorder',
         action: `Created interaction record ${interactionId}`,
@@ -456,6 +456,9 @@ export const recorderWorkflow = createWorkflow({
     callControlId: z.string().optional(),
     meetingUuid: z.string().optional(),
     channels: z.enum(['dual', 'single']),
+  }),
+  outputSchema: z.object({
+    done: z.boolean(),
   }),
 })
   .then(ingestAudio)

@@ -142,7 +142,7 @@ const riskScan = createStep({
     done: z.boolean(),
     risksFound: z.number(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (_) => {
     // Fetch all open tasks and projects for risk analysis
     const { data: tasks } = await supabase
       .from('v_open_tasks')
@@ -197,6 +197,10 @@ export const pmWorkflow = createWorkflow({
     suggestedAssignee: z.string().optional(),
     suggestedDueDate: z.string().optional(),
     suggestedPriority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  }),
+  outputSchema: z.object({
+    done: z.boolean(),
+    risksFound: z.number(),
   }),
 })
   .then(triageTask)
