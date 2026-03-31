@@ -118,7 +118,7 @@ const createTask = createStep({
     // Flag urgent tasks to Simon
     if (inputData.priority === 'urgent') {
       await supabase.from('agent_activity').insert({
-        agent_name: 'pm',
+        agent_name: 'petra',
         action: `Urgent task created: ${inputData.title}`,
         status: 'auto',
         entity_type: 'task',

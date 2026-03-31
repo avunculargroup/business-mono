@@ -473,7 +473,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
 CREATE TABLE agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name        TEXT NOT NULL
-                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex')),
+                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
@@ -520,7 +520,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 CREATE TABLE platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name      TEXT NOT NULL
-                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex')),
+                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
   capability      TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
                   CHECK (status IN ('active', 'planned', 'unavailable')),
@@ -668,10 +668,10 @@ CREATE POLICY "agent_activity_all" ON agent_activity
   FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "platform_capabilities_all" ON platform_capabilities
-  FOR ALL USING (auth.role() = 'authenticated');
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "capacity_gaps_all" ON capacity_gaps
-  FOR ALL USING (auth.role() = 'authenticated');
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 CREATE POLICY "research_monitors_all" ON research_monitors
   FOR ALL USING (auth.role() = 'authenticated');
