@@ -46,8 +46,10 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
   const [showCreate, setShowCreate] = useState(false);
   const [tasks, setTasks] = useState(initialTasks);
 
-  const handleTaskCreated = useCallback((task: TaskRow) => {
-    setTasks((prev) => [task, ...prev]);
+  const handleTaskCreated = useCallback((task?: TaskRow) => {
+    if (task) {
+      setTasks((prev) => [task, ...prev]);
+    }
     setShowCreate(false);
   }, []);
 
