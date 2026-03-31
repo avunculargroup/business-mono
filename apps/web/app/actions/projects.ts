@@ -21,19 +21,23 @@ export async function createProject(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { error } = await supabase.from('projects').insert({
-    name: data.name,
-    description: data.description || null,
-    status: data.status,
-    priority: data.priority,
-    created_by: data.owner_id || null,
-    target_date: data.target_date || null,
-  });
+  const { data: project, error } = await supabase
+    .from('projects')
+    .insert({
+      name: data.name,
+      description: data.description || null,
+      status: data.status,
+      priority: data.priority,
+      created_by: data.owner_id || null,
+      target_date: data.target_date || null,
+    })
+    .select()
+    .single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/projects');
-  return { success: true };
+  return { success: true, project };
 }
 
 export async function deleteProject(id: string) {

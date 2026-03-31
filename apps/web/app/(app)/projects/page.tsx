@@ -1,19 +1,15 @@
-import { createClient } from '@/lib/supabase/server';
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { ProjectsView } from '@/components/projects/ProjectsView';
+import { ProjectsContent } from './ProjectsContent';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
-export default async function ProjectsPage() {
-  const supabase = await createClient();
-
-  const [{ data: projects }, { data: teamMembers }] = await Promise.all([
-    supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('team_members').select('id, full_name'),
-  ]);
-
+export default function ProjectsPage() {
   return (
     <>
       <PageHeader title="Projects" />
-      <ProjectsView projects={projects || []} teamMembers={teamMembers || []} />
+      <Suspense fallback={<SkeletonLoader lines={6} height="100px" />}>
+        <ProjectsContent />
+      </Suspense>
     </>
   );
 }

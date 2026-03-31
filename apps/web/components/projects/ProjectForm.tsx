@@ -6,9 +6,17 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
+interface CreatedProject {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+}
+
 interface ProjectFormProps {
   teamMembers: { id: string; full_name: string }[];
-  onSuccess: () => void;
+  onSuccess: (project: CreatedProject) => void;
 }
 
 export function ProjectForm({ teamMembers, onSuccess }: ProjectFormProps) {
@@ -17,12 +25,12 @@ export function ProjectForm({ teamMembers, onSuccess }: ProjectFormProps) {
 
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
     const result = await createProject(formData);
-    if (result.error) {
+    if ('error' in result) {
       error(result.error);
       return { error: result.error };
     }
     success('Project created');
-    onSuccess();
+    onSuccess(result.project as CreatedProject);
     return null;
   };
 

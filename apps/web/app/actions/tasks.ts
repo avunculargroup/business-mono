@@ -24,26 +24,30 @@ export async function createTask(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { error } = await supabase.from('tasks').insert({
-    title: data.title,
-    description: data.description || null,
-    project_id: data.project_id || null,
-    related_contact_id: data.related_contact_id || null,
-    assigned_to: data.assigned_to || null,
-    priority: data.priority,
-    due_date: data.due_date || null,
-    status: data.status,
-    parent_task_id: null,
-    completed_at: null,
-    source: 'manual',
-    source_interaction_id: null,
-  });
+  const { data: task, error } = await supabase
+    .from('tasks')
+    .insert({
+      title: data.title,
+      description: data.description || null,
+      project_id: data.project_id || null,
+      related_contact_id: data.related_contact_id || null,
+      assigned_to: data.assigned_to || null,
+      priority: data.priority,
+      due_date: data.due_date || null,
+      status: data.status,
+      parent_task_id: null,
+      completed_at: null,
+      source: 'manual',
+      source_interaction_id: null,
+    })
+    .select()
+    .single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/tasks');
   revalidatePath('/');
-  return { success: true };
+  return { success: true, task };
 }
 
 export async function updateTaskStatus(id: string, status: string) {

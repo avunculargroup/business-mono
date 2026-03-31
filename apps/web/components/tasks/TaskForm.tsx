@@ -6,11 +6,22 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
+interface CreatedTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  related_contact_id: string | null;
+  project_id: string | null;
+  assigned_to: string | null;
+}
+
 interface TaskFormProps {
   projects: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
-  onSuccess: () => void;
+  onSuccess: (task: CreatedTask) => void;
 }
 
 export function TaskForm({ projects, teamMembers, contacts, onSuccess }: TaskFormProps) {
@@ -19,12 +30,12 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess }: TaskFor
 
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
     const result = await createTask(formData);
-    if (result.error) {
+    if ('error' in result) {
       error(result.error);
       return { error: result.error };
     }
     success('Task created');
-    onSuccess();
+    onSuccess(result.task as CreatedTask);
     return null;
   };
 
