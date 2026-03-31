@@ -26,9 +26,8 @@ export async function createProject(formData: FormData) {
     description: data.description || null,
     status: data.status,
     priority: data.priority,
-    owner_id: data.owner_id || null,
+    created_by: data.owner_id || null,
     target_date: data.target_date || null,
-    completed_at: null,
   });
 
   if (error) return { error: error.message };
