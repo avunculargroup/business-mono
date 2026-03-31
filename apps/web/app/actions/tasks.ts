@@ -68,6 +68,45 @@ export async function updateTaskStatus(id: string, status: string) {
   return { success: true };
 }
 
+export async function updateTask(id: string, formData: FormData) {
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = taskSchema.partial().safeParse(raw);
+
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  const supabase = await createClient();
+  const data = parsed.data;
+
+  const updateData: Record<string, unknown> = {};
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description || null;
+  if (data.project_id !== undefined) updateData.project_id = data.project_id || null;
+  if (data.related_contact_id !== undefined) updateData.related_contact_id = data.related_contact_id || null;
+  if (data.assigned_to !== undefined) updateData.assigned_to = data.assigned_to || null;
+  if (data.priority !== undefined) updateData.priority = data.priority;
+  if (data.due_date !== undefined) updateData.due_date = data.due_date || null;
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+    if (data.status === 'done') {
+      updateData.completed_at = new Date().toISOString();
+    } else {
+      updateData.completed_at = null;
+    }
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .update(updateData as never)
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/tasks');
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath('/');
+  return { success: true };
+}
+
 export async function deleteTask(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('tasks').delete().eq('id', id);
