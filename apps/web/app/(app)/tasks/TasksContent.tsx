@@ -26,7 +26,6 @@ export async function TasksContent() {
   return (
     <TasksView
       initialTasks={tasks ?? []}
-      totalCount={tasks?.length ?? 0}
       projects={projects ?? []}
       teamMembers={teamMembers}
       contacts={contacts ?? []}

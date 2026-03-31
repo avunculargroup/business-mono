@@ -28,7 +28,6 @@ type TaskRow = {
 
 interface TasksViewProps {
   initialTasks: TaskRow[];
-  totalCount: number;
   projects: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
@@ -42,7 +41,7 @@ const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
   cancelled: 'neutral',
 };
 
-export function TasksView({ initialTasks, totalCount, projects, teamMembers, contacts }: TasksViewProps) {
+export function TasksView({ initialTasks, projects, teamMembers, contacts }: TasksViewProps) {
   const [view, setView] = useLocalStorage<'list' | 'board'>('tasks-view', 'list');
   const [showCreate, setShowCreate] = useState(false);
   const [tasks, setTasks] = useState(initialTasks);

@@ -31,8 +31,8 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess }: TaskFor
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
     const result = await createTask(formData);
     if ('error' in result) {
-      error(result.error);
-      return { error: result.error };
+      error(result.error!);
+      return { error: result.error! };
     }
     success('Task created');
     onSuccess(result.task as CreatedTask);
