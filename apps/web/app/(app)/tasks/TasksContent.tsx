@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
-import { getCachedTeamMembers } from '@/lib/queries/cached';
 import { TasksView } from '@/components/tasks/TasksView';
 
 export async function TasksContent() {
   const supabase = await createClient();
 
-  const [{ data: tasks }, { data: projects }, { data: contacts }, teamMembers] = await Promise.all([
+  const [{ data: tasks }, { data: projects }, { data: contacts }, { data: teamMembers }] = await Promise.all([
     supabase
       .from('tasks')
       .select('*')
@@ -20,14 +19,16 @@ export async function TasksContent() {
       .select('id, first_name, last_name')
       .order('first_name')
       .limit(100),
-    getCachedTeamMembers(),
+    supabase
+      .from('team_members')
+      .select('id, full_name'),
   ]);
 
   return (
     <TasksView
       initialTasks={tasks ?? []}
       projects={projects ?? []}
-      teamMembers={teamMembers}
+      teamMembers={teamMembers ?? []}
       contacts={contacts ?? []}
     />
   );
