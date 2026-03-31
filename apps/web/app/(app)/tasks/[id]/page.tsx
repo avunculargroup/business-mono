@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { getCachedTeamMembers } from '@/lib/queries/cached';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PriorityChip } from '@/components/ui/PriorityChip';
@@ -26,7 +25,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const [
     projectResult,
     contactResult,
-    teamMembers,
+    { data: teamMembers },
     { data: allProjects },
     { data: allContacts },
   ] = await Promise.all([
@@ -36,14 +35,14 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     task.related_contact_id
       ? supabase.from('contacts').select('id, first_name, last_name').eq('id', task.related_contact_id).single()
       : Promise.resolve({ data: null }),
-    getCachedTeamMembers(),
+    supabase.from('team_members').select('id, full_name'),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
   ]);
 
   const project = projectResult?.data;
   const contact = contactResult?.data;
-  const assignee = teamMembers.find((m) => m.id === task.assigned_to);
+  const assignee = (teamMembers ?? []).find((m) => m.id === task.assigned_to);
 
   const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'destructive'> = {
     todo: 'neutral', in_progress: 'accent', blocked: 'destructive', done: 'success', cancelled: 'neutral',
@@ -57,7 +56,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <TaskDetailActions
           task={task}
           projects={allProjects ?? []}
-          teamMembers={teamMembers}
+          teamMembers={teamMembers ?? []}
           contacts={allContacts ?? []}
         />
       </PageHeader>
