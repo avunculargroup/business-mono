@@ -26,8 +26,8 @@ export function ProjectForm({ teamMembers, onSuccess }: ProjectFormProps) {
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
     const result = await createProject(formData);
     if ('error' in result) {
-      error(result.error);
-      return { error: result.error };
+      error(result.error!);
+      return { error: result.error! };
     }
     success('Project created');
     onSuccess(result.project as CreatedProject);
