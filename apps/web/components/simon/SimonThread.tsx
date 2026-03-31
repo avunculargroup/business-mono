@@ -88,6 +88,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         const activity = payload.new as Database['public']['Tables']['agent_activity']['Row'];
         if (activity && activity.agent_name === 'simon') {
+          if (/^Web directive:/i.test(activity.action ?? '')) return;
           setApprovalItems((prev) => {
             const filtered = prev.filter(
               (item) => !(item.type === 'approval' && item.data.id === activity.id)
