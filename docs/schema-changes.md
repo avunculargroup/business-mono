@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-03-30 — Fix agent_activity RLS, CHECK constraints, and workflow agent names
+
+Three bugs that blocked all agent audit logging:
+
+- **RLS missing `service_role`** — `agent_activity`, `platform_capabilities`, and `capacity_gaps` policies only allowed `auth.role() = 'authenticated'`. The Mastra server authenticates with the service role key, so every agent insert was rejected at the RLS layer. Policies now use `auth.role() IN ('authenticated', 'service_role')`, matching the pattern already set on `agent_conversations`.
+- **`'della'` missing from CHECK constraints** — The `20260327000000_rename_agent_names` migration added `agent_activity_agent_name_check` and `platform_capabilities_agent_name_check` without including `'della'` (Relationship Manager). Her listener was writing `agent_name: 'della'`, causing every insert to fail with a constraint violation. Both constraints now include `'della'`.
+- **Workflow agent_name mismatch (code fix)** — The Recorder workflow (`recorder/workflow.ts`) still wrote `'recorder'` and the PM workflow (`pm/workflow.ts`) still wrote `'pm'` — the pre-rename names. These were rejected by the CHECK constraints that require `'roger'` and `'petra'`. Fixed in TypeScript source; no additional schema migration needed.
+
+Migration: `20260330000000_fix_agent_activity_rls_and_constraints.sql`
+
+---
+
 ## 2026-03-29 — Add source_activity_id to tasks
 
 - **`tasks.source_activity_id`** — new nullable FK column referencing `agent_activity(id)`. The PM workflow (`pmListener`) passes the `agent_activity.id` of the Simon dispatch row as `sourceActivityId` when creating tasks; the column was missing, causing every PM-triggered task creation to fail with "Could not find the 'source_activity_id' column". Note: `source_interaction_id` (FK to `interactions`) remains for tasks created from call/meeting interactions — these are semantically distinct audit links.

@@ -357,7 +357,7 @@ const proposeCrmUpdates = createStep({
     // Log proposed actions for approval
     if (proposedUpdates.length > 0) {
       await supabase.from('agent_activity').insert({
-        agent_name: 'recorder',
+        agent_name: 'roger',
         action: 'Propose CRM updates from interaction',
         status: 'pending',
         entity_type: 'interaction',
@@ -391,7 +391,7 @@ const proposeTasks = createStep({
 
     for (const item of actionItems) {
       await supabase.from('agent_activity').insert({
-        agent_name: 'recorder',
+        agent_name: 'roger',
         action: `Propose task: ${item.text}`,
         status: 'pending',
         entity_type: 'interaction',
