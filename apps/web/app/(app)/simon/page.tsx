@@ -50,9 +50,10 @@ export default async function SimonPage() {
     }
   }
 
-  // Add activity items
+  // Add activity items (excluding web directives — already shown as director messages)
   if (activities) {
     for (const activity of activities) {
+      if (/^Web directive:/i.test(activity.action)) continue;
       threadItems.push({
         type: 'approval',
         data: activity,
