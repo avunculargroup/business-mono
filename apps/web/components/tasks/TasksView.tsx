@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -45,6 +45,12 @@ const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
 export function TasksView({ initialTasks, totalCount, projects, teamMembers, contacts }: TasksViewProps) {
   const [view, setView] = useLocalStorage<'list' | 'board'>('tasks-view', 'list');
   const [showCreate, setShowCreate] = useState(false);
+  const [tasks, setTasks] = useState(initialTasks);
+
+  const handleTaskCreated = useCallback((task: TaskRow) => {
+    setTasks((prev) => [task, ...prev]);
+    setShowCreate(false);
+  }, []);
 
   const columns: Column<TaskRow>[] = [
     {
@@ -134,9 +140,9 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
       {view === 'list' ? (
         <DataTable
           columns={columns}
-          data={initialTasks}
+          data={tasks}
           rowKey={(row) => row.id}
-          pagination={{ page: 1, pageSize: 25, total: totalCount, onPageChange: () => {} }}
+          pagination={{ page: 1, pageSize: 25, total: tasks.length, onPageChange: () => {} }}
           emptyState={
             <div className={styles.empty}>
               <CheckSquare size={48} strokeWidth={1} />
@@ -148,7 +154,7 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
         />
       ) : (
         <KanbanBoard
-          tasks={initialTasks}
+          tasks={tasks}
           onStatusChange={async (id, status) => {
             return await updateTaskStatus(id, status);
           }}
@@ -170,7 +176,7 @@ export function TasksView({ initialTasks, totalCount, projects, teamMembers, con
           projects={projects}
           teamMembers={teamMembers}
           contacts={contacts}
-          onSuccess={() => setShowCreate(false)}
+          onSuccess={handleTaskCreated}
         />
       </SlideOver>
     </div>

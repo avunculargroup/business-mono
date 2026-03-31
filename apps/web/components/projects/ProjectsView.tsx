@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/Card';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
@@ -31,8 +31,14 @@ const statusColors: Record<string, 'accent' | 'success' | 'warning' | 'neutral'>
   archived: 'neutral',
 };
 
-export function ProjectsView({ projects, teamMembers }: ProjectsViewProps) {
+export function ProjectsView({ projects: initialProjects, teamMembers }: ProjectsViewProps) {
   const [showCreate, setShowCreate] = useState(false);
+  const [projects, setProjects] = useState(initialProjects);
+
+  const handleProjectCreated = useCallback((project: ProjectRow) => {
+    setProjects((prev) => [project, ...prev]);
+    setShowCreate(false);
+  }, []);
 
   return (
     <>
@@ -88,7 +94,7 @@ export function ProjectsView({ projects, teamMembers }: ProjectsViewProps) {
       >
         <ProjectForm
           teamMembers={teamMembers}
-          onSuccess={() => setShowCreate(false)}
+          onSuccess={handleProjectCreated}
         />
       </SlideOver>
     </>

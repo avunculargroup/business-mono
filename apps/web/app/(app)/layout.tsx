@@ -16,21 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login');
   }
 
-  const { data: member } = await supabase
-    .from('team_members')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  const [{ data: member }, { count: pendingCount }] = await Promise.all([
+    supabase.from('team_members').select('*').eq('id', user.id).single(),
+    supabase.from('agent_activity').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+  ]);
 
   if (!member) {
     redirect('/login');
   }
-
-  // Fetch pending approval count for sidebar badge
-  const { count: pendingCount } = await supabase
-    .from('agent_activity')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending');
 
   return (
     <UserProvider user={member}>
