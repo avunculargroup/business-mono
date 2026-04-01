@@ -19,6 +19,7 @@ import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startMonitorListener } from '../listeners/monitorListener.js';
 import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
+import { startFastmailListener } from '../listeners/fastmailListener.js';
 
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
@@ -67,3 +68,6 @@ startMonitorListener(mastra);
 
 // Start Supabase Realtime listener for Relationship Manager dispatches
 startRelationshipManagerListener();
+
+// Start Fastmail JMAP polling loop
+startFastmailListener();

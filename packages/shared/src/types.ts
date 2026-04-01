@@ -84,6 +84,7 @@ export const InteractionSource = {
   RECORDER_AGENT: 'recorder_agent',
   SIGNAL: 'signal',
   CALL_TRANSCRIPT: 'call_transcript',
+  FASTMAIL_SYNC: 'fastmail_sync',
 } as const;
 export type InteractionSource = (typeof InteractionSource)[keyof typeof InteractionSource];
 
@@ -95,6 +96,7 @@ export const AgentName = {
   BRUNO: 'bruno',
   CHARLIE: 'charlie',
   REX: 'rex',
+  DELLA: 'della',
 } as const;
 export type AgentName = (typeof AgentName)[keyof typeof AgentName];
 
