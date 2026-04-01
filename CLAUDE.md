@@ -54,6 +54,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 - **Agent Server**: Mastra AI (`apps/agents`) → Railway — TypeScript, ES2022 modules
 - **Database**: Supabase (Postgres + pgvector + RLS)
 - **Communication**: Signal CLI (Simon’s dedicated number)
+- **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB, Della analyses content)
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
@@ -148,6 +149,7 @@ Key principles:
 - Generated types from Supabase CLI: `packages/db/src/types/database.ts`
 - RPC functions (graph traversal, semantic search): `packages/db/src/rpc/`
 - Simon’s capacity check uses `platform_capabilities` and `capacity_gaps` tables
+- Fastmail sync uses `fastmail_accounts`, `fastmail_exclusions`, `fastmail_sync_state` tables (managed via web UI at `/settings/integrations/fastmail`)
 
 ### Type generation
 
@@ -242,6 +244,8 @@ Read the relevant docs BEFORE writing code. This saves rework.
 |Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit. Required and banned term lists.    |
 |New agent or capability                                  |`docs/agents/simon.md` (capacity awareness)                  |Update `platform_capabilities` table when adding new capabilities                             |
 |Signal integration, Simon’s messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
+|Fastmail accounts, exclusions, email review queue         |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
+|Fastmail JMAP polling, email-to-interaction sync          |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
 
 **If in doubt, read `docs/brand-voice.md`.** It’s the most commonly needed reference after this file.
 

@@ -6,6 +6,21 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-01 — Fastmail JMAP email auto-logging
+
+Three new tables plus extended source enums to support automatic email logging from Fastmail inboxes.
+
+- **`fastmail_accounts`** — stores one row per team member Fastmail account (username, app-specific password token, display name, active flag). Managed via the web UI at `/settings/integrations/fastmail`. RLS allows `authenticated` and `service_role`.
+- **`fastmail_exclusions`** — domains and email addresses to silently skip during sync (e.g. `stripe.com`, `noreply@example.com`). Type is `'domain'` or `'email'`. Managed via web UI.
+- **`fastmail_sync_state`** — one row per `fastmail_accounts` row. Stores Fastmail's JMAP `queryState` for Inbox and Sent mailboxes to enable incremental sync (no re-processing old emails). Cascades on account deletion.
+- **`contacts.source` extended** — `'fastmail_sync'` added to the check constraint. Contacts auto-created from email are tagged `['needs-review']` and have `pipeline_stage = 'lead'`.
+- **`interactions.source` extended** — `'fastmail_sync'` added. Internal (team-to-team) emails land with `direction = 'internal'` and `contact_id = null`.
+- **`platform_capabilities` seed** — `simon / fastmail_email_sync` row inserted.
+
+Migration: `20260401120000_add_fastmail_sync.sql`
+
+---
+
 ## 2026-03-30 — Fix agent_activity RLS, CHECK constraints, and workflow agent names
 
 Three bugs that blocked all agent audit logging:
