@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-01 — Fastmail watched_addresses filter
+
+Added `watched_addresses TEXT[] NOT NULL DEFAULT '{}'` to `fastmail_accounts`.
+
+When non-empty, the polling listener skips any email where none of the participants (From, To, Cc) match a watched address. This supports Fastmail accounts with multiple aliases where only specific addresses should be monitored. Empty array (the default) retains the original behaviour of logging all emails on the account.
+
+Migration: `20260401130000_fastmail_watched_addresses.sql`
+
+---
+
 ## 2026-04-01 — Fastmail JMAP email auto-logging
 
 Three new tables plus extended source enums to support automatic email logging from Fastmail inboxes.

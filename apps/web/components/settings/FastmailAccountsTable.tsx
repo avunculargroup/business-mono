@@ -13,6 +13,7 @@ export type FastmailAccountRow = {
   username: string;
   display_name: string | null;
   is_active: boolean;
+  watched_addresses: string[];
   created_at: string;
 };
 
@@ -59,12 +60,29 @@ export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountR
     {
       key: 'token',
       header: 'Token',
-      width: '15%',
+      width: '10%',
       render: () => (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
           ••••••••
         </span>
       ),
+    },
+    {
+      key: 'watched',
+      header: 'Watched addresses',
+      width: '20%',
+      render: (row) =>
+        row.watched_addresses.length === 0 ? (
+          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>All</span>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {row.watched_addresses.map((addr) => (
+              <li key={addr} style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
+                {addr}
+              </li>
+            ))}
+          </ul>
+        ),
     },
     {
       key: 'status',
