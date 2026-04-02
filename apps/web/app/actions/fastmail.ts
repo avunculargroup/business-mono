@@ -11,6 +11,7 @@ export async function addFastmailAccount(data: {
   username: string;
   token: string;
   display_name?: string;
+  watched_addresses?: string[];
 }) {
   if (!data.username || !data.token) {
     return { error: 'Username and token are required' };
@@ -18,9 +19,10 @@ export async function addFastmailAccount(data: {
 
   const supabase = await createClient();
   const { error } = await supabase.from('fastmail_accounts').insert({
-    username:     data.username.trim().toLowerCase(),
-    token:        data.token,
-    display_name: data.display_name?.trim() || null,
+    username:          data.username.trim().toLowerCase(),
+    token:             data.token,
+    display_name:      data.display_name?.trim() || null,
+    watched_addresses: data.watched_addresses ?? [],
   });
 
   if (error) return { error: error.message };

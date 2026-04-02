@@ -29,13 +29,13 @@ export function startFastmailListener(): void {
 // ── Poll all accounts ─────────────────────────────────────────────────────────
 
 async function pollAllAccounts(): Promise<void> {
-  let accounts: Array<{ id: string; username: string; token: string; display_name: string | null }>;
+  let accounts: Array<{ id: string; username: string; token: string; display_name: string | null; watched_addresses: string[] }>;
   let exclusions: Array<{ type: string; value: string }>;
   let teamEmails: Set<string>;
 
   try {
     const [accountsRes, exclusionsRes, teamRes] = await Promise.all([
-      supabase.from('fastmail_accounts').select('id, username, token, display_name').eq('is_active', true),
+      supabase.from('fastmail_accounts').select('id, username, token, display_name, watched_addresses').eq('is_active', true),
       supabase.from('fastmail_exclusions').select('type, value'),
       supabase.from('team_members').select('email'),
     ]);
@@ -74,7 +74,7 @@ async function pollAllAccounts(): Promise<void> {
 // ── Poll a single account ─────────────────────────────────────────────────────
 
 async function pollAccount(
-  account: { id: string; username: string; token: string; display_name: string | null },
+  account: { id: string; username: string; token: string; display_name: string | null; watched_addresses: string[] },
   exclusions: Array<{ type: string; value: string }>,
   teamEmails: Set<string>,
 ): Promise<void> {
@@ -82,6 +82,10 @@ async function pollAccount(
 
   const { accountId, apiUrl } = await client.getSession();
   const { inboxId, sentId } = await client.getMailboxIds(accountId, apiUrl);
+
+  const watchedAddresses: Set<string> = new Set(
+    account.watched_addresses.map((a) => a.toLowerCase()),
+  );
 
   // Load or create sync state row for this account
   const { data: syncRow } = await supabase
@@ -100,7 +104,7 @@ async function pollAccount(
     const emails = await client.getEmails(accountId, apiUrl, inboxResult.emailIds);
     for (const email of emails) {
       try {
-        await processEmail(email, 'inbox', account.username, exclusions, teamEmails);
+        await processEmail(email, 'inbox', account.username, exclusions, teamEmails, watchedAddresses);
       } catch (err) {
         console.error(
           `[fastmail-listener] Error processing inbox email ${email.id} for ${account.username}:`,
@@ -128,7 +132,7 @@ async function pollAccount(
       if (!hasExternalRecipient) continue; // All recipients are team members — skip
 
       try {
-        await processEmail(email, 'sent', account.username, exclusions, teamEmails);
+        await processEmail(email, 'sent', account.username, exclusions, teamEmails, watchedAddresses);
       } catch (err) {
         console.error(
           `[fastmail-listener] Error processing sent email ${email.id} for ${account.username}:`,
@@ -165,6 +169,7 @@ async function processEmail(
   accountUsername: string,
   exclusions: Array<{ type: string; value: string }>,
   teamEmails: Set<string>,
+  watchedAddresses: Set<string>,
 ): Promise<void> {
   // 1. Marketing / spam header check
   if (shouldSkipEmail(email.headers)) return;
@@ -173,12 +178,15 @@ async function processEmail(
   const toEmails   = [...(email.to ?? []), ...(email.cc ?? [])].map((a) => a.email.toLowerCase());
   const allParticipants = [fromEmail, ...toEmails].filter(Boolean);
 
-  // 2. Exclusion list check (domain and exact email)
+  // 2. Watched-address filter — skip if no participant matches a watched address
+  if (watchedAddresses.size > 0 && !allParticipants.some((e) => watchedAddresses.has(e))) return;
+
+  // 3. Exclusion list check (domain and exact email)
   for (const participant of allParticipants) {
     if (isExcluded(participant, exclusions)) return;
   }
 
-  // 3. Determine direction and contact
+  // 4. Determine direction and contact
   const isInternal = allParticipants.every((e) => teamEmails.has(e));
   let direction: 'inbound' | 'outbound' | 'internal';
   let contactId: string | null = null;
@@ -207,11 +215,11 @@ async function processEmail(
     }
   }
 
-  // 4. Extract body text
+  // 5. Extract body text
   const bodyText = extractBody(email);
   const subject  = email.subject ?? '(no subject)';
 
-  // 5. Insert interaction
+  // 6. Insert interaction
   const { data: interaction, error: interactionError } = await supabase
     .from('interactions')
     .insert({
@@ -233,7 +241,7 @@ async function processEmail(
 
   const interactionId = (interaction as { id: string }).id;
 
-  // 6. Dispatch to Della for content analysis
+  // 7. Dispatch to Della for content analysis
   const contactLine = contactId
     ? `Contact: ${contactId}${isNewContact ? ' (NEW — needs review, confirm genuine lead or remove)' : ''}`
     : 'Internal team email — no contact linked';

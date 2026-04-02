@@ -21,10 +21,17 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
     const form = e.currentTarget;
     const data = new FormData(form);
 
+    const watchedRaw = (data.get('watched_addresses') as string) ?? '';
+    const watchedAddresses = watchedRaw
+      .split(/[\n,]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
     const result = await addFastmailAccount({
-      username:     (data.get('username') as string) ?? '',
-      token:        (data.get('token') as string) ?? '',
-      display_name: (data.get('display_name') as string) || undefined,
+      username:          (data.get('username') as string) ?? '',
+      token:             (data.get('token') as string) ?? '',
+      display_name:      (data.get('display_name') as string) || undefined,
+      watched_addresses: watchedAddresses.length > 0 ? watchedAddresses : undefined,
     });
 
     setLoading(false);
@@ -78,6 +85,25 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
         <p className={styles.hint}>
           Generate at Fastmail → Settings → Password &amp; Security → App Passwords.
           Grant <strong>read-only</strong> mail access.
+        </p>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="watched_addresses" className={styles.label}>
+          Watched addresses <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>(optional)</span>
+        </label>
+        <textarea
+          id="watched_addresses"
+          name="watched_addresses"
+          className={styles.input}
+          rows={3}
+          placeholder={"chris@business.com\nchris@otherdomain.com"}
+          autoComplete="off"
+        />
+        <p className={styles.hint}>
+          Leave empty to log all addresses on this account. Enter specific addresses
+          (one per line or comma-separated) to only log emails where one of those
+          addresses appears as a sender or recipient.
         </p>
       </div>
 

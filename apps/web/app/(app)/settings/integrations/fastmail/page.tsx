@@ -8,7 +8,7 @@ export default async function FastmailSettingsPage() {
   const [accountsRes, exclusionsRes, reviewRes, activityRes] = await Promise.all([
     supabase
       .from('fastmail_accounts')
-      .select('id, username, display_name, is_active, created_at')
+      .select('id, username, display_name, is_active, watched_addresses, created_at')
       .order('display_name', { ascending: true }),
 
     supabase
