@@ -45,9 +45,11 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={styles.form}>
+    <form onSubmit={handleSubmit} className={styles.form} aria-describedby={error ? 'account-form-error' : undefined} noValidate>
       <div className={styles.field}>
-        <label htmlFor="display_name" className={styles.label}>Display name (optional)</label>
+        <label htmlFor="display_name" className={styles.label}>
+          Display name <span className={styles.optional}>(optional)</span>
+        </label>
         <input
           id="display_name"
           name="display_name"
@@ -55,11 +57,15 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
           className={styles.input}
           placeholder="e.g. Simon"
           autoComplete="off"
+          // eslint-disable-next-line jsx-a11y/no-autofocus
+          autoFocus
         />
       </div>
 
       <div className={styles.field}>
-        <label htmlFor="username" className={styles.label}>Fastmail username</label>
+        <label htmlFor="username" className={styles.label}>
+          Fastmail username <span className={styles.required} aria-hidden="true">*</span>
+        </label>
         <input
           id="username"
           name="username"
@@ -72,7 +78,9 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
       </div>
 
       <div className={styles.field}>
-        <label htmlFor="token" className={styles.label}>App-specific password</label>
+        <label htmlFor="token" className={styles.label}>
+          App-specific password <span className={styles.required} aria-hidden="true">*</span>
+        </label>
         <input
           id="token"
           name="token"
@@ -90,24 +98,28 @@ export function FastmailAccountForm({ onSuccess }: FastmailAccountFormProps) {
 
       <div className={styles.field}>
         <label htmlFor="watched_addresses" className={styles.label}>
-          Watched addresses <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>(optional)</span>
+          Watched addresses <span className={styles.optional}>(optional)</span>
         </label>
         <textarea
           id="watched_addresses"
           name="watched_addresses"
-          className={styles.input}
+          className={styles.textarea}
           rows={3}
-          placeholder={"chris@business.com\nchris@otherdomain.com"}
+          placeholder={"chris@business.com\nchris@alias.com"}
           autoComplete="off"
         />
         <p className={styles.hint}>
-          Leave empty to log all addresses on this account. Enter specific addresses
-          (one per line or comma-separated) to only log emails where one of those
-          addresses appears as a sender or recipient.
+          Leave empty to log all addresses on this account. Add specific addresses
+          (one per line or comma-separated) to only log emails where one of them
+          appears as a sender or recipient — useful when a single account has multiple aliases.
         </p>
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      {error && (
+        <p id="account-form-error" className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       <div className={styles.footer}>
         <Button type="submit" variant="primary" loading={loading}>
