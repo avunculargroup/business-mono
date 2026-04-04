@@ -475,6 +475,98 @@ export type Database = {
           },
         ]
       }
+      fastmail_accounts: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          token: string
+          updated_at: string
+          username: string
+          watched_addresses: string[]
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          token: string
+          updated_at?: string
+          username: string
+          watched_addresses?: string[]
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          token?: string
+          updated_at?: string
+          username?: string
+          watched_addresses?: string[]
+        }
+        Relationships: []
+      }
+      fastmail_exclusions: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          type: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          type: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          type?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      fastmail_sync_state: {
+        Row: {
+          account_id: string
+          id: string
+          inbox_query_state: string | null
+          jmap_account_id: string | null
+          last_synced_at: string | null
+          sent_query_state: string | null
+        }
+        Insert: {
+          account_id: string
+          id?: string
+          inbox_query_state?: string | null
+          jmap_account_id?: string | null
+          last_synced_at?: string | null
+          sent_query_state?: string | null
+        }
+        Update: {
+          account_id?: string
+          id?: string
+          inbox_query_state?: string | null
+          jmap_account_id?: string | null
+          last_synced_at?: string | null
+          sent_query_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fastmail_sync_state_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "fastmail_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forms: {
         Row: {
           created_at: string
