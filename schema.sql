@@ -86,7 +86,7 @@ CREATE TABLE contacts (
   notes           TEXT,
   tags            TEXT[],
   source          TEXT DEFAULT 'manual'
-                  CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'signal', 'call_transcript')),
+                  CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'signal', 'call_transcript', 'fastmail_sync')),
   created_by      UUID REFERENCES team_members(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -121,7 +121,7 @@ CREATE TABLE interactions (
   -- Shape: see @platform/shared InteractionExtractedData
 
   source          TEXT DEFAULT 'manual'
-                  CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'signal', 'call_transcript')),
+                  CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'signal', 'call_transcript', 'fastmail_sync')),
 
   created_by      UUID REFERENCES team_members(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -779,3 +779,69 @@ INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_
   ('rex', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
   ('rex', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
 ON CONFLICT DO NOTHING;
+
+
+-- ============================================================
+-- FASTMAIL JMAP EMAIL AUTO-LOGGING
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS fastmail_accounts (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  username          TEXT        NOT NULL UNIQUE,
+  token             TEXT        NOT NULL,
+  display_name      TEXT,
+  is_active         BOOLEAN     NOT NULL DEFAULT true,
+  watched_addresses TEXT[]      NOT NULL DEFAULT '{}', -- empty = all; non-empty = filter by these aliases
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE TRIGGER fastmail_accounts_updated_at
+  BEFORE UPDATE ON fastmail_accounts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE fastmail_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "fastmail_accounts_all" ON fastmail_accounts;
+CREATE POLICY "fastmail_accounts_all" ON fastmail_accounts
+  FOR ALL
+  USING  (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+
+
+CREATE TABLE IF NOT EXISTS fastmail_exclusions (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  type       TEXT        NOT NULL CHECK (type IN ('domain', 'email')),
+  value      TEXT        NOT NULL UNIQUE,
+  notes      TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE fastmail_exclusions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "fastmail_exclusions_all" ON fastmail_exclusions;
+CREATE POLICY "fastmail_exclusions_all" ON fastmail_exclusions
+  FOR ALL
+  USING  (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+
+
+CREATE TABLE IF NOT EXISTS fastmail_sync_state (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id        UUID        NOT NULL UNIQUE
+                    REFERENCES fastmail_accounts(id) ON DELETE CASCADE,
+  jmap_account_id   TEXT,
+  inbox_query_state TEXT,
+  sent_query_state  TEXT,
+  last_synced_at    TIMESTAMPTZ,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE TRIGGER fastmail_sync_state_updated_at
+  BEFORE UPDATE ON fastmail_sync_state
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE fastmail_sync_state ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "fastmail_sync_state_all" ON fastmail_sync_state;
+CREATE POLICY "fastmail_sync_state_all" ON fastmail_sync_state
+  FOR ALL
+  USING  (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));

@@ -14,6 +14,7 @@ Owns customer and company understanding. Manages CRM records, assesses relations
 - Director requests a pipeline review or relationship health check
 - Director asks for advice on improving relationship management
 - Other agent needs customer context for personalising outreach (via Simon)
+- **Fastmail email logged** — `fastmailListener` inserts an `agent_activity` row with `trigger_type: 'system'` and `agent: 'della'` after each email sync. Della analyses the email body and populates `interactions.extracted_data` with action items, decisions, commitments, bitcoin signals, and sentiment. For new contacts (source `fastmail_sync`), Della also assesses whether the sender looks like a genuine lead.
 
 ## Capabilities
 
@@ -39,6 +40,8 @@ Owns customer and company understanding. Manages CRM records, assesses relations
 
 **Reads**: `contacts`, `companies`, `interactions`, `tasks`, `v_contacts_overview`, `v_recent_interactions`, `knowledge_items`, `knowledge_connections`
 **Writes**: `contacts`, `companies`, `interactions`, `agent_activity`
+
+**Note on Fastmail dispatches**: When dispatched by `fastmailListener` (trigger_type `system`), Della receives a message containing the interaction ID, email metadata, and contact ID. She should call `supabase_update` on the `interactions` table to populate `extracted_data`, and `supabase_update` on `contacts` to update notes if relevant. The `contact_id` may be `null` for internal team-to-team emails.
 
 ## Approval Gates
 
