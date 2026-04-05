@@ -3,7 +3,7 @@
 **Agent name:** The Researcher  
 **Status:** Built
 **Position in roster:** Agent 7 (specialist)
-**Last updated:** 2026-03-26
+**Last updated:** 2026-04-05
 
 ---
 
@@ -25,7 +25,7 @@ Unlike the other agents (which are primarily *writers* — producing records, ta
 
 **Deep research** — Multi-hop, iterative research across multiple sources. Used for contact/company briefings, regulatory landscape analysis, and competitive intelligence.
 
-**URL ingestion** — Accept a URL, extract clean markdown, and hand it to The Archivist's `ingest-knowledge` pipeline. Triggered when a human pastes a URL into Signal with intent to save it.
+**URL ingestion** — Accept a URL, extract clean markdown, and hand it to The Archivist's `ingest-knowledge` pipeline. Triggered when a human pastes a URL into Signal with intent to save it. For podcast episodes, The Researcher detects the podcast and searches YouTube for the episode to extract a transcript. If a YouTube transcript is found, it is returned as the `clean_markdown`. If not, the result signals that an audio file upload is needed for transcription by Roger.
 
 **Monitoring** — Track a subject, topic, or entity over time. Run on a schedule, compare new findings against the prior state stored in the knowledge base, and surface meaningful changes to Simon.
 
@@ -123,6 +123,9 @@ interface ResearchResult {
     title: string;
     clean_markdown: string;     // ready for Archivist embedding pipeline
     extracted_at: string;       // ISO 8601
+    transcript_source?: 'page' | 'youtube' | 'none';  // where content was sourced
+    youtube_url?: string;       // set when transcript_source is 'youtube'
+    needs_audio_upload?: boolean; // true when podcast episode has no online transcript
   };
 
   // Always present
@@ -146,7 +149,7 @@ interface Source {
 
 ## Tool Inventory
 
-The Researcher owns three tools. All are wrapped as Mastra tools in `packages/shared` so they can be referenced by other agents if ever needed.
+The Researcher owns four tools. All are wrapped as Mastra tools so they can be referenced by other agents if ever needed.
 
 ### 1. `search-web` — Tavily Search API
 
@@ -223,6 +226,50 @@ const crawlStructuredTool = createTool({
 - Treat as a premium tool — use only when Jina is insufficient
 - The `extract_schema` param enables schema-guided extraction (e.g. "extract company name, ASX code, and board members")
 - Monitor free tier usage; 500 pages/month is sufficient for BTS's current scale
+
+---
+
+### 4. `youtube-transcript` — YouTube Transcript Extraction
+
+**Purpose:** Fetch the timestamped transcript and metadata for a YouTube video.  
+**Provider:** `youtube-transcript` npm package (fetches auto-generated or manual captions)  
+**When used:** During `ingest_url` when a podcast episode is detected and a YouTube version is found via search  
+
+```typescript
+const youtubeTranscriptTool = createTool({
+  id: 'youtube-transcript',
+  description: 'Fetch transcript and metadata for a YouTube video',
+  inputSchema: z.object({
+    videoUrl: z.string(),  // YouTube URL or 11-character video ID
+  }),
+  // returns: { videoId, title, channel, duration, segmentCount, transcript }
+});
+```
+
+**Notes:**
+- Shared tool — also used by The Archivist for direct YouTube URL ingestion
+- Located in `apps/agents/src/tools/youtube.ts`
+- Supports multiple YouTube URL formats (watch, short, embed)
+- Transcript is timestamped (`[MM:SS] text`) and capped at 50KB
+- Throws an error if the video has no captions — The Researcher catches this and falls back to `needs_audio_upload: true`
+
+---
+
+## Podcast YouTube Lookup — `ingest_url` Sub-flow
+
+When The Researcher processes an `ingest_url` brief and detects the URL is a podcast episode:
+
+1. **Detect podcast** — URL patterns (spotify.com, podcasts.apple.com, podbean.com, anchor.fm, transistor.fm, buzzsprout.com, overcast.fm, pocketcasts.com, simplecast.com) or page content signals (show notes, episode description, no full transcript)
+2. **Extract metadata** — podcast name + episode title from the page content
+3. **Search YouTube** — `search_web` with `"{podcast name} {episode title}"`
+4. **Extract transcript** — if a YouTube match is found, call `youtube_transcript`
+5. **Return result**:
+   - Transcript found → `transcript_source: 'youtube'`, `youtube_url`, `clean_markdown` = full transcript with header
+   - No YouTube match or no captions → `transcript_source: 'none'`, `needs_audio_upload: true`, `clean_markdown` = show notes
+
+Simon handles the `needs_audio_upload` signal by asking the director for an audio file so Roger can transcribe it. The show notes are saved to the knowledge base in the meantime so the metadata is preserved.
+
+When storing in the knowledge base, `source_type` should be `'podcast'` (not `'youtube'`) since the content is a podcast — YouTube was just the transcript source. The original podcast URL is `source_url`.
 
 ---
 

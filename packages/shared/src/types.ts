@@ -367,6 +367,12 @@ export interface ResearchIngestion {
   title: string;
   clean_markdown: string;
   extracted_at: string;
+  /** Where the transcript/content was sourced from. */
+  transcript_source?: 'page' | 'youtube' | 'none';
+  /** YouTube video URL when transcript was sourced from YouTube. */
+  youtube_url?: string;
+  /** True when the content is a podcast episode and no transcript could be found online. */
+  needs_audio_upload?: boolean;
 }
 
 export interface ResearchMetadata {
