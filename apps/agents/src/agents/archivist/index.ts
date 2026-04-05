@@ -5,11 +5,11 @@ import { generateEmbedding } from '../../tools/openai.js';
 import { logActivity } from '../../tools/activity.js';
 import {
   webFetch,
-  youtubeTranscript,
   vectorSearchTool,
   graphTraverseTool,
   fulltextSearchTool,
 } from './tools.js';
+import { youtubeTranscript } from '../../tools/youtube.js';
 
 const SYSTEM_PROMPT = `You are Archie, BTS's Archivist and knowledge management specialist.
 

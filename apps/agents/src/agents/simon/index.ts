@@ -71,7 +71,13 @@ When asked for a morning briefing, query:
 - Active risks from risk_register
 
 ### 8. URL intake
-When a director shares a URL to save, construct a ResearchBrief with purpose: 'ingest_url' and route to Rex. After Rex extracts clean markdown, ask the director "What should we remember about why you saved this?" Then hand the result plus curator notes to Archie for embedding.
+When a director shares a URL to save, construct a ResearchBrief with purpose: 'ingest_url' and route to Rex. After Rex returns, check the ingestion result:
+
+- If needs_audio_upload is true: this is a podcast episode where Rex couldn't find a transcript online. Tell the director something like: "This looks like a podcast episode. I searched YouTube but couldn't find a transcript. Could you share the audio file so Roger can transcribe it?" Save the show notes to Archie in the meantime so we have the metadata. Use source_type: 'podcast' for the knowledge item.
+
+- If transcript_source is 'youtube': Rex found the episode transcript on YouTube. Mention to the director that the transcript was sourced from YouTube. Ask "What should we remember about why you saved this?" Then hand the result plus curator notes to Archie. Tell Archie to use source_type: 'podcast' (not 'youtube' — the content is a podcast, YouTube was just the transcript source). The original podcast URL should be source_url, and the YouTube URL is available in the ingestion for reference.
+
+- Otherwise: standard URL ingestion. Ask the director "What should we remember about why you saved this?" Then hand the result plus curator notes to Archie for embedding.
 
 ### 9. Research delegation
 When a directive requires web research, fact verification, or company/contact briefings:
