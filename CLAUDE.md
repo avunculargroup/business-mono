@@ -17,7 +17,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 ├── docs/
 │   ├── agents/          # Individual agent specifications
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance (content source of truth)
-│   ├── design-brief.md  # UI design system — colours, typography, components, tokens, IA (web source of truth)
+│   ├── DESIGN_BRIEF.md  # UI design system — colours, typography, components, tokens, IA (web source of truth)
 │   ├── schema-changes.md  # Changelog: what changed from original schema and why
 │   └── webhooks.md
 ├── schema.sql           # Consolidated database schema (source of truth)
@@ -110,14 +110,14 @@ Simon maintains awareness of what the platform can and cannot do. Before routing
 |PM             |Workflow + Agent|`docs/agents/pm.md`             |Projects, tasks, risk tracking                                         |
 |BA             |Agent           |`docs/agents/ba.md`             |Requirements analysis, clarification loops                             |
 |Content Creator|Agent           |`docs/agents/content-creator.md`|Content drafting, iteration, brand consistency                         |
-|Researcher     |Agent           |`docs/agents/researcher-agent-spec.md`|Web research, fact verification, URL ingestion, topic monitoring|
+|Researcher     |Workflow + Agent|`docs/agents/researcher-agent-spec.md`|Web research, fact verification, URL ingestion, topic monitoring|
 |Della (RM)     |Agent           |`docs/agents/relationship-manager.md` |CRM management, customer understanding, relationship health, pipeline advice|
 
 ### Agent vs Workflow decision
 
-- **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator, Researcher, Relationship Manager (Della).
+- **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator, Relationship Manager (Della).
 - **Workflow**: Deterministic pipelines with known steps. Recorder’s transcription pipeline, PM’s task triage.
-- **Hybrid** (Workflow + Agent): Core process is a workflow, but specific steps use agent reasoning.
+- **Hybrid** (Workflow + Agent): Core process is a workflow, but specific steps use agent reasoning. Recorder, PM, Researcher.
 
 -----
 
@@ -208,7 +208,7 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 |`supabase/migrations/`             |Migration files — applied sequentially to the live DB via `supabase db push` (auto on push to `main`)          |
 |`packages/db/MIGRATIONS.md`       |Developer workflow — how to create and apply schema migrations                                                 |
 |`CLAUDE.md`                        |This file — architecture, routing, naming conventions                                                          |
-|`docs/design-brief.md`             |**Web UI source of truth** — colours, typography, spacing, components, CSS tokens, IA, accessibility           |
+|`docs/DESIGN_BRIEF.md`             |**Web UI source of truth** — colours, typography, spacing, components, CSS tokens, IA, accessibility           |
 |`docs/brand-voice.md`              |**Content source of truth** — tone, terminology, Bitcoin stance, banned words, content lengths, microcopy rules|
 |`docs/schema-changes.md`           |Schema changelog — what changed from original and why (reference, not executable)                              |
 |`docs/webhooks.md`                 |Webhook endpoint specs, payloads, authentication                                                               |
@@ -228,10 +228,10 @@ Read the relevant docs BEFORE writing code. This saves rework.
 
 |Task                                                     |Read first                                                   |Why                                                                                           |
 |---------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-|Any UI component, page, or styling                       |`docs/design-brief.md`                                       |Colours, typography, spacing, component specs, layout pattern, CSS tokens, accessibility rules|
-|Agent activity feed or approval UI                       |`docs/design-brief.md` → Agent Activity Feed section         |`--color-agent-*` tokens, feed item anatomy, approval UX spec                                 |
-|Navigation, sidebar, or app shell layout                 |`docs/design-brief.md` → Layout Pattern + Navigation sections|Sidebar width, header height, responsive breakpoints, active states                           |
-|CSS tokens or custom properties                          |`docs/design-brief.md` → Design Tokens section               |Canonical token names — do not invent new ones or use raw hex values                          |
+|Any UI component, page, or styling                       |`docs/DESIGN_BRIEF.md`                                       |Colours, typography, spacing, component specs, layout pattern, CSS tokens, accessibility rules|
+|Agent activity feed or approval UI                       |`docs/DESIGN_BRIEF.md` → Agent Activity Feed section         |`--color-agent-*` tokens, feed item anatomy, approval UX spec                                 |
+|Navigation, sidebar, or app shell layout                 |`docs/DESIGN_BRIEF.md` → Layout Pattern + Navigation sections|Sidebar width, header height, responsive breakpoints, active states                           |
+|CSS tokens or custom properties                          |`docs/DESIGN_BRIEF.md` → Design Tokens section               |Canonical token names — do not invent new ones or use raw hex values                          |
 |UI copy, empty states, labels, microcopy                 |`docs/brand-voice.md` → UI Microcopy Rules section           |Tone, action label patterns, banned phrases                                                   |
 |Content Creator agent, content tools, or draft generation|`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
 |Any agent (building, modifying, adding tools)            |`docs/agents/{agent-name}.md`                                |Triggers, capabilities, tools, schema deps, approval gates                                    |
@@ -255,13 +255,13 @@ These two files cover adjacent territory — know which one to reach for:
 
 |Topic                                   |Source of truth       |
 |----------------------------------------|----------------------|
-|What the platform looks like            |`docs/design-brief.md`|
+|What the platform looks like            |`docs/DESIGN_BRIEF.md`|
 |What the platform sounds like           |`docs/brand-voice.md` |
-|CSS token names and values              |`docs/design-brief.md`|
+|CSS token names and values              |`docs/DESIGN_BRIEF.md`|
 |Banned words in copy                    |`docs/brand-voice.md` |
-|Component states and specs              |`docs/design-brief.md`|
+|Component states and specs              |`docs/DESIGN_BRIEF.md`|
 |Bitcoin terminology rules               |`docs/brand-voice.md` |
-|Visual identity (colours, type, spacing)|`docs/design-brief.md`|
+|Visual identity (colours, type, spacing)|`docs/DESIGN_BRIEF.md`|
 |Brand personality and tone              |`docs/brand-voice.md` |
 
-If `docs/brand-voice.md` contains visual identity values (colours, hex codes), treat them as illustrative reference only — the implementation spec lives in `docs/design-brief.md`.
+If `docs/brand-voice.md` contains visual identity values (colours, hex codes), treat them as illustrative reference only — the implementation spec lives in `docs/DESIGN_BRIEF.md`.
