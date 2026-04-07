@@ -6,6 +6,8 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toggleFastmailAccount, removeFastmailAccount } from '@/app/actions/fastmail';
+import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useToast } from '@/providers/ToastProvider';
 import { formatDate } from '@/lib/utils';
 
 export type FastmailAccountRow = {
@@ -18,20 +20,25 @@ export type FastmailAccountRow = {
 };
 
 export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountRow[] }) {
-  const [pendingToggle, setPendingToggle] = useState<string | null>(null);
   const [pendingRemove, setPendingRemove] = useState<FastmailAccountRow | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const { items: optimisticAccounts, optimisticUpdate, optimisticRemove } = useOptimisticList(accounts);
+  const toast = useToast();
 
-  async function handleToggle(account: FastmailAccountRow) {
-    setPendingToggle(account.id);
-    await toggleFastmailAccount(account.id, !account.is_active);
-    setPendingToggle(null);
+  function handleToggle(account: FastmailAccountRow) {
+    const newActive = !account.is_active;
+    optimisticUpdate(
+      account.id,
+      { is_active: newActive } as Partial<FastmailAccountRow>,
+      () => toggleFastmailAccount(account.id, newActive)
+    );
   }
 
   async function handleRemove() {
     if (!pendingRemove) return;
     setRemovingId(pendingRemove.id);
-    await removeFastmailAccount(pendingRemove.id);
+    optimisticRemove(pendingRemove.id, () => removeFastmailAccount(pendingRemove.id));
+    toast.success(`"${pendingRemove.display_name || pendingRemove.username}" removed`);
     setRemovingId(null);
     setPendingRemove(null);
   }
@@ -43,7 +50,7 @@ export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountR
       width: '20%',
       render: (row) => (
         <span style={{ fontWeight: 500 }}>
-          {row.display_name || '—'}
+          {row.display_name || '\u2014'}
         </span>
       ),
     },
@@ -115,7 +122,6 @@ export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountR
           <Button
             variant="secondary"
             size="sm"
-            loading={pendingToggle === row.id}
             onClick={() => handleToggle(row)}
           >
             {row.is_active ? 'Pause' : 'Activate'}
@@ -136,7 +142,7 @@ export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountR
     <>
       <DataTable
         columns={columns}
-        data={accounts}
+        data={optimisticAccounts}
         rowKey={(row) => row.id}
         emptyState={
           <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', padding: 'var(--space-4) 0' }}>

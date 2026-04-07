@@ -6,10 +6,22 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
 import styles from './ContactForm.module.css';
 
+type ContactRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  pipeline_stage: string;
+  owner_id: string | null;
+  company_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 interface ContactFormProps {
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
-  onSuccess: () => void;
+  onSuccess: (contact?: ContactRow) => void;
 }
 
 export function ContactForm({ companies, teamMembers, onSuccess }: ContactFormProps) {
@@ -23,7 +35,7 @@ export function ContactForm({ companies, teamMembers, onSuccess }: ContactFormPr
       return { error: result.error };
     }
     success('Contact created');
-    onSuccess();
+    onSuccess(result.contact as ContactRow);
     return null;
   };
 
