@@ -3,13 +3,17 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { RowActionsMenu } from '@/components/ui/RowActionsMenu';
 import { PipelineChip } from '@/components/ui/PipelineChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ContactForm } from './ContactForm';
+import { deleteContact } from '@/app/actions/contacts';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Eye, Pencil, Trash2 } from 'lucide-react';
+import { useToast } from '@/providers/ToastProvider';
 import styles from './ContactsList.module.css';
 
 type ContactRow = {
@@ -33,7 +37,11 @@ interface ContactsListProps {
 
 export function ContactsList({ initialContacts, totalCount: _totalCount, companies, teamMembers }: ContactsListProps) {
   const [showCreate, setShowCreate] = useState(false);
+  const [editContact, setEditContact] = useState<ContactRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ContactRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
+  const { success, error } = useToast();
   const { items: contacts, optimisticAdd } = useOptimisticList(initialContacts);
 
   const handleContactCreated = useCallback((contact?: ContactRow) => {
@@ -42,6 +50,20 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
     }
     setShowCreate(false);
   }, [optimisticAdd]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const result = await deleteContact(deleteTarget.id);
+    setIsDeleting(false);
+    if (result.error) {
+      error(result.error);
+    } else {
+      success('Contact deleted');
+      setDeleteTarget(null);
+      router.refresh();
+    }
+  };
 
   const columns: Column<ContactRow>[] = [
     {
@@ -104,6 +126,24 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         data={contacts}
         onRowClick={(row) => router.push(`/crm/contacts/${row.id}`)}
         rowKey={(row) => row.id}
+        rowActions={(row) => [
+          {
+            label: 'View',
+            icon: <Eye size={14} strokeWidth={1.5} />,
+            onClick: () => router.push(`/crm/contacts/${row.id}`),
+          },
+          {
+            label: 'Edit',
+            icon: <Pencil size={14} strokeWidth={1.5} />,
+            onClick: () => setEditContact(row),
+          },
+          {
+            label: 'Delete',
+            icon: <Trash2 size={14} strokeWidth={1.5} />,
+            onClick: () => setDeleteTarget(row),
+            destructive: true,
+          },
+        ]}
         pagination={{
           page: 1,
           pageSize: 25,
@@ -120,6 +160,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         }
       />
 
+      {/* Create slide-over */}
       <SlideOver
         open={showCreate}
         onClose={() => setShowCreate(false)}
@@ -137,6 +178,45 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
           onSuccess={handleContactCreated}
         />
       </SlideOver>
+
+      {/* Edit slide-over */}
+      <SlideOver
+        open={!!editContact}
+        onClose={() => setEditContact(null)}
+        title="Edit contact"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditContact(null)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="contact-edit-form">Save changes</Button>
+          </>
+        }
+      >
+        {editContact && (
+          <ContactForm
+            key={editContact.id}
+            companies={companies}
+            teamMembers={teamMembers}
+            mode="edit"
+            defaultValues={editContact}
+            onSuccess={() => {
+              setEditContact(null);
+              router.refresh();
+            }}
+          />
+        )}
+      </SlideOver>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete contact"
+        description={`Permanently delete ${deleteTarget?.first_name} ${deleteTarget?.last_name}? This cannot be undone.`}
+        confirmLabel="Delete contact"
+        destructive
+        loading={isDeleting}
+      />
     </div>
   );
 }
