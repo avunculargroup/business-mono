@@ -27,7 +27,7 @@ Directors (Signal / Web UI)
         ↕
      Simon (coordinator agent)
         ↕
-Specialist Agents: Recorder · Archivist · PM · BA · Content Creator · Researcher
+Specialist Agents: Recorder · Archivist · PM · BA · Content Creator · Researcher · Della (RM)
         ↕
   Supabase (shared Postgres + pgvector)
 ```
@@ -43,7 +43,7 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 ```
 ├── apps/
 │   ├── agents/          # Mastra AI agent server — deployed to Railway
-│   └── web/             # Next.js frontend — deployed to Vercel (future)
+│   └── web/             # Next.js frontend — deployed to Vercel
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
 │   ├── shared/          # Shared TypeScript types, enums, constants
@@ -52,12 +52,13 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
 │   ├── agents/          # Per-agent specification docs
+│   ├── DESIGN_BRIEF.md  # UI design system — colours, typography, components, tokens
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
 │   ├── schema-changes.md
 │   └── webhooks.md
-├── schema.sql           # Database schema — source of truth
-├── Dockerfile           # Multi-stage build for Railway (pnpm + Turborepo)
-├── .dockerignore
+├── supabase/
+│   └── migrations/      # Database migrations — execution source of truth
+├── schema.sql           # Consolidated database schema — human-readable reference only
 ├── CLAUDE.md            # AI agent instructions
 ├── tsconfig.base.json   # Base TypeScript config (extended by all packages)
 ├── turbo.json
@@ -106,10 +107,9 @@ cp apps/agents/.env.example apps/agents/.env
 
 # 3. Set up the database (choose one)
 #    Option A — Local (Supabase CLI):
-supabase init && supabase start
-psql $(supabase status -o env | grep DATABASE_URL | cut -d= -f2-) < schema.sql
+supabase start && supabase db push
 #    Option B — Remote (hosted Supabase project):
-psql $DATABASE_URL < schema.sql
+supabase link --project-ref $SUPABASE_PROJECT_ID && supabase db push
 
 # 4. Seed brand assets
 pnpm --filter @platform/db seed:brand-voice
@@ -164,7 +164,7 @@ cp apps/agents/.env.example apps/agents/.env
 | Command | Description |
 |---------|-------------|
 | `pnpm dev:agents` | Start agent server in watch mode |
-| `pnpm dev:web` | Start Next.js frontend (when implemented) |
+| `pnpm dev:web` | Start Next.js frontend in dev mode |
 | `pnpm build` | Build all packages and apps |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
@@ -205,14 +205,15 @@ Mastra requires ES2022 modules — do not downgrade `module` or `target`.
 
 ## Database
 
-`schema.sql` at the repo root is the **source of truth**.
+Schema changes are managed via **Supabase CLI migrations** in `supabase/migrations/`. These are the **execution source of truth** and are applied automatically on push to `main` via `.github/workflows/migrate.yml`. `schema.sql` at the repo root is a human-readable consolidated reference — do not execute it directly against a live database. See `packages/db/MIGRATIONS.md` for the full migration workflow.
 
 ### Remote setup (hosted Supabase project)
 
-Apply the schema directly to a hosted Supabase project:
+Link to your hosted project and push migrations:
 
 ```bash
-psql $DATABASE_URL < schema.sql
+supabase link --project-ref $SUPABASE_PROJECT_ID
+supabase db push
 ```
 
 ### Local setup (Supabase CLI)
@@ -224,21 +225,18 @@ For local development using the Supabase CLI:
 brew install supabase/tap/supabase   # macOS
 # or: npm install -g supabase        # any platform
 
-# 2. Initialise Supabase in the repo (one-time — creates supabase/ directory)
-supabase init
-
-# 3. Start the local Supabase stack (Postgres, Auth, Storage, etc.)
+# 2. Start the local Supabase stack (Postgres, Auth, Storage, etc.)
 supabase start
 
-# 4. Apply the schema to the local database
-psql $(supabase status -o env | grep DATABASE_URL | cut -d= -f2-) < schema.sql
+# 3. Apply migrations to the local database
+supabase db push
 
-# 5. Seed brand assets into the local database
+# 4. Seed brand assets into the local database
 SUPABASE_URL=$(supabase status -o env | grep API_URL | cut -d= -f2-) \
 SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep SERVICE_ROLE_KEY | cut -d= -f2-) \
 pnpm --filter @platform/db seed:brand-voice
 
-# 6. Generate TypeScript types from the local instance
+# 5. Generate TypeScript types from the local instance
 supabase gen types typescript --local > packages/db/src/types/database.ts
 ```
 
@@ -294,6 +292,9 @@ Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into 
 | `content_items` | Content pipeline: idea → draft → review → approved → published |
 | `risk_register` | Risk tracking with severity × likelihood matrix |
 | `research_monitors` | Scheduled research monitoring — subjects, search queries, digests, notification routing |
+| `fastmail_accounts` | Fastmail JMAP accounts for email polling (credentials stored in DB, managed via web UI) |
+| `fastmail_exclusions` | Email addresses/domains excluded from processing |
+| `fastmail_sync_state` | Per-account sync cursor state |
 
 ### RPC wrappers (`packages/db/src/rpc/`)
 
@@ -317,7 +318,8 @@ Full specifications are in `docs/agents/`. Summary:
 | **PM** | Workflow + Agent | Triages tasks from `agent_activity`, manages projects, tracks risks, monitors blocked tasks. |
 | **BA** | Agent | Elicits and structures requirements with multi-round clarification loops (Mastra suspend/resume). |
 | **Content Creator** | Agent | Drafts and iterates content, enforces brand consistency, adapts across formats. All publishing is human-approved. |
-| **Researcher** | Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds Archivist knowledge base. |
+| **Researcher** | Workflow + Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds Archivist knowledge base. |
+| **Della (RM)** | Agent | CRM management, customer understanding, relationship health, pipeline advice. Analyses Fastmail email via JMAP polling. |
 
 ### Approval philosophy
 
@@ -347,23 +349,22 @@ All three feed into the Recorder workflow.
 
 ### Agent server → Railway
 
-`apps/agents/railway.toml` is already configured. The build uses a multi-stage `Dockerfile` at the monorepo root (pnpm + Turborepo — no nixpacks):
+`apps/agents/railway.toml` is already configured.
 
-- **Build**: Docker multi-stage — installs pnpm via corepack, runs `turbo build --filter=@platform/agents...` to build workspace deps in order, produces a minimal runtime image
 - **Start**: `node dist/index.js`
 - **Health check**: `GET /health` (30s timeout)
 - **Restart policy**: on failure, max 3 retries
 
-Set all environment variables (see above) in your Railway service settings. Ensure the Railway service's **Root Directory** is set to the repo root (not `apps/agents/`) so the Dockerfile build context includes all workspace packages.
+Set all environment variables (see above) in your Railway service settings.
 
 ### Frontend → Vercel
 
-`apps/web` is not yet implemented. When ready, connect the `apps/web` directory to a Vercel project and set the same Supabase variables.
+Connect the `apps/web` directory to a Vercel project and set the same Supabase variables.
 
 ### Database → Supabase
 
 1. Create a new Supabase project.
-2. Run `schema.sql` via the SQL editor or `psql`.
+2. Link and push migrations: `supabase link --project-ref $SUPABASE_PROJECT_ID && supabase db push`.
 3. Copy the project URL, service role key, and project ID into your `.env`.
 
 ---
