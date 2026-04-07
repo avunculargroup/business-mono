@@ -49,7 +49,7 @@ export function ComposeArea({ onSend }: ComposeAreaProps) {
         <textarea
           ref={textareaRef}
           className={styles.textarea}
-          placeholder="Send a directive to Simon\u2026"
+          placeholder="Send a directive to Simon…"
           value={message}
           onChange={(e) => { setMessage(e.target.value); handleInput(); }}
           onKeyDown={handleKeyDown}
