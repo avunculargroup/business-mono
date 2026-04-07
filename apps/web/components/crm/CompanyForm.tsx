@@ -6,8 +6,17 @@ import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import styles from './ContactForm.module.css';
 
+type CompanyRow = {
+  id: string;
+  name: string;
+  industry: string | null;
+  size: string | null;
+  website: string | null;
+  created_at: string;
+};
+
 interface CompanyFormProps {
-  onSuccess: () => void;
+  onSuccess: (company?: CompanyRow) => void;
 }
 
 export function CompanyForm({ onSuccess }: CompanyFormProps) {
@@ -20,7 +29,7 @@ export function CompanyForm({ onSuccess }: CompanyFormProps) {
       return { error: result.error };
     }
     success('Company created');
-    onSuccess();
+    onSuccess(result.company as CompanyRow);
     return null;
   };
 

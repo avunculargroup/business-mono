@@ -28,7 +28,7 @@ export async function createContact(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { error } = await supabase.from('contacts').insert({
+  const { data: contact, error } = await supabase.from('contacts').insert({
     first_name: data.first_name,
     last_name: data.last_name,
     email: data.email || null,
@@ -39,13 +39,13 @@ export async function createContact(formData: FormData) {
     owner_id: data.owner_id || null,
     notes: data.notes || null,
     source: data.source || 'manual',
-  });
+  }).select().single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/crm/contacts');
   revalidatePath('/');
-  return { success: true };
+  return { success: true, contact };
 }
 
 export async function updateContact(id: string, formData: FormData) {

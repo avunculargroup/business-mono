@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
+import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { formatRelativeDate } from '@/lib/utils';
 import { Plus, List, LayoutGrid, CheckSquare } from 'lucide-react';
@@ -44,14 +45,17 @@ const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
 export function TasksView({ initialTasks, projects, teamMembers, contacts }: TasksViewProps) {
   const [view, setView] = useLocalStorage<'list' | 'board'>('tasks-view', 'list');
   const [showCreate, setShowCreate] = useState(false);
-  const [tasks, setTasks] = useState(initialTasks);
+  const { items: tasks, optimisticAdd } = useOptimisticList(initialTasks);
 
   const handleTaskCreated = useCallback((task?: TaskRow) => {
     if (task) {
-      setTasks((prev) => [task, ...prev]);
+      optimisticAdd(task, async () => {
+        // Server action already called by the form — this is a no-op
+        // The optimistic add happens immediately when the form succeeds
+      });
     }
     setShowCreate(false);
-  }, []);
+  }, [optimisticAdd]);
 
   const columns: Column<TaskRow>[] = [
     {
