@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PipelineChip } from '@/components/ui/PipelineChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { ContactForm } from './ContactForm';
+import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
 import { Plus, Users } from 'lucide-react';
 import styles from './ContactsList.module.css';
@@ -30,9 +31,17 @@ interface ContactsListProps {
   teamMembers: { id: string; full_name: string }[];
 }
 
-export function ContactsList({ initialContacts, totalCount, companies, teamMembers }: ContactsListProps) {
+export function ContactsList({ initialContacts, totalCount: _totalCount, companies, teamMembers }: ContactsListProps) {
   const [showCreate, setShowCreate] = useState(false);
   const router = useRouter();
+  const { items: contacts, optimisticAdd } = useOptimisticList(initialContacts);
+
+  const handleContactCreated = useCallback((contact?: ContactRow) => {
+    if (contact) {
+      optimisticAdd(contact, async () => {});
+    }
+    setShowCreate(false);
+  }, [optimisticAdd]);
 
   const columns: Column<ContactRow>[] = [
     {
@@ -92,13 +101,13 @@ export function ContactsList({ initialContacts, totalCount, companies, teamMembe
 
       <DataTable
         columns={columns}
-        data={initialContacts}
+        data={contacts}
         onRowClick={(row) => router.push(`/crm/contacts/${row.id}`)}
         rowKey={(row) => row.id}
         pagination={{
           page: 1,
           pageSize: 25,
-          total: totalCount,
+          total: contacts.length,
           onPageChange: () => {},
         }}
         emptyState={
@@ -125,7 +134,7 @@ export function ContactsList({ initialContacts, totalCount, companies, teamMembe
         <ContactForm
           companies={companies}
           teamMembers={teamMembers}
-          onSuccess={() => setShowCreate(false)}
+          onSuccess={handleContactCreated}
         />
       </SlideOver>
     </div>

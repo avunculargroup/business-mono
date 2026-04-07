@@ -14,6 +14,17 @@ export function Toast() {
       {toasts.map((toast) => (
         <div key={toast.id} className={`${styles.toast} ${styles[toast.type]}`}>
           <span className={styles.message}>{toast.message}</span>
+          {toast.action && (
+            <button
+              className={styles.action}
+              onClick={() => {
+                toast.action!.onClick();
+                dismiss(toast.id);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button className={styles.close} onClick={() => dismiss(toast.id)}>
             <X size={14} strokeWidth={1.5} />
           </button>

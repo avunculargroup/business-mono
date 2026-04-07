@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { CompanyForm } from './CompanyForm';
+import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { Plus, Building2 } from 'lucide-react';
 import styles from './ContactsList.module.css';
 
@@ -23,9 +24,17 @@ interface CompaniesListProps {
   totalCount: number;
 }
 
-export function CompaniesList({ initialCompanies, totalCount }: CompaniesListProps) {
+export function CompaniesList({ initialCompanies, totalCount: _totalCount }: CompaniesListProps) {
   const [showCreate, setShowCreate] = useState(false);
   const router = useRouter();
+  const { items: companies, optimisticAdd } = useOptimisticList(initialCompanies);
+
+  const handleCompanyCreated = useCallback((company?: CompanyRow) => {
+    if (company) {
+      optimisticAdd(company, async () => {});
+    }
+    setShowCreate(false);
+  }, [optimisticAdd]);
 
   const columns: Column<CompanyRow>[] = [
     {
@@ -71,13 +80,13 @@ export function CompaniesList({ initialCompanies, totalCount }: CompaniesListPro
 
       <DataTable
         columns={columns}
-        data={initialCompanies}
+        data={companies}
         onRowClick={(row) => router.push(`/crm/companies/${row.id}`)}
         rowKey={(row) => row.id}
         pagination={{
           page: 1,
           pageSize: 25,
-          total: totalCount,
+          total: companies.length,
           onPageChange: () => {},
         }}
         emptyState={
@@ -91,7 +100,7 @@ export function CompaniesList({ initialCompanies, totalCount }: CompaniesListPro
       />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add company" size="md">
-        <CompanyForm onSuccess={() => setShowCreate(false)} />
+        <CompanyForm onSuccess={handleCompanyCreated} />
       </Modal>
     </div>
   );
