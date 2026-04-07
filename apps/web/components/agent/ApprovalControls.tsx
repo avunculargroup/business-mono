@@ -62,7 +62,7 @@ export function ApprovalControls({ activityId }: ApprovalControlsProps) {
         <input
           type="text"
           className={styles.responseInput}
-          placeholder="Or respond to Simon\u2026"
+          placeholder="Or respond to Simon…"
           value={response}
           onChange={(e) => setResponse(e.target.value)}
         />
