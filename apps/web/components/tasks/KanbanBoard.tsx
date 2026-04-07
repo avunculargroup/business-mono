@@ -1,6 +1,21 @@
 'use client';
 
 import { useState, useOptimistic, useTransition } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragStartEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+} from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
+import { useDraggable } from '@dnd-kit/core';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { formatRelativeDate } from '@/lib/utils';
 import styles from './KanbanBoard.module.css';
@@ -28,8 +43,89 @@ interface KanbanBoardProps {
   onStatusChange: (id: string, status: string) => Promise<{ error?: string } | void>;
 }
 
+function KanbanCard({ task, isDragOverlay }: { task: TaskRow; isDragOverlay?: boolean }) {
+  return (
+    <div className={`${styles.card} ${isDragOverlay ? styles.cardOverlay : ''}`}>
+      <span className={styles.cardTitle}>{task.title}</span>
+      <div className={styles.cardMeta}>
+        <PriorityChip priority={task.priority} />
+        {task.assigned_to && (
+          <span className={styles.assignee}>Assigned</span>
+        )}
+        {task.due_date && (
+          <span className={styles.dueDate}>{formatRelativeDate(task.due_date)}</span>
+        )}
+      </div>
+      {task.related_contact_id && (
+        <span className={styles.contact}>Contact linked</span>
+      )}
+    </div>
+  );
+}
+
+function DraggableCard({ task }: { task: TaskRow }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`${styles.cardWrapper} ${isDragging ? styles.cardDragging : ''}`}
+    >
+      <KanbanCard task={task} />
+    </div>
+  );
+}
+
+function DroppableColumn({
+  columnKey,
+  label,
+  tasks,
+  isOver,
+  isEmpty,
+}: {
+  columnKey: string;
+  label: string;
+  tasks: TaskRow[];
+  isOver: boolean;
+  isEmpty: boolean;
+}) {
+  const { setNodeRef } = useDroppable({ id: columnKey });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${styles.column} ${isOver ? styles.columnOver : ''} ${isEmpty ? styles.columnEmpty : ''}`}
+    >
+      <div className={styles.columnHeader}>
+        <span className={styles.columnLabel}>{label}</span>
+        <span className={styles.columnCount}>{tasks.length}</span>
+      </div>
+      <div className={styles.cards}>
+        {tasks.map((task) => (
+          <DraggableCard key={task.id} task={task} />
+        ))}
+        {isEmpty && !isOver && (
+          <div className={styles.emptyPlaceholder}>
+            Drop here
+          </div>
+        )}
+        {isOver && (
+          <div className={styles.dropIndicator} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
   const [error, setError] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<TaskRow | null>(null);
+  const [overColumn, setOverColumn] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [optimisticTasks, setOptimisticStatus] = useOptimistic(
     tasks,
@@ -37,10 +133,41 @@ export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
       currentTasks.map((t) => (t.id === id ? { ...t, status } : t))
   );
 
-  const handleDrop = (e: React.DragEvent, newStatus: string) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain');
-    if (!taskId) return;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = optimisticTasks.find((t) => t.id === event.active.id);
+    if (task) setActiveTask(task);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const overId = event.over?.id as string | undefined;
+    if (overId && columns.some((c) => c.key === overId)) {
+      setOverColumn(overId);
+    } else {
+      setOverColumn(null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null);
+    setOverColumn(null);
+
+    const taskId = event.active.id as string;
+    const newStatus = event.over?.id as string | undefined;
+
+    if (!newStatus || !columns.some((c) => c.key === newStatus)) return;
+
+    const task = optimisticTasks.find((t) => t.id === taskId);
+    if (!task || task.status === newStatus) return;
 
     setError(null);
     startTransition(async () => {
@@ -52,12 +179,9 @@ export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
     });
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    e.dataTransfer.setData('text/plain', taskId);
+  const handleDragCancel = () => {
+    setActiveTask(null);
+    setOverColumn(null);
   };
 
   return (
@@ -68,52 +192,36 @@ export function KanbanBoard({ tasks, onStatusChange }: KanbanBoardProps) {
           <button onClick={() => setError(null)} className={styles.dismissError}>Dismiss</button>
         </div>
       )}
-      <div className={styles.board}>
-        {columns.map((col) => {
-          const colTasks = optimisticTasks.filter((t) => t.status === col.key);
-          const isCollapsed = (col.key === 'done' || col.key === 'cancelled') && colTasks.length === 0;
-
-          if (isCollapsed) return null;
-
-          return (
-            <div
-              key={col.key}
-              className={styles.column}
-              onDrop={(e) => handleDrop(e, col.key)}
-              onDragOver={handleDragOver}
-            >
-              <div className={styles.columnHeader}>
-                <span className={styles.columnLabel}>{col.label}</span>
-                <span className={styles.columnCount}>{colTasks.length}</span>
-              </div>
-              <div className={styles.cards}>
-                {colTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={styles.card}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, task.id)}
-                  >
-                    <span className={styles.cardTitle}>{task.title}</span>
-                    <div className={styles.cardMeta}>
-                      <PriorityChip priority={task.priority} />
-                      {task.assigned_to && (
-                        <span className={styles.assignee}>Assigned</span>
-                      )}
-                      {task.due_date && (
-                        <span className={styles.dueDate}>{formatRelativeDate(task.due_date)}</span>
-                      )}
-                    </div>
-                    {task.related_contact_id && (
-                      <span className={styles.contact}>Contact linked</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className={styles.board}>
+          {columns.map((col) => {
+            const colTasks = optimisticTasks.filter((t) => t.status === col.key);
+            return (
+              <DroppableColumn
+                key={col.key}
+                columnKey={col.key}
+                label={col.label}
+                tasks={colTasks}
+                isOver={overColumn === col.key}
+                isEmpty={colTasks.length === 0}
+              />
+            );
+          })}
+        </div>
+        <DragOverlay dropAnimation={{
+          duration: 200,
+          easing: 'cubic-bezier(0.2, 0, 0, 1)',
+        }}>
+          {activeTask ? <KanbanCard task={activeTask} isDragOverlay /> : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }

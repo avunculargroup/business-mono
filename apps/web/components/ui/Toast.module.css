@@ -40,6 +40,21 @@
   color: var(--color-text-primary);
 }
 
+.action {
+  background: none;
+  border: none;
+  color: var(--color-accent-dark);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.action:hover {
+  text-decoration: underline;
+}
+
 .close {
   background: none;
   border: none;

@@ -24,7 +24,7 @@ export async function createCompany(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { error } = await supabase.from('companies').insert({
+  const { data: company, error } = await supabase.from('companies').insert({
     name: data.name,
     industry: data.industry || null,
     size: data.size || null,
@@ -32,12 +32,12 @@ export async function createCompany(formData: FormData) {
     linkedin_url: data.linkedin_url || null,
     notes: data.notes || null,
     source: 'web',
-  });
+  }).select().single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/crm/companies');
-  return { success: true };
+  return { success: true, company };
 }
 
 export async function updateCompany(id: string, formData: FormData) {
