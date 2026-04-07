@@ -100,6 +100,12 @@
   cursor: not-allowed;
 }
 
+.actionsCell {
+  padding: var(--space-1) var(--space-2);
+  text-align: right;
+  width: 48px;
+}
+
 @media (max-width: 767px) {
   .th,
   .td {
