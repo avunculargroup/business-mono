@@ -160,6 +160,22 @@ export class SignalClient {
     });
   }
 
+  async sendTypingIndicator(recipient: string): Promise<void> {
+    await this.request<void>(
+      'PUT',
+      `/v1/typing-indicator/${encodeURIComponent(this.account)}`,
+      { recipient }
+    );
+  }
+
+  async stopTypingIndicator(recipient: string): Promise<void> {
+    await this.request<void>(
+      'DELETE',
+      `/v1/typing-indicator/${encodeURIComponent(this.account)}`,
+      { recipient }
+    );
+  }
+
   async sendAttachment(params: AttachmentParams): Promise<SendMessageResult> {
     return this.request<SendMessageResult>('POST', `/v2/send`, {
       number: this.account,
