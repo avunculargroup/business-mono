@@ -5,6 +5,7 @@ import type { ThreadItem } from '@/app/(app)/simon/page';
 import type { Database } from '@/lib/database';
 import { DirectorMessage } from './DirectorMessage';
 import { SimonResponse } from './SimonResponse';
+import { TypingIndicator } from './TypingIndicator';
 import { ApprovalCard } from './ApprovalCard';
 import { ComposeArea } from './ComposeArea';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -20,6 +21,7 @@ interface SimonThreadProps {
 type ConvRow = {
   signal_chat_id: string;
   messages: unknown;
+  is_processing: boolean;
 };
 
 function parseConversationMessages(messages: unknown): ThreadItem[] {
@@ -50,6 +52,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
   const [approvalItems, setApprovalItems] = useState<ThreadItem[]>(() =>
     initialItems.filter((i) => i.type === 'approval')
   );
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const items = sortItems([...messageItems, ...approvalItems]);
 
@@ -72,14 +75,14 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     if (atBottom) setHasNew(false);
   }, []);
 
-  // Auto-scroll when new items arrive and user is at bottom
+  // Auto-scroll when new items or typing indicator appear and user is at bottom
   useEffect(() => {
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     } else {
       setHasNew(true);
     }
-  }, [items.length, isAtBottom]);
+  }, [items.length, isProcessing, isAtBottom]);
 
   // Real-time: agent_activity (approval cards)
   useRealtimeSubscription(
@@ -101,21 +104,26 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     'agent_name=eq.simon'
   );
 
-  // Real-time: agent_conversations (Simon's responses)
+  // Real-time: agent_conversations (Simon's responses + processing state)
   useRealtimeSubscription(
     'agent_conversations',
     useCallback((payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
         const conv = payload.new as ConvRow;
         if (conv?.signal_chat_id === 'web') {
-          setMessageItems(parseConversationMessages(conv.messages));
+          setIsProcessing(conv.is_processing ?? false);
+          // Only update messages when not mid-processing to avoid flickering
+          // the optimistic message out before Simon's response arrives
+          if (!conv.is_processing) {
+            setMessageItems(parseConversationMessages(conv.messages));
+          }
         }
       }
     }, []),
     'signal_chat_id=eq.web'
   );
 
-  // Send handler: optimistic update + server action
+  // Send handler: optimistic update + instant typing indicator + server action
   const handleSend = useCallback(async (message: string) => {
     const optimistic: ThreadItem = {
       type: 'message',
@@ -126,6 +134,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
       },
     };
     setMessageItems((prev) => [...prev, optimistic]);
+    setIsProcessing(true);
     await sendDirective(message);
   }, []);
 
@@ -134,7 +143,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     setHasNew(false);
   };
 
-  if (items.length === 0) {
+  if (items.length === 0 && !isProcessing) {
     return (
       <div className={styles.container}>
         <div className={styles.thread}>
@@ -162,6 +171,7 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
             }
             return <ApprovalCard key={item.data.id} activity={item.data} />;
           })}
+          {isProcessing && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
       </div>
