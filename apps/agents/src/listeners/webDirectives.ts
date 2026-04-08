@@ -16,6 +16,7 @@ type ConvRow = {
   signal_chat_id: string;
   thread_type: string;
   messages: unknown;
+  is_processing: boolean;
 };
 
 // Module-level state so reconnect logic is properly deduped across calls
@@ -67,6 +68,7 @@ export function startWebDirectivesListener(): void {
 
         const conv = payload.new;
         if (conv.signal_chat_id !== 'web') return;
+        if (conv.is_processing) return; // Prevents re-triggering from our own is_processing=true write
         console.log('[web-directives] Processing web conversation:', conv.id);
 
         const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
@@ -74,6 +76,12 @@ export function startWebDirectivesListener(): void {
 
         // Only process when the latest message is from the director (user)
         if (!lastMessage || lastMessage.role !== 'user') return;
+
+        // Signal to the web client that Simon is thinking
+        await supabase
+          .from('agent_conversations')
+          .update({ is_processing: true })
+          .eq('id', conv.id);
 
         try {
           const messagesForSimon: CoreMessage[] = messages.map((m) => ({
@@ -90,9 +98,10 @@ export function startWebDirectivesListener(): void {
             source: 'simon',
           };
 
+          // Write response and clear processing flag atomically in one update
           await supabase
             .from('agent_conversations')
-            .update({ messages: [...messages, simonMessage] })
+            .update({ messages: [...messages, simonMessage], is_processing: false })
             .eq('id', conv.id);
 
           await supabase.from('agent_activity').insert({
@@ -110,6 +119,11 @@ export function startWebDirectivesListener(): void {
           });
         } catch (err) {
           console.error('[web-directives] Simon processing error:', err);
+          // Clear the flag so the UI doesn't get stuck showing the typing indicator
+          await supabase
+            .from('agent_conversations')
+            .update({ is_processing: false })
+            .eq('id', conv.id);
         }
       }
     )

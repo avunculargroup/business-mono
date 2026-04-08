@@ -96,6 +96,11 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 
   const updatedMessages = [...messages, newUserMessage];
 
+  // Fire-and-forget typing indicator — failure must not block message processing
+  void client.sendTypingIndicator(senderNumber).catch((err) => {
+    console.warn('[signal-listener] Typing indicator failed (non-fatal):', err);
+  });
+
   // Generate Simon's response
   let responseText: string;
   try {
