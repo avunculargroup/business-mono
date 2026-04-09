@@ -16,6 +16,8 @@
     "@anthropic-ai/sdk": "^0.32.0",
     "@deepgram/sdk": "^3.9.0",
     "@mastra/core": "^0.14.0",
+    "@mastra/memory": "^0.13.1",
+    "@mastra/pg": "^0.14.4",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",

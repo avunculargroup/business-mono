@@ -1,4 +1,5 @@
 import { Mastra } from '@mastra/core';
+import { PostgresStore } from '@mastra/pg';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
 import { archie } from '../agents/archivist/index.js';
@@ -25,6 +26,10 @@ import { startFastmailListener } from '../listeners/fastmailListener.js';
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
   (c: Context) => fn(c.req.raw);
 
+const storage = new PostgresStore({
+  connectionString: process.env['SUPABASE_DB_URL']!,
+});
+
 export const mastra = new Mastra({
   agents: {
     simon,
@@ -34,6 +39,7 @@ export const mastra = new Mastra({
     rex,
     della,
   },
+  storage,
   workflows: {
     recorder: recorderWorkflow,
     pm: pmWorkflow,
