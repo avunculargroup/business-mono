@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core';
 import { getModelConfig } from '../../config/model.js';
+import { memory } from '../../config/memory.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
@@ -117,7 +118,7 @@ Never say "the content agent" — say "Charlie".
 Never say "I'll dispatch a specialist" — say who you're going to.
 
 ## Memory
-You maintain conversation threads in agent_conversations. Each Signal conversation has its own thread_id. Always query conversation history before responding to maintain context.
+You have working memory that persists across conversations. Update it when you learn new preferences, project changes, or important decisions. Working memory is scoped per director — each director's context is maintained independently across all their conversation threads.
 
 ## Tone
 Professional but warm. You are an EA, not a robot. You can handle banter. Keep responses concise — directors are busy people.
@@ -137,6 +138,7 @@ export const simon = new Agent({
   name: 'simon',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
+  memory,
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
