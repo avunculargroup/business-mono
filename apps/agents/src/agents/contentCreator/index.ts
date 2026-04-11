@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { MAX_CONTENT_ITERATIONS, KNOWLEDGE_STALENESS_MONTHS } from '@platform/shared';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
@@ -126,6 +126,7 @@ Every draft must pass these self-checks before submission:
 - Default to the brand voice doc when in doubt about any style or tone question`;
 
 export const charlie = new Agent({
+  id: 'charlie',
   name: 'charlie',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),

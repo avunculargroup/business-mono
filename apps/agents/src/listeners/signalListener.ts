@@ -1,17 +1,10 @@
 import { SignalClient } from '@platform/signal';
 import type { IncomingMessage } from '@platform/signal';
 import { supabase } from '@platform/db';
-import type { CoreMessage } from 'ai';
 import { simon } from '../agents/simon/index.js';
+import type { ConvMessage } from './types.js';
 
 const client = new SignalClient();
-
-type ConvMessage = {
-  role: string;
-  content: string;
-  timestamp?: string;
-  source?: string;
-};
 
 async function resolveSenderName(phoneNumber: string | null | undefined, signalId: string): Promise<string> {
   // Try phone number lookup in contacts
@@ -60,7 +53,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 
   console.log(`[signal-listener] Message from ${senderName} (${senderNumber}): ${userMessage.slice(0, 80)}`);
 
-  // Get or create conversation thread keyed by sender's phone number
+  // Ensure agent_conversations row exists for dual-write
   let { data: conv } = await supabase
     .from('agent_conversations')
     .select('id, messages')
@@ -85,31 +78,20 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     conv = created;
   }
 
-  const messages: ConvMessage[] = Array.isArray(conv.messages) ? (conv.messages as unknown as ConvMessage[]) : [];
-
-  const newUserMessage: ConvMessage = {
-    role: 'user',
-    content: userMessage,
-    timestamp: new Date(dm.timestamp).toISOString(),
-    source: senderNumber,
-  };
-
-  const updatedMessages = [...messages, newUserMessage];
-
   // Fire-and-forget typing indicator — failure must not block message processing
   void client.sendTypingIndicator(senderNumber).catch((err) => {
     console.warn('[signal-listener] Typing indicator failed (non-fatal):', err);
   });
 
-  // Generate Simon's response
+  // Generate Simon's response via Mastra Memory (handles history retrieval, token limiting, etc.)
   let responseText: string;
   try {
-    const messagesForSimon: CoreMessage[] = updatedMessages.map((m) => ({
-      role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-      content: m.content,
-    }));
-
-    const result = await simon.generate(messagesForSimon);
+    const result = await simon.generate(userMessage, {
+      memory: {
+        resource: senderNumber,
+        thread: `signal-${senderNumber}`,
+      },
+    });
     responseText = result.text;
     console.log(
       `[signal-listener] Simon response (${responseText.length} chars):`,
@@ -127,6 +109,18 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     console.error('[signal-listener] Send error:', err);
   }
 
+  // Dual-write: keep agent_conversations populated for web UI
+  const existingMessages: ConvMessage[] = Array.isArray(conv.messages)
+    ? (conv.messages as unknown as ConvMessage[])
+    : [];
+
+  const newUserMessage: ConvMessage = {
+    role: 'user',
+    content: userMessage,
+    timestamp: new Date(dm.timestamp).toISOString(),
+    source: senderNumber,
+  };
+
   const simonMessage: ConvMessage = {
     role: 'assistant',
     content: responseText,
@@ -134,10 +128,9 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     source: 'simon',
   };
 
-  // Persist conversation
   await supabase
     .from('agent_conversations')
-    .update({ messages: [...updatedMessages, simonMessage] })
+    .update({ messages: [...existingMessages, newUserMessage, simonMessage] })
     .eq('id', conv.id);
 
   // Audit log

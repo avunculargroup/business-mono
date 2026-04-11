@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { createClient } from '@deepgram/sdk';
 
@@ -13,7 +13,7 @@ export const deepgramTranscribe = createTool({
     multichannel: z.boolean().default(false).describe('True for dual-channel Telnyx calls'),
     diarize: z.boolean().default(true).describe('Enable speaker diarisation for single-channel'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const options: Record<string, unknown> = {
       model: 'nova-3',
       punctuate: true,

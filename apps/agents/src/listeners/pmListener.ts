@@ -149,7 +149,7 @@ export function startPMListener(mastra: Mastra): void {
         }
 
         try {
-          const run = await mastra.getWorkflow('pm').createRunAsync();
+          const run = await mastra.getWorkflow('pm').createRun();
           const result = await run.start({ inputData: workflowInput });
           console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, result);
         } catch (err) {

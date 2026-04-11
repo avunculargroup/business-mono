@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Json } from '@platform/db';
@@ -11,7 +11,7 @@ export const conflictCheck = createTool({
     entityType: z.string().describe('Type of entity (e.g. contact, company, project)'),
     entityId: z.string().describe('ID of the entity'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from('agent_activity')
       .select('id, agent_name, action, created_at')
@@ -34,7 +34,7 @@ export const capacityCheck = createTool({
     directive: z.string().describe('The directive to check'),
     agentName: z.string().optional().describe('Specific agent to check workload for'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     // Fetch active capabilities
     const { data: capabilities } = await supabase
       .from('platform_capabilities')
@@ -69,7 +69,7 @@ export const logCapacityGap = createTool({
     directive: z.string().optional().describe('The original directive that exposed the gap'),
     agentName: z.string().optional().describe('Agent involved in the gap'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from('capacity_gaps')
       .insert({
@@ -94,7 +94,7 @@ export const notifySpecialist = createTool({
     message: z.string().describe('Instruction or context to send to the specialist'),
     additionalContext: z.record(z.unknown()).optional().describe('Additional structured context'),
   }),
-  execute: async ({ context: ctx }) => {
+  execute: async (ctx) => {
     // Log the dispatch to agent_activity
     const { data, error } = await supabase
       .from('agent_activity')
@@ -128,7 +128,7 @@ export const emailDraft = createTool({
     body: z.string().describe('Email body (plain text or HTML)'),
     replyToInteractionId: z.string().optional().describe('Interaction ID this email relates to'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     // Save draft to content_items for approval
     const { data, error } = await supabase
       .from('content_items')
@@ -159,7 +159,7 @@ export const createReminder = createTool({
     contactId: z.string().optional().describe('Contact this reminder relates to'),
     taskId: z.string().optional().describe('Task this reminder relates to'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from('reminders')
       .insert({
@@ -183,7 +183,7 @@ export const webSearch = createTool({
   inputSchema: z.object({
     query: z.string().describe('Search query'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     // Placeholder — integrate with Brave Search API or similar
     return {
       results: [],

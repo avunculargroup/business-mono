@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 const TELNYX_API_KEY = process.env['TELNYX_API_KEY'] ?? '';
@@ -10,7 +10,7 @@ export const telnyxDownload = createTool({
     recordingUrl: z.string().describe('URL of the Telnyx recording'),
     callControlId: z.string().describe('Telnyx call control ID for this recording'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const response = await fetch(context.recordingUrl, {
       headers: {
         Authorization: `Bearer ${TELNYX_API_KEY}`,

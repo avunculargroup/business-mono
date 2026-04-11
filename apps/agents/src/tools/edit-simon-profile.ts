@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
 import { extname } from 'path';
@@ -16,7 +16,7 @@ export const editSimonProfile = createTool({
     about: z.string().max(140).optional().describe('Profile bio / status text (max 140 chars)'),
     avatarPath: z.string().optional().describe('Absolute path to a PNG/JPG image file'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { name, about, avatarPath } = context;
 
     console.log(`${LOG_TAG} Starting profile update — fields requested:`, {

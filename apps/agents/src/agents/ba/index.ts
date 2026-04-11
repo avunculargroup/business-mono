@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { MAX_CLARIFICATION_ROUNDS } from '@platform/shared';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
@@ -50,6 +50,7 @@ Before structuring requirements, query the Archivist's knowledge base for:
 - Notify Simon when requirements are ready for PM triage`;
 
 export const bruno = new Agent({
+  id: 'bruno',
   name: 'bruno',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),

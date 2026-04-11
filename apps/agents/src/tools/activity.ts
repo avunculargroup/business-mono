@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Json } from '@platform/db';
@@ -19,7 +19,7 @@ export const logActivity = createTool({
     approvedActions: z.array(z.record(z.unknown())).optional(),
     notes: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from('agent_activity')
       .insert({

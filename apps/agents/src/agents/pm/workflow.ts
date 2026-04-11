@@ -1,31 +1,38 @@
-import { createWorkflow, createStep } from '@mastra/core';
+import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { petra } from './agent.js';
 
 // ─── Step 1: Triage incoming task proposal ─────────────────────────────────
+const triageInputSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  sourceActivityId: z.string().optional(),
+  suggestedProjectId: z.string().optional(),
+  suggestedAssignee: z.string().optional(),
+  suggestedDueDate: z.string().optional(),
+  suggestedPriority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+});
+
+const triageOutputSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  projectId: z.string().nullable(),
+  assignee: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  priority: z.string(),
+  sourceActivityId: z.string().optional(),
+  requiresApproval: z.boolean(),
+});
+
+type TriageInput = z.infer<typeof triageInputSchema>;
+
 const triageTask = createStep({
   id: 'triage_task',
-  inputSchema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
-    sourceActivityId: z.string().optional(),
-    suggestedProjectId: z.string().optional(),
-    suggestedAssignee: z.string().optional(),
-    suggestedDueDate: z.string().optional(),
-    suggestedPriority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-  }),
-  outputSchema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
-    projectId: z.string().nullable(),
-    assignee: z.string().nullable(),
-    dueDate: z.string().nullable(),
-    priority: z.string(),
-    sourceActivityId: z.string().optional(),
-    requiresApproval: z.boolean(),
-  }),
-  execute: async ({ inputData }) => {
+  inputSchema: triageInputSchema,
+  outputSchema: triageOutputSchema,
+  execute: async (params) => {
+    const inputData = params.inputData as TriageInput;
     // Fetch open projects for context
     const { data: projects } = await supabase
       .from('projects')
@@ -74,24 +81,30 @@ requires_approval should be true only for the first 10 task creations in each pr
 });
 
 // ─── Step 2: Create task record ─────────────────────────────────────────────
+const createTaskInputSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  projectId: z.string().nullable(),
+  assignee: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  priority: z.string(),
+  sourceActivityId: z.string().optional(),
+  requiresApproval: z.boolean(),
+});
+
+type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
+
 const createTask = createStep({
   id: 'create_task',
-  inputSchema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
-    projectId: z.string().nullable(),
-    assignee: z.string().nullable(),
-    dueDate: z.string().nullable(),
-    priority: z.string(),
-    sourceActivityId: z.string().optional(),
-    requiresApproval: z.boolean(),
-  }),
+  inputSchema: createTaskInputSchema,
   outputSchema: z.object({
     taskId: z.string(),
     title: z.string(),
     priority: z.string(),
   }),
-  execute: async ({ inputData, suspend }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as CreateTaskInput;
+    const suspend = params.suspend;
     if (inputData.requiresApproval) {
       await suspend({ action: 'create_task', task: inputData });
     }
@@ -142,7 +155,7 @@ const riskScan = createStep({
     done: z.boolean(),
     risksFound: z.number(),
   }),
-  execute: async (_) => {
+  execute: async () => {
     // Fetch all open tasks and projects for risk analysis
     const { data: tasks } = await supabase
       .from('v_open_tasks')

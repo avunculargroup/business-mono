@@ -1,4 +1,4 @@
-import { createWorkflow, createStep } from '@mastra/core';
+import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { roger } from './agent.js';
@@ -26,20 +26,25 @@ const ingestAudio = createStep({
     channels: z.string(),
     externalId: z.string().optional(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      source: 'telnyx' | 'zoom' | 'signal' | 'manual';
+      recordingUrl: string;
+      callControlId?: string;
+      meetingUuid?: string;
+      channels: 'dual' | 'single';
+    };
     let audioUrl = inputData.recordingUrl;
     let externalId: string | undefined;
 
     if (inputData.source === 'telnyx' && inputData.callControlId) {
-      const result = await telnyxDownload.execute!({
-        context: {
+      const result = await telnyxDownload.execute!(
+        {
           recordingUrl: inputData.recordingUrl,
           callControlId: inputData.callControlId,
-        },
-        runId: '',
-        mastra: undefined as never,
-        runtimeContext: undefined as never,
-      }) as { audioUrl: string; callControlId: string };
+        } as never,
+        {} as never,
+      ) as { audioUrl: string; callControlId: string };
       audioUrl = result.audioUrl;
       externalId = result.callControlId;
     } else if (inputData.source === 'zoom') {
@@ -66,29 +71,37 @@ const transcribeAudio = createStep({
     source: z.string(),
     externalId: z.string().optional(),
   }),
-  execute: async ({ inputData, suspend }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      audioUrl: string;
+      source: string;
+      channels: string;
+      externalId?: string;
+    };
+    const suspend = params.suspend;
     const multichannel = inputData.channels === 'dual';
     const callbackUrl = `${DEEPGRAM_CALLBACK_BASE}/webhooks/deepgram`;
 
-    const result = await deepgramTranscribe.execute!({
-      context: {
+    const result = await deepgramTranscribe.execute!(
+      {
         audioUrl: inputData.audioUrl,
         callbackUrl,
         multichannel,
         diarize: !multichannel,
-      },
-      runId: '',
-      mastra: undefined as never,
-      runtimeContext: undefined as never,
-    }) as { requestId: string };
+      } as never,
+      {} as never,
+    ) as { requestId: string };
 
     // Suspend — workflow will be resumed by the Deepgram webhook handler
-    const resumeData = await suspend({ requestId: result.requestId });
+    const resumeData = await suspend({ requestId: result.requestId }) as unknown as {
+      transcript: string;
+      channels: unknown;
+    };
 
     return {
-      transcript: (resumeData as { transcript: string }).transcript,
+      transcript: resumeData.transcript,
       requestId: result.requestId,
-      channels: (resumeData as { channels: unknown }).channels,
+      channels: resumeData.channels,
       source: inputData.source,
       externalId: inputData.externalId,
     };
@@ -111,7 +124,14 @@ const identifySpeakers = createStep({
     source: z.string(),
     externalId: z.string().optional(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      transcript: string;
+      source: string;
+      channels: unknown;
+      requestId: string;
+      externalId?: string;
+    };
     // Fetch team members for director identification
     const { data: teamMembers } = await supabase
       .from('team_members')
@@ -164,7 +184,13 @@ const extractEntities = createStep({
     source: z.string(),
     externalId: z.string().optional(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      transcript: string;
+      speakerMap: Record<string, string>;
+      source: string;
+      externalId?: string;
+    };
     const prompt = `Extract structured data from this transcript.
 
 Speaker map: ${JSON.stringify(inputData.speakerMap)}
@@ -217,7 +243,15 @@ const crmMatch = createStep({
     source: z.string(),
     externalId: z.string().optional(),
   }),
-  execute: async ({ inputData, suspend }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      extractedData: Record<string, unknown>;
+      transcript: string;
+      speakerMap: Record<string, string>;
+      source: string;
+      externalId?: string;
+    };
+    const suspend = params.suspend;
     const { data: contacts } = await supabase
       .from('contacts')
       .select('id, first_name, last_name, email, company_id');
@@ -284,8 +318,16 @@ const createInteraction = createStep({
     crmMatches: z.array(z.record(z.unknown())),
     source: z.string(),
   }),
-  execute: async ({ inputData }) => {
-    const contactMatch = inputData.crmMatches.find((m) => m['type'] === 'contact');
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      extractedData: Record<string, unknown>;
+      crmMatches: Array<Record<string, unknown>>;
+      lowConfidenceMatches: Array<Record<string, unknown>>;
+      transcript: string;
+      source: string;
+      externalId?: string;
+    };
+    const contactMatch = inputData.crmMatches.find((m: Record<string, unknown>) => m['type'] === 'contact');
 
     const { data, error } = await supabase
       .from('interactions')
@@ -304,19 +346,17 @@ const createInteraction = createStep({
     if (error) throw new Error(`Failed to create interaction: ${error.message}`);
     const interactionId = (data as { id: string }).id;
 
-    await logActivity.execute!({
-      context: {
+    await logActivity.execute!(
+      {
         agentName: 'recorder',
         action: `Created interaction record ${interactionId}`,
         status: 'auto',
         triggerType: 'call_transcript',
         entityType: 'interaction',
         entityId: interactionId,
-      },
-      runId: '',
-      mastra: undefined as never,
-      runtimeContext: undefined as never,
-    });
+      } as never,
+      {} as never,
+    );
 
     return {
       interactionId,
@@ -341,8 +381,14 @@ const proposeCrmUpdates = createStep({
     extractedData: z.record(z.unknown()),
     proposedUpdates: z.array(z.record(z.unknown())),
   }),
-  execute: async ({ inputData }) => {
-    const newEntities = inputData.crmMatches.filter((m) => m['is_new'] === true);
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      interactionId: string;
+      extractedData: Record<string, unknown>;
+      crmMatches: Array<Record<string, unknown>>;
+      source: string;
+    };
+    const newEntities = inputData.crmMatches.filter((m: Record<string, unknown>) => m['is_new'] === true);
     const proposedUpdates: Array<Record<string, unknown>> = [];
 
     for (const entity of newEntities) {
@@ -386,7 +432,12 @@ const proposeTasks = createStep({
     interactionId: z.string(),
     proposedTaskCount: z.number(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      interactionId: string;
+      extractedData: Record<string, unknown>;
+      proposedUpdates: Array<Record<string, unknown>>;
+    };
     const actionItems = (inputData.extractedData['action_items'] as Array<{ text: string; deadline?: string; assignee?: string }>) ?? [];
 
     for (const item of actionItems) {
@@ -418,7 +469,11 @@ const proposeReminders = createStep({
     interactionId: z.string(),
     proposedTaskCount: z.number(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      interactionId: string;
+      proposedTaskCount: number;
+    };
     // Reminders are proposed via agent_activity — PM and Simon pick them up
     return inputData;
   },
@@ -434,7 +489,11 @@ const reportToSimon = createStep({
   outputSchema: z.object({
     done: z.boolean(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      interactionId: string;
+      proposedTaskCount: number;
+    };
     await supabase.from('agent_activity').insert({
       agent_name: 'recorder',
       action: `Recorder workflow complete. Interaction ${inputData.interactionId} created. ${inputData.proposedTaskCount} tasks proposed. Awaiting director review via Simon.`,
