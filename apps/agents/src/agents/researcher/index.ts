@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
@@ -109,6 +109,7 @@ You operate in the context of Bitcoin Treasury Solutions — a Bitcoin education
 Log every research run to agent_activity using the log_activity tool with agent_name: 'rex'. Include the purpose, subject, and a summary of findings in the notes field.`;
 
 export const rex = new Agent({
+  id: 'rex',
   name: 'rex',
   instructions: RESEARCHER_SYSTEM_PROMPT,
   model: getModelConfig(),

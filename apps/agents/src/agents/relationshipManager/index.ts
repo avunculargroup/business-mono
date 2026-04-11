@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
@@ -73,6 +73,7 @@ Share opinions on how the CRM structure, pipeline stages, or interaction trackin
 - For ambiguous company associations, present options rather than guessing`;
 
 export const della = new Agent({
+  id: 'della',
   name: 'della',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),

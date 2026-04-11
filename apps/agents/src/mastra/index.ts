@@ -1,4 +1,4 @@
-import { Mastra } from '@mastra/core';
+import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
@@ -27,6 +27,7 @@ const honoHandler = (fn: (req: Request) => Promise<Response>) =>
   (c: Context) => fn(c.req.raw);
 
 const storage = new PostgresStore({
+  id: 'default',
   connectionString: process.env['SUPABASE_DB_URL']!,
 });
 

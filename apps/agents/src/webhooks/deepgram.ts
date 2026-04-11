@@ -15,7 +15,7 @@ export async function handleDeepgramWebhook(req: Request): Promise<Response> {
 
   // Resume the suspended Recorder workflow run that's waiting on this request_id
   const workflow = mastra.getWorkflow('recorder');
-  const run = await workflow.createRunAsync({ runId: requestId });
+  const run = await workflow.createRun({ runId: requestId });
   await run.resume({
     resumeData: {
       transcript,

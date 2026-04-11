@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import OpenAI from 'openai';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
@@ -11,7 +11,7 @@ export const generateEmbedding = createTool({
   inputSchema: z.object({
     text: z.string().describe('Text to embed'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
       input: context.text,

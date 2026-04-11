@@ -46,8 +46,9 @@ async function pollAllAccounts(): Promise<void> {
 
     accounts = accountsRes.data ?? [];
     exclusions = exclusionsRes.data ?? [];
+    const teamRows = (teamRes.data ?? []) as unknown as Array<{ email: string | null }>;
     teamEmails = new Set(
-      (teamRes.data ?? [])
+      teamRows
         .map((m) => m.email?.toLowerCase())
         .filter((e): e is string => Boolean(e)),
     );
@@ -166,7 +167,7 @@ async function pollAccount(
 async function processEmail(
   email: Awaited<ReturnType<FastmailJmapClient['getEmails']>>[number],
   folder: 'inbox' | 'sent',
-  accountUsername: string,
+  _accountUsername: string,
   exclusions: Array<{ type: string; value: string }>,
   teamEmails: Set<string>,
   watchedAddresses: Set<string>,
