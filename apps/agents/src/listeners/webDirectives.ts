@@ -1,23 +1,8 @@
 import { createRealtimeClient } from '@platform/db';
 
 const supabase = createRealtimeClient();
-import type { CoreMessage } from 'ai';
 import { simon } from '../agents/simon/index.js';
-
-type ConvMessage = {
-  role: string;
-  content: string;
-  timestamp?: string;
-  source?: string;
-};
-
-type ConvRow = {
-  id: string;
-  signal_chat_id: string;
-  thread_type: string;
-  messages: unknown;
-  is_processing: boolean;
-};
+import type { ConvMessage, ConvRow } from './types.js';
 
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -80,16 +65,17 @@ export function startWebDirectivesListener(): void {
         // Signal to the web client that Simon is thinking
         await supabase
           .from('agent_conversations')
-          .update({ is_processing: true })
+          .update({ is_processing: true } as never)
           .eq('id', conv.id);
 
         try {
-          const messagesForSimon: CoreMessage[] = messages.map((m) => ({
-            role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-            content: m.content,
-          }));
-
-          const result = await simon.generate(messagesForSimon);
+          // Generate Simon's response via Mastra Memory
+          const result = await simon.generate(lastMessage.content, {
+            memory: {
+              resource: 'web-director',
+              thread: conv.id,
+            },
+          });
 
           const simonMessage: ConvMessage = {
             role: 'assistant',
@@ -98,10 +84,10 @@ export function startWebDirectivesListener(): void {
             source: 'simon',
           };
 
-          // Write response and clear processing flag atomically in one update
+          // Dual-write: write response to agent_conversations and clear processing flag
           await supabase
             .from('agent_conversations')
-            .update({ messages: [...messages, simonMessage], is_processing: false })
+            .update({ messages: [...messages, simonMessage], is_processing: false } as never)
             .eq('id', conv.id);
 
           await supabase.from('agent_activity').insert({
@@ -122,7 +108,7 @@ export function startWebDirectivesListener(): void {
           // Clear the flag so the UI doesn't get stuck showing the typing indicator
           await supabase
             .from('agent_conversations')
-            .update({ is_processing: false })
+            .update({ is_processing: false } as never)
             .eq('id', conv.id);
         }
       }

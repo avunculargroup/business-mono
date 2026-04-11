@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 
@@ -13,7 +13,7 @@ export const supabaseQuery = createTool({
     orderBy: z.string().optional().describe('Column to order by'),
     ascending: z.boolean().optional().describe('Sort ascending'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     let query = supabase.from(context.table as never).select(context.select);
 
     if (context.filters) {
@@ -42,7 +42,7 @@ export const supabaseInsert = createTool({
     table: z.string().describe('Table name'),
     record: z.record(z.unknown()).describe('Record to insert'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from(context.table as never)
       .insert(context.record as never)
@@ -62,7 +62,7 @@ export const supabaseUpdate = createTool({
     id: z.string().describe('Row ID to update'),
     updates: z.record(z.unknown()).describe('Fields to update'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { data, error } = await supabase
       .from(context.table as never)
       .update(context.updates as never)

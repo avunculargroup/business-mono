@@ -1,4 +1,4 @@
-import type { Mastra } from '@mastra/core';
+import type { Mastra } from '@mastra/core/mastra';
 import { MONITOR_CHECK_INTERVAL_MS } from '@platform/shared';
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -7,7 +7,7 @@ async function runMonitorCheck(mastra: Mastra): Promise<void> {
   console.log('[monitor-listener] Running scheduled monitor check...');
 
   try {
-    const run = await mastra.getWorkflow('monitorResearch').createRunAsync();
+    const run = await mastra.getWorkflow('monitorResearch').createRun();
     const result = await run.start({ inputData: { triggered_at: new Date().toISOString() } });
     console.log('[monitor-listener] Monitor check completed:', result);
   } catch (err) {

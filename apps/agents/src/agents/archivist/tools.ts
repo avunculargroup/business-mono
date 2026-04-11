@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
 
@@ -8,7 +8,7 @@ export const webFetch = createTool({
   inputSchema: z.object({
     url: z.string().describe('URL to fetch'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const response = await fetch(context.url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PlatformArchivist/1.0)' },
     });
@@ -34,7 +34,7 @@ export const vectorSearchTool = createTool({
     matchThreshold: z.number().default(0.7).describe('Minimum similarity score'),
     matchCount: z.number().default(10).describe('Max results to return'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const results = await vectorSearch(context.queryEmbedding, {
       matchThreshold: context.matchThreshold,
       matchCount: context.matchCount,
@@ -51,7 +51,7 @@ export const graphTraverseTool = createTool({
     relationshipFilter: z.string().optional().describe('Filter by relationship type'),
     maxDepth: z.number().default(3).describe('Maximum traversal depth'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const results = await graphTraverse(context.startItemId, {
       relationshipFilter: context.relationshipFilter,
       maxDepth: context.maxDepth,
@@ -67,7 +67,7 @@ export const fulltextSearchTool = createTool({
     query: z.string().describe('Search query (supports websearch syntax)'),
     limit: z.number().default(10).describe('Max results'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const results = await fulltextSearch(context.query, { limit: context.limit });
     return { results };
   },

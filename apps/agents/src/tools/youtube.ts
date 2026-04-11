@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { YoutubeTranscript } from 'youtube-transcript';
 
@@ -62,7 +62,7 @@ export const youtubeTranscript = createTool({
   inputSchema: z.object({
     videoUrl: z.string().describe('YouTube video URL or video ID'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const videoId = extractVideoId(context.videoUrl);
     if (!videoId) {
       throw new Error(

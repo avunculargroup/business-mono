@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { SignalClient } from '@platform/signal';
 
@@ -11,7 +11,7 @@ export const signalSend = createTool({
     recipient: z.string().describe('Recipient phone number in E.164 format'),
     message: z.string().describe('Message body to send'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const result = await client.sendMessage({
       recipients: [context.recipient],
       message: context.message,

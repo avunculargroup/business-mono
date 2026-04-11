@@ -1,4 +1,4 @@
-import { createWorkflow, createStep } from '@mastra/core';
+import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { rex } from './index.js';
@@ -97,7 +97,19 @@ const runMonitorChecks = createStep({
       }),
     ),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      monitors: Array<{
+        id: string;
+        subject: string;
+        context: string | null;
+        search_queries: string[];
+        frequency: string;
+        last_digest: string | null;
+        notify_signal: boolean;
+        notify_agent: string | null;
+      }>;
+    };
     const results: Array<{
       monitor_id: string;
       has_changed: boolean;
@@ -195,7 +207,18 @@ const updateAndNotify = createStep({
     updated: z.number(),
     changes_detected: z.number(),
   }),
-  execute: async ({ inputData }) => {
+  execute: async (params) => {
+    const inputData = params.inputData as {
+      results: Array<{
+        monitor_id: string;
+        has_changed: boolean;
+        change_summary: string | null;
+        current_digest: string;
+        notify_signal: boolean;
+        notify_agent: string | null;
+        subject: string;
+      }>;
+    };
     let changesDetected = 0;
 
     for (const result of inputData.results) {
