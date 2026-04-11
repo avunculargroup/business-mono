@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 
@@ -8,7 +8,7 @@ export const brandLookup = createTool({
   inputSchema: z.object({
     type: z.string().optional().describe('Filter by asset type (e.g. tone_of_voice, style_guide, template)'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     let query = supabase.from('brand_assets').select('name, type, content');
 
     if (context.type) {

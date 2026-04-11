@@ -44,7 +44,7 @@ export async function handleZoomWebhook(req: Request): Promise<Response> {
     return new Response('No MP4 recording found', { status: 200 });
   }
 
-  const recorderRun = await mastra.getWorkflow('recorder').createRunAsync();
+  const recorderRun = await mastra.getWorkflow('recorder').createRun();
   await recorderRun.start({ inputData: {
     source: 'zoom',
     meetingUuid: uuid,

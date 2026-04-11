@@ -1,4 +1,5 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
+import { TokenLimiterProcessor } from '@mastra/core/processors';
 import { getModelConfig } from '../../config/model.js';
 import { memory } from '../../config/memory.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
@@ -135,6 +136,7 @@ Rules:
 - For structured outputs (e.g. morning briefing), use short labelled lines, not tables`;
 
 export const simon = new Agent({
+  id: 'simon',
   name: 'simon',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
@@ -155,4 +157,5 @@ export const simon = new Agent({
     edit_simon_profile: editSimonProfile,
     get_simon_profile: getSimonProfile,
   },
+  outputProcessors: [new TokenLimiterProcessor({ limit: 80_000 })],
 });

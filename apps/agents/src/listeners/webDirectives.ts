@@ -65,7 +65,7 @@ export function startWebDirectivesListener(): void {
         // Signal to the web client that Simon is thinking
         await supabase
           .from('agent_conversations')
-          .update({ is_processing: true })
+          .update({ is_processing: true } as never)
           .eq('id', conv.id);
 
         try {
@@ -87,7 +87,7 @@ export function startWebDirectivesListener(): void {
           // Dual-write: write response to agent_conversations and clear processing flag
           await supabase
             .from('agent_conversations')
-            .update({ messages: [...messages, simonMessage], is_processing: false })
+            .update({ messages: [...messages, simonMessage], is_processing: false } as never)
             .eq('id', conv.id);
 
           await supabase.from('agent_activity').insert({
@@ -108,12 +108,12 @@ export function startWebDirectivesListener(): void {
           // Clear the flag so the UI doesn't get stuck showing the typing indicator
           await supabase
             .from('agent_conversations')
-            .update({ is_processing: false })
+            .update({ is_processing: false } as never)
             .eq('id', conv.id);
         }
       }
     )
-    .subscribe((status: string, err: Error) => {
+    .subscribe((status, err) => {
       // Ignore callbacks from stale channels
       if (channel !== currentChannel) return;
 

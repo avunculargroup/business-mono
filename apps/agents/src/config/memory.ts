@@ -1,5 +1,4 @@
 import { Memory } from '@mastra/memory';
-import { TokenLimiter } from '@mastra/memory/processors';
 import { z } from 'zod';
 
 const workingMemorySchema = z.object({
@@ -11,6 +10,19 @@ const workingMemorySchema = z.object({
   notes: z.string().describe('Other persistent context Simon should remember'),
 });
 
+/**
+ * Simon's memory configuration.
+ *
+ * - `lastMessages: 40` — recent conversation history passed to the model.
+ * - `workingMemory` — persistent Zod-schema-based director context, scoped per resource
+ *   (director). Survives restarts and is shared across all threads for the same director.
+ * - `observationalMemory` — Observer/Reflector agents compress long-running conversations
+ *   into summaries once they exceed the configured message budget, scoped to the resource
+ *   so observations persist across threads.
+ *
+ * The 80k-token output budget is enforced by `TokenLimiterProcessor` on the Simon Agent
+ * (see `agents/simon/index.ts`). Memory's own `processors` field is deprecated in core 1.x.
+ */
 export const memory = new Memory({
   options: {
     lastMessages: 40,
@@ -20,16 +32,14 @@ export const memory = new Memory({
       schema: workingMemorySchema,
       scope: 'resource',
     },
-    // Observational Memory requires @mastra/core >= 1.x.
-    // Enable when @mastra/core is upgraded:
-    // observationalMemory: {
-    //   enabled: true,
-    //   observerThresholdTokens: 30_000,
-    //   reflectorThresholdTokens: 40_000,
-    //   previousObserverTokens: 4_000,
-    // },
+    observationalMemory: {
+      scope: 'resource',
+      observation: {
+        messageTokens: 30_000,
+      },
+      reflection: {
+        observationTokens: 40_000,
+      },
+    },
   },
-  processors: [
-    new TokenLimiter({ limit: 80_000 }),
-  ],
 });

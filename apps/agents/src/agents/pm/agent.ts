@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
@@ -24,6 +24,7 @@ For each risk identified, return:
 Return as a JSON array of risk objects.`;
 
 export const petra = new Agent({
+  id: 'petra',
   name: 'petra',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),

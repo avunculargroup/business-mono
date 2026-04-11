@@ -1,4 +1,4 @@
-import { createTool } from '@mastra/core';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 // ============================================================
@@ -24,7 +24,7 @@ export const searchWeb = createTool({
         'Use "advanced" only for verify and deep_research purposes',
       ),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const apiKey = process.env['TAVILY_API_KEY'];
     if (!apiKey) {
       throw new Error('TAVILY_API_KEY environment variable is not set');
@@ -78,7 +78,7 @@ export const fetchUrl = createTool({
   inputSchema: z.object({
     url: z.string().url().describe('URL to fetch and extract content from'),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const jinaUrl = `https://r.jina.ai/${encodeURIComponent(context.url)}`;
 
     const response = await fetch(jinaUrl, {
@@ -127,7 +127,7 @@ export const crawlStructured = createTool({
         'Optional JSON schema for guided extraction (e.g. { company_name: "string", board_members: "string[]" })',
       ),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const apiKey = process.env['FIRECRAWL_API_KEY'];
     if (!apiKey) {
       throw new Error('FIRECRAWL_API_KEY environment variable is not set');

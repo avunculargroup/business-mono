@@ -1,4 +1,4 @@
-import { Agent } from '@mastra/core';
+import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { generateEmbedding } from '../../tools/openai.js';
@@ -69,6 +69,7 @@ Flag items older than 6 months as potentially stale when returning search result
 Every knowledge item saved, every search performed — log to agent_activity.`;
 
 export const archie = new Agent({
+  id: 'archie',
   name: 'archie',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
