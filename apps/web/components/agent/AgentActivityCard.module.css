@@ -4,6 +4,8 @@
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   border-left: 3px solid transparent;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .compact {
