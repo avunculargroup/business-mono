@@ -239,7 +239,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
             teamMembers={teamMembers}
             contacts={contacts}
             mode="edit"
-            defaultValues={editTask}
+            defaultValues={{ ...editTask, description: null }}
             onSuccess={() => {
               setEditTask(null);
               router.refresh();
