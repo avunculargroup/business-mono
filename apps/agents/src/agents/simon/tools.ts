@@ -2,7 +2,15 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Json } from '@platform/db';
-import { CapacityGapType } from '@platform/shared';
+import { CapacityGapType, AGENT_REGISTRY } from '@platform/shared';
+import { archie } from '../archivist/index.js';
+import { bruno } from '../ba/index.js';
+import { charlie } from '../contentCreator/index.js';
+import { rex } from '../researcher/index.js';
+import { della } from '../relationshipManager/index.js';
+import { roger } from '../recorder/agent.js';
+import { petra } from '../pm/agent.js';
+import type { Agent } from '@mastra/core/agent';
 
 export const conflictCheck = createTool({
   id: 'conflict_check',
@@ -188,6 +196,162 @@ export const webSearch = createTool({
     return {
       results: [],
       note: `Web search for "${context.query}" — integrate search API to enable`,
+    };
+  },
+});
+
+// Map agent names to their Agent instances (excluding simon — he runs the check)
+const specialistAgents: Record<string, Agent> = {
+  roger: roger as unknown as Agent,
+  archie: archie as unknown as Agent,
+  petra: petra as unknown as Agent,
+  bruno: bruno as unknown as Agent,
+  charlie: charlie as unknown as Agent,
+  rex: rex as unknown as Agent,
+  della: della as unknown as Agent,
+};
+
+export const agentHealthCheck = createTool({
+  id: 'agent_health_check',
+  description:
+    'Check the health and recent activity of all agents. Returns last activity timestamps, error counts, and recent error messages. Use deep: true to also ping each agent for a liveness check (slower).',
+  inputSchema: z.object({
+    deep: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Run liveness pings on each specialist agent (slower but thorough)'),
+  }),
+  execute: async (context) => {
+    const agentNames = Object.keys(AGENT_REGISTRY);
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Step 1: Query recent activity per agent
+    const activityResults = await Promise.all(
+      agentNames.map(async (name) => {
+        // Last activity
+        const { data: lastRow } = await supabase
+          .from('agent_activity')
+          .select('created_at, action, status')
+          .eq('agent_name', name)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        // Actions and errors in last 24h
+        const { count: totalActions } = await supabase
+          .from('agent_activity')
+          .select('*', { count: 'exact', head: true })
+          .eq('agent_name', name)
+          .gte('created_at', twentyFourHoursAgo);
+
+        const { count: errorCount } = await supabase
+          .from('agent_activity')
+          .select('*', { count: 'exact', head: true })
+          .eq('agent_name', name)
+          .eq('status', 'error')
+          .gte('created_at', twentyFourHoursAgo);
+
+        // Recent error messages (last 3 within 24h)
+        const { data: recentErrors } = await supabase
+          .from('agent_activity')
+          .select('action, created_at')
+          .eq('agent_name', name)
+          .eq('status', 'error')
+          .gte('created_at', twentyFourHoursAgo)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        const lastActivity = lastRow?.[0]?.created_at ?? null;
+        const errors24h = errorCount ?? 0;
+        const actions24h = totalActions ?? 0;
+
+        // Classify status
+        let status: 'active' | 'idle' | 'silent' | 'error-prone';
+        if (errors24h > 3) {
+          status = 'error-prone';
+        } else if (!lastActivity) {
+          status = 'silent';
+        } else {
+          const lastTime = new Date(lastActivity).getTime();
+          const hourAgo = now.getTime() - 60 * 60 * 1000;
+          const dayAgo = now.getTime() - 24 * 60 * 60 * 1000;
+          if (lastTime >= hourAgo) {
+            status = 'active';
+          } else if (lastTime >= dayAgo) {
+            status = 'idle';
+          } else {
+            status = 'silent';
+          }
+        }
+
+        const registry = AGENT_REGISTRY[name]!;
+
+        return {
+          name,
+          displayName: registry.displayName,
+          role: registry.role,
+          status,
+          lastActivity,
+          actions24h,
+          errors24h,
+          recentErrors: (recentErrors ?? []).map((e) => ({
+            message: (e as { action: string }).action,
+            at: (e as { created_at: string }).created_at,
+          })),
+        };
+      }),
+    );
+
+    // Step 2: Liveness pings (only when deep: true)
+    let livenessResults: Record<string, { alive: boolean; responseMs: number; error?: string }> | null =
+      null;
+
+    if (context.deep) {
+      const PING_TIMEOUT_MS = 30_000;
+
+      const pingResults = await Promise.allSettled(
+        Object.entries(specialistAgents).map(async ([name, agent]) => {
+          const start = Date.now();
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Timed out after 30s')), PING_TIMEOUT_MS),
+          );
+          const generatePromise = agent.generate([
+            { role: 'user', content: 'Health check: respond with OK and nothing else.' },
+          ]);
+
+          await Promise.race([generatePromise, timeoutPromise]);
+          return { name, responseMs: Date.now() - start };
+        }),
+      );
+
+      livenessResults = {};
+      for (const result of pingResults) {
+        if (result.status === 'fulfilled') {
+          livenessResults[result.value.name] = {
+            alive: true,
+            responseMs: result.value.responseMs,
+          };
+        } else {
+          // Extract agent name from the error — Promise.allSettled loses the name on rejection
+          // We match by index since the order is preserved
+          const entries = Object.keys(specialistAgents);
+          const idx = pingResults.indexOf(result);
+          const agentName = entries[idx] ?? 'unknown';
+          livenessResults[agentName] = {
+            alive: false,
+            responseMs: -1,
+            error: String(result.reason),
+          };
+        }
+      }
+    }
+
+    return {
+      checkedAt: now.toISOString(),
+      mode: context.deep ? 'deep' : 'quick',
+      agents: activityResults,
+      liveness: livenessResults,
     };
   },
 });
