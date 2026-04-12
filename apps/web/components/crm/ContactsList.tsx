@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
-import { RowActionsMenu } from '@/components/ui/RowActionsMenu';
 import { PipelineChip } from '@/components/ui/PipelineChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
