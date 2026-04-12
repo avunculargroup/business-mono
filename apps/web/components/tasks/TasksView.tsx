@@ -1,18 +1,21 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { formatRelativeDate } from '@/lib/utils';
-import { Plus, List, LayoutGrid, CheckSquare } from 'lucide-react';
-import { updateTaskStatus } from '@/app/actions/tasks';
+import { Plus, List, LayoutGrid, CheckSquare, Pencil, Trash2 } from 'lucide-react';
+import { updateTaskStatus, deleteTask } from '@/app/actions/tasks';
+import { useToast } from '@/providers/ToastProvider';
 import Link from 'next/link';
 import styles from './TasksView.module.css';
 
@@ -45,17 +48,35 @@ const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
 export function TasksView({ initialTasks, projects, teamMembers, contacts }: TasksViewProps) {
   const [view, setView] = useLocalStorage<'list' | 'board'>('tasks-view', 'list');
   const [showCreate, setShowCreate] = useState(false);
+  const [editTask, setEditTask] = useState<TaskRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
+  const { success, error } = useToast();
   const { items: tasks, optimisticAdd } = useOptimisticList(initialTasks);
 
   const handleTaskCreated = useCallback((task?: TaskRow) => {
     if (task) {
       optimisticAdd(task, async () => {
-        // Server action already called by the form — this is a no-op
-        // The optimistic add happens immediately when the form succeeds
+        // Server action already called by the form — optimistic add only
       });
     }
     setShowCreate(false);
   }, [optimisticAdd]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const result = await deleteTask(deleteTarget.id);
+    setIsDeleting(false);
+    if (result.error) {
+      error(result.error);
+    } else {
+      success('Task deleted');
+      setDeleteTarget(null);
+      router.refresh();
+    }
+  };
 
   const columns: Column<TaskRow>[] = [
     {
@@ -147,6 +168,19 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
           columns={columns}
           data={tasks}
           rowKey={(row) => row.id}
+          rowActions={(row) => [
+            {
+              label: 'Edit',
+              icon: <Pencil size={14} strokeWidth={1.5} />,
+              onClick: () => setEditTask(row),
+            },
+            {
+              label: 'Delete',
+              icon: <Trash2 size={14} strokeWidth={1.5} />,
+              onClick: () => setDeleteTarget(row),
+              destructive: true,
+            },
+          ]}
           pagination={{ page: 1, pageSize: 25, total: tasks.length, onPageChange: () => {} }}
           emptyState={
             <div className={styles.empty}>
@@ -166,6 +200,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
         />
       )}
 
+      {/* Create slide-over */}
       <SlideOver
         open={showCreate}
         onClose={() => setShowCreate(false)}
@@ -184,6 +219,46 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
           onSuccess={handleTaskCreated}
         />
       </SlideOver>
+
+      {/* Edit slide-over */}
+      <SlideOver
+        open={!!editTask}
+        onClose={() => setEditTask(null)}
+        title="Edit task"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditTask(null)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="task-edit-form">Save changes</Button>
+          </>
+        }
+      >
+        {editTask && (
+          <TaskForm
+            key={editTask.id}
+            projects={projects}
+            teamMembers={teamMembers}
+            contacts={contacts}
+            mode="edit"
+            defaultValues={{ ...editTask, description: null }}
+            onSuccess={() => {
+              setEditTask(null);
+              router.refresh();
+            }}
+          />
+        )}
+      </SlideOver>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete task"
+        description={`Permanently delete "${deleteTarget?.title}"? This cannot be undone.`}
+        confirmLabel="Delete task"
+        destructive
+        loading={isDeleting}
+      />
     </div>
   );
 }

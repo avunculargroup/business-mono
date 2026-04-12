@@ -3,6 +3,7 @@
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { SkeletonLoader } from './SkeletonLoader';
+import { RowActionsMenu, type RowAction } from './RowActionsMenu';
 import styles from './DataTable.module.css';
 
 export interface Column<T> {
@@ -21,6 +22,7 @@ interface DataTableProps<T> {
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   onRowClick?: (row: T) => void;
+  rowActions?: (row: T) => RowAction[];
   pagination?: {
     page: number;
     pageSize: number;
@@ -39,6 +41,7 @@ export function DataTable<T>({
   sortKey,
   sortDir,
   onRowClick,
+  rowActions,
   pagination,
   loading,
   emptyState,
@@ -83,6 +86,7 @@ export function DataTable<T>({
                 </span>
               </th>
             ))}
+            {rowActions && <th className={styles.th} style={{ width: '48px' }} />}
           </tr>
         </thead>
         <tbody>
@@ -97,6 +101,14 @@ export function DataTable<T>({
                   {col.render(row)}
                 </td>
               ))}
+              {rowActions && (
+                <td
+                  className={`${styles.td} ${styles.actionsCell}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <RowActionsMenu actions={rowActions(row)} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
