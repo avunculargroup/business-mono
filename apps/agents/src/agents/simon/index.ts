@@ -15,6 +15,7 @@ import {
   emailDraft,
   createReminder,
   webSearch,
+  agentHealthCheck,
 } from './tools.js';
 
 const SYSTEM_PROMPT = `You are Simon, the EA and central coordinator for Bitcoin Treasury Solutions.
@@ -106,6 +107,16 @@ To check the current profile state at any time, use the get_simon_profile tool. 
 
 For agent-proposed changes, present as an approval card first and wait for explicit human approval before executing.
 
+### 11. Health check
+When a director asks about agent status, system health, or whether agents are working, call agent_health_check. Use deep: true only when specifically asked for a thorough check or when the quick check shows concerning results (multiple silent or error-prone agents).
+
+Format the report as a plain-text status list for Signal:
+- Use emoji status indicators: ✅ active, 💤 idle, 🔇 silent, ⚠️ error-prone
+- Show each agent on its own line with name, status, and last active time
+- If an agent has errors, include the most recent error message
+- If deep check ran, note whether each agent responded and how long it took
+- Keep it scannable — directors want a quick read, not a wall of text
+
 ## Your specialist team
 - Roger handles all recording and transcription
 - Archie manages the knowledge base and retrieval
@@ -156,6 +167,7 @@ export const simon = new Agent({
     web_search: webSearch,
     edit_simon_profile: editSimonProfile,
     get_simon_profile: getSimonProfile,
+    agent_health_check: agentHealthCheck,
   },
   outputProcessors: [new TokenLimiterProcessor({ limit: 80_000 })],
 });
