@@ -234,6 +234,101 @@
   padding: 0 3px;
 }
 
+/* More tab — button reset to match .tab appearance */
+.moreTab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* More sheet — backdrop */
+.moreBackdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 25, 21, 0.4);
+  z-index: calc(var(--z-overlay) - 1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-in-out);
+}
+
+.moreBackdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* More sheet — panel */
+.moreSheet {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 12px 12px 0 0;
+  z-index: var(--z-overlay);
+  box-shadow: var(--shadow-md);
+  transform: translateY(100%);
+  transition: transform var(--duration-base) var(--ease-in-out);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.moreSheet.open {
+  transform: translateY(0);
+}
+
+.moreSheetHandle {
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  margin: 12px auto 4px;
+}
+
+.moreSheetSection {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.moreSheetSectionLabel {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  padding: var(--space-2) var(--space-3);
+}
+
+.moreSheetItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+.moreSheetItem:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.moreSheetItemActive {
+  color: var(--color-accent-hover);
+}
+
+.moreSheetItemActive svg {
+  color: var(--color-accent);
+}
+
 /* Responsive */
 @media (max-width: 1023px) {
   .sidebar {
@@ -277,5 +372,11 @@
   }
   .bottomBar {
     display: flex;
+  }
+  .moreBackdrop {
+    display: block;
+  }
+  .moreSheet {
+    display: block;
   }
 }
