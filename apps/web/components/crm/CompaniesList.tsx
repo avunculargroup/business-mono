@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CompanyForm } from './CompanyForm';
+import { deleteCompany } from '@/app/actions/companies';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, Eye, Pencil, Trash2 } from 'lucide-react';
+import { useToast } from '@/providers/ToastProvider';
 import styles from './ContactsList.module.css';
 
 type CompanyRow = {
@@ -26,7 +29,11 @@ interface CompaniesListProps {
 
 export function CompaniesList({ initialCompanies, totalCount: _totalCount }: CompaniesListProps) {
   const [showCreate, setShowCreate] = useState(false);
+  const [editCompany, setEditCompany] = useState<CompanyRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CompanyRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
+  const { success, error } = useToast();
   const { items: companies, optimisticAdd } = useOptimisticList(initialCompanies);
 
   const handleCompanyCreated = useCallback((company?: CompanyRow) => {
@@ -35,6 +42,20 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
     }
     setShowCreate(false);
   }, [optimisticAdd]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const result = await deleteCompany(deleteTarget.id);
+    setIsDeleting(false);
+    if (result.error) {
+      error(result.error);
+    } else {
+      success('Company deleted');
+      setDeleteTarget(null);
+      router.refresh();
+    }
+  };
 
   const columns: Column<CompanyRow>[] = [
     {
@@ -83,6 +104,24 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
         data={companies}
         onRowClick={(row) => router.push(`/crm/companies/${row.id}`)}
         rowKey={(row) => row.id}
+        rowActions={(row) => [
+          {
+            label: 'View',
+            icon: <Eye size={14} strokeWidth={1.5} />,
+            onClick: () => router.push(`/crm/companies/${row.id}`),
+          },
+          {
+            label: 'Edit',
+            icon: <Pencil size={14} strokeWidth={1.5} />,
+            onClick: () => setEditCompany(row),
+          },
+          {
+            label: 'Delete',
+            icon: <Trash2 size={14} strokeWidth={1.5} />,
+            onClick: () => setDeleteTarget(row),
+            destructive: true,
+          },
+        ]}
         pagination={{
           page: 1,
           pageSize: 25,
@@ -99,9 +138,48 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
         }
       />
 
+      {/* Create modal */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add company" size="md">
         <CompanyForm onSuccess={handleCompanyCreated} />
       </Modal>
+
+      {/* Edit modal */}
+      <Modal
+        open={!!editCompany}
+        onClose={() => setEditCompany(null)}
+        title="Edit company"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditCompany(null)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="company-edit-form">Save changes</Button>
+          </>
+        }
+      >
+        {editCompany && (
+          <CompanyForm
+            key={editCompany.id}
+            mode="edit"
+            defaultValues={editCompany}
+            onSuccess={() => {
+              setEditCompany(null);
+              router.refresh();
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete company"
+        description={`Permanently delete ${deleteTarget?.name}? This cannot be undone.`}
+        confirmLabel="Delete company"
+        destructive
+        loading={isDeleting}
+      />
     </div>
   );
 }
