@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Bot,
@@ -13,6 +14,7 @@ import {
   Bookmark,
   Settings,
   LogOut,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -41,14 +43,45 @@ const systemNav = [
   { href: '/brand', label: 'Brand Hub', icon: Bookmark },
 ];
 
+const moreNav = [
+  {
+    label: 'Work',
+    items: [
+      { href: '/crm/contacts', label: 'CRM', icon: Users },
+      { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+      { href: '/projects', label: 'Projects', icon: FolderOpen },
+      { href: '/content', label: 'Content', icon: FileText },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { href: '/activity', label: 'Agent Activity', icon: Activity },
+      { href: '/brand', label: 'Brand Hub', icon: Bookmark },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+];
+
 export function Sidebar({ pendingCount }: SidebarProps) {
   const pathname = usePathname();
   const user = useCurrentUser();
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
+
+  const isMoreActive = pathname !== '/' && !pathname.startsWith('/simon');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <>
@@ -139,19 +172,50 @@ export function Sidebar({ pendingCount }: SidebarProps) {
           <span>Simon</span>
           {pendingCount > 0 && <span className={styles.tabBadge}>{pendingCount}</span>}
         </Link>
-        <Link href="/crm/contacts" className={`${styles.tab} ${isActive('/crm') ? styles.tabActive : ''}`}>
-          <Users size={20} strokeWidth={1.5} />
-          <span>CRM</span>
-        </Link>
-        <Link href="/tasks" className={`${styles.tab} ${isActive('/tasks') ? styles.tabActive : ''}`}>
-          <CheckSquare size={20} strokeWidth={1.5} />
-          <span>Tasks</span>
-        </Link>
-        <Link href="/content" className={`${styles.tab} ${isActive('/content') ? styles.tabActive : ''}`}>
-          <FileText size={20} strokeWidth={1.5} />
-          <span>Content</span>
-        </Link>
+        <button
+          type="button"
+          className={`${styles.tab} ${styles.moreTab} ${isMoreActive && !isMoreOpen ? styles.tabActive : ''} ${isMoreOpen ? styles.tabActive : ''}`}
+          onClick={() => setIsMoreOpen((prev) => !prev)}
+          aria-haspopup="dialog"
+          aria-expanded={isMoreOpen}
+        >
+          <MoreHorizontal size={20} strokeWidth={1.5} />
+          <span>More</span>
+        </button>
       </nav>
+
+      {/* More — bottom sheet backdrop */}
+      <div
+        className={`${styles.moreBackdrop} ${isMoreOpen ? styles.open : ''}`}
+        onClick={() => setIsMoreOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* More — bottom sheet */}
+      <div
+        className={`${styles.moreSheet} ${isMoreOpen ? styles.open : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="More navigation"
+      >
+        <div className={styles.moreSheetHandle} />
+        {moreNav.map((section) => (
+          <div key={section.label} className={styles.moreSheetSection}>
+            <span className={styles.moreSheetSectionLabel}>{section.label}</span>
+            {section.items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`${styles.moreSheetItem} ${isActive(item.href.startsWith('/crm') ? '/crm' : item.href) ? styles.moreSheetItemActive : ''}`}
+                onClick={() => setIsMoreOpen(false)}
+              >
+                <item.icon size={18} strokeWidth={1.5} />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        ))}
+      </div>
     </>
   );
 }
