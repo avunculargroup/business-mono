@@ -35,4 +35,4 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "--import=./.mastra/output/instrumentation.mjs", ".mastra/output/index.mjs"]
+CMD ["node", ".mastra/output/index.mjs"]
