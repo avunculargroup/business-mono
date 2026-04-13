@@ -1,4 +1,5 @@
 import { setDefaultResultOrder } from 'node:dns';
+import { resolve4 } from 'node:dns/promises';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
 import type { Context } from 'hono';
@@ -55,9 +56,56 @@ if (supabaseDbUrl.includes('pooler.supabase.com') || supabaseDbUrl.includes(':65
   );
 }
 
+// Guard against literal IPv6 addresses in the connection string.
+// Supabase dashboard sometimes shows an IPv6 direct-connection URL — these are
+// unreachable on Railway. The URL-encoded form wraps the address in brackets:
+// postgresql://user:pass@[2406:...]:5432/db
+const hasLiteralIPv6 = /\[[\da-fA-F:]+\]/.test(supabaseDbUrl) ||
+  // bare IPv6 in host position (no brackets, unlikely but guard anyway)
+  /postgres(?:ql)?:\/\/[^@]+@[\da-fA-F]{0,4}(?::[\da-fA-F]{0,4}){2,}:/.test(supabaseDbUrl);
+if (hasLiteralIPv6) {
+  throw new Error(
+    'SUPABASE_DB_URL contains a literal IPv6 address which Railway cannot reach (ENETUNREACH). ' +
+    'Use the hostname-based Direct Connection URL instead: Supabase dashboard → ' +
+    'Settings → Database → Connection string → Direct connection ' +
+    '(host db.[ref].supabase.co, port 5432). Do NOT copy the IPv6 address directly.'
+  );
+}
+
+// Newer Supabase projects return only AAAA records for db.[ref].supabase.co,
+// making setDefaultResultOrder('ipv4first') ineffective (no A record to prefer).
+// Resolve to IPv4 explicitly at startup and rewrite the URL so pg always
+// connects via IPv4, which Railway can reach.
+async function resolveDbUrlToIPv4(connStr: string): Promise<string> {
+  let url: URL;
+  try {
+    url = new URL(connStr);
+  } catch {
+    return connStr; // not a valid URL, let pg handle it
+  }
+  const hostname = url.hostname;
+  // Already an IPv4 address — nothing to do.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return connStr;
+  try {
+    const [ipv4] = await resolve4(hostname);
+    url.hostname = ipv4;
+    // pg uses SNI for SSL — connecting via IP disables hostname verification.
+    // Append sslmode=require so the connection is still encrypted.
+    if (!url.searchParams.has('sslmode')) {
+      url.searchParams.set('sslmode', 'require');
+    }
+    return url.toString();
+  } catch {
+    // DNS resolution failed; fall back to original string and let pg report it.
+    return connStr;
+  }
+}
+
+const resolvedDbUrl = await resolveDbUrlToIPv4(supabaseDbUrl);
+
 const storage = new PostgresStore({
   id: 'default',
-  connectionString: supabaseDbUrl,
+  connectionString: resolvedDbUrl,
 });
 
 export const mastra = new Mastra({
