@@ -29,8 +29,24 @@ const honoHandler = (fn: (req: Request) => Promise<Response>) =>
 const supabaseDbUrl = process.env['SUPABASE_DB_URL'];
 if (!supabaseDbUrl) {
   throw new Error(
-    'SUPABASE_DB_URL is not set. Add the direct Postgres connection string ' +
-    '(Transaction Pooler URL from Supabase dashboard → Settings → Database → Connection Pooling).'
+    'SUPABASE_DB_URL is not set. Add the direct Postgres connection string — ' +
+    'find it in Supabase dashboard → Settings → Database → Connection string ' +
+    '(Direct connection, port 5432, host db.[ref].supabase.co). ' +
+    'Do NOT use the Transaction Pooler URL (port 6543) — that host resolves to IPv6 ' +
+    'which is unreachable on Railway.'
+  );
+}
+
+// Guard against the Transaction Pooler URL (port 6543) which resolves to IPv6 on
+// pooler.supabase.com — Railway containers have no IPv6 outbound routing, causing
+// ENETUNREACH on startup. The direct connection (port 5432, db.[ref].supabase.co)
+// resolves to IPv4 and works correctly.
+if (supabaseDbUrl.includes(':6543')) {
+  throw new Error(
+    'SUPABASE_DB_URL is set to the Transaction Pooler URL (port 6543). ' +
+    'This host resolves to an IPv6 address that Railway cannot reach. ' +
+    'Use the Direct Connection URL instead: Supabase dashboard → ' +
+    'Settings → Database → Connection string (port 5432, host db.[ref].supabase.co).'
   );
 }
 
