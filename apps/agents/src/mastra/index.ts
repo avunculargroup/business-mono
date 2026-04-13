@@ -1,3 +1,4 @@
+import { setDefaultResultOrder } from 'node:dns';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
 import type { Context } from 'hono';
@@ -22,6 +23,11 @@ import { startMonitorListener } from '../listeners/monitorListener.js';
 import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 
+// Railway containers have no IPv6 outbound routing. Force Node.js to prefer
+// IPv4 when a hostname resolves to both A and AAAA records (e.g. Supabase
+// db.[ref].supabase.co can return both). Must be called before any TCP connect.
+setDefaultResultOrder('ipv4first');
+
 // Adapt Web API handlers (Request → Response) to Hono handlers
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
   (c: Context) => fn(c.req.raw);
@@ -37,14 +43,13 @@ if (!supabaseDbUrl) {
   );
 }
 
-// Guard against the Transaction Pooler URL (port 6543) which resolves to IPv6 on
-// pooler.supabase.com — Railway containers have no IPv6 outbound routing, causing
-// ENETUNREACH on startup. The direct connection (port 5432, db.[ref].supabase.co)
-// resolves to IPv4 and works correctly.
-if (supabaseDbUrl.includes(':6543')) {
+// Guard against Supabase Pooler URLs (both Transaction Pooler :6543 and Session
+// Pooler :5432) — pooler.supabase.com resolves to IPv6 which Railway cannot reach.
+// The direct connection (db.[ref].supabase.co:5432) resolves to IPv4 and works.
+if (supabaseDbUrl.includes('pooler.supabase.com') || supabaseDbUrl.includes(':6543')) {
   throw new Error(
-    'SUPABASE_DB_URL is set to the Transaction Pooler URL (port 6543). ' +
-    'This host resolves to an IPv6 address that Railway cannot reach. ' +
+    'SUPABASE_DB_URL is set to a Supabase Pooler URL (pooler.supabase.com). ' +
+    'Pooler hosts resolve to IPv6 which Railway cannot reach (ENETUNREACH). ' +
     'Use the Direct Connection URL instead: Supabase dashboard → ' +
     'Settings → Database → Connection string (port 5432, host db.[ref].supabase.co).'
   );
