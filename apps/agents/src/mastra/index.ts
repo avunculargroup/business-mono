@@ -33,42 +33,37 @@ setDefaultResultOrder('ipv4first');
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
   (c: Context) => fn(c.req.raw);
 
-const supabaseDbUrl = process.env['SUPABASE_DB_URL'];
-if (!supabaseDbUrl) {
+// MASTRA_DB_URL is the Postgres connection string used exclusively for Mastra's
+// internal thread/memory storage (PostgresStore). It is NOT the Supabase JS client —
+// that uses SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY over HTTPS and is unaffected.
+//
+// Recommended: point this at a Railway Postgres plugin (add one via Railway dashboard
+// → + New → Database → PostgreSQL, then set MASTRA_DB_URL to ${{Postgres.DATABASE_URL}}).
+// Railway-internal URLs are always IPv4 — no connectivity issues.
+//
+// Alternatively, use the Supabase direct connection (db.[ref].supabase.co:5432) but
+// only if the Supabase IPv4 Add-On is enabled (Dashboard → Settings → Add-Ons → IPv4
+// address, ~$4/mo). Without it, newer Supabase projects resolve to IPv6 only, which
+// Railway cannot reach (ENETUNREACH).
+const mastraDbUrl = process.env['MASTRA_DB_URL'] ?? process.env['SUPABASE_DB_URL'];
+if (!mastraDbUrl) {
   throw new Error(
-    'SUPABASE_DB_URL is not set. Add the direct Postgres connection string — ' +
-    'find it in Supabase dashboard → Settings → Database → Connection string ' +
-    '(Direct connection, port 5432, host db.[ref].supabase.co). ' +
-    'Do NOT use the Transaction Pooler URL (port 6543) — that host resolves to IPv6 ' +
-    'which is unreachable on Railway.'
+    'MASTRA_DB_URL is not set. Add a Postgres connection string for Mastra storage. ' +
+    'Recommended: add a Railway Postgres plugin and set MASTRA_DB_URL=${{Postgres.DATABASE_URL}}. ' +
+    'Alternatively, use the Supabase direct connection URL (db.[ref].supabase.co:5432) ' +
+    'with the Supabase IPv4 Add-On enabled.'
   );
 }
 
-// Guard against Supabase Pooler URLs (both Transaction Pooler :6543 and Session
-// Pooler :5432) — pooler.supabase.com resolves to IPv6 which Railway cannot reach.
-// The direct connection (db.[ref].supabase.co:5432) resolves to IPv4 and works.
-if (supabaseDbUrl.includes('pooler.supabase.com') || supabaseDbUrl.includes(':6543')) {
-  throw new Error(
-    'SUPABASE_DB_URL is set to a Supabase Pooler URL (pooler.supabase.com). ' +
-    'Pooler hosts resolve to IPv6 which Railway cannot reach (ENETUNREACH). ' +
-    'Use the Direct Connection URL instead: Supabase dashboard → ' +
-    'Settings → Database → Connection string (port 5432, host db.[ref].supabase.co).'
-  );
-}
-
-// Guard against literal IPv6 addresses in the connection string.
-// Supabase dashboard sometimes shows an IPv6 direct-connection URL — these are
-// unreachable on Railway. The URL-encoded form wraps the address in brackets:
-// postgresql://user:pass@[2406:...]:5432/db
-const hasLiteralIPv6 = /\[[\da-fA-F:]+\]/.test(supabaseDbUrl) ||
-  // bare IPv6 in host position (no brackets, unlikely but guard anyway)
-  /postgres(?:ql)?:\/\/[^@]+@[\da-fA-F]{0,4}(?::[\da-fA-F]{0,4}){2,}:/.test(supabaseDbUrl);
+// Guard against literal IPv6 addresses — Railway containers cannot reach them.
+const hasLiteralIPv6 = /\[[\da-fA-F:]+\]/.test(mastraDbUrl) ||
+  /postgres(?:ql)?:\/\/[^@]+@[\da-fA-F]{0,4}(?::[\da-fA-F]{0,4}){2,}:/.test(mastraDbUrl);
 if (hasLiteralIPv6) {
   throw new Error(
-    'SUPABASE_DB_URL contains a literal IPv6 address which Railway cannot reach (ENETUNREACH). ' +
-    'Use the hostname-based Direct Connection URL instead: Supabase dashboard → ' +
-    'Settings → Database → Connection string → Direct connection ' +
-    '(host db.[ref].supabase.co, port 5432). Do NOT copy the IPv6 address directly.'
+    'MASTRA_DB_URL contains a literal IPv6 address which Railway cannot reach (ENETUNREACH). ' +
+    'Use a hostname-based URL. Recommended: Railway Postgres plugin (${{Postgres.DATABASE_URL}}). ' +
+    'If using Supabase, use db.[ref].supabase.co:5432 (not the IPv6 address directly) ' +
+    'with the Supabase IPv4 Add-On enabled.'
   );
 }
 
@@ -101,18 +96,16 @@ async function resolveDbUrlToIPv4(connStr: string): Promise<string> {
     // reach (ENETUNREACH). Throw a clear error so the container fails fast
     // with an actionable message rather than crashing deep in storage init.
     throw new Error(
-      `SUPABASE_DB_URL hostname "${hostname}" has no IPv4 (A) DNS records. ` +
+      `MASTRA_DB_URL hostname "${hostname}" has no IPv4 (A) DNS records. ` +
       'Railway containers cannot reach IPv6 addresses. ' +
-      'Options: (1) Enable the Supabase IPv4 Add-On (Dashboard → Settings → ' +
-      'Add-Ons → IPv4 address, ~$4/mo) so db.[ref].supabase.co resolves to IPv4. ' +
-      '(2) Check that SUPABASE_DB_URL is the Direct Connection URL ' +
-      '(db.[ref].supabase.co:5432), not a pooler URL. ' +
+      'Recommended fix: add a Railway Postgres plugin and set MASTRA_DB_URL=${{Postgres.DATABASE_URL}}. ' +
+      'If using Supabase, enable the IPv4 Add-On (Dashboard → Settings → Add-Ons → IPv4 address, ~$4/mo). ' +
       `DNS error: ${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
 
-const resolvedDbUrl = await resolveDbUrlToIPv4(supabaseDbUrl);
+const resolvedDbUrl = await resolveDbUrlToIPv4(mastraDbUrl);
 
 const storage = new PostgresStore({
   id: 'default',
