@@ -22,6 +22,7 @@ interface BrandViewProps {
 
 export function BrandView({ assets }: BrandViewProps) {
   const [showCreate, setShowCreate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   return (
     <>
@@ -63,11 +64,11 @@ export function BrandView({ assets }: BrandViewProps) {
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="brand-asset-form">Save asset</Button>
+            <Button variant="primary" type="submit" form="brand-asset-form" loading={isSubmitting}>Save asset</Button>
           </>
         }
       >
-        <BrandAssetForm onSuccess={() => setShowCreate(false)} />
+        <BrandAssetForm onSuccess={() => setShowCreate(false)} onPendingChange={setIsSubmitting} />
       </SlideOver>
     </>
   );

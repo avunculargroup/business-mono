@@ -32,6 +32,7 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
   const [editCompany, setEditCompany] = useState<CompanyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanyRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { success, error } = useToast();
   const { items: companies, optimisticAdd } = useOptimisticList(initialCompanies);
@@ -152,7 +153,7 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditCompany(null)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="company-edit-form">Save changes</Button>
+            <Button variant="primary" type="submit" form="company-edit-form" loading={isSubmitting}>Save changes</Button>
           </>
         }
       >
@@ -165,6 +166,7 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
               setEditCompany(null);
               router.refresh();
             }}
+            onPendingChange={setIsSubmitting}
           />
         )}
       </Modal>

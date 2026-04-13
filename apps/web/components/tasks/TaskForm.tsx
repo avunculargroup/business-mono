@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { createTask, updateTask } from '@/app/actions/tasks';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
@@ -34,11 +34,12 @@ interface TaskFormProps {
   teamMembers: { id: string; full_name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
   onSuccess: (task?: CreatedTask) => void;
+  onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
   defaultValues?: TaskDefaultValues;
 }
 
-export function TaskForm({ projects, teamMembers, contacts, onSuccess, mode = 'create', defaultValues }: TaskFormProps) {
+export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPendingChange, mode = 'create', defaultValues }: TaskFormProps) {
   const user = useCurrentUser();
   const { success, error } = useToast();
 
@@ -66,7 +67,11 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, mode = 'c
     return null;
   };
 
-  const [state, formAction] = useActionState(handleSubmit, null);
+  const [state, formAction, isPending] = useActionState(handleSubmit, null);
+
+  useEffect(() => {
+    onPendingChange?.(isPending);
+  }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>

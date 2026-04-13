@@ -13,7 +13,7 @@ interface ApprovalControlsProps {
 
 export function ApprovalControls({ activityId }: ApprovalControlsProps) {
   const [response, setResponse] = useState('');
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [optimisticStatus, setOptimisticStatus] = useOptimistic<'pending' | 'approved' | 'rejected'>('pending');
   const { success, error } = useToast();
 
@@ -46,6 +46,7 @@ export function ApprovalControls({ activityId }: ApprovalControlsProps) {
         <Button
           variant="primary"
           size="sm"
+          loading={isPending}
           onClick={() => handleAction('approved')}
         >
           Approve all
@@ -53,6 +54,7 @@ export function ApprovalControls({ activityId }: ApprovalControlsProps) {
         <Button
           variant="destructive"
           size="sm"
+          loading={isPending}
           onClick={() => handleAction('rejected')}
         >
           Reject all

@@ -51,6 +51,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
   const [editTask, setEditTask] = useState<TaskRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { success, error } = useToast();
   const { items: tasks, optimisticAdd } = useOptimisticList(initialTasks);
@@ -208,7 +209,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="task-form">Save task</Button>
+            <Button variant="primary" type="submit" form="task-form" loading={isSubmitting}>Save task</Button>
           </>
         }
       >
@@ -217,6 +218,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
           teamMembers={teamMembers}
           contacts={contacts}
           onSuccess={handleTaskCreated}
+          onPendingChange={setIsSubmitting}
         />
       </SlideOver>
 
@@ -228,7 +230,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditTask(null)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="task-edit-form">Save changes</Button>
+            <Button variant="primary" type="submit" form="task-edit-form" loading={isSubmitting}>Save changes</Button>
           </>
         }
       >
@@ -244,6 +246,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
               setEditTask(null);
               router.refresh();
             }}
+            onPendingChange={setIsSubmitting}
           />
         )}
       </SlideOver>
