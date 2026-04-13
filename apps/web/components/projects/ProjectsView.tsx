@@ -34,6 +34,7 @@ const statusColors: Record<string, 'accent' | 'success' | 'warning' | 'neutral'>
 export function ProjectsView({ projects: initialProjects, teamMembers }: ProjectsViewProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [projects, setProjects] = useState(initialProjects);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleProjectCreated = useCallback((project: ProjectRow) => {
     setProjects((prev) => [project, ...prev]);
@@ -88,13 +89,14 @@ export function ProjectsView({ projects: initialProjects, teamMembers }: Project
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="project-form">Save project</Button>
+            <Button variant="primary" type="submit" form="project-form" loading={isSubmitting}>Save project</Button>
           </>
         }
       >
         <ProjectForm
           teamMembers={teamMembers}
           onSuccess={handleProjectCreated}
+          onPendingChange={setIsSubmitting}
         />
       </SlideOver>
     </>

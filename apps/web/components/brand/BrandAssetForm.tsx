@@ -1,15 +1,16 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { createBrandAsset } from '@/app/actions/brand';
 import { useToast } from '@/providers/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
 interface BrandAssetFormProps {
   onSuccess: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
-export function BrandAssetForm({ onSuccess }: BrandAssetFormProps) {
+export function BrandAssetForm({ onSuccess, onPendingChange }: BrandAssetFormProps) {
   const { success, error } = useToast();
 
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
@@ -23,7 +24,11 @@ export function BrandAssetForm({ onSuccess }: BrandAssetFormProps) {
     return null;
   };
 
-  const [state, formAction] = useActionState(handleSubmit, null);
+  const [state, formAction, isPending] = useActionState(handleSubmit, null);
+
+  useEffect(() => {
+    onPendingChange?.(isPending);
+  }, [isPending, onPendingChange]);
 
   return (
     <form id="brand-asset-form" action={formAction} className={styles.form}>
