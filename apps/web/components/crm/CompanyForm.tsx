@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { createCompany, updateCompany } from '@/app/actions/companies';
 import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
@@ -20,11 +20,12 @@ type CompanyRow = {
 
 interface CompanyFormProps {
   onSuccess: (company?: CompanyRow) => void;
+  onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
   defaultValues?: CompanyRow;
 }
 
-export function CompanyForm({ onSuccess, mode = 'create', defaultValues }: CompanyFormProps) {
+export function CompanyForm({ onSuccess, onPendingChange, mode = 'create', defaultValues }: CompanyFormProps) {
   const { success, error } = useToast();
 
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
@@ -51,6 +52,10 @@ export function CompanyForm({ onSuccess, mode = 'create', defaultValues }: Compa
 
   const [state, formAction, isPending] = useActionState(handleSubmit, null);
   const formId = mode === 'edit' ? 'company-edit-form' : 'company-form';
+
+  useEffect(() => {
+    onPendingChange?.(isPending);
+  }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>

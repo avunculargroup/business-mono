@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { createContact, updateContact } from '@/app/actions/contacts';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
@@ -26,11 +26,12 @@ interface ContactFormProps {
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   onSuccess: (contact?: ContactRow) => void;
+  onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
   defaultValues?: ContactRow;
 }
 
-export function ContactForm({ companies, teamMembers, onSuccess, mode = 'create', defaultValues }: ContactFormProps) {
+export function ContactForm({ companies, teamMembers, onSuccess, onPendingChange, mode = 'create', defaultValues }: ContactFormProps) {
   const user = useCurrentUser();
   const { success, error } = useToast();
 
@@ -56,8 +57,12 @@ export function ContactForm({ companies, teamMembers, onSuccess, mode = 'create'
     return null;
   };
 
-  const [state, formAction] = useActionState(handleSubmit, null);
+  const [state, formAction, isPending] = useActionState(handleSubmit, null);
   const formId = mode === 'edit' ? 'contact-edit-form' : 'contact-form';
+
+  useEffect(() => {
+    onPendingChange?.(isPending);
+  }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>

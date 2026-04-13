@@ -39,6 +39,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
   const [editContact, setEditContact] = useState<ContactRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContactRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { success, error } = useToast();
   const { items: contacts, optimisticAdd } = useOptimisticList(initialContacts);
@@ -167,7 +168,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="contact-form">Save contact</Button>
+            <Button variant="primary" type="submit" form="contact-form" loading={isSubmitting}>Save contact</Button>
           </>
         }
       >
@@ -175,6 +176,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
           companies={companies}
           teamMembers={teamMembers}
           onSuccess={handleContactCreated}
+          onPendingChange={setIsSubmitting}
         />
       </SlideOver>
 
@@ -186,7 +188,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditContact(null)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="contact-edit-form">Save changes</Button>
+            <Button variant="primary" type="submit" form="contact-edit-form" loading={isSubmitting}>Save changes</Button>
           </>
         }
       >
@@ -201,6 +203,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
               setEditContact(null);
               router.refresh();
             }}
+            onPendingChange={setIsSubmitting}
           />
         )}
       </SlideOver>

@@ -45,6 +45,7 @@ interface ContentBoardProps {
 export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [, startTransition] = useTransition();
   const [optimisticItems, setOptimisticStatus] = useOptimistic(
     items,
@@ -137,13 +138,14 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="content-form">Save</Button>
+            <Button variant="primary" type="submit" form="content-form" loading={isSubmitting}>Save</Button>
           </>
         }
       >
         <ContentForm
           teamMembers={teamMembers}
           onSuccess={() => setShowCreate(false)}
+          onPendingChange={setIsSubmitting}
         />
       </SlideOver>
     </div>
