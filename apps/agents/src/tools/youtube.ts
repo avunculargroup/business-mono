@@ -1,6 +1,5 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { YoutubeTranscript } from 'youtube-transcript';
 
 /** Extract a YouTube video ID from various URL formats or a raw 11-char ID. */
 export function extractVideoId(input: string): string | null {
@@ -69,6 +68,8 @@ export const youtubeTranscript = createTool({
         'Could not extract YouTube video ID. Provide a valid YouTube URL or 11-character video ID.',
       );
     }
+
+    const { YoutubeTranscript } = await import('youtube-transcript');
 
     const [segments, metadata] = await Promise.all([
       YoutubeTranscript.fetchTranscript(videoId),
