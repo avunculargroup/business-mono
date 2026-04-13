@@ -95,9 +95,20 @@ async function resolveDbUrlToIPv4(connStr: string): Promise<string> {
       url.searchParams.set('sslmode', 'require');
     }
     return url.toString();
-  } catch {
-    // DNS resolution failed; fall back to original string and let pg report it.
-    return connStr;
+  } catch (err) {
+    // No A (IPv4) records found for this hostname. Falling back to the
+    // hostname would cause pg to resolve it to IPv6, which Railway cannot
+    // reach (ENETUNREACH). Throw a clear error so the container fails fast
+    // with an actionable message rather than crashing deep in storage init.
+    throw new Error(
+      `SUPABASE_DB_URL hostname "${hostname}" has no IPv4 (A) DNS records. ` +
+      'Railway containers cannot reach IPv6 addresses. ' +
+      'Options: (1) Enable the Supabase IPv4 Add-On (Dashboard → Settings → ' +
+      'Add-Ons → IPv4 address, ~$4/mo) so db.[ref].supabase.co resolves to IPv4. ' +
+      '(2) Check that SUPABASE_DB_URL is the Direct Connection URL ' +
+      '(db.[ref].supabase.co:5432), not a pooler URL. ' +
+      `DNS error: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 
