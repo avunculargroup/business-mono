@@ -26,9 +26,17 @@ import { startFastmailListener } from '../listeners/fastmailListener.js';
 const honoHandler = (fn: (req: Request) => Promise<Response>) =>
   (c: Context) => fn(c.req.raw);
 
+const supabaseDbUrl = process.env['SUPABASE_DB_URL'];
+if (!supabaseDbUrl) {
+  throw new Error(
+    'SUPABASE_DB_URL is not set. Add the direct Postgres connection string ' +
+    '(Transaction Pooler URL from Supabase dashboard → Settings → Database → Connection Pooling).'
+  );
+}
+
 const storage = new PostgresStore({
   id: 'default',
-  connectionString: process.env['SUPABASE_DB_URL']!,
+  connectionString: supabaseDbUrl,
 });
 
 export const mastra = new Mastra({
