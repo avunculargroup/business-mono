@@ -26,6 +26,7 @@ interface TaskDetailActionsProps {
 
 export function TaskDetailActions({ task, projects, teamMembers, contacts }: TaskDetailActionsProps) {
   const [showEdit, setShowEdit] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
   return (
@@ -42,7 +43,7 @@ export function TaskDetailActions({ task, projects, teamMembers, contacts }: Tas
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowEdit(false)}>Cancel</Button>
-            <Button variant="primary" type="submit" form="task-edit-form">Save changes</Button>
+            <Button variant="primary" type="submit" form="task-edit-form" loading={isSubmitting}>Save changes</Button>
           </>
         }
       >
@@ -56,6 +57,7 @@ export function TaskDetailActions({ task, projects, teamMembers, contacts }: Tas
             setShowEdit(false);
             router.refresh();
           }}
+          onPendingChange={setIsSubmitting}
         />
       </SlideOver>
     </>
