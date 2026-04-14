@@ -81,6 +81,11 @@
 
   .panel {
     width: 100vw;
+    height: 100dvh; /* shrinks when soft keyboard appears, keeping footer visible */
+  }
+
+  .footer {
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
 }
 
