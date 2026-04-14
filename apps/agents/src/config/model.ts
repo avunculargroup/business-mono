@@ -1,5 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import { DEFAULT_MODEL } from '@platform/shared';
 
 /**
@@ -15,7 +16,7 @@ import { DEFAULT_MODEL } from '@platform/shared';
  *   OPENROUTER_MODEL=openai/gpt-4o
  *   OPENROUTER_MODEL=google/gemini-2.0-flash-001
  */
-export function getModelConfig() {
+export function getModelConfig(): LanguageModelV2 {
   if (process.env['OPENROUTER_API_KEY']) {
     const openai = createOpenAI({
       apiKey: process.env['OPENROUTER_API_KEY'],
