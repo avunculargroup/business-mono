@@ -86,9 +86,14 @@
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
   border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 @media (max-width: 767px) {
+  .panel {
+    max-height: calc(100dvh - var(--space-8)); /* shrinks when soft keyboard appears */
+  }
+
   .close {
     padding: var(--space-2);
     min-width: 44px;
