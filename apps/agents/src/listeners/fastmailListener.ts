@@ -34,23 +34,29 @@ async function pollAllAccounts(): Promise<void> {
   let teamEmails: Set<string>;
 
   try {
-    const [accountsRes, exclusionsRes, teamRes] = await Promise.all([
-      supabase.from('fastmail_accounts').select('id, username, token, display_name, watched_addresses').eq('is_active', true),
+    const [allAccountsRes, exclusionsRes] = await Promise.all([
+      // Fetch all accounts (active + inactive) so we can build the full team
+      // email set for internal/external classification, then filter to active
+      // for polling.
+      supabase.from('fastmail_accounts').select('id, username, token, display_name, watched_addresses, is_active'),
       supabase.from('fastmail_exclusions').select('type, value'),
-      supabase.from('team_members').select('email'),
     ]);
 
-    if (accountsRes.error) throw accountsRes.error;
+    if (allAccountsRes.error) throw allAccountsRes.error;
     if (exclusionsRes.error) throw exclusionsRes.error;
-    if (teamRes.error) throw teamRes.error;
 
-    accounts = accountsRes.data ?? [];
+    const allAccounts = allAccountsRes.data ?? [];
+    accounts = allAccounts.filter((a) => a.is_active);
     exclusions = exclusionsRes.data ?? [];
-    const teamRows = (teamRes.data ?? []) as unknown as Array<{ email: string | null }>;
+
+    // Derive team email addresses from all Fastmail accounts (active + inactive).
+    // All accounts in this table belong to team members, so their addresses
+    // (username + any watched aliases) count as internal addresses.
     teamEmails = new Set(
-      teamRows
-        .map((m) => m.email?.toLowerCase())
-        .filter((e): e is string => Boolean(e)),
+      allAccounts.flatMap((a) => [
+        a.username.toLowerCase(),
+        ...a.watched_addresses.map((addr) => addr.toLowerCase()),
+      ]),
     );
   } catch (err) {
     console.error('[fastmail-listener] Failed to load config from DB:', err);
