@@ -131,9 +131,11 @@ export default async function DashboardPage() {
               <div className={styles.tasksList}>
                 {followUpContacts.map((contact) => (
                   <div key={contact.id} className={styles.taskRow}>
-                    <Link href={`/crm/contacts/${contact.id}`} className={styles.taskTitle}>
-                      {contact.first_name} {contact.last_name}
-                    </Link>
+                    <div className={styles.taskInfo}>
+                      <Link href={`/crm/contacts/${contact.id}`} className={styles.taskTitle}>
+                        {contact.first_name} {contact.last_name}
+                      </Link>
+                    </div>
                     <PipelineChip stage={contact.pipeline_stage} />
                     <span className={styles.dueDate}>{formatRelativeDate(contact.updated_at)}</span>
                   </div>
