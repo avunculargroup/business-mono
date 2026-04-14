@@ -84,11 +84,14 @@ async function resolveDbUrlToIPv4(connStr: string): Promise<string> {
   try {
     const [ipv4] = await resolve4(hostname);
     url.hostname = ipv4;
-    // pg uses SNI for SSL — connecting via IP disables hostname verification.
-    // Append sslmode=require so the connection is still encrypted.
-    if (!url.searchParams.has('sslmode')) {
-      url.searchParams.set('sslmode', 'require');
-    }
+    // When connecting via IP, hostname-based cert verification is impossible
+    // (the cert CN is the hostname, not the IP). Both Railway's internal
+    // Postgres plugin and Supabase use self-signed certs that are not in
+    // Node.js's trust store, causing SELF_SIGNED_CERT_IN_CHAIN with
+    // sslmode=require (which pg-connection-string v2 maps to verify-full).
+    // Force no-verify: the connection remains encrypted; cert chain and
+    // hostname checks are skipped.
+    url.searchParams.set('sslmode', 'no-verify');
     return url.toString();
   } catch (err) {
     // No A (IPv4) records found for this hostname. Falling back to the
