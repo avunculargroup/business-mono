@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-14 — Add source column to companies table
+
+- **`companies.source`** — new nullable TEXT column with `DEFAULT 'manual'` and a CHECK constraint (`'manual'`, `'web'`, `'coordinator_agent'`, `'recorder_agent'`, `'call_transcript'`). The web UI (`apps/web/app/actions/companies.ts`) was inserting `source: 'web'` on every company creation, causing "Could not find the 'source' column of 'companies' in the schema cache" errors. Mirrors the pattern already established on `contacts.source`.
+
+Migration: `20260414000000_add_source_to_companies.sql`
+
+---
+
 ## 2026-04-01 — Fastmail watched_addresses filter
 
 Added `watched_addresses TEXT[] NOT NULL DEFAULT '{}'` to `fastmail_accounts`.
