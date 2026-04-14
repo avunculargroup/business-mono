@@ -84,11 +84,11 @@ async function resolveDbUrlToIPv4(connStr: string): Promise<string> {
   try {
     const [ipv4] = await resolve4(hostname);
     url.hostname = ipv4;
-    // pg uses SNI for SSL — connecting via IP disables hostname verification.
-    // Append sslmode=require so the connection is still encrypted.
-    if (!url.searchParams.has('sslmode')) {
-      url.searchParams.set('sslmode', 'require');
-    }
+    // When connecting via IP, hostname-based cert verification is impossible
+    // (the cert CN is the hostname, not the IP). Supabase also uses a custom
+    // CA not in Node.js's trust store, causing SELF_SIGNED_CERT_IN_CHAIN.
+    // Force no-verify: the connection remains encrypted; we skip chain checks.
+    url.searchParams.set('sslmode', 'no-verify');
     return url.toString();
   } catch (err) {
     // No A (IPv4) records found for this hostname. Falling back to the
