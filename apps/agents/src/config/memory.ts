@@ -1,5 +1,6 @@
 import { Memory } from '@mastra/memory';
 import { z } from 'zod';
+import { getModelConfig } from './model.js';
 
 const workingMemorySchema = z.object({
   directorName: z.string().describe('Name of the director'),
@@ -24,6 +25,7 @@ const workingMemorySchema = z.object({
  * (see `agents/simon/index.ts`). Memory's own `processors` field is deprecated in core 1.x.
  */
 export const memory = new Memory({
+  model: getModelConfig(),
   options: {
     lastMessages: 40,
     semanticRecall: false,
