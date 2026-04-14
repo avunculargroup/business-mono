@@ -56,6 +56,8 @@ CREATE TABLE companies (
   website       TEXT,
   linkedin_url  TEXT,
   notes         TEXT,
+  source        TEXT DEFAULT 'manual'
+                  CHECK (source IN ('manual', 'web', 'coordinator_agent', 'recorder_agent', 'call_transcript')),
   created_by    UUID REFERENCES team_members(id),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
