@@ -31,6 +31,14 @@ $$ LANGUAGE plpgsql;
 
 
 -- ============================================================
+-- DISCOVERY ENUMS
+-- ============================================================
+
+CREATE TYPE stakeholder_role AS ENUM ('CFO','CEO','HR','Treasury','PeopleOps','Other');
+CREATE TYPE trigger_event_type AS ENUM ('FASB_CHANGE','EMPLOYEE_BTC_REQUEST','REGULATORY_UPDATE','OTHER');
+
+
+-- ============================================================
 -- TEAM MEMBERS
 -- ============================================================
 
@@ -89,6 +97,7 @@ CREATE TABLE contacts (
   tags            TEXT[],
   source          TEXT DEFAULT 'manual'
                   CHECK (source IN ('manual', 'coordinator_agent', 'recorder_agent', 'signal', 'call_transcript', 'fastmail_sync')),
+  role            stakeholder_role,
   created_by      UUID REFERENCES team_members(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -847,3 +856,109 @@ CREATE POLICY "fastmail_sync_state_all" ON fastmail_sync_state
   FOR ALL
   USING  (auth.role() IN ('authenticated', 'service_role'))
   WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+
+
+-- ============================================================
+-- DISCOVERY INTERVIEWS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS discovery_interviews (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  contact_id      UUID        REFERENCES contacts(id)  ON DELETE CASCADE,
+  company_id      UUID        REFERENCES companies(id) ON DELETE SET NULL,
+  interview_date  TIMESTAMPTZ,
+  status          TEXT        NOT NULL DEFAULT 'scheduled'
+                              CHECK (status IN ('scheduled','completed','cancelled','no_show')),
+  channel         TEXT,
+  notes           TEXT,
+  pain_points     TEXT[]      DEFAULT '{}',
+  trigger_event   trigger_event_type,
+  email_thread_id TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE TRIGGER discovery_interviews_updated_at
+  BEFORE UPDATE ON discovery_interviews
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_di_contact ON discovery_interviews(contact_id);
+CREATE INDEX IF NOT EXISTS idx_di_company ON discovery_interviews(company_id);
+CREATE INDEX IF NOT EXISTS idx_di_date    ON discovery_interviews(interview_date DESC);
+
+ALTER TABLE discovery_interviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "discovery_interviews_all" ON discovery_interviews;
+CREATE POLICY "discovery_interviews_all" ON discovery_interviews
+  FOR ALL USING (auth.role() = 'authenticated');
+
+
+-- ============================================================
+-- PAIN POINT LOG
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS pain_point_log (
+  id            BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  interview_id  UUID        REFERENCES discovery_interviews(id) ON DELETE CASCADE,
+  pain_point    TEXT        NOT NULL,
+  change_type   TEXT        NOT NULL,
+  changed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ppl_interview ON pain_point_log(interview_id);
+
+CREATE OR REPLACE FUNCTION log_pain_points() RETURNS TRIGGER AS $$
+DECLARE
+  pp TEXT;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.pain_points IS NOT NULL THEN
+      FOREACH pp IN ARRAY NEW.pain_points LOOP
+        INSERT INTO pain_point_log(interview_id, pain_point, change_type, changed_at)
+        VALUES (NEW.id, pp, 'insert', NOW());
+      END LOOP;
+    END IF;
+  ELSIF TG_OP = 'UPDATE' AND NEW.pain_points IS DISTINCT FROM OLD.pain_points THEN
+    IF NEW.pain_points IS NOT NULL THEN
+      FOREACH pp IN ARRAY NEW.pain_points LOOP
+        INSERT INTO pain_point_log(interview_id, pain_point, change_type, changed_at)
+        VALUES (NEW.id, pp, 'update', NOW());
+      END LOOP;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER pain_points_audit
+  AFTER INSERT OR UPDATE ON discovery_interviews
+  FOR EACH ROW EXECUTE FUNCTION log_pain_points();
+
+ALTER TABLE pain_point_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pain_point_log_all" ON pain_point_log;
+CREATE POLICY "pain_point_log_all" ON pain_point_log
+  FOR ALL USING (auth.role() = 'authenticated');
+
+
+-- ============================================================
+-- SEGMENT SCORECARDS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS segment_scorecards (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  segment_name        TEXT        UNIQUE NOT NULL,
+  need_score          INTEGER     CHECK (need_score BETWEEN 1 AND 5),
+  access_score        INTEGER     CHECK (access_score BETWEEN 1 AND 5),
+  planned_interviews  INTEGER     NOT NULL DEFAULT 0,
+  notes               TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE TRIGGER segment_scorecards_updated_at
+  BEFORE UPDATE ON segment_scorecards
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE segment_scorecards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "segment_scorecards_all" ON segment_scorecards;
+CREATE POLICY "segment_scorecards_all" ON segment_scorecards
+  FOR ALL USING (auth.role() = 'authenticated');

@@ -391,3 +391,106 @@ export interface ResearchResult {
   ingestion?: ResearchIngestion;
   metadata: ResearchMetadata;
 }
+
+
+// ============================================================
+// Discovery Interviews
+// ============================================================
+
+export const StakeholderRole = {
+  CFO:        'CFO',
+  CEO:        'CEO',
+  HR:         'HR',
+  TREASURY:   'Treasury',
+  PEOPLE_OPS: 'PeopleOps',
+  OTHER:      'Other',
+} as const;
+export type StakeholderRole = (typeof StakeholderRole)[keyof typeof StakeholderRole];
+
+export const TriggerEventType = {
+  FASB_CHANGE:          'FASB_CHANGE',
+  EMPLOYEE_BTC_REQUEST: 'EMPLOYEE_BTC_REQUEST',
+  REGULATORY_UPDATE:    'REGULATORY_UPDATE',
+  OTHER:                'OTHER',
+} as const;
+export type TriggerEventType = (typeof TriggerEventType)[keyof typeof TriggerEventType];
+
+export const InterviewStatus = {
+  SCHEDULED: 'scheduled',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  NO_SHOW:   'no_show',
+} as const;
+export type InterviewStatus = (typeof InterviewStatus)[keyof typeof InterviewStatus];
+
+export const DiscoveryInterviewChannel = {
+  CALL:      'call',
+  EMAIL:     'email',
+  IN_PERSON: 'in_person',
+  OTHER:     'other',
+} as const;
+export type DiscoveryInterviewChannel = (typeof DiscoveryInterviewChannel)[keyof typeof DiscoveryInterviewChannel];
+
+export const STAKEHOLDER_ROLE_LABELS: Record<StakeholderRole, string> = {
+  CFO:       'CFO',
+  CEO:       'CEO',
+  HR:        'HR',
+  Treasury:  'Treasury',
+  PeopleOps: 'People Ops',
+  Other:     'Other',
+};
+
+export const TRIGGER_EVENT_LABELS: Record<TriggerEventType, string> = {
+  FASB_CHANGE:          'FASB change',
+  EMPLOYEE_BTC_REQUEST: 'Employee BTC request',
+  REGULATORY_UPDATE:    'Regulatory update',
+  OTHER:                'Other',
+};
+
+export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show:   'No show',
+};
+
+export const INTERVIEW_CHANNEL_LABELS: Record<DiscoveryInterviewChannel, string> = {
+  call:      'Call',
+  email:     'Email',
+  in_person: 'In person',
+  other:     'Other',
+};
+
+export interface DiscoveryInterview {
+  id: string;
+  contact_id: string | null;
+  company_id: string | null;
+  interview_date: string | null;
+  status: InterviewStatus;
+  channel: string | null;
+  notes: string | null;
+  pain_points: string[];
+  trigger_event: TriggerEventType | null;
+  email_thread_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PainPointLog {
+  id: number;
+  interview_id: string;
+  pain_point: string;
+  change_type: string;
+  changed_at: string;
+}
+
+export interface SegmentScorecard {
+  id: string;
+  segment_name: string;
+  need_score: number | null;
+  access_score: number | null;
+  planned_interviews: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}

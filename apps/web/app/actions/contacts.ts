@@ -15,6 +15,7 @@ const contactSchema = z.object({
   owner_id: z.string().uuid().optional().or(z.literal('')),
   notes: z.string().optional(),
   source: z.string().optional(),
+  role: z.enum(['CFO', 'CEO', 'HR', 'Treasury', 'PeopleOps', 'Other']).optional().or(z.literal('')),
 });
 
 export async function createContact(formData: FormData) {
