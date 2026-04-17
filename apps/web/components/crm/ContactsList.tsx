@@ -25,7 +25,7 @@ type ContactRow = {
   pipeline_stage: string;
   owner_id: string | null;
   company_id: string | null;
-  role: string | null;
+  role?: string | null;
   created_at: string;
   updated_at: string;
 };
