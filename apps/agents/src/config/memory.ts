@@ -35,6 +35,7 @@ export const memory = new Memory({
       scope: 'resource',
     },
     observationalMemory: {
+      model: getModelConfig(),
       scope: 'resource',
       observation: {
         messageTokens: 30_000,
