@@ -4,7 +4,6 @@ import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PipelineItemForm } from './PipelineItemForm';
 import { movePipelineItem } from '@/app/actions/pipeline';
 import { useToast } from '@/providers/ToastProvider';
