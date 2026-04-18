@@ -109,18 +109,44 @@ export async function movePipelineItem(id: string, status: string) {
 
 export async function getPipelineItems() {
   const supabase = await createClient();
-  // Cast to any — the Phase 2 migration adds pain_point_id/score/research_links
-  // to content_items but the generated types haven't been regenerated yet.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('content_items')
-    .select('*')
+    .select('*, pain_points(id, content, interview_id)')
     .eq('type', 'linkedin')
     .neq('status', 'archived')
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function overrideValidation(id: string, validated: boolean, reason: string) {
+  if (!reason.trim()) return { error: 'Reason is required for manual override.' };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { error } = await (supabase as any)
+    .from('content_items')
+    .update({ validated } as never)
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+
+  // Log override to agent_activity for audit trail
+  await (supabase as any).from('agent_activity').insert({
+    agent_name:   'simon',
+    action:       `Pipeline validation override: ${validated ? 'validated' : 'invalidated'} — ${reason}`,
+    status:       'auto',
+    trigger_type: 'manual',
+    entity_type:  'content_item',
+    entity_id:    id,
+    proposed_actions: { reason, validated, overridden_by: user?.id ?? null },
+  });
+
+  revalidatePath('/discovery/pipeline');
+  return { success: true };
 }
 
 export async function getPainPointsForPicker() {

@@ -1,9 +1,9 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { createPipelineItem, updatePipelineItem } from '@/app/actions/pipeline';
+import { createPipelineItem, updatePipelineItem, overrideValidation } from '@/app/actions/pipeline';
 import { useToast } from '@/providers/ToastProvider';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 import type { PipelineItemRow, PainPointOption, TeamMember } from './PipelineBoard';
 import { INSIGHT_PIPELINE_STAGE_LABELS } from '@platform/shared';
 import styles from './DiscoveryForm.module.css';
@@ -29,9 +29,12 @@ export function PipelineItemForm({
 }: PipelineItemFormProps) {
   const { success, error } = useToast();
 
-  const [tags, setTags]         = useState<string[]>(defaultValues?.topic_tags ?? []);
-  const [tagInput, setTagInput] = useState('');
-  const [links, setLinks]       = useState<ResearchLink[]>(defaultValues?.research_links ?? []);
+  const [tags, setTags]               = useState<string[]>(defaultValues?.topic_tags ?? []);
+  const [tagInput, setTagInput]       = useState('');
+  const [links, setLinks]             = useState<ResearchLink[]>(defaultValues?.research_links ?? []);
+  const [showOverride, setShowOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [isOverriding, setIsOverriding]     = useState(false);
 
   const addTag = () => {
     const v = tagInput.trim().toLowerCase();
@@ -68,6 +71,18 @@ export function PipelineItemForm({
   const formId = mode === 'edit' ? 'pipeline-edit-form' : 'pipeline-form';
 
   useEffect(() => { onPendingChange?.(isPending); }, [isPending, onPendingChange]);
+
+  const handleOverride = async () => {
+    if (!defaultValues || !overrideReason.trim()) return;
+    setIsOverriding(true);
+    const result = await overrideValidation(defaultValues.id, !defaultValues.validated, overrideReason);
+    setIsOverriding(false);
+    if (result.error) { error(result.error); } else {
+      success(`Validation ${defaultValues.validated ? 'removed' : 'overridden'}`);
+      setShowOverride(false);
+      onSuccess();
+    }
+  };
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
@@ -130,6 +145,55 @@ export function PipelineItemForm({
               </option>
             ))}
           </select>
+          {/* Validation status — only shown in edit mode when a pain point is linked */}
+          {mode === 'edit' && defaultValues?.pain_point_id && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              {defaultValues.validated ? (
+                <CheckCircle size={14} strokeWidth={2} style={{ color: 'var(--color-success, #22c55e)' }} />
+              ) : (
+                <AlertCircle size={14} strokeWidth={2} style={{ color: 'var(--color-text-tertiary)' }} />
+              )}
+              <span className={styles.hint} style={{ margin: 0 }}>
+                {defaultValues.validated
+                  ? `Validated — mentioned in ${defaultValues.question_count} interview${defaultValues.question_count !== 1 ? 's' : ''}`
+                  : `Not validated — mentioned in ${defaultValues.question_count} interview${defaultValues.question_count !== 1 ? 's' : ''} (need 3+)`
+                }
+              </span>
+              <button
+                type="button"
+                className={styles.addLinkBtn}
+                style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: 11 }}
+                onClick={() => setShowOverride((v) => !v)}
+              >
+                Override
+              </button>
+            </div>
+          )}
+          {showOverride && mode === 'edit' && defaultValues && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="Reason for override (required)"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" className={styles.addLinkBtn} onClick={() => setShowOverride(false)} style={{ padding: '3px 8px' }}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.addLinkBtn}
+                  onClick={handleOverride}
+                  disabled={!overrideReason.trim() || isOverriding}
+                  style={{ padding: '3px 8px', borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}
+                >
+                  {isOverriding ? 'Saving…' : `Set to ${defaultValues.validated ? 'not validated' : 'validated'}`}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
