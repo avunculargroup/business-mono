@@ -32,7 +32,7 @@ interface ChampionEventLogProps {
 }
 
 export function ChampionEventLog({ championId, initialEvents }: ChampionEventLogProps) {
-  const [events, setEvents] = useState(initialEvents);
+  const [events] = useState(initialEvents);
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
