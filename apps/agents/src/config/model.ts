@@ -26,8 +26,7 @@ export function getModelConfig(): LanguageModelV2 {
       if (process.env['OPENROUTER_API_KEY']) {
         throw new Error(
           'ANTHROPIC_API_KEY is missing but required for Claude models. ' +
-            'If you are using OpenRouter, set ANTHROPIC_MODEL to a non-Claude model (e.g., "openai/gpt-4o-mini") ' +
-            'or set ANTHROPIC_MODEL=anthropic/claude-sonnet-4-5 to route Claude via OpenRouter with OPENROUTER_MODEL.'
+            'To use Claude via OpenRouter, set OPENROUTER_MODEL=anthropic/claude-sonnet-4-5 instead of ANTHROPIC_MODEL.'
         );
       }
       throw new Error('ANTHROPIC_API_KEY is required for Claude models.');
