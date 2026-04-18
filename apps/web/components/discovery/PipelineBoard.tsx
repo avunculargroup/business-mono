@@ -143,8 +143,8 @@ export function PipelineBoard({ initialItems, painPoints, teamMembers }: Pipelin
                           <p className={styles.cardTitle}>{item.title}</p>
                           {item.pain_point_id && (
                             item.validated
-                              ? <CheckCircle size={14} strokeWidth={2} className={styles.validatedIcon} title="Validated — 3+ interviews" />
-                              : <AlertCircle size={14} strokeWidth={2} className={styles.unvalidatedIcon} title={`Not validated — mentioned ${item.question_count}×`} />
+                              ? <CheckCircle size={14} strokeWidth={2} className={styles.validatedIcon} aria-label="Validated — 3+ interviews" />
+                              : <AlertCircle size={14} strokeWidth={2} className={styles.unvalidatedIcon} aria-label={`Not validated — mentioned ${item.question_count}×`} />
                           )}
                         </div>
                         {painPoint && (
