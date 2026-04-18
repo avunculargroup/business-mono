@@ -16,6 +16,7 @@ import {
   LogOut,
   MoreHorizontal,
   Search,
+  ChevronRight,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -54,15 +55,44 @@ const systemNav = [
   { href: '/brand', label: 'Brand Hub', icon: Bookmark },
 ];
 
-const moreNav = [
+interface MoreNavChild {
+  href: string;
+  label: string;
+}
+
+interface MoreNavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  children?: MoreNavChild[];
+}
+
+interface MoreNavSection {
+  label: string;
+  items: MoreNavItem[];
+}
+
+const moreNav: MoreNavSection[] = [
   {
     label: 'Work',
     items: [
-      { href: '/crm/contacts',       label: 'CRM',       icon: Users       },
-      { href: '/tasks',              label: 'Tasks',     icon: CheckSquare },
-      { href: '/projects',           label: 'Projects',  icon: FolderOpen  },
-      { href: '/content',            label: 'Content',   icon: FileText    },
-      { href: '/discovery/pipeline', label: 'Discovery', icon: Search      },
+      { href: '/crm', label: 'CRM', icon: Users, children: [
+        { href: '/crm/contacts',   label: 'Contacts'   },
+        { href: '/crm/companies',  label: 'Companies'  },
+        { href: '/crm/champions',  label: 'Champions'  },
+        { href: '/crm/community',  label: 'Community'  },
+      ]},
+      { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
+      { href: '/projects',  label: 'Projects',  icon: FolderOpen  },
+      { href: '/content',   label: 'Content',   icon: FileText    },
+      { href: '/discovery', label: 'Discovery', icon: Search, children: [
+        { href: '/crm/interviews',        label: 'Interviews' },
+        { href: '/crm/segments',          label: 'Segments'   },
+        { href: '/discovery/lexicon',     label: 'Lexicon'    },
+        { href: '/discovery/templates',   label: 'Templates'  },
+        { href: '/discovery/feedback',    label: 'Feedback'   },
+        { href: '/discovery/pipeline',    label: 'Pipeline'   },
+      ]},
     ],
   },
   {
@@ -79,6 +109,7 @@ export function Sidebar({ pendingCount }: SidebarProps) {
   const pathname = usePathname();
   const user = useCurrentUser();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -87,6 +118,30 @@ export function Sidebar({ pendingCount }: SidebarProps) {
   };
 
   const isMoreActive = pathname !== '/' && !pathname.startsWith('/simon');
+
+  const toggleSection = (href: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(href)) {
+        next.delete(href);
+      } else {
+        next.add(href);
+      }
+      return next;
+    });
+  };
+
+  // Auto-expand the active section when the sheet opens
+  useEffect(() => {
+    if (!isMoreOpen) return;
+    const active = moreNav
+      .flatMap(s => s.items)
+      .find(item => item.children && isActive(item.href));
+    if (active) {
+      setExpandedSections(new Set([active.href]));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMoreOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -215,17 +270,55 @@ export function Sidebar({ pendingCount }: SidebarProps) {
         {moreNav.map((section) => (
           <div key={section.label} className={styles.moreSheetSection}>
             <span className={styles.moreSheetSectionLabel}>{section.label}</span>
-            {section.items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.moreSheetItem} ${isActive(item.href.startsWith('/crm') ? '/crm' : item.href) ? styles.moreSheetItemActive : ''}`}
-                onClick={() => setIsMoreOpen(false)}
-              >
-                <item.icon size={18} strokeWidth={1.5} />
-                <span>{item.label}</span>
-              </Link>
-            ))}
+            {section.items.map((item) => {
+              const active = isActive(item.href);
+              const expanded = expandedSections.has(item.href);
+
+              if (item.children) {
+                return (
+                  <div key={item.href}>
+                    <button
+                      type="button"
+                      className={`${styles.moreSheetAccordionTrigger} ${active ? styles.moreSheetAccordionTriggerActive : ''}`}
+                      onClick={() => toggleSection(item.href)}
+                      aria-expanded={expanded}
+                    >
+                      <item.icon size={18} strokeWidth={1.5} />
+                      <span>{item.label}</span>
+                      <ChevronRight
+                        size={16}
+                        strokeWidth={1.5}
+                        className={`${styles.moreSheetChevron} ${expanded ? styles.moreSheetChevronOpen : ''}`}
+                      />
+                    </button>
+                    <div className={`${styles.moreSheetSubItems} ${expanded ? styles.moreSheetSubItemsOpen : ''}`}>
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`${styles.moreSheetSubItem} ${pathname.startsWith(child.href) ? styles.moreSheetSubItemActive : ''}`}
+                          onClick={() => setIsMoreOpen(false)}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${styles.moreSheetItem} ${active ? styles.moreSheetItemActive : ''}`}
+                  onClick={() => setIsMoreOpen(false)}
+                >
+                  <item.icon size={18} strokeWidth={1.5} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
           </div>
         ))}
       </div>
