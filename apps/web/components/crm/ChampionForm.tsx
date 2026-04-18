@@ -70,7 +70,7 @@ export function ChampionForm({ champion, contacts, companies, onSuccess, onPendi
       {companies.length > 0 && !champion && (
         <div className={styles.field}>
           <label className={styles.label}>Company</label>
-          <select name="company_id" defaultValue={champion?.company_id ?? ''} className={styles.select}>
+          <select name="company_id" defaultValue="" className={styles.select}>
             <option value="">— Select company —</option>
             {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
