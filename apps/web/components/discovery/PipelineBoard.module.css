@@ -9,7 +9,26 @@
 
 .toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.validationToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggleCheckbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--color-accent);
 }
 
 .board {
@@ -100,12 +119,37 @@
   gap: var(--space-1);
 }
 
+.cardTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
 .cardTitle {
+  flex: 1;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-primary);
   margin: 0;
   line-height: 1.4;
+}
+
+.validatedIcon {
+  flex-shrink: 0;
+  color: var(--color-success, #22c55e);
+  margin-top: 2px;
+}
+
+.unvalidatedIcon {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.mentionCount {
+  font-style: normal;
+  color: var(--color-accent);
+  font-weight: 500;
 }
 
 .cardPainPoint {
