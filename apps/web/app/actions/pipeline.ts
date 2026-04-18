@@ -109,7 +109,10 @@ export async function movePipelineItem(id: string, status: string) {
 
 export async function getPipelineItems() {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  // Cast to any — the Phase 2 migration adds pain_point_id/score/research_links
+  // to content_items but the generated types haven't been regenerated yet.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('content_items')
     .select('*')
     .eq('type', 'linkedin')
