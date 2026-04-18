@@ -68,10 +68,6 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
     });
   }, [templates, filterType]);
 
-  const getApprovedVersion = (t: TemplateRow) =>
-    t.mvp_template_versions.find((v) => v.status === 'approved') ??
-    t.mvp_template_versions.sort((a, b) => b.version_number - a.version_number)[0];
-
   const handleApprove = async () => {
     if (!approveTarget) return;
     setIsActioning(true);
@@ -116,7 +112,6 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
       ) : (
         <div className={styles.grid}>
           {filtered.map((template) => {
-            const activeVersion = getApprovedVersion(template);
             const totalVersions = template.mvp_template_versions.length;
             const hasApproved = template.mvp_template_versions.some((v) => v.status === 'approved');
 
