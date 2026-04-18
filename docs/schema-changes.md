@@ -6,6 +6,22 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-17 — Discovery interviews foundation
+
+Adds structured discovery interview tracking, pain point audit logging, stakeholder role tagging on contacts, and segment scorecards to support the 15–20 discovery interviews planned for Q2 validation.
+
+- **`stakeholder_role` enum** — `CFO`, `CEO`, `HR`, `Treasury`, `PeopleOps`, `Other`. Applied to `contacts.role`.
+- **`trigger_event_type` enum** — `FASB_CHANGE`, `EMPLOYEE_BTC_REQUEST`, `REGULATORY_UPDATE`, `OTHER`. Applied to `discovery_interviews.trigger_event`.
+- **`contacts.role stakeholder_role`** — nullable column; existing contacts default to `NULL` (displayed as "Unassigned" in the portal).
+- **`discovery_interviews`** — records each outreach or interview. Includes `status` (scheduled/completed/cancelled/no_show), `channel`, `pain_points TEXT[]`, `trigger_event`, and optional `email_thread_id` for future Fastmail thread linking. FK to `contacts` cascades on delete; FK to `companies` sets null on delete (preserving interview history if a company is removed).
+- **`pain_point_log`** — audit trail for `pain_points` array changes. Populated by the `pain_points_audit` trigger, which guards against flooding on unrelated field updates (`NEW.pain_points IS DISTINCT FROM OLD.pain_points`).
+- **`segment_scorecards`** — lightweight scorecard table: `need_score` and `access_score` (1–5 integers), `planned_interviews`, `notes`. Weighted score (`need × access`) is calculated client-side.
+- All three new tables have RLS enabled (authenticated read/write), `updated_at` triggers, and appropriate indexes.
+
+Migration: `20260417000000_add_discovery_interviews.sql`
+
+---
+
 ## 2026-04-14 — Add source column to companies table
 
 - **`companies.source`** — new nullable TEXT column with `DEFAULT 'manual'` and a CHECK constraint (`'manual'`, `'web'`, `'coordinator_agent'`, `'recorder_agent'`, `'call_transcript'`). The web UI (`apps/web/app/actions/companies.ts`) was inserting `source: 'web'` on every company creation, causing "Could not find the 'source' column of 'companies' in the schema cache" errors. Mirrors the pattern already established on `contacts.source`.

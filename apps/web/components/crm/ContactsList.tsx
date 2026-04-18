@@ -4,13 +4,15 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PipelineChip } from '@/components/ui/PipelineChip';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ContactForm } from './ContactForm';
-import { deleteContact } from '@/app/actions/contacts';
+import { deleteContact, updateContact } from '@/app/actions/contacts';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
+import { STAKEHOLDER_ROLE_LABELS, type StakeholderRole } from '@platform/shared';
 import { Plus, Users, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/providers/ToastProvider';
 import styles from './ContactsList.module.css';
@@ -23,6 +25,7 @@ type ContactRow = {
   pipeline_stage: string;
   owner_id: string | null;
   company_id: string | null;
+  role?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -35,14 +38,16 @@ interface ContactsListProps {
 }
 
 export function ContactsList({ initialContacts, totalCount: _totalCount, companies, teamMembers }: ContactsListProps) {
-  const [showCreate, setShowCreate] = useState(false);
-  const [editContact, setEditContact] = useState<ContactRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ContactRow | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCreate, setShowCreate]       = useState(false);
+  const [editContact, setEditContact]     = useState<ContactRow | null>(null);
+  const [roleTarget, setRoleTarget]       = useState<ContactRow | null>(null);
+  const [deleteTarget, setDeleteTarget]   = useState<ContactRow | null>(null);
+  const [isDeleting, setIsDeleting]       = useState(false);
+  const [isSubmitting, setIsSubmitting]   = useState(false);
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
   const router = useRouter();
   const { success, error } = useToast();
-  const { items: contacts, optimisticAdd } = useOptimisticList(initialContacts);
+  const { items: contacts, optimisticAdd, optimisticUpdate } = useOptimisticList(initialContacts);
 
   const handleContactCreated = useCallback((contact?: ContactRow) => {
     if (contact) {
@@ -50,6 +55,22 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
     }
     setShowCreate(false);
   }, [optimisticAdd]);
+
+  const handleRoleSave = async (role: string) => {
+    if (!roleTarget) return;
+    setRoleSubmitting(true);
+    const fd = new FormData();
+    fd.set('role', role);
+    const result = await updateContact(roleTarget.id, fd);
+    setRoleSubmitting(false);
+    if (result.error) {
+      error(result.error);
+    } else {
+      success('Role updated');
+      optimisticUpdate(roleTarget.id, { role: role || null }, async () => {});
+      setRoleTarget(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -110,6 +131,18 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         <span className={styles.mono}>{formatRelativeDate(row.updated_at)}</span>
       ),
     },
+    {
+      key: 'role',
+      header: 'Role',
+      width: '12%',
+      render: (row) => {
+        const role = row.role as StakeholderRole | null;
+        if (role) {
+          return <StatusChip label={STAKEHOLDER_ROLE_LABELS[role] ?? role} color="neutral" />;
+        }
+        return <span className={styles.unassigned}>Unassigned</span>;
+      },
+    },
   ];
 
   return (
@@ -136,6 +169,11 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
             label: 'Edit',
             icon: <Pencil size={14} strokeWidth={1.5} />,
             onClick: () => setEditContact(row),
+          },
+          {
+            label: 'Assign role',
+            icon: <Users size={14} strokeWidth={1.5} />,
+            onClick: () => setRoleTarget(row),
           },
           {
             label: 'Delete',
@@ -219,6 +257,41 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
         destructive
         loading={isDeleting}
       />
+
+      {/* Role assignment */}
+      <SlideOver
+        open={!!roleTarget}
+        onClose={() => setRoleTarget(null)}
+        title="Assign role"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRoleTarget(null)}>Cancel</Button>
+          </>
+        }
+      >
+        {roleTarget && (
+          <div className={styles.roleForm}>
+            <p className={styles.roleSubtitle}>
+              {roleTarget.first_name} {roleTarget.last_name}
+            </p>
+            <label className={styles.roleLabel}>Stakeholder role</label>
+            <select
+              className={styles.roleSelect}
+              defaultValue={roleTarget.role ?? ''}
+              onChange={(e) => handleRoleSave(e.target.value)}
+              disabled={roleSubmitting}
+            >
+              <option value="">— Unassigned —</option>
+              <option value="CFO">CFO</option>
+              <option value="CEO">CEO</option>
+              <option value="HR">HR</option>
+              <option value="Treasury">Treasury</option>
+              <option value="PeopleOps">People Ops</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        )}
+      </SlideOver>
     </div>
   );
 }
