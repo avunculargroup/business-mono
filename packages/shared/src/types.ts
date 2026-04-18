@@ -494,3 +494,171 @@ export interface SegmentScorecard {
   created_at: string;
   updated_at: string;
 }
+
+export interface PainPoint {
+  id: string;
+  interview_id: string;
+  content: string;
+  created_at: string;
+}
+
+// ============================================================
+// Phase 2 — Corporate Lexicon
+// ============================================================
+
+export const LexiconStatus = {
+  DRAFT:      'draft',
+  APPROVED:   'approved',
+  DEPRECATED: 'deprecated',
+} as const;
+export type LexiconStatus = (typeof LexiconStatus)[keyof typeof LexiconStatus];
+
+export const LEXICON_STATUS_LABELS: Record<LexiconStatus, string> = {
+  draft:      'Draft',
+  approved:   'Approved',
+  deprecated: 'Deprecated',
+};
+
+export interface CorporateLexiconEntry {
+  id: string;
+  term: string;
+  professional_term: string;
+  definition: string | null;
+  category: string | null;
+  example_usage: string | null;
+  status: LexiconStatus;
+  version: number;
+  created_by: string | null;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Phase 2 — MVP Templates
+// ============================================================
+
+export const TemplateType = {
+  ONE_PAGER:     'one_pager',
+  BRIEFING_DECK: 'briefing_deck',
+} as const;
+export type TemplateType = (typeof TemplateType)[keyof typeof TemplateType];
+
+export const TemplateVersionStatus = {
+  DRAFT:      'draft',
+  APPROVED:   'approved',
+  DEPRECATED: 'deprecated',
+} as const;
+export type TemplateVersionStatus = (typeof TemplateVersionStatus)[keyof typeof TemplateVersionStatus];
+
+export const TEMPLATE_TYPE_LABELS: Record<TemplateType, string> = {
+  one_pager:     'One-pager',
+  briefing_deck: 'Briefing deck',
+};
+
+export const TEMPLATE_VERSION_STATUS_LABELS: Record<TemplateVersionStatus, string> = {
+  draft:      'Draft',
+  approved:   'Approved',
+  deprecated: 'Deprecated',
+};
+
+export interface MvpTemplate {
+  id: string;
+  type: TemplateType;
+  title: string;
+  description: string | null;
+  tags: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MvpTemplateVersion {
+  id: string;
+  template_id: string;
+  version_number: number;
+  status: TemplateVersionStatus;
+  content: Record<string, unknown>;
+  created_by: string | null;
+  approved_by: string | null;
+  created_at: string;
+}
+
+// ============================================================
+// Phase 2 — Feedback Repository
+// ============================================================
+
+export const FeedbackSource = {
+  INTERVIEW:   'interview',
+  SURVEY:      'survey',
+  EMAIL:       'email',
+  TESTIMONIAL: 'testimonial',
+} as const;
+export type FeedbackSource = (typeof FeedbackSource)[keyof typeof FeedbackSource];
+
+export const FeedbackCategory = {
+  BUG_REPORT:      'bug_report',
+  FEATURE_REQUEST: 'feature_request',
+  USABILITY:       'usability',
+  TESTIMONIAL:     'testimonial',
+} as const;
+export type FeedbackCategory = (typeof FeedbackCategory)[keyof typeof FeedbackCategory];
+
+export const FEEDBACK_SOURCE_LABELS: Record<FeedbackSource, string> = {
+  interview:   'Interview',
+  survey:      'Survey',
+  email:       'Email',
+  testimonial: 'Testimonial',
+};
+
+export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
+  bug_report:      'Bug report',
+  feature_request: 'Feature request',
+  usability:       'Usability',
+  testimonial:     'Testimonial',
+};
+
+export interface FeedbackSentiment {
+  score: number;
+  magnitude: number;
+  label: 'positive' | 'neutral' | 'negative' | 'mixed';
+}
+
+export interface FeedbackEntry {
+  id: string;
+  contact_id: string | null;
+  company_id: string | null;
+  pain_point_id: string | null;
+  source: FeedbackSource;
+  date_received: string | null;
+  category: FeedbackCategory;
+  rating: number | null;
+  description: string;
+  tags: string[];
+  sentiment: FeedbackSentiment | null;
+  created_by: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Phase 2 — Insight Pipeline (augments ContentStatus/ContentType)
+// ============================================================
+// The pipeline reuses content_items filtered to type='linkedin'.
+// These stage labels map content_items status values to Kanban column names.
+
+export const INSIGHT_PIPELINE_STAGE_LABELS: Record<string, string> = {
+  idea:      'Ideas',
+  draft:     'Committed',
+  review:    'In Progress',
+  approved:  'Ready to Publish',
+  published: 'Posted',
+  archived:  'Archived',
+};
+
+export interface ResearchLink {
+  url: string;
+  title: string;
+  note?: string;
+}
