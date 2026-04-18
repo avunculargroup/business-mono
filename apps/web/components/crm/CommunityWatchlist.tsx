@@ -47,11 +47,11 @@ const TYPE_COLORS: Record<string, 'neutral' | 'warning' | 'success'> = {
   conference:     'success',
 };
 
-const ENGAGEMENT_COLORS: Record<string, 'neutral' | 'warning' | 'success' | 'info'> = {
+const ENGAGEMENT_COLORS: Record<string, 'neutral' | 'warning' | 'success' | 'accent'> = {
   not_joined: 'neutral',
   joined:     'warning',
   attended:   'success',
-  sponsor:    'info' as never,
+  sponsor:    'accent',
 };
 
 interface CommunityWatchlistProps {
