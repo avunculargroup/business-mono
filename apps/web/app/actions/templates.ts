@@ -195,7 +195,7 @@ const BRIEFING_DECK_TEMPLATE = {
     { id: 'problem',    title: 'The Problem',           content: 'State the customer pain point clearly. Back it with one data point.' },
     { id: 'pain',       title: 'Why it matters',        content: 'Cost of inaction. Quantify the pain.' },
     { id: 'solution',   title: 'Our Solution',          content: 'High-level description. One visual or diagram.' },
-    { id: 'benefits',   title: 'Key Benefits',          content: '3–5 benefits aligned to the audience's priorities.' },
+    { id: 'benefits',   title: 'Key Benefits',          content: '3\u20135 benefits aligned to the audience\u2019s priorities.' },
     { id: 'proof',      title: 'Proof of Competence',   content: 'Testimonials, pilot results, or relevant credentials.' },
     { id: 'plan',       title: 'Implementation Plan',   content: 'Phased approach. Timeline. Who does what.' },
     { id: 'next_steps', title: 'Next Steps',            content: 'Clear ask. Date for follow-up. Contact info.' },
