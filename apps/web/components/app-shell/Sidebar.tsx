@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   MoreHorizontal,
+  Search,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -30,14 +31,20 @@ const workNav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/simon', label: 'Simon', icon: Bot, badge: true },
   { href: '/crm', label: 'CRM', icon: Users, children: [
-    { href: '/crm/contacts',   label: 'Contacts'   },
-    { href: '/crm/companies',  label: 'Companies'  },
-    { href: '/crm/interviews', label: 'Interviews' },
-    { href: '/crm/segments',   label: 'Segments'   },
+    { href: '/crm/contacts',  label: 'Contacts'  },
+    { href: '/crm/companies', label: 'Companies' },
   ]},
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderOpen },
   { href: '/content', label: 'Content', icon: FileText },
+  { href: '/discovery', label: 'Discovery', icon: Search, children: [
+    { href: '/crm/interviews', label: 'Interviews'  },
+    { href: '/crm/segments',   label: 'Segments'    },
+    { href: '/discovery/lexicon',   label: 'Lexicon'   },
+    { href: '/discovery/templates', label: 'Templates' },
+    { href: '/discovery/feedback',  label: 'Feedback'  },
+    { href: '/discovery/pipeline',  label: 'Pipeline'  },
+  ]},
 ];
 
 const systemNav = [
@@ -49,18 +56,19 @@ const moreNav = [
   {
     label: 'Work',
     items: [
-      { href: '/crm/contacts', label: 'CRM', icon: Users },
-      { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-      { href: '/projects', label: 'Projects', icon: FolderOpen },
-      { href: '/content', label: 'Content', icon: FileText },
+      { href: '/crm/contacts',       label: 'CRM',       icon: Users       },
+      { href: '/tasks',              label: 'Tasks',     icon: CheckSquare },
+      { href: '/projects',           label: 'Projects',  icon: FolderOpen  },
+      { href: '/content',            label: 'Content',   icon: FileText    },
+      { href: '/discovery/pipeline', label: 'Discovery', icon: Search      },
     ],
   },
   {
     label: 'System',
     items: [
       { href: '/activity', label: 'Agent Activity', icon: Activity },
-      { href: '/brand', label: 'Brand Hub', icon: Bookmark },
-      { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
+      { href: '/settings', label: 'Settings',       icon: Settings },
     ],
   },
 ];
@@ -72,6 +80,7 @@ export function Sidebar({ pendingCount }: SidebarProps) {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
+    if (href === '/discovery') return pathname.startsWith('/discovery') || pathname.startsWith('/crm/interviews') || pathname.startsWith('/crm/segments');
     return pathname.startsWith(href);
   };
 

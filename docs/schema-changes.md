@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-18 — Phase 2: Professional Presence & Testing
+
+Adds four new capabilities on top of the Phase 1 discovery foundation: a corporate lexicon, MVP template library, feedback repository, and insight pipeline (LinkedIn content Kanban).
+
+- **`pain_points` table** — normalises `discovery_interviews.pain_points TEXT[]` into individual rows (id, interview_id, content). Backfilled from existing data via `unnest()`. `feedback` and `content_items` (insight pipeline) FK to this table so items can be linked to a specific pain point, not just an interview. FK cascades on interview delete.
+
+- **`corporate_lexicon` table** — term/professional_term pairs with definition, category, example usage, status (`draft`/`approved`/`deprecated`), and version counter. `approved_by` FK to `team_members`. GIN index on FTS vector (`term || professional_term`). Version increments on every update, tracking terminology evolution.
+
+- **`mvp_templates` + `mvp_template_versions` tables** — two-table design: `mvp_templates` holds metadata (type: `one_pager`/`briefing_deck`, title, tags) and `mvp_template_versions` holds versioned JSONB content. Only one version per template can be `approved` at a time; approval action deprecates the previous approved version. UNIQUE constraint on `(template_id, version_number)`.
+
+- **`feedback` table** — captures MVP test feedback and testimonials. FK to `contacts`, `companies`, and `pain_points` (all SET NULL on delete). `source` and `category` enums. `sentiment JSONB` (score, magnitude, label) populated by Della after creation. Soft-delete via `deleted_at`. Partial index on active entries.
+
+- **`content_items` augmented** — three nullable columns added: `pain_point_id UUID` (FK to `pain_points`), `score INTEGER` (priority), `research_links JSONB DEFAULT '[]'`. The insight pipeline Kanban is a filtered view of `content_items WHERE type = 'linkedin'`; no new table needed.
+
+All new tables have RLS enabled (authenticated read/write), `updated_at` triggers where applicable, and appropriate indexes.
+
+Migration: `20260418000000_phase2_professional_presence.sql`
+
+---
+
 ## 2026-04-17 — Discovery interviews foundation
 
 Adds structured discovery interview tracking, pain point audit logging, stakeholder role tagging on contacts, and segment scorecards to support the 15–20 discovery interviews planned for Q2 validation.
