@@ -12,14 +12,28 @@ import { DEFAULT_MODEL } from '@platform/shared';
  * 3. Fallback → Anthropic SDK
  *
  * Supported model names: 'anthropic/claude-X', 'claude-X', or OpenRouter format
+ *
+ * IMPORTANT: If using OpenRouter, set ANTHROPIC_MODEL to a non-Claude model name
+ * (e.g., 'openai/gpt-4o-mini') to prevent the code from attempting direct Anthropic API calls.
  */
 export function getModelConfig(): LanguageModelV2 {
   const modelName = process.env['ANTHROPIC_MODEL'] ?? DEFAULT_MODEL;
 
   // Use Anthropic SDK directly for Claude models (preferred, avoids OpenRouter routing issues)
   if (modelName.startsWith('anthropic/') || modelName.startsWith('claude-')) {
+    const apiKey = process.env['ANTHROPIC_API_KEY'];
+    if (!apiKey) {
+      if (process.env['OPENROUTER_API_KEY']) {
+        throw new Error(
+          'ANTHROPIC_API_KEY is missing but required for Claude models. ' +
+            'If you are using OpenRouter, set ANTHROPIC_MODEL to a non-Claude model (e.g., "openai/gpt-4o-mini") ' +
+            'or set ANTHROPIC_MODEL=anthropic/claude-sonnet-4-5 to route Claude via OpenRouter with OPENROUTER_MODEL.'
+        );
+      }
+      throw new Error('ANTHROPIC_API_KEY is required for Claude models.');
+    }
     const anthropic = createAnthropic({
-      apiKey: process.env['ANTHROPIC_API_KEY'],
+      apiKey,
     });
     const cleanModelName = modelName.replace(/^anthropic\//, '');
     return anthropic(cleanModelName);
@@ -35,8 +49,14 @@ export function getModelConfig(): LanguageModelV2 {
   }
 
   // Fallback to Anthropic SDK
+  const apiKey = process.env['ANTHROPIC_API_KEY'];
+  if (!apiKey) {
+    throw new Error(
+      'No AI provider configured. Set either ANTHROPIC_API_KEY (for Anthropic) or OPENROUTER_API_KEY (for OpenRouter).'
+    );
+  }
   const anthropic = createAnthropic({
-    apiKey: process.env['ANTHROPIC_API_KEY'],
+    apiKey,
   });
   const cleanModelName = modelName.replace(/^anthropic\//, '');
   return anthropic(cleanModelName);
