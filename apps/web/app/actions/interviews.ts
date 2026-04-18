@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+// Table not in generated types until migration is applied — bypass with any cast
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const di = (supabase: Awaited<ReturnType<typeof createClient>>) =>
+  (supabase as any).from('discovery_interviews');
+
 const interviewSchema = z.object({
   contact_id:      z.string().uuid().optional().or(z.literal('')),
   company_id:      z.string().uuid().optional().or(z.literal('')),
@@ -37,8 +42,7 @@ export async function createInterview(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { data: interview, error } = await supabase
-    .from('discovery_interviews')
+  const { data: interview, error } = await di(supabase)
     .insert({
       contact_id:      data.contact_id      || null,
       company_id:      data.company_id      || null,
@@ -47,7 +51,7 @@ export async function createInterview(formData: FormData) {
       channel:         data.channel         || null,
       notes:           data.notes           || null,
       pain_points:     parsePainPoints(data.pain_points),
-      trigger_event:   (data.trigger_event  || null) as never,
+      trigger_event:   data.trigger_event   || null,
       email_thread_id: data.email_thread_id || null,
     })
     .select()
@@ -82,9 +86,8 @@ export async function updateInterview(id: string, formData: FormData) {
     }
   }
 
-  const { data: interview, error } = await supabase
-    .from('discovery_interviews')
-    .update(updateData as never)
+  const { data: interview, error } = await di(supabase)
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -97,7 +100,7 @@ export async function updateInterview(id: string, formData: FormData) {
 
 export async function deleteInterview(id: string) {
   const supabase = await createClient();
-  const { error } = await supabase.from('discovery_interviews').delete().eq('id', id);
+  const { error } = await di(supabase).delete().eq('id', id);
 
   if (error) return { error: error.message };
 
@@ -107,8 +110,7 @@ export async function deleteInterview(id: string) {
 
 export async function getInterviews() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('discovery_interviews')
+  const { data, error } = await di(supabase)
     .select('*, contacts(id, first_name, last_name, job_title, role), companies(id, name)')
     .order('interview_date', { ascending: false });
 
@@ -118,8 +120,7 @@ export async function getInterviews() {
 
 export async function getInterview(id: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('discovery_interviews')
+  const { data, error } = await di(supabase)
     .select('*, contacts(id, first_name, last_name, job_title, role), companies(id, name), pain_point_log(*)')
     .eq('id', id)
     .order('changed_at', { referencedTable: 'pain_point_log', ascending: true })

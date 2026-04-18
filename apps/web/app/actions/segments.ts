@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+// Table not in generated types until migration is applied — bypass with any cast
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ss = (supabase: Awaited<ReturnType<typeof createClient>>) =>
+  (supabase as any).from('segment_scorecards');
+
 const segmentSchema = z.object({
   segment_name:       z.string().min(1, 'Segment name is required'),
   need_score:         z.coerce.number().int().min(1).max(5).optional().or(z.literal('')),
@@ -23,8 +28,7 @@ export async function createSegment(formData: FormData) {
   const supabase = await createClient();
   const data = parsed.data;
 
-  const { data: segment, error } = await supabase
-    .from('segment_scorecards')
+  const { data: segment, error } = await ss(supabase)
     .insert({
       segment_name:       data.segment_name,
       need_score:         (data.need_score   as number | undefined) || null,
@@ -58,9 +62,8 @@ export async function updateSegment(id: string, formData: FormData) {
     updateData[key] = value === '' ? null : value;
   }
 
-  const { data: segment, error } = await supabase
-    .from('segment_scorecards')
-    .update(updateData as never)
+  const { data: segment, error } = await ss(supabase)
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -73,7 +76,7 @@ export async function updateSegment(id: string, formData: FormData) {
 
 export async function deleteSegment(id: string) {
   const supabase = await createClient();
-  const { error } = await supabase.from('segment_scorecards').delete().eq('id', id);
+  const { error } = await ss(supabase).delete().eq('id', id);
 
   if (error) return { error: error.message };
 
