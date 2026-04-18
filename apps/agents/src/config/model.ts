@@ -17,47 +17,31 @@ import { DEFAULT_MODEL } from '@platform/shared';
  * (e.g., 'openai/gpt-4o-mini') to prevent the code from attempting direct Anthropic API calls.
  */
 export function getModelConfig(): LanguageModelV2 {
-  const modelName = process.env['ANTHROPIC_MODEL'] ?? DEFAULT_MODEL;
+  const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
+  const openrouterApiKey = process.env['OPENROUTER_API_KEY'];
+  const anthropicModel = process.env['ANTHROPIC_MODEL'];
+  const openrouterModel = process.env['OPENROUTER_MODEL'];
 
-  // Use Anthropic SDK directly for Claude models (preferred, avoids OpenRouter routing issues)
-  if (modelName.startsWith('anthropic/') || modelName.startsWith('claude-')) {
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
-    if (!apiKey) {
-      if (process.env['OPENROUTER_API_KEY']) {
-        throw new Error(
-          'ANTHROPIC_API_KEY is missing but required for Claude models. ' +
-            'If you are using OpenRouter, set ANTHROPIC_MODEL to a non-Claude model (e.g., "openai/gpt-4o-mini") ' +
-            'or set ANTHROPIC_MODEL=anthropic/claude-sonnet-4-5 to route Claude via OpenRouter with OPENROUTER_MODEL.'
-        );
-      }
-      throw new Error('ANTHROPIC_API_KEY is required for Claude models.');
-    }
-    const anthropic = createAnthropic({
-      apiKey,
+  // Priority: OpenRouter (if configured) > Anthropic SDK (if API key available) > fail
+  if (openrouterApiKey) {
+    const model = openrouterModel ?? anthropicModel ?? DEFAULT_MODEL;
+    const openai = createOpenAI({
+      apiKey: openrouterApiKey,
+      baseURL: 'https://openrouter.ai/api/v1',
     });
-    const cleanModelName = modelName.replace(/^anthropic\//, '');
+    return openai(model);
+  }
+
+  if (anthropicApiKey) {
+    const model = anthropicModel ?? DEFAULT_MODEL;
+    const anthropic = createAnthropic({
+      apiKey: anthropicApiKey,
+    });
+    const cleanModelName = model.replace(/^anthropic\//, '');
     return anthropic(cleanModelName);
   }
 
-  // For non-Claude models via OpenRouter
-  if (process.env['OPENROUTER_API_KEY']) {
-    const openai = createOpenAI({
-      apiKey: process.env['OPENROUTER_API_KEY'],
-      baseURL: 'https://openrouter.ai/api/v1',
-    });
-    return openai(process.env['OPENROUTER_MODEL'] ?? modelName);
-  }
-
-  // Fallback to Anthropic SDK
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) {
-    throw new Error(
-      'No AI provider configured. Set either ANTHROPIC_API_KEY (for Anthropic) or OPENROUTER_API_KEY (for OpenRouter).'
-    );
-  }
-  const anthropic = createAnthropic({
-    apiKey,
-  });
-  const cleanModelName = modelName.replace(/^anthropic\//, '');
-  return anthropic(cleanModelName);
+  throw new Error(
+    'No AI provider configured. Set either ANTHROPIC_API_KEY (for Anthropic) or OPENROUTER_API_KEY (for OpenRouter).'
+  );
 }
