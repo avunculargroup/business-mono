@@ -122,6 +122,24 @@ export async function createTemplateVersion(templateId: string, formData: FormDa
   return { success: true, version_number: nextVersion };
 }
 
+export async function updateTemplateVersion(versionId: string, content: Record<string, unknown>) {
+  if (typeof content !== 'object' || content === null || Array.isArray(content)) {
+    return { error: 'Content must be an object' };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await ver(supabase)
+    .update({ content })
+    .eq('id', versionId)
+    .eq('status', 'draft');
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/discovery/templates');
+  return { success: true };
+}
+
 export async function approveTemplateVersion(templateId: string, versionId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
