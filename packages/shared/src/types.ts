@@ -662,3 +662,123 @@ export interface ResearchLink {
   title: string;
   note?: string;
 }
+
+// ============================================================
+// Phase 3 — Community Watchlist
+// ============================================================
+
+export const CommunityType = {
+  LINKEDIN_GROUP: 'linkedin_group',
+  ASSOCIATION:    'association',
+  CONFERENCE:     'conference',
+} as const;
+export type CommunityType = (typeof CommunityType)[keyof typeof CommunityType];
+
+export const EngagementStatus = {
+  NOT_JOINED: 'not_joined',
+  JOINED:     'joined',
+  ATTENDED:   'attended',
+  SPONSOR:    'sponsor',
+} as const;
+export type EngagementStatus = (typeof EngagementStatus)[keyof typeof EngagementStatus];
+
+export const COMMUNITY_TYPE_LABELS: Record<CommunityType, string> = {
+  linkedin_group: 'LinkedIn Group',
+  association:    'Association',
+  conference:     'Conference',
+};
+
+export const ENGAGEMENT_STATUS_LABELS: Record<EngagementStatus, string> = {
+  not_joined: 'Not joined',
+  joined:     'Joined',
+  attended:   'Attended',
+  sponsor:    'Sponsor',
+};
+
+export interface CommunityWatchlistEntry {
+  id: string;
+  type: CommunityType;
+  name: string;
+  url: string | null;
+  description: string | null;
+  role_tags: string[];
+  industry_tags: string[];
+  membership_size: number | null;
+  activity_level: number | null;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  timezone: string | null;
+  engagement_status: EngagementStatus;
+  notes: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Phase 3 — Champion Tracking
+// ============================================================
+
+export const ChampionRoleType = {
+  CHAMPION:       'Champion',
+  ECONOMIC_BUYER: 'Economic Buyer',
+  INFLUENCER:     'Influencer',
+} as const;
+export type ChampionRoleType = (typeof ChampionRoleType)[keyof typeof ChampionRoleType];
+
+export const ChampionStatus = {
+  ACTIVE:   'active',
+  AT_RISK:  'at_risk',
+  DEPARTED: 'departed',
+} as const;
+export type ChampionStatus = (typeof ChampionStatus)[keyof typeof ChampionStatus];
+
+export const ChampionEventType = {
+  JOB_CHANGE: 'job_change',
+  PROMOTION:  'promotion',
+  DEPARTURE:  'departure',
+  NOTE:       'note',
+} as const;
+export type ChampionEventType = (typeof ChampionEventType)[keyof typeof ChampionEventType];
+
+export const CHAMPION_ROLE_TYPE_LABELS: Record<ChampionRoleType, string> = {
+  Champion:        'Champion',
+  'Economic Buyer': 'Economic Buyer',
+  Influencer:      'Influencer',
+};
+
+export const CHAMPION_STATUS_LABELS: Record<ChampionStatus, string> = {
+  active:   'Active',
+  at_risk:  'At risk',
+  departed: 'Departed',
+};
+
+export const CHAMPION_EVENT_TYPE_LABELS: Record<ChampionEventType, string> = {
+  job_change: 'Job change',
+  promotion:  'Promotion',
+  departure:  'Departure',
+  note:       'Note',
+};
+
+export interface Champion {
+  id: string;
+  contact_id: string;
+  company_id: string | null;
+  role_type: ChampionRoleType;
+  champion_score: number;
+  status: ChampionStatus;
+  last_contacted_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChampionEvent {
+  id: string;
+  champion_id: string;
+  event_type: ChampionEventType;
+  event_date: string;
+  details: string | null;
+  created_at: string;
+}

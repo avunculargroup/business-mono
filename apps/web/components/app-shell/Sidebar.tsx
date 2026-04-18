@@ -31,8 +31,10 @@ const workNav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/simon', label: 'Simon', icon: Bot, badge: true },
   { href: '/crm', label: 'CRM', icon: Users, children: [
-    { href: '/crm/contacts',  label: 'Contacts'  },
-    { href: '/crm/companies', label: 'Companies' },
+    { href: '/crm/contacts',   label: 'Contacts'   },
+    { href: '/crm/companies',  label: 'Companies'  },
+    { href: '/crm/champions',  label: 'Champions'  },
+    { href: '/crm/community',  label: 'Community'  },
   ]},
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderOpen },

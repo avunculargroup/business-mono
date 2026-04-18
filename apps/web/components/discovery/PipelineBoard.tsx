@@ -8,7 +8,7 @@ import { PipelineItemForm } from './PipelineItemForm';
 import { movePipelineItem } from '@/app/actions/pipeline';
 import { useToast } from '@/providers/ToastProvider';
 import { INSIGHT_PIPELINE_STAGE_LABELS } from '@platform/shared';
-import { Plus, GripVertical, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Plus, GripVertical, ChevronRight, ChevronLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import styles from './PipelineBoard.module.css';
 
 export type PipelineItemRow = {
@@ -22,7 +22,10 @@ export type PipelineItemRow = {
   assigned_to: string | null;
   pain_point_id: string | null;
   score: number | null;
+  question_count: number;
+  validated: boolean;
   research_links: Array<{ url: string; title: string; note?: string }> | null;
+  pain_points?: { id: string; content: string; interview_id: string } | null;
   created_at: string;
   updated_at: string;
 };
@@ -46,11 +49,12 @@ interface PipelineBoardProps {
 }
 
 export function PipelineBoard({ initialItems, painPoints, teamMembers }: PipelineBoardProps) {
-  const [items, setItems]           = useState(initialItems);
-  const [showCreate, setShowCreate] = useState(false);
-  const [editItem,   setEditItem]   = useState<PipelineItemRow | null>(null);
+  const [items, setItems]               = useState(initialItems);
+  const [showCreate, setShowCreate]     = useState(false);
+  const [editItem,   setEditItem]       = useState<PipelineItemRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [movingId, setMovingId]     = useState<string | null>(null);
+  const [movingId, setMovingId]         = useState<string | null>(null);
+  const [hideUnvalidated, setHideUnvalidated] = useState(false);
 
   const router = useRouter();
   const { success, error } = useToast();
@@ -59,10 +63,11 @@ export function PipelineBoard({ initialItems, painPoints, teamMembers }: Pipelin
     const map: Record<string, PipelineItemRow[]> = {};
     for (const stage of STAGES) map[stage.status] = [];
     for (const item of items) {
+      if (hideUnvalidated && item.pain_point_id && !item.validated) continue;
       if (map[item.status]) map[item.status].push(item);
     }
     return map;
-  }, [items]);
+  }, [items, hideUnvalidated]);
 
   const handleMove = useCallback(async (item: PipelineItemRow, direction: 'forward' | 'back') => {
     const idx = STAGES.findIndex((s) => s.status === item.status);
@@ -95,6 +100,15 @@ export function PipelineBoard({ initialItems, painPoints, teamMembers }: Pipelin
   return (
     <div className={styles.wrapper}>
       <div className={styles.toolbar}>
+        <label className={styles.validationToggle}>
+          <input
+            type="checkbox"
+            checked={hideUnvalidated}
+            onChange={(e) => setHideUnvalidated(e.target.checked)}
+            className={styles.toggleCheckbox}
+          />
+          Hide unvalidated ideas
+        </label>
         <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
           <Plus size={16} strokeWidth={1.5} />
           New idea
@@ -125,9 +139,21 @@ export function PipelineBoard({ initialItems, painPoints, teamMembers }: Pipelin
                         <GripVertical size={14} strokeWidth={1.5} className={styles.dragIcon} />
                       </div>
                       <div className={styles.cardBody}>
-                        <p className={styles.cardTitle}>{item.title}</p>
+                        <div className={styles.cardTitleRow}>
+                          <p className={styles.cardTitle}>{item.title}</p>
+                          {item.pain_point_id && (
+                            item.validated
+                              ? <CheckCircle size={14} strokeWidth={2} className={styles.validatedIcon} aria-label="Validated — 3+ interviews" />
+                              : <AlertCircle size={14} strokeWidth={2} className={styles.unvalidatedIcon} aria-label={`Not validated — mentioned ${item.question_count}×`} />
+                          )}
+                        </div>
                         {painPoint && (
-                          <p className={styles.cardPainPoint}>{painPoint.content.slice(0, 60)}{painPoint.content.length > 60 ? '…' : ''}</p>
+                          <p className={styles.cardPainPoint}>
+                            {painPoint.content.slice(0, 60)}{painPoint.content.length > 60 ? '…' : ''}
+                            {item.question_count > 0 && (
+                              <span className={styles.mentionCount}> · {item.question_count}×</span>
+                            )}
+                          </p>
                         )}
                         <div className={styles.cardMeta}>
                           {item.score != null && (
