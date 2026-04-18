@@ -48,7 +48,7 @@ interface TemplatesListProps {
 }
 
 export function TemplatesList({ initialTemplates }: TemplatesListProps) {
-  const [templates, setTemplates] = useState(initialTemplates);
+  const [templates] = useState(initialTemplates);
   const [showCreate,    setShowCreate]    = useState(false);
   const [viewTemplate,  setViewTemplate]  = useState<TemplateRow | null>(null);
   const [editTemplate,  setEditTemplate]  = useState<TemplateRow | null>(null);
