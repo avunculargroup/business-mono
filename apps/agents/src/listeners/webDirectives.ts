@@ -48,68 +48,72 @@ export function startWebDirectivesListener(): void {
       'postgres_changes' as never,
       { event: '*', schema: 'public', table: 'agent_conversations' },
       async (payload: { eventType: string; new: ConvRow }) => {
-        console.log('[web-directives] Received event:', payload.eventType);
-        if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
-
-        const conv = payload.new;
-        if (conv.signal_chat_id !== 'web') return;
-        if (conv.is_processing) return; // Prevents re-triggering from our own is_processing=true write
-        console.log('[web-directives] Processing web conversation:', conv.id);
-
-        const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
-        const lastMessage = messages[messages.length - 1];
-
-        // Only process when the latest message is from the director (user)
-        if (!lastMessage || lastMessage.role !== 'user') return;
-
-        // Signal to the web client that Simon is thinking
-        await supabase
-          .from('agent_conversations')
-          .update({ is_processing: true } as never)
-          .eq('id', conv.id);
-
         try {
-          // Generate Simon's response via Mastra Memory
-          const result = await simon.generate(lastMessage.content, {
-            memory: {
-              resource: 'web-director',
-              thread: conv.id,
-            },
-          });
+          console.log('[web-directives] Received event:', payload.eventType);
+          if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
-          const simonMessage: ConvMessage = {
-            role: 'assistant',
-            content: result.text,
-            timestamp: new Date().toISOString(),
-            source: 'simon',
-          };
+          const conv = payload.new;
+          if (conv.signal_chat_id !== 'web') return;
+          if (conv.is_processing) return; // Prevents re-triggering from our own is_processing=true write
+          console.log('[web-directives] Processing web conversation:', conv.id);
 
-          // Dual-write: write response to agent_conversations and clear processing flag
+          const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
+          const lastMessage = messages[messages.length - 1];
+
+          // Only process when the latest message is from the director (user)
+          if (!lastMessage || lastMessage.role !== 'user') return;
+
+          // Signal to the web client that Simon is thinking
           await supabase
             .from('agent_conversations')
-            .update({ messages: [...messages, simonMessage], is_processing: false } as never)
+            .update({ is_processing: true } as never)
             .eq('id', conv.id);
 
-          await supabase.from('agent_activity').insert({
-            agent_name: 'simon',
-            action: `Web directive: ${lastMessage.content.slice(0, 120)}`,
-            status: 'auto',
-            trigger_type: 'manual',
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          });
+          try {
+            // Generate Simon's response via Mastra Memory
+            const result = await simon.generate(lastMessage.content, {
+              memory: {
+                resource: 'web-director',
+                thread: conv.id,
+              },
+            });
+
+            const simonMessage: ConvMessage = {
+              role: 'assistant',
+              content: result.text,
+              timestamp: new Date().toISOString(),
+              source: 'simon',
+            };
+
+            // Dual-write: write response to agent_conversations and clear processing flag
+            await supabase
+              .from('agent_conversations')
+              .update({ messages: [...messages, simonMessage], is_processing: false } as never)
+              .eq('id', conv.id);
+
+            await supabase.from('agent_activity').insert({
+              agent_name: 'simon',
+              action: `Web directive: ${lastMessage.content.slice(0, 120)}`,
+              status: 'auto',
+              trigger_type: 'manual',
+              workflow_run_id: null,
+              entity_type: null,
+              entity_id: null,
+              proposed_actions: null,
+              approved_actions: null,
+              clarifications: null,
+              notes: null,
+            });
+          } catch (err) {
+            console.error('[web-directives] Simon processing error:', err);
+            // Clear the flag so the UI doesn't get stuck showing the typing indicator
+            await supabase
+              .from('agent_conversations')
+              .update({ is_processing: false } as never)
+              .eq('id', conv.id);
+          }
         } catch (err) {
-          console.error('[web-directives] Simon processing error:', err);
-          // Clear the flag so the UI doesn't get stuck showing the typing indicator
-          await supabase
-            .from('agent_conversations')
-            .update({ is_processing: false } as never)
-            .eq('id', conv.id);
+          console.error('[web-directives] Unhandled error in event handler:', err);
         }
       }
     )
