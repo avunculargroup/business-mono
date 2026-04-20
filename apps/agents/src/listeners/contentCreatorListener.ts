@@ -124,17 +124,19 @@ export function startContentCreatorListener(): void {
           contentItemId = data?.id ?? existingContentItemId;
         } else {
           // First draft: insert a new content_items row
-          const { data } = await supabase
+          const { data, error: insertError } = await supabase
             .from('content_items')
             .insert({
               body: responseText,
               type: inferContentType(dispatch.message),
               status: 'draft',
               source: 'content_agent',
-              source_interaction_id: row.id,
             })
             .select('id')
             .single();
+          if (insertError) {
+            console.error('[content-creator-listener] Failed to insert content_items:', insertError);
+          }
           contentItemId = data?.id ?? null;
         }
 
