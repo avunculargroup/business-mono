@@ -113,6 +113,7 @@ export function Sidebar({ pendingCount }: SidebarProps) {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
+    if (href === '/crm') return pathname.startsWith('/crm') && !pathname.startsWith('/crm/interviews') && !pathname.startsWith('/crm/segments');
     if (href === '/discovery') return pathname.startsWith('/discovery') || pathname.startsWith('/crm/interviews') || pathname.startsWith('/crm/segments');
     return pathname.startsWith(href);
   };
