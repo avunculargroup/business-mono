@@ -9,7 +9,7 @@ export default async function ActivityPage() {
     .from('agent_activity')
     .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(25);
+    .limit(100);
 
   return (
     <>
