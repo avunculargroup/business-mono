@@ -15,6 +15,23 @@ type ActivityRow = {
   proposed_actions: unknown;
 };
 
+const CONTENT_TYPE_KEYWORDS: Array<[string, string]> = [
+  ['newsletter', 'newsletter'],
+  ['linkedin', 'linkedin'],
+  ['twitter', 'twitter_x'],
+  ['tweet', 'twitter_x'],
+  ['blog', 'blog'],
+  ['email', 'email'],
+];
+
+function inferContentType(message: string): string {
+  const lower = message.toLowerCase();
+  for (const [keyword, type] of CONTENT_TYPE_KEYWORDS) {
+    if (lower.includes(keyword)) return type;
+  }
+  return 'email';
+}
+
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -91,14 +108,50 @@ export function startContentCreatorListener(): void {
           return;
         }
 
+        // Listener owns persistence — save draft to content_items unconditionally
+        // rather than relying on Charlie's tool calls, which are unreliable.
+        const existingContentItemId = dispatch.context?.['content_item_id'] as string | undefined;
+
+        let contentItemId: string | null = null;
+        if (existingContentItemId) {
+          // Revision: update the existing draft
+          const { data } = await supabase
+            .from('content_items')
+            .update({ body: responseText, updated_at: new Date().toISOString() })
+            .eq('id', existingContentItemId)
+            .select('id')
+            .single();
+          contentItemId = data?.id ?? existingContentItemId;
+        } else {
+          // First draft: insert a new content_items row
+          const { data } = await supabase
+            .from('content_items')
+            .insert({
+              body: responseText,
+              type: inferContentType(dispatch.message),
+              status: 'draft',
+              source: 'content_agent',
+              source_interaction_id: row.id,
+            })
+            .select('id')
+            .single();
+          contentItemId = data?.id ?? null;
+        }
+
+        if (contentItemId) {
+          console.log(`[content-creator-listener] Saved draft to content_items ${contentItemId}`);
+        } else {
+          console.warn('[content-creator-listener] Failed to save draft to content_items');
+        }
+
         await supabase.from('agent_activity').insert({
           agent_name: 'charlie',
           action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
           status: 'auto',
           trigger_type: 'agent',
           workflow_run_id: null,
-          entity_type: null,
-          entity_id: null,
+          entity_type: contentItemId ? 'content_items' : null,
+          entity_id: contentItemId,
           proposed_actions: null,
           approved_actions: [{ response: responseText }],
           clarifications: null,
