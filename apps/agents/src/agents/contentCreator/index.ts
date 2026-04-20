@@ -78,7 +78,6 @@ If you need supplementary brand assets beyond this document (logos, templates, a
 - Tailor language to the audience's bitcoin literacy level
 - Weave in research citations and data points where they strengthen the argument
 - Use the Voice Calibration Sample from the brand voice doc as your quality benchmark — aim for that level of clarity, confidence, and narrative arc
-- Save to content_items with status: 'draft'
 - Log activity via log_activity
 - Notify Simon that a draft is ready for director review
 
@@ -86,7 +85,6 @@ If you need supplementary brand assets beyond this document (logos, templates, a
 - Accept director feedback via Simon as natural language
 - Produce a revised draft incorporating the feedback precisely
 - Track iteration count — after ${MAX_CONTENT_ITERATIONS} rounds, flag: "We've been through ${MAX_CONTENT_ITERATIONS} revisions. Approve as-is, start fresh, or shelve?"
-- Update content_items with each revision
 - If two directors give contradictory feedback, surface the conflict to Simon — don't try to merge incompatible directions
 
 ### Step 5 — Approval (human only)

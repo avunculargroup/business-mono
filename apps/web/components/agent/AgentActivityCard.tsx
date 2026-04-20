@@ -60,6 +60,8 @@ const TRIGGER_LABELS: Record<string, string> = {
 export function AgentActivityCard({ activity, compact }: AgentActivityCardProps) {
   const proposedActions = (activity.proposed_actions as Array<{ description: string; entity_type?: string; entity_id?: string }>) || [];
   const { prefix, message } = parseAction(activity.action);
+  const approvedResponse = (activity.approved_actions as Array<{ response?: string }> | null)
+    ?.find((a) => a.response)?.response ?? null;
 
   const triggerLabel = activity.trigger_type ? TRIGGER_LABELS[activity.trigger_type] : null;
 
@@ -103,6 +105,19 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
         <p className={styles.actionCount}>
           {proposedActions.length} proposed action{proposedActions.length !== 1 ? 's' : ''}
         </p>
+      )}
+
+      {activity.entity_type === 'content_items' && activity.entity_id && (
+        <a href={`/content/${activity.entity_id}`} className={styles.entityLink}>
+          View draft →
+        </a>
+      )}
+
+      {approvedResponse && !activity.entity_id && !compact && (
+        <details className={styles.responsePreview}>
+          <summary>View generated content</summary>
+          <pre className={styles.responseBody}>{approvedResponse}</pre>
+        </details>
       )}
 
       {activity.status === 'pending' && !compact && (

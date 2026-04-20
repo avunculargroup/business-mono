@@ -114,3 +114,43 @@
 .statusDot.auto {
   background: var(--color-accent);
 }
+
+.entityLink {
+  display: inline-block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.entityLink:hover {
+  text-decoration: underline;
+}
+
+.responsePreview {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.responsePreview summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.responseBody {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
