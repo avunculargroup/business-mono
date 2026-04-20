@@ -109,13 +109,29 @@ const createTask = createStep({
       await suspend({ action: 'create_task', task: inputData });
     }
 
+    let assignedToId: string | null = null;
+    if (inputData.assignee) {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (UUID_RE.test(inputData.assignee)) {
+        assignedToId = inputData.assignee;
+      } else {
+        const { data: member } = await supabase
+          .from('team_members')
+          .select('id')
+          .ilike('full_name', inputData.assignee)
+          .limit(1)
+          .maybeSingle();
+        assignedToId = (member as { id: string } | null)?.id ?? null;
+      }
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({
         title: inputData.title,
         description: inputData.description ?? null,
         project_id: inputData.projectId,
-        assigned_to: inputData.assignee,
+        assigned_to: assignedToId,
         due_date: inputData.dueDate,
         priority: inputData.priority,
         status: 'todo',

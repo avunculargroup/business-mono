@@ -22,6 +22,9 @@ import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startMonitorListener } from '../listeners/monitorListener.js';
 import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
+import { startRecorderListener } from '../listeners/recorderListener.js';
+import { startArchivistListener } from '../listeners/archivistListener.js';
+import { startResearcherListener } from '../listeners/researcherListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -159,6 +162,15 @@ startMonitorListener(mastra);
 
 // Start Supabase Realtime listener for Relationship Manager dispatches
 startRelationshipManagerListener();
+
+// Start Supabase Realtime listener for Recorder dispatches
+startRecorderListener();
+
+// Start Supabase Realtime listener for Archivist dispatches
+startArchivistListener();
+
+// Start Supabase Realtime listener for Researcher dispatches
+startResearcherListener();
 
 // Start Fastmail JMAP polling loop
 startFastmailListener();
