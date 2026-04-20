@@ -4,6 +4,9 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { StarterKit } from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
 import { Button } from '@/components/ui/Button';
 import { StatusChip } from '@/components/ui/StatusChip';
 import {
@@ -16,6 +19,7 @@ import {
   TEMPLATE_VERSION_STATUS_LABELS,
   type TemplateVersionStatus,
 } from '@platform/shared';
+import { RichTextToolbar } from './RichTextToolbar';
 import type { TemplateRow, TemplateVersionRow } from './TemplatesList';
 import styles from './TemplateVersionEditor.module.css';
 
@@ -37,66 +41,6 @@ function versionToMarkdown(version: TemplateVersionRow): string {
   return items.map((s) => `## ${s.title}\n\n${s.content}`).join('\n\n\n');
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function inlineFormat(text: string): string {
-  return escapeHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code>$1</code>');
-}
-
-function renderMarkdown(text: string): string {
-  const lines = text.split('\n');
-  const html: string[] = [];
-  let inList = false;
-  const buffer: string[] = [];
-
-  const flushBuffer = () => {
-    if (buffer.length > 0) {
-      const content = buffer.join(' ').trim();
-      if (content) html.push(`<p>${inlineFormat(content)}</p>`);
-      buffer.length = 0;
-    }
-  };
-
-  for (const line of lines) {
-    if (/^## /.test(line)) {
-      if (inList) { html.push('</ul>'); inList = false; }
-      flushBuffer();
-      html.push(`<h2>${escapeHtml(line.slice(3))}</h2>`);
-    } else if (/^### /.test(line)) {
-      if (inList) { html.push('</ul>'); inList = false; }
-      flushBuffer();
-      html.push(`<h3>${escapeHtml(line.slice(4))}</h3>`);
-    } else if (/^[*-] /.test(line)) {
-      flushBuffer();
-      if (!inList) { html.push('<ul>'); inList = true; }
-      html.push(`<li>${inlineFormat(line.slice(2))}</li>`);
-    } else if (/^-{3,}\s*$/.test(line) || /^\*{3,}\s*$/.test(line)) {
-      if (inList) { html.push('</ul>'); inList = false; }
-      flushBuffer();
-      html.push('<hr>');
-    } else if (line.trim() === '') {
-      if (inList) { html.push('</ul>'); inList = false; }
-      flushBuffer();
-    } else {
-      if (inList) { html.push('</ul>'); inList = false; }
-      buffer.push(line);
-    }
-  }
-
-  if (inList) html.push('</ul>');
-  flushBuffer();
-
-  return html.join('\n');
-}
-
 interface TemplateVersionEditorProps {
   template: TemplateRow;
 }
@@ -109,10 +53,10 @@ export function TemplateVersionEditor({ template }: TemplateVersionEditorProps) 
   const latest = sortedVersions[0] ?? null;
 
   const [selectedVersionId, setSelectedVersionId] = useState(latest?.id ?? null);
-  const [editorContent, setEditorContent] = useState(() =>
+  const [savedContent, setSavedContent] = useState(() =>
     latest ? versionToMarkdown(latest) : '',
   );
-  const [savedContent, setSavedContent] = useState(() =>
+  const [editorContent, setEditorContent] = useState(() =>
     latest ? versionToMarkdown(latest) : '',
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -120,11 +64,27 @@ export function TemplateVersionEditor({ template }: TemplateVersionEditorProps) 
   const router = useRouter();
   const { success, error } = useToast();
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Markdown.configure({ html: false, tightLists: true }),
+    ],
+    content: latest ? versionToMarkdown(latest) : '',
+    onUpdate: ({ editor: e }) => {
+      const md = e.storage.markdown.getMarkdown() as string;
+      setEditorContent(md);
+    },
+  });
+
   const selectedVersion = sortedVersions.find((v) => v.id === selectedVersionId) ?? null;
   const isDraft   = selectedVersion?.status === 'draft';
   const isDirty   = editorContent !== savedContent;
   const wordCount = editorContent.trim() ? editorContent.trim().split(/\s+/).length : 0;
-  const preview   = useMemo(() => renderMarkdown(editorContent), [editorContent]);
+
+  // Keep editor editability in sync with version status
+  if (editor && editor.isEditable !== isDraft) {
+    editor.setEditable(isDraft);
+  }
 
   const handleVersionChange = (versionId: string) => {
     const version = sortedVersions.find((v) => v.id === versionId) ?? null;
@@ -133,6 +93,7 @@ export function TemplateVersionEditor({ template }: TemplateVersionEditorProps) 
     const content = versionToMarkdown(version);
     setEditorContent(content);
     setSavedContent(content);
+    editor?.commands.setContent(content);
   };
 
   const handleSave = async () => {
@@ -223,23 +184,13 @@ export function TemplateVersionEditor({ template }: TemplateVersionEditorProps) 
       </div>
 
       {selectedVersion ? (
-        <div className={styles.layout}>
-          <div className={styles.writePane}>
-            <textarea
-              className={styles.textarea}
-              value={editorContent}
-              onChange={(e) => setEditorContent(e.target.value)}
-              placeholder="Start writing in markdown…"
-              spellCheck
-              aria-label="Markdown editor"
-            />
-            <div className={styles.wordCount}>{wordCount} {wordCount === 1 ? 'word' : 'words'}</div>
-          </div>
-          <div className={styles.previewPane}>
-            <div
-              className={styles.preview}
-              dangerouslySetInnerHTML={{ __html: preview }}
-            />
+        <div className={styles.editorWrapper}>
+          {isDraft && <RichTextToolbar editor={editor} />}
+          <div className={styles.editorScroll}>
+            <EditorContent editor={editor} className={styles.editorContent} />
+            <div className={styles.wordCount}>
+              {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            </div>
           </div>
         </div>
       ) : (
