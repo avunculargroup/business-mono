@@ -7,14 +7,13 @@ import { DEFAULT_MODEL } from '@platform/shared';
  * Returns an AI SDK model instance for Mastra agents.
  *
  * Priority:
- * 1. Claude models → use Anthropic SDK directly (avoids routing issues with OpenRouter responses API)
- * 2. Non-Claude models → use OpenRouter with OpenAI-compatible client
- * 3. Fallback → Anthropic SDK
- *
- * Supported model names: 'anthropic/claude-X', 'claude-X', or OpenRouter format
- *
- * IMPORTANT: If using OpenRouter, set ANTHROPIC_MODEL to a non-Claude model name
- * (e.g., 'openai/gpt-4o-mini') to prevent the code from attempting direct Anthropic API calls.
+ * 1. OpenRouter (if OPENROUTER_API_KEY set) → OpenAI-compatible chat completions
+ *    endpoint. Must use `openai.chat()` rather than `openai()` because
+ *    `@ai-sdk/openai` v2 defaults to the Responses API (`/v1/responses`), which
+ *    OpenRouter rejects with `invalid_prompt` for the message shapes the AI SDK
+ *    emits (reasoning blocks, tool calls, etc.).
+ * 2. Anthropic SDK (if only ANTHROPIC_API_KEY is set) → direct Anthropic API.
+ * 3. Fail fast.
  */
 export function getModelConfig(): LanguageModelV2 {
   const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
@@ -22,14 +21,13 @@ export function getModelConfig(): LanguageModelV2 {
   const anthropicModel = process.env['ANTHROPIC_MODEL'];
   const openrouterModel = process.env['OPENROUTER_MODEL'];
 
-  // Priority: OpenRouter (if configured) > Anthropic SDK (if API key available) > fail
   if (openrouterApiKey) {
     const model = openrouterModel ?? anthropicModel ?? DEFAULT_MODEL;
     const openai = createOpenAI({
       apiKey: openrouterApiKey,
       baseURL: 'https://openrouter.ai/api/v1',
     });
-    return openai(model);
+    return openai.chat(model);
   }
 
   if (anthropicApiKey) {
