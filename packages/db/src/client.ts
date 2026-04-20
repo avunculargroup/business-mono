@@ -9,6 +9,18 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
 }
 
+// Subclass ws.WebSocket to guarantee an error listener is always present.
+// Without this, transient transport errors during channel teardown (e.g.
+// ECONNRESET arriving after removeChannel() strips Supabase's own listener)
+// emit an unhandled 'error' event that prints a stack trace and can crash
+// the process in Node.js 20.
+class SafeWebSocket extends WebSocket {
+  constructor(...args: ConstructorParameters<typeof WebSocket>) {
+    super(...args);
+    this.on('error', () => {});
+  }
+}
+
 const realtimeConfig = {
   auth: {
     persistSession: false,
@@ -20,7 +32,7 @@ const realtimeConfig = {
     // Node.js 20 has no native WebSocket; provide ws so Supabase Realtime
     // uses a real WebSocket instead of falling back to HTTP LongPoll.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    transport: WebSocket as any,
+    transport: SafeWebSocket as any,
   },
 } as const;
 
