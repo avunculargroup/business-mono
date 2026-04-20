@@ -1,15 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TemplateForm } from './TemplateForm';
-import { TemplateDetail } from './TemplateDetail';
-import { approveTemplateVersion } from '@/app/actions/templates';
-import { useToast } from '@/providers/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import { TEMPLATE_TYPE_LABELS, type TemplateType } from '@platform/shared';
 import { LayoutTemplate, Plus, Eye, Pencil } from 'lucide-react';
@@ -49,17 +46,12 @@ interface TemplatesListProps {
 
 export function TemplatesList({ initialTemplates }: TemplatesListProps) {
   const [templates] = useState(initialTemplates);
-  const [showCreate,    setShowCreate]    = useState(false);
-  const [viewTemplate,  setViewTemplate]  = useState<TemplateRow | null>(null);
-  const [editTemplate,  setEditTemplate]  = useState<TemplateRow | null>(null);
-  const [approveTarget, setApproveTarget] = useState<{ template: TemplateRow; versionId: string } | null>(null);
-
-  const [filterType, setFilterType] = useState('');
+  const [showCreate,   setShowCreate]   = useState(false);
+  const [editTemplate, setEditTemplate] = useState<TemplateRow | null>(null);
+  const [filterType,   setFilterType]   = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isActioning,  setIsActioning]  = useState(false);
 
   const router = useRouter();
-  const { success, error } = useToast();
 
   const filtered = useMemo(() => {
     return templates.filter((t) => {
@@ -67,20 +59,6 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
       return true;
     });
   }, [templates, filterType]);
-
-  const handleApprove = async () => {
-    if (!approveTarget) return;
-    setIsActioning(true);
-    const result = await approveTemplateVersion(approveTarget.template.id, approveTarget.versionId);
-    setIsActioning(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Version approved');
-      setApproveTarget(null);
-      router.refresh();
-    }
-  };
 
   return (
     <div className={styles.container}>
@@ -143,9 +121,13 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
                     {totalVersions} version{totalVersions !== 1 ? 's' : ''} · updated {formatRelativeDate(template.updated_at)}
                   </span>
                   <div className={styles.cardActions}>
-                    <Button variant="ghost" size="sm" onClick={() => setViewTemplate(template)}>
-                      <Eye size={14} strokeWidth={1.5} /> View
-                    </Button>
+                    <Link
+                      href={`/discovery/templates/${template.id}`}
+                      className={styles.viewLink}
+                    >
+                      <Eye size={14} strokeWidth={1.5} />
+                      View
+                    </Link>
                     <Button variant="ghost" size="sm" onClick={() => setEditTemplate(template)}>
                       <Pencil size={14} strokeWidth={1.5} /> Edit
                     </Button>
@@ -175,7 +157,7 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
         />
       </SlideOver>
 
-      {/* Edit */}
+      {/* Edit metadata */}
       <SlideOver
         open={!!editTemplate}
         onClose={() => setEditTemplate(null)}
@@ -197,32 +179,6 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
           />
         )}
       </SlideOver>
-
-      {/* Detail */}
-      <SlideOver
-        open={!!viewTemplate}
-        onClose={() => setViewTemplate(null)}
-        title={viewTemplate?.title ?? 'Template'}
-      >
-        {viewTemplate && (
-          <TemplateDetail
-            template={viewTemplate}
-            onApproveVersion={(versionId) => setApproveTarget({ template: viewTemplate, versionId })}
-            onEdit={() => { setEditTemplate(viewTemplate); setViewTemplate(null); }}
-          />
-        )}
-      </SlideOver>
-
-      {/* Approve confirm */}
-      <ConfirmDialog
-        open={!!approveTarget}
-        onClose={() => setApproveTarget(null)}
-        onConfirm={handleApprove}
-        title="Approve version"
-        description="Mark this version as approved? Any previously approved version will be deprecated."
-        confirmLabel="Approve"
-        loading={isActioning}
-      />
     </div>
   );
 }
