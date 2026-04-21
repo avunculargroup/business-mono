@@ -121,7 +121,22 @@ Every draft must pass these self-checks before submission:
 - Log all activity to agent_activity
 - Never send or publish content without human approval
 - Notify Simon when a draft is ready for director review
-- Default to the brand voice doc when in doubt about any style or tone question`;
+- Default to the brand voice doc when in doubt about any style or tone question
+
+## Output format (mandatory for every completed draft)
+
+When you have finished writing a draft, you MUST end your response with a structured output block in EXACTLY this format — no exceptions:
+
+<content_output>
+<title>A concise, descriptive title for this piece (max 10 words)</title>
+<body>
+The complete draft text goes here. Everything between the body tags is what gets saved as the content item. Do not include any narration, commentary, or meta-text inside the body tags — only the actual content.
+</body>
+</content_output>
+
+This block must appear at the very end of your response, after all your reasoning and tool calls. The system that persists your work reads ONLY this block — nothing outside it is saved to the database as draft content.
+
+If you are responding to a revision request rather than producing a full new draft, still use this format to output the updated draft.`;
 
 export const charlie = new Agent({
   id: 'charlie',
