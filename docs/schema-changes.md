@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-21 — Routines supersede research_monitors
+
+Replaces the Rex-only `research_monitors` table with a generic `routines` table that schedules any agent on a daily/weekly/fortnightly cadence. The internal platform needed a UI for directors to CRUD scheduled agent jobs (e.g. "every morning Rex pulls daily bitcoin headlines"), and the old table was too specialised to the monitor change-detection flow.
+
+- **`routines` table** — `name`, `description`, `agent_name` (same CHECK as `agent_activity`), `action_type` (`research_digest` | `monitor_change`), `action_config JSONB` (shape depends on action_type — see `packages/shared/src/routines.ts`), `frequency` + `time_of_day` + `timezone` (default `Australia/Melbourne`) define the schedule, `next_run_at`/`last_run_at` drive the listener, `last_result JSONB` holds the structured output (shape common across action types so dashboard tiles can render generically), `last_status`/`last_error` for observability, `show_on_dashboard` + `dashboard_title` gate dashboard tile rendering, `is_active` pauses without deletion. Partial indexes on `next_run_at WHERE is_active` and `show_on_dashboard WHERE show_on_dashboard`. Standard `updated_at` trigger and authenticated+service_role RLS policy.
+- **Data migration** — every existing `research_monitors` row is INSERT'd into `routines` as `agent_name='rex'`, `action_type='monitor_change'`, with `action_config` preserving `subject`/`context`/`search_queries`/`notify_signal`/`notify_agent`/`last_digest` and `last_result.digest` populated from the prior `last_digest`. Then `research_monitors` is dropped.
+- **`platform_capabilities` augmented** — `rex.topic_monitoring` row's note updated to reference the new table; new `rex.scheduled_digests` row added for `action_type='research_digest'`.
+
+Migration: `20260421000000_add_routines_table.sql`
+
+---
+
 ## 2026-04-18 — Phase 2: Professional Presence & Testing
 
 Adds four new capabilities on top of the Phase 1 discovery foundation: a corporate lexicon, MVP template library, feedback repository, and insight pipeline (LinkedIn content Kanban).

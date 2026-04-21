@@ -569,33 +569,42 @@ CREATE INDEX idx_capacity_gaps_type ON capacity_gaps(gap_type);
 
 
 -- ============================================================
--- RESEARCH MONITORS
+-- ROUTINES (generic scheduled agent jobs)
 -- ============================================================
 
-CREATE TABLE research_monitors (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  subject         TEXT NOT NULL,
-  context         TEXT,
-  search_queries  TEXT[] NOT NULL,
-  frequency       TEXT NOT NULL DEFAULT 'weekly'
-                  CHECK (frequency IN ('daily', 'weekly', 'fortnightly')),
-  next_run_at     TIMESTAMPTZ NOT NULL,
-  last_run_at     TIMESTAMPTZ,
-  last_digest     TEXT,
-  notify_signal   BOOLEAN NOT NULL DEFAULT TRUE,
-  notify_agent    TEXT,
-  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-  created_by      UUID REFERENCES team_members(id),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE routines (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name              TEXT NOT NULL,
+  description       TEXT,
+  agent_name        TEXT NOT NULL
+                    CHECK (agent_name IN
+                      ('simon','roger','archie','petra','bruno','charlie','rex','della')),
+  action_type       TEXT NOT NULL
+                    CHECK (action_type IN ('research_digest','monitor_change')),
+  action_config     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  frequency         TEXT NOT NULL
+                    CHECK (frequency IN ('daily','weekly','fortnightly')),
+  time_of_day       TIME NOT NULL DEFAULT '07:00',
+  timezone          TEXT NOT NULL DEFAULT 'Australia/Melbourne',
+  next_run_at       TIMESTAMPTZ NOT NULL,
+  last_run_at       TIMESTAMPTZ,
+  last_result       JSONB,
+  last_status       TEXT CHECK (last_status IN ('success','failed','running')),
+  last_error        TEXT,
+  show_on_dashboard BOOLEAN NOT NULL DEFAULT FALSE,
+  dashboard_title   TEXT,
+  is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by        UUID REFERENCES team_members(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER research_monitors_updated_at
-  BEFORE UPDATE ON research_monitors
+CREATE TRIGGER routines_updated_at
+  BEFORE UPDATE ON routines
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE INDEX idx_research_monitors_next_run ON research_monitors(next_run_at)
-  WHERE is_active = TRUE;
+CREATE INDEX idx_routines_next_run  ON routines(next_run_at) WHERE is_active;
+CREATE INDEX idx_routines_dashboard ON routines(show_on_dashboard) WHERE show_on_dashboard;
 
 
 -- ============================================================
@@ -621,7 +630,7 @@ ALTER TABLE agent_conversations   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_activity        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE platform_capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE capacity_gaps         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE research_monitors     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routines              ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated team members can read and write everything
 CREATE POLICY "team_members_all" ON team_members
@@ -684,8 +693,8 @@ CREATE POLICY "platform_capabilities_all" ON platform_capabilities
 CREATE POLICY "capacity_gaps_all" ON capacity_gaps
   FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
-CREATE POLICY "research_monitors_all" ON research_monitors
-  FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "routines_all" ON routines
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
 
 -- ============================================================
@@ -788,7 +797,8 @@ INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_
   ('rex', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
   ('rex', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
   ('rex', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
-  ('rex', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
+  ('rex', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via routines table (action_type=monitor_change)'),
+  ('rex', 'scheduled_digests',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Recurring research digests via routines table (action_type=research_digest)')
 ON CONFLICT DO NOTHING;
 
 
