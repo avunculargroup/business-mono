@@ -16,5 +16,6 @@ INSERT INTO platform_capabilities (agent_name, capability, status, phase, tools_
   ('researcher', 'fact_verification',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Cross-reference claims across multiple sources'),
   ('researcher', 'url_ingestion',           'active', 'phase_1', ARRAY['fetch_url', 'crawl_structured'], 'Extract clean markdown from URLs for Archivist'),
   ('researcher', 'content_summarisation',   'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Structured summaries with key points and sources'),
-  ('researcher', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via research_monitors table')
+  ('researcher', 'topic_monitoring',        'active', 'phase_1', ARRAY['search_web'],                   'Scheduled monitoring via routines table (action_type=monitor_change)'),
+  ('researcher', 'scheduled_digests',       'active', 'phase_1', ARRAY['search_web', 'fetch_url'],      'Scheduled research digests via routines table (action_type=research_digest) — dashboard tiles + optional source archival')
 ON CONFLICT DO NOTHING;

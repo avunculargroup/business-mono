@@ -5,6 +5,7 @@ import { PriorityChip } from '@/components/ui/PriorityChip';
 import { PipelineChip } from '@/components/ui/PipelineChip';
 import { Card } from '@/components/ui/Card';
 import { QuickAdd } from '@/components/dashboard/QuickAdd';
+import { RoutineTile } from '@/components/dashboard/RoutineTile';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -27,6 +28,7 @@ export default async function DashboardPage() {
     { data: teamMembers },
     { data: activeProjects },
     { data: allContacts },
+    { data: dashboardRoutines },
   ] = await Promise.all([
     supabase
       .from('agent_activity')
@@ -60,6 +62,13 @@ export default async function DashboardPage() {
     supabase.from('team_members').select('id, full_name'),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
+    supabase
+      .from('routines')
+      .select('id, name, dashboard_title, last_run_at, last_result')
+      .eq('show_on_dashboard', true)
+      .eq('is_active', true)
+      .not('last_result', 'is', null)
+      .order('last_run_at', { ascending: false }),
   ]);
 
   // Count content by status
@@ -149,6 +158,20 @@ export default async function DashboardPage() {
 
         {/* Right column */}
         <div className={styles.right}>
+          {/* Dashboard routine tiles */}
+          {dashboardRoutines?.map((r) => (
+            <RoutineTile
+              key={r.id}
+              routine={{
+                id: r.id,
+                name: r.name,
+                dashboard_title: r.dashboard_title,
+                last_run_at: r.last_run_at,
+                last_result: r.last_result as React.ComponentProps<typeof RoutineTile>['routine']['last_result'],
+              }}
+            />
+          ))}
+
           {/* Recent Agent Activity */}
           <Card>
             <div className={styles.widgetHeader}>

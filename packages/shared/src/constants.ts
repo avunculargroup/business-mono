@@ -29,5 +29,5 @@ export const TAVILY_MONTHLY_LIMIT = 1000;
 // Researcher: Firecrawl free tier monthly limit
 export const FIRECRAWL_MONTHLY_LIMIT = 500;
 
-// Researcher: monitor check interval (ms) — 1 hour
-export const MONITOR_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+// Routine scheduler: how often the listener polls for due routines — 1 hour
+export const ROUTINE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
