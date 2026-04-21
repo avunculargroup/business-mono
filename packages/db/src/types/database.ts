@@ -1077,58 +1077,76 @@ export type Database = {
           },
         ]
       }
-      research_monitors: {
+      routines: {
         Row: {
-          context: string | null
+          action_config: Json
+          action_type: string
+          agent_name: string
           created_at: string
           created_by: string | null
+          dashboard_title: string | null
+          description: string | null
           frequency: string
           id: string
           is_active: boolean
-          last_digest: string | null
+          last_error: string | null
+          last_result: Json | null
           last_run_at: string | null
+          last_status: string | null
+          name: string
           next_run_at: string
-          notify_agent: string | null
-          notify_signal: boolean
-          search_queries: string[]
-          subject: string
+          show_on_dashboard: boolean
+          time_of_day: string
+          timezone: string
           updated_at: string
         }
         Insert: {
-          context?: string | null
+          action_config?: Json
+          action_type: string
+          agent_name: string
           created_at?: string
           created_by?: string | null
-          frequency?: string
+          dashboard_title?: string | null
+          description?: string | null
+          frequency: string
           id?: string
           is_active?: boolean
-          last_digest?: string | null
+          last_error?: string | null
+          last_result?: Json | null
           last_run_at?: string | null
+          last_status?: string | null
+          name: string
           next_run_at: string
-          notify_agent?: string | null
-          notify_signal?: boolean
-          search_queries: string[]
-          subject: string
+          show_on_dashboard?: boolean
+          time_of_day?: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
-          context?: string | null
+          action_config?: Json
+          action_type?: string
+          agent_name?: string
           created_at?: string
           created_by?: string | null
+          dashboard_title?: string | null
+          description?: string | null
           frequency?: string
           id?: string
           is_active?: boolean
-          last_digest?: string | null
+          last_error?: string | null
+          last_result?: Json | null
           last_run_at?: string | null
+          last_status?: string | null
+          name?: string
           next_run_at?: string
-          notify_agent?: string | null
-          notify_signal?: boolean
-          search_queries?: string[]
-          subject?: string
+          show_on_dashboard?: boolean
+          time_of_day?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "research_monitors_created_by_fkey"
+            foreignKeyName: "routines_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_members"
