@@ -11,7 +11,7 @@ import { rex } from '../agents/researcher/index.js';
 import { della } from '../agents/relationshipManager/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
-import { monitorResearchWorkflow } from '../agents/researcher/workflow.js';
+import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -20,7 +20,7 @@ import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
-import { startMonitorListener } from '../listeners/monitorListener.js';
+import { startRoutineListener } from '../listeners/routineListener.js';
 import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
 import { startRecorderListener } from '../listeners/recorderListener.js';
 import { startArchivistListener } from '../listeners/archivistListener.js';
@@ -131,7 +131,7 @@ export const mastra = new Mastra({
   workflows: {
     recorder: recorderWorkflow,
     pm: pmWorkflow,
-    monitorResearch: monitorResearchWorkflow,
+    executeRoutine: executeRoutineWorkflow,
   },
   server: {
     apiRoutes: [
@@ -157,8 +157,8 @@ startBAListener();
 // Start Supabase Realtime listener for PM dispatches
 startPMListener(mastra);
 
-// Start hourly monitor check for research monitors
-startMonitorListener(mastra);
+// Start hourly routine check for scheduled agent routines
+startRoutineListener(mastra);
 
 // Start Supabase Realtime listener for Relationship Manager dispatches
 startRelationshipManagerListener();
