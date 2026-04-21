@@ -122,3 +122,33 @@ export async function approveContact(id: string) {
   revalidatePath('/crm/contacts');
   return { success: true };
 }
+
+export async function rejectContact(id: string, reason: 'marketing' | 'spam' | 'other') {
+  const supabase = await createClient();
+
+  const { data: contact, error: fetchError } = await supabase
+    .from('contacts')
+    .select('email')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) return { error: fetchError.message };
+
+  const { error: deleteError } = await supabase.from('contacts').delete().eq('id', id);
+  if (deleteError) return { error: deleteError.message };
+
+  if (reason === 'marketing' || reason === 'spam') {
+    const email = (contact as { email: string | null }).email;
+    if (email) {
+      await supabase.from('fastmail_exclusions').insert({
+        type:  'email',
+        value: email.toLowerCase(),
+        notes: `Auto-excluded: ${reason}`,
+      });
+    }
+  }
+
+  revalidatePath(REVALIDATE);
+  revalidatePath('/crm/contacts');
+  return { success: true };
+}
