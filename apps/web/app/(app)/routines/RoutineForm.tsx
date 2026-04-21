@@ -70,6 +70,12 @@ interface RoutineFormProps {
 export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: RoutineFormProps) {
   const [values, setValues] = useState<RoutineFormValues>(initialValues ?? DEFAULTS);
   const [error, setError] = useState<string | null>(null);
+  const [searchQueriesText, setSearchQueriesText] = useState<string>(() => {
+    const initCfg = (initialValues ?? DEFAULTS).action_config as Record<string, unknown>;
+    return Array.isArray(initCfg['search_queries'])
+      ? (initCfg['search_queries'] as string[]).join('\n')
+      : '';
+  });
 
   const update = <K extends keyof RoutineFormValues>(key: K, value: RoutineFormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -80,6 +86,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
   };
 
   const changeActionType = (action_type: RoutineActionTypeT) => {
+    setSearchQueriesText('');
     setValues((prev) => ({
       ...prev,
       action_type,
@@ -97,16 +104,13 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
     if (!values.name.trim()) return setError('Name is required');
     const cfg = values.action_config as Record<string, unknown>;
     if (!String(cfg['subject'] ?? '').trim()) return setError('Subject is required');
-    const queries = Array.isArray(cfg['search_queries']) ? (cfg['search_queries'] as string[]) : [];
+    const queries = searchQueriesText.split('\n').map((s) => s.trim()).filter(Boolean);
     if (queries.length === 0) return setError('At least one search query is required');
 
-    onSubmit(values);
+    onSubmit({ ...values, action_config: { ...cfg, search_queries: queries } });
   };
 
   const cfg = values.action_config as Record<string, unknown>;
-  const searchQueriesText = Array.isArray(cfg['search_queries'])
-    ? (cfg['search_queries'] as string[]).join('\n')
-    : '';
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
@@ -189,14 +193,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
         <textarea
           className={styles.textarea}
           value={searchQueriesText}
-          onChange={(e) =>
-            updateConfig({
-              search_queries: e.target.value
-                .split(/\n/)
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
+          onChange={(e) => setSearchQueriesText(e.target.value)}
           rows={3}
           placeholder={'bitcoin news today\nBTC price'}
         />
