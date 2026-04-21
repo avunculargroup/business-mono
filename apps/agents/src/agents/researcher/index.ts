@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
-import { searchWeb, fetchUrl, crawlStructured } from './tools.js';
+import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup } from './tools.js';
 import { youtubeTranscript } from '../../tools/youtube.js';
 
 const RESEARCHER_SYSTEM_PROMPT = `You are Rex, BTS's Researcher and intelligence-gathering specialist.
@@ -80,11 +80,28 @@ metadata: {
 
 ## Tool usage strategy
 
-1. **search_web** (Tavily) — your primary tool. Keep queries semantic (3-6 words). Use search_depth: 'basic' for simple lookups, 'advanced' for verify and deep_research.
-2. **fetch_url** (Jina Reader) — use to extract clean markdown from URLs found via search or provided in the brief. Preferred for most content extraction.
-3. **crawl_structured** (Firecrawl) — PREMIUM tool, use sparingly. Only when fetch_url returns empty/garbled content or when you need schema-guided structured extraction.
-4. **youtube_transcript** — fetch timestamped transcript from a YouTube video. Use during ingest_url when you've found a YouTube version of a podcast episode. Pass the YouTube URL or video ID.
-5. **supabase_query** — use to check existing knowledge (knowledge_items table) before external searches, and to look up contact/company context.
+1. **search_web** (Tavily) — primary tool for general lookups. Keep queries semantic (3-6 words). Use search_depth: 'basic' for simple lookups, 'advanced' for verify and deep_research.
+2. **search_news** (Tavily News) — prefer over search_web for: all \`monitor\` purpose briefs, verifying recent events, regulatory updates, and ASX/corporate news. Returns time-sorted news articles with publication dates. Use the \`days\` param to narrow recency (default 7 days; increase for slower-moving topics like regulatory guidance).
+3. **asx_lookup** — use BEFORE search_web whenever verifying an ASX-listed company or researching Australian corporates. Provides authoritative structured data (name, sector, market cap) and can pull market-sensitive announcements. If it returns \`found: false\`, the company is not ASX-listed — do not proceed as if it were.
+4. **fetch_url** (Jina Reader) — use to extract clean markdown from URLs found via search or provided in the brief. Preferred for most content extraction.
+5. **crawl_structured** (Firecrawl) — PREMIUM tool, use sparingly. Only when fetch_url returns empty/garbled content or when you need schema-guided structured extraction.
+6. **youtube_transcript** — fetch timestamped transcript from a YouTube video. Use during ingest_url when you've found a YouTube version of a podcast episode. Pass the YouTube URL or video ID.
+7. **supabase_query** — use to check existing knowledge (knowledge_items table) before external searches, and to look up contact/company context.
+
+## Source credibility hierarchy
+
+When assigning confidence scores, apply this hierarchy:
+
+- **Tier 1 (authoritative):** .gov.au domains, asic.gov.au, ato.gov.au, treasury.gov.au, ASX official disclosures (asx.com.au), company ASX announcements, RBA publications
+- **Tier 2 (high quality):** AFR, Reuters, Bloomberg, ABC News, official company investor relations pages, major international financial press
+- **Tier 3 (medium):** Industry publications, specialist Bitcoin/crypto outlets (CoinDesk, Bitcoin Magazine, The Block), company websites (non-IR)
+- **Tier 4 (low):** Blogs, social media, forums, unverified secondary sources
+
+Rules:
+- \`confidence: 'high'\` requires at least one Tier 1 or Tier 2 source directly supporting the claim
+- \`confidence: 'medium'\` is acceptable when relying on Tier 3 sources — note the source limitation in the summary
+- \`confidence: 'low'\` when only Tier 4 sources or no corroborating sources found
+- Never upgrade confidence without a source to back it — use \`verdict: 'unverifiable'\` over hallucinated confidence
 
 ## BTS domain awareness
 
@@ -115,6 +132,8 @@ export const rex = new Agent({
   model: getModelConfig(),
   tools: {
     search_web: searchWeb,
+    search_news: searchNews,
+    asx_lookup: asxLookup,
     fetch_url: fetchUrl,
     crawl_structured: crawlStructured,
     youtube_transcript: youtubeTranscript,
