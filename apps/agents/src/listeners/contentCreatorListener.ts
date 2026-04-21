@@ -32,6 +32,16 @@ function inferContentType(message: string): string {
   return 'email';
 }
 
+function parseContentOutput(text: string): { title: string | null; body: string } {
+  const match = text.match(
+    /<content_output>\s*<title>([\s\S]*?)<\/title>\s*<body>([\s\S]*?)<\/body>\s*<\/content_output>/
+  );
+  if (match) {
+    return { title: match[1].trim() || null, body: match[2].trim() };
+  }
+  return { title: null, body: text };
+}
+
 // Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,13 +121,14 @@ export function startContentCreatorListener(): void {
         // Listener owns persistence — save draft to content_items unconditionally
         // rather than relying on Charlie's tool calls, which are unreliable.
         const existingContentItemId = dispatch.context?.['content_item_id'] as string | undefined;
+        const parsed = parseContentOutput(responseText);
 
         let contentItemId: string | null = null;
         if (existingContentItemId) {
           // Revision: update the existing draft
           const { data } = await supabase
             .from('content_items')
-            .update({ body: responseText, updated_at: new Date().toISOString() })
+            .update({ body: parsed.body, updated_at: new Date().toISOString() })
             .eq('id', existingContentItemId)
             .select('id')
             .single();
@@ -127,7 +138,8 @@ export function startContentCreatorListener(): void {
           const { data, error: insertError } = await supabase
             .from('content_items')
             .insert({
-              body: responseText,
+              title: parsed.title,
+              body: parsed.body,
               type: inferContentType(dispatch.message),
               status: 'draft',
               source: 'content_agent',
