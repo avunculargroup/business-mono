@@ -110,7 +110,7 @@ export async function addSlide(
   deckId: string,
   type: SlideType,
   insertAfterIndex?: number,
-): Promise<{ error: string } | { success: true; id: string }> {
+): Promise<{ error: string } | { success: true; slide: DeckSlideRow }> {
   const supabase = await createClient();
 
   // Determine order_index: append at end, or insert after given index
@@ -134,12 +134,12 @@ export async function addSlide(
       order_index: orderIndex,
       content_json: defaultSlide.content,
     })
-    .select('id')
+    .select('*')
     .single();
 
   if (error) return { error: error.message };
   revalidatePath(`/decks/${deckId}/edit`);
-  return { success: true, id: data.id };
+  return { success: true, slide: data as DeckSlideRow };
 }
 
 export async function updateSlide(

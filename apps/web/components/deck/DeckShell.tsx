@@ -49,8 +49,8 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
   async function handleAddSlide(type: SlideType) {
     const res = await addSlide(deck.id, type);
     if ('error' in res) { toast.error(res.error); return; }
-    router.refresh();
-    // Select the new slide after next render — router.refresh triggers re-render with new data from server
+    setSlides((prev) => [...prev, res.slide]);
+    setSelectedId(res.slide.id);
   }
 
   function handleContentChange(patch: Record<string, unknown>) {
