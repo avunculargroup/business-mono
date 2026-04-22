@@ -1,0 +1,5 @@
+.frame {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}

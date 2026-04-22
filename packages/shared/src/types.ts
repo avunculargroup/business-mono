@@ -782,3 +782,43 @@ export interface ChampionEvent {
   details: string | null;
   created_at: string;
 }
+
+// ============================================================
+// Slide Builder
+// ============================================================
+
+export const SlideType = {
+  TITLE: 'title',
+  SECTION: 'section',
+  AGENDA: 'agenda',
+  TWO_COLUMN: 'two_column',
+  IMAGE_CAPTION: 'image_caption',
+  KPI_GRID: 'kpi_grid',
+  QUOTE: 'quote',
+  CLOSING: 'closing',
+} as const;
+export type SlideType = (typeof SlideType)[keyof typeof SlideType];
+
+export const SLIDE_TYPE_LABELS: Record<SlideType, string> = {
+  title: 'Title Slide',
+  section: 'Section Header',
+  agenda: 'Agenda',
+  two_column: 'Two Column',
+  image_caption: 'Image + Caption',
+  kpi_grid: 'KPI Grid',
+  quote: 'Quote',
+  closing: 'Closing Slide',
+};
+
+export const DeckStatus = {
+  DRAFT: 'draft',
+  PUBLISHED: 'published',
+  ARCHIVED: 'archived',
+} as const;
+export type DeckStatus = (typeof DeckStatus)[keyof typeof DeckStatus];
+
+export const DECK_STATUS_LABELS: Record<DeckStatus, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  archived: 'Archived',
+};
