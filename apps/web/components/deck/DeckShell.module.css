@@ -1,0 +1,81 @@
+.shell {
+  display: flex;
+  height: calc(100vh - var(--header-height, 57px));
+  overflow: hidden;
+  background: var(--color-background);
+}
+
+.sidebar {
+  width: 196px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-subtle);
+}
+
+.sidebarHeader {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: var(--space-6);
+  background: var(--color-background);
+}
+
+.stageCanvas {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.emptyStage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.inspector {
+  width: 280px;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyInspector {
+  padding: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  padding-top: var(--space-12);
+}
+
+.addBtn {
+  width: 100%;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.addBtn:hover {
+  opacity: 0.88;
+}

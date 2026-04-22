@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-22 — Slide Builder
+
+Adds the browser-first slide authoring tool so directors can create presentation decks without leaving the platform.
+
+- **`assets` table** — shared media library for uploaded slide images. Stores bucket, path, filename, mime_type, dimensions, and alt_text. `org_id` column kept for future multi-tenancy; hardcoded to the BTS constant in MVP. `uploaded_by` FK to `auth.users`. Storage bucket: `slide-assets` (private).
+
+- **`decks` table** — top-level deck entity. `theme_id` defaults to `'company-default'` (neutral white theme); `status` is `draft | published | archived`; `aspect_ratio` defaults to `16:9`. Both `created_by` and `updated_by` FK to `auth.users` for audit trail.
+
+- **`deck_slides` table** — individual slides belonging to a deck (`deck_id` cascades on delete). `type` is constrained to the 8 template types: `title | section | agenda | two_column | image_caption | kpi_grid | quote | closing`. `order_index` determines display order; `content_json` is the JSONB payload whose shape is discriminated by `type` (validated by Zod in `apps/web/lib/decks/schema.ts`). No `deck_exports` table — PPTX files are streamed on demand.
+
+Migration: `20260422000000_add_slide_builder.sql`
+
+---
+
 ## 2026-04-21 — Routines supersede research_monitors
 
 Replaces the Rex-only `research_monitors` table with a generic `routines` table that schedules any agent on a daily/weekly/fortnightly cadence. The internal platform needed a UI for directors to CRUD scheduled agent jobs (e.g. "every morning Rex pulls daily bitcoin headlines"), and the old table was too specialised to the monitor change-detection flow.

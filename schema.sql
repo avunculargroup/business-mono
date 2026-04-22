@@ -1135,4 +1135,49 @@ ALTER TABLE content_items
   ADD COLUMN IF NOT EXISTS score           INTEGER,
   ADD COLUMN IF NOT EXISTS research_links  JSONB NOT NULL DEFAULT '[]';
 
+-- ============================================================
+-- SLIDE BUILDER (migration: 20260422000000_add_slide_builder)
+-- ============================================================
+
+CREATE TABLE assets (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       TEXT NOT NULL,
+  uploaded_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  bucket       TEXT NOT NULL,
+  path         TEXT NOT NULL,
+  filename     TEXT NOT NULL,
+  mime_type    TEXT NOT NULL,
+  byte_size    BIGINT,
+  width        INT,
+  height       INT,
+  alt_text     TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE decks (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       TEXT NOT NULL,
+  title        TEXT NOT NULL,
+  theme_id     TEXT NOT NULL DEFAULT 'company-default',
+  status       TEXT NOT NULL DEFAULT 'draft'
+               CHECK (status IN ('draft', 'published', 'archived')),
+  aspect_ratio TEXT NOT NULL DEFAULT '16:9',
+  created_by   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_by   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE deck_slides (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id      UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  type         TEXT NOT NULL
+               CHECK (type IN ('title','section','agenda','two_column','image_caption','kpi_grid','quote','closing')),
+  order_index  INT NOT NULL,
+  content_json JSONB NOT NULL DEFAULT '{}',
+  notes        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_content_pain_point ON content_items(pain_point_id);
