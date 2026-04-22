@@ -20,6 +20,7 @@ export function AgendaSlideView({ content, theme }: Props) {
         display: 'flex',
         flexDirection: 'column',
         padding: `${py}px ${px}px`,
+        paddingTop: 240,
         background: theme.colors.background,
         boxSizing: 'border-box',
       }}
@@ -33,6 +34,8 @@ export function AgendaSlideView({ content, theme }: Props) {
           marginBottom: 48,
           paddingBottom: 24,
           borderBottom: `3px solid ${theme.colors.accent}`,
+          maxWidth: 1440,
+          width: '100%',
         }}
       >
         {content.title || 'Agenda'}

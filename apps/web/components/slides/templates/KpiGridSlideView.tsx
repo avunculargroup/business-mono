@@ -22,6 +22,7 @@ export function KpiGridSlideView({ content, theme }: Props) {
         display: 'flex',
         flexDirection: 'column',
         padding: `${py}px ${px}px`,
+        paddingTop: 120,
         background: theme.colors.background,
         boxSizing: 'border-box',
       }}
@@ -35,10 +36,12 @@ export function KpiGridSlideView({ content, theme }: Props) {
             fontWeight: 700,
             color: theme.colors.primary,
             marginBottom: 48,
+            maxWidth: 1440,
+            width: '100%',
           }}
         />
       ) : (
-        <div style={{ fontSize: 44, fontWeight: 700, color: theme.colors.border, marginBottom: 48 }}>
+        <div style={{ fontSize: 44, fontWeight: 700, color: theme.colors.border, marginBottom: 48, maxWidth: 1440 }}>
           KPI Overview
         </div>
       )}

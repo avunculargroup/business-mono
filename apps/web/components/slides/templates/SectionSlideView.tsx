@@ -20,10 +20,11 @@ export function SectionSlideView({ content, theme }: Props) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         padding: `${py}px ${px}px`,
         background: theme.colors.primary,
         boxSizing: 'border-box',
+        paddingTop: 240,
       }}
     >
       {content.sectionNumber && (
@@ -52,16 +53,18 @@ export function SectionSlideView({ content, theme }: Props) {
             color: '#FFFFFF',
             lineHeight: 1.2,
             marginBottom: 24,
+            maxWidth: 1440,
+            width: '100%',
           }}
         />
       ) : (
-        <div style={{ fontSize: 64, fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: 24 }}>
+        <div style={{ fontSize: 64, fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: 24, maxWidth: 1440 }}>
           Section Title
         </div>
       )}
 
       {content.subtitle && (
-        <div style={{ fontSize: 28, color: 'rgba(255,255,255,0.7)', fontFamily: theme.fonts.body }}>
+        <div style={{ fontSize: 28, color: 'rgba(255,255,255,0.7)', fontFamily: theme.fonts.body, maxWidth: 1440, width: '100%' }}>
           {content.subtitle}
         </div>
       )}
