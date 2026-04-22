@@ -26,6 +26,7 @@ export function ImageCaptionSlideView({ content, theme, imageUrl }: Props) {
         flexDirection: 'column',
         background: theme.colors.background,
         boxSizing: 'border-box',
+        paddingTop: 80,
       }}
     >
       {/* Title bar */}
@@ -38,6 +39,8 @@ export function ImageCaptionSlideView({ content, theme, imageUrl }: Props) {
               fontSize: 40,
               fontWeight: 700,
               color: theme.colors.primary,
+              maxWidth: 1440,
+              width: '100%',
             }}
           />
         </div>

@@ -20,11 +20,12 @@ export function TitleSlideView({ content, theme }: Props) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         padding: `${py}px ${px}px`,
         background: theme.colors.background,
         boxSizing: 'border-box',
         position: 'relative',
+        paddingTop: 240,
       }}
     >
       {/* Accent bar */}
@@ -49,10 +50,12 @@ export function TitleSlideView({ content, theme }: Props) {
             color: theme.colors.primary,
             lineHeight: 1.15,
             marginBottom: 24,
+            maxWidth: 1440,
+            width: '100%',
           }}
         />
       ) : (
-        <div style={{ fontSize: 72, fontWeight: 700, color: theme.colors.border, marginBottom: 24 }}>
+        <div style={{ fontSize: 72, fontWeight: 700, color: theme.colors.border, marginBottom: 24, maxWidth: 1440 }}>
           Presentation Title
         </div>
       )}
@@ -64,6 +67,8 @@ export function TitleSlideView({ content, theme }: Props) {
             color: theme.colors.mutedText,
             marginBottom: 48,
             fontFamily: theme.fonts.body,
+            maxWidth: 1440,
+            width: '100%',
           }}
         >
           {content.subheadline}
