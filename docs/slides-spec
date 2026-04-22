@@ -1,0 +1,866 @@
+**Slide Builder MVP Implementation Specification**
+
+**1\. Objective**
+
+Build a browser-first slide creation and presentation system in a Next.js app for a single company theme. The application is the primary runtime for authoring and presenting. PPTX export is a backup capability, not the system of record.
+
+The MVP will support:
+
+- Creating decks from structured slide templates
+- Editing content in a guided, non-technical-user-friendly interface
+- Uploading and using images stored in Supabase Storage
+- Presenting decks full-screen from the app
+- Exporting decks to PPTX as a fallback artifact
+
+**2\. Product Principles**
+
+- **App-native first**: the browser presentation is the canonical experience.
+- **Structured templates over freeform canvas**: users edit approved layouts, not arbitrary coordinates.
+- **Single source of truth**: deck content is stored as application JSON, never as PPTX.
+- **Brand-safe by default**: one theme, locked typography, locked colors, fixed spacing rules.
+- **Simple editing UX**: most edits happen through fields, inline editing, image selection, and reordering.
+- **Export is an adapter**: PPTX generation translates application data into a backup presentation file.
+
+**3\. Recommended Stack**
+
+- **Framework**: Next.js App Router
+- **Language**: TypeScript
+- **Database/Auth/Storage**: Supabase
+- **Rich text**: Tiptap
+- **Validation**: Zod
+- **Drag and drop**: dnd-kit
+- **PPTX export**: PptxGenJS
+- **Image optimization**: Next.js image pipeline for presentation/editor preview where appropriate
+- **State management**: React state + server actions for MVP, or a light client store if needed
+
+**4\. Architecture Overview**
+
+The system is composed of five layers:
+
+- **Deck domain model**
+  - Theme definition
+  - Template schemas
+  - Deck JSON
+  - Validation rules
+- **Rendering layer**
+  - React slide renderer for editor preview
+  - React slide renderer for present mode
+  - Shared layout primitives and theme tokens
+- **Editing layer**
+  - Deck shell
+  - Slide list sidebar
+  - Slide stage
+  - Inspector panel
+  - Inline editing hooks
+  - Asset picker
+- **Persistence layer**
+  - Supabase Postgres tables for decks, slides, assets
+  - Supabase Storage buckets for uploaded media and generated export files
+- **Export layer**
+  - Mapping from deck JSON to PptxGenJS
+  - Template-specific export functions
+  - Download endpoint or server action
+
+**5\. Core Domain Model**
+
+**5.1 Deck**
+
+A deck is an ordered collection of slides with metadata.
+
+export type Deck = {
+
+id: string
+
+orgId: string
+
+title: string
+
+themeId: 'company-default'
+
+status: 'draft' | 'published' | 'archived'
+
+aspectRatio: '16:9'
+
+createdBy: string
+
+updatedBy: string
+
+createdAt: string
+
+updatedAt: string
+
+slides: Slide\[\]
+
+}
+
+**5.2 Slide**
+
+Each slide is a discriminated union with template-specific fields.
+
+export type SlideBase = {
+
+id: string
+
+type: SlideType
+
+orderIndex: number
+
+notes?: string
+
+}
+
+export type Slide =
+
+| TitleSlide
+
+| SectionSlide
+
+| AgendaSlide
+
+| TwoColumnSlide
+
+| ImageCaptionSlide
+
+| KPIGridSlide
+
+| QuoteSlide
+
+| ClosingSlide
+
+**5.3 Rich Text**
+
+Use Tiptap JSON for fields that need rich formatting. Restrict extensions to a minimal approved set.
+
+export type RichTextDoc = Record&lt;string, unknown&gt;
+
+**5.4 Theme**
+
+Single company theme with locked design tokens.
+
+export type Theme = {
+
+id: 'company-default'
+
+fonts: {
+
+heading: string
+
+body: string
+
+}
+
+colors: {
+
+background: string
+
+surface: string
+
+text: string
+
+mutedText: string
+
+primary: string
+
+secondary: string
+
+accent: string
+
+border: string
+
+}
+
+spacing: {
+
+pagePaddingX: number
+
+pagePaddingY: number
+
+gapSm: number
+
+gapMd: number
+
+gapLg: number
+
+}
+
+typography: {
+
+h1: number
+
+h2: number
+
+h3: number
+
+body: number
+
+small: number
+
+quote: number
+
+}
+
+}
+
+**6\. Eight Initial Templates**
+
+These are intentionally conservative and broadly useful.
+
+**6.1 Title Slide**
+
+**Purpose**: deck opening
+
+Fields:
+
+- title: plain text
+- subtitle: plain text
+- eyebrow: optional plain text
+- backgroundVariant: enum
+- logoVisible: boolean
+
+**6.2 Section Divider**
+
+**Purpose**: transitions between sections
+
+Fields:
+
+- sectionTitle: plain text
+- sectionSubtitle: optional plain text
+- backgroundVariant: enum
+
+**6.3 Agenda Slide**
+
+**Purpose**: ordered overview
+
+Fields:
+
+- title: plain text
+- items: array of 3 to 8 strings
+- highlightIndex: optional number
+
+**6.4 Two-Column Content**
+
+**Purpose**: common body slide
+
+Fields:
+
+- title: plain text
+- leftBody: rich text
+- rightBody: rich text
+- footer: optional plain text
+
+**6.5 Image with Caption**
+
+**Purpose**: image-led storytelling
+
+Fields:
+
+- title: plain text
+- imageAssetId: string
+- imageFit: 'cover' | 'contain'
+- focalPointX: number
+- focalPointY: number
+- caption: optional plain text
+- body: optional rich text
+
+**6.6 KPI Grid**
+
+**Purpose**: numeric highlights
+
+Fields:
+
+- title: plain text
+- intro: optional plain text
+- metrics: array of 2 to 6 items
+
+Metric item:
+
+- label: string
+- value: string
+- sublabel: optional string
+
+**6.7 Quote Slide**
+
+**Purpose**: pull quote / testimonial / key statement
+
+Fields:
+
+- quote: plain text
+- attribution: optional plain text
+- role: optional plain text
+- backgroundVariant: enum
+
+**6.8 Closing / CTA Slide**
+
+**Purpose**: final page
+
+Fields:
+
+- title: plain text
+- body: optional rich text
+- ctaLabel: optional string
+- ctaValue: optional string
+- contactLine: optional string
+
+**7\. UX Specification**
+
+**7.1 Main Editor Layout**
+
+Desktop editor layout:
+
+- **Left sidebar**: ordered slide list with thumbnail previews
+- **Center stage**: active slide preview at fixed 16:9 ratio
+- **Right inspector**: fields for the selected slide
+- **Top bar**: deck title, present, export, add slide
+
+**7.2 Editing Interactions**
+
+Required interactions:
+
+- Create deck
+- Rename deck
+- Add slide from template picker
+- Duplicate slide
+- Delete slide
+- Reorder slides via drag and drop
+- Edit fields in inspector
+- Click title/body fields inline for fast edits where practical
+- Upload/select image from asset picker
+- Edit image focal point within frame for image-based templates
+- Add speaker notes per slide
+
+**7.3 UX Constraints**
+
+To preserve simplicity and quality:
+
+- No arbitrary drag-anything-anywhere layout in MVP
+- No user font selection
+- No free color picker
+- No rotation, arbitrary layers, or animation editor
+- No collaboration features
+
+**7.4 Present Mode**
+
+Present mode requirements:
+
+- Full-screen 16:9 slide viewport
+- Keyboard navigation
+- Click navigation support
+- Presenter notes view optional for MVP, but notes storage should exist
+- Smooth transitions kept minimal
+- Mobile presenting out of scope for MVP
+
+**8\. Storage and Persistence Design**
+
+**8.1 Supabase Postgres Tables**
+
+**decks**
+
+- id (uuid, pk)
+- org_id (uuid or text)
+- title (text)
+- theme_id (text)
+- status (text)
+- aspect_ratio (text)
+- created_by (uuid)
+- updated_by (uuid)
+- created_at (timestamptz)
+- updated_at (timestamptz)
+
+**deck_slides**
+
+- id (uuid, pk)
+- deck_id (uuid, fk -> decks.id)
+- type (text)
+- order_index (int)
+- content_json (jsonb)
+- notes (text)
+- created_at (timestamptz)
+- updated_at (timestamptz)
+
+**assets**
+
+- id (uuid, pk)
+- org_id (uuid or text)
+- uploaded_by (uuid)
+- bucket (text)
+- path (text)
+- filename (text)
+- mime_type (text)
+- byte_size (bigint)
+- width (int, nullable)
+- height (int, nullable)
+- alt_text (text, nullable)
+- created_at (timestamptz)
+
+**deck_exports**
+
+- id (uuid, pk)
+- deck_id (uuid, fk -> decks.id)
+- export_type (text) // pptx
+- storage_path (text)
+- created_by (uuid)
+- created_at (timestamptz)
+
+**8.2 Supabase Storage Buckets**
+
+Create two private buckets:
+
+- **slide-assets**
+  - Stores uploaded images used inside decks
+  - Paths scoped by org and deck or org only
+- **deck-exports**
+  - Stores generated PPTX files if exports are persisted
+  - May optionally be skipped if exports are always streamed directly
+
+Recommended object key patterns:
+
+- slide-assets/{orgId}/{assetId}/{originalFilename}
+- deck-exports/{orgId}/{deckId}/{timestamp}.pptx
+
+**8.3 Access Model**
+
+- Keep buckets private
+- Use authenticated access for the editor
+- Use signed URLs for temporary asset preview/download when necessary
+- Use RLS on data tables and storage object access
+
+**8.4 Upload Strategy**
+
+For MVP:
+
+- Standard uploads are acceptable for typical marketing and presentation images
+- Enforce file type allowlist: png, jpg, jpeg, webp, svg if desired
+- Enforce max upload size and validate dimensions
+- Generate metadata row after upload succeeds
+
+Future:
+
+- Add resumable uploads if large asset handling becomes necessary
+
+**9\. Validation Rules**
+
+Validation should happen both client-side and server-side.
+
+Examples:
+
+- deck title required
+- slide type required
+- title length limits per template
+- agenda item count between min and max
+- metrics array within allowed bounds
+- imageAssetId must exist and be accessible to org
+- rich text allowed nodes and marks only
+
+Recommended Zod approach:
+
+- One base schema per template
+- One discriminated union for all slide types
+- One deck schema for full export validation
+
+**10\. Rich Text Policy**
+
+Use rich text only where it materially improves usability.
+
+Allowed for MVP:
+
+- paragraph
+- bullet list
+- ordered list
+- bold
+- italic
+- link if needed
+- hard break
+
+Do not allow for MVP:
+
+- arbitrary font sizes
+- arbitrary colors
+- tables inside rich text
+- nested embeds
+- pasted uncontrolled HTML styling
+
+The editor should normalize pasted content into the approved schema.
+
+**11\. Rendering System**
+
+**11.1 Shared Slide Primitives**
+
+Implement a shared set of primitives used by all templates:
+
+- SlideFrame
+- SlideHeader
+- SlideBody
+- SlideFooter
+- RichTextBlock
+- ImageFrame
+- MetricCard
+- QuoteBlock
+
+**11.2 Fixed Stage**
+
+Use a fixed virtual slide size, for example:
+
+- 1600 x 900 logical pixels
+
+Render all slides against that coordinate system using CSS layout. Scale the stage responsively in the editor and present mode.
+
+**11.3 Overflow Handling**
+
+Each template must define clear overflow behavior:
+
+- clamp where acceptable
+- shrink text only in tightly controlled ways
+- display validation warnings in editor if content exceeds safe bounds
+
+MVP rule: prefer warning users rather than implementing aggressive auto-fit logic.
+
+**12\. PPTX Export Design**
+
+**12.1 Export Philosophy**
+
+PPTX is a fallback format. The export must be reliable and visually close, but not a perfect editable reproduction of app behavior.
+
+**12.2 Export Strategy**
+
+- Validate deck against schema
+- Load theme tokens
+- Create PptxGenJS presentation instance
+- Define one slide master for the company theme
+- Iterate over slides in order
+- For each slide type, call a dedicated export function
+- Write file and return download
+
+**12.3 Export Function Contract**
+
+Each template implements:
+
+function exportTitleSlide(slide: TitleSlide, pres: PptxGenJS): void
+
+or:
+
+function exportTitleSlide(slide: TitleSlide, pptxSlide: Slide): void
+
+Each function is responsible for:
+
+- slide background
+- title/subtitle placement
+- logo placement
+- images if present
+- notes if supported later
+
+**12.4 Export Scope for MVP**
+
+Must support:
+
+- text
+- bulleted text
+- images
+- simple shapes/background blocks
+- simple metric cards
+
+Avoid in MVP export:
+
+- advanced PowerPoint animations
+- editable charts unless you explicitly build chart mapping
+- complex text auto-fit behavior
+
+**12.5 Export Execution Location**
+
+Preferred approach:
+
+- Generate PPTX on the server in a route handler or server action
+
+Reasons:
+
+- Keeps the browser lighter
+- Easier to fetch and embed protected assets securely
+- Easier to centralize export logging and failure handling
+
+**13\. Image Pipeline**
+
+**13.1 Accepted Formats**
+
+- PNG
+- JPEG
+- WebP
+- SVG optional, only if trusted and sanitized appropriately
+
+**13.2 Image Metadata**
+
+On upload, capture:
+
+- width
+- height
+- mime type
+- byte size
+- uploader
+- org scope
+
+**13.3 Focal Point Support**
+
+For image-based templates, support focal point editing:
+
+- x from 0 to 1
+- y from 0 to 1
+
+Store focal point on slide content, not asset metadata, because usage may vary by slide.
+
+**14\. API and Route Design**
+
+**14.1 App Routes**
+
+- /decks - deck list
+- /decks/new - create deck flow
+- /decks/\[deckId\]/edit - editor
+- /decks/\[deckId\]/present - presentation mode
+
+**14.2 API / Server Actions**
+
+- createDeck(title)
+- updateDeckMeta(deckId, patch)
+- addSlide(deckId, templateType, insertIndex?)
+- updateSlide(deckId, slideId, contentPatch)
+- reorderSlides(deckId, orderedSlideIds)
+- duplicateSlide(deckId, slideId)
+- deleteSlide(deckId, slideId)
+- createAssetUploadUrl(...) if using signed upload flow
+- registerUploadedAsset(...)
+- generatePptxExport(deckId)
+
+**15\. Suggested Folder Structure**
+
+src/
+
+app/
+
+decks/
+
+page.tsx
+
+new/page.tsx
+
+\[deckId\]/
+
+edit/page.tsx
+
+present/page.tsx
+
+api/
+
+exports/
+
+\[deckId\]/pptx/route.ts
+
+components/
+
+deck/
+
+DeckShell.tsx
+
+SlideList.tsx
+
+SlideThumbnail.tsx
+
+TemplatePicker.tsx
+
+InspectorPanel.tsx
+
+slides/
+
+primitives/
+
+templates/
+
+TitleSlideView.tsx
+
+SectionSlideView.tsx
+
+AgendaSlideView.tsx
+
+TwoColumnSlideView.tsx
+
+ImageCaptionSlideView.tsx
+
+KPIGridSlideView.tsx
+
+QuoteSlideView.tsx
+
+ClosingSlideView.tsx
+
+editors/
+
+RichTextEditor.tsx
+
+AssetPicker.tsx
+
+FocalPointEditor.tsx
+
+lib/
+
+deck-schema/
+
+deck.ts
+
+templates.ts
+
+theme/
+
+companyTheme.ts
+
+export/
+
+pptx/
+
+index.ts
+
+masters.ts
+
+slides/
+
+title.ts
+
+section.ts
+
+agenda.ts
+
+twoColumn.ts
+
+imageCaption.ts
+
+kpiGrid.ts
+
+quote.ts
+
+closing.ts
+
+supabase/
+
+client.ts
+
+server.ts
+
+utils/
+
+ids.ts
+
+validation.ts
+
+**16\. Security and Permissions**
+
+- All data scoped by org or tenant
+- RLS required on decks, deck_slides, assets, deck_exports
+- Storage object policies should only allow authorized users to access objects in their org scope
+- Never trust client-provided storage paths without verification
+- Export routes must verify deck access before generating file
+
+**17\. Performance Considerations**
+
+- Load slide thumbnails lazily if deck grows
+- Keep slide preview rendering pure and memoized
+- Debounce rich text writes to the backend
+- Persist edits incrementally, not full deck rewrites where practical
+- Use server-side export to avoid browser memory spikes for large decks
+
+**18\. Observability**
+
+Track:
+
+- deck created
+- slide added
+- slide deleted
+- deck presented
+- export requested
+- export succeeded
+- export failed
+- asset uploaded
+
+Capture export failures with slide type context for debugging.
+
+**19\. Non-Goals for MVP**
+
+- Real-time collaboration
+- Comments
+- Arbitrary custom themes
+- PowerPoint import
+- Freeform drawing canvas
+- Embedded live charts/data integrations
+- Animation timeline editor
+- Template designer UI
+
+**20\. Milestones**
+
+**Milestone 1: Foundation**
+
+- Supabase schema and storage buckets
+- Theme tokens
+- Deck and slide schemas
+- Deck CRUD
+- Basic editor shell
+
+**Milestone 2: Core Authoring**
+
+- Implement all 8 templates in React
+- Inspector panel controls
+- Slide add/delete/duplicate/reorder
+- Asset upload and selection
+- Rich text editor integration
+
+**Milestone 3: Presentation Mode**
+
+- Full-screen present mode
+- Keyboard navigation
+- Basic notes support in model
+
+**Milestone 4: PPTX Export**
+
+- PptxGenJS integration
+- Slide master definition
+- Export support for all 8 templates
+- Download flow
+- Validation and error handling
+
+**Milestone 5: Hardening**
+
+- Overflow warnings
+- RLS and storage policy review
+- Analytics and error monitoring
+- QA against real company content
+
+**21\. Recommended Build Order for the First Two Weeks**
+
+- Define theme tokens and 8 slide schemas
+- Build deck list and deck editor shell
+- Implement 3 templates first: Title, Two-Column, Image-Caption
+- Add Supabase asset upload flow
+- Add remaining 5 templates
+- Add present mode
+- Implement PPTX export for the first 3 templates
+- Finish export for all 8 templates
+
+**22\. Key Engineering Decisions**
+
+- **Canonical model is JSON**
+- **Presentation is app-native**
+- **Templates are fixed and structured**
+- **PPTX is a one-way export adapter**
+- **Supabase Storage is private and accessed through controlled URLs/policies**
+
+**23\. Open Decisions to Resolve Before Build Starts**
+
+- Whether exports are streamed only or also persisted to deck-exports
+- Whether notes are included in MVP present mode UI or stored only for later
+- Whether SVG uploads are allowed in MVP
+- Whether inline editing is enabled on all text fields or only headline/body fields
+- Whether a deck can exceed a soft slide count limit in MVP
+
+**24\. Final Recommendation**
+
+Start with the most common deck flow and optimize for predictable quality:
+
+- fixed company theme
+- 8 templates
+- structured content fields
+- browser-first presentation
+- server-side PPTX export
+
+This will give the team a credible MVP without getting trapped in PowerPoint parity work.
