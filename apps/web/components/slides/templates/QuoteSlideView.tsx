@@ -20,9 +20,10 @@ export function QuoteSlideView({ content, theme }: Props) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         alignItems: 'flex-start',
         padding: `${py}px ${px + 40}px`,
+        paddingTop: 160,
         background: theme.colors.background,
         boxSizing: 'border-box',
         position: 'relative',
@@ -59,10 +60,12 @@ export function QuoteSlideView({ content, theme }: Props) {
             position: 'relative',
             zIndex: 1,
             marginBottom: 40,
+            maxWidth: 1440,
+            width: '100%',
           }}
         />
       ) : (
-        <div style={{ fontSize: 44, color: theme.colors.border, marginBottom: 40, fontStyle: 'italic' }}>
+        <div style={{ fontSize: 44, color: theme.colors.border, marginBottom: 40, fontStyle: 'italic', maxWidth: 1440 }}>
           "The quote goes here..."
         </div>
       )}

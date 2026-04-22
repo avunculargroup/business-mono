@@ -21,6 +21,7 @@ export function TwoColumnSlideView({ content, theme }: Props) {
         display: 'flex',
         flexDirection: 'column',
         padding: `${py}px ${px}px`,
+        paddingTop: 120,
         background: theme.colors.background,
         boxSizing: 'border-box',
       }}
@@ -34,10 +35,12 @@ export function TwoColumnSlideView({ content, theme }: Props) {
             fontWeight: 700,
             color: theme.colors.primary,
             marginBottom: 40,
+            maxWidth: 1440,
+            width: '100%',
           }}
         />
       ) : (
-        <div style={{ fontSize: 44, fontWeight: 700, color: theme.colors.border, marginBottom: 40 }}>
+        <div style={{ fontSize: 44, fontWeight: 700, color: theme.colors.border, marginBottom: 40, maxWidth: 1440 }}>
           Slide Title
         </div>
       )}
