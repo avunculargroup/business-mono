@@ -18,6 +18,7 @@ import {
   Search,
   ChevronRight,
   Clock,
+  Presentation,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -41,6 +42,7 @@ const workNav = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderOpen },
   { href: '/content', label: 'Content', icon: FileText },
+  { href: '/decks', label: 'Decks', icon: Presentation },
   { href: '/routines', label: 'Routines', icon: Clock },
   { href: '/discovery', label: 'Discovery', icon: Search, children: [
     { href: '/crm/interviews', label: 'Interviews'  },
@@ -87,6 +89,7 @@ const moreNav: MoreNavSection[] = [
       { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
       { href: '/projects',  label: 'Projects',  icon: FolderOpen  },
       { href: '/content',   label: 'Content',   icon: FileText    },
+      { href: '/decks',     label: 'Decks',     icon: Presentation },
       { href: '/routines',  label: 'Routines',  icon: Clock       },
       { href: '/discovery', label: 'Discovery', icon: Search, children: [
         { href: '/crm/interviews',        label: 'Interviews' },

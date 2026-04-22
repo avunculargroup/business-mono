@@ -1,0 +1,93 @@
+.stage {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  inset: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.slide {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.empty {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  color: #888;
+  font-family: sans-serif;
+}
+
+.controls {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 32px;
+  padding: 8px 20px;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+
+.controls.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.navBtn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0.8;
+  transition: opacity 0.1s;
+}
+
+.navBtn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.counter {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  font-family: sans-serif;
+  min-width: 56px;
+  text-align: center;
+}
+
+.progressBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+}
+
+.progressFill {
+  height: 100%;
+  background: rgba(255,255,255,0.5);
+  transition: width 0.3s ease;
+}
