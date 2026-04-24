@@ -43,6 +43,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .presentBtn,
@@ -75,4 +77,52 @@
 .exportBtn:hover {
   border-color: var(--color-text-secondary);
   color: var(--color-text-primary);
+}
+
+@media (max-width: 1023px) {
+  .toolbar {
+    flex-direction: column;
+    height: auto;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+  }
+
+  .toolbarLeft {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .toolbarRight {
+    width: 100%;
+  }
+
+  .presentBtn,
+  .exportBtn {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .title {
+    font-size: var(--text-sm);
+  }
+
+  .back {
+    font-size: var(--text-xs);
+  }
+
+  .toolbarLeft {
+    gap: var(--space-2);
+  }
+
+  .presentBtn,
+  .exportBtn {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-xs);
+  }
 }
