@@ -80,6 +80,10 @@
   opacity: 0.88;
 }
 
+.mobileBack {
+  display: none;
+}
+
 @media (max-width: 1023px) {
   .sidebar {
     width: 64px;
@@ -108,33 +112,67 @@
     flex-direction: column;
   }
 
+  /* Thumbnail grid fills the full view */
   .sidebar {
     width: 100%;
-    height: 64px;
+    height: auto;
+    flex: 1;
     border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    flex-direction: row;
-    overflow-x: auto;
+    border-bottom: none;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .sidebarHeader {
-    padding: var(--space-2);
-    border-bottom: none;
-    border-right: 1px solid var(--color-border);
-    min-width: 64px;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    border-right: none;
+    min-width: unset;
+    min-height: unset;
+    display: block;
+    justify-content: unset;
   }
 
   .stage {
-    flex: 1;
-    padding: var(--space-3);
-  }
-
-  .stageCanvas {
-    max-width: 100%;
-    max-height: 100%;
+    display: none;
   }
 
   .inspector {
     display: none;
+  }
+
+  /* Mobile: inspector open — hide thumbnails, show inspector full-screen */
+  .mobileInspector .sidebar {
+    display: none;
+  }
+
+  .mobileInspector .inspector {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .mobileBack {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface-subtle);
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    width: 100%;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  .mobileBack:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
   }
 }

@@ -30,6 +30,7 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
   const [selectedId, setSelectedId] = useState<string | null>(initialSlides[0]?.id ?? null);
   const [showPicker, setShowPicker] = useState(false);
   const [stageWidth, setStageWidth] = useState(0);
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
   const parsedSelected: Slide | null = selectedSlide ? parseSlideContent(selectedSlide) : null;
@@ -51,6 +52,12 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
     if ('error' in res) { toast.error(res.error); return; }
     setSlides((prev) => [...prev, res.slide]);
     setSelectedId(res.slide.id);
+    setMobileInspectorOpen(true);
+  }
+
+  function handleSelectSlide(id: string) {
+    setSelectedId(id);
+    setMobileInspectorOpen(true);
   }
 
   function handleContentChange(patch: Record<string, unknown>) {
@@ -68,6 +75,7 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
     const remaining = slides.filter((s) => s.id !== selectedId);
     setSlides(remaining);
     setSelectedId(remaining[0]?.id ?? null);
+    setMobileInspectorOpen(false);
   }
 
   function handleSlideDeletedFromList() {
@@ -82,8 +90,8 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
   }
 
   return (
-    <div className={styles.shell}>
-      {/* Left panel: slide list */}
+    <div className={`${styles.shell} ${mobileInspectorOpen ? styles.mobileInspector : ''}`}>
+      {/* Left panel: slide list / mobile thumbnail grid */}
       <div className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <button
@@ -99,13 +107,13 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
           slides={slides}
           selectedSlideId={selectedId}
           theme={theme}
-          onSelectSlide={setSelectedId}
+          onSelectSlide={handleSelectSlide}
           onSlidesReordered={setSlides}
           onSlideDeleted={handleSlideDeletedFromList}
         />
       </div>
 
-      {/* Centre: slide stage */}
+      {/* Centre: slide stage (hidden on mobile) */}
       <div className={styles.stage} ref={stageRef}>
         {parsedSelected && scale > 0 ? (
           <div
@@ -128,8 +136,15 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
         )}
       </div>
 
-      {/* Right panel: inspector */}
+      {/* Right panel: inspector (full-screen on mobile when open) */}
       <div className={styles.inspector}>
+        <button
+          type="button"
+          className={styles.mobileBack}
+          onClick={() => setMobileInspectorOpen(false)}
+        >
+          ← All slides
+        </button>
         {selectedSlide && parsedSelected ? (
           <InspectorPanel
             deckId={deck.id}
