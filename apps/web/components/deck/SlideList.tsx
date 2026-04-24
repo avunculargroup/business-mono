@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -16,11 +16,12 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { reorderSlides } from '@/app/actions/decks';
+import { reorderSlides, deleteSlide } from '@/app/actions/decks';
 import { SlideThumbnail } from './SlideThumbnail';
 import type { Slide, DeckSlideRow } from '@/lib/decks/schema';
 import { parseSlideContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
+import { useToast } from '@/providers/ToastProvider';
 import styles from './SlideList.module.css';
 
 interface SlideListProps {
@@ -30,6 +31,7 @@ interface SlideListProps {
   theme: SlideTheme;
   onSelectSlide: (id: string) => void;
   onSlidesReordered: (slides: DeckSlideRow[]) => void;
+  onSlideDeleted?: () => void;
 }
 
 function SortableSlide({
@@ -38,14 +40,20 @@ function SortableSlide({
   isSelected,
   theme,
   onClick,
+  deckId,
+  onDelete,
 }: {
   slide: DeckSlideRow;
   index: number;
   isSelected: boolean;
   theme: SlideTheme;
   onClick: () => void;
+  deckId: string;
+  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slide.id });
+  const [isPending, startTransition] = useTransition();
+  const toast = useToast();
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -54,6 +62,17 @@ function SortableSlide({
   };
 
   const parsed: Slide = parseSlideContent(slide);
+
+  async function handleDelete() {
+    startTransition(async () => {
+      const res = await deleteSlide(deckId, slide.id);
+      if ('error' in res) {
+        toast.error(res.error);
+      } else {
+        onDelete();
+      }
+    });
+  }
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
@@ -64,6 +83,7 @@ function SortableSlide({
         isSelected={isSelected}
         slideNumber={index + 1}
         onClick={onClick}
+        onDelete={isPending ? undefined : handleDelete}
       />
     </div>
   );
@@ -76,6 +96,7 @@ export function SlideList({
   theme,
   onSelectSlide,
   onSlidesReordered,
+  onSlideDeleted,
 }: SlideListProps) {
   const [localSlides, setLocalSlides] = useState(slides);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -98,6 +119,12 @@ export function SlideList({
     await reorderSlides(deckId, reordered.map((s) => s.id));
   }
 
+  function handleSlideDeleted(deletedSlideId: string) {
+    const remaining = localSlides.filter((s) => s.id !== deletedSlideId);
+    setLocalSlides(remaining);
+    onSlideDeleted?.();
+  }
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={localSlides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -110,6 +137,8 @@ export function SlideList({
               isSelected={slide.id === selectedSlideId}
               theme={theme}
               onClick={() => onSelectSlide(slide.id)}
+              deckId={deckId}
+              onDelete={() => handleSlideDeleted(slide.id)}
             />
           ))}
         </div>
