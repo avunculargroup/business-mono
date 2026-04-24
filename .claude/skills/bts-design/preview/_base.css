@@ -1,0 +1,38 @@
+/* Preview-card base — keeps cards minimal; asset name renders outside the card */
+@import url('../colors_and_type.css');
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+}
+
+body {
+  padding: var(--space-5);
+}
+
+/* Swatch + specimen helpers shared across preview cards */
+.swatch-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.swatch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 96px;
+}
+.swatch .chip {
+  height: 56px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+.swatch .label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+.swatch .hex {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}

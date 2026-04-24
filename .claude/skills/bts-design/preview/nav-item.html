@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sidebar nav item — states</title>
+<link rel="stylesheet" href="_base.css">
+<style></style>
+</head><body>
+<style>
+.nav { font-family: var(--font-body); font-size:14px; font-weight:500; color: var(--color-text-secondary); display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:6px; width:220px; }
+.nav.hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.nav.active { background: var(--color-accent-subtle); color: var(--color-accent-hover); border-left: 3px solid var(--color-accent); padding-left: 9px; }
+.dot { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
+</style>
+<div style="display:flex; flex-direction:column; gap:4px;">
+  <div class="nav"><svg class="dot" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>Dashboard — default</span></div>
+  <div class="nav hover"><svg class="dot" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>CRM — hover</span></div>
+  <div class="nav active"><svg class="dot" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" viewBox="0 0 24 24" style="color:var(--color-accent)"><path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z"/></svg><span>Simon — active</span></div>
+</div></body></html>

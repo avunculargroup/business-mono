@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Buttons</title>
+<link rel="stylesheet" href="_base.css">
+<style></style>
+</head><body>
+<style>
+.btn { font-family: var(--font-body); font-weight:500; font-size:14px; height:36px; padding:0 18px; border-radius:8px; border:1px solid transparent; cursor:pointer; transition: background 120ms ease, transform 100ms ease; }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--color-accent); color: var(--color-text-primary); }
+.btn.primary:hover { background: var(--color-accent-hover); color: #fff; }
+.btn.secondary { background: var(--color-surface); color: var(--color-text-primary); border-color: var(--color-border); }
+.btn.secondary:hover { background: var(--color-surface-subtle); }
+.btn.ghost { background: transparent; color: var(--color-text-primary); }
+.btn.ghost:hover { background: var(--color-surface-subtle); }
+.btn.destructive { background: var(--color-destructive); color:#fff; }
+.btn.sm { height:28px; font-size:13px; padding:0 12px; }
+</style>
+<div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+  <button class="btn primary">Approve all</button>
+  <button class="btn secondary">Review individually</button>
+  <button class="btn ghost">Ghost</button>
+  <button class="btn destructive">Reject</button>
+  <button class="btn secondary sm">Small action</button>
+</div>
+<div style="font-size:11px; color: var(--color-text-tertiary); margin-top:12px;">36px default · 28px small · 8px radius · DM Sans 14/500 · all need visible focus ring</div></body></html>
