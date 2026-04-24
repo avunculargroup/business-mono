@@ -18,6 +18,52 @@
   gap: var(--space-4);
 }
 
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-3);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-4);
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .card {
+    border-radius: var(--radius-md);
+  }
+
+  .cardPreview {
+    height: 100px;
+  }
+
+  .cardIcon {
+    font-size: 28px;
+  }
+
+  .cardMeta {
+    padding: var(--space-3);
+  }
+
+  .cardTitle {
+    font-size: var(--text-xs);
+  }
+
+  .cardSub {
+    gap: var(--space-2);
+  }
+
+  .cardDate {
+    font-size: var(--text-xs);
+  }
+}
+
 .card {
   display: flex;
   flex-direction: column;
