@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { SlideFrame } from '@/components/slides/primitives/SlideFrame';
 import { SlideView } from '@/components/slides/templates/SlideView';
 import type { Slide } from '@/lib/decks/schema';
@@ -15,6 +15,7 @@ interface SlideThumbnailProps {
   isSelected?: boolean;
   slideNumber?: number;
   onClick?: () => void;
+  onDelete?: () => void;
 }
 
 export const SlideThumbnail = memo(function SlideThumbnail({
@@ -24,30 +25,82 @@ export const SlideThumbnail = memo(function SlideThumbnail({
   isSelected = false,
   slideNumber,
   onClick,
+  onDelete,
 }: SlideThumbnailProps) {
   const scale = thumbnailWidth / SLIDE_WIDTH;
   const thumbnailHeight = SLIDE_HEIGHT * scale;
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
+  function handleContextMenu(e: React.MouseEvent) {
+    e.preventDefault();
+    setShowMenu(!showMenu);
+  }
+
+  function handleDelete() {
+    if (!confirm('Delete this slide?')) return;
+    setShowMenu(false);
+    onDelete?.();
+  }
 
   return (
-    <button
-      type="button"
-      className={`${styles.thumbnail} ${isSelected ? styles.selected : ''}`}
-      onClick={onClick}
-      title={`Slide ${slideNumber}`}
-    >
-      {slideNumber !== undefined && (
-        <span className={styles.number}>{slideNumber}</span>
-      )}
-      <div
-        className={styles.canvas}
-        style={{ width: thumbnailWidth, height: thumbnailHeight }}
+    <div className={styles.container} ref={menuRef}>
+      <button
+        type="button"
+        className={`${styles.thumbnail} ${isSelected ? styles.selected : ''}`}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        title={`Slide ${slideNumber} (right-click to delete)`}
       >
-        <div style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          <SlideFrame theme={theme}>
-            <SlideView slide={slide} theme={theme} />
-          </SlideFrame>
+        {slideNumber !== undefined && (
+          <span className={styles.number}>{slideNumber}</span>
+        )}
+        <div
+          className={styles.canvas}
+          style={{ width: thumbnailWidth, height: thumbnailHeight }}
+        >
+          <div style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+            <SlideFrame theme={theme}>
+              <SlideView slide={slide} theme={theme} />
+            </SlideFrame>
+          </div>
         </div>
-      </div>
-    </button>
+        {onDelete && (
+          <button
+            type="button"
+            className={styles.deleteBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            title="Delete slide"
+            aria-label="Delete slide"
+          >
+            ✕
+          </button>
+        )}
+      </button>
+
+      {showMenu && onDelete && (
+        <div className={styles.contextMenu}>
+          <button type="button" onClick={handleDelete} className={styles.contextMenuItem}>
+            Delete slide
+          </button>
+        </div>
+      )}
+    </div>
   );
 });
