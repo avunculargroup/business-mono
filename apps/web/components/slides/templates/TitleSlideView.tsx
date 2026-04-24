@@ -25,7 +25,7 @@ export function TitleSlideView({ content, theme }: Props) {
         background: theme.colors.background,
         boxSizing: 'border-box',
         position: 'relative',
-        paddingTop: 240,
+        paddingTop: '26.67%',
       }}
     >
       {/* Accent bar */}
