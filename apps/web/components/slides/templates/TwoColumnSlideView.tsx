@@ -21,7 +21,7 @@ export function TwoColumnSlideView({ content, theme }: Props) {
         display: 'flex',
         flexDirection: 'column',
         padding: `${py}px ${px}px`,
-        paddingTop: 120,
+        paddingTop: '13.33%',
         background: theme.colors.background,
         boxSizing: 'border-box',
       }}

@@ -23,7 +23,7 @@ export function QuoteSlideView({ content, theme }: Props) {
         justifyContent: 'flex-start',
         alignItems: 'flex-start',
         padding: `${py}px ${px + 40}px`,
-        paddingTop: 160,
+        paddingTop: '17.78%',
         background: theme.colors.background,
         boxSizing: 'border-box',
         position: 'relative',
