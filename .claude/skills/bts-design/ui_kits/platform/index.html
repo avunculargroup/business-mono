@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>BTS Platform — UI Kit</title>
+<link rel="stylesheet" href="../../colors_and_type.css"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--color-bg); color: var(--color-text-primary); font-family: var(--font-body); }
+  body { min-height: 100vh; }
+  a { color: inherit; }
+  button { font-family: inherit; }
+  h1, h2, h3, h4 { margin: 0; }
+  p { margin: 0; }
+  ul, ol { margin: 0; }
+  #root { display: flex; min-height: 100vh; }
+  .main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-bg); }
+  .content-scroll { flex: 1; overflow-y: auto; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="Primitives.jsx"></script>
+<script type="text/babel" src="Shell.jsx"></script>
+<script type="text/babel" src="Surfaces.jsx"></script>
+<script type="text/babel" src="Screens.jsx"></script>
+
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const TITLES = {
+  dashboard: 'Dashboard',
+  activity: 'Agent activity',
+  crm: 'Contacts',
+  simon: 'Simon',
+  tasks: 'Tasks',
+  projects: 'Projects',
+  content: 'Content',
+  brand: 'Brand hub',
+  settings: 'Settings',
+};
+
+const INITIAL_ACTIVITIES = [
+  {
+    id: 'a1',
+    agent: 'Recorder',
+    prefix: 'Proposing 3 updates',
+    message: 'Following call with Marcus Chen (Dorian Trust Pty Ltd)',
+    trigger: '32-min phone call, 22 Mar 14:32',
+    status: 'pending',
+    timestamp: '2 min ago',
+    actions: [
+      { description: 'Log interaction summary to contact timeline', entity: 'Marcus Chen' },
+      { description: 'Update allocation attribute: 5–8% of excess cash', entity: 'Dorian Trust Pty Ltd' },
+      { description: 'Create task: send treasury primer by 24 Mar', entity: 'Marcus Chen' },
+    ],
+  },
+  {
+    id: 'a2',
+    agent: 'Content',
+    prefix: 'Proposing 1 update',
+    message: 'Q1 regulatory brief — draft ready for review',
+    trigger: 'Weekly content schedule',
+    status: 'pending',
+    timestamp: '18 min ago',
+    actions: [
+      { description: 'Move "Australian Treasury Q1 Outlook" from Draft → Review', entity: 'Content pipeline' },
+    ],
+  },
+  {
+    id: 'a3',
+    agent: 'PM',
+    prefix: 'Proposing 2 updates',
+    message: 'Aspen Super onboarding — prep pack assembled',
+    trigger: 'Project milestone reached',
+    status: 'approved',
+    timestamp: '1 hr ago',
+    actions: [
+      { description: 'Attach vendor shortlist PDF to project Aspen Super', entity: 'Aspen Super' },
+      { description: 'Mark milestone "Vendor review" as complete' },
+    ],
+  },
+  {
+    id: 'a4',
+    agent: 'Archivist',
+    prefix: 'Proposing 1 update',
+    message: 'Filed board pack v3 under Q2 2026',
+    trigger: 'Document uploaded to shared drive',
+    status: 'approved',
+    timestamp: '3 hr ago',
+    actions: [
+      { description: 'File Q2 board pack v3 under /Board/2026/Q2', entity: 'BTS internal' },
+    ],
+  },
+];
+
+function App() {
+  const [route, setRoute] = useState('dashboard');
+  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+  const [openContact, setOpenContact] = useState(null);
+
+  const pending = activities.filter(a => a.status === 'pending').length;
+
+  const setStatus = (id, status) => {
+    setActivities(list => list.map(a => a.id === id ? { ...a, status } : a));
+  };
+
+  const handleNav = (r) => { setOpenContact(null); setRoute(r); };
+
+  const headerActions = (
+    <>
+      <button aria-label="Search" style={{
+        width:36, height:36, border:'1px solid var(--color-border)', borderRadius:6,
+        background:'var(--color-surface)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+        color:'var(--color-text-secondary)',
+      }}><Icon name="search" size={16}/></button>
+      {route === 'crm' && <Button variant="primary"><Icon name="plus" size={16}/>Add contact</Button>}
+    </>
+  );
+
+  let body;
+  if (openContact) body = <ContactDetail contact={openContact} onBack={()=>setOpenContact(null)}/>;
+  else if (route === 'dashboard') body = <Dashboard activities={activities} onApprove={(id)=>setStatus(id,'approved')} onReject={(id)=>setStatus(id,'rejected')} onNav={handleNav}/>;
+  else if (route === 'activity' || route === 'simon') body = <AgentActivity activities={activities} onApprove={(id)=>setStatus(id,'approved')} onReject={(id)=>setStatus(id,'rejected')}/>;
+  else if (route === 'crm') body = <ContactsList onOpen={(c)=>setOpenContact(c)}/>;
+  else body = (
+    <div style={{padding:48}}>
+      <EmptyState icon="folder"
+        heading={`${TITLES[route]} — placeholder`}
+        sub="This surface isn't part of the UI kit recreation. Open Dashboard, Agent activity, or CRM to see wired screens."
+        cta={<Button variant="secondary" onClick={()=>handleNav('dashboard')}>Back to dashboard</Button>}/>
+    </div>
+  );
+
+  const title = openContact ? openContact.name : TITLES[route];
+
+  return (
+    <>
+      <Sidebar current={openContact ? 'crm' : route} onNav={handleNav} pending={pending}/>
+      <div className="main-col">
+        <PageHeader title={title} actions={headerActions}/>
+        <div className="content-scroll">{body}</div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
