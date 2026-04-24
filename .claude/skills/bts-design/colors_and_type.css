@@ -1,0 +1,136 @@
+/* ──────────────────────────────────────────────────────────────
+   BTS Design System — Colors & Type
+   Source: docs/DESIGN_BRIEF.md in avunculargroup/business-mono
+   ────────────────────────────────────────────────────────────── */
+
+/* Self-host webfonts (see /fonts) with Google CDN fallback */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Primitive colours ── */
+  --color-bg: #FAFAF8;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F4F4F1;
+  --color-border: #E8E6E0;
+  --color-text-primary: #1A1915;
+  --color-text-secondary: #6B6860;
+  --color-text-tertiary: #9E9C96;
+  --color-accent-base: #C9A84C;
+  --color-accent-light: #F0E4C0;
+  --color-accent-dark: #9A7A2E;
+  --color-success: #3D7A5E;
+  --color-warning: #B8860B;
+  --color-destructive: #B04040;
+
+  /* Extended stage chip colours (from DESIGN_BRIEF Pipeline Stage Chips) */
+  --color-stage-warm-bg: #FEF3C7;
+  --color-stage-warm-fg: #92400E;
+  --color-stage-client-bg: #E8F4EE;
+  --color-stage-client-fg: #1E5C3F;
+
+  /* ── Semantic colour aliases ── */
+  --color-accent: var(--color-accent-base);
+  --color-accent-hover: var(--color-accent-dark);
+  --color-accent-subtle: var(--color-accent-light);
+  --color-surface-hover: var(--color-surface-subtle);
+  --color-focus-ring: var(--color-accent-base);
+
+  /* ── Agent activity surfaces ── */
+  --color-agent-proposed: var(--color-accent-light);
+  --color-agent-approved: #E8F4EE;
+  --color-agent-rejected: #F8ECEC;
+  --color-agent-pending: var(--color-surface-subtle);
+
+  /* ── Typography stack ── */
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ── Type scale (base 16px) ── */
+  --text-xs: 11px;    /* caption, uppercase labels */
+  --text-sm: 13px;    /* small body, helper text */
+  --text-base: 15px;  /* body */
+  --text-md: 16px;    /* h3 card title */
+  --text-lg: 20px;    /* h2 section heading */
+  --text-xl: 28px;    /* h1 page title */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  /* ── Spacing (4px base) ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ── Layout ── */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 64px;
+  --content-max-width: 1200px;
+
+  /* ── Border radius ── */
+  --radius-sm: 4px;   /* badges, chips */
+  --radius-md: 6px;   /* inputs */
+  --radius-lg: 8px;   /* buttons */
+  --radius-xl: 12px;  /* cards, panels, modals */
+
+  /* ── Shadows — warm, not cool grey ── */
+  --shadow-sm: 0 1px 3px rgba(26, 25, 21, 0.06), 0 1px 2px rgba(26, 25, 21, 0.04);
+  --shadow-md: 0 4px 12px rgba(26, 25, 21, 0.08), 0 2px 4px rgba(26, 25, 21, 0.04);
+  --shadow-lg: 0 12px 32px rgba(26, 25, 21, 0.10), 0 4px 8px rgba(26, 25, 21, 0.06);
+
+  /* ── Motion ── */
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-default: ease;
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Z-index ── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-toast: 300;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Base typography — semantic element defaults
+   ────────────────────────────────────────────────────────────── */
+
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg);
+}
+
+h1 { font-family: var(--font-display); font-weight: 600; font-size: var(--text-xl); line-height: var(--leading-tight); }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: var(--text-lg); line-height: var(--leading-tight); }
+h3 { font-family: var(--font-body);    font-weight: 600; font-size: var(--text-md); line-height: var(--leading-tight); }
+h4 { font-family: var(--font-body);    font-weight: 600; font-size: 14px;            line-height: var(--leading-tight); }
+
+p          { font-size: var(--text-base); line-height: var(--leading-relaxed); }
+small      { font-size: var(--text-sm); }
+.caption   { font-size: var(--text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+code, .data, .mono { font-family: var(--font-mono); font-size: 14px; }
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-hover); }
+
+:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
