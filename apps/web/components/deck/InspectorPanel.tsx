@@ -66,8 +66,8 @@ export function InspectorPanel({
           <button type="button" className={styles.actionBtn} onClick={handleDuplicate} disabled={isPending} title="Duplicate slide">
             ⊕
           </button>
-          <button type="button" className={`${styles.actionBtn} ${styles.danger}`} onClick={handleDelete} disabled={isPending} title="Delete slide">
-            ✕
+          <button type="button" className={`${styles.actionBtn} ${styles.danger}`} onClick={handleDelete} disabled={isPending} title="Delete slide" aria-label="Delete slide">
+            <span>Delete</span>
           </button>
         </div>
       </div>

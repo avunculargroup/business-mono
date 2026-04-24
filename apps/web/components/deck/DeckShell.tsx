@@ -70,6 +70,12 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
     setSelectedId(remaining[0]?.id ?? null);
   }
 
+  function handleSlideDeletedFromList() {
+    const remaining = slides.filter((s) => s.id !== selectedId);
+    setSlides(remaining);
+    setSelectedId(remaining[0]?.id ?? null);
+  }
+
   function handleDuplicated(newId: string) {
     router.refresh();
     setSelectedId(newId);
@@ -95,6 +101,7 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
           theme={theme}
           onSelectSlide={setSelectedId}
           onSlidesReordered={setSlides}
+          onSlideDeleted={handleSlideDeletedFromList}
         />
       </div>
 
