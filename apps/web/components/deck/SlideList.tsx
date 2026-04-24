@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -42,6 +42,7 @@ function SortableSlide({
   onClick,
   deckId,
   onDelete,
+  thumbnailWidth,
 }: {
   slide: DeckSlideRow;
   index: number;
@@ -50,6 +51,7 @@ function SortableSlide({
   onClick: () => void;
   deckId: string;
   onDelete: () => void;
+  thumbnailWidth: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slide.id });
   const [isPending, startTransition] = useTransition();
@@ -79,7 +81,7 @@ function SortableSlide({
       <SlideThumbnail
         slide={parsed}
         theme={theme}
-        thumbnailWidth={160}
+        thumbnailWidth={thumbnailWidth}
         isSelected={isSelected}
         slideNumber={index + 1}
         onClick={onClick}
@@ -88,6 +90,10 @@ function SortableSlide({
     </div>
   );
 }
+
+const MOBILE_BREAKPOINT = 768;
+const MOBILE_LIST_PADDING = 20; // matches --space-5 (20px each side)
+const DESKTOP_THUMBNAIL_WIDTH = 160;
 
 export function SlideList({
   deckId,
@@ -100,6 +106,24 @@ export function SlideList({
 }: SlideListProps) {
   const [localSlides, setLocalSlides] = useState(slides);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const listRef = useRef<HTMLDivElement>(null);
+  const [thumbnailWidth, setThumbnailWidth] = useState(DESKTOP_THUMBNAIL_WIDTH);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const update = () => {
+      if (window.innerWidth <= MOBILE_BREAKPOINT) {
+        setThumbnailWidth(el.offsetWidth - MOBILE_LIST_PADDING * 2);
+      } else {
+        setThumbnailWidth(DESKTOP_THUMBNAIL_WIDTH);
+      }
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => ro.disconnect();
+  }, []);
 
   // Sync external changes (e.g. after add/delete)
   if (slides !== localSlides && slides.length !== localSlides.length) {
@@ -128,7 +152,7 @@ export function SlideList({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={localSlides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-        <div className={styles.list}>
+        <div className={styles.list} ref={listRef}>
           {localSlides.map((slide, i) => (
             <SortableSlide
               key={slide.id}
@@ -139,6 +163,7 @@ export function SlideList({
               onClick={() => onSelectSlide(slide.id)}
               deckId={deckId}
               onDelete={() => handleSlideDeleted(slide.id)}
+              thumbnailWidth={thumbnailWidth}
             />
           ))}
         </div>
