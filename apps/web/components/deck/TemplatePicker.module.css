@@ -17,6 +17,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  max-width: 90vw;
 }
 
 .header {
@@ -77,4 +78,35 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    width: 100%;
+    max-width: 95vw;
+    max-height: 90vh;
+    border-radius: var(--radius-md);
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .header {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .card {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .cardLabel {
+    font-size: var(--text-sm);
+  }
+
+  .cardDesc {
+    font-size: var(--text-xs);
+  }
 }

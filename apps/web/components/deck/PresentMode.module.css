@@ -30,7 +30,7 @@
 
 .controls {
   position: fixed;
-  bottom: 32px;
+  bottom: calc(32px + var(--safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -91,4 +91,21 @@
   height: 100%;
   background: rgba(255,255,255,0.5);
   transition: width 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .navBtn {
+    font-size: 24px;
+    padding: 0 2px;
+  }
+
+  .controls {
+    padding: 6px 16px;
+    gap: 12px;
+  }
+
+  .counter {
+    font-size: 12px;
+    min-width: 48px;
+  }
 }
