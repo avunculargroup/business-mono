@@ -20,7 +20,7 @@ export function AgendaSlideView({ content, theme }: Props) {
         display: 'flex',
         flexDirection: 'column',
         padding: `${py}px ${px}px`,
-        paddingTop: 240,
+        paddingTop: '26.67%',
         background: theme.colors.background,
         boxSizing: 'border-box',
       }}

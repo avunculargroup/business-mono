@@ -24,7 +24,7 @@ export function SectionSlideView({ content, theme }: Props) {
         padding: `${py}px ${px}px`,
         background: theme.colors.primary,
         boxSizing: 'border-box',
-        paddingTop: 240,
+        paddingTop: '26.67%',
       }}
     >
       {content.sectionNumber && (
