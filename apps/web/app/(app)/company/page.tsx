@@ -1,11 +1,13 @@
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CompanyView } from '@/components/company/CompanyView';
-import { getCompanyRecords, getCompanyRecordTypes, getCompanyAssetUrl } from '@/app/actions/company';
+import { getCompanyRecords, getCompanyRecordTypes, getCompanyAssetUrl, getDomains, getSubscriptions } from '@/app/actions/company';
 
 export default async function CompanyPage() {
-  const [records, recordTypes] = await Promise.all([
+  const [records, recordTypes, domains, subscriptions] = await Promise.all([
     getCompanyRecords(),
     getCompanyRecordTypes(),
+    getDomains(),
+    getSubscriptions(),
   ]);
 
   const signedUrls: Record<string, string> = {};
@@ -21,7 +23,13 @@ export default async function CompanyPage() {
   return (
     <>
       <PageHeader title="Company" />
-      <CompanyView records={records} recordTypes={recordTypes} signedUrls={signedUrls} />
+      <CompanyView
+        records={records}
+        recordTypes={recordTypes}
+        signedUrls={signedUrls}
+        initialDomains={domains}
+        initialSubscriptions={subscriptions}
+      />
     </>
   );
 }

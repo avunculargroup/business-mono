@@ -7,11 +7,13 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CompanyHero } from './CompanyHero';
 import { CompanyCategory } from './CompanyCategory';
 import { CompanyRecordForm } from './CompanyRecordForm';
+import { DomainsSection } from './DomainsSection';
+import { SubscriptionsSection } from './SubscriptionsSection';
 import { deleteCompanyRecord } from '@/app/actions/company';
 import { useToast } from '@/providers/ToastProvider';
 import { useRouter } from 'next/navigation';
 import { Building2, Plus } from 'lucide-react';
-import type { CompanyRecord, CompanyRecordType } from '@platform/shared';
+import type { CompanyRecord, CompanyRecordType, CompanyDomain, CompanySubscription } from '@platform/shared';
 import styles from './CompanyView.module.css';
 
 const CATEGORY_ORDER = ['Legal', 'Identity', 'Content', 'Documents', 'Custom'];
@@ -20,9 +22,11 @@ interface CompanyViewProps {
   records: CompanyRecord[];
   recordTypes: CompanyRecordType[];
   signedUrls: Record<string, string>;
+  initialDomains: CompanyDomain[];
+  initialSubscriptions: CompanySubscription[];
 }
 
-export function CompanyView({ records, recordTypes: initialTypes, signedUrls }: CompanyViewProps) {
+export function CompanyView({ records, recordTypes: initialTypes, signedUrls, initialDomains, initialSubscriptions }: CompanyViewProps) {
   const router = useRouter();
   const { success, error } = useToast();
 
@@ -122,6 +126,9 @@ export function CompanyView({ records, recordTypes: initialTypes, signedUrls }: 
           ))}
         </>
       )}
+
+      <DomainsSection initialDomains={initialDomains} />
+      <SubscriptionsSection initialSubscriptions={initialSubscriptions} />
 
       <CompanyRecordForm
         open={showForm}

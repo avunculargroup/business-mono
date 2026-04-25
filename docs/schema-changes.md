@@ -6,6 +6,30 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-25 — Company Domains and Subscriptions
+
+Adds two tables for tracking BTS's own operational data on the `/company` page. These are **not** CRM tables — they hold BTS-internal records rather than client company data, following the same pattern as `company_records` (no `company_id` FK; implicitly scoped to the single BTS organisation).
+
+- **`company_domains` table** — stores domain registrations owned by BTS: `name`, `provider`, `renewal_date`, `notes`. Separate table (not JSONB on `companies`) because `renewal_date` is time-sensitive data that warrants a dedicated index for future expiry queries. Index on `renewal_date`.
+
+- **`company_subscriptions` table** — stores SaaS accounts and service subscriptions: `business`, `website`, `service_type`, `payment_type` (`free | paid | trial`), `expiry`, `account_email`, `notes`. Same reasoning: `expiry` benefits from a dedicated index. Index on `expiry`.
+
+Migration: `20260425000000_add_company_domains_and_subscriptions.sql`
+
+---
+
+## 2026-04-24 — Company Records
+
+Adds a flexible key-value record system for BTS's own company data (logo, legal name, mission, etc.), managed via the `/company` page.
+
+- **`company_record_types` table** — catalogue of record types (built-in + custom). `content_type` constrains to `text | markdown | image | file`. `is_singleton` prevents duplicate records for types like `logo` or `legal_name`. `is_builtin` marks platform-defined types that cannot be deleted.
+
+- **`company_records` table** — the actual data rows, each linked to a type via `type_key`. Text/markdown stored in `value`; files/images stored in Supabase Storage with `storage_path`, `filename`, `mime_type`. `is_pinned` surfaces records at the top of the company page. `display_order` controls card ordering within a category.
+
+Migration: `20260424000000_add_company_records.sql`
+
+---
+
 ## 2026-04-22 — Slide Builder
 
 Adds the browser-first slide authoring tool so directors can create presentation decks without leaving the platform.
