@@ -103,6 +103,9 @@ export function DomainsSection({ initialDomains }: DomainsSectionProps) {
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.value }));
 
+  const setDomainName = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, name: e.target.value.toLowerCase() }));
+
   return (
     <section className={styles.section}>
       <div className={styles.header}>
@@ -174,7 +177,7 @@ export function DomainsSection({ initialDomains }: DomainsSectionProps) {
               type="text"
               placeholder="btcsolutions.com"
               value={form.name}
-              onChange={set('name')}
+              onChange={setDomainName}
             />
           </div>
           <div className={styles.field}>
