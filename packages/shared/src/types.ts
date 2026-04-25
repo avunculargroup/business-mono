@@ -861,3 +861,36 @@ export interface CompanyRecord {
   updated_at: string;
   type?: CompanyRecordType;
 }
+
+// ============================================================
+// Company Domains
+// ============================================================
+
+export interface CompanyDomain {
+  id: string;
+  name: string;
+  provider: string | null;
+  renewal_date: string | null; // ISO date yyyy-mm-dd
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Company Subscriptions
+// ============================================================
+
+export type SubscriptionPaymentType = 'free' | 'paid' | 'trial';
+
+export interface CompanySubscription {
+  id: string;
+  business: string;
+  website: string | null;
+  service_type: string | null;
+  payment_type: SubscriptionPaymentType | null;
+  expiry: string | null; // ISO date yyyy-mm-dd
+  account_email: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
