@@ -13,10 +13,12 @@ export interface SlideTheme {
     accent: string;
     border: string;
     accentLight: string;
+    negative: string;
   };
   fonts: {
     display: string;
     body: string;
+    mono: string;
   };
   radii: {
     card: string;
@@ -28,18 +30,20 @@ export const companyTheme: SlideTheme = {
   id: 'company-default',
   colors: {
     background: '#FFFFFF',
-    surface: '#F7F7F7',
-    text: '#111111',
-    mutedText: '#555555',
-    primary: '#1A1A1A',
-    secondary: '#444444',
-    accent: '#C9A84C',      // BTS gold as accent highlight only
-    accentLight: '#F5EDD4',
-    border: '#E0E0E0',
+    surface: '#FAFAF8',       // tint — used as background on title/agenda/quote/closing slides
+    text: '#1A1915',          // ink
+    mutedText: '#6B6860',     // muted
+    primary: '#1A1915',       // ink
+    secondary: '#6B6860',     // muted
+    accent: '#9A7A2E',        // gold
+    accentLight: '#F0E4C0',   // gold-light
+    border: '#E5E1D6',        // line
+    negative: '#B04040',      // negative KPI delta
   },
   fonts: {
-    display: "'Georgia', 'Times New Roman', serif",
-    body: "'Inter', 'Helvetica Neue', sans-serif",
+    display: "'Playfair Display', Georgia, 'Times New Roman', serif",
+    body: "'DM Sans', system-ui, sans-serif",
+    mono: "'JetBrains Mono', ui-monospace, monospace",
   },
   radii: {
     card: '8px',

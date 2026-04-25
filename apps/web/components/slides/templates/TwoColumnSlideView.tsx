@@ -1,110 +1,117 @@
 import type { z } from 'zod';
 import type { TwoColumnContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
-import { SLIDE_PADDING } from '@/lib/decks/theme';
-import { RichTextBlock } from '../primitives/RichTextBlock';
+import { Folio } from '../primitives/Folio';
+import { Eyebrow } from '../primitives/Eyebrow';
 
 interface Props {
   content: z.infer<typeof TwoColumnContent>;
   theme: SlideTheme;
+  slideIndex?: number;
+  slideCount?: number;
+  deckLabel?: string;
 }
 
-export function TwoColumnSlideView({ content, theme }: Props) {
-  const px = SLIDE_PADDING.x;
-  const py = SLIDE_PADDING.y;
-
+export function TwoColumnSlideView({ content, theme, slideIndex, slideCount, deckLabel }: Props) {
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: `${py}px ${px}px`,
-        paddingTop: '13.33%',
-        background: theme.colors.background,
-        boxSizing: 'border-box',
-      }}
-    >
-      {content.title ? (
-        <RichTextBlock
-          html={content.title}
-          style={{
+    <div style={{ width: '100%', height: '100%', background: '#FFFFFF', position: 'relative', boxSizing: 'border-box' }}>
+      <Folio theme={theme} label={deckLabel ?? '—'} slideIndex={slideIndex} slideCount={slideCount} />
+
+      {/* Title area */}
+      <div style={{ position: 'absolute', left: 80, right: 80, top: 140 }}>
+        <Eyebrow theme={theme} gold>The argument</Eyebrow>
+        <h2 style={{
+          fontFamily: theme.fonts.display,
+          fontWeight: 700,
+          fontSize: 64,
+          lineHeight: 1.05,
+          letterSpacing: '-0.02em',
+          color: theme.colors.primary,
+          margin: '20px 0 0',
+          maxWidth: 1100,
+        }}>
+          {content.title || 'Two Columns'}
+        </h2>
+      </div>
+
+      {/* Two-column body */}
+      <div style={{
+        position: 'absolute',
+        left: 80,
+        right: 80,
+        top: 380,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 0,
+      }}>
+        {/* Left: conventional view */}
+        <div style={{ padding: '0 56px 0 0', borderRight: `1px solid ${theme.colors.border}` }}>
+          <div style={{
+            fontFamily: theme.fonts.mono,
+            fontSize: 12,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: theme.colors.mutedText,
+            marginBottom: 14,
+          }}>
+            — the conventional view
+          </div>
+          <h3 style={{
             fontFamily: theme.fonts.display,
-            fontSize: 44,
-            fontWeight: 700,
+            fontWeight: 600,
+            fontSize: 32,
+            fontStyle: 'italic',
+            lineHeight: 1.2,
             color: theme.colors.primary,
-            marginBottom: 40,
-            maxWidth: 1440,
-            width: '100%',
-          }}
-        />
-      ) : (
-        <div style={{ fontSize: 44, fontWeight: 700, color: theme.colors.border, marginBottom: 40, maxWidth: 1440 }}>
-          Slide Title
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flex: 1, gap: 48 }}>
-        {/* Left column */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            borderRight: `1px solid ${theme.colors.border}`,
-            paddingRight: 48,
-          }}
-        >
-          {content.leftHeading && (
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 700,
-                color: theme.colors.accent,
-                fontFamily: theme.fonts.body,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {content.leftHeading}
-            </div>
-          )}
-          {content.leftBody ? (
-            <RichTextBlock
-              html={content.leftBody}
-              style={{ fontSize: 22, lineHeight: 1.6, color: theme.colors.text, fontFamily: theme.fonts.body }}
-            />
-          ) : (
-            <div style={{ fontSize: 22, color: theme.colors.border }}>Left column content</div>
-          )}
+            margin: '0 0 20px',
+          }}>
+            {content.leftHeading || 'Conventional approach'}
+          </h3>
+          <p style={{
+            fontFamily: theme.fonts.body,
+            fontSize: 22,
+            lineHeight: 1.55,
+            color: theme.colors.mutedText,
+            margin: 0,
+            maxWidth: 620,
+          }}>
+            {content.leftBody || ''}
+          </p>
         </div>
 
-        {/* Right column */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {content.rightHeading && (
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 700,
-                color: theme.colors.accent,
-                fontFamily: theme.fonts.body,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {content.rightHeading}
-            </div>
-          )}
-          {content.rightBody ? (
-            <RichTextBlock
-              html={content.rightBody}
-              style={{ fontSize: 22, lineHeight: 1.6, color: theme.colors.text, fontFamily: theme.fonts.body }}
-            />
-          ) : (
-            <div style={{ fontSize: 22, color: theme.colors.border }}>Right column content</div>
-          )}
+        {/* Right: our position */}
+        <div style={{ padding: '0 0 0 56px' }}>
+          <div style={{
+            fontFamily: theme.fonts.mono,
+            fontSize: 12,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: theme.colors.accent,
+            marginBottom: 14,
+          }}>
+            — our position
+          </div>
+          <h3 style={{
+            fontFamily: theme.fonts.display,
+            fontWeight: 600,
+            fontSize: 32,
+            fontStyle: 'normal',
+            lineHeight: 1.2,
+            color: theme.colors.primary,
+            margin: '0 0 20px',
+          }}>
+            {content.rightHeading || 'Our approach'}
+          </h3>
+          <p style={{
+            fontFamily: theme.fonts.body,
+            fontSize: 22,
+            lineHeight: 1.55,
+            color: theme.colors.primary,
+            margin: 0,
+            maxWidth: 620,
+          }}>
+            {content.rightBody || ''}
+          </p>
         </div>
       </div>
     </div>

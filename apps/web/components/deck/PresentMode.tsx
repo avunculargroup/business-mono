@@ -73,7 +73,7 @@ export function PresentMode({ deck, slides }: PresentModeProps) {
         >
           <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: SLIDE_WIDTH, height: SLIDE_HEIGHT }}>
             <SlideFrame theme={theme}>
-              <SlideView slide={parsed} theme={theme} />
+              <SlideView slide={parsed} theme={theme} slideIndex={currentIndex + 1} slideCount={total} deckLabel={deck.title} />
             </SlideFrame>
           </div>
         </div>

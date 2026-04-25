@@ -1,104 +1,110 @@
 import type { z } from 'zod';
 import type { ClosingContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
-import { SLIDE_PADDING } from '@/lib/decks/theme';
-import { RichTextBlock } from '../primitives/RichTextBlock';
+import { Folio } from '../primitives/Folio';
+import { Eyebrow } from '../primitives/Eyebrow';
 
 interface Props {
   content: z.infer<typeof ClosingContent>;
   theme: SlideTheme;
+  slideIndex?: number;
+  slideCount?: number;
+  deckLabel?: string;
 }
 
-export function ClosingSlideView({ content, theme }: Props) {
-  const px = SLIDE_PADDING.x;
-  const py = SLIDE_PADDING.y;
-
+export function ClosingSlideView({ content, theme, slideIndex, slideCount }: Props) {
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: `${py}px ${px}px`,
-        background: theme.colors.primary,
-        boxSizing: 'border-box',
-        position: 'relative',
-      }}
-    >
-      {/* Top accent bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 6,
-          background: theme.colors.accent,
-        }}
-      />
+    <div style={{ width: '100%', height: '100%', background: '#FFFFFF', position: 'relative', boxSizing: 'border-box' }}>
+      <Folio theme={theme} label="Thank you" slideIndex={slideIndex} slideCount={slideCount} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        {content.headline ? (
-          <RichTextBlock
-            html={content.headline}
-            style={{
-              fontFamily: theme.fonts.display,
-              fontSize: 64,
-              fontWeight: 700,
-              color: '#FFFFFF',
-              lineHeight: 1.2,
-              marginBottom: 24,
-              maxWidth: 1440,
-              width: '100%',
-            }}
-          />
-        ) : (
-          <div style={{ fontSize: 64, fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: 24, maxWidth: 1440 }}>
-            Thank You
-          </div>
-        )}
-
+      {/* Body */}
+      <div style={{ position: 'absolute', left: 80, right: 80, top: 220 }}>
+        <Eyebrow theme={theme} gold>Next steps</Eyebrow>
+        <h2 style={{
+          fontFamily: theme.fonts.display,
+          fontWeight: 700,
+          fontSize: 96,
+          lineHeight: 1.02,
+          letterSpacing: '-0.02em',
+          color: theme.colors.primary,
+          margin: '24px 0 0',
+          maxWidth: 1280,
+        }}>
+          {content.headline || 'Thank You'}
+        </h2>
         {content.subheadline && (
-          <div style={{ fontSize: 28, color: 'rgba(255,255,255,0.7)', fontFamily: theme.fonts.body, marginBottom: 48, maxWidth: 1440, width: '100%' }}>
+          <p style={{
+            fontFamily: theme.fonts.display,
+            fontStyle: 'italic',
+            fontSize: 28,
+            lineHeight: 1.4,
+            color: theme.colors.mutedText,
+            marginTop: 28,
+            maxWidth: 1080,
+          }}>
             {content.subheadline}
-          </div>
+          </p>
         )}
-
         {content.cta && (
-          <div
-            style={{
-              display: 'inline-block',
-              fontSize: 24,
-              fontWeight: 700,
-              color: theme.colors.accent,
-              padding: '14px 32px',
-              border: `2px solid ${theme.colors.accent}`,
-              borderRadius: theme.radii.chip,
-              fontFamily: theme.fonts.body,
-              alignSelf: 'flex-start',
-            }}
-          >
-            {content.cta}
+          <div style={{
+            display: 'inline-block',
+            marginTop: 40,
+            fontFamily: theme.fonts.body,
+            fontSize: 18,
+            fontWeight: 600,
+            color: theme.colors.primary,
+            padding: '14px 24px',
+            background: theme.colors.accentLight,
+            border: `1px solid ${theme.colors.accent}`,
+            letterSpacing: '0.02em',
+          }}>
+            {content.cta} →
           </div>
         )}
       </div>
 
-      {(content.contactEmail || content.contactPhone) && (
-        <div style={{ display: 'flex', gap: 40 }}>
+      {/* Footer */}
+      <div style={{
+        position: 'absolute',
+        left: 80,
+        right: 80,
+        bottom: 64,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        borderTop: `1px solid ${theme.colors.border}`,
+        paddingTop: 24,
+      }}>
+        <div style={{ display: 'flex', gap: 56 }}>
           {content.contactEmail && (
-            <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.6)', fontFamily: theme.fonts.body }}>
-              {content.contactEmail}
+            <div>
+              <div style={{ fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: theme.colors.mutedText, marginBottom: 6 }}>
+                Email
+              </div>
+              <div style={{ fontFamily: theme.fonts.body, fontSize: 18, color: theme.colors.primary }}>
+                {content.contactEmail}
+              </div>
             </div>
           )}
           {content.contactPhone && (
-            <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.6)', fontFamily: theme.fonts.body }}>
-              {content.contactPhone}
+            <div>
+              <div style={{ fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: theme.colors.mutedText, marginBottom: 6 }}>
+                Phone
+              </div>
+              <div style={{ fontFamily: theme.fonts.body, fontSize: 18, color: theme.colors.primary }}>
+                {content.contactPhone}
+              </div>
             </div>
           )}
         </div>
-      )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bts-logo.svg" width={32} height={32} alt="BTS" style={{ display: 'block' }} />
+          <div style={{ fontFamily: theme.fonts.display, fontSize: 20, fontWeight: 600, color: theme.colors.primary, letterSpacing: '0.04em' }}>
+            BTS
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
