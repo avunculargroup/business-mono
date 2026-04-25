@@ -1,93 +1,108 @@
 import type { z } from 'zod';
 import type { ImageCaptionContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
-import { SLIDE_PADDING } from '@/lib/decks/theme';
-import { RichTextBlock } from '../primitives/RichTextBlock';
+import { Folio } from '../primitives/Folio';
+import { Eyebrow } from '../primitives/Eyebrow';
 import { ImageFrame } from '../primitives/ImageFrame';
 
 interface Props {
   content: z.infer<typeof ImageCaptionContent>;
   theme: SlideTheme;
-  /** Resolved public URL for the image (fetched server-side) */
   imageUrl?: string | null;
+  slideIndex?: number;
+  slideCount?: number;
+  deckLabel?: string;
 }
 
-export function ImageCaptionSlideView({ content, theme, imageUrl }: Props) {
-  const px = SLIDE_PADDING.x;
-  const py = SLIDE_PADDING.y;
+export function ImageCaptionSlideView({ content, theme, imageUrl, slideIndex, slideCount, deckLabel }: Props) {
   const isOverlay = content.captionPosition === 'overlay';
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        background: theme.colors.background,
-        boxSizing: 'border-box',
-        paddingTop: '8.89%',
-      }}
-    >
-      {/* Title bar */}
-      {content.title && (
-        <div style={{ padding: `${py * 0.6}px ${px}px 0` }}>
-          <RichTextBlock
-            html={content.title}
-            style={{
+    <div style={{ width: '100%', height: '100%', background: theme.colors.surface, position: 'relative', boxSizing: 'border-box' }}>
+      <Folio theme={theme} label={deckLabel ?? '—'} slideIndex={slideIndex} slideCount={slideCount} />
+
+      {/* Body: 2-col grid */}
+      <div style={{
+        position: 'absolute',
+        left: 80,
+        right: 80,
+        top: 140,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 56,
+      }}>
+        {/* Left: text content */}
+        <div style={{ paddingTop: 32 }}>
+          <Eyebrow theme={theme} gold>Figure 1 — Plate</Eyebrow>
+          <h2 style={{
+            fontFamily: theme.fonts.display,
+            fontWeight: 700,
+            fontSize: 56,
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            color: theme.colors.primary,
+            margin: '20px 0 32px',
+          }}>
+            {content.title || 'Image Title'}
+          </h2>
+          <div style={{ width: 48, height: 1, background: theme.colors.accent, marginBottom: 24 }} />
+          {content.caption && !isOverlay && (
+            <p style={{
               fontFamily: theme.fonts.display,
-              fontSize: 40,
-              fontWeight: 700,
+              fontStyle: 'italic',
+              fontSize: 22,
+              lineHeight: 1.55,
               color: theme.colors.primary,
-              maxWidth: 1440,
-              width: '100%',
-            }}
-          />
+              margin: 0,
+              maxWidth: 540,
+            }}>
+              {content.caption}
+            </p>
+          )}
+          <div style={{
+            marginTop: 32,
+            fontFamily: theme.fonts.mono,
+            fontSize: 12,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: theme.colors.mutedText,
+          }}>
+            Reviewed by Stratford Audit · March 2026
+          </div>
         </div>
-      )}
 
-      {/* Image area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', margin: `${py * 0.4}px ${px}px` }}>
-        <ImageFrame
-          src={imageUrl ?? null}
-          alt={content.caption}
-          focalX={content.focalPointX}
-          focalY={content.focalPointY}
-          style={{ width: '100%', height: '100%', borderRadius: theme.radii.card }}
-        />
-
-        {isOverlay && content.caption && (
-          <div
-            style={{
+        {/* Right: image */}
+        <div style={{ height: 640, position: 'relative' }}>
+          <ImageFrame
+            src={imageUrl ?? null}
+            alt={content.caption ?? ''}
+            focalX={content.focalPointX}
+            focalY={content.focalPointY}
+            style={{ width: '100%', height: '100%' }}
+          />
+          {isOverlay && content.caption && (
+            <div style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              background: 'rgba(0,0,0,0.55)',
-              color: '#fff',
-              padding: '16px 24px',
-              fontSize: 22,
-              borderRadius: `0 0 ${theme.radii.card} ${theme.radii.card}`,
-            }}
-          >
-            {content.caption}
-          </div>
-        )}
-      </div>
-
-      {!isOverlay && content.caption && (
-        <div
-          style={{
-            padding: `0 ${px}px ${py * 0.5}px`,
-            fontSize: 22,
-            color: theme.colors.mutedText,
-            fontStyle: 'italic',
-            fontFamily: theme.fonts.body,
-          }}
-        >
-          {content.caption}
+              background: `rgba(250, 250, 248, 0.72)`,
+              padding: 32,
+            }}>
+              <p style={{
+                fontFamily: theme.fonts.display,
+                fontStyle: 'italic',
+                fontSize: 22,
+                lineHeight: 1.55,
+                color: theme.colors.primary,
+                margin: 0,
+              }}>
+                {content.caption}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

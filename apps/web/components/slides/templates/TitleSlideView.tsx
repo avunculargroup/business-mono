@@ -1,90 +1,102 @@
 import type { z } from 'zod';
 import type { TitleContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
-import { SLIDE_PADDING } from '@/lib/decks/theme';
-import { RichTextBlock } from '../primitives/RichTextBlock';
+import { Folio } from '../primitives/Folio';
+import { Eyebrow } from '../primitives/Eyebrow';
 
 interface Props {
   content: z.infer<typeof TitleContent>;
   theme: SlideTheme;
+  slideIndex?: number;
+  slideCount?: number;
+  deckLabel?: string;
 }
 
-export function TitleSlideView({ content, theme }: Props) {
-  const px = SLIDE_PADDING.x;
-  const py = SLIDE_PADDING.y;
+export function TitleSlideView({ content, theme, slideIndex, slideCount, deckLabel }: Props) {
+  const headline = content.headline
+    ? content.headline.replace(/\.?\s*$/, '') + '.'
+    : 'Presentation Title.';
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
+    <div style={{ width: '100%', height: '100%', background: theme.colors.surface, position: 'relative', boxSizing: 'border-box' }}>
+      <Folio theme={theme} label={deckLabel ?? 'BTS · Strategy Review'} slideIndex={slideIndex} slideCount={slideCount} />
+
+      {/* Body block */}
+      <div style={{
+        position: 'absolute',
+        left: 80,
+        right: 80,
+        top: 220,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'flex-start',
-        padding: `${py}px ${px}px`,
-        background: theme.colors.background,
-        boxSizing: 'border-box',
-        position: 'relative',
-        paddingTop: '26.67%',
-      }}
-    >
-      {/* Accent bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: 8,
-          height: '100%',
-          background: theme.colors.accent,
-        }}
-      />
-
-      {content.headline ? (
-        <RichTextBlock
-          html={content.headline}
-          style={{
+        gap: 36,
+      }}>
+        <Eyebrow theme={theme} gold>The Quarterly Review</Eyebrow>
+        <h1 style={{
+          fontFamily: theme.fonts.display,
+          fontWeight: 700,
+          fontSize: 116,
+          lineHeight: 1.02,
+          letterSpacing: '-0.02em',
+          color: theme.colors.primary,
+          margin: 0,
+          maxWidth: 1280,
+        }}>
+          {headline}
+        </h1>
+        {content.subheadline && (
+          <div style={{
             fontFamily: theme.fonts.display,
-            fontSize: 72,
-            fontWeight: 700,
-            color: theme.colors.primary,
-            lineHeight: 1.15,
-            marginBottom: 24,
-            maxWidth: 1440,
-            width: '100%',
-          }}
-        />
-      ) : (
-        <div style={{ fontSize: 72, fontWeight: 700, color: theme.colors.border, marginBottom: 24, maxWidth: 1440 }}>
-          Presentation Title
-        </div>
-      )}
-
-      {content.subheadline && (
-        <div
-          style={{
+            fontStyle: 'italic',
             fontSize: 32,
+            lineHeight: 1.35,
             color: theme.colors.mutedText,
-            marginBottom: 48,
-            fontFamily: theme.fonts.body,
-            maxWidth: 1440,
-            width: '100%',
-          }}
-        >
-          {content.subheadline}
-        </div>
-      )}
+            maxWidth: 1100,
+          }}>
+            {content.subheadline}
+          </div>
+        )}
+      </div>
 
-      <div style={{ display: 'flex', gap: 32, alignItems: 'center', marginTop: 'auto' }}>
-        {content.presenter && (
-          <div style={{ fontSize: 20, color: theme.colors.secondary }}>{content.presenter}</div>
-        )}
-        {content.presenter && content.date && (
-          <div style={{ width: 1, height: 20, background: theme.colors.border }} />
-        )}
-        {content.date && (
-          <div style={{ fontSize: 20, color: theme.colors.mutedText }}>{content.date}</div>
-        )}
+      {/* Bottom footer */}
+      <div style={{
+        position: 'absolute',
+        left: 80,
+        right: 80,
+        bottom: 64,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+      }}>
+        <div style={{ display: 'flex', gap: 56 }}>
+          {content.presenter && (
+            <div>
+              <div style={{ fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: theme.colors.mutedText, marginBottom: 6 }}>
+                Presented by
+              </div>
+              <div style={{ fontFamily: theme.fonts.body, fontSize: 20, fontWeight: 500, color: theme.colors.primary }}>
+                {content.presenter}
+              </div>
+            </div>
+          )}
+          {content.date && (
+            <div>
+              <div style={{ fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: theme.colors.mutedText, marginBottom: 6 }}>
+                Date
+              </div>
+              <div style={{ fontFamily: theme.fonts.body, fontSize: 20, fontWeight: 500, color: theme.colors.primary }}>
+                {content.date}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bts-logo.svg" width={44} height={44} alt="BTS" style={{ display: 'block' }} />
+          <div style={{ fontFamily: theme.fonts.display, fontSize: 22, fontWeight: 600, color: theme.colors.primary, letterSpacing: '0.04em' }}>
+            Bitcoin Treasury Solutions
+          </div>
+        </div>
       </div>
     </div>
   );

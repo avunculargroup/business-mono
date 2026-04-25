@@ -34,6 +34,8 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
   const parsedSelected: Slide | null = selectedSlide ? parseSlideContent(selectedSlide) : null;
+  const slideIndex = selectedId ? slides.findIndex((s) => s.id === selectedId) + 1 : 1;
+  const slideCount = slides.length;
 
   // Compute scale to fit slide in available stage width
   const stageRef = useCallback((node: HTMLDivElement | null) => {
@@ -122,7 +124,7 @@ export function DeckShell({ deck, initialSlides }: DeckShellProps) {
           >
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: SLIDE_WIDTH, height: SLIDE_HEIGHT }}>
               <SlideFrame theme={theme}>
-                <SlideView slide={parsedSelected} theme={theme} />
+                <SlideView slide={parsedSelected} theme={theme} slideIndex={slideIndex} slideCount={slideCount} deckLabel={deck.title} />
               </SlideFrame>
             </div>
           </div>
