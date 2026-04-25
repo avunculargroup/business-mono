@@ -822,3 +822,42 @@ export const DECK_STATUS_LABELS: Record<DeckStatus, string> = {
   published: 'Published',
   archived: 'Archived',
 };
+
+// ============================================================
+// Company Records
+// ============================================================
+
+export type CompanyContentType = 'text' | 'markdown' | 'image' | 'file';
+
+export const COMPANY_CONTENT_TYPE_LABELS: Record<CompanyContentType, string> = {
+  text:     'Text',
+  markdown: 'Rich Text',
+  image:    'Image',
+  file:     'File',
+};
+
+export interface CompanyRecordType {
+  key: string;
+  label: string;
+  content_type: CompanyContentType;
+  category: string;
+  is_singleton: boolean;
+  is_builtin: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface CompanyRecord {
+  id: string;
+  type_key: string;
+  value: string | null;
+  storage_path: string | null;
+  filename: string | null;
+  mime_type: string | null;
+  is_pinned: boolean;
+  display_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  type?: CompanyRecordType;
+}
