@@ -138,12 +138,9 @@ export function CompanyRecordForm({
         return;
       }
       const supabase = createClient();
-      const { error: uploadError } = await supabase.storage.uploadToSignedUrl(
-        'company-assets',
-        urlResult.signedUrl,
-        file,
-        { contentType: file.type },
-      );
+      const { error: uploadError } = await supabase.storage
+        .from('company-assets')
+        .uploadToSignedUrl(urlResult.path, urlResult.signedUrl, file);
       if (uploadError) {
         error(uploadError.message);
         setSaving(false);
