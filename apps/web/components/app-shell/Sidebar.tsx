@@ -12,6 +12,7 @@ import {
   FileText,
   Activity,
   Bookmark,
+  Building2,
   Settings,
   LogOut,
   MoreHorizontal,
@@ -56,7 +57,8 @@ const workNav = [
 
 const systemNav = [
   { href: '/activity', label: 'Agent Activity', icon: Activity },
-  { href: '/brand', label: 'Brand Hub', icon: Bookmark },
+  { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
+  { href: '/company',  label: 'Company',         icon: Building2 },
 ];
 
 interface MoreNavChild {
@@ -106,6 +108,7 @@ const moreNav: MoreNavSection[] = [
     items: [
       { href: '/activity', label: 'Agent Activity', icon: Activity },
       { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
+      { href: '/company',  label: 'Company',         icon: Building2 },
       { href: '/settings', label: 'Settings',       icon: Settings },
     ],
   },
