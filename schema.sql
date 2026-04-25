@@ -1181,3 +1181,63 @@ CREATE TABLE deck_slides (
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_pain_point ON content_items(pain_point_id);
+
+-- ============================================================
+-- COMPANY RECORDS (migration: 20260424000000_add_company_records)
+-- ============================================================
+
+CREATE TABLE company_record_types (
+  key           TEXT        PRIMARY KEY,
+  label         TEXT        NOT NULL,
+  content_type  TEXT        NOT NULL CHECK (content_type IN ('text', 'markdown', 'image', 'file')),
+  category      TEXT        NOT NULL,
+  is_singleton  BOOLEAN     NOT NULL DEFAULT false,
+  is_builtin    BOOLEAN     NOT NULL DEFAULT false,
+  sort_order    INT         NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE company_records (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  type_key      TEXT        NOT NULL REFERENCES company_record_types(key) ON DELETE RESTRICT,
+  value         TEXT,
+  storage_path  TEXT,
+  filename      TEXT,
+  mime_type     TEXT,
+  is_pinned     BOOLEAN     NOT NULL DEFAULT false,
+  display_order INT         NOT NULL DEFAULT 0,
+  created_by    UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- COMPANY DOMAINS (migration: 20260425000000_add_company_domains_and_subscriptions)
+-- ============================================================
+
+CREATE TABLE company_domains (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT        NOT NULL,
+  provider     TEXT,
+  renewal_date DATE,
+  notes        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- COMPANY SUBSCRIPTIONS (migration: 20260425000000_add_company_domains_and_subscriptions)
+-- ============================================================
+
+CREATE TABLE company_subscriptions (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  business      TEXT        NOT NULL,
+  website       TEXT,
+  service_type  TEXT,
+  payment_type  TEXT        CHECK (payment_type IN ('free', 'paid', 'trial')),
+  expiry        DATE,
+  account_email TEXT,
+  notes         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

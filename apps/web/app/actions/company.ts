@@ -2,7 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import type { CompanyRecord, CompanyRecordType } from '@platform/shared';
+import type {
+  CompanyRecord,
+  CompanyRecordType,
+  CompanyDomain,
+  CompanySubscription,
+  SubscriptionPaymentType,
+} from '@platform/shared';
 
 const BUCKET = 'company-assets';
 
@@ -215,4 +221,163 @@ export async function getCompanyAssetUrl(path: string): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;
+}
+
+// ──────────────────────────────────────────────────────────
+// Domains
+// ──────────────────────────────────────────────────────────
+
+export async function getDomains(): Promise<CompanyDomain[]> {
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any)
+    .from('company_domains')
+    .select('*')
+    .order('renewal_date', { nullsFirst: false })
+    .order('name');
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function createDomain(params: {
+  name: string;
+  provider?: string;
+  renewal_date?: string;
+  notes?: string;
+}): Promise<{ error: string } | { success: true; id: string }> {
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any)
+    .from('company_domains')
+    .insert({
+      name:         params.name,
+      provider:     params.provider     || null,
+      renewal_date: params.renewal_date || null,
+      notes:        params.notes        || null,
+    })
+    .select('id')
+    .single();
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true, id: data.id };
+}
+
+export async function updateDomain(
+  id: string,
+  params: {
+    name?: string;
+    provider?: string;
+    renewal_date?: string;
+    notes?: string;
+  },
+): Promise<{ error: string } | { success: true }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('company_domains')
+    .update({
+      ...(params.name         !== undefined && { name:         params.name }),
+      ...(params.provider     !== undefined && { provider:     params.provider     || null }),
+      ...(params.renewal_date !== undefined && { renewal_date: params.renewal_date || null }),
+      ...(params.notes        !== undefined && { notes:        params.notes        || null }),
+    })
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true };
+}
+
+export async function deleteDomain(
+  id: string,
+): Promise<{ error: string } | { success: true }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('company_domains')
+    .delete()
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true };
+}
+
+// ──────────────────────────────────────────────────────────
+// Subscriptions
+// ──────────────────────────────────────────────────────────
+
+export async function getSubscriptions(): Promise<CompanySubscription[]> {
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any)
+    .from('company_subscriptions')
+    .select('*')
+    .order('business');
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function createSubscription(params: {
+  business: string;
+  website?: string;
+  service_type?: string;
+  payment_type?: SubscriptionPaymentType;
+  expiry?: string;
+  account_email?: string;
+  notes?: string;
+}): Promise<{ error: string } | { success: true; id: string }> {
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any)
+    .from('company_subscriptions')
+    .insert({
+      business:      params.business,
+      website:       params.website       || null,
+      service_type:  params.service_type  || null,
+      payment_type:  params.payment_type  || null,
+      expiry:        params.expiry        || null,
+      account_email: params.account_email || null,
+      notes:         params.notes         || null,
+    })
+    .select('id')
+    .single();
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true, id: data.id };
+}
+
+export async function updateSubscription(
+  id: string,
+  params: {
+    business?: string;
+    website?: string;
+    service_type?: string;
+    payment_type?: SubscriptionPaymentType | null;
+    expiry?: string;
+    account_email?: string;
+    notes?: string;
+  },
+): Promise<{ error: string } | { success: true }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('company_subscriptions')
+    .update({
+      ...(params.business      !== undefined && { business:      params.business }),
+      ...(params.website       !== undefined && { website:       params.website       || null }),
+      ...(params.service_type  !== undefined && { service_type:  params.service_type  || null }),
+      ...(params.payment_type  !== undefined && { payment_type:  params.payment_type  ?? null }),
+      ...(params.expiry        !== undefined && { expiry:        params.expiry        || null }),
+      ...(params.account_email !== undefined && { account_email: params.account_email || null }),
+      ...(params.notes         !== undefined && { notes:         params.notes         || null }),
+    })
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true };
+}
+
+export async function deleteSubscription(
+  id: string,
+): Promise<{ error: string } | { success: true }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('company_subscriptions')
+    .delete()
+    .eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/company');
+  return { success: true };
 }
