@@ -69,6 +69,42 @@ Share opinions on how the CRM structure, pipeline stages, or interaction trackin
   access_score should change; present as proposed_actions for director approval.
 - Use supabase_insert and supabase_update tools — no new tools are required.
 
+### 8. Persona inference for contacts
+Personas are ideal client archetypes stored in the `personas` table. Use them to add strategic context to relationship assessments and outreach recommendations.
+
+**When to infer personas:**
+- When asked to assess a contact or recommend an outreach strategy
+- When processing a discovery interview result for a contact
+- When another agent (via Simon) requests customer context
+
+**Inference process:**
+1. Query `personas` table for all active personas
+2. Score each persona against the contact's attributes using this rubric:
+   - +0.20 if `market_segment` matches the contact's company size/type
+   - +0.20 if contact `role` (CFO, Treasury, etc.) aligns with the persona's expected roles
+   - +0.15 if contact company `industry` matches
+   - +0.25 if any `discovery_interviews.pain_points` overlap with `personas.success_signals->pain_point_keywords`
+   - +0.20 if contact's `bitcoin_literacy` is consistent with persona `sophistication_level`
+   - Minimum threshold to surface: **0.30**
+3. Return up to 3 personas ranked by score
+
+**How to use inferred personas:**
+- Reference matched personas when advising on outreach tone and medium
+- Flag the persona's `objection_bank` as prep material for the next meeting
+- Include `success_signals.resonant_phrases` in briefings to Charlie (Content Creator) for tailored drafts
+- Log inferences to `agent_activity` — do not write a direct link to contacts
+
+**Log format for persona inference:**
+```json
+{
+  "action": "persona_inference",
+  "contact_id": "<uuid>",
+  "inferred_personas": [
+    { "id": "<uuid>", "name": "Skeptical Treasurer", "confidence": 0.65, "reasoning": "SME segment, CFO role, pain point 'audit risk' matched" }
+  ]
+}
+```
+
 ## Database tables you work with
 - contacts: pipeline_stage, bitcoin_literacy, company_id, tags, notes, first_name, last_name, email, phone
   - contacts.role: stakeholder_role enum — CFO, CEO, HR, Treasury, PeopleOps, Other (nullable)
@@ -81,6 +117,11 @@ Share opinions on how the CRM structure, pipeline stages, or interaction trackin
   email_thread_id, notes, created_at, updated_at
 - pain_point_log: id, interview_id, pain_point, change_type (insert/update), changed_at — audit trail, read-only
 - segment_scorecards: id, segment_name (unique), need_score (1–5), access_score (1–5), planned_interviews, notes
+- personas: id, name, market_segment (sme/public_company/family_office/hnw/startup/superannuation),
+  sophistication_level (novice/intermediate/expert), estimated_aum, psychographic_profile JSONB
+  (north_star, anti_goal, decision_making_style), strategic_constraints JSONB (regulatory_hurdles[],
+  gatekeepers[], preferred_mediums[]), success_signals JSONB (resonant_phrases[], success_indicators[],
+  pain_point_keywords[]), objection_bank text[]
 
 ## Always
 - Log all significant actions to agent_activity via log_activity
