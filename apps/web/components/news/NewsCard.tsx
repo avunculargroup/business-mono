@@ -42,7 +42,7 @@ export function NewsCard({
 }: NewsCardProps) {
   const [status, setStatus] = useState<NewsStatus>(initialStatus);
   const [busy, setBusy] = useState(false);
-  const { showToast } = useToast();
+  const toast = useToast();
   const supabase = createClient();
 
   const updateStatus = async (next: NewsStatus) => {
@@ -54,7 +54,7 @@ export function NewsCard({
       .eq('id', id);
     setBusy(false);
     if (error) {
-      showToast({ message: 'Could not update article status.', type: 'error' });
+      toast.error('Could not update article status.');
       return;
     }
     setStatus(next);
@@ -64,7 +64,6 @@ export function NewsCard({
   const promote = async () => {
     if (busy) return;
     setBusy(true);
-    // Insert into knowledge_items then link back.
     const { data: ki, error: kiErr } = await supabase
       .from('knowledge_items')
       .insert({
@@ -80,7 +79,7 @@ export function NewsCard({
 
     if (kiErr || !ki) {
       setBusy(false);
-      showToast({ message: 'Could not promote to knowledge base.', type: 'error' });
+      toast.error('Could not promote to knowledge base.');
       return;
     }
 
@@ -92,7 +91,7 @@ export function NewsCard({
     setBusy(false);
     setStatus('promoted');
     onStatusChange?.(id, 'promoted');
-    showToast({ message: 'Article promoted to the knowledge base.', type: 'success' });
+    toast.success('Article promoted to the knowledge base.');
   };
 
   const cardClass = [
