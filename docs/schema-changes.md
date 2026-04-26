@@ -6,6 +6,19 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-26 — News Items (news aggregation feed)
+
+**Migration:** `20260426120000_add_news_items.sql`
+
+- **`news_category` enum** — four values: `regulatory`, `corporate`, `macro`, `international`. Focused on news relevant to Australian Bitcoin/treasury customers.
+- **`news_items` table** — dedicated news aggregation store. Separate from `knowledge_items` because news is high-volume, ephemeral, and freshness-centric; `knowledge_items` is curated and durable. Key fields: `url` (unique, deduplication anchor), `url_hash` (generated md5 for fast lookups), `embedding VECTOR(1536)` (semantic search + near-duplicate detection), `fts` (generated tsvector for keyword search), `relevance_score`, `status` (`new → reviewed/archived/promoted`), `knowledge_item_id` (FK to `knowledge_items` when promoted).
+- **`vector_search_news` RPC** — pgvector HNSW cosine similarity search with optional category and recency filters. Used for semantic deduplication (threshold 0.95) and Rex's internal news query tool.
+- **`routines.action_type` constraint** — extended to include `news_ingest`. Four seed routines inserted (regulatory, corporate, macro, international) set to run daily at 07:00 AEST.
+
+**Design rationale:** pgvector (already in Supabase) handles all required news use cases — semantic search, deduplication, topic clustering — without adding a dedicated graph DB. The graph layer (`knowledge_connections`) remains available if promoted articles need relationship edges.
+
+---
+
 ## 2026-04-25 — Company Domains and Subscriptions
 
 Adds two tables for tracking BTS's own operational data on the `/company` page. These are **not** CRM tables — they hold BTS-internal records rather than client company data, following the same pattern as `company_records` (no `company_id` FK; implicitly scoped to the single BTS organisation).
