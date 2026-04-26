@@ -1,5 +1,8 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import OpenAI from 'openai';
+import { supabase } from '@platform/db';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 
 // ============================================================
 // search_web — Tavily Search API
@@ -352,6 +355,80 @@ export const crawlStructured = createTool({
       markdown: (data.data?.markdown ?? '').slice(0, 50000),
       structured_data: data.data?.extract ?? null,
       metadata: data.data?.metadata ?? {},
+    };
+  },
+});
+
+// ============================================================
+// query_news_items — internal news feed (query before web search)
+// ============================================================
+
+export const queryNewsItems = createTool({
+  id: 'query_news_items',
+  description:
+    'Query the internal news_items feed. Always call this BEFORE search_web or search_news. Returns recent aggregated articles relevant to the query. Use category to narrow scope. Returns empty when the feed has no matching items (then proceed to web search).',
+  inputSchema: z.object({
+    query: z.string().describe('Natural language query or topic to search for'),
+    category: z
+      .enum(['regulatory', 'corporate', 'macro', 'international'])
+      .optional()
+      .describe('Narrow to a specific news category'),
+    days: z
+      .number()
+      .default(14)
+      .describe('Only return articles published or fetched within this many days'),
+    limit: z.number().default(10).describe('Maximum results to return'),
+  }),
+  execute: async (context) => {
+    const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+
+    // Parallel: vector search + fulltext search
+    const embRes = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: context.query,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
+    const embedding = embRes.data[0]?.embedding ?? [];
+
+    const [vectorRows, ftRows] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.rpc as any)('vector_search_news', {
+        query_embedding: embedding,
+        match_threshold: 0.65,
+        match_count: context.limit,
+        filter_category: context.category ?? null,
+        filter_days: context.days,
+      }).then((r: { data: unknown[] | null }) => r.data ?? []),
+      supabase
+        .from('news_items')
+        .select('id, title, summary, category, published_at, url, source_name, relevance_score')
+        .textSearch('fts', context.query, { type: 'websearch' })
+        .eq('status', 'new')
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .limit(context.limit)
+        .then((r: { data: unknown[] | null }) => r.data ?? []),
+    ]);
+
+    // Merge and deduplicate by id, prefer vector results (have similarity score).
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of [...(ftRows as Record<string, unknown>[]), ...(vectorRows as Record<string, unknown>[])]) {
+      byId.set(row['id'] as string, row);
+    }
+
+    const results = Array.from(byId.values()).slice(0, context.limit);
+
+    return {
+      count: results.length,
+      results: results.map((r) => ({
+        id: r['id'],
+        title: r['title'],
+        summary: r['summary'] ?? null,
+        category: r['category'],
+        published_at: r['published_at'] ?? null,
+        url: r['url'],
+        source_name: r['source_name'] ?? null,
+        relevance_score: (r['relevance_score'] ?? r['similarity']) ?? null,
+      })),
     };
   },
 });

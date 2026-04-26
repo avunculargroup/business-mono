@@ -12,9 +12,11 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 // What kind of work a routine performs.
 //  - research_digest: Rex pulls the latest on a topic; full digest is surfaced.
 //  - monitor_change: Rex detects whether the topic's state has changed vs last run.
+//  - news_ingest: Rex fetches fresh news articles into the news_items feed.
 export const RoutineActionType = {
   RESEARCH_DIGEST: 'research_digest',
-  MONITOR_CHANGE: 'monitor_change',
+  MONITOR_CHANGE:  'monitor_change',
+  NEWS_INGEST:     'news_ingest',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 

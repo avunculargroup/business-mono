@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Clock,
   Presentation,
+  Rss,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -46,6 +47,10 @@ const workNav = [
   { href: '/content', label: 'Content', icon: FileText },
   { href: '/decks', label: 'Decks', icon: Presentation },
   { href: '/routines', label: 'Routines', icon: Clock },
+  { href: '/news', label: 'News feed', icon: Rss, children: [
+    { href: '/news',       label: 'Feed'          },
+    { href: '/news/daily', label: 'Daily digest'  },
+  ]},
   { href: '/discovery', label: 'Discovery', icon: Search, children: [
     { href: '/crm/interviews', label: 'Interviews'  },
     { href: '/crm/segments',   label: 'Segments'    },
@@ -95,6 +100,10 @@ const moreNav: MoreNavSection[] = [
       { href: '/content',   label: 'Content',   icon: FileText    },
       { href: '/decks',     label: 'Decks',     icon: Presentation },
       { href: '/routines',  label: 'Routines',  icon: Clock       },
+      { href: '/news', label: 'News feed', icon: Rss, children: [
+        { href: '/news',       label: 'Feed'         },
+        { href: '/news/daily', label: 'Daily digest' },
+      ]},
       { href: '/discovery', label: 'Discovery', icon: Search, children: [
         { href: '/crm/interviews',        label: 'Interviews' },
         { href: '/crm/segments',          label: 'Segments'   },
