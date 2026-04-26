@@ -849,6 +849,62 @@ export type Database = {
         }
         Relationships: []
       }
+      personas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimated_aum: string | null
+          id: string
+          market_segment: string
+          name: string
+          notes: string | null
+          objection_bank: string[]
+          psychographic_profile: Json | null
+          sophistication_level: string
+          strategic_constraints: Json | null
+          success_signals: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimated_aum?: string | null
+          id?: string
+          market_segment: string
+          name: string
+          notes?: string | null
+          objection_bank?: string[]
+          psychographic_profile?: Json | null
+          sophistication_level?: string
+          strategic_constraints?: Json | null
+          success_signals?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimated_aum?: string | null
+          id?: string
+          market_segment?: string
+          name?: string
+          notes?: string | null
+          objection_bank?: string[]
+          psychographic_profile?: Json | null
+          sophistication_level?: string
+          strategic_constraints?: Json | null
+          success_signals?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string
