@@ -894,3 +894,95 @@ export interface CompanySubscription {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================
+// Personas
+// ============================================================
+
+export const PersonaMarketSegment = {
+  SME:             'sme',
+  PUBLIC_COMPANY:  'public_company',
+  FAMILY_OFFICE:   'family_office',
+  HNW:             'hnw',
+  STARTUP:         'startup',
+  SUPERANNUATION:  'superannuation',
+} as const;
+export type PersonaMarketSegment = (typeof PersonaMarketSegment)[keyof typeof PersonaMarketSegment];
+
+export const PersonaSophisticationLevel = {
+  NOVICE:       'novice',
+  INTERMEDIATE: 'intermediate',
+  EXPERT:       'expert',
+} as const;
+export type PersonaSophisticationLevel = (typeof PersonaSophisticationLevel)[keyof typeof PersonaSophisticationLevel];
+
+export const PersonaDecisionStyle = {
+  DATA_DRIVEN:       'data_driven',
+  CONSENSUS_SEEKING: 'consensus_seeking',
+  RISK_AVERSE:       'risk_averse',
+  OPPORTUNISTIC:     'opportunistic',
+  PROCESS_ORIENTED:  'process_oriented',
+} as const;
+export type PersonaDecisionStyle = (typeof PersonaDecisionStyle)[keyof typeof PersonaDecisionStyle];
+
+export const PERSONA_MARKET_SEGMENT_LABELS: Record<PersonaMarketSegment, string> = {
+  sme:            'SME',
+  public_company: 'Public Company',
+  family_office:  'Family Office',
+  hnw:            'HNW Individual',
+  startup:        'Startup',
+  superannuation: 'Superannuation',
+};
+
+export const PERSONA_SOPHISTICATION_LABELS: Record<PersonaSophisticationLevel, string> = {
+  novice:       'Novice',
+  intermediate: 'Intermediate',
+  expert:       'Expert',
+};
+
+export const PERSONA_DECISION_STYLE_LABELS: Record<PersonaDecisionStyle, string> = {
+  data_driven:       'Data-driven',
+  consensus_seeking: 'Consensus-seeking',
+  risk_averse:       'Risk-averse',
+  opportunistic:     'Opportunistic',
+  process_oriented:  'Process-oriented',
+};
+
+export interface PsychographicProfile {
+  north_star?: string;
+  anti_goal?: string;
+  decision_making_style?: PersonaDecisionStyle;
+  time_horizon?: 'short_term' | 'medium_term' | 'long_term';
+  risk_tolerance?: 'low' | 'medium' | 'high';
+  custom_traits?: string[];
+}
+
+export interface StrategicConstraints {
+  regulatory_hurdles?: string[];
+  gatekeepers?: string[];
+  preferred_mediums?: string[];
+  approval_layers?: 'single' | 'multi_stage' | 'committee';
+  budget_approval_cycle?: 'monthly' | 'quarterly' | 'annual';
+}
+
+export interface PersonaSuccessSignals {
+  resonant_phrases?: string[];
+  success_indicators?: string[];
+  pain_point_keywords?: string[];
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  market_segment: PersonaMarketSegment;
+  sophistication_level: PersonaSophisticationLevel;
+  estimated_aum: string | null;
+  psychographic_profile: PsychographicProfile | null;
+  strategic_constraints: StrategicConstraints | null;
+  success_signals: PersonaSuccessSignals | null;
+  objection_bank: string[];
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
