@@ -13,6 +13,7 @@ import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Database, Json } from '@platform/db';
+import OpenAI from 'openai';
 import type {
   ResearchBrief,
   ResearchResult,
@@ -20,7 +21,11 @@ import type {
   RoutineActionType,
   RoutineFrequency,
   RoutineResult,
+  NewsIngestionConfig,
+  NewsCategory,
+  NewsIngestResult,
 } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
@@ -98,6 +103,8 @@ interface RoutineOutcome {
   notify_agent?: string | null;
   // Source URLs to archive (populated when archive_sources is set):
   archive_urls?: string[];
+  // news_ingest result counts:
+  news_ingest_result?: NewsIngestResult;
 }
 
 const runRoutine = createStep({
@@ -120,6 +127,8 @@ const runRoutine = createStep({
           outcomes.push(await runResearchDigest(routine));
         } else if (routine.action_type === 'monitor_change') {
           outcomes.push(await runMonitorChange(routine));
+        } else if (routine.action_type === 'news_ingest') {
+          outcomes.push(await runNewsIngest(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -271,6 +280,148 @@ async function runMonitorChange(
     change_summary: monitor?.change_summary ?? null,
     notify_signal: cfg.notify_signal ?? false,
     notify_agent: cfg.notify_agent ?? null,
+  };
+}
+
+async function runNewsIngest(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as NewsIngestionConfig;
+  const category = cfg.category;
+  const queries = cfg.queries ?? [];
+  const maxPerQuery = cfg.max_results_per_query ?? 5;
+
+  const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+
+  // Step 1: Collect Tavily news results across all queries, deduplicate by URL.
+  const seen = new Set<string>();
+  const candidates: Array<{ url: string; title: string; summary: string; source: string; published_at: string | null; score: number }> = [];
+
+  for (const query of queries) {
+    try {
+      const res = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: process.env['TAVILY_API_KEY'],
+          query,
+          max_results: maxPerQuery,
+          topic: 'news',
+          days: 2,
+          include_answer: false,
+        }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json() as { results?: Array<{ url: string; title: string; content: string; score: number; published_date?: string; source?: string }> };
+      for (const r of data.results ?? []) {
+        if (!seen.has(r.url)) {
+          seen.add(r.url);
+          candidates.push({
+            url: r.url,
+            title: r.title,
+            summary: r.content?.slice(0, 500) ?? '',
+            source: (r.source ?? new URL(r.url).hostname).replace(/^www\./, ''),
+            published_at: r.published_date ?? null,
+            score: r.score ?? 0,
+          });
+        }
+      }
+    } catch {
+      // skip failed query, continue
+    }
+  }
+
+  if (candidates.length === 0) {
+    const result: RoutineResult = { summary: 'No new articles found.', sources: [] };
+    return {
+      routine_id: routine.id, name: routine.name,
+      action_type: 'news_ingest', frequency: routine.frequency as RoutineFrequency,
+      time_of_day: routine.time_of_day, timezone: routine.timezone,
+      status: 'success', result, error: null,
+      news_ingest_result: { category, items_found: 0, items_stored: 0, items_skipped_duplicate: 0 },
+    };
+  }
+
+  // Step 2: Filter already-known URLs.
+  const { data: existing } = await supabase
+    .from('news_items')
+    .select('url')
+    .in('url', candidates.map((c) => c.url));
+  const existingUrls = new Set((existing ?? []).map((r) => r.url as string));
+  const newCandidates = candidates.filter((c) => !existingUrls.has(c.url));
+
+  let itemsSkipped = candidates.length - newCandidates.length;
+  let itemsStored = 0;
+
+  for (const item of newCandidates) {
+    try {
+      // Step 3: Generate embedding.
+      const embeddingText = `${item.title} ${item.summary}`.trim();
+      const embRes = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: embeddingText,
+        dimensions: EMBEDDING_DIMENSIONS,
+      });
+      const embedding = embRes.data[0]?.embedding ?? null;
+
+      // Step 4: Semantic deduplication — skip near-identical articles.
+      if (embedding) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: near } = await (supabase.rpc as any)('vector_search_news', {
+          query_embedding: embedding,
+          match_threshold: 0.95,
+          match_count: 1,
+          filter_category: category,
+          filter_days: 3,
+        });
+        if (near && near.length > 0) {
+          itemsSkipped += 1;
+          continue;
+        }
+      }
+
+      // Step 5: Insert.
+      await supabase.from('news_items').insert({
+        title: item.title,
+        url: item.url,
+        source_name: item.source,
+        published_at: item.published_at,
+        summary: item.summary,
+        category: category as NewsCategory,
+        relevance_score: Math.min(1, item.score),
+        embedding: embedding as unknown as string,
+        routine_id: routine.id,
+        ingested_by: 'rex',
+      });
+      itemsStored += 1;
+    } catch {
+      // skip individual failures
+    }
+  }
+
+  const ingestResult: NewsIngestResult = {
+    category,
+    items_found: candidates.length,
+    items_stored: itemsStored,
+    items_skipped_duplicate: itemsSkipped,
+  };
+
+  const result: RoutineResult = {
+    summary: `Stored ${itemsStored} new ${category} articles (${itemsSkipped} skipped as duplicates).`,
+    sources: candidates.slice(0, 5).map((c) => ({
+      url: c.url,
+      title: c.title,
+      excerpt: c.summary,
+      retrieved_at: new Date().toISOString(),
+    })),
+  };
+
+  return {
+    routine_id: routine.id, name: routine.name,
+    action_type: 'news_ingest', frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day, timezone: routine.timezone,
+    status: 'success', result, error: null,
+    news_ingest_result: ingestResult,
   };
 }
 

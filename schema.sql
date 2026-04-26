@@ -1278,3 +1278,72 @@ CREATE TABLE personas (
   created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- ============================================================
+-- NEWS ITEMS (migration: 20260426120000_add_news_items)
+-- ============================================================
+-- Dedicated news aggregation store. Separate from knowledge_items because news
+-- is high-volume, ephemeral, and freshness-centric. Promotable to knowledge_items.
+-- routines.action_type constraint extended to include 'news_ingest'.
+
+CREATE TYPE news_category AS ENUM (
+  'regulatory',    -- ASIC, ATO, APRA, government policy
+  'corporate',     -- ASX companies, treasury announcements
+  'macro',         -- RBA rates, AUD, inflation, economic indicators
+  'international'  -- US/EU/global regulation with AU implications
+);
+
+CREATE TABLE news_items (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title                TEXT NOT NULL,
+  url                  TEXT NOT NULL UNIQUE,
+  url_hash             TEXT GENERATED ALWAYS AS (md5(url)) STORED,
+  source_name          TEXT NOT NULL DEFAULT '',
+  published_at         TIMESTAMPTZ,
+  fetched_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  body_markdown        TEXT,
+  summary              TEXT,
+  key_points           JSONB NOT NULL DEFAULT '[]'::jsonb,
+  category             news_category NOT NULL,
+  topic_tags           TEXT[] NOT NULL DEFAULT '{}',
+  australian_relevance BOOLEAN NOT NULL DEFAULT TRUE,
+  relevance_score      NUMERIC(3,2),
+  embedding            VECTOR(1536),
+  fts                  TSVECTOR GENERATED ALWAYS AS (
+                         to_tsvector('english',
+                           coalesce(title, '') || ' ' || coalesce(summary, ''))
+                       ) STORED,
+  status               TEXT NOT NULL DEFAULT 'new'
+                         CHECK (status IN ('new','reviewed','archived','promoted')),
+  knowledge_item_id    UUID REFERENCES knowledge_items(id) ON DELETE SET NULL,
+  ingested_by          TEXT NOT NULL DEFAULT 'rex',
+  routine_id           UUID REFERENCES routines(id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- RPC: semantic search on news_items
+CREATE OR REPLACE FUNCTION vector_search_news(
+  query_embedding  VECTOR(1536),
+  match_threshold  FLOAT   DEFAULT 0.7,
+  match_count      INT     DEFAULT 20,
+  filter_category  TEXT    DEFAULT NULL,
+  filter_days      INT     DEFAULT 30
+)
+RETURNS TABLE (
+  id UUID, title TEXT, summary TEXT, category news_category,
+  published_at TIMESTAMPTZ, url TEXT, similarity FLOAT
+)
+LANGUAGE sql STABLE AS $$
+  SELECT id, title, summary, category, published_at, url,
+         1 - (embedding <=> query_embedding) AS similarity
+  FROM news_items
+  WHERE embedding IS NOT NULL
+    AND (filter_category IS NULL OR category::TEXT = filter_category)
+    AND (filter_days IS NULL
+         OR published_at >= NOW() - (filter_days || ' days')::INTERVAL
+         OR published_at IS NULL)
+    AND 1 - (embedding <=> query_embedding) > match_threshold
+  ORDER BY similarity DESC
+  LIMIT match_count;
+$$;

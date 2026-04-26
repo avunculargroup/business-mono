@@ -813,6 +813,96 @@ export type Database = {
           },
         ]
       }
+      news_items: {
+        Row: {
+          australian_relevance: boolean
+          body_markdown: string | null
+          category: Database["public"]["Enums"]["news_category"]
+          created_at: string
+          embedding: string | null
+          fetched_at: string
+          fts: unknown
+          id: string
+          ingested_by: string
+          key_points: Json
+          knowledge_item_id: string | null
+          published_at: string | null
+          relevance_score: number | null
+          routine_id: string | null
+          source_name: string
+          status: string
+          summary: string | null
+          title: string
+          topic_tags: string[] | null
+          updated_at: string
+          url: string
+          url_hash: string | null
+        }
+        Insert: {
+          australian_relevance?: boolean
+          body_markdown?: string | null
+          category: Database["public"]["Enums"]["news_category"]
+          created_at?: string
+          embedding?: string | null
+          fetched_at?: string
+          fts?: unknown
+          id?: string
+          ingested_by?: string
+          key_points?: Json
+          knowledge_item_id?: string | null
+          published_at?: string | null
+          relevance_score?: number | null
+          routine_id?: string | null
+          source_name: string
+          status?: string
+          summary?: string | null
+          title: string
+          topic_tags?: string[] | null
+          updated_at?: string
+          url: string
+          url_hash?: never
+        }
+        Update: {
+          australian_relevance?: boolean
+          body_markdown?: string | null
+          category?: Database["public"]["Enums"]["news_category"]
+          created_at?: string
+          embedding?: string | null
+          fetched_at?: string
+          fts?: unknown
+          id?: string
+          ingested_by?: string
+          key_points?: Json
+          knowledge_item_id?: string | null
+          published_at?: string | null
+          relevance_score?: number | null
+          routine_id?: string | null
+          source_name?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          topic_tags?: string[] | null
+          updated_at?: string
+          url?: string
+          url_hash?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_items_knowledge_item_id_fkey"
+            columns: ["knowledge_item_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_items_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_capabilities: {
         Row: {
           agent_name: string
@@ -1543,10 +1633,27 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      vector_search_news: {
+        Args: {
+          query_embedding: string
+          match_threshold?: number
+          match_count?: number
+          filter_category?: Database["public"]["Enums"]["news_category"]
+          filter_days?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          summary: string | null
+          category: Database["public"]["Enums"]["news_category"]
+          published_at: string | null
+          url: string
+          similarity: number
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      news_category: "regulatory" | "corporate" | "macro" | "international"
     }
     CompositeTypes: {
       [_ in never]: never

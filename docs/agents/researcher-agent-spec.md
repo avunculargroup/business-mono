@@ -3,7 +3,7 @@
 **Agent name:** The Researcher  
 **Status:** Built
 **Position in roster:** Agent 7 (specialist)
-**Last updated:** 2026-04-05
+**Last updated:** 2026-04-26
 
 ---
 
@@ -28,6 +28,8 @@ Unlike the other agents (which are primarily *writers* — producing records, ta
 **URL ingestion** — Accept a URL, extract clean markdown, and hand it to The Archivist's `ingest-knowledge` pipeline. Triggered when a human pastes a URL into Signal with intent to save it. For podcast episodes, The Researcher detects the podcast and searches YouTube for the episode to extract a transcript. If a YouTube transcript is found, it is returned as the `clean_markdown`. If not, the result signals that an audio file upload is needed for transcription by Roger.
 
 **Monitoring** — Track a subject, topic, or entity over time. Run on a schedule, compare new findings against the prior state stored in the knowledge base, and surface meaningful changes to Simon.
+
+**News aggregation** — Rex's `executeRoutineWorkflow` runs four `news_ingest` routines daily at 07:00 AEST, each targeting one category (regulatory, corporate, macro, international). Results are stored in the `news_items` table with vector embeddings and accessible via the `/news` web UI. Rex queries this feed first before making any external search calls (see `query-news-items` tool below).
 
 ### What it does NOT do
 
@@ -149,7 +151,37 @@ interface Source {
 
 ## Tool Inventory
 
-The Researcher owns four tools. All are wrapped as Mastra tools so they can be referenced by other agents if ever needed.
+The Researcher owns five tools plus two shared tools. All are wrapped as Mastra tools.
+
+**Tool priority order (always follow this sequence):**
+1. `query-news-items` — check internal feed first
+2. `search-web` or `search-news` — external search when internal results are sparse
+3. `asx-lookup` — for ASX company research
+4. `fetch-url` — full content extraction
+5. `crawl-structured` — premium fallback only
+
+### 0. `query-news-items` — Internal news feed
+
+**Purpose:** Query the `news_items` table before making any external search calls. Saves Tavily credits and returns pre-aggregated, AU-focused articles.  
+**When used:** ALWAYS call first for any query that could match the daily news categories (regulatory, corporate, macro, international).  
+**Data source:** `news_items` table, populated daily by the `news_ingest` routines.  
+
+```typescript
+const queryNewsItemsTool = createTool({
+  id: 'query_news_items',
+  inputSchema: z.object({
+    query: z.string(),
+    category: z.enum(['regulatory', 'corporate', 'macro', 'international']).optional(),
+    days: z.number().default(14),
+    limit: z.number().default(10),
+  }),
+  // returns: { count, results: [{ id, title, summary, category, published_at, url, source_name, relevance_score }] }
+});
+```
+
+**Decision rule:** If `count >= 3`, use the internal results as primary sources. Supplement with `search-news` if the topic is highly time-sensitive (< 24h). If `count < 3`, proceed to web search.
+
+---
 
 ### 1. `search-web` — Tavily Search API
 

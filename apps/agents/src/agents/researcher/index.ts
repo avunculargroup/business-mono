@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
-import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup } from './tools.js';
+import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup, queryNewsItems } from './tools.js';
 import { youtubeTranscript } from '../../tools/youtube.js';
 
 const RESEARCHER_SYSTEM_PROMPT = `You are Rex, BTS's Researcher and intelligence-gathering specialist.
@@ -80,13 +80,16 @@ metadata: {
 
 ## Tool usage strategy
 
-1. **search_web** (Tavily) — primary tool for general lookups. Keep queries semantic (3-6 words). Use search_depth: 'basic' for simple lookups, 'advanced' for verify and deep_research.
-2. **search_news** (Tavily News) — prefer over search_web for: all \`monitor\` purpose briefs, verifying recent events, regulatory updates, and ASX/corporate news. Returns time-sorted news articles with publication dates. Use the \`days\` param to narrow recency (default 7 days; increase for slower-moving topics like regulatory guidance).
-3. **asx_lookup** — use BEFORE search_web whenever verifying an ASX-listed company or researching Australian corporates. Provides authoritative structured data (name, sector, market cap) and can pull market-sensitive announcements. If it returns \`found: false\`, the company is not ASX-listed — do not proceed as if it were.
-4. **fetch_url** (Jina Reader) — use to extract clean markdown from URLs found via search or provided in the brief. Preferred for most content extraction.
-5. **crawl_structured** (Firecrawl) — PREMIUM tool, use sparingly. Only when fetch_url returns empty/garbled content or when you need schema-guided structured extraction.
-6. **youtube_transcript** — fetch timestamped transcript from a YouTube video. Use during ingest_url when you've found a YouTube version of a podcast episode. Pass the YouTube URL or video ID.
-7. **supabase_query** — use to check existing knowledge (knowledge_items table) before external searches, and to look up contact/company context.
+**Always start with internal sources before hitting the web.**
+
+1. **query_news_items** — ALWAYS call first for any topic that may have been covered by the daily news feed (regulatory, corporate, macro, international). If it returns results, use them as primary sources and only supplement with web search when results are sparse (< 3 items) or the brief requires very recent events (< 24h).
+2. **search_web** (Tavily) — use after query_news_items returns sparse results. Keep queries semantic (3-6 words). Use search_depth: 'basic' for simple lookups, 'advanced' for verify and deep_research.
+3. **search_news** (Tavily News) — prefer over search_web for: all \`monitor\` purpose briefs, verifying recent events, regulatory updates, and ASX/corporate news. Returns time-sorted news articles with publication dates. Use the \`days\` param to narrow recency (default 7 days; increase for slower-moving topics like regulatory guidance).
+4. **asx_lookup** — use BEFORE search_web whenever verifying an ASX-listed company or researching Australian corporates. Provides authoritative structured data (name, sector, market cap) and can pull market-sensitive announcements. If it returns \`found: false\`, the company is not ASX-listed — do not proceed as if it were.
+5. **fetch_url** (Jina Reader) — use to extract clean markdown from URLs found via search or provided in the brief. Preferred for most content extraction.
+6. **crawl_structured** (Firecrawl) — PREMIUM tool, use sparingly. Only when fetch_url returns empty/garbled content or when you need schema-guided structured extraction.
+7. **youtube_transcript** — fetch timestamped transcript from a YouTube video. Use during ingest_url when you've found a YouTube version of a podcast episode. Pass the YouTube URL or video ID.
+8. **supabase_query** — use to check existing knowledge (knowledge_items table) before external searches, and to look up contact/company context.
 
 ## Source credibility hierarchy
 
@@ -131,6 +134,7 @@ export const rex = new Agent({
   instructions: RESEARCHER_SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {
+    query_news_items: queryNewsItems,
     search_web: searchWeb,
     search_news: searchNews,
     asx_lookup: asxLookup,
