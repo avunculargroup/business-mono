@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { NewsFeed } from '@/components/news/NewsFeed';
-import type { NewsItemRecord } from '@platform/shared';
+import type { NewsItemRecord, NewsCategory } from '@platform/shared';
 
 export default async function NewsPage() {
   const supabase = await createClient();
@@ -33,7 +33,7 @@ export default async function NewsPage() {
       <PageHeader title="News feed" />
       <NewsFeed
         initialItems={(items ?? []) as unknown as NewsItemRecord[]}
-        todayDigest={(digest ?? []) as { id: string; title: string; url: string; category: string }[]}
+        todayDigest={(digest ?? []) as unknown as { id: string; title: string; url: string; category: NewsCategory }[]}
       />
     </>
   );
