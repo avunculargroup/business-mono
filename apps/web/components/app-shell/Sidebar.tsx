@@ -37,6 +37,7 @@ const workNav = [
   { href: '/crm', label: 'CRM', icon: Users, children: [
     { href: '/crm/contacts',   label: 'Contacts'   },
     { href: '/crm/companies',  label: 'Companies'  },
+    { href: '/crm/personas',   label: 'Personas'   },
     { href: '/crm/champions',  label: 'Champions'  },
     { href: '/crm/community',  label: 'Community'  },
   ]},
@@ -85,6 +86,7 @@ const moreNav: MoreNavSection[] = [
       { href: '/crm', label: 'CRM', icon: Users, children: [
         { href: '/crm/contacts',   label: 'Contacts'   },
         { href: '/crm/companies',  label: 'Companies'  },
+        { href: '/crm/personas',   label: 'Personas'   },
         { href: '/crm/champions',  label: 'Champions'  },
         { href: '/crm/community',  label: 'Community'  },
       ]},
