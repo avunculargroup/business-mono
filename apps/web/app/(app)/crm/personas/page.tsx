@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PersonasList } from '@/components/crm/PersonasList';
+import type { Persona } from '@platform/shared';
 
 export default async function PersonasPage() {
   const supabase = await createClient();
@@ -15,7 +16,7 @@ export default async function PersonasPage() {
     <>
       <PageHeader title="Personas" />
       <PersonasList
-        initialPersonas={personas || []}
+        initialPersonas={(personas || []) as Persona[]}
         totalCount={count || 0}
       />
     </>

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PersonaDetail } from '@/components/crm/PersonaDetail';
+import type { Persona } from '@platform/shared';
 
 export default async function PersonaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +19,7 @@ export default async function PersonaDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       <PageHeader title={persona.name} />
-      <PersonaDetail persona={persona} />
+      <PersonaDetail persona={persona as Persona} />
     </>
   );
 }
