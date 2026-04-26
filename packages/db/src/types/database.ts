@@ -96,6 +96,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_processing: boolean
           last_message_at: string | null
           messages: Json | null
           participant_ids: string[] | null
@@ -106,6 +107,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_processing?: boolean
           last_message_at?: string | null
           messages?: Json | null
           participant_ids?: string[] | null
@@ -116,12 +118,58 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_processing?: boolean
           last_message_at?: string | null
           messages?: Json | null
           participant_ids?: string[] | null
           signal_chat_id?: string
           thread_type?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      assets: {
+        Row: {
+          alt_text: string | null
+          bucket: string
+          byte_size: number | null
+          created_at: string
+          filename: string
+          height: number | null
+          id: string
+          mime_type: string
+          org_id: string
+          path: string
+          uploaded_by: string | null
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          bucket: string
+          byte_size?: number | null
+          created_at?: string
+          filename: string
+          height?: number | null
+          id?: string
+          mime_type: string
+          org_id: string
+          path: string
+          uploaded_by?: string | null
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          bucket?: string
+          byte_size?: number | null
+          created_at?: string
+          filename?: string
+          height?: number | null
+          id?: string
+          mime_type?: string
+          org_id?: string
+          path?: string
+          uploaded_by?: string | null
+          width?: number | null
         }
         Relationships: []
       }
@@ -208,6 +256,165 @@ export type Database = {
         }
         Relationships: []
       }
+      champion_events: {
+        Row: {
+          champion_id: string
+          created_at: string
+          details: string | null
+          event_date: string
+          event_type: string
+          id: string
+        }
+        Insert: {
+          champion_id: string
+          created_at?: string
+          details?: string | null
+          event_date?: string
+          event_type: string
+          id?: string
+        }
+        Update: {
+          champion_id?: string
+          created_at?: string
+          details?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "champion_events_champion_id_fkey"
+            columns: ["champion_id"]
+            isOneToOne: false
+            referencedRelation: "champions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      champions: {
+        Row: {
+          champion_score: number
+          company_id: string | null
+          contact_id: string
+          created_at: string
+          id: string
+          last_contacted_at: string | null
+          notes: string | null
+          role_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          champion_score?: number
+          company_id?: string | null
+          contact_id: string
+          created_at?: string
+          id?: string
+          last_contacted_at?: string | null
+          notes?: string | null
+          role_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          champion_score?: number
+          company_id?: string | null
+          contact_id?: string
+          created_at?: string
+          id?: string
+          last_contacted_at?: string | null
+          notes?: string | null
+          role_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "champions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "champions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "champions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "v_contacts_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_watchlist: {
+        Row: {
+          activity_level: number | null
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          end_date: string | null
+          engagement_status: string
+          id: string
+          industry_tags: string[]
+          location: string | null
+          membership_size: number | null
+          name: string
+          notes: string | null
+          role_tags: string[]
+          start_date: string | null
+          timezone: string | null
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          activity_level?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          engagement_status?: string
+          id?: string
+          industry_tags?: string[]
+          location?: string | null
+          membership_size?: number | null
+          name: string
+          notes?: string | null
+          role_tags?: string[]
+          start_date?: string | null
+          timezone?: string | null
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          activity_level?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          engagement_status?: string
+          id?: string
+          industry_tags?: string[]
+          location?: string | null
+          membership_size?: number | null
+          name?: string
+          notes?: string | null
+          role_tags?: string[]
+          start_date?: string | null
+          timezone?: string | null
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           country: string | null
@@ -219,6 +426,7 @@ export type Database = {
           name: string
           notes: string | null
           size: string | null
+          source: string | null
           updated_at: string
           website: string | null
         }
@@ -232,6 +440,7 @@ export type Database = {
           name: string
           notes?: string | null
           size?: string | null
+          source?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -245,6 +454,7 @@ export type Database = {
           name?: string
           notes?: string | null
           size?: string | null
+          source?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -257,6 +467,158 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      company_domains: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          provider: string | null
+          renewal_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          provider?: string | null
+          renewal_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          provider?: string | null
+          renewal_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_record_types: {
+        Row: {
+          category: string
+          content_type: string
+          created_at: string
+          is_builtin: boolean
+          is_singleton: boolean
+          key: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          content_type: string
+          created_at?: string
+          is_builtin?: boolean
+          is_singleton?: boolean
+          key: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          content_type?: string
+          created_at?: string
+          is_builtin?: boolean
+          is_singleton?: boolean
+          key?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      company_records: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          filename: string | null
+          id: string
+          is_pinned: boolean
+          mime_type: string | null
+          storage_path: string | null
+          type_key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          filename?: string | null
+          id?: string
+          is_pinned?: boolean
+          mime_type?: string | null
+          storage_path?: string | null
+          type_key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          filename?: string | null
+          id?: string
+          is_pinned?: boolean
+          mime_type?: string | null
+          storage_path?: string | null
+          type_key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_records_type_key_fkey"
+            columns: ["type_key"]
+            isOneToOne: false
+            referencedRelation: "company_record_types"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      company_subscriptions: {
+        Row: {
+          account_email: string | null
+          business: string
+          created_at: string
+          expiry: string | null
+          id: string
+          notes: string | null
+          payment_type: string | null
+          service_type: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          account_email?: string | null
+          business: string
+          created_at?: string
+          expiry?: string | null
+          id?: string
+          notes?: string | null
+          payment_type?: string | null
+          service_type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          account_email?: string | null
+          business?: string
+          created_at?: string
+          expiry?: string | null
+          id?: string
+          notes?: string | null
+          payment_type?: string | null
+          service_type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
       }
       contacts: {
         Row: {
@@ -274,6 +636,7 @@ export type Database = {
           owner_id: string | null
           phone: string | null
           pipeline_stage: string
+          role: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid: string | null
           source: string | null
           tags: string[] | null
@@ -294,6 +657,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           pipeline_stage?: string
+          role?: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid?: string | null
           source?: string | null
           tags?: string[] | null
@@ -314,6 +678,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           pipeline_stage?: string
+          role?: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid?: string | null
           source?: string | null
           tags?: string[] | null
@@ -350,9 +715,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          pain_point_id: string | null
           published_at: string | null
           published_url: string | null
+          question_count: number
+          research_links: Json
           scheduled_for: string | null
+          score: number | null
           source: string | null
           source_interaction_id: string | null
           status: string
@@ -360,6 +729,7 @@ export type Database = {
           topic_tags: string[] | null
           type: string
           updated_at: string
+          validated: boolean
         }
         Insert: {
           assigned_to?: string | null
@@ -367,9 +737,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          pain_point_id?: string | null
           published_at?: string | null
           published_url?: string | null
+          question_count?: number
+          research_links?: Json
           scheduled_for?: string | null
+          score?: number | null
           source?: string | null
           source_interaction_id?: string | null
           status?: string
@@ -377,6 +751,7 @@ export type Database = {
           topic_tags?: string[] | null
           type: string
           updated_at?: string
+          validated?: boolean
         }
         Update: {
           assigned_to?: string | null
@@ -384,9 +759,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          pain_point_id?: string | null
           published_at?: string | null
           published_url?: string | null
+          question_count?: number
+          research_links?: Json
           scheduled_for?: string | null
+          score?: number | null
           source?: string | null
           source_interaction_id?: string | null
           status?: string
@@ -394,6 +773,7 @@ export type Database = {
           topic_tags?: string[] | null
           type?: string
           updated_at?: string
+          validated?: boolean
         }
         Relationships: [
           {
@@ -408,6 +788,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_pain_point_id_fkey"
+            columns: ["pain_point_id"]
+            isOneToOne: false
+            referencedRelation: "pain_points"
             referencedColumns: ["id"]
           },
           {
@@ -426,51 +813,215 @@ export type Database = {
           },
         ]
       }
-      form_submissions: {
+      corporate_lexicon: {
         Row: {
-          contact_id: string | null
-          data: Json
-          form_id: string
+          approved_by: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          definition: string | null
+          example_usage: string | null
           id: string
-          ip_address: string | null
-          submitted_at: string
+          professional_term: string
+          status: string
+          term: string
+          updated_at: string
+          version: number
         }
         Insert: {
-          contact_id?: string | null
-          data?: Json
-          form_id: string
+          approved_by?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition?: string | null
+          example_usage?: string | null
           id?: string
-          ip_address?: string | null
-          submitted_at?: string
+          professional_term: string
+          status?: string
+          term: string
+          updated_at?: string
+          version?: number
         }
         Update: {
-          contact_id?: string | null
-          data?: Json
-          form_id?: string
+          approved_by?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          definition?: string | null
+          example_usage?: string | null
           id?: string
-          ip_address?: string | null
-          submitted_at?: string
+          professional_term?: string
+          status?: string
+          term?: string
+          updated_at?: string
+          version?: number
         }
         Relationships: [
           {
-            foreignKeyName: "form_submissions_contact_id_fkey"
+            foreignKeyName: "corporate_lexicon_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corporate_lexicon_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deck_slides: {
+        Row: {
+          content_json: Json
+          created_at: string
+          deck_id: string
+          id: string
+          notes: string | null
+          order_index: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          content_json?: Json
+          created_at?: string
+          deck_id: string
+          id?: string
+          notes?: string | null
+          order_index: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          content_json?: Json
+          created_at?: string
+          deck_id?: string
+          id?: string
+          notes?: string | null
+          order_index?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_slides_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decks: {
+        Row: {
+          aspect_ratio: string
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          status: string
+          theme_id: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          status?: string
+          theme_id?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          status?: string
+          theme_id?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      discovery_interviews: {
+        Row: {
+          channel: string | null
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          email_thread_id: string | null
+          id: string
+          interview_date: string | null
+          notes: string | null
+          pain_points: string[] | null
+          status: string
+          trigger_event:
+            | Database["public"]["Enums"]["trigger_event_type"]
+            | null
+          updated_at: string
+        }
+        Insert: {
+          channel?: string | null
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email_thread_id?: string | null
+          id?: string
+          interview_date?: string | null
+          notes?: string | null
+          pain_points?: string[] | null
+          status?: string
+          trigger_event?:
+            | Database["public"]["Enums"]["trigger_event_type"]
+            | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string | null
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email_thread_id?: string | null
+          id?: string
+          interview_date?: string | null
+          notes?: string | null
+          pain_points?: string[] | null
+          status?: string
+          trigger_event?:
+            | Database["public"]["Enums"]["trigger_event_type"]
+            | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_interviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_interviews_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "form_submissions_contact_id_fkey"
+            foreignKeyName: "discovery_interviews_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "v_contacts_overview"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_submissions_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "forms"
             referencedColumns: ["id"]
           },
         ]
@@ -540,6 +1091,7 @@ export type Database = {
           jmap_account_id: string | null
           last_synced_at: string | null
           sent_query_state: string | null
+          updated_at: string
         }
         Insert: {
           account_id: string
@@ -548,6 +1100,7 @@ export type Database = {
           jmap_account_id?: string | null
           last_synced_at?: string | null
           sent_query_state?: string | null
+          updated_at?: string
         }
         Update: {
           account_id?: string
@@ -556,6 +1109,7 @@ export type Database = {
           jmap_account_id?: string | null
           last_synced_at?: string | null
           sent_query_state?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -563,6 +1117,145 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: true
             referencedRelation: "fastmail_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          category: string
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          date_received: string | null
+          deleted_at: string | null
+          description: string
+          id: string
+          pain_point_id: string | null
+          rating: number | null
+          sentiment: Json | null
+          source: string
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_received?: string | null
+          deleted_at?: string | null
+          description: string
+          id?: string
+          pain_point_id?: string | null
+          rating?: number | null
+          sentiment?: Json | null
+          source?: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_received?: string | null
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          pain_point_id?: string | null
+          rating?: number | null
+          sentiment?: Json | null
+          source?: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_pain_point_id_fkey"
+            columns: ["pain_point_id"]
+            isOneToOne: false
+            referencedRelation: "pain_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submissions: {
+        Row: {
+          contact_id: string | null
+          data: Json
+          form_id: string
+          id: string
+          ip_address: string | null
+          submitted_at: string
+        }
+        Insert: {
+          contact_id?: string | null
+          data?: Json
+          form_id: string
+          id?: string
+          ip_address?: string | null
+          submitted_at?: string
+        }
+        Update: {
+          contact_id?: string | null
+          data?: Json
+          form_id?: string
+          id?: string
+          ip_address?: string | null
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
             referencedColumns: ["id"]
           },
         ]
@@ -813,6 +1506,102 @@ export type Database = {
           },
         ]
       }
+      mvp_template_versions: {
+        Row: {
+          approved_by: string | null
+          content: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          status: string
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          approved_by?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          template_id: string
+          version_number: number
+        }
+        Update: {
+          approved_by?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mvp_template_versions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mvp_template_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mvp_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "mvp_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mvp_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          tags: string[] | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          tags?: string[] | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          tags?: string[] | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mvp_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_items: {
         Row: {
           australian_relevance: boolean
@@ -833,7 +1622,7 @@ export type Database = {
           status: string
           summary: string | null
           title: string
-          topic_tags: string[] | null
+          topic_tags: string[]
           updated_at: string
           url: string
           url_hash: string | null
@@ -853,14 +1642,14 @@ export type Database = {
           published_at?: string | null
           relevance_score?: number | null
           routine_id?: string | null
-          source_name: string
+          source_name?: string
           status?: string
           summary?: string | null
           title: string
-          topic_tags?: string[] | null
+          topic_tags?: string[]
           updated_at?: string
           url: string
-          url_hash?: never
+          url_hash?: string | null
         }
         Update: {
           australian_relevance?: boolean
@@ -881,10 +1670,10 @@ export type Database = {
           status?: string
           summary?: string | null
           title?: string
-          topic_tags?: string[] | null
+          topic_tags?: string[]
           updated_at?: string
           url?: string
-          url_hash?: never
+          url_hash?: string | null
         }
         Relationships: [
           {
@@ -899,6 +1688,123 @@ export type Database = {
             columns: ["routine_id"]
             isOneToOne: false
             referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pain_point_log: {
+        Row: {
+          change_type: string
+          changed_at: string
+          id: number
+          interview_id: string | null
+          pain_point: string
+        }
+        Insert: {
+          change_type: string
+          changed_at?: string
+          id?: never
+          interview_id?: string | null
+          pain_point: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          id?: never
+          interview_id?: string | null
+          pain_point?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pain_point_log_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pain_points: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          interview_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          interview_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          interview_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pain_points_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimated_aum: string | null
+          id: string
+          market_segment: Database["public"]["Enums"]["persona_market_segment"]
+          name: string
+          notes: string | null
+          objection_bank: string[]
+          psychographic_profile: Json | null
+          sophistication_level: Database["public"]["Enums"]["persona_sophistication_level"]
+          strategic_constraints: Json | null
+          success_signals: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimated_aum?: string | null
+          id?: string
+          market_segment: Database["public"]["Enums"]["persona_market_segment"]
+          name: string
+          notes?: string | null
+          objection_bank?: string[]
+          psychographic_profile?: Json | null
+          sophistication_level?: Database["public"]["Enums"]["persona_sophistication_level"]
+          strategic_constraints?: Json | null
+          success_signals?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimated_aum?: string | null
+          id?: string
+          market_segment?: Database["public"]["Enums"]["persona_market_segment"]
+          name?: string
+          notes?: string | null
+          objection_bank?: string[]
+          psychographic_profile?: Json | null
+          sophistication_level?: Database["public"]["Enums"]["persona_sophistication_level"]
+          strategic_constraints?: Json | null
+          success_signals?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -938,62 +1844,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      personas: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          estimated_aum: string | null
-          id: string
-          market_segment: string
-          name: string
-          notes: string | null
-          objection_bank: string[]
-          psychographic_profile: Json | null
-          sophistication_level: string
-          strategic_constraints: Json | null
-          success_signals: Json | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          estimated_aum?: string | null
-          id?: string
-          market_segment: string
-          name: string
-          notes?: string | null
-          objection_bank?: string[]
-          psychographic_profile?: Json | null
-          sophistication_level?: string
-          strategic_constraints?: Json | null
-          success_signals?: Json | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          estimated_aum?: string | null
-          id?: string
-          market_segment?: string
-          name?: string
-          notes?: string | null
-          objection_bank?: string[]
-          psychographic_profile?: Json | null
-          sophistication_level?: string
-          strategic_constraints?: Json | null
-          success_signals?: Json | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "personas_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       projects: {
         Row: {
@@ -1223,6 +2073,59 @@ export type Database = {
           },
         ]
       }
+      risk_register: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          identified_by: string
+          likelihood: string
+          mitigation: string | null
+          project_id: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          identified_by: string
+          likelihood: string
+          mitigation?: string | null
+          project_id?: string | null
+          resolved_at?: string | null
+          severity: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          identified_by?: string
+          likelihood?: string
+          mitigation?: string | null
+          project_id?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_register_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routines: {
         Row: {
           action_config: Json
@@ -1300,58 +2203,38 @@ export type Database = {
           },
         ]
       }
-      risk_register: {
+      segment_scorecards: {
         Row: {
+          access_score: number | null
           created_at: string
-          description: string | null
           id: string
-          identified_by: string
-          likelihood: string
-          mitigation: string | null
-          project_id: string | null
-          resolved_at: string | null
-          severity: string
-          status: string
-          title: string
+          need_score: number | null
+          notes: string | null
+          planned_interviews: number
+          segment_name: string
           updated_at: string
         }
         Insert: {
+          access_score?: number | null
           created_at?: string
-          description?: string | null
           id?: string
-          identified_by: string
-          likelihood: string
-          mitigation?: string | null
-          project_id?: string | null
-          resolved_at?: string | null
-          severity: string
-          status?: string
-          title: string
+          need_score?: number | null
+          notes?: string | null
+          planned_interviews?: number
+          segment_name: string
           updated_at?: string
         }
         Update: {
+          access_score?: number | null
           created_at?: string
-          description?: string | null
           id?: string
-          identified_by?: string
-          likelihood?: string
-          mitigation?: string | null
-          project_id?: string | null
-          resolved_at?: string | null
-          severity?: string
-          status?: string
-          title?: string
+          need_score?: number | null
+          notes?: string | null
+          planned_interviews?: number
+          segment_name?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "risk_register_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       tasks: {
         Row: {
@@ -1633,27 +2516,60 @@ export type Database = {
       }
     }
     Functions: {
+      compute_pipeline_validation: {
+        Args: { pain_point_uuid: string }
+        Returns: {
+          question_count: number
+          validated: boolean
+        }[]
+      }
       vector_search_news: {
         Args: {
-          query_embedding: string
-          match_threshold?: number
-          match_count?: number
-          filter_category?: Database["public"]["Enums"]["news_category"]
+          filter_category?: string
           filter_days?: number
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
         }
         Returns: {
-          id: string
-          title: string
-          summary: string | null
           category: Database["public"]["Enums"]["news_category"]
-          published_at: string | null
-          url: string
+          id: string
+          published_at: string
           similarity: number
+          summary: string
+          title: string
+          url: string
         }[]
       }
     }
     Enums: {
       news_category: "regulatory" | "corporate" | "macro" | "international"
+      persona_decision_style:
+        | "data_driven"
+        | "consensus_seeking"
+        | "risk_averse"
+        | "opportunistic"
+        | "process_oriented"
+      persona_market_segment:
+        | "sme"
+        | "public_company"
+        | "family_office"
+        | "hnw"
+        | "startup"
+        | "superannuation"
+      persona_sophistication_level: "novice" | "intermediate" | "expert"
+      stakeholder_role:
+        | "CFO"
+        | "CEO"
+        | "HR"
+        | "Treasury"
+        | "PeopleOps"
+        | "Other"
+      trigger_event_type:
+        | "FASB_CHANGE"
+        | "EMPLOYEE_BTC_REQUEST"
+        | "REGULATORY_UPDATE"
+        | "OTHER"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1780,6 +2696,31 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      news_category: ["regulatory", "corporate", "macro", "international"],
+      persona_decision_style: [
+        "data_driven",
+        "consensus_seeking",
+        "risk_averse",
+        "opportunistic",
+        "process_oriented",
+      ],
+      persona_market_segment: [
+        "sme",
+        "public_company",
+        "family_office",
+        "hnw",
+        "startup",
+        "superannuation",
+      ],
+      persona_sophistication_level: ["novice", "intermediate", "expert"],
+      stakeholder_role: ["CFO", "CEO", "HR", "Treasury", "PeopleOps", "Other"],
+      trigger_event_type: [
+        "FASB_CHANGE",
+        "EMPLOYEE_BTC_REQUEST",
+        "REGULATORY_UPDATE",
+        "OTHER",
+      ],
+    },
   },
 } as const
