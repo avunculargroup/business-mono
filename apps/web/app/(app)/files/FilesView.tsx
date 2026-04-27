@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Upload, Search, X, Download, Pencil, Trash2, Eye, EyeOff,
   FileText, FileImage, File, Tag, Files,
@@ -164,7 +163,6 @@ function TagInput({
 // ── Main component ─────────────────────────────────────────
 
 export function FilesView({ initialFiles }: { initialFiles: PlatformFile[] }) {
-  const router = useRouter();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadDialogRef = useRef<HTMLDialogElement>(null);
