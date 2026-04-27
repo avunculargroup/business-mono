@@ -14,6 +14,131 @@ export type Database = {
   }
   public: {
     Tables: {
+      advisor_partner_contacts: {
+        Row: {
+          advisor_partner_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          role: string | null
+        }
+        Insert: {
+          advisor_partner_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          role?: string | null
+        }
+        Update: {
+          advisor_partner_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisor_partner_contacts_advisor_partner_id_fkey"
+            columns: ["advisor_partner_id"]
+            isOneToOne: false
+            referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisor_partner_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisor_partner_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      advisors_partners: {
+        Row: {
+          active: boolean
+          bio: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          engagement_model: string | null
+          id: string
+          key_relationship_id: string | null
+          linkedin_url: string | null
+          logo_url: string | null
+          name: string
+          rate_notes: string | null
+          specialization: string | null
+          type: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          active?: boolean
+          bio?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          engagement_model?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name: string
+          rate_notes?: string | null
+          specialization?: string | null
+          type: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          active?: boolean
+          bio?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          engagement_model?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name?: string
+          rate_notes?: string | null
+          specialization?: string | null
+          type?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisors_partners_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisors_partners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisors_partners_key_relationship_id_fkey"
+            columns: ["key_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_activity: {
         Row: {
           action: string
@@ -127,124 +252,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      advisor_partner_contacts: {
-        Row: {
-          advisor_partner_id: string
-          contact_id: string
-          created_at: string
-          id: string
-          role: string | null
-        }
-        Insert: {
-          advisor_partner_id: string
-          contact_id: string
-          created_at?: string
-          id?: string
-          role?: string | null
-        }
-        Update: {
-          advisor_partner_id?: string
-          contact_id?: string
-          created_at?: string
-          id?: string
-          role?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "advisor_partner_contacts_advisor_partner_id_fkey"
-            columns: ["advisor_partner_id"]
-            isOneToOne: false
-            referencedRelation: "advisors_partners"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "advisor_partner_contacts_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      advisors_partners: {
-        Row: {
-          active: boolean
-          bio: string | null
-          company_id: string | null
-          created_at: string
-          created_by: string | null
-          engagement_model: string | null
-          id: string
-          key_relationship_id: string | null
-          linkedin_url: string | null
-          logo_url: string | null
-          name: string
-          rate_notes: string | null
-          specialization: string | null
-          type: string
-          updated_at: string
-          website: string | null
-        }
-        Insert: {
-          active?: boolean
-          bio?: string | null
-          company_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          engagement_model?: string | null
-          id?: string
-          key_relationship_id?: string | null
-          linkedin_url?: string | null
-          logo_url?: string | null
-          name: string
-          rate_notes?: string | null
-          specialization?: string | null
-          type: string
-          updated_at?: string
-          website?: string | null
-        }
-        Update: {
-          active?: boolean
-          bio?: string | null
-          company_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          engagement_model?: string | null
-          id?: string
-          key_relationship_id?: string | null
-          linkedin_url?: string | null
-          logo_url?: string | null
-          name?: string
-          rate_notes?: string | null
-          specialization?: string | null
-          type?: string
-          updated_at?: string
-          website?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "advisors_partners_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "advisors_partners_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "advisors_partners_key_relationship_id_fkey"
-            columns: ["key_relationship_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       assets: {
         Row: {
@@ -1991,6 +1998,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_key_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_overview"
             referencedColumns: ["id"]
           },
           {
