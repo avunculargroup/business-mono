@@ -28,6 +28,16 @@
   --color-agent-approved: #E8F4EE;
   --color-agent-rejected: #F8ECEC;
 
+  /* ── Status chip tints ── */
+  --color-warning-subtle: #FEF3C7;
+  --color-stage-warm-bg:   #FEF3C7;
+  --color-stage-warm-fg:   #92400E;
+  --color-stage-client-bg: #E8F4EE;
+  --color-stage-client-fg: #1E5C3F;
+
+  /* ── Focus glow ── */
+  --color-accent-glow: rgba(201, 168, 76, 0.12);
+
   /* ── Typography ── */
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;

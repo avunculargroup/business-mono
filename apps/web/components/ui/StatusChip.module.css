@@ -24,7 +24,7 @@
 }
 
 .warning {
-  background: #FFF4E0;
+  background: var(--color-warning-subtle);
   color: var(--color-warning);
 }
 

@@ -46,12 +46,8 @@ export default async function DailyDigestPage() {
   return (
     <>
       <PageHeader title="Daily digest">
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-          {dateLabel}
-        </span>
-        <Link href="/news" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent)' }}>
-          Full feed
-        </Link>
+        <span className={styles.headerMeta}>{dateLabel}</span>
+        <Link href="/news" className={styles.headerLink}>Full feed</Link>
       </PageHeader>
       <div className={styles.container}>
         {activeCats.length === 0 ? (

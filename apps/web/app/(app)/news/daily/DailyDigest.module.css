@@ -106,3 +106,18 @@
 .link:hover {
   color: var(--color-accent-hover);
 }
+
+.headerMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.headerLink {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.headerLink:hover {
+  color: var(--color-accent-hover);
+}
