@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 const ORG_ID = 'bts';
-export const FILES_BUCKET = 'platform-files';
+const FILES_BUCKET = 'platform-files';
 
 export type PlatformFile = {
   id: string;
