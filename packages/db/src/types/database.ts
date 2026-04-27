@@ -128,6 +128,124 @@ export type Database = {
         }
         Relationships: []
       }
+      advisor_partner_contacts: {
+        Row: {
+          advisor_partner_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          role: string | null
+        }
+        Insert: {
+          advisor_partner_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          role?: string | null
+        }
+        Update: {
+          advisor_partner_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisor_partner_contacts_advisor_partner_id_fkey"
+            columns: ["advisor_partner_id"]
+            isOneToOne: false
+            referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisor_partner_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      advisors_partners: {
+        Row: {
+          active: boolean
+          bio: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          engagement_model: string | null
+          id: string
+          key_relationship_id: string | null
+          linkedin_url: string | null
+          logo_url: string | null
+          name: string
+          rate_notes: string | null
+          specialization: string | null
+          type: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          active?: boolean
+          bio?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          engagement_model?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name: string
+          rate_notes?: string | null
+          specialization?: string | null
+          type: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          active?: boolean
+          bio?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          engagement_model?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name?: string
+          rate_notes?: string | null
+          specialization?: string | null
+          type?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisors_partners_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisors_partners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisors_partners_key_relationship_id_fkey"
+            columns: ["key_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           alt_text: string | null
@@ -1844,6 +1962,162 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      product_key_contacts: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          product_service_id: string
+          role: string | null
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          product_service_id: string
+          role?: string | null
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          product_service_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_key_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_key_contacts_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_referral_agreements: {
+        Row: {
+          active: boolean
+          agreement_type: string | null
+          counterparty_name: string | null
+          created_at: string
+          fee_structure: string | null
+          id: string
+          notes: string | null
+          percentage: number | null
+          product_service_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          agreement_type?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          fee_structure?: string | null
+          id?: string
+          notes?: string | null
+          percentage?: number | null
+          product_service_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          agreement_type?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          fee_structure?: string | null
+          id?: string
+          notes?: string | null
+          percentage?: number | null
+          product_service_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_referral_agreements_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products_services: {
+        Row: {
+          australian_owned: boolean
+          business_name: string | null
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          key_relationship_id: string | null
+          logo_url: string | null
+          name: string
+          product_image_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          australian_owned?: boolean
+          business_name?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          logo_url?: string | null
+          name: string
+          product_image_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          australian_owned?: boolean
+          business_name?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          key_relationship_id?: string | null
+          logo_url?: string | null
+          name?: string
+          product_image_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_services_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_services_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_services_key_relationship_id_fkey"
+            columns: ["key_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {

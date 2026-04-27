@@ -52,7 +52,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
     <>
       <PageHeader title={advisor.name} />
       <AdvisorDetail
-        advisor={advisor}
+        advisor={advisor as typeof advisor & { type: 'advisor' | 'partner' }}
         contacts={contacts ?? []}
         interactions={interactions ?? []}
         companies={companies ?? []}

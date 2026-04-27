@@ -37,7 +37,7 @@ export function ProductForm({ companies, teamMembers, onSuccess, onPendingChange
       return { error: result.error! };
     }
     success('Product added');
-    onSuccess(result.product as ProductRow);
+    onSuccess({ ...result.product, companies: null, team_members: null } as unknown as ProductRow);
     return null;
   };
 
