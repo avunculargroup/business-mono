@@ -1970,6 +1970,54 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_files: {
+        Row: {
+          bucket: string
+          byte_size: number | null
+          created_at: string
+          id: string
+          is_public: boolean
+          mime_type: string
+          name: string
+          org_id: string
+          original_filename: string
+          storage_path: string
+          tags: string[]
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          bucket?: string
+          byte_size?: number | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          mime_type: string
+          name: string
+          org_id?: string
+          original_filename: string
+          storage_path: string
+          tags?: string[]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          bucket?: string
+          byte_size?: number | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          mime_type?: string
+          name?: string
+          org_id?: string
+          original_filename?: string
+          storage_path?: string
+          tags?: string[]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       product_key_contacts: {
         Row: {
           contact_id: string
