@@ -22,6 +22,7 @@ import {
   Presentation,
   Rss,
   Globe,
+  HardDrive,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -69,6 +70,7 @@ const workNav = [
 const systemNav = [
   { href: '/activity', label: 'Agent Activity', icon: Activity },
   { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
+  { href: '/files',    label: 'Files',          icon: HardDrive },
   { href: '/company',  label: 'Company',         icon: Building2 },
 ];
 
@@ -128,6 +130,7 @@ const moreNav: MoreNavSection[] = [
     items: [
       { href: '/activity', label: 'Agent Activity', icon: Activity },
       { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
+      { href: '/files',    label: 'Files',          icon: HardDrive },
       { href: '/company',  label: 'Company',         icon: Building2 },
       { href: '/settings', label: 'Settings',       icon: Settings },
     ],
