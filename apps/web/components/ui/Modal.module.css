@@ -2,25 +2,19 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: var(--space-4);
   border: none;
   background: transparent;
-  padding: var(--space-4);
-  max-width: 100vw;
-  max-height: 100vh;
-  width: 100%;
-  height: 100%;
 }
 
 .dialog::backdrop {
   background: rgba(26, 25, 21, 0.4);
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
+.dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .panel {

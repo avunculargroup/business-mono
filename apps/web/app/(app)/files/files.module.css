@@ -326,12 +326,15 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border: none;
   background: transparent;
   padding: var(--space-4);
+}
+
+.uploadDialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   max-width: 100vw;
   max-height: 100vh;
   width: 100%;
