@@ -1347,3 +1347,91 @@ LANGUAGE sql STABLE AS $$
   ORDER BY similarity DESC
   LIMIT match_count;
 $$;
+
+
+-- ============================================================
+-- PRODUCTS & SERVICES
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS products_services (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                 TEXT        NOT NULL,
+  company_id           UUID        REFERENCES companies(id) ON DELETE SET NULL,
+  business_name        TEXT,
+  australian_owned     BOOLEAN     NOT NULL DEFAULT FALSE,
+  category             TEXT        CHECK (category IN (
+                         'custody', 'exchange', 'wallet_software', 'wallet_hardware',
+                         'payment_processing', 'treasury_management', 'education',
+                         'consulting', 'insurance', 'lending', 'other'
+                       )),
+  description          TEXT,
+  logo_url             TEXT,
+  product_image_url    TEXT,
+  key_relationship_id  UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_by           UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Child: referral agreements
+CREATE TABLE IF NOT EXISTS product_referral_agreements (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_service_id UUID        NOT NULL REFERENCES products_services(id) ON DELETE CASCADE,
+  agreement_type     TEXT        CHECK (agreement_type IN (
+                       'referral_fee', 'revenue_share', 'affiliate', 'strategic', 'other'
+                     )),
+  counterparty_name  TEXT,
+  fee_structure      TEXT,
+  percentage         NUMERIC(5,2),
+  active             BOOLEAN     NOT NULL DEFAULT TRUE,
+  notes              TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Junction: key contacts
+CREATE TABLE IF NOT EXISTS product_key_contacts (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_service_id UUID        NOT NULL REFERENCES products_services(id) ON DELETE CASCADE,
+  contact_id         UUID        NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  role               TEXT        CHECK (role IN ('primary', 'technical', 'sales', 'support', 'other')),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (product_service_id, contact_id)
+);
+
+
+-- ============================================================
+-- ADVISORS & PARTNERS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS advisors_partners (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                TEXT        NOT NULL,
+  type                TEXT        NOT NULL CHECK (type IN ('advisor', 'partner')),
+  company_id          UUID        REFERENCES companies(id) ON DELETE SET NULL,
+  specialization      TEXT,
+  engagement_model    TEXT        CHECK (engagement_model IN (
+                        'ongoing_retainer', 'project_based', 'ad_hoc',
+                        'revenue_share', 'honorary'
+                      )),
+  rate_notes          TEXT,
+  bio                 TEXT,
+  logo_url            TEXT,
+  website             TEXT,
+  linkedin_url        TEXT,
+  key_relationship_id UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  active              BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_by          UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Junction: key contacts
+CREATE TABLE IF NOT EXISTS advisor_partner_contacts (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  advisor_partner_id  UUID        NOT NULL REFERENCES advisors_partners(id) ON DELETE CASCADE,
+  contact_id          UUID        NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  role                TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (advisor_partner_id, contact_id)
+);
