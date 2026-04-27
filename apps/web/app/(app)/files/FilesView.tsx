@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Upload, Search, X, Download, Pencil, Trash2, Eye, EyeOff,
-  FileText, FileImage, File, Tag, Plus, Files,
+  FileText, FileImage, File, Tag, Files,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
