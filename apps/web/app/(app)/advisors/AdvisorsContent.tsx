@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { AdvisorsView } from '@/components/advisors/AdvisorsView';
+import { AdvisorsView, type AdvisorRow } from '@/components/advisors/AdvisorsView';
 
 export async function AdvisorsContent() {
   const supabase = await createClient();
@@ -19,7 +19,7 @@ export async function AdvisorsContent() {
 
   return (
     <AdvisorsView
-      advisors={advisors ?? []}
+      advisors={(advisors ?? []) as unknown as AdvisorRow[]}
       companies={companies ?? []}
       teamMembers={teamMembers ?? []}
     />

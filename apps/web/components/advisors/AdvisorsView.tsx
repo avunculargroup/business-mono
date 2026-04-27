@@ -11,7 +11,7 @@ import { AdvisorForm } from './AdvisorForm';
 import { getInitials } from '@/lib/utils';
 import styles from '@/app/(app)/advisors/advisors.module.css';
 
-type AdvisorRow = {
+export type AdvisorRow = {
   id: string;
   name: string;
   type: 'advisor' | 'partner';

@@ -37,7 +37,7 @@ export function AdvisorForm({ companies, teamMembers, onSuccess, onPendingChange
       return { error: result.error! };
     }
     success('Advisor added');
-    onSuccess(result.advisor as AdvisorRow);
+    onSuccess({ ...result.advisor, companies: null, team_members: null } as unknown as AdvisorRow);
     return null;
   };
 
