@@ -80,6 +80,7 @@ export function startBAListener(): void {
             action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
+            parent_activity_id: row.id,
             workflow_run_id: null,
             entity_type: null,
             entity_id: null,
@@ -87,7 +88,7 @@ export function startBAListener(): void {
             approved_actions: null,
             clarifications: null,
             notes: null,
-          });
+          } as never);
           return;
         }
 
@@ -96,6 +97,7 @@ export function startBAListener(): void {
           action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
           status: 'auto',
           trigger_type: 'agent',
+          parent_activity_id: row.id,
           workflow_run_id: null,
           entity_type: null,
           entity_id: null,
@@ -103,7 +105,7 @@ export function startBAListener(): void {
           approved_actions: [{ response: responseText }],
           clarifications: null,
           notes: null,
-        });
+        } as never);
 
         console.log(`[ba-listener] Completed dispatch from activity ${row.id}`);
       }

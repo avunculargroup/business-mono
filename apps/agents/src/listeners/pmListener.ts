@@ -137,6 +137,7 @@ export function startPMListener(mastra: Mastra): void {
             action: `Error parsing dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
+            parent_activity_id: row.id,
             workflow_run_id: null,
             entity_type: null,
             entity_id: null,
@@ -144,7 +145,7 @@ export function startPMListener(mastra: Mastra): void {
             approved_actions: null,
             clarifications: null,
             notes: null,
-          });
+          } as never);
           return;
         }
 
@@ -152,6 +153,21 @@ export function startPMListener(mastra: Mastra): void {
           const run = await mastra.getWorkflow('pm').createRun();
           const result = await run.start({ inputData: workflowInput });
           console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, result);
+
+          await supabase.from('agent_activity').insert({
+            agent_name: 'petra',
+            action: `Completed workflow for dispatch from activity ${row.id}: ${workflowInput.title}`,
+            status: 'auto',
+            trigger_type: 'agent',
+            parent_activity_id: row.id,
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: [{ title: workflowInput.title, result }],
+            clarifications: null,
+            notes: null,
+          } as never);
         } catch (err) {
           console.error('[pm-listener] PM workflow error:', err);
           await supabase.from('agent_activity').insert({
@@ -159,6 +175,7 @@ export function startPMListener(mastra: Mastra): void {
             action: `Error executing workflow for dispatch from activity ${row.id}: ${String(err)}`,
             status: 'error',
             trigger_type: 'agent',
+            parent_activity_id: row.id,
             workflow_run_id: null,
             entity_type: null,
             entity_id: null,
@@ -166,7 +183,7 @@ export function startPMListener(mastra: Mastra): void {
             approved_actions: null,
             clarifications: null,
             notes: null,
-          });
+          } as never);
         }
       }
     )

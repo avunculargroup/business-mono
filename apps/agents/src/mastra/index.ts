@@ -25,6 +25,7 @@ import { startRelationshipManagerListener } from '../listeners/relationshipManag
 import { startRecorderListener } from '../listeners/recorderListener.js';
 import { startArchivistListener } from '../listeners/archivistListener.js';
 import { startResearcherListener } from '../listeners/researcherListener.js';
+import { startSimonListener } from '../listeners/simonListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -171,6 +172,9 @@ startArchivistListener();
 
 // Start Supabase Realtime listener for Researcher dispatches
 startResearcherListener();
+
+// Start Supabase Realtime listener for specialist completions — relays results to directors via Signal
+startSimonListener();
 
 // Start Fastmail JMAP polling loop
 startFastmailListener();
