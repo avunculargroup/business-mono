@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-28 — Fix platform-files storage RLS
+
+**Migration:** `20260428120000_fix_platform_files_storage_rls.sql`
+
+The `20260427120000_add_platform_files` migration created the `platform_files` table and its RLS policy, but did not create the corresponding Supabase Storage bucket or `storage.objects` policies. Supabase's `createSignedUploadUrl` checks the `storage.objects` INSERT policy before issuing a token, so all uploads to the files page were failing with "new row violates row-level security policy".
+
+This migration adds:
+- **`storage.buckets` insert** — creates the `platform-files` private bucket (50 MB limit) if not already present.
+- **`storage.objects` policies** — INSERT, SELECT, UPDATE, DELETE for `authenticated` and `service_role` roles scoped to `bucket_id = 'platform-files'`.
+
+---
+
 ## 2026-04-26 — News Items (news aggregation feed)
 
 **Migration:** `20260426120000_add_news_items.sql`

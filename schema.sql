@@ -1471,3 +1471,31 @@ CREATE POLICY "platform_files_all" ON platform_files
   FOR ALL TO authenticated
   USING (true)
   WITH CHECK (true);
+
+-- ============================================================
+-- PLATFORM FILES — STORAGE BUCKET + POLICIES
+-- (migration: 20260428120000_fix_platform_files_storage_rls)
+-- createSignedUploadUrl checks storage.objects INSERT policy
+-- before issuing a token, so uploads require these policies.
+-- ============================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('platform-files', 'platform-files', false, 52428800, null)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "platform_files_objects_insert" ON storage.objects
+  FOR INSERT TO authenticated, service_role
+  WITH CHECK (bucket_id = 'platform-files');
+
+CREATE POLICY "platform_files_objects_select" ON storage.objects
+  FOR SELECT TO authenticated, service_role
+  USING (bucket_id = 'platform-files');
+
+CREATE POLICY "platform_files_objects_update" ON storage.objects
+  FOR UPDATE TO authenticated, service_role
+  USING (bucket_id = 'platform-files')
+  WITH CHECK (bucket_id = 'platform-files');
+
+CREATE POLICY "platform_files_objects_delete" ON storage.objects
+  FOR DELETE TO authenticated, service_role
+  USING (bucket_id = 'platform-files');
