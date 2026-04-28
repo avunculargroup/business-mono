@@ -28,19 +28,8 @@ export function Modal({ open, onClose, title, size = 'md', children, footer }: M
     }
   }, [open]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open) onClose();
-    };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
     <dialog ref={dialogRef} className={cn(styles.dialog, styles[size])} onClose={onClose}>
-      <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.panel}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
