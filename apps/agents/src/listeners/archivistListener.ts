@@ -1,8 +1,8 @@
 import { createRealtimeClient } from '@platform/db';
+import { runDispatch } from '../lib/dispatchRunner.js';
+import { archie } from '../agents/archivist/index.js';
 
 const supabase = createRealtimeClient();
-import type { CoreMessage } from 'ai';
-import { archie } from '../agents/archivist/index.js';
 
 type ProposedAction = {
   agent: string;
@@ -61,45 +61,14 @@ export function startArchivistListener(): void {
 
         console.log(`[archivist-listener] Dispatch received from activity ${row.id}`);
 
-        const messages: CoreMessage[] = [{ role: 'user', content: dispatch.message }];
-
-        let responseText: string;
-        try {
-          const result = await archie.generate(messages);
-          responseText = result.text;
-        } catch (err) {
-          console.error('[archivist-listener] Archivist error:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'archie',
-            action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
-          return;
-        }
-
-        await supabase.from('agent_activity').insert({
-          agent_name: 'archie',
-          action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
-          status: 'auto',
-          trigger_type: 'agent',
-          parent_activity_id: row.id,
-          workflow_run_id: null,
-          entity_type: null,
-          entity_id: null,
-          proposed_actions: null,
-          approved_actions: [{ response: responseText }],
-          clarifications: null,
-          notes: null,
-        } as never);
+        await runDispatch({
+          supabase,
+          agentName: 'archie',
+          dispatchActivityId: row.id,
+          dispatchMessage: dispatch.message,
+          run: async () => archie.generate([{ role: 'user', content: dispatch.message }]),
+          onSuccess: async (result) => ({ approvedActions: [{ response: result.text }] }),
+        });
 
         console.log(`[archivist-listener] Completed dispatch from activity ${row.id}`);
       }
