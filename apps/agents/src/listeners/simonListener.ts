@@ -83,6 +83,7 @@ export function startSimonListener(): void {
         if (row.agent_name === 'simon') return;
         if (!row.parent_activity_id) return;
         if (row.trigger_type !== 'agent') return;
+        if (row.status === 'in_progress') return; // start log — not a completion
 
         console.log(
           `[simon-listener] Completion from ${row.agent_name} (activity ${row.id}, parent ${row.parent_activity_id})`,
@@ -130,6 +131,7 @@ export function startSimonListener(): void {
           ? `${displayName} encountered an error on a task you dispatched.\n\nOriginal task: ${originalTask}\n\nError: ${row.action}\n\nCraft a brief Signal message notifying the director what failed and suggesting a next step.`
           : `${displayName} has completed a task you dispatched.\n\nOriginal task: ${originalTask}\n\nResult: ${resultText}\n\nCraft a brief Signal message relaying this to the director. Summarise — don't paste the raw output verbatim. Offer to share the full result if it's substantial.`;
 
+        const relayStartedAt = Date.now();
         let responseText: string;
         try {
           const result = await simon.generate(relayPrompt, {
@@ -155,20 +157,25 @@ export function startSimonListener(): void {
         }
 
         // Audit log for the relay itself
-        await supabase.from('agent_activity').insert({
-          agent_name: 'simon',
-          action: `Relayed ${displayName} ${isError ? 'error' : 'completion'} to director: ${originalTask.slice(0, 100)}`,
-          status: 'auto',
-          trigger_type: 'agent',
-          parent_activity_id: row.id,
-          workflow_run_id: null,
-          entity_type: null,
-          entity_id: null,
-          proposed_actions: null,
-          approved_actions: null,
-          clarifications: null,
-          notes: null,
-        } as never);
+        try {
+          const { error: auditError } = await supabase.from('agent_activity').insert({
+            agent_name: 'simon',
+            action: `Relayed ${displayName} ${isError ? 'error' : 'completion'} to director: ${originalTask.slice(0, 100)}`,
+            status: 'auto',
+            trigger_type: 'agent',
+            parent_activity_id: row.id,
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: null,
+            clarifications: null,
+            notes: JSON.stringify({ phase: 'completed', durationMs: Date.now() - relayStartedAt, dispatchActivityId: row.id }),
+          } as never);
+          if (auditError) console.error('[simon-listener] Failed to insert relay audit log:', auditError);
+        } catch (auditErr) {
+          console.error('[simon-listener] Failed to insert relay audit log:', auditErr);
+        }
       },
     )
     .subscribe((status, err) => {

@@ -105,6 +105,8 @@ export const AgentActivityStatus = {
   APPROVED: 'approved',
   REJECTED: 'rejected',
   AUTO: 'auto',
+  IN_PROGRESS: 'in_progress',
+  ERROR: 'error',
 } as const;
 export type AgentActivityStatus = (typeof AgentActivityStatus)[keyof typeof AgentActivityStatus];
 

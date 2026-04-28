@@ -1,8 +1,9 @@
 import type { Mastra } from '@mastra/core';
 import { createRealtimeClient } from '@platform/db';
+import { petra } from '../agents/pm/agent.js';
+import type { ActivityNotes } from '../lib/dispatchRunner.js';
 
 const supabase = createRealtimeClient();
-import { petra } from '../agents/pm/agent.js';
 
 type ProposedAction = {
   agent: string;
@@ -25,7 +26,6 @@ type WorkflowInput = {
   suggestedPriority?: 'low' | 'medium' | 'high' | 'urgent';
 };
 
-// Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
@@ -47,10 +47,6 @@ function scheduleReconnect(reason?: string): void {
   }, delay);
 }
 
-/**
- * Uses pmAgent to parse a free-text dispatch message into the structured
- * input expected by pmWorkflow.
- */
 async function parseDispatchToWorkflowInput(
   message: string,
   sourceActivityId: string,
@@ -77,7 +73,9 @@ Return ONLY a JSON object with these fields:
   try {
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-  } catch { /* fall back to defaults */ }
+  } catch (jsonParseErr) {
+    console.warn('[pm-listener] JSON parse failed on petra output, using title-only fallback:', jsonParseErr);
+  }
 
   return {
     title: (parsed['title'] as string | undefined) ?? message.slice(0, 120),
@@ -90,11 +88,6 @@ Return ONLY a JSON object with these fields:
   };
 }
 
-/**
- * Subscribes to agent_activity via Supabase Realtime.
- * When Simon dispatches to pm, parses the free-text message into structured
- * workflow input and executes pmWorkflow.
- */
 export function startPMListener(mastra: Mastra): void {
   mastraInstance = mastra;
 
@@ -123,6 +116,34 @@ export function startPMListener(mastra: Mastra): void {
 
         console.log(`[pm-listener] Dispatch received from activity ${row.id}`);
 
+        // Log that petra has started work so the UI shows activity immediately
+        const startedAt = Date.now();
+        const startNotes: ActivityNotes = {
+          phase: 'in_progress',
+          dispatchMessage: dispatch.message,
+          dispatchActivityId: row.id,
+          startedAt: new Date(startedAt).toISOString(),
+        };
+        try {
+          const { error } = await supabase.from('agent_activity').insert({
+            agent_name: 'petra',
+            action: `Processing dispatch from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
+            status: 'in_progress',
+            trigger_type: 'agent',
+            parent_activity_id: row.id,
+            workflow_run_id: null,
+            entity_type: null,
+            entity_id: null,
+            proposed_actions: null,
+            approved_actions: null,
+            clarifications: null,
+            notes: JSON.stringify(startNotes),
+          } as never);
+          if (error) console.error('[pm-listener] Failed to insert in_progress log:', error);
+        } catch (err) {
+          console.error('[pm-listener] Failed to insert in_progress log:', err);
+        }
+
         let workflowInput: WorkflowInput;
         try {
           workflowInput = await parseDispatchToWorkflowInput(
@@ -131,59 +152,96 @@ export function startPMListener(mastra: Mastra): void {
             dispatch.context,
           );
         } catch (err) {
+          const durationMs = Date.now() - startedAt;
           console.error('[pm-listener] Failed to parse dispatch:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'petra',
-            action: `Error parsing dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
+          const errorNotes: ActivityNotes = {
+            phase: 'error',
+            durationMs,
+            dispatchActivityId: row.id,
+            errorMessage: err instanceof Error ? err.message : String(err),
+            errorStack: err instanceof Error ? (err.stack ?? null) : null,
+          };
+          try {
+            const { error } = await supabase.from('agent_activity').insert({
+              agent_name: 'petra',
+              action: `Error parsing dispatch from activity ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+              status: 'error',
+              trigger_type: 'agent',
+              parent_activity_id: row.id,
+              workflow_run_id: null,
+              entity_type: null,
+              entity_id: null,
+              proposed_actions: null,
+              approved_actions: null,
+              clarifications: null,
+              notes: JSON.stringify(errorNotes),
+            } as never);
+            if (error) console.error('[pm-listener] Failed to insert parse-error log:', error);
+          } catch (insertErr) {
+            console.error('[pm-listener] Failed to insert parse-error log:', insertErr);
+          }
           return;
         }
 
         try {
           const run = await mastra.getWorkflow('pm').createRun();
           const result = await run.start({ inputData: workflowInput });
+          const durationMs = Date.now() - startedAt;
           console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, result);
 
-          await supabase.from('agent_activity').insert({
-            agent_name: 'petra',
-            action: `Completed workflow for dispatch from activity ${row.id}: ${workflowInput.title}`,
-            status: 'auto',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: [{ title: workflowInput.title, result }],
-            clarifications: null,
-            notes: null,
-          } as never);
+          const completedNotes: ActivityNotes = {
+            phase: 'completed',
+            durationMs,
+            dispatchActivityId: row.id,
+          };
+          try {
+            const { error } = await supabase.from('agent_activity').insert({
+              agent_name: 'petra',
+              action: `Completed workflow for dispatch from activity ${row.id}: ${workflowInput.title}`,
+              status: 'auto',
+              trigger_type: 'agent',
+              parent_activity_id: row.id,
+              workflow_run_id: null,
+              entity_type: null,
+              entity_id: null,
+              proposed_actions: null,
+              approved_actions: [{ title: workflowInput.title, result }],
+              clarifications: null,
+              notes: JSON.stringify(completedNotes),
+            } as never);
+            if (error) console.error('[pm-listener] Failed to insert completion log:', error);
+          } catch (insertErr) {
+            console.error('[pm-listener] Failed to insert completion log:', insertErr);
+          }
         } catch (err) {
+          const durationMs = Date.now() - startedAt;
           console.error('[pm-listener] PM workflow error:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'petra',
-            action: `Error executing workflow for dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
+          const errorNotes: ActivityNotes = {
+            phase: 'error',
+            durationMs,
+            dispatchActivityId: row.id,
+            errorMessage: err instanceof Error ? err.message : String(err),
+            errorStack: err instanceof Error ? (err.stack ?? null) : null,
+          };
+          try {
+            const { error } = await supabase.from('agent_activity').insert({
+              agent_name: 'petra',
+              action: `Error executing workflow for dispatch from activity ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+              status: 'error',
+              trigger_type: 'agent',
+              parent_activity_id: row.id,
+              workflow_run_id: null,
+              entity_type: null,
+              entity_id: null,
+              proposed_actions: null,
+              approved_actions: null,
+              clarifications: null,
+              notes: JSON.stringify(errorNotes),
+            } as never);
+            if (error) console.error('[pm-listener] Failed to insert workflow-error log:', error);
+          } catch (insertErr) {
+            console.error('[pm-listener] Failed to insert workflow-error log:', insertErr);
+          }
         }
       }
     )

@@ -1,8 +1,8 @@
 import { createRealtimeClient } from '@platform/db';
+import { runDispatch } from '../lib/dispatchRunner.js';
+import { della } from '../agents/relationshipManager/index.js';
 
 const supabase = createRealtimeClient();
-import type { CoreMessage } from 'ai';
-import { della } from '../agents/relationshipManager/index.js';
 
 type ProposedAction = {
   agent: string;
@@ -15,7 +15,6 @@ type ActivityRow = {
   proposed_actions: unknown;
 };
 
-// Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
@@ -36,11 +35,6 @@ function scheduleReconnect(reason?: string): void {
   }, delay);
 }
 
-/**
- * Subscribes to agent_activity via Supabase Realtime.
- * When Simon dispatches to della, invokes della.generate() with the provided
- * message and logs the result back to agent_activity.
- */
 export function startRelationshipManagerListener(): void {
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
@@ -67,45 +61,14 @@ export function startRelationshipManagerListener(): void {
 
         console.log(`[rm-listener] Dispatch received from activity ${row.id}`);
 
-        const messages: CoreMessage[] = [{ role: 'user', content: dispatch.message }];
-
-        let responseText: string;
-        try {
-          const result = await della.generate(messages);
-          responseText = result.text;
-        } catch (err) {
-          console.error('[rm-listener] Della error:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'della',
-            action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
-          return;
-        }
-
-        await supabase.from('agent_activity').insert({
-          agent_name: 'della',
-          action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
-          status: 'auto',
-          trigger_type: 'agent',
-          parent_activity_id: row.id,
-          workflow_run_id: null,
-          entity_type: null,
-          entity_id: null,
-          proposed_actions: null,
-          approved_actions: [{ response: responseText }],
-          clarifications: null,
-          notes: null,
-        } as never);
+        await runDispatch({
+          supabase,
+          agentName: 'della',
+          dispatchActivityId: row.id,
+          dispatchMessage: dispatch.message,
+          run: async () => della.generate([{ role: 'user', content: dispatch.message }]),
+          onSuccess: async (result) => ({ approvedActions: [{ response: result.text }] }),
+        });
 
         console.log(`[rm-listener] Completed dispatch from activity ${row.id}`);
       }

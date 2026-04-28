@@ -1,8 +1,8 @@
 import { createRealtimeClient } from '@platform/db';
+import { runDispatch } from '../lib/dispatchRunner.js';
+import { roger } from '../agents/recorder/agent.js';
 
 const supabase = createRealtimeClient();
-import type { CoreMessage } from 'ai';
-import { roger } from '../agents/recorder/agent.js';
 
 type ProposedAction = {
   agent: string;
@@ -61,45 +61,14 @@ export function startRecorderListener(): void {
 
         console.log(`[recorder-listener] Dispatch received from activity ${row.id}`);
 
-        const messages: CoreMessage[] = [{ role: 'user', content: dispatch.message }];
-
-        let responseText: string;
-        try {
-          const result = await roger.generate(messages);
-          responseText = result.text;
-        } catch (err) {
-          console.error('[recorder-listener] Recorder error:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'roger',
-            action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
-          return;
-        }
-
-        await supabase.from('agent_activity').insert({
-          agent_name: 'roger',
-          action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
-          status: 'auto',
-          trigger_type: 'agent',
-          parent_activity_id: row.id,
-          workflow_run_id: null,
-          entity_type: null,
-          entity_id: null,
-          proposed_actions: null,
-          approved_actions: [{ response: responseText }],
-          clarifications: null,
-          notes: null,
-        } as never);
+        await runDispatch({
+          supabase,
+          agentName: 'roger',
+          dispatchActivityId: row.id,
+          dispatchMessage: dispatch.message,
+          run: async () => roger.generate([{ role: 'user', content: dispatch.message }]),
+          onSuccess: async (result) => ({ approvedActions: [{ response: result.text }] }),
+        });
 
         console.log(`[recorder-listener] Completed dispatch from activity ${row.id}`);
       }

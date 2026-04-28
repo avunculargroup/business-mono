@@ -133,20 +133,25 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     .update({ messages: [...existingMessages, newUserMessage, simonMessage] })
     .eq('id', conv.id);
 
-  // Audit log
-  await supabase.from('agent_activity').insert({
-    agent_name: 'simon',
-    action: `Signal message from ${senderName}: ${userMessage.slice(0, 120)}`,
-    status: 'auto',
-    trigger_type: 'manual',
-    workflow_run_id: null,
-    entity_type: null,
-    entity_id: null,
-    proposed_actions: null,
-    approved_actions: null,
-    clarifications: null,
-    notes: null,
-  });
+  // Audit log — failure must never affect the Signal conversation
+  try {
+    const { error: auditError } = await supabase.from('agent_activity').insert({
+      agent_name: 'simon',
+      action: `Signal message from ${senderName}: ${userMessage.slice(0, 120)}`,
+      status: 'auto',
+      trigger_type: 'signal_message',
+      workflow_run_id: null,
+      entity_type: null,
+      entity_id: null,
+      proposed_actions: null,
+      approved_actions: null,
+      clarifications: null,
+      notes: null,
+    });
+    if (auditError) console.error('[signal-listener] Failed to insert audit log:', auditError);
+  } catch (err) {
+    console.error('[signal-listener] Failed to insert audit log:', err);
+  }
 }
 
 export function startSignalListener(): void {

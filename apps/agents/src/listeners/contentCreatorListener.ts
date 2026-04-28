@@ -1,8 +1,8 @@
 import { createRealtimeClient } from '@platform/db';
+import { runDispatch } from '../lib/dispatchRunner.js';
+import { charlie } from '../agents/contentCreator/index.js';
 
 const supabase = createRealtimeClient();
-import type { CoreMessage } from 'ai';
-import { charlie } from '../agents/contentCreator/index.js';
 
 type ProposedAction = {
   agent: string;
@@ -42,7 +42,6 @@ function parseContentOutput(text: string): { title: string | null; body: string 
   return { title: null, body: text };
 }
 
-// Module-level state so reconnect logic is properly deduped across calls
 let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
@@ -63,11 +62,6 @@ function scheduleReconnect(reason?: string): void {
   }, delay);
 }
 
-/**
- * Subscribes to agent_activity via Supabase Realtime.
- * When Simon dispatches to charlie, invokes contentCreator.generate()
- * with the provided message and logs the result back to agent_activity.
- */
 export function startContentCreatorListener(): void {
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
@@ -94,85 +88,63 @@ export function startContentCreatorListener(): void {
 
         console.log(`[content-creator-listener] Dispatch received from activity ${row.id}`);
 
-        const messages: CoreMessage[] = [{ role: 'user', content: dispatch.message }];
-
-        let responseText: string;
-        try {
-          const result = await charlie.generate(messages);
-          responseText = result.text;
-        } catch (err) {
-          console.error('[content-creator-listener] Content Creator error:', err);
-          await supabase.from('agent_activity').insert({
-            agent_name: 'charlie',
-            action: `Error processing dispatch from activity ${row.id}: ${String(err)}`,
-            status: 'error',
-            trigger_type: 'agent',
-            parent_activity_id: row.id,
-            workflow_run_id: null,
-            entity_type: null,
-            entity_id: null,
-            proposed_actions: null,
-            approved_actions: null,
-            clarifications: null,
-            notes: null,
-          } as never);
-          return;
-        }
-
-        // Listener owns persistence — save draft to content_items unconditionally
-        // rather than relying on Charlie's tool calls, which are unreliable.
         const existingContentItemId = dispatch.context?.['content_item_id'] as string | undefined;
-        const parsed = parseContentOutput(responseText);
 
-        let contentItemId: string | null = null;
-        if (existingContentItemId) {
-          // Revision: update the existing draft
-          const { data } = await supabase
-            .from('content_items')
-            .update({ body: parsed.body, updated_at: new Date().toISOString() })
-            .eq('id', existingContentItemId)
-            .select('id')
-            .single();
-          contentItemId = data?.id ?? existingContentItemId;
-        } else {
-          // First draft: insert a new content_items row
-          const { data, error: insertError } = await supabase
-            .from('content_items')
-            .insert({
-              title: parsed.title,
-              body: parsed.body,
-              type: inferContentType(dispatch.message),
-              status: 'draft',
-              source: 'content_agent',
-            })
-            .select('id')
-            .single();
-          if (insertError) {
-            console.error('[content-creator-listener] Failed to insert content_items:', insertError);
-          }
-          contentItemId = data?.id ?? null;
-        }
+        await runDispatch({
+          supabase,
+          agentName: 'charlie',
+          dispatchActivityId: row.id,
+          dispatchMessage: dispatch.message,
+          run: async () => charlie.generate([{ role: 'user', content: dispatch.message }]),
+          onSuccess: async (result) => {
+            // Listener owns persistence — save draft to content_items unconditionally
+            // rather than relying on Charlie's tool calls, which are unreliable.
+            const parsed = parseContentOutput(result.text);
+            let contentItemId: string | null = null;
 
-        if (contentItemId) {
-          console.log(`[content-creator-listener] Saved draft to content_items ${contentItemId}`);
-        } else {
-          console.warn('[content-creator-listener] Failed to save draft to content_items');
-        }
+            if (existingContentItemId) {
+              // Revision: update the existing draft
+              const { data } = await supabase
+                .from('content_items')
+                .update({ body: parsed.body, updated_at: new Date().toISOString() })
+                .eq('id', existingContentItemId)
+                .select('id')
+                .single();
+              contentItemId = data?.id ?? existingContentItemId;
+            } else {
+              // First draft: insert a new content_items row
+              const { data, error: insertError } = await supabase
+                .from('content_items')
+                .insert({
+                  title: parsed.title,
+                  body: parsed.body,
+                  type: inferContentType(dispatch.message),
+                  status: 'draft',
+                  source: 'content_agent',
+                })
+                .select('id')
+                .single();
 
-        await supabase.from('agent_activity').insert({
-          agent_name: 'charlie',
-          action: `Completed task dispatched from activity ${row.id}: ${dispatch.message.slice(0, 120)}`,
-          status: 'auto',
-          trigger_type: 'agent',
-          parent_activity_id: row.id,
-          workflow_run_id: null,
-          entity_type: contentItemId ? 'content_items' : null,
-          entity_id: contentItemId,
-          proposed_actions: null,
-          approved_actions: [{ response: responseText }],
-          clarifications: null,
-          notes: null,
-        } as never);
+              if (insertError) {
+                console.error('[content-creator-listener] Failed to insert content_items:', insertError);
+                throw new Error(`Failed to persist content_items: ${insertError.message}`);
+              }
+              contentItemId = data?.id ?? null;
+            }
+
+            if (!contentItemId) {
+              throw new Error('Failed to persist content_items — insert returned no id');
+            }
+
+            console.log(`[content-creator-listener] Saved draft to content_items ${contentItemId}`);
+            return {
+              entityType: 'content_items',
+              entityId: contentItemId,
+              approvedActions: [{ response: result.text }],
+              extra: { contentItemId },
+            };
+          },
+        });
 
         console.log(`[content-creator-listener] Completed dispatch from activity ${row.id}`);
       }

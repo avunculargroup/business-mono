@@ -10,7 +10,7 @@ export const logActivity = createTool({
   inputSchema: z.object({
     agentName: z.string().describe('Name of the agent logging the action'),
     action: z.string().describe('Description of the action taken'),
-    status: z.enum(['pending', 'approved', 'rejected', 'auto']).default('auto'),
+    status: z.enum(['pending', 'approved', 'rejected', 'auto', 'in_progress', 'error']).default('auto'),
     triggerType: z.string().optional().describe('What triggered this action'),
     workflowRunId: z.string().optional(),
     entityType: z.string().optional().describe('Type of entity acted on'),
