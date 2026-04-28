@@ -266,6 +266,7 @@
   bottom: 0;
   left: 0;
   right: 0;
+  max-height: 80vh;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   border-radius: 12px 12px 0 0;
@@ -273,11 +274,20 @@
   box-shadow: var(--shadow-md);
   transform: translateY(100%);
   transition: transform var(--duration-base) var(--ease-in-out);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .moreSheet.open {
   transform: translateY(0);
+}
+
+/* Sheet header — contains the visual handle and the close button */
+.moreSheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  flex-shrink: 0;
 }
 
 .moreSheetHandle {
@@ -285,7 +295,46 @@
   height: 4px;
   background: var(--color-border);
   border-radius: 2px;
-  margin: 12px auto 4px;
+}
+
+/* Close button — 44px tap target, icon-only ghost style */
+.moreSheetCloseBtn {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+.moreSheetCloseBtn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.moreSheetCloseBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Scrollable content area — prevents touch events bleeding through to page */
+.moreSheetScrollArea {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .moreSheetSection {
@@ -456,6 +505,7 @@
     display: block;
   }
   .moreSheet {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 }

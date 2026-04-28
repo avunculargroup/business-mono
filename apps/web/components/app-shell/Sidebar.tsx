@@ -23,6 +23,7 @@ import {
   Rss,
   Globe,
   HardDrive,
+  X,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { logout } from '@/app/actions/auth';
@@ -185,6 +186,11 @@ export function Sidebar({ pendingCount }: SidebarProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = isMoreOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMoreOpen]);
+
   return (
     <>
       <aside className={styles.sidebar}>
@@ -300,61 +306,73 @@ export function Sidebar({ pendingCount }: SidebarProps) {
         aria-modal="true"
         aria-label="More navigation"
       >
-        <div className={styles.moreSheetHandle} />
-        {moreNav.map((section) => (
-          <div key={section.label} className={styles.moreSheetSection}>
-            <span className={styles.moreSheetSectionLabel}>{section.label}</span>
-            {section.items.map((item) => {
-              const active = isActive(item.href);
-              const expanded = expandedSections.has(item.href);
+        <div className={styles.moreSheetHeader}>
+          <div className={styles.moreSheetHandle} />
+          <button
+            type="button"
+            className={styles.moreSheetCloseBtn}
+            onClick={() => setIsMoreOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={20} strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className={styles.moreSheetScrollArea}>
+          {moreNav.map((section) => (
+            <div key={section.label} className={styles.moreSheetSection}>
+              <span className={styles.moreSheetSectionLabel}>{section.label}</span>
+              {section.items.map((item) => {
+                const active = isActive(item.href);
+                const expanded = expandedSections.has(item.href);
 
-              if (item.children) {
-                return (
-                  <div key={item.href}>
-                    <button
-                      type="button"
-                      className={`${styles.moreSheetAccordionTrigger} ${active ? styles.moreSheetAccordionTriggerActive : ''}`}
-                      onClick={() => toggleSection(item.href)}
-                      aria-expanded={expanded}
-                    >
-                      <item.icon size={18} strokeWidth={1.5} />
-                      <span>{item.label}</span>
-                      <ChevronRight
-                        size={16}
-                        strokeWidth={1.5}
-                        className={`${styles.moreSheetChevron} ${expanded ? styles.moreSheetChevronOpen : ''}`}
-                      />
-                    </button>
-                    <div className={`${styles.moreSheetSubItems} ${expanded ? styles.moreSheetSubItemsOpen : ''}`}>
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={`${styles.moreSheetSubItem} ${pathname.startsWith(child.href) ? styles.moreSheetSubItemActive : ''}`}
-                          onClick={() => setIsMoreOpen(false)}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
+                if (item.children) {
+                  return (
+                    <div key={item.href}>
+                      <button
+                        type="button"
+                        className={`${styles.moreSheetAccordionTrigger} ${active ? styles.moreSheetAccordionTriggerActive : ''}`}
+                        onClick={() => toggleSection(item.href)}
+                        aria-expanded={expanded}
+                      >
+                        <item.icon size={18} strokeWidth={1.5} />
+                        <span>{item.label}</span>
+                        <ChevronRight
+                          size={16}
+                          strokeWidth={1.5}
+                          className={`${styles.moreSheetChevron} ${expanded ? styles.moreSheetChevronOpen : ''}`}
+                        />
+                      </button>
+                      <div className={`${styles.moreSheetSubItems} ${expanded ? styles.moreSheetSubItemsOpen : ''}`}>
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`${styles.moreSheetSubItem} ${pathname.startsWith(child.href) ? styles.moreSheetSubItemActive : ''}`}
+                            onClick={() => setIsMoreOpen(false)}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              }
+                  );
+                }
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`${styles.moreSheetItem} ${active ? styles.moreSheetItemActive : ''}`}
-                  onClick={() => setIsMoreOpen(false)}
-                >
-                  <item.icon size={18} strokeWidth={1.5} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`${styles.moreSheetItem} ${active ? styles.moreSheetItemActive : ''}`}
+                    onClick={() => setIsMoreOpen(false)}
+                  >
+                    <item.icon size={18} strokeWidth={1.5} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </>
   );
