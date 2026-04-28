@@ -101,6 +101,9 @@ export const notifySpecialist = createTool({
     agentName: z.enum(['roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della']),
     message: z.string().describe('Instruction or context to send to the specialist'),
     additionalContext: z.record(z.unknown()).optional().describe('Additional structured context'),
+    directorSignalId: z.string().optional().describe(
+      'Signal number of the director who originated this request (e.g. +1234567890). Always include this when dispatching in response to a Signal message so the completion can be relayed back automatically.',
+    ),
   }),
   execute: async (ctx) => {
     // Log the dispatch to agent_activity
@@ -111,6 +114,8 @@ export const notifySpecialist = createTool({
         action: `Dispatch to ${ctx.agentName}: ${ctx.message}`,
         status: 'auto',
         trigger_type: 'manual',
+        // trigger_ref holds the originating director's Signal ID so completions can be routed back
+        trigger_ref: ctx.directorSignalId ?? null,
         workflow_run_id: null,
         entity_type: null,
         entity_id: null,
