@@ -11,10 +11,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@tiptap/pm": "^2.11.5",
-    "@tiptap/react": "^2.11.5",
-    "@tiptap/starter-kit": "^2.11.5",
-    "tiptap-markdown": "^0.8.10",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -23,12 +19,17 @@
     "@platform/shared": "workspace:*",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@tiptap/pm": "^2.11.5",
+    "@tiptap/react": "^2.11.5",
+    "@tiptap/starter-kit": "^2.11.5",
     "lucide-react": "^0.460.0",
+    "mammoth": "^1.12.0",
     "next": "^15.1.0",
+    "pptxgenjs": "^3.12.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.0",
-    "pptxgenjs": "^3.12.0",
+    "tiptap-markdown": "^0.8.10",
     "zod": "^3.23.0"
   },
   "devDependencies": {

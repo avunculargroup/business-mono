@@ -176,6 +176,60 @@ export async function getDocument(id: string) {
   return data;
 }
 
+export async function importDocxDocument(formData: FormData) {
+  const file = formData.get('file') as File | null;
+  if (!file || file.size === 0) return { error: 'No file selected' };
+  if (!file.name.toLowerCase().endsWith('.docx')) return { error: 'File must be a .docx' };
+
+  const raw = {
+    type:        formData.get('type'),
+    title:       formData.get('title'),
+    description: formData.get('description'),
+    tags:        formData.get('tags'),
+  };
+
+  const parsed = documentSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const mammoth = require('mammoth') as any;
+  const { value: markdown } = await mammoth.convertToMarkdown({ buffer }) as { value: string };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const tags = parseTags(parsed.data.tags);
+
+  const { data: document, error: docErr } = await docs(supabase)
+    .insert({
+      type:        parsed.data.type,
+      title:       parsed.data.title,
+      description: parsed.data.description || null,
+      tags,
+      created_by:  user?.id ?? null,
+    })
+    .select()
+    .single();
+
+  if (docErr) return { error: docErr.message };
+
+  const { error: verErr } = await vers(supabase).insert({
+    document_id:    document.id,
+    version_number: 1,
+    status:         'draft',
+    content:        { markdown },
+    created_by:     user?.id ?? null,
+  });
+
+  if (verErr) return { error: verErr.message };
+
+  revalidatePath('/docs');
+  return { success: true, document };
+}
+
 function parseTags(raw: string | undefined): string[] {
   if (!raw) return [];
   try {
