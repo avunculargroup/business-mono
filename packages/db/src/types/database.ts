@@ -1151,6 +1151,80 @@ export type Database = {
           },
         ]
       }
+      document_versions: {
+        Row: {
+          approved_by: string | null
+          content: Json
+          created_at: string
+          created_by: string | null
+          document_id: string
+          id: string
+          status: string
+          version_number: number
+        }
+        Insert: {
+          approved_by?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          id?: string
+          status?: string
+          version_number: number
+        }
+        Update: {
+          approved_by?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          id?: string
+          status?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          tags: string[]
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          tags?: string[]
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          tags?: string[]
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fastmail_accounts: {
         Row: {
           created_at: string
