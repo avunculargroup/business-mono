@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-04-29 — Add documents tables
+
+- **`documents`** — general-purpose document records with `type` (report, proposal, brief, memo, strategy), title, description, and tags. Mirrors `mvp_templates` structure.
+- **`document_versions`** — versioned content for each document with the same `draft → approved → deprecated` status workflow as `mvp_template_versions`. Content stored as JSONB with `{ markdown: string }` shape.
+- Supports the new `/docs` Docs page in the web app for free-form document writing with version management.
+
+---
+
 ## 2026-04-28 — Fix platform-files storage RLS
 
 **Migration:** `20260428120000_fix_platform_files_storage_rls.sql`

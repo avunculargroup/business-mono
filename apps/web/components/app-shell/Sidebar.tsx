@@ -23,6 +23,7 @@ import {
   Rss,
   Globe,
   HardDrive,
+  ScrollText,
   X,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
@@ -48,6 +49,7 @@ const workNav = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderOpen },
   { href: '/content', label: 'Content', icon: FileText },
+  { href: '/docs', label: 'Docs', icon: ScrollText },
   { href: '/decks', label: 'Decks', icon: Presentation },
   { href: '/routines', label: 'Routines', icon: Clock },
   { href: '/news', label: 'News feed', icon: Rss, children: [
@@ -106,6 +108,7 @@ const moreNav: MoreNavSection[] = [
       { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
       { href: '/projects',  label: 'Projects',  icon: FolderOpen  },
       { href: '/content',   label: 'Content',   icon: FileText    },
+      { href: '/docs',      label: 'Docs',      icon: ScrollText  },
       { href: '/decks',     label: 'Decks',     icon: Presentation },
       { href: '/routines',  label: 'Routines',  icon: Clock       },
       { href: '/news', label: 'News feed', icon: Rss, children: [
