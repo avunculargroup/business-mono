@@ -184,8 +184,8 @@ export async function importDocxDocument(formData: FormData) {
   const raw = {
     type:        formData.get('type'),
     title:       formData.get('title'),
-    description: formData.get('description'),
-    tags:        formData.get('tags'),
+    description: formData.get('description') ?? undefined,
+    tags:        formData.get('tags') ?? undefined,
   };
 
   const parsed = documentSchema.safeParse(raw);
