@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS document_versions (
 
 CREATE TRIGGER documents_updated_at
   BEFORE UPDATE ON documents
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE documents         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_versions ENABLE ROW LEVEL SECURITY;
