@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { importDocxDocument } from '@/app/actions/documents';
 import { useToast } from '@/providers/ToastProvider';
-import { Upload, X } from 'lucide-react';
+import { Upload, FileText, X } from 'lucide-react';
 import styles from './DocForm.module.css';
 import importStyles from './ImportDocxForm.module.css';
 
@@ -12,12 +12,19 @@ interface ImportDocxFormProps {
   onPendingChange?: (pending: boolean) => void;
 }
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormProps) {
   const { success, error } = useToast();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [fileName, setFileName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addTag = () => {
@@ -26,18 +33,34 @@ export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormPro
     setTagInput('');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) { setFileName(''); setTitle(''); return; }
-    setFileName(file.name);
-    // Pre-fill title from filename (strip .docx extension)
+  const applyFile = (file: File) => {
+    setSelectedFile(file);
     const base = file.name.replace(/\.docx$/i, '').replace(/[-_]/g, ' ');
     setTitle(base.charAt(0).toUpperCase() + base.slice(1));
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    setTitle('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) applyFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.toLowerCase().endsWith('.docx')) applyFile(file);
   };
 
   const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
     formData.set('tags', JSON.stringify(tags));
     formData.set('title', title);
+    if (selectedFile) formData.set('file', selectedFile);
 
     const result = await importDocxDocument(formData);
     if (result.error) { error(result.error); return { error: result.error }; }
@@ -54,25 +77,43 @@ export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormPro
     <form id="import-docx-form" action={formAction} className={styles.form}>
       <div className={styles.field}>
         <label className={styles.label}>File <span className={styles.required}>*</span></label>
-        <div
-          className={importStyles.dropZone}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {fileName ? (
-            <span className={importStyles.fileName}>{fileName}</span>
-          ) : (
-            <>
-              <Upload size={20} strokeWidth={1.5} className={importStyles.uploadIcon} />
-              <span>Click to choose a .docx file</span>
-            </>
-          )}
-        </div>
+
+        {selectedFile ? (
+          <div className={importStyles.selectedFile}>
+            <div className={importStyles.selectedFileIcon}>
+              <FileText size={18} strokeWidth={1.5} />
+            </div>
+            <div className={importStyles.selectedFileInfo}>
+              <div className={importStyles.selectedFileName}>{selectedFile.name}</div>
+              <div className={importStyles.selectedFileSize}>{formatBytes(selectedFile.size)}</div>
+            </div>
+            <button type="button" className={importStyles.selectedFileClear} onClick={clearFile} aria-label="Remove file">
+              <X size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+        ) : (
+          <div
+            className={`${importStyles.dropzone} ${dragOver ? importStyles.dragOver : ''}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+            aria-label="Drop a .docx file here or click to select"
+          >
+            <Upload size={24} strokeWidth={1.5} />
+            <span className={importStyles.dropzoneText}>Drop a .docx file here or click to select</span>
+            <span className={importStyles.dropzoneHint}>Word documents (.docx) only</span>
+          </div>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
           name="file"
           accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          required
           className={importStyles.hiddenInput}
           onChange={handleFileChange}
         />
