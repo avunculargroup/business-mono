@@ -26,6 +26,8 @@ Return as a JSON array of risk objects.`;
 export const petra = new Agent({
   id: 'petra',
   name: 'petra',
+  description:
+    'Project manager. Risk identification across the task and project portfolio — overdue, blocked, stale, deadline-approaching, workload-concentrated. Use to ask about portfolio status, risks, or to reason about a specific task/project. Note: task creation flows go through the PM workflow (triggered by the pm listener), not direct delegation. Input: directive plus relevant task/project ids. Output: ranked risk list or status answer in JSON.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

@@ -18,14 +18,8 @@ import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
 import { startWebDirectivesListener } from '../listeners/webDirectives.js';
 import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
-import { startBAListener } from '../listeners/baListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startRoutineListener } from '../listeners/routineListener.js';
-import { startRelationshipManagerListener } from '../listeners/relationshipManagerListener.js';
-import { startRecorderListener } from '../listeners/recorderListener.js';
-import { startArchivistListener } from '../listeners/archivistListener.js';
-import { startResearcherListener } from '../listeners/researcherListener.js';
-import { startSimonListener } from '../listeners/simonListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -146,35 +140,22 @@ export const mastra = new Mastra({
 // Start Supabase Realtime listener for web directives
 startWebDirectivesListener();
 
-// Start Signal polling loop
+// Start Signal polling loop — Simon receives messages here and delegates natively
+// to specialists registered as subagents (see ../agents/simon/index.ts).
 startSignalListener();
 
-// Start Supabase Realtime listener for Content Creator dispatches
+// Start Supabase Realtime listener for Content Creator dispatches.
+// Charlie persists drafts to content_items via this listener when other agents
+// (e.g. recorder workflow) propose content via agent_activity rows.
+// Simon-originated content delegation goes through Charlie natively as a subagent.
 startContentCreatorListener();
 
-// Start Supabase Realtime listener for BA dispatches
-startBAListener();
-
-// Start Supabase Realtime listener for PM dispatches
+// Start Supabase Realtime listener for PM dispatches — picks up proposed_actions
+// rows from the recorder workflow and routes them through the PM workflow.
 startPMListener(mastra);
 
 // Start hourly routine check for scheduled agent routines
 startRoutineListener(mastra);
-
-// Start Supabase Realtime listener for Relationship Manager dispatches
-startRelationshipManagerListener();
-
-// Start Supabase Realtime listener for Recorder dispatches
-startRecorderListener();
-
-// Start Supabase Realtime listener for Archivist dispatches
-startArchivistListener();
-
-// Start Supabase Realtime listener for Researcher dispatches
-startResearcherListener();
-
-// Start Supabase Realtime listener for specialist completions — relays results to directors via Signal
-startSimonListener();
 
 // Start Fastmail JMAP polling loop
 startFastmailListener();

@@ -141,6 +141,8 @@ If you are responding to a revision request rather than producing a full new dra
 export const charlie = new Agent({
   id: 'charlie',
   name: 'charlie',
+  description:
+    'Content creator. Drafts and revises emails, newsletters, LinkedIn/Twitter posts, and blog articles in BTS brand voice. Use whenever a directive asks for written content for an external (or internal-but-polished) audience. Always wrap the final draft in a single <content_output><title>…</title><body>…</body></content_output> block — that is the contract used by the persistence layer. Input: directive describing the content type, audience, and key points. Output: reasoning followed by a single <content_output> block.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

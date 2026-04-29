@@ -494,7 +494,13 @@ const persistAndSchedule = createStep({
         notes: outcome.error ?? outcome.change_summary ?? null,
       });
 
-      // monitor_change notify flow (preserves legacy behaviour).
+      // monitor_change notify flow.
+      // The previous implementation wrote a proposed_actions row that the deleted
+      // specialist dispatch listeners (archivist/ba/recorder/relationshipManager/
+      // researcher) consumed. After the supervisor migration those listeners are
+      // gone; this row remains as an audit trail only. Re-wiring monitor_change to
+      // delegate via Simon's supervisor (or to invoke the target agent directly)
+      // is deferred to the Tier 1.4 split of this workflow.
       if (
         outcome.action_type === 'monitor_change' &&
         outcome.has_changed &&
