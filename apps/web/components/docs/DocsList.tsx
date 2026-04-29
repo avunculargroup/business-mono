@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { DocForm } from './DocForm';
+import { ImportDocxForm } from './ImportDocxForm';
 import { formatRelativeDate } from '@/lib/utils';
 import { DOCUMENT_TYPE_LABELS, type DocumentType } from '@platform/shared';
-import { ScrollText, Plus, Eye, Pencil } from 'lucide-react';
+import { ScrollText, Plus, ChevronDown, FileText, Upload, Eye, Pencil } from 'lucide-react';
 import styles from './DocsList.module.css';
 
 export type DocumentVersionRow = {
@@ -49,12 +50,25 @@ interface DocsListProps {
 
 export function DocsList({ initialDocuments }: DocsListProps) {
   const [documents] = useState(initialDocuments);
-  const [showCreate,  setShowCreate]  = useState(false);
-  const [editDoc,     setEditDoc]     = useState<DocumentRow | null>(null);
-  const [filterType,  setFilterType]  = useState('');
+  const [showCreate,   setShowCreate]   = useState(false);
+  const [showImport,   setShowImport]   = useState(false);
+  const [editDoc,      setEditDoc]      = useState<DocumentRow | null>(null);
+  const [filterType,   setFilterType]   = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const filtered = useMemo(() => {
     return documents.filter((d) => {
@@ -80,10 +94,31 @@ export function DocsList({ initialDocuments }: DocsListProps) {
             <option value="strategy">Strategy</option>
           </select>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-          <Plus size={16} strokeWidth={1.5} />
-          New document
-        </Button>
+        <div ref={menuRef} className={styles.createMenu}>
+          <Button variant="primary" size="sm" onClick={() => setMenuOpen((o) => !o)}>
+            <Plus size={16} strokeWidth={1.5} />
+            New document
+            <ChevronDown size={14} strokeWidth={1.5} className={menuOpen ? styles.chevronOpen : styles.chevron} />
+          </Button>
+          {menuOpen && (
+            <div className={styles.createDropdown}>
+              <button
+                className={styles.createOption}
+                onClick={() => { setMenuOpen(false); setShowCreate(true); }}
+              >
+                <FileText size={15} strokeWidth={1.5} />
+                Blank document
+              </button>
+              <button
+                className={styles.createOption}
+                onClick={() => { setMenuOpen(false); setShowImport(true); }}
+              >
+                <Upload size={15} strokeWidth={1.5} />
+                Import .docx
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -159,6 +194,24 @@ export function DocsList({ initialDocuments }: DocsListProps) {
       >
         <DocForm
           onSuccess={(id) => { setShowCreate(false); if (id) router.push(`/docs/${id}`); else router.refresh(); }}
+          onPendingChange={setIsSubmitting}
+        />
+      </SlideOver>
+
+      {/* Import .docx */}
+      <SlideOver
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        title="Import .docx"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowImport(false)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="import-docx-form" loading={isSubmitting}>Import document</Button>
+          </>
+        }
+      >
+        <ImportDocxForm
+          onSuccess={(id) => { setShowImport(false); if (id) router.push(`/docs/${id}`); else router.refresh(); }}
           onPendingChange={setIsSubmitting}
         />
       </SlideOver>
