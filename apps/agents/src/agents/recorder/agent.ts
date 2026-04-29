@@ -28,6 +28,8 @@ Always return structured JSON matching the InteractionExtractedData shape.`;
 export const roger = new Agent({
   id: 'roger',
   name: 'roger',
+  description:
+    'Recorder. Reasoning component of the transcription pipeline — speaker identification, entity extraction (decisions, action items, topics, sentiment, commitments), and CRM matching against existing contacts/companies. Primary trigger is the recorder workflow (Telnyx/Zoom/Deepgram); only delegate directly when reasoning over an already-transcribed conversation is needed. Input: transcript plus participant context. Output: structured InteractionExtractedData JSON.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

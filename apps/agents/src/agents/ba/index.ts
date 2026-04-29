@@ -52,6 +52,8 @@ Before structuring requirements, query the Archivist's knowledge base for:
 export const bruno = new Agent({
   id: 'bruno',
   name: 'bruno',
+  description:
+    'Business analyst. Turns ambiguous director requests into structured requirements: clarifying questions, acceptance criteria, scope, and conflicts with existing strategy. Use when a directive is large, vague, or cross-cutting and needs scoping before work starts. Input: the raw directive plus any background. Output: a structured requirements summary or a set of clarification questions.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

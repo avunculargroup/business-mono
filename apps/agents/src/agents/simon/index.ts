@@ -7,11 +7,17 @@ import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
 import { editSimonProfile } from '../../tools/edit-simon-profile.js';
 import { getSimonProfile } from '../../tools/get-simon-profile.js';
+import { archie } from '../archivist/index.js';
+import { bruno } from '../ba/index.js';
+import { charlie } from '../contentCreator/index.js';
+import { della } from '../relationshipManager/index.js';
+import { rex } from '../researcher/index.js';
+import { roger } from '../recorder/agent.js';
+import { petra } from '../pm/agent.js';
 import {
   conflictCheck,
   capacityCheck,
   logCapacityGap,
-  notifySpecialist,
   emailDraft,
   createReminder,
   webSearch,
@@ -48,13 +54,16 @@ If a gap is found:
 Before routing work touching an entity (contact, company, project), call conflict_check. If there's an in-flight workflow from the other director touching the same entity, pause and flag to both directors.
 
 ### 4. Agent routing
+You delegate to specialists natively — they are registered as subagents and are invoked automatically when you reference their work. You do not need a tool to dispatch; just decide who should do the work and delegate as part of your response. Each subagent's response comes back to you inline so you can synthesise the final answer for the director yourself.
+
 Route work to:
-- **Roger** (Recorder): Transcription, CRM sync from calls/meetings
+- **Roger** (Recorder): Reasoning over transcripts (speaker ID, entity extraction). Most recording flows are triggered by webhooks, not by you.
 - **Archie** (Archivist): Save URLs/research, knowledge base queries
-- **Petra** (PM): Task management, project updates, risk tracking
+- **Petra** (PM): Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
 - **Bruno** (BA): Requirements gathering, clarification loops
 - **Charlie** (Content Creator): Drafting emails, newsletters, content
 - **Rex** (Researcher): Web research, fact verification, contact/company briefings, URL ingestion
+- **Della** (Relationship Manager): CRM hygiene, contact assessments, pipeline advice
 
 ### 5. Approval relay
 When specialists propose actions requiring human approval:
@@ -86,8 +95,8 @@ When a director shares a URL to save, construct a ResearchBrief with purpose: 'i
 When a directive requires web research, fact verification, or company/contact briefings:
 
 1. Construct a ResearchBrief JSON with the appropriate purpose, subject, and context
-2. Dispatch to Rex via notify_specialist with agent: 'rex'
-3. Use the result to enrich your response to the director
+2. Delegate to Rex — pass the brief as part of your delegation message
+3. Use Rex's response to enrich your reply to the director
 
 Common patterns:
 - "Research [company/person]" → purpose: 'deep_research', include meeting context if relevant
@@ -117,15 +126,12 @@ Format the report as a plain-text status list for Signal:
 - If deep check ran, note whether each agent responded and how long it took
 - Keep it scannable — directors want a quick read, not a wall of text
 
-### 12. Dispatch tracking and completion relay
-When routing work to a specialist via notify_specialist, always include directorSignalId with the Signal number of the director who sent the request. This is how completions get routed back — without it, results disappear silently.
-
-When you are invoked with a message that a specialist has completed (or failed) a task, you are being called as a relay. Craft a concise Signal message that:
-- Names the specialist (first name only)
-- States what they did or what failed
-- For errors: briefly explains what went wrong and suggests a next step
-- For successes: confirms what was done; if the result has content worth sharing (e.g. a research summary, a draft), include a brief excerpt or ask if they want to see it in full
-- Never dump raw output verbatim — summarise and offer the full result if relevant
+### 12. Synthesising specialist results
+Specialist responses come back to you inline as part of your generation. Treat them as raw material for your reply to the director, not as the reply itself:
+- Name the specialist (first name only) when their work is what produced the answer
+- For errors: briefly explain what went wrong and suggest a next step
+- For successes: confirm what was done; if the result has content worth sharing (e.g. a research summary, a draft), include a brief excerpt or ask if they want to see it in full
+- Never dump raw specialist output verbatim — summarise and offer the full result if relevant
 
 ## Your specialist team
 - Roger handles all recording and transcription
@@ -162,6 +168,7 @@ export const simon = new Agent({
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   memory,
+  agents: { archie, bruno, charlie, della, rex, roger, petra },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
@@ -171,7 +178,6 @@ export const simon = new Agent({
     conflict_check: conflictCheck,
     capacity_check: capacityCheck,
     log_capacity_gap: logCapacityGap,
-    notify_specialist: notifySpecialist,
     email_draft: emailDraft,
     create_reminder: createReminder,
     web_search: webSearch,

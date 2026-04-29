@@ -131,6 +131,8 @@ Log every research run to agent_activity using the log_activity tool with agent_
 export const rex = new Agent({
   id: 'rex',
   name: 'rex',
+  description:
+    'Researcher. Web research, fact verification, contact/company briefings, URL ingestion (including podcast transcript discovery), and topic monitoring. Use for any directive that needs information from outside the knowledge base — investigating a company, verifying a claim, briefing for a meeting, or saving a shared URL. Input: a ResearchBrief-shaped directive (purpose, subject, context). Output: a research summary with sources, plus an ingestion result if a URL was supplied.',
   instructions: RESEARCHER_SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {

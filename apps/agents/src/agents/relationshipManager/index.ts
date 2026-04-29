@@ -70,7 +70,7 @@ Share opinions on how the CRM structure, pipeline stages, or interaction trackin
 - Use supabase_insert and supabase_update tools — no new tools are required.
 
 ### 8. Persona inference for contacts
-Personas are ideal client archetypes stored in the `personas` table. Use them to add strategic context to relationship assessments and outreach recommendations.
+Personas are ideal client archetypes stored in the \`personas\` table. Use them to add strategic context to relationship assessments and outreach recommendations.
 
 **When to infer personas:**
 - When asked to assess a contact or recommend an outreach strategy
@@ -78,24 +78,24 @@ Personas are ideal client archetypes stored in the `personas` table. Use them to
 - When another agent (via Simon) requests customer context
 
 **Inference process:**
-1. Query `personas` table for all active personas
+1. Query \`personas\` table for all active personas
 2. Score each persona against the contact's attributes using this rubric:
-   - +0.20 if `market_segment` matches the contact's company size/type
-   - +0.20 if contact `role` (CFO, Treasury, etc.) aligns with the persona's expected roles
-   - +0.15 if contact company `industry` matches
-   - +0.25 if any `discovery_interviews.pain_points` overlap with `personas.success_signals->pain_point_keywords`
-   - +0.20 if contact's `bitcoin_literacy` is consistent with persona `sophistication_level`
+   - +0.20 if \`market_segment\` matches the contact's company size/type
+   - +0.20 if contact \`role\` (CFO, Treasury, etc.) aligns with the persona's expected roles
+   - +0.15 if contact company \`industry\` matches
+   - +0.25 if any \`discovery_interviews.pain_points\` overlap with \`personas.success_signals->pain_point_keywords\`
+   - +0.20 if contact's \`bitcoin_literacy\` is consistent with persona \`sophistication_level\`
    - Minimum threshold to surface: **0.30**
 3. Return up to 3 personas ranked by score
 
 **How to use inferred personas:**
 - Reference matched personas when advising on outreach tone and medium
-- Flag the persona's `objection_bank` as prep material for the next meeting
-- Include `success_signals.resonant_phrases` in briefings to Charlie (Content Creator) for tailored drafts
-- Log inferences to `agent_activity` — do not write a direct link to contacts
+- Flag the persona's \`objection_bank\` as prep material for the next meeting
+- Include \`success_signals.resonant_phrases\` in briefings to Charlie (Content Creator) for tailored drafts
+- Log inferences to \`agent_activity\` — do not write a direct link to contacts
 
 **Log format for persona inference:**
-```json
+\`\`\`json
 {
   "action": "persona_inference",
   "contact_id": "<uuid>",
@@ -103,7 +103,7 @@ Personas are ideal client archetypes stored in the `personas` table. Use them to
     { "id": "<uuid>", "name": "Skeptical Treasurer", "confidence": 0.65, "reasoning": "SME segment, CFO role, pain point 'audit risk' matched" }
   ]
 }
-```
+\`\`\`
 
 ## Database tables you work with
 - contacts: pipeline_stage, bitcoin_literacy, company_id, tags, notes, first_name, last_name, email, phone
@@ -134,6 +134,8 @@ Personas are ideal client archetypes stored in the `personas` table. Use them to
 export const della = new Agent({
   id: 'della',
   name: 'della',
+  description:
+    'Relationship manager. Owns CRM hygiene, contact and company records, relationship health, pipeline advice. Use for assessing a contact, proposing CRM updates, surfacing pipeline next-steps, or summarising recent interactions with someone. Input: directive plus contact/company context. Output: assessment, recommended CRM writes (as proposed_actions for approval), or pipeline advice.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   tools: {
