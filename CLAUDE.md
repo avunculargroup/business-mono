@@ -2,6 +2,34 @@
 
 This is the internal business platform for Bitcoin Treasury Solutions (BTS) — a Bitcoin education, consulting, and treasury implementation company. Two co-founders, pre-revenue, building an AI-powered operations platform.
 
+## Coding Behavior
+
+**Bias toward caution over speed. For trivial tasks, use judgment.**
+
+### Think Before Coding
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If something is unclear, stop. Name what's confusing. Ask.
+- If a simpler approach exists, say so and push back.
+
+### Simplicity First
+- No features beyond what was asked. No speculative abstractions or configurability.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+### Surgical Changes
+- Don't "improve" adjacent code, comments, or formatting.
+- Match existing style, even if you'd do it differently.
+- Remove only imports/variables/functions that YOUR changes made unused.
+- Mention pre-existing dead code — don't delete it.
+
+### Goal-Driven Execution
+Transform tasks into verifiable goals before implementing:
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- For multi-step tasks, state a brief plan with a verify step for each.
+
+-----
+
 ## Monorepo Structure
 
 ```
@@ -26,9 +54,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 └── turbo.json
 ```
 
-**Package manager**: pnpm workspaces
-**Build orchestration**: Turborepo
-**Deploy**: `apps/agents` → Railway, `apps/web` → Vercel
+**Package manager**: pnpm workspaces | **Build**: Turborepo | **Deploy**: `apps/agents` → Railway, `apps/web` → Vercel
 
 ### Package naming
 
@@ -53,7 +79,7 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 - **Frontend**: Next.js (`apps/web`) → Vercel
 - **Agent Server**: Mastra AI (`apps/agents`) → Railway — TypeScript, ES2022 modules
 - **Database**: Supabase (Postgres + pgvector + RLS)
-- **Communication**: Signal CLI (Simon’s dedicated number)
+- **Communication**: Signal CLI (Simon's dedicated number)
 - **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB, Della analyses content)
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
@@ -80,7 +106,7 @@ Mastra requires ES2022 modules. All packages extend `tsconfig.base.json`:
 
 ## Architecture: Hub-and-Spoke
 
-Simon is the central coordinator. All other agents are specialists. Directors interact ONLY with Simon via Signal (future: also via `apps/web`). Specialists never message humans directly.
+Simon is the central coordinator. Directors interact ONLY with Simon via Signal (future: also via `apps/web`). Specialists never message humans directly.
 
 ```
 Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
@@ -92,52 +118,40 @@ Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
 
 1. **Via Simon**: Simon dispatches work to specialists and relays results to directors. Default path.
 1. **Via database events**: Some agent outputs trigger other agents implicitly (e.g. Recorder proposes tasks → PM picks them up from `agent_activity`).
-1. **Read-only knowledge queries**: Any agent can query the Archivist’s knowledge base directly without going through Simon. Only direct cross-agent call allowed.
+1. **Read-only knowledge queries**: Any agent can query the Archivist's knowledge base directly. The only permitted direct cross-agent call.
 
 ### Capacity awareness
 
-Simon maintains awareness of what the platform can and cannot do. Before routing any directive, Simon checks for capacity gaps across four dimensions: no agent for the task, missing tool on an existing agent, workload overload on the assignee, or broken capability chain across multiple agents. When a gap is found, Simon surfaces what CAN be done, what CANNOT, and recommends alternatives (manual workaround, defer, or build new capability). Gaps are logged to `capacity_gaps` table — patterns of recurring gaps tell the directors what to build next. Simon includes unresolved gaps in the morning briefing and proactively suggests new capabilities when gap patterns emerge. See `docs/agents/simon.md` for full spec.
+Simon checks for gaps before routing any directive: no agent for the task, missing tool on an existing agent, workload overload, or broken capability chain. When a gap is found, Simon surfaces what CAN/CANNOT be done and recommends alternatives. Gaps are logged to `capacity_gaps` and included in the morning briefing. See `docs/agents/simon.md` for the full spec.
 
 -----
 
 ## Agent Roster
 
-|Agent          |Mastra Type     |Spec                            |Primary Domain                                                         |
-|---------------|----------------|--------------------------------|-----------------------------------------------------------------------|
-|Simon          |Agent           |`docs/agents/simon.md`          |Orchestration, Signal interface, conflict detection, capacity awareness|
-|Recorder       |Workflow + Agent|`docs/agents/recorder.md`       |Transcription, entity extraction, CRM sync                             |
-|Archivist      |Agent           |`docs/agents/archivist.md`      |Knowledge management, hybrid search                                    |
-|PM             |Workflow + Agent|`docs/agents/pm.md`             |Projects, tasks, risk tracking                                         |
-|BA             |Agent           |`docs/agents/ba.md`             |Requirements analysis, clarification loops                             |
-|Content Creator|Agent           |`docs/agents/content-creator.md`|Content drafting, iteration, brand consistency                         |
-|Researcher     |Workflow + Agent|`docs/agents/researcher-agent-spec.md`|Web research, fact verification, URL ingestion, topic monitoring|
-|Della (RM)     |Agent           |`docs/agents/relationship-manager.md` |CRM management, customer understanding, relationship health, pipeline advice|
+|Agent          |Mastra Type     |Spec                                         |Primary Domain                                                         |
+|---------------|----------------|---------------------------------------------|-----------------------------------------------------------------------|
+|Simon          |Agent           |`docs/agents/simon.md`                       |Orchestration, Signal interface, conflict detection, capacity awareness|
+|Recorder       |Workflow + Agent|`docs/agents/recorder.md`                    |Transcription, entity extraction, CRM sync                             |
+|Archivist      |Agent           |`docs/agents/archivist.md`                   |Knowledge management, hybrid search                                    |
+|PM             |Workflow + Agent|`docs/agents/pm.md`                          |Projects, tasks, risk tracking                                         |
+|BA             |Agent           |`docs/agents/ba.md`                          |Requirements analysis, clarification loops                             |
+|Content Creator|Agent           |`docs/agents/content-creator.md`             |Content drafting, iteration, brand consistency                         |
+|Researcher     |Workflow + Agent|`docs/agents/researcher-agent-spec.md`       |Web research, fact verification, URL ingestion, topic monitoring       |
+|Della (RM)     |Agent           |`docs/agents/relationship-manager.md`        |CRM management, relationship health, pipeline advice                   |
 
-### Agent vs Workflow decision
-
-- **Agent**: Open-ended tasks requiring judgment. Simon, Archivist, BA, Content Creator, Relationship Manager (Della).
-- **Workflow**: Deterministic pipelines with known steps. Recorder’s transcription pipeline, PM’s task triage.
-- **Hybrid** (Workflow + Agent): Core process is a workflow, but specific steps use agent reasoning. Recorder, PM, Researcher.
+**Agent vs Workflow**: Use Agent for open-ended judgment tasks; Workflow for deterministic pipelines; Hybrid where a pipeline has reasoning steps.
 
 -----
 
 ## Approval Philosophy
 
-Every agent starts with maximum guardrails. Approval workflows graduate:
-
-1. **One-at-a-time** → human confirms each action
-1. **Batch approval** → human confirms a set of proposed actions
-1. **Autonomous** → agent acts, human is notified after
-
-Read-only operations are always auto-approved.
-Write operations start as human-confirmed and graduate based on track record.
-Emails and public content are ALWAYS human-approved (no graduation).
+Every agent starts with maximum guardrails. Write operations graduate: one-at-a-time → batch approval → autonomous (notified after). Read-only is always auto-approved. Emails and public content are ALWAYS human-approved — no graduation.
 
 -----
 
 ## Database (`packages/db`)
 
-Schema changes are managed via the **Supabase CLI migration workflow**. Migration files in `supabase/migrations/` are the **execution source of truth** and are applied automatically on push to `main` via `.github/workflows/migrate.yml`. `schema.sql` at the repo root is a human-readable consolidated reference only — do not execute it directly against a live database. `docs/schema-changes.md` is a changelog explaining what changed and why. See `packages/db/MIGRATIONS.md` for the full developer workflow (how to create and apply new migrations).
+Schema changes go through the **Supabase CLI migration workflow**. `supabase/migrations/` is the execution source of truth, applied automatically on push to `main`. `schema.sql` is a human-readable reference only — do not execute it directly. See `packages/db/MIGRATIONS.md` for the full workflow.
 
 Key principles:
 
@@ -145,27 +159,14 @@ Key principles:
 - Use `source` columns to identify which agent created a record
 - `extracted_data` JSONB fields follow shapes documented in agent specs
 - RLS: authenticated team members can read/write everything (two-person team)
-- Supabase client initialised in `packages/db/src/client.ts`, imported by both apps
-- Generated types from Supabase CLI: `packages/db/src/types/database.ts`
+- Supabase client: `packages/db/src/client.ts` | Generated types: `packages/db/src/types/database.ts`
 - RPC functions (graph traversal, semantic search): `packages/db/src/rpc/`
-- Simon’s capacity check uses `platform_capabilities` and `capacity_gaps` tables
-- Fastmail sync uses `fastmail_accounts`, `fastmail_exclusions`, `fastmail_sync_state` tables (managed via web UI at `/settings/integrations/fastmail`)
-
-### Type generation
+- Simon's capacity check uses `platform_capabilities` and `capacity_gaps` tables
+- Fastmail sync uses `fastmail_accounts`, `fastmail_exclusions`, `fastmail_sync_state` tables
 
 ```bash
 pnpm --filter @platform/db generate-types
 ```
-
------
-
-## Webhook Endpoints
-
-All specs in `docs/webhooks.md`. The Mastra server (`apps/agents`) on Railway exposes:
-
-- `/webhooks/telnyx` — phone call recordings
-- `/webhooks/zoom` — video call recordings
-- `/webhooks/deepgram` — completed transcriptions
 
 -----
 
@@ -176,8 +177,6 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 1. **pgvector**: Semantic similarity (HNSW on VECTOR(1536))
 1. **Recursive CTEs**: Graph traversal on `knowledge_connections`
 1. **Postgres FTS**: tsvector/tsquery on `knowledge_items.raw_content`
-
-Future: pgRouting for path queries. SQL/PGQ when it lands in stable Postgres.
 
 -----
 
@@ -191,12 +190,7 @@ Future: pgRouting for path queries. SQL/PGQ when it lands in stable Postgres.
 - **TypeScript files**: camelCase for modules, PascalCase for components/classes
 - **Env vars**: SCREAMING_SNAKE_CASE, prefixed by service (`TELNYX_API_KEY`)
 - **Railway internal URLs**: `http://{service-name}.railway.internal:{port}`
-
------
-
-## Shared Types (`packages/shared`)
-
-Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NOT duplicate types between apps.
+- **Shared types**: live in `packages/shared` — do NOT duplicate between apps
 
 -----
 
@@ -204,13 +198,12 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 
 |File                               |Purpose                                                                                                        |
 |-----------------------------------|---------------------------------------------------------------------------------------------------------------|
-|`schema.sql`                       |Consolidated database schema — human-readable reference only (not executable; use `supabase/migrations/`)      |
-|`supabase/migrations/`             |Migration files — applied sequentially to the live DB via `supabase db push` (auto on push to `main`)          |
-|`packages/db/MIGRATIONS.md`       |Developer workflow — how to create and apply schema migrations                                                 |
-|`CLAUDE.md`                        |This file — architecture, routing, naming conventions                                                          |
+|`schema.sql`                       |Consolidated schema — human-readable reference only (not executable; use `supabase/migrations/`)               |
+|`supabase/migrations/`             |Migration files — applied sequentially via `supabase db push` (auto on push to `main`)                        |
+|`packages/db/MIGRATIONS.md`        |Developer workflow for creating and applying migrations                                                        |
 |`docs/DESIGN_BRIEF.md`             |Backing data for the `bts-design` skill — do not read directly; invoke the skill instead                       |
 |`docs/brand-voice.md`              |**Content source of truth** — tone, terminology, Bitcoin stance, banned words, content lengths, microcopy rules|
-|`docs/schema-changes.md`           |Schema changelog — what changed from original and why (reference, not executable)                              |
+|`docs/schema-changes.md`           |Schema changelog — what changed from original and why                                                          |
 |`docs/webhooks.md`                 |Webhook endpoint specs, payloads, authentication                                                               |
 |`docs/agents/*.md`                 |Individual agent specifications                                                                                |
 |`packages/db/src/types/database.ts`|Generated Supabase types                                                                                       |
@@ -224,30 +217,27 @@ Types used by both `apps/agents` and `apps/web` live in `packages/shared`. Do NO
 
 ## When Working On…
 
-Read the relevant docs BEFORE writing code. This saves rework.
+Read the relevant docs BEFORE writing code.
 
 |Task                                                     |Read first                                                   |Why                                                                                           |
 |---------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-|Any UI component, page, or styling                       |Invoke `bts-design` skill                                    |Colours, typography, spacing, component specs, layout pattern, CSS tokens, accessibility rules|
-|Agent activity feed or approval UI                       |Invoke `bts-design` skill                                    |`--color-agent-*` tokens, feed item anatomy, approval UX spec                                 |
-|Navigation, sidebar, or app shell layout                 |Invoke `bts-design` skill                                    |Sidebar width, header height, responsive breakpoints, active states                           |
+|Any UI component, page, or styling                       |Invoke `bts-design` skill                                    |Colours, typography, spacing, component specs, CSS tokens, accessibility rules                |
 |CSS tokens or custom properties                          |Invoke `bts-design` skill                                    |Canonical token names — do not invent new ones or use raw hex values                          |
 |UI copy, empty states, labels, microcopy                 |`docs/brand-voice.md` → UI Microcopy Rules section           |Tone, action label patterns, banned phrases                                                   |
-|Content Creator agent, content tools, or draft generation|`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
+|Content drafts, Content Creator agent                    |`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
 |Any agent (building, modifying, adding tools)            |`docs/agents/{agent-name}.md`                                |Triggers, capabilities, tools, schema deps, approval gates                                    |
 |Simon specifically                                       |`docs/agents/simon.md`                                       |Conflict detection flow, capacity awareness, morning briefing spec                            |
+|New agent or capability                                  |`docs/agents/simon.md` (capacity awareness)                  |Update `platform_capabilities` table when adding new capabilities                             |
 |Webhook handlers or external service integration         |`docs/webhooks.md`                                           |Payloads, authentication, handler logic                                                       |
-|Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth; see MIGRATIONS.md for the full workflow|
+|Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth                        |
 |Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
 |Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
-|Email or newsletter drafts/templates                     |`docs/brand-voice.md`                                        |Formality level (semi-formal), length (400–800 words), required/banned terminology            |
-|Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit. Required and banned term lists.    |
-|New agent or capability                                  |`docs/agents/simon.md` (capacity awareness)                  |Update `platform_capabilities` table when adding new capabilities                             |
-|Signal integration, Simon’s messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
-|Fastmail accounts, exclusions, email review queue         |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
-|Fastmail JMAP polling, email-to-interaction sync          |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
+|Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit                                     |
+|Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
+|Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
+|Fastmail JMAP polling, email-to-interaction sync         |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
 
-**If in doubt, read `docs/brand-voice.md`.** It’s the most commonly needed reference after this file.
+**If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
 
 ### Source of truth boundaries
 
