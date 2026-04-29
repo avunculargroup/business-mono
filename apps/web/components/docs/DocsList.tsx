@@ -107,7 +107,7 @@ export function DocsList({ initialDocuments }: DocsListProps) {
                 onClick={() => { setMenuOpen(false); setShowCreate(true); }}
               >
                 <FileText size={15} strokeWidth={1.5} />
-                New
+                Blank document
               </button>
               <button
                 className={styles.createOption}
