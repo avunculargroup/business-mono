@@ -152,7 +152,7 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
         }
       >
         <TemplateForm
-          onSuccess={() => { setShowCreate(false); router.refresh(); }}
+          onSuccess={(id) => { setShowCreate(false); if (id) router.push(`/discovery/templates/${id}`); else router.refresh(); }}
           onPendingChange={setIsSubmitting}
         />
       </SlideOver>

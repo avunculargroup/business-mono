@@ -8,7 +8,7 @@ import type { DocumentRow } from './DocsList';
 import styles from './DocForm.module.css';
 
 interface DocFormProps {
-  onSuccess: () => void;
+  onSuccess: (id?: string) => void;
   onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
   defaultValues?: DocumentRow;
@@ -39,7 +39,7 @@ export function DocForm({ onSuccess, onPendingChange, mode = 'create', defaultVa
     const result = await createDocument(formData);
     if (result.error) { error(result.error); return { error: result.error }; }
     success('Document created');
-    onSuccess();
+    onSuccess(result.document?.id);
     return null;
   };
 
