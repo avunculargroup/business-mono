@@ -587,6 +587,62 @@ export interface MvpTemplateVersion {
 }
 
 // ============================================================
+// Documents
+// ============================================================
+
+export const DocumentType = {
+  REPORT:   'report',
+  PROPOSAL: 'proposal',
+  BRIEF:    'brief',
+  MEMO:     'memo',
+  STRATEGY: 'strategy',
+} as const;
+export type DocumentType = (typeof DocumentType)[keyof typeof DocumentType];
+
+export const DocumentVersionStatus = {
+  DRAFT:      'draft',
+  APPROVED:   'approved',
+  DEPRECATED: 'deprecated',
+} as const;
+export type DocumentVersionStatus = (typeof DocumentVersionStatus)[keyof typeof DocumentVersionStatus];
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  report:   'Report',
+  proposal: 'Proposal',
+  brief:    'Brief',
+  memo:     'Memo',
+  strategy: 'Strategy',
+};
+
+export const DOCUMENT_VERSION_STATUS_LABELS: Record<DocumentVersionStatus, string> = {
+  draft:      'Draft',
+  approved:   'Approved',
+  deprecated: 'Deprecated',
+};
+
+export interface BtsDocument {
+  id: string;
+  type: DocumentType;
+  title: string;
+  description: string | null;
+  tags: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  version_number: number;
+  status: DocumentVersionStatus;
+  content: Record<string, unknown>;
+  created_by: string | null;
+  approved_by: string | null;
+  created_at: string;
+}
+
+// ============================================================
 // Phase 2 — Feedback Repository
 // ============================================================
 
