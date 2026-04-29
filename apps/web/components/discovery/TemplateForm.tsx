@@ -8,7 +8,7 @@ import type { TemplateRow } from './TemplatesList';
 import styles from './DiscoveryForm.module.css';
 
 interface TemplateFormProps {
-  onSuccess: () => void;
+  onSuccess: (id?: string) => void;
   onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
   defaultValues?: TemplateRow;
@@ -39,7 +39,7 @@ export function TemplateForm({ onSuccess, onPendingChange, mode = 'create', defa
     const result = await createTemplate(formData);
     if (result.error) { error(result.error); return { error: result.error }; }
     success('Template created');
-    onSuccess();
+    onSuccess(result.template?.id);
     return null;
   };
 

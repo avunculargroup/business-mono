@@ -158,7 +158,7 @@ export function DocsList({ initialDocuments }: DocsListProps) {
         }
       >
         <DocForm
-          onSuccess={() => { setShowCreate(false); router.refresh(); }}
+          onSuccess={(id) => { setShowCreate(false); if (id) router.push(`/docs/${id}`); else router.refresh(); }}
           onPendingChange={setIsSubmitting}
         />
       </SlideOver>
