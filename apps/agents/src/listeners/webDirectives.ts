@@ -37,6 +37,14 @@ export function startWebDirectivesListener(): void {
     reconnectTimer = null;
   }
 
+  // Clear any is_processing flag left by a previous crash so the web UI
+  // isn't permanently stuck showing a typing indicator on restart.
+  void supabase
+    .from('agent_conversations')
+    .update({ is_processing: false } as never)
+    .eq('signal_chat_id', 'web')
+    .eq('is_processing', true as never);
+
   // Clean up existing channel before creating a new one
   if (currentChannel !== null) {
     void supabase.removeChannel(currentChannel);
