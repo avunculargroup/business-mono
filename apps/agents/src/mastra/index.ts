@@ -2,7 +2,7 @@ import { setDefaultResultOrder } from 'node:dns';
 import { resolve4 } from 'node:dns/promises';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
-import { Observability, SamplingStrategyType } from '@mastra/observability';
+import { Observability, SamplingStrategyType, DefaultExporter } from '@mastra/observability';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
 import { archie } from '../agents/archivist/index.js';
@@ -124,6 +124,7 @@ const observability = new Observability({
     default: {
       serviceName: 'bts-agents',
       sampling: { type: SamplingStrategyType.ALWAYS },
+      exporters: [new DefaultExporter()],
       spanOutputProcessors: [new AgentActivitySpanProcessor()],
     },
   },
