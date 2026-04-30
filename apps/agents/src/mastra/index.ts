@@ -2,6 +2,7 @@ import { setDefaultResultOrder } from 'node:dns';
 import { resolve4 } from 'node:dns/promises';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
+import { Observability, SamplingStrategyType } from '@mastra/observability';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
 import { archie } from '../agents/archivist/index.js';
@@ -21,6 +22,7 @@ import { startContentCreatorListener } from '../listeners/contentCreatorListener
 import { startPMListener } from '../listeners/pmListener.js';
 import { startRoutineListener } from '../listeners/routineListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
+import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
 // IPv4 when a hostname resolves to both A and AAAA records (e.g. Supabase
@@ -113,6 +115,20 @@ const storage = new PostgresStore({
   connectionString: resolvedDbUrl,
 });
 
+// Observability mirrors agent/tool/workflow spans into agent_activity via a
+// SpanOutputProcessor so existing audit dashboards keep working. Adding an
+// OTLP exporter (Grafana/Honeycomb/Datadog) here later requires no changes
+// to call sites — they already create spans implicitly via Mastra primitives.
+const observability = new Observability({
+  configs: {
+    default: {
+      serviceName: 'bts-agents',
+      sampling: { type: SamplingStrategyType.ALWAYS },
+      spanOutputProcessors: [new AgentActivitySpanProcessor()],
+    },
+  },
+});
+
 export const mastra = new Mastra({
   agents: {
     simon,
@@ -123,6 +139,7 @@ export const mastra = new Mastra({
     della,
   },
   storage,
+  observability,
   workflows: {
     recorder: recorderWorkflow,
     pm: pmWorkflow,
