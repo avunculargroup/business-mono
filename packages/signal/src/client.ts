@@ -110,7 +110,7 @@ export class SignalClient {
         }
       });
 
-      ws.addEventListener('error', () => {
+      ws.on('error', () => {
         onError?.(new Error('Signal WebSocket connection error'));
       });
 

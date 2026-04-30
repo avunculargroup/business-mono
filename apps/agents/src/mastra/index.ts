@@ -155,6 +155,15 @@ export const mastra = new Mastra({
   },
 });
 
+// Last-resort guard: log rather than crash on any error that slips through
+// module-level handlers (e.g. a delayed ECONNRESET on a closed socket).
+process.on('uncaughtException', (err) => {
+  console.error('[process] Uncaught exception (process continuing):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] Unhandled rejection (process continuing):', reason);
+});
+
 // Start Supabase Realtime listener for web directives
 startWebDirectivesListener();
 
