@@ -12,6 +12,9 @@ const MIRRORED_SPAN_TYPES: ReadonlySet<SpanType> = new Set([
   SpanType.TOOL_CALL,
 ]);
 
+// Valid agent names that match the database constraint
+const VALID_AGENT_NAMES = new Set(['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della']);
+
 const TRIGGER_TYPE = 'mastra-span';
 
 type SpanNotes = {
@@ -70,6 +73,13 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
 
   private async writeRow(span: AnySpan, status: AgentActivityStatus): Promise<void> {
     try {
+      const agentName = agentNameFromSpan(span);
+
+      // Skip logging if agent_name is not valid (e.g., workflow step spans without a valid agent context)
+      if (!VALID_AGENT_NAMES.has(agentName)) {
+        return;
+      }
+
       const notes: SpanNotes = {
         traceId: span.traceId,
         spanId: span.id,
@@ -85,7 +95,7 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
       }
 
       const { error } = await supabase.from('agent_activity').insert({
-        agent_name: agentNameFromSpan(span),
+        agent_name: agentName,
         action: actionFromSpan(span, status),
         status,
         trigger_type: TRIGGER_TYPE,
