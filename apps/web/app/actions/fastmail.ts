@@ -33,9 +33,15 @@ export async function addFastmailAccount(data: {
 
 export async function toggleFastmailAccount(id: string, isActive: boolean) {
   const supabase = await createClient();
+  // When re-activating, also clear any failure state so the listener gets a
+  // fresh start. Pausing leaves the error history intact for diagnostics.
+  const update = isActive
+    ? { is_active: true, consecutive_failures: 0, last_error: null, last_error_at: null }
+    : { is_active: false };
+
   const { error } = await supabase
     .from('fastmail_accounts')
-    .update({ is_active: isActive })
+    .update(update)
     .eq('id', id);
 
   if (error) return { error: error.message };

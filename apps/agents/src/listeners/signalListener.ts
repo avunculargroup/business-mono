@@ -155,6 +155,10 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 }
 
 export function startSignalListener(): void {
+  if (process.env['SIGNAL_LISTENER_ENABLED'] === 'false') {
+    console.log('[signal-listener] Disabled via SIGNAL_LISTENER_ENABLED=false');
+    return;
+  }
   console.log('[signal-listener] Connecting to Signal via WebSocket');
   client.subscribe(handleMessage, (err) => {
     console.error('[signal-listener] WebSocket error:', err);

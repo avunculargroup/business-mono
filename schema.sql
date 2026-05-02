@@ -807,14 +807,17 @@ ON CONFLICT DO NOTHING;
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fastmail_accounts (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  username          TEXT        NOT NULL UNIQUE,
-  token             TEXT        NOT NULL,
-  display_name      TEXT,
-  is_active         BOOLEAN     NOT NULL DEFAULT true,
-  watched_addresses TEXT[]      NOT NULL DEFAULT '{}', -- empty = all; non-empty = filter by these aliases
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  username              TEXT        NOT NULL UNIQUE,
+  token                 TEXT        NOT NULL,
+  display_name          TEXT,
+  is_active             BOOLEAN     NOT NULL DEFAULT true,
+  watched_addresses     TEXT[]      NOT NULL DEFAULT '{}', -- empty = all; non-empty = filter by these aliases
+  last_error            TEXT,
+  last_error_at         TIMESTAMPTZ,
+  consecutive_failures  INTEGER     NOT NULL DEFAULT 0,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE OR REPLACE TRIGGER fastmail_accounts_updated_at
