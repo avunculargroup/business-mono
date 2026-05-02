@@ -21,7 +21,7 @@ function scheduleReconnect(reason?: string): void {
   );
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    startWebDirectivesListener();
+    void startWebDirectivesListener();
   }, delay);
 }
 
@@ -30,7 +30,7 @@ function scheduleReconnect(reason?: string): void {
  * When a new user message arrives on the web thread, Simon processes it
  * and writes the response back — no HTTP call between services needed.
  */
-export function startWebDirectivesListener(): void {
+export async function startWebDirectivesListener(): Promise<void> {
   // Cancel any pending reconnect
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
@@ -39,11 +39,16 @@ export function startWebDirectivesListener(): void {
 
   // Clear any is_processing flag left by a previous crash so the web UI
   // isn't permanently stuck showing a typing indicator on restart.
-  void supabase
+  // Must await: the supabase-js query builder is a thenable that only fires
+  // the HTTP request when then() is called — discarding it with `void` is a no-op.
+  const { error: cleanupError } = await supabase
     .from('agent_conversations')
     .update({ is_processing: false } as never)
     .eq('signal_chat_id', 'web')
     .eq('is_processing', true as never);
+  if (cleanupError) {
+    console.error('[web-directives] Failed to clear stuck is_processing flag:', cleanupError);
+  }
 
   // Clean up existing channel before creating a new one
   if (currentChannel !== null) {
