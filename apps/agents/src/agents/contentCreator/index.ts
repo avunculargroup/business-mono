@@ -8,7 +8,7 @@ import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supab
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { generateEmbedding } from '../../tools/openai.js';
-import { brandLookup } from './tools.js';
+import { brandLookup, persistContentDraft } from './tools.js';
 
 function loadBrandVoice(): string {
   const candidates = [
@@ -79,11 +79,12 @@ If you need supplementary brand assets beyond this document (logos, templates, a
 - Weave in research citations and data points where they strengthen the argument
 - Use the Voice Calibration Sample from the brand voice doc as your quality benchmark — aim for that level of clarity, confidence, and narrative arc
 - Log activity via log_activity
-- Notify Simon that a draft is ready for director review
+- **Persist the draft**: BEFORE producing the <content_output> block, call persist_content_draft with the title, body, and type. Capture the returned contentItemId. This is mandatory — your draft is not saved otherwise.
 
 ### Step 4 — Iterative refinement
 - Accept director feedback via Simon as natural language
 - Produce a revised draft incorporating the feedback precisely
+- When revising, pass the prior contentItemId to persist_content_draft so the existing row is updated rather than duplicated. Simon will give you the contentItemId in the revision request.
 - Track iteration count — after ${MAX_CONTENT_ITERATIONS} rounds, flag: "We've been through ${MAX_CONTENT_ITERATIONS} revisions. Approve as-is, start fresh, or shelve?"
 - If two directors give contradictory feedback, surface the conflict to Simon — don't try to merge incompatible directions
 
@@ -120,23 +121,22 @@ Every draft must pass these self-checks before submission:
 ## Always
 - Log all activity to agent_activity
 - Never send or publish content without human approval
-- Notify Simon when a draft is ready for director review
 - Default to the brand voice doc when in doubt about any style or tone question
 
 ## Output format (mandatory for every completed draft)
 
-When you have finished writing a draft, you MUST end your response with a structured output block in EXACTLY this format — no exceptions:
+The canonical store for your draft is the persist_content_draft tool call (Step 3). The <content_output> block below is a preview the supervisor (Simon) reads to quote an excerpt back to the director. Both must happen, in this order: persist_content_draft first, then the <content_output> block at the end of your response.
 
 <content_output>
-<title>A concise, descriptive title for this piece (max 10 words)</title>
+<title>A concise, descriptive title for this piece (max 10 words) — match the title you passed to persist_content_draft</title>
 <body>
-The complete draft text goes here. Everything between the body tags is what gets saved as the content item. Do not include any narration, commentary, or meta-text inside the body tags — only the actual content.
+The complete draft text — match the body you passed to persist_content_draft. Do not include narration, commentary, or meta-text inside the body tags.
 </body>
 </content_output>
 
-This block must appear at the very end of your response, after all your reasoning and tool calls. The system that persists your work reads ONLY this block — nothing outside it is saved to the database as draft content.
+This block must appear at the very end of your response, after all your reasoning and tool calls.
 
-If you are responding to a revision request rather than producing a full new draft, still use this format to output the updated draft.`;
+If you are responding to a revision request rather than producing a full new draft, still use this format to output the updated draft (and remember to pass the prior contentItemId to persist_content_draft).`;
 
 export const charlie = new Agent({
   id: 'charlie',
@@ -154,5 +154,6 @@ export const charlie = new Agent({
     graph_traverse: graphTraverseTool,
     generate_embedding: generateEmbedding,
     brand_lookup: brandLookup,
+    persist_content_draft: persistContentDraft,
   },
 });

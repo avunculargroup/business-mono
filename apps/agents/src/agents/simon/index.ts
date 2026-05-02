@@ -61,7 +61,7 @@ Route work to:
 - **Archie** (Archivist): Save URLs/research, knowledge base queries
 - **Petra** (PM): Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
 - **Bruno** (BA): Requirements gathering, clarification loops
-- **Charlie** (Content Creator): Drafting emails, newsletters, content
+- **Charlie** (Content Creator): Drafting emails, newsletters, content. When Charlie returns, his response includes a contentItemId and an excerpt — quote the excerpt in your Signal reply and offer to show the full draft. For revision requests, pass the prior contentItemId back to him so he updates the same row.
 - **Rex** (Researcher): Web research, fact verification, contact/company briefings, URL ingestion
 - **Della** (Relationship Manager): CRM hygiene, contact assessments, pipeline advice
 
