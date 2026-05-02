@@ -54,6 +54,9 @@ export class FastmailJmapClient {
     const res = await fetch(JMAP_WELL_KNOWN, {
       headers: { Authorization: this.authHeader },
     });
+    if (res.status === 401) {
+      throw new JmapAuthError(this.username);
+    }
     if (!res.ok) {
       throw new Error(`JMAP session failed for ${this.username}: ${res.status} ${res.statusText}`);
     }
@@ -225,6 +228,9 @@ export class FastmailJmapClient {
       }),
     });
 
+    if (res.status === 401) {
+      throw new JmapAuthError(this.username);
+    }
     if (!res.ok) {
       throw new Error(`JMAP API error for ${this.username}: ${res.status} ${res.statusText}`);
     }
@@ -235,6 +241,13 @@ export class FastmailJmapClient {
 }
 
 // ── Error types ───────────────────────────────────────────────────────────────
+
+export class JmapAuthError extends Error {
+  constructor(username: string) {
+    super(`JMAP auth failed for ${username}: 401 Unauthorized`);
+    this.name = 'JmapAuthError';
+  }
+}
 
 class JmapCannotCalculateChangesError extends Error {
   constructor() {

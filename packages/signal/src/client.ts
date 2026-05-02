@@ -82,6 +82,7 @@ export class SignalClient {
     let stopped = false;
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
 
     let pingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -90,6 +91,7 @@ export class SignalClient {
       ws = new WebSocket(`${wsUrl}/v1/receive/${encodeURIComponent(account)}`);
 
       ws.addEventListener('open', () => {
+        failures = 0;
         // Send a ping every 30s to keep the connection alive through Railway's
         // TCP idle timeout and any intermediate proxy/load-balancer timeouts.
         pingInterval = setInterval(() => {
@@ -110,8 +112,8 @@ export class SignalClient {
         }
       });
 
-      ws.on('error', () => {
-        onError?.(new Error('Signal WebSocket connection error'));
+      ws.on('error', (err: Error) => {
+        onError?.(err);
       });
 
       ws.addEventListener('close', () => {
@@ -121,7 +123,9 @@ export class SignalClient {
         }
         ws = null;
         if (!stopped) {
-          reconnectTimer = setTimeout(connect, 5_000);
+          const delay = Math.min(5_000 * 2 ** failures, 60_000);
+          failures += 1;
+          reconnectTimer = setTimeout(connect, delay);
         }
       });
     };

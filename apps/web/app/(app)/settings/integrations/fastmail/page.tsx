@@ -5,11 +5,17 @@ import { FastmailSettingsClient } from './FastmailSettingsClient';
 export default async function FastmailSettingsPage() {
   const supabase = await createClient();
 
-  const [accountsRes, exclusionsRes, reviewRes, activityRes] = await Promise.all([
+  const [accountsRes, syncRes, exclusionsRes, reviewRes, activityRes] = await Promise.all([
     supabase
       .from('fastmail_accounts')
-      .select('id, username, display_name, is_active, watched_addresses, created_at')
+      .select(
+        'id, username, display_name, is_active, watched_addresses, last_error, last_error_at, consecutive_failures, created_at',
+      )
       .order('display_name', { ascending: true }),
+
+    supabase
+      .from('fastmail_sync_state')
+      .select('account_id, last_synced_at'),
 
     supabase
       .from('fastmail_exclusions')
@@ -33,11 +39,20 @@ export default async function FastmailSettingsPage() {
       .limit(10),
   ]);
 
+  const lastSyncByAccount = new Map<string, string | null>(
+    (syncRes.data ?? []).map((row) => [row.account_id, row.last_synced_at]),
+  );
+
+  const accounts = (accountsRes.data ?? []).map((a) => ({
+    ...a,
+    last_synced_at: lastSyncByAccount.get(a.id) ?? null,
+  }));
+
   return (
     <>
       <PageHeader title="Fastmail" />
       <FastmailSettingsClient
-        accounts={accountsRes.data ?? []}
+        accounts={accounts}
         exclusions={exclusionsRes.data ?? []}
         reviewContacts={reviewRes.data ?? []}
         recentActivity={activityRes.data ?? []}

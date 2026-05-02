@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-05-02 — Fastmail account error tracking
+
+**Migration:** `20260502000000_fastmail_account_error_tracking.sql`
+
+Adds three columns to `fastmail_accounts`:
+
+- **`last_error TEXT`** — most recent poll/auth failure message.
+- **`last_error_at TIMESTAMPTZ`** — when that error occurred.
+- **`consecutive_failures INTEGER NOT NULL DEFAULT 0`** — increments on each failed poll, resets on success.
+
+The Fastmail listener uses these to auto-disable an account (`is_active = false`) after 3 consecutive auth (`401`) failures, so an expired token stops spamming the logs every 5 minutes and the failure becomes visible in the integrations UI. Re-activating the account through the UI clears the error fields.
+
+---
+
 ## 2026-04-29 — Add documents tables
 
 - **`documents`** — general-purpose document records with `type` (report, proposal, brief, memo, strategy), title, description, and tags. Mirrors `mvp_templates` structure.

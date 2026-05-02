@@ -1227,30 +1227,39 @@ export type Database = {
       }
       fastmail_accounts: {
         Row: {
+          consecutive_failures: number
           created_at: string
           display_name: string | null
           id: string
           is_active: boolean
+          last_error: string | null
+          last_error_at: string | null
           token: string
           updated_at: string
           username: string
           watched_addresses: string[]
         }
         Insert: {
+          consecutive_failures?: number
           created_at?: string
           display_name?: string | null
           id?: string
           is_active?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
           token: string
           updated_at?: string
           username: string
           watched_addresses?: string[]
         }
         Update: {
+          consecutive_failures?: number
           created_at?: string
           display_name?: string | null
           id?: string
           is_active?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
           token?: string
           updated_at?: string
           username?: string

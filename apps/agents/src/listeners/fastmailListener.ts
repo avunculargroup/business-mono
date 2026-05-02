@@ -12,11 +12,23 @@
 import { supabase } from '@platform/db';
 import {
   FastmailJmapClient,
+  JmapAuthError,
   shouldSkipEmail,
   extractBody,
 } from '../lib/fastmailJmap.js';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const AUTH_FAILURE_DISABLE_THRESHOLD = 3;
+const ERROR_MESSAGE_MAX_LEN = 500;
+
+type FastmailAccount = {
+  id: string;
+  username: string;
+  token: string;
+  display_name: string | null;
+  watched_addresses: string[];
+  consecutive_failures: number;
+};
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -29,7 +41,7 @@ export function startFastmailListener(): void {
 // ── Poll all accounts ─────────────────────────────────────────────────────────
 
 async function pollAllAccounts(): Promise<void> {
-  let accounts: Array<{ id: string; username: string; token: string; display_name: string | null; watched_addresses: string[] }>;
+  let accounts: FastmailAccount[];
   let exclusions: Array<{ type: string; value: string }>;
   let teamEmails: Set<string>;
 
@@ -38,7 +50,9 @@ async function pollAllAccounts(): Promise<void> {
       // Fetch all accounts (active + inactive) so we can build the full team
       // email set for internal/external classification, then filter to active
       // for polling.
-      supabase.from('fastmail_accounts').select('id, username, token, display_name, watched_addresses, is_active'),
+      supabase
+        .from('fastmail_accounts')
+        .select('id, username, token, display_name, watched_addresses, is_active, consecutive_failures'),
       supabase.from('fastmail_exclusions').select('type, value'),
     ]);
 
@@ -72,10 +86,46 @@ async function pollAllAccounts(): Promise<void> {
   for (const account of accounts) {
     try {
       await pollAccount(account, exclusions, teamEmails);
+      await markAccountSuccess(account);
     } catch (err) {
       console.error(`[fastmail-listener] Error polling account ${account.username}:`, err);
+      await markAccountFailure(account, err);
     }
   }
+}
+
+async function markAccountSuccess(account: FastmailAccount): Promise<void> {
+  if (account.consecutive_failures === 0) return;
+  await supabase
+    .from('fastmail_accounts')
+    .update({ consecutive_failures: 0, last_error: null, last_error_at: null })
+    .eq('id', account.id);
+}
+
+async function markAccountFailure(account: FastmailAccount, err: unknown): Promise<void> {
+  const nextFailures = account.consecutive_failures + 1;
+  const message = err instanceof Error ? err.message : String(err);
+  const truncated = message.slice(0, ERROR_MESSAGE_MAX_LEN);
+
+  const update: {
+    consecutive_failures: number;
+    last_error: string;
+    last_error_at: string;
+    is_active?: boolean;
+  } = {
+    consecutive_failures: nextFailures,
+    last_error: truncated,
+    last_error_at: new Date().toISOString(),
+  };
+
+  if (err instanceof JmapAuthError && nextFailures >= AUTH_FAILURE_DISABLE_THRESHOLD) {
+    update.is_active = false;
+    console.error(
+      `[fastmail-listener] Auto-disabled ${account.username} after ${nextFailures} consecutive auth failures`,
+    );
+  }
+
+  await supabase.from('fastmail_accounts').update(update).eq('id', account.id);
 }
 
 // ── Poll a single account ─────────────────────────────────────────────────────

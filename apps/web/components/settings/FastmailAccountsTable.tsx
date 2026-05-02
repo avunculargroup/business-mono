@@ -16,6 +16,10 @@ export type FastmailAccountRow = {
   display_name: string | null;
   is_active: boolean;
   watched_addresses: string[];
+  last_error: string | null;
+  last_error_at: string | null;
+  consecutive_failures: number;
+  last_synced_at: string | null;
   created_at: string;
 };
 
@@ -94,18 +98,33 @@ export function FastmailAccountsTable({ accounts }: { accounts: FastmailAccountR
     {
       key: 'status',
       header: 'Status',
-      width: '15%',
-      render: (row) => (
-        <StatusChip
-          label={row.is_active ? 'Active' : 'Paused'}
-          color={row.is_active ? 'success' : 'neutral'}
-        />
-      ),
+      width: '20%',
+      render: (row) => {
+        const hasAuthFailure = !row.is_active && row.last_error;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            <StatusChip
+              label={hasAuthFailure ? 'Auth failed' : row.is_active ? 'Active' : 'Paused'}
+              color={hasAuthFailure ? 'destructive' : row.is_active ? 'success' : 'neutral'}
+            />
+            {hasAuthFailure && row.last_error && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                {row.last_error}
+              </span>
+            )}
+            {row.last_synced_at && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                Last synced {formatDate(row.last_synced_at)}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'added',
       header: 'Added',
-      width: '10%',
+      width: '5%',
       render: (row) => (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)' }}>
           {formatDate(row.created_at)}
