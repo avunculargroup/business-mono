@@ -91,9 +91,29 @@ export async function startWebDirectivesListener(): Promise<void> {
               },
             });
 
+            // Guard against the "Simon claimed delegation but didn't actually invoke a
+            // specialist" failure mode. Make it loud rather than silent so directors
+            // see something is wrong instead of waiting on a draft that will never come.
+            const toolCalls = (result as { toolCalls?: Array<{ toolName?: string }> }).toolCalls ?? [];
+            const delegated = toolCalls.some((c) => c.toolName?.startsWith('delegate_to_'));
+            const claimsDelegation =
+              /\bdelegat|hand(ed|ing) (this )?(off|over) to|asked? \w+ to (draft|research|check|find|look)/i.test(
+                result.text,
+              );
+            const replyText =
+              claimsDelegation && !delegated
+                ? `${result.text}\n\n[system: I named a specialist but didn't actually invoke one — please retry, or rephrase the directive.]`
+                : result.text;
+            if (claimsDelegation && !delegated) {
+              console.warn(
+                '[web-directives] Simon claimed delegation but made no delegate_* tool call:',
+                result.text.slice(0, 200),
+              );
+            }
+
             const simonMessage: ConvMessage = {
               role: 'assistant',
-              content: result.text,
+              content: replyText,
               timestamp: new Date().toISOString(),
               source: 'simon',
             };

@@ -18,7 +18,7 @@ import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
 import { startWebDirectivesListener } from '../listeners/webDirectives.js';
 import { startSignalListener } from '../listeners/signalListener.js';
-// import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
+import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startRoutineListener } from '../listeners/routineListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
@@ -171,11 +171,11 @@ startWebDirectivesListener();
 // to specialists registered as subagents (see ../agents/simon/index.ts).
 startSignalListener();
 
-// Dormant: Charlie now self-persists via the persist_content_draft tool when
-// Simon delegates natively as a subagent. Restore this registration if a
-// non-Simon producer (e.g. recorder workflow) starts dispatching Charlie via
+// Safety net: Simon-originated content delegation goes through delegate_to_charlie
+// and self-persists via persist_content_draft. This listener handles non-Simon
+// producers (e.g. recorder workflow → charlie) that dispatch via
 // proposed_actions on agent_activity.
-// startContentCreatorListener();
+startContentCreatorListener();
 
 // Start Supabase Realtime listener for PM dispatches — picks up proposed_actions
 // rows from the recorder workflow and routes them through the PM workflow.
