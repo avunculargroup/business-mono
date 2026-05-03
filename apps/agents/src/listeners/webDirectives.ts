@@ -139,10 +139,15 @@ export async function startWebDirectivesListener(): Promise<void> {
             });
           } catch (err) {
             console.error('[web-directives] Simon processing error:', err);
-            // Clear the flag so the UI doesn't get stuck showing the typing indicator
+            const errorMessage: ConvMessage = {
+              role: 'assistant',
+              content: 'Something went wrong processing your request. Please try again.',
+              timestamp: new Date().toISOString(),
+              source: 'simon',
+            };
             await supabase
               .from('agent_conversations')
-              .update({ is_processing: false } as never)
+              .update({ messages: [...messages, errorMessage], is_processing: false } as never)
               .eq('id', conv.id);
           }
         } catch (err) {

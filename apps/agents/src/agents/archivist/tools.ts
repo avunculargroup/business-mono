@@ -1,6 +1,10 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import OpenAI from 'openai';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
+
+const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
 export const webFetch = createTool({
   id: 'web_fetch',
@@ -28,14 +32,20 @@ export const webFetch = createTool({
 
 export const vectorSearchTool = createTool({
   id: 'vector_search',
-  description: 'Search the knowledge base by semantic similarity',
+  description: 'Search the knowledge base by semantic similarity using a natural language query',
   inputSchema: z.object({
-    queryEmbedding: z.array(z.number()).describe('Query embedding vector'),
+    query: z.string().describe('Natural language search query'),
     matchThreshold: z.number().default(0.7).describe('Minimum similarity score'),
     matchCount: z.number().default(10).describe('Max results to return'),
   }),
   execute: async (context) => {
-    const results = await vectorSearch(context.queryEmbedding, {
+    const embResponse = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: context.query,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
+    const embedding = embResponse.data[0]?.embedding ?? [];
+    const results = await vectorSearch(embedding, {
       matchThreshold: context.matchThreshold,
       matchCount: context.matchCount,
     });
