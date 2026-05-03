@@ -6,14 +6,6 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
-## 2026-05-03 — Allow `mastra-span` trigger_type on agent_activity
-
-**Migration:** `20260503000000_add_mastra_span_trigger_type.sql`
-
-`AgentActivitySpanProcessor` mirrors Mastra spans (`AGENT_RUN`, `WORKFLOW_RUN`, `WORKFLOW_STEP`, `TOOL_CALL`) into `agent_activity` with `trigger_type = 'mastra-span'`, but that value wasn't in the CHECK constraint, so every span insert was rejected. Symptom: agents would start a turn, log nothing past the first user reply, and appear to silently stall. Adds `'mastra-span'` to the allowed values.
-
----
-
 ## 2026-05-02 — Fastmail account error tracking
 
 **Migration:** `20260502000000_fastmail_account_error_tracking.sql`
