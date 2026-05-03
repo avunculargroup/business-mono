@@ -15,7 +15,14 @@ const MIRRORED_SPAN_TYPES: ReadonlySet<SpanType> = new Set([
 // Valid agent names that match the database constraint
 const VALID_AGENT_NAMES = new Set(['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della']);
 
-const TRIGGER_TYPE = 'mastra-span';
+// Span rows are mirrored under trigger_type='agent'. The originating span type
+// (agent_run/workflow_run/tool_call/...) lives in notes.spanType, so the
+// dispatch-vs-span distinction is preserved without growing the constraint.
+const TRIGGER_TYPE = 'agent';
+
+// Escalate after this many consecutive insert failures so a broken audit trail
+// is visible as a single loud line, not buried in a stream of per-row errors.
+const FAILURE_ESCALATION_THRESHOLD = 25;
 
 type SpanNotes = {
   traceId: string;
@@ -43,6 +50,10 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
 
   // Tracks spans we've already written an in_progress row for, keyed by span.id.
   private readonly seenSpanIds = new Set<string>();
+
+  // Consecutive insert failures since the last success. Used to escalate when
+  // tracing has been silently broken for a sustained run of spans.
+  private consecutiveFailures = 0;
 
   process(span?: AnySpan): AnySpan | undefined {
     if (!span) return span;
@@ -94,9 +105,10 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
         if (span.errorInfo.stack) notes.errorStack = span.errorInfo.stack;
       }
 
+      const action = actionFromSpan(span, status);
       const { error } = await supabase.from('agent_activity').insert({
         agent_name: agentName,
-        action: actionFromSpan(span, status),
+        action,
         status,
         trigger_type: TRIGGER_TYPE,
         workflow_run_id: span.type === SpanType.WORKFLOW_RUN ? span.id : null,
@@ -108,12 +120,66 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
         notes: JSON.stringify(notes) as Json,
       });
       if (error) {
-        console.error('[agent-activity-processor] insert failed', error);
+        this.recordFailure({ agentName, action, status, spanType: span.type, error });
+      } else {
+        this.recordSuccess();
       }
     } catch (err) {
-      console.error('[agent-activity-processor] insert threw', err);
+      this.recordFailure({
+        agentName: agentNameFromSpan(span),
+        action: actionFromSpan(span, status),
+        status,
+        spanType: span.type,
+        error: err,
+      });
     }
   }
+
+  private recordSuccess(): void {
+    if (this.consecutiveFailures > 0) {
+      console.warn(
+        `[agent-activity-processor] recovered after ${this.consecutiveFailures} failed insert(s) — audit trail resumed`,
+      );
+      this.consecutiveFailures = 0;
+    }
+  }
+
+  private recordFailure(ctx: {
+    agentName: string;
+    action: string;
+    status: AgentActivityStatus;
+    spanType: string;
+    error: unknown;
+  }): void {
+    this.consecutiveFailures += 1;
+    console.error('[agent-activity-processor] insert failed', {
+      agent: ctx.agentName,
+      action: ctx.action,
+      status: ctx.status,
+      spanType: ctx.spanType,
+      consecutiveFailures: this.consecutiveFailures,
+      error: serialiseError(ctx.error),
+    });
+    if (this.consecutiveFailures % FAILURE_ESCALATION_THRESHOLD === 0) {
+      console.error(
+        `[agent-activity-processor] CRITICAL: ${this.consecutiveFailures} consecutive audit-trail inserts have failed. ` +
+          `agent_activity is no longer recording spans — check DB connectivity or the agent_activity CHECK constraints.`,
+      );
+    }
+  }
+}
+
+function serialiseError(err: unknown): Record<string, unknown> {
+  if (err && typeof err === 'object') {
+    const e = err as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    return {
+      message: e.message,
+      code: e.code,
+      details: e.details,
+      hint: e.hint,
+    };
+  }
+  return { message: String(err) };
 }
 
 function agentNameFromSpan(span: AnySpan): string {
