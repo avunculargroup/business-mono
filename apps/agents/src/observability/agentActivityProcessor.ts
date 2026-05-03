@@ -1,6 +1,6 @@
 import type { AnySpan, SpanOutputProcessor } from '@mastra/core/observability';
 import { SpanType } from '@mastra/core/observability';
-import { supabase, type Json } from '@platform/db';
+import { supabase } from '@platform/db';
 import { AgentActivityStatus } from '@platform/shared';
 
 // Span types we mirror into agent_activity. Model/memory/RAG spans are
@@ -105,7 +105,7 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
         proposed_actions: null,
         approved_actions: null,
         clarifications: null,
-        notes: JSON.stringify(notes) as Json,
+        notes: JSON.stringify(notes),
       });
       if (error) {
         console.error('[agent-activity-processor] insert failed', error);
