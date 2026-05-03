@@ -177,6 +177,100 @@ const specialistAgents: Record<string, Agent> = {
   della: della as unknown as Agent,
 };
 
+// Synchronously invoke a specialist and return their reply text. Errors propagate
+// to Simon's tool loop so the model can mention the failure rather than silently
+// claiming delegation succeeded.
+async function runSpecialist(agent: Agent, prompt: string): Promise<{ reply: string }> {
+  const result = await agent.generate([{ role: 'user', content: prompt }]);
+  return { reply: result.text };
+}
+
+export const delegateToCharlie = createTool({
+  id: 'delegate_to_charlie',
+  description:
+    'Delegate a content-drafting task to Charlie (Content Creator). Use for emails, ' +
+    'newsletters, LinkedIn/Twitter, blog posts. Pass the directive verbatim plus any ' +
+    'context (audience, tone). For revisions, include the prior contentItemId so Charlie ' +
+    'updates the existing draft. Returns Charlie\'s reply, which includes a contentItemId ' +
+    'and excerpt to quote back to the director.',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Full instruction for Charlie'),
+    contentItemId: z.string().uuid().optional().describe('Existing draft to revise in place'),
+  }),
+  execute: async (context) => {
+    const prompt = context.contentItemId
+      ? `${context.directive}\n\n(Revision — pass contentItemId ${context.contentItemId} to persist_content_draft so the existing row is updated.)`
+      : context.directive;
+    return runSpecialist(charlie as unknown as Agent, prompt);
+  },
+});
+
+export const delegateToRex = createTool({
+  id: 'delegate_to_rex',
+  description:
+    'Delegate web research, fact verification, URL ingestion, or contact/company briefings ' +
+    'to Rex (Researcher). Pass a ResearchBrief-shaped directive (purpose, subject, context).',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Research brief or directive for Rex'),
+  }),
+  execute: async (context) => runSpecialist(rex as unknown as Agent, context.directive),
+});
+
+export const delegateToArchie = createTool({
+  id: 'delegate_to_archie',
+  description:
+    'Delegate knowledge-base work to Archie (Archivist) — saving URLs, embedding research, ' +
+    'or answering questions from the knowledge base.',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Instruction for Archie'),
+  }),
+  execute: async (context) => runSpecialist(archie as unknown as Agent, context.directive),
+});
+
+export const delegateToPetra = createTool({
+  id: 'delegate_to_petra',
+  description:
+    'Delegate to Petra (PM) for risk reasoning or portfolio status. Note: task creation ' +
+    'goes through the PM workflow (recorder → pm listener), not direct delegation.',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Instruction for Petra'),
+  }),
+  execute: async (context) => runSpecialist(petra as unknown as Agent, context.directive),
+});
+
+export const delegateToBruno = createTool({
+  id: 'delegate_to_bruno',
+  description:
+    'Delegate requirements gathering or clarification loops to Bruno (BA).',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Instruction for Bruno'),
+  }),
+  execute: async (context) => runSpecialist(bruno as unknown as Agent, context.directive),
+});
+
+export const delegateToDella = createTool({
+  id: 'delegate_to_della',
+  description:
+    'Delegate CRM hygiene, contact assessments, or pipeline advice to Della ' +
+    '(Relationship Manager).',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Instruction for Della'),
+  }),
+  execute: async (context) => runSpecialist(della as unknown as Agent, context.directive),
+});
+
+export const delegateToRoger = createTool({
+  id: 'delegate_to_roger',
+  description:
+    'Delegate transcript reasoning (speaker ID, entity extraction) to Roger (Recorder). ' +
+    'Most recording flows are triggered by webhooks, not by you — only call this for ' +
+    'follow-up reasoning over an existing transcript.',
+  inputSchema: z.object({
+    directive: z.string().min(1).describe('Instruction for Roger'),
+  }),
+  execute: async (context) => runSpecialist(roger as unknown as Agent, context.directive),
+});
+
 export const agentHealthCheck = createTool({
   id: 'agent_health_check',
   description:

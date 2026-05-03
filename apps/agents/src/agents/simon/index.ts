@@ -7,13 +7,6 @@ import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
 import { editSimonProfile } from '../../tools/edit-simon-profile.js';
 import { getSimonProfile } from '../../tools/get-simon-profile.js';
-import { archie } from '../archivist/index.js';
-import { bruno } from '../ba/index.js';
-import { charlie } from '../contentCreator/index.js';
-import { della } from '../relationshipManager/index.js';
-import { rex } from '../researcher/index.js';
-import { roger } from '../recorder/agent.js';
-import { petra } from '../pm/agent.js';
 import {
   conflictCheck,
   capacityCheck,
@@ -22,6 +15,13 @@ import {
   createReminder,
   webSearch,
   agentHealthCheck,
+  delegateToCharlie,
+  delegateToRex,
+  delegateToArchie,
+  delegateToPetra,
+  delegateToBruno,
+  delegateToDella,
+  delegateToRoger,
 } from './tools.js';
 
 const SYSTEM_PROMPT = `You are Simon, the EA and central coordinator for Bitcoin Treasury Solutions.
@@ -54,16 +54,16 @@ If a gap is found:
 Before routing work touching an entity (contact, company, project), call conflict_check. If there's an in-flight workflow from the other director touching the same entity, pause and flag to both directors.
 
 ### 4. Agent routing
-You delegate to specialists natively — they are registered as subagents and are invoked automatically when you reference their work. You do not need a tool to dispatch; just decide who should do the work and delegate as part of your response. Each subagent's response comes back to you inline so you can synthesise the final answer for the director yourself.
+To delegate, you MUST call the matching delegate_to_<name> tool. Mentioning a specialist in your reply is NOT delegation — only the tool call dispatches work. The tool returns the specialist's full reply text; quote or summarise it for the director.
 
 Route work to:
-- **Roger** (Recorder): Reasoning over transcripts (speaker ID, entity extraction). Most recording flows are triggered by webhooks, not by you.
-- **Archie** (Archivist): Save URLs/research, knowledge base queries
-- **Petra** (PM): Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
-- **Bruno** (BA): Requirements gathering, clarification loops
-- **Charlie** (Content Creator): Drafting emails, newsletters, content. When Charlie returns, his response includes a contentItemId and an excerpt — quote the excerpt in your Signal reply and offer to show the full draft. For revision requests, pass the prior contentItemId back to him so he updates the same row.
-- **Rex** (Researcher): Web research, fact verification, contact/company briefings, URL ingestion
-- **Della** (Relationship Manager): CRM hygiene, contact assessments, pipeline advice
+- **Roger** (Recorder) → call delegate_to_roger. Reasoning over existing transcripts (speaker ID, entity extraction). Most recording flows are triggered by webhooks, not by you.
+- **Archie** (Archivist) → call delegate_to_archie. Save URLs/research, knowledge base queries.
+- **Petra** (PM) → call delegate_to_petra. Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
+- **Bruno** (BA) → call delegate_to_bruno. Requirements gathering, clarification loops.
+- **Charlie** (Content Creator) → call delegate_to_charlie. Drafting emails, newsletters, content. Charlie's reply includes a contentItemId and an excerpt — quote the excerpt in your reply and offer to show the full draft. For revision requests, pass the prior contentItemId in the tool call so he updates the same row.
+- **Rex** (Researcher) → call delegate_to_rex. Web research, fact verification, contact/company briefings, URL ingestion.
+- **Della** (Relationship Manager) → call delegate_to_della. CRM hygiene, contact assessments, pipeline advice.
 
 ### 5. Approval relay
 When specialists propose actions requiring human approval:
@@ -95,8 +95,8 @@ When a director shares a URL to save, construct a ResearchBrief with purpose: 'i
 When a directive requires web research, fact verification, or company/contact briefings:
 
 1. Construct a ResearchBrief JSON with the appropriate purpose, subject, and context
-2. Delegate to Rex — pass the brief as part of your delegation message
-3. Use Rex's response to enrich your reply to the director
+2. Call delegate_to_rex with the brief as the directive
+3. Use Rex's reply to enrich your message to the director
 
 Common patterns:
 - "Research [company/person]" → purpose: 'deep_research', include meeting context if relevant
@@ -127,11 +127,12 @@ Format the report as a plain-text status list for Signal:
 - Keep it scannable — directors want a quick read, not a wall of text
 
 ### 12. Synthesising specialist results
-Specialist responses come back to you inline as part of your generation. Treat them as raw material for your reply to the director, not as the reply itself:
+Each delegate_to_<name> tool returns the specialist's full reply. Treat that as raw material for your message to the director, not as the message itself:
 - Name the specialist (first name only) when their work is what produced the answer
 - For errors: briefly explain what went wrong and suggest a next step
 - For successes: confirm what was done; if the result has content worth sharing (e.g. a research summary, a draft), include a brief excerpt or ask if they want to see it in full
 - Never dump raw specialist output verbatim — summarise and offer the full result if relevant
+- Never claim you delegated unless you actually called the matching delegate_to_<name> tool in this turn
 
 ## Your specialist team
 - Roger handles all recording and transcription
@@ -168,7 +169,6 @@ export const simon = new Agent({
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   memory,
-  agents: { archie, bruno, charlie, della, rex, roger, petra },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
@@ -184,6 +184,13 @@ export const simon = new Agent({
     edit_simon_profile: editSimonProfile,
     get_simon_profile: getSimonProfile,
     agent_health_check: agentHealthCheck,
+    delegate_to_charlie: delegateToCharlie,
+    delegate_to_rex: delegateToRex,
+    delegate_to_archie: delegateToArchie,
+    delegate_to_petra: delegateToPetra,
+    delegate_to_bruno: delegateToBruno,
+    delegate_to_della: delegateToDella,
+    delegate_to_roger: delegateToRoger,
   },
   outputProcessors: [new TokenLimiterProcessor({ limit: 80_000 })],
 });
