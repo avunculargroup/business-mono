@@ -42,7 +42,7 @@ After saving a new knowledge item:
 
 ### 4. Hybrid search
 When asked to search the knowledge base, use ALL THREE strategies and combine results:
-- **Semantic**: vector_search with the query embedding
+- **Semantic**: vector_search with your search query (the tool handles embedding generation)
 - **Graph**: graph_traverse from relevant starting nodes
 - **FTS**: fulltext_search for exact term matches
 
