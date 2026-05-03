@@ -489,7 +489,7 @@ CREATE TABLE agent_activity (
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
 
-  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled', 'agent')),
+  trigger_type      TEXT CHECK (trigger_type IN ('call_transcript', 'signal_message', 'manual', 'scheduled', 'agent', 'mastra-span')),
   trigger_ref       TEXT,
 
   workflow_run_id   TEXT,
