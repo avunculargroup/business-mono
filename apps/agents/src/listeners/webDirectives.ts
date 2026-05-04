@@ -111,13 +111,39 @@ export async function startWebDirectivesListener(): Promise<void> {
               /\bdelegat|hand(ed|ing) (this )?(off|over) to|asked? \w+ to (draft|research|check|find|look)/i.test(
                 result.text,
               );
-            const replyText =
-              claimsDelegation && !delegated
-                ? `${result.text}\n\n[system: I named a specialist but didn't actually invoke one — please retry, or rephrase the directive.]`
-                : result.text;
+            // Catch the "let me try again" failure mode where Simon reports a specialist
+            // timeout, promises to retry, and then ends the turn without making another
+            // delegate_to_* call. The director would otherwise sit waiting on a retry
+            // that will never come.
+            const lastDelegateIdx = (() => {
+              for (let i = toolCalls.length - 1; i >= 0; i -= 1) {
+                if (toolCalls[i]?.toolName?.startsWith('delegate_to_')) return i;
+              }
+              return -1;
+            })();
+            const promisesRetry =
+              /\b(let me|i(?:'ll| will| am going to)?)\s+(try|retry|run|do|ask)\s+(?:that|this|him|her|them|it|again|once more)\b|\b(retrying|trying)\s+(?:again|once more|now)\b/i.test(
+                result.text,
+              );
+            // A retry promise is empty if Simon didn't issue any delegate call after
+            // making the promise — approximated here as: no delegate call exists, or
+            // the last delegate call was the failed one Simon is now apologising for.
+            // We can't precisely correlate text position to tool-call order, but if
+            // the model promises a retry and the turn ends with a single delegate
+            // call, that's almost always the empty-promise case.
+            const emptyRetryPromise = promisesRetry && lastDelegateIdx <= 0;
+
+            let replyText = result.text;
             if (claimsDelegation && !delegated) {
+              replyText = `${result.text}\n\n[system: I named a specialist but didn't actually invoke one — please retry, or rephrase the directive.]`;
               console.warn(
                 '[web-directives] Simon claimed delegation but made no delegate_* tool call:',
+                result.text.slice(0, 200),
+              );
+            } else if (emptyRetryPromise) {
+              replyText = `${result.text}\n\n[system: Simon promised a retry but didn't actually run one. Please resend the directive — a shorter prompt sometimes helps.]`;
+              console.warn(
+                '[web-directives] Simon promised a retry but made no follow-up delegate_* tool call:',
                 result.text.slice(0, 200),
               );
             }

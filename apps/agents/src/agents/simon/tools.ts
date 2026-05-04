@@ -183,7 +183,76 @@ const specialistAgents: Record<string, Agent> = {
 // pinning the web UI on a forever-typing indicator.
 const SPECIALIST_TIMEOUT_MS = 180_000;
 
+type InFlightActivity = {
+  action: string;
+  ageSeconds: number;
+};
+
+// Look up which spans the specialist had open but not yet closed when we gave
+// up on it. AgentActivitySpanProcessor writes an `in_progress` row on span
+// start and a terminal row (`auto`/`error`) on span end, both with the same
+// `spanId` in `notes`. An in-flight span is one whose start row exists but
+// whose terminal row doesn't.
+async function inFlightSpans(agentName: string, sinceMs: number): Promise<InFlightActivity[]> {
+  const since = new Date(Date.now() - sinceMs).toISOString();
+  const [startedRes, endedRes] = await Promise.all([
+    supabase
+      .from('agent_activity')
+      .select('action, notes, created_at')
+      .eq('agent_name', agentName)
+      .eq('status', 'in_progress')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('agent_activity')
+      .select('notes')
+      .eq('agent_name', agentName)
+      .neq('status', 'in_progress')
+      .gte('created_at', since),
+  ]);
+
+  const started = (startedRes.data ?? []) as Array<{
+    action: string;
+    notes: string | null;
+    created_at: string;
+  }>;
+  if (!started.length) return [];
+
+  const endedSpanIds = new Set<string>();
+  for (const row of (endedRes.data ?? []) as Array<{ notes: string | null }>) {
+    if (!row.notes) continue;
+    try {
+      const parsed = JSON.parse(row.notes) as { spanId?: string };
+      if (parsed.spanId) endedSpanIds.add(parsed.spanId);
+    } catch {
+      // Malformed notes — skip. We'd rather drop a row than crash the timeout path.
+    }
+  }
+
+  const now = Date.now();
+  const out: InFlightActivity[] = [];
+  for (const row of started) {
+    if (!row.notes) continue;
+    let parsed: { spanId?: string; spanType?: string };
+    try {
+      parsed = JSON.parse(row.notes) as { spanId?: string; spanType?: string };
+    } catch {
+      continue;
+    }
+    if (!parsed.spanId || endedSpanIds.has(parsed.spanId)) continue;
+    // The agent's own AGENT_RUN being open is implicit from the timeout — only
+    // the nested tool calls / workflow steps tell us where it actually stalled.
+    if (parsed.spanType === 'agent_run') continue;
+    out.push({
+      action: row.action,
+      ageSeconds: Math.round((now - new Date(row.created_at).getTime()) / 1000),
+    });
+  }
+  return out;
+}
+
 async function runSpecialist(agent: Agent, prompt: string): Promise<{ reply: string }> {
+  const startMs = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(
@@ -197,6 +266,23 @@ async function runSpecialist(agent: Agent, prompt: string): Promise<{ reply: str
       timeout,
     ]);
     return { reply: result.text };
+  } catch (err) {
+    if (err instanceof Error && /timed out/i.test(err.message)) {
+      // Pad the lookup window slightly so spans started just before the timer
+      // fired aren't missed. Failures here are non-fatal — we'd rather throw
+      // the original opaque timeout than swallow it.
+      const inFlight = await inFlightSpans(agent.name, Date.now() - startMs + 5_000).catch(
+        () => [] as InFlightActivity[],
+      );
+      if (inFlight.length) {
+        const summary = inFlight
+          .slice(0, 3)
+          .map((s) => `${s.action} (running ${s.ageSeconds}s)`)
+          .join('; ');
+        throw new Error(`${err.message}. Last in-flight: ${summary}`);
+      }
+    }
+    throw err;
   } finally {
     if (timer) clearTimeout(timer);
   }
