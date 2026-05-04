@@ -10,6 +10,13 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
 let hasEverSubscribed = false;
 
+// Bound the top-level simon.generate() call so a hung model or runaway tool
+// chain cannot leave the web UI on a forever-typing indicator. Set above the
+// 180s per-specialist ceiling in tools.ts so a single legitimate specialist
+// call doesn't trip this outer timeout. Mastra forwards abortSignal into
+// tool executions, so this also cancels any in-flight specialist call.
+const SIMON_TIMEOUT_MS = 240_000;
+
 function scheduleReconnect(reason?: string): void {
   if (reconnectTimer !== null) return;
   reconnectAttempt += 1;
@@ -82,19 +89,23 @@ export async function startWebDirectivesListener(): Promise<void> {
             .update({ is_processing: true } as never)
             .eq('id', conv.id);
 
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), SIMON_TIMEOUT_MS);
           try {
-            // Generate Simon's response via Mastra Memory
-            const result = await simon.generate(lastMessage.content, {
+            // Generate Simon's response via Mastra Memory. The abortSignal
+            // also propagates into in-flight specialist tool calls.
+            const result = (await simon.generate(lastMessage.content, {
               memory: {
                 resource: 'web-director',
                 thread: conv.id,
               },
-            });
+              abortSignal: controller.signal,
+            })) as { text: string; toolCalls?: Array<{ toolName?: string }> };
 
             // Guard against the "Simon claimed delegation but didn't actually invoke a
             // specialist" failure mode. Make it loud rather than silent so directors
             // see something is wrong instead of waiting on a draft that will never come.
-            const toolCalls = (result as { toolCalls?: Array<{ toolName?: string }> }).toolCalls ?? [];
+            const toolCalls = result.toolCalls ?? [];
             const delegated = toolCalls.some((c) => c.toolName?.startsWith('delegate_to_'));
             const claimsDelegation =
               /\bdelegat|hand(ed|ing) (this )?(off|over) to|asked? \w+ to (draft|research|check|find|look)/i.test(
@@ -139,11 +150,36 @@ export async function startWebDirectivesListener(): Promise<void> {
             });
           } catch (err) {
             console.error('[web-directives] Simon processing error:', err);
-            // Clear the flag so the UI doesn't get stuck showing the typing indicator
+            // Surface the failure to the director — clearing the typing indicator
+            // without a message just looks like Simon ignored them.
+            const isTimeout = controller.signal.aborted;
+            const errorContent = isTimeout
+              ? `That took longer than I'm willing to wait. Try again, or rephrase the directive.`
+              : `Something went wrong on my end and I couldn't finish that. Please try again.`;
+            const errorMessage: ConvMessage = {
+              role: 'assistant',
+              content: errorContent,
+              timestamp: new Date().toISOString(),
+              source: 'simon',
+            };
+            // Re-fetch messages so we don't clobber anything appended in the meantime.
+            const { data: latest } = await supabase
+              .from('agent_conversations')
+              .select('messages')
+              .eq('id', conv.id)
+              .maybeSingle();
+            const currentMessages: ConvMessage[] = Array.isArray(latest?.messages)
+              ? (latest.messages as ConvMessage[])
+              : messages;
             await supabase
               .from('agent_conversations')
-              .update({ is_processing: false } as never)
+              .update({
+                messages: [...currentMessages, errorMessage],
+                is_processing: false,
+              } as never)
               .eq('id', conv.id);
+          } finally {
+            clearTimeout(timer);
           }
         } catch (err) {
           console.error('[web-directives] Unhandled error in event handler:', err);
