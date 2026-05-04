@@ -13,20 +13,9 @@ let hasEverSubscribed = false;
 // Bound the top-level simon.generate() call so a hung model or runaway tool
 // chain cannot leave the web UI on a forever-typing indicator. Set above the
 // 180s per-specialist ceiling in tools.ts so a single legitimate specialist
-// call doesn't trip this outer timeout.
+// call doesn't trip this outer timeout. Mastra forwards abortSignal into
+// tool executions, so this also cancels any in-flight specialist call.
 const SIMON_TIMEOUT_MS = 240_000;
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
 
 function scheduleReconnect(reason?: string): void {
   if (reconnectTimer !== null) return;
@@ -100,18 +89,18 @@ export async function startWebDirectivesListener(): Promise<void> {
             .update({ is_processing: true } as never)
             .eq('id', conv.id);
 
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), SIMON_TIMEOUT_MS);
           try {
-            // Generate Simon's response via Mastra Memory
-            const result = (await withTimeout(
-              simon.generate(lastMessage.content, {
-                memory: {
-                  resource: 'web-director',
-                  thread: conv.id,
-                },
-              }),
-              SIMON_TIMEOUT_MS,
-              'Simon generate',
-            )) as { text: string; toolCalls?: Array<{ toolName?: string }> };
+            // Generate Simon's response via Mastra Memory. The abortSignal
+            // also propagates into in-flight specialist tool calls.
+            const result = (await simon.generate(lastMessage.content, {
+              memory: {
+                resource: 'web-director',
+                thread: conv.id,
+              },
+              abortSignal: controller.signal,
+            })) as { text: string; toolCalls?: Array<{ toolName?: string }> };
 
             // Guard against the "Simon claimed delegation but didn't actually invoke a
             // specialist" failure mode. Make it loud rather than silent so directors
@@ -163,7 +152,7 @@ export async function startWebDirectivesListener(): Promise<void> {
             console.error('[web-directives] Simon processing error:', err);
             // Surface the failure to the director — clearing the typing indicator
             // without a message just looks like Simon ignored them.
-            const isTimeout = err instanceof Error && /timed out/.test(err.message);
+            const isTimeout = controller.signal.aborted;
             const errorContent = isTimeout
               ? `That took longer than I'm willing to wait. Try again, or rephrase the directive.`
               : `Something went wrong on my end and I couldn't finish that. Please try again.`;
@@ -189,6 +178,8 @@ export async function startWebDirectivesListener(): Promise<void> {
                 is_processing: false,
               } as never)
               .eq('id', conv.id);
+          } finally {
+            clearTimeout(timer);
           }
         } catch (err) {
           console.error('[web-directives] Unhandled error in event handler:', err);
