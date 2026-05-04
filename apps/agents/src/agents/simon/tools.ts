@@ -179,10 +179,27 @@ const specialistAgents: Record<string, Agent> = {
 
 // Synchronously invoke a specialist and return their reply text. Errors propagate
 // to Simon's tool loop so the model can mention the failure rather than silently
-// claiming delegation succeeded.
+// claiming delegation succeeded. The timeout prevents a stalled specialist from
+// pinning the web UI on a forever-typing indicator.
+const SPECIALIST_TIMEOUT_MS = 180_000;
+
 async function runSpecialist(agent: Agent, prompt: string): Promise<{ reply: string }> {
-  const result = await agent.generate([{ role: 'user', content: prompt }]);
-  return { reply: result.text };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Specialist ${agent.name} timed out after ${SPECIALIST_TIMEOUT_MS / 1000}s`)),
+      SPECIALIST_TIMEOUT_MS,
+    );
+  });
+  try {
+    const result = await Promise.race([
+      agent.generate([{ role: 'user', content: prompt }]),
+      timeout,
+    ]);
+    return { reply: result.text };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export const delegateToCharlie = createTool({
