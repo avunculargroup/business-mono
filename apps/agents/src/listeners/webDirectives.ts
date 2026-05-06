@@ -100,7 +100,15 @@ export async function startWebDirectivesListener(): Promise<void> {
                 thread: conv.id,
               },
               abortSignal: controller.signal,
-            })) as { text: string; toolCalls?: Array<{ toolName?: string }> };
+            })) as {
+              text: string;
+              toolCalls?: Array<{ toolName?: string }>;
+              toolResults?: Array<{
+                toolName?: string;
+                result?: unknown;
+                isError?: boolean;
+              }>;
+            };
 
             // Guard against the "Simon claimed delegation but didn't actually invoke a
             // specialist" failure mode. Make it loud rather than silent so directors
@@ -133,12 +141,61 @@ export async function startWebDirectivesListener(): Promise<void> {
             // call, that's almost always the empty-promise case.
             const emptyRetryPromise = promisesRetry && lastDelegateIdx <= 0;
 
+            // Catch the "specialist failed but Simon claims success" failure mode:
+            // a delegate_to_* tool call returned an error (e.g. "Specialist charlie
+            // timed out after 180s"), and Simon then told the director "Done —
+            // Charlie's working on it" without acknowledging the failure. Without
+            // this guard the director thinks a draft is on its way and waits
+            // indefinitely. Mastra surfaces tool-execution errors via toolResults
+            // entries with isError=true (or, for older shapes, by stringifying the
+            // thrown error into result), so we check both.
+            const toolResults = result.toolResults ?? [];
+            const failedDelegate = toolResults.find((r) => {
+              if (!r.toolName?.startsWith('delegate_to_')) return false;
+              if (r.isError === true) return true;
+              const raw =
+                typeof r.result === 'string'
+                  ? r.result
+                  : r.result && typeof r.result === 'object'
+                    ? JSON.stringify(r.result)
+                    : '';
+              return /\b(timed out|timeout|specialist .* (timed out|failed|errored))\b/i.test(raw);
+            });
+            const acknowledgesFailure =
+              /\b(timed out|timeout|failed|couldn'?t|wasn'?t able|stalled|errored|issue|trouble|problem|sorry)\b/i.test(
+                result.text,
+              );
+            const claimsSuccessOrInProgress =
+              /\b(done|drafted|created|wrote|posted|sent|completed|all set|here'?s|here you go|ready (?:shortly|soon|now|in a moment)|will (?:be|have it) ready|working on (?:it|that|a|the))\b/i.test(
+                result.text,
+              );
+            const silentFailure =
+              !!failedDelegate && !acknowledgesFailure && claimsSuccessOrInProgress;
+
             let replyText = result.text;
             if (claimsDelegation && !delegated) {
               replyText = `${result.text}\n\n[system: I named a specialist but didn't actually invoke one — please retry, or rephrase the directive.]`;
               console.warn(
                 '[web-directives] Simon claimed delegation but made no delegate_* tool call:',
                 result.text.slice(0, 200),
+              );
+            } else if (silentFailure) {
+              const errStr = ((): string => {
+                const r = failedDelegate.result;
+                if (typeof r === 'string') return r;
+                if (r instanceof Error) return r.message;
+                if (r && typeof r === 'object') {
+                  const obj = r as { message?: unknown; error?: unknown };
+                  if (typeof obj.message === 'string') return obj.message;
+                  if (typeof obj.error === 'string') return obj.error;
+                  return JSON.stringify(r).slice(0, 240);
+                }
+                return `${failedDelegate.toolName} failed`;
+              })();
+              replyText = `${result.text}\n\n[system: ${failedDelegate.toolName} actually returned an error: ${errStr}. Please resend the directive — a shorter prompt sometimes helps.]`;
+              console.warn(
+                '[web-directives] Simon claimed success but delegate tool errored:',
+                { toolName: failedDelegate.toolName, error: errStr, replyPrefix: result.text.slice(0, 200) },
               );
             } else if (emptyRetryPromise) {
               replyText = `${result.text}\n\n[system: Simon promised a retry but didn't actually run one. Please resend the directive — a shorter prompt sometimes helps.]`;
