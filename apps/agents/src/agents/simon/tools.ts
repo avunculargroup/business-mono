@@ -10,6 +10,7 @@ import { della } from '../relationshipManager/index.js';
 import { roger } from '../recorder/agent.js';
 import { petra } from '../pm/agent.js';
 import type { Agent } from '@mastra/core/agent';
+import { makeStepLogger } from '../../lib/agentStepTelemetry.js';
 
 export const conflictCheck = createTool({
   id: 'conflict_check',
@@ -281,10 +282,17 @@ async function runSpecialist(
     else opts.abortSignal.addEventListener('abort', onUpstreamAbort, { once: true });
   }
 
+  // Per-step telemetry — logs to console at end-of-run with step count, total
+  // time, tool counts, finishReason, and token usage. The diagnostic question
+  // is "where are the 180s going?" and span-only logging doesn't answer it
+  // (Mastra v1.24 doesn't emit per-tool spans into agent_activity for every
+  // run). Label uses the agent name so log lines are greppable per specialist.
+  const stepLogger = makeStepLogger(agent.name);
   try {
     const result = await agent.generate([{ role: 'user', content: prompt }], {
       abortSignal: controller.signal,
       maxSteps: SPECIALIST_MAX_STEPS,
+      onStepFinish: stepLogger.onStepFinish,
     });
     return { reply: result.text };
   } catch (err) {
@@ -332,6 +340,7 @@ async function runSpecialist(
   } finally {
     clearTimeout(timer);
     if (opts.abortSignal) opts.abortSignal.removeEventListener('abort', onUpstreamAbort);
+    stepLogger.summarise();
   }
 }
 
