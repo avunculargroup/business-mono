@@ -166,7 +166,7 @@ export async function startWebDirectivesListener(): Promise<void> {
                 result.text,
               );
             const claimsSuccessOrInProgress =
-              /\b(done|drafted|created|wrote|posted|sent|completed|all set|here'?s|here you go|ready (?:shortly|soon|now|in a moment)|will (?:be|have it) ready|working on (?:it|that|a|the))\b/i.test(
+              /\b(done|drafted|created|wrote|posted|sent|completed|all set|here'?s|here you go|ready (?:shortly|soon|now|in a moment)|will (?:be|have it) ready|working on (?:it|that|a|the)|(?:just )?(?:finished|wrapped up)|(?:still )?processing|give (?:him|her|them) (?:another|a)? ?moment|almost (?:done|ready)|should be ready|in progress)\b/i.test(
                 result.text,
               );
             const silentFailure =
