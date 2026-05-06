@@ -251,40 +251,87 @@ async function inFlightSpans(agentName: string, sinceMs: number): Promise<InFlig
   return out;
 }
 
-async function runSpecialist(agent: Agent, prompt: string): Promise<{ reply: string }> {
+// Cap the specialist's tool-call loop. Without this, a confused model can
+// hammer tools indefinitely until our 180s timer fires, leaving every
+// delegation looking like a hang to the director. Mastra returns whatever the
+// agent has produced so far when this cap is hit, with finishReason='tool-calls'.
+const SPECIALIST_MAX_STEPS = 20;
+
+async function runSpecialist(
+  agent: Agent,
+  prompt: string,
+  opts: { abortSignal?: AbortSignal } = {},
+): Promise<{ reply: string }> {
   const startMs = Date.now();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`Specialist ${agent.name} timed out after ${SPECIALIST_TIMEOUT_MS / 1000}s`)),
-      SPECIALIST_TIMEOUT_MS,
-    );
-  });
+  // One controller drives both: our 180s timer AND the upstream signal Simon
+  // received (the 240s outer abort from webDirectives.ts). Promise.race only
+  // throws the timeout to *our* caller — it leaves agent.generate running in
+  // the background, which is how a single director retry produced two
+  // overlapping Charlie runs. Aborting the inner generate actually stops it.
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`Specialist ${agent.name} timed out after ${SPECIALIST_TIMEOUT_MS / 1000}s`));
+  }, SPECIALIST_TIMEOUT_MS);
+
+  const onUpstreamAbort = () => {
+    controller.abort(opts.abortSignal?.reason ?? new Error('Aborted by upstream'));
+  };
+  if (opts.abortSignal) {
+    if (opts.abortSignal.aborted) onUpstreamAbort();
+    else opts.abortSignal.addEventListener('abort', onUpstreamAbort, { once: true });
+  }
+
   try {
-    const result = await Promise.race([
-      agent.generate([{ role: 'user', content: prompt }]),
-      timeout,
-    ]);
+    const result = await agent.generate([{ role: 'user', content: prompt }], {
+      abortSignal: controller.signal,
+      maxSteps: SPECIALIST_MAX_STEPS,
+    });
     return { reply: result.text };
   } catch (err) {
-    if (err instanceof Error && /timed out/i.test(err.message)) {
-      // Pad the lookup window slightly so spans started just before the timer
-      // fired aren't missed. Failures here are non-fatal — we'd rather throw
-      // the original opaque timeout than swallow it.
+    // Distinguish "we hit our own 180s ceiling" from "upstream aborted us".
+    // The first is a Charlie-specific problem worth logging as a capacity gap;
+    // the second is just Simon's outer 240s firing and shouldn't double-log.
+    const reason = controller.signal.reason;
+    const ourTimeout =
+      controller.signal.aborted &&
+      reason instanceof Error &&
+      /timed out/i.test(reason.message);
+
+    if (ourTimeout) {
       const inFlight = await inFlightSpans(agent.name, Date.now() - startMs + 5_000).catch(
         () => [] as InFlightActivity[],
       );
-      if (inFlight.length) {
-        const summary = inFlight
-          .slice(0, 3)
-          .map((s) => `${s.action} (running ${s.ageSeconds}s)`)
-          .join('; ');
-        throw new Error(`${err.message}. Last in-flight: ${summary}`);
-      }
+      const summary = inFlight.length
+        ? inFlight.slice(0, 3).map((s) => `${s.action} (running ${s.ageSeconds}s)`).join('; ')
+        : null;
+
+      // Auto-log so the director doesn't have to ask Simon to "note this as a
+      // capacity gap" every time a specialist hangs. broken_chain is the
+      // closest existing gap_type — the chain (delegate → specialist → reply)
+      // didn't complete.
+      void supabase
+        .from('capacity_gaps')
+        .insert({
+          gap_type: 'broken_chain' as CapacityGapType,
+          directive_summary: prompt.slice(0, 200),
+          details: summary
+            ? `${agent.name} timed out after ${SPECIALIST_TIMEOUT_MS / 1000}s. Last in-flight: ${summary}`
+            : `${agent.name} timed out after ${SPECIALIST_TIMEOUT_MS / 1000}s with no in-flight tool spans recorded.`,
+          resolved: false,
+        } as never)
+        .then(({ error }) => {
+          if (error) {
+            console.error('[runSpecialist] Failed to log capacity_gap on timeout:', error);
+          }
+        });
+
+      const message = (reason as Error).message + (summary ? `. Last in-flight: ${summary}` : '');
+      throw new Error(message);
     }
     throw err;
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
+    if (opts.abortSignal) opts.abortSignal.removeEventListener('abort', onUpstreamAbort);
   }
 }
 
@@ -300,11 +347,11 @@ export const delegateToCharlie = createTool({
     directive: z.string().min(1).describe('Full instruction for Charlie'),
     contentItemId: z.string().uuid().optional().describe('Existing draft to revise in place'),
   }),
-  execute: async (context) => {
+  execute: async (context, options?: { abortSignal?: AbortSignal }) => {
     const prompt = context.contentItemId
       ? `${context.directive}\n\n(Revision — pass contentItemId ${context.contentItemId} to persist_content_draft so the existing row is updated.)`
       : context.directive;
-    return runSpecialist(charlie as unknown as Agent, prompt);
+    return runSpecialist(charlie as unknown as Agent, prompt, { abortSignal: options?.abortSignal });
   },
 });
 
@@ -316,7 +363,8 @@ export const delegateToRex = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Research brief or directive for Rex'),
   }),
-  execute: async (context) => runSpecialist(rex as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(rex as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const delegateToArchie = createTool({
@@ -327,7 +375,8 @@ export const delegateToArchie = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Instruction for Archie'),
   }),
-  execute: async (context) => runSpecialist(archie as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(archie as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const delegateToPetra = createTool({
@@ -338,7 +387,8 @@ export const delegateToPetra = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Instruction for Petra'),
   }),
-  execute: async (context) => runSpecialist(petra as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(petra as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const delegateToBruno = createTool({
@@ -348,7 +398,8 @@ export const delegateToBruno = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Instruction for Bruno'),
   }),
-  execute: async (context) => runSpecialist(bruno as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(bruno as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const delegateToDella = createTool({
@@ -359,7 +410,8 @@ export const delegateToDella = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Instruction for Della'),
   }),
-  execute: async (context) => runSpecialist(della as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(della as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const delegateToRoger = createTool({
@@ -371,7 +423,8 @@ export const delegateToRoger = createTool({
   inputSchema: z.object({
     directive: z.string().min(1).describe('Instruction for Roger'),
   }),
-  execute: async (context) => runSpecialist(roger as unknown as Agent, context.directive),
+  execute: async (context, options?: { abortSignal?: AbortSignal }) =>
+    runSpecialist(roger as unknown as Agent, context.directive, { abortSignal: options?.abortSignal }),
 });
 
 export const agentHealthCheck = createTool({
