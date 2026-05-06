@@ -10,20 +10,63 @@ import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { generateEmbedding } from '../../tools/openai.js';
 import { brandLookup, persistContentDraft } from './tools.js';
 
-function loadBrandVoice(): string {
+// Sections of brand-voice.md that Charlie needs on every inference. The full
+// doc is ~14KB / ~5K tokens; embedding it on every step makes Charlie hit the
+// 180s ceiling on simple directives. These four sections are the only ones
+// applied per-draft (tone, channel rules, required/banned words). Framing
+// sections (company identity, Bitcoin stance, voice calibration sample) and
+// non-content sections (visual identity, director profiles) stay in
+// brand-voice.md as the human source of truth but are not embedded.
+const ESSENTIAL_BRAND_SECTIONS = [
+  'Tone of Voice',
+  'Content Style Rules',
+  'Required Terminology',
+  'Banned Terminology',
+];
+
+function loadBrandVoiceEssentials(): string {
   const candidates = [
     // Dev: 5 levels up from source file reaches monorepo root
     resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../docs/brand-voice.md'),
     // Production: CWD is /app, docs/ copied alongside .mastra/output/
     resolve(process.cwd(), 'docs/brand-voice.md'),
   ];
+  let md: string | null = null;
   for (const p of candidates) {
-    if (existsSync(p)) return readFileSync(p, 'utf-8');
+    if (existsSync(p)) {
+      md = readFileSync(p, 'utf-8');
+      break;
+    }
   }
-  throw new Error(`brand-voice.md not found. Tried: ${candidates.join(', ')}`);
+  if (md === null) {
+    throw new Error(`brand-voice.md not found. Tried: ${candidates.join(', ')}`);
+  }
+  // Split on `## ` headers (level-2 only — preserves `### ` subheaders inside
+  // each section). The first chunk is everything before the first `## ` and
+  // is discarded.
+  const chunks = md.split(/^## /m).slice(1);
+  const byName = new Map<string, string>();
+  for (const chunk of chunks) {
+    const newlineIdx = chunk.indexOf('\n');
+    if (newlineIdx === -1) continue;
+    const name = chunk.slice(0, newlineIdx).trim();
+    const body = chunk.slice(newlineIdx + 1).trimEnd();
+    byName.set(name, body);
+  }
+  const sections: string[] = [];
+  for (const name of ESSENTIAL_BRAND_SECTIONS) {
+    const body = byName.get(name);
+    if (body === undefined) {
+      throw new Error(
+        `brand-voice.md: section "## ${name}" not found — keep section header in sync with ESSENTIAL_BRAND_SECTIONS`,
+      );
+    }
+    sections.push(`## ${name}\n${body}`);
+  }
+  return sections.join('\n\n');
 }
 
-const BRAND_VOICE = loadBrandVoice();
+const BRAND_VOICE = loadBrandVoiceEssentials();
 
 const SYSTEM_PROMPT = `You are Charlie, BTS's Content Creator.
 

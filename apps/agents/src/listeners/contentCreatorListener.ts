@@ -1,5 +1,6 @@
 import { createRealtimeClient } from '@platform/db';
 import { runDispatch } from '../lib/dispatchRunner.js';
+import { makeStepLogger } from '../lib/agentStepTelemetry.js';
 import { charlie } from '../agents/contentCreator/index.js';
 
 const supabase = createRealtimeClient();
@@ -98,8 +99,20 @@ export function startContentCreatorListener(): void {
           // Cap the tool-call loop. Without this, a confused model can hammer
           // tools indefinitely and blow past sensible run times. Mastra returns
           // whatever the agent has produced so far when the cap is hit.
-          run: async () =>
-            charlie.generate([{ role: 'user', content: dispatch.message }], { maxSteps: 20 }),
+          run: async () => {
+            const stepLogger = makeStepLogger(`charlie/${row.id}`);
+            try {
+              return await charlie.generate(
+                [{ role: 'user', content: dispatch.message }],
+                {
+                  maxSteps: 20,
+                  onStepFinish: stepLogger.onStepFinish,
+                },
+              );
+            } finally {
+              stepLogger.summarise();
+            }
+          },
           onSuccess: async (result) => {
             // Listener owns persistence — save draft to content_items unconditionally
             // rather than relying on Charlie's tool calls, which are unreliable.
