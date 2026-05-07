@@ -7,7 +7,6 @@ import { getModelConfig } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
-import { generateEmbedding } from '../../tools/openai.js';
 import { brandLookup, persistContentDraft } from './tools.js';
 
 // Sections of brand-voice.md that Charlie needs on every inference. The full
@@ -198,7 +197,6 @@ export const charlie = new Agent({
     log_activity: logActivity,
     vector_search: vectorSearchTool,
     graph_traverse: graphTraverseTool,
-    generate_embedding: generateEmbedding,
     brand_lookup: brandLookup,
     persist_content_draft: persistContentDraft,
   },

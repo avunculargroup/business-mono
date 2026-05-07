@@ -1,6 +1,10 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import OpenAI from 'openai';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+
+const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
 export const webFetch = createTool({
   id: 'web_fetch',
@@ -28,14 +32,37 @@ export const webFetch = createTool({
 
 export const vectorSearchTool = createTool({
   id: 'vector_search',
-  description: 'Search the knowledge base by semantic similarity',
-  inputSchema: z.object({
-    queryEmbedding: z.array(z.number()).describe('Query embedding vector'),
-    matchThreshold: z.number().default(0.7).describe('Minimum similarity score'),
-    matchCount: z.number().default(10).describe('Max results to return'),
-  }),
+  description:
+    'Search the knowledge base by semantic similarity. Pass a plain text query — the embedding is generated internally.',
+  inputSchema: z
+    .object({
+      query: z
+        .string()
+        .optional()
+        .describe('Plain text query — preferred. The embedding is generated internally.'),
+      queryEmbedding: z
+        .array(z.number())
+        .optional()
+        .describe('Pre-computed embedding (advanced; pass `query` instead unless you have one)'),
+      matchThreshold: z.number().default(0.7).describe('Minimum similarity score'),
+      matchCount: z.number().default(10).describe('Max results to return'),
+    })
+    .refine((data) => data.query !== undefined || data.queryEmbedding !== undefined, {
+      message: 'Either `query` (plain text) or `queryEmbedding` (number[]) must be provided.',
+    }),
   execute: async (context) => {
-    const results = await vectorSearch(context.queryEmbedding, {
+    let embedding: number[];
+    if (context.queryEmbedding) {
+      embedding = context.queryEmbedding;
+    } else {
+      const response = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: context.query!,
+        dimensions: EMBEDDING_DIMENSIONS,
+      });
+      embedding = response.data[0]?.embedding ?? [];
+    }
+    const results = await vectorSearch(embedding, {
       matchThreshold: context.matchThreshold,
       matchCount: context.matchCount,
     });
