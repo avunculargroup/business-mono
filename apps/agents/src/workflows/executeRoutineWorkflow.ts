@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Database, Json } from '@platform/db';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import type {
   ResearchBrief,
   ResearchResult,
@@ -25,7 +26,7 @@ import type {
   NewsCategory,
   NewsIngestResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, DEFAULT_MODEL } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
@@ -41,6 +42,17 @@ const routineSchema = z.object({
   frequency: z.string(),
   time_of_day: z.string(),
   timezone: z.string(),
+});
+
+const newsExtractionSchema = z.object({
+  summary: z.string().min(40).max(500)
+    .describe('A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
+  key_points: z.array(z.string()).min(3).max(7)
+    .describe('3–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
+  topic_tags: z.array(z.string()).min(3).max(8)
+    .describe('3–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
+  australian_relevance: z.boolean()
+    .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
 });
 
 const fetchDueRoutines = createStep({
@@ -283,6 +295,79 @@ async function runMonitorChange(
   };
 }
 
+async function extractNewsMetadata(input: {
+  title: string;
+  source: string;
+  category: NewsCategory;
+  content: string;
+}): Promise<z.infer<typeof newsExtractionSchema> | null> {
+  const apiKey = process.env['ANTHROPIC_API_KEY'];
+  if (!apiKey) return null;
+
+  const modelId = (process.env['ANTHROPIC_MODEL'] ?? DEFAULT_MODEL).replace(/^anthropic\//, '');
+  const anthropic = new Anthropic({ apiKey });
+
+  const response = await anthropic.messages.create({
+    model: modelId,
+    max_tokens: 1024,
+    tool_choice: { type: 'tool', name: 'record_news_metadata' },
+    tools: [
+      {
+        name: 'record_news_metadata',
+        description: 'Record structured metadata extracted from a news article.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            summary: {
+              type: 'string',
+              description: 'A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit. 40–500 characters.',
+            },
+            key_points: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 3,
+              maxItems: 7,
+              description: '3–7 short factual bullet points capturing main claims, numbers, names, and dates. No marketing language.',
+            },
+            topic_tags: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 3,
+              maxItems: 8,
+              description: '3–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".',
+            },
+            australian_relevance: {
+              type: 'boolean',
+              description: 'true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.',
+            },
+          },
+          required: ['summary', 'key_points', 'topic_tags', 'australian_relevance'],
+        },
+      },
+    ],
+    system:
+      'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
+      'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
+      'Avoid marketing language. Topic tags must be lowercase and hyphenated.',
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Category hint: ${input.category}\n` +
+          `Title: ${input.title}\n` +
+          `Source: ${input.source}\n\n` +
+          `Article:\n${input.content}`,
+      },
+    ],
+  });
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') return null;
+
+  const parsed = newsExtractionSchema.safeParse(toolUse.input);
+  return parsed.success ? parsed.data : null;
+}
+
 async function runNewsIngest(
   routine: z.infer<typeof routineSchema>,
 ): Promise<RoutineOutcome> {
@@ -355,20 +440,19 @@ async function runNewsIngest(
 
   for (const item of newCandidates) {
     try {
-      // Step 3: Generate embedding.
-      const embeddingText = `${item.title} ${item.summary}`.trim();
-      const embRes = await openai.embeddings.create({
+      // Step 3: Cheap snippet-based embedding for dedup.
+      const dedupEmbRes = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
-        input: embeddingText,
+        input: `${item.title} ${item.summary}`.trim(),
         dimensions: EMBEDDING_DIMENSIONS,
       });
-      const embedding = embRes.data[0]?.embedding ?? null;
+      const dedupEmbedding = dedupEmbRes.data[0]?.embedding ?? null;
 
       // Step 4: Semantic deduplication — skip near-identical articles.
-      if (embedding) {
+      if (dedupEmbedding) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: near } = await (supabase.rpc as any)('vector_search_news', {
-          query_embedding: embedding,
+          query_embedding: dedupEmbedding,
           match_threshold: 0.95,
           match_count: 1,
           filter_category: category,
@@ -380,16 +464,56 @@ async function runNewsIngest(
         }
       }
 
-      // Step 5: Insert.
+      // Step 5: Fetch full article body via Jina Reader.
+      let bodyMarkdown: string | null = null;
+      try {
+        const fetched = await fetchUrl.execute!({ url: item.url } as never, {} as never) as
+          | { title?: string; markdown?: string }
+          | undefined;
+        const md = fetched?.markdown?.trim();
+        if (md && md.length > 200) bodyMarkdown = md;
+      } catch {
+        // body fetch failed; carry on with snippet-only enrichment
+      }
+
+      // Step 6: Structured extraction (summary, key_points, topic_tags, AU relevance).
+      const extractionInput = bodyMarkdown ?? item.summary;
+      const truncated = extractionInput.slice(0, 12000);
+      let extracted: z.infer<typeof newsExtractionSchema> | null = null;
+      try {
+        extracted = await extractNewsMetadata({
+          title: item.title,
+          source: item.source,
+          category,
+          content: truncated,
+        });
+      } catch {
+        // extraction failed; fall back to snippet summary and defaults
+      }
+
+      // Step 7: Final embedding on title + curated summary for higher-quality search.
+      const finalSummary = extracted?.summary ?? item.summary;
+      const finalEmbRes = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: `${item.title}\n${finalSummary}`.trim(),
+        dimensions: EMBEDDING_DIMENSIONS,
+      });
+      const finalEmbedding = finalEmbRes.data[0]?.embedding ?? dedupEmbedding;
+
+      // Step 8: Insert.
       await supabase.from('news_items').insert({
         title: item.title,
         url: item.url,
         source_name: item.source,
         published_at: item.published_at,
-        summary: item.summary,
+        body_markdown: bodyMarkdown,
+        summary: finalSummary,
+        key_points: extracted?.key_points ?? [],
+        topic_tags: extracted?.topic_tags ?? [],
+        australian_relevance: extracted?.australian_relevance ?? true,
         category: category as NewsCategory,
         relevance_score: Math.min(1, item.score),
-        embedding: embedding as unknown as string,
+        embedding: finalEmbedding as unknown as string,
         routine_id: routine.id,
         ingested_by: 'rex',
       });
