@@ -1,4 +1,5 @@
 import { supabase } from '../client.js';
+import { DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import type { NewsCategory, NewsItemRecord } from '@platform/shared';
 
 export interface NewsVectorSearchResult {
@@ -76,16 +77,13 @@ export async function newsFulltextSearch(
 export async function newsDailyDigest(
   date?: Date,
 ): Promise<Record<NewsCategory, NewsItemRecord[]>> {
-  const since = date
-    ? new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    : new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-  const until = new Date(since.getTime() + 24 * 60 * 60 * 1000);
+  const { start, end } = dayBoundsInTz(DEFAULT_TIMEZONE, date);
 
   const { data, error } = await supabase
     .from('news_items')
     .select('*')
-    .gte('fetched_at', since.toISOString())
-    .lt('fetched_at', until.toISOString())
+    .gte('fetched_at', start.toISOString())
+    .lt('fetched_at', end.toISOString())
     .neq('status', 'archived')
     .order('relevance_score', { ascending: false, nullsFirst: false })
     .order('published_at', { ascending: false, nullsFirst: false })

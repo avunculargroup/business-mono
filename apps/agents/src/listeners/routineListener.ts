@@ -16,17 +16,18 @@ async function runRoutineCheck(mastra: Mastra): Promise<void> {
 }
 
 /**
- * Starts an hourly interval that triggers the execute-routine workflow.
+ * Starts a recurring interval that triggers the execute-routine workflow.
  * Checks for routines where is_active AND next_run_at <= NOW().
+ * Interval is configured by ROUTINE_CHECK_INTERVAL_MS — short enough that a
+ * routine fires within that window of its scheduled wall-clock time.
  */
 export function startRoutineListener(mastra: Mastra): void {
   if (intervalHandle !== null) {
     clearInterval(intervalHandle);
   }
 
-  console.log(
-    `[routine-listener] Starting routine check interval (${ROUTINE_CHECK_INTERVAL_MS / 1000}s)`,
-  );
+  const minutes = ROUTINE_CHECK_INTERVAL_MS / 60000;
+  console.log(`[routine-listener] Starting routine check interval (every ${minutes}m)`);
 
   void runRoutineCheck(mastra);
 

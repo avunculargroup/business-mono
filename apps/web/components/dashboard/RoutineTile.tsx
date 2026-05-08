@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
-import { formatRelativeDate } from '@/lib/utils';
+import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
 import styles from './RoutineTile.module.css';
 
 interface RoutineSource {
@@ -22,6 +22,7 @@ interface RoutineTileProps {
     dashboard_title: string | null;
     last_run_at: string | null;
     last_result: RoutineResult | null;
+    timezone: string;
   };
 }
 
@@ -35,7 +36,10 @@ export function RoutineTile({ routine }: RoutineTileProps) {
       <div className={styles.header}>
         <h2 className={styles.title}>{title}</h2>
         {routine.last_run_at && (
-          <span className={styles.subtitle}>Last run {formatRelativeDate(routine.last_run_at)}</span>
+          <span className={styles.subtitle}>
+            Last run {formatRelativeDate(routine.last_run_at, routine.timezone)},{' '}
+            {formatTimeInTz(routine.last_run_at, routine.timezone)}
+          </span>
         )}
       </div>
 

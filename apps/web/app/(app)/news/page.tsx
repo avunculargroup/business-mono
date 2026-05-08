@@ -1,14 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { NewsFeed } from '@/components/news/NewsFeed';
+import { DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import type { NewsItemRecord, NewsCategory } from '@platform/shared';
 
 export default async function NewsPage() {
   const supabase = await createClient();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const { start, end } = dayBoundsInTz(DEFAULT_TIMEZONE);
 
   const [{ data: items }, { data: digest }] = await Promise.all([
     supabase
@@ -21,8 +20,8 @@ export default async function NewsPage() {
     supabase
       .from('news_items')
       .select('id, title, url, category')
-      .gte('fetched_at', today.toISOString())
-      .lt('fetched_at', tomorrow.toISOString())
+      .gte('fetched_at', start.toISOString())
+      .lt('fetched_at', end.toISOString())
       .neq('status', 'archived')
       .order('relevance_score', { ascending: false, nullsFirst: false })
       .limit(20),
