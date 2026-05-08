@@ -10,11 +10,11 @@
  */
 
 import { createWorkflow, createStep } from '@mastra/core/workflows';
+import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import type { Database, Json } from '@platform/db';
 import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 import type {
   ResearchBrief,
   ResearchResult,
@@ -26,10 +26,11 @@ import type {
   NewsCategory,
   NewsIngestResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, DEFAULT_MODEL } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
+import { getModelConfig } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
 
@@ -295,77 +296,73 @@ async function runMonitorChange(
   };
 }
 
+let newsExtractorAgent: Agent | null = null;
+function getNewsExtractor(): Agent {
+  if (!newsExtractorAgent) {
+    newsExtractorAgent = new Agent({
+      id: 'newsExtractor',
+      name: 'newsExtractor',
+      instructions:
+        'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
+        'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
+        'Avoid marketing language. Topic tags must be lowercase and hyphenated.\n\n' +
+        'Return ONLY a single JSON object — no prose, no code fences — with these keys:\n' +
+        '  - summary: string, 2–3 neutral sentences (40–500 characters total)\n' +
+        '  - key_points: array of 3–7 short factual strings (claims, numbers, names, dates)\n' +
+        '  - topic_tags: array of 3–8 lowercase hyphenated tag strings (e.g. "etf", "asx-listed", "treasury-strategy")\n' +
+        '  - australian_relevance: boolean — true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.',
+      model: getModelConfig(),
+    });
+  }
+  return newsExtractorAgent;
+}
+
 async function extractNewsMetadata(input: {
   title: string;
   source: string;
   category: NewsCategory;
   content: string;
 }): Promise<z.infer<typeof newsExtractionSchema> | null> {
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) return null;
+  const prompt =
+    `Category hint: ${input.category}\n` +
+    `Title: ${input.title}\n` +
+    `Source: ${input.source}\n\n` +
+    `Article:\n${input.content}\n\n` +
+    `Return the JSON object now.`;
 
-  const modelId = (process.env['ANTHROPIC_MODEL'] ?? DEFAULT_MODEL).replace(/^anthropic\//, '');
-  const anthropic = new Anthropic({ apiKey });
+  const response = await getNewsExtractor().generate([
+    { role: 'user', content: prompt },
+  ]);
 
-  const response = await anthropic.messages.create({
-    model: modelId,
-    max_tokens: 1024,
-    tool_choice: { type: 'tool', name: 'record_news_metadata' },
-    tools: [
-      {
-        name: 'record_news_metadata',
-        description: 'Record structured metadata extracted from a news article.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            summary: {
-              type: 'string',
-              description: 'A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit. 40–500 characters.',
-            },
-            key_points: {
-              type: 'array',
-              items: { type: 'string' },
-              minItems: 3,
-              maxItems: 7,
-              description: '3–7 short factual bullet points capturing main claims, numbers, names, and dates. No marketing language.',
-            },
-            topic_tags: {
-              type: 'array',
-              items: { type: 'string' },
-              minItems: 3,
-              maxItems: 8,
-              description: '3–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".',
-            },
-            australian_relevance: {
-              type: 'boolean',
-              description: 'true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.',
-            },
-          },
-          required: ['summary', 'key_points', 'topic_tags', 'australian_relevance'],
-        },
-      },
-    ],
-    system:
-      'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
-      'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
-      'Avoid marketing language. Topic tags must be lowercase and hyphenated.',
-    messages: [
-      {
-        role: 'user',
-        content:
-          `Category hint: ${input.category}\n` +
-          `Title: ${input.title}\n` +
-          `Source: ${input.source}\n\n` +
-          `Article:\n${input.content}`,
-      },
-    ],
-  });
+  const match = response.text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.warn('[news-ingest] extraction returned no JSON object', {
+      title: input.title,
+      preview: response.text.slice(0, 200),
+    });
+    return null;
+  }
 
-  const toolUse = response.content.find((b) => b.type === 'tool_use');
-  if (!toolUse || toolUse.type !== 'tool_use') return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(match[0]);
+  } catch (err) {
+    console.warn('[news-ingest] extraction JSON parse failed', {
+      title: input.title,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 
-  const parsed = newsExtractionSchema.safeParse(toolUse.input);
-  return parsed.success ? parsed.data : null;
+  const parsed = newsExtractionSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn('[news-ingest] extraction schema validation failed', {
+      title: input.title,
+      issues: parsed.error.issues,
+    });
+    return null;
+  }
+  return parsed.data;
 }
 
 async function runNewsIngest(
@@ -487,8 +484,11 @@ async function runNewsIngest(
           category,
           content: truncated,
         });
-      } catch {
-        // extraction failed; fall back to snippet summary and defaults
+      } catch (err) {
+        console.warn('[news-ingest] extraction threw — falling back to snippet', {
+          title: item.title,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // Step 7: Final embedding on title + curated summary for higher-quality search.
@@ -518,8 +518,12 @@ async function runNewsIngest(
         ingested_by: 'rex',
       });
       itemsStored += 1;
-    } catch {
-      // skip individual failures
+    } catch (err) {
+      console.warn('[news-ingest] item failed — skipping', {
+        url: item.url,
+        title: item.title,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
