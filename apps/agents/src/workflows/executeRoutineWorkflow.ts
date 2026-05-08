@@ -434,6 +434,7 @@ async function runNewsIngest(
 
   let itemsSkipped = candidates.length - newCandidates.length;
   let itemsStored = 0;
+  const storedSources: NonNullable<RoutineResult['sources']> = [];
 
   for (const item of newCandidates) {
     try {
@@ -518,6 +519,12 @@ async function runNewsIngest(
         ingested_by: 'rex',
       });
       itemsStored += 1;
+      storedSources.push({
+        url: item.url,
+        title: item.title,
+        excerpt: finalSummary,
+        retrieved_at: new Date().toISOString(),
+      });
     } catch (err) {
       console.warn('[news-ingest] item failed — skipping', {
         url: item.url,
@@ -536,12 +543,7 @@ async function runNewsIngest(
 
   const result: RoutineResult = {
     summary: `Stored ${itemsStored} new ${category} articles (${itemsSkipped} skipped as duplicates).`,
-    sources: candidates.slice(0, 5).map((c) => ({
-      url: c.url,
-      title: c.title,
-      excerpt: c.summary,
-      retrieved_at: new Date().toISOString(),
-    })),
+    sources: storedSources.slice(0, 5),
   };
 
   return {
