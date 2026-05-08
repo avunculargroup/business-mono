@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { computeNextRunAt } from '@platform/shared';
+import { computeNextRunAt, DEFAULT_TIMEZONE } from '@platform/shared';
 
 const FREQUENCIES = ['daily', 'weekly', 'fortnightly'] as const;
 const AGENTS = ['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della'] as const;
@@ -44,7 +44,7 @@ const baseSchema = z.object({
   agent_name: z.enum(AGENTS),
   frequency: z.enum(FREQUENCIES),
   time_of_day: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Invalid time'),
-  timezone: z.string().min(1).default('Australia/Melbourne'),
+  timezone: z.string().min(1).default(DEFAULT_TIMEZONE),
   show_on_dashboard: z.coerce.boolean().optional().default(false),
   dashboard_title: z.string().optional().default(''),
   is_active: z.coerce.boolean().optional().default(true),

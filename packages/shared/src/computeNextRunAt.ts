@@ -1,4 +1,5 @@
 import type { RoutineFrequency } from './routines.js';
+import { offsetMinutes } from './tz.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FREQUENCY_DAYS: Record<RoutineFrequency, number> = {
@@ -6,31 +7,6 @@ const FREQUENCY_DAYS: Record<RoutineFrequency, number> = {
   weekly: 7,
   fortnightly: 14,
 };
-
-// IANA timezone -> current offset in minutes east of UTC.
-function offsetMinutes(timeZone: string, at: Date): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(at);
-  const lookup: Record<string, string> = {};
-  for (const p of parts) if (p.type !== 'literal') lookup[p.type] = p.value;
-  const asUTC = Date.UTC(
-    Number(lookup['year']),
-    Number(lookup['month']) - 1,
-    Number(lookup['day']),
-    Number(lookup['hour'] === '24' ? '0' : lookup['hour']),
-    Number(lookup['minute']),
-    Number(lookup['second']),
-  );
-  return (asUTC - at.getTime()) / 60000;
-}
 
 // Returns the next UTC timestamp at which the routine should run.
 // Semantics: walk forward from `from` by one frequency step; align to the

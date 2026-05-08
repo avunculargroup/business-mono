@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { AgentName, RoutineActionType, RoutineFrequency } from '@platform/shared';
+import { AgentName, RoutineActionType, RoutineFrequency, DEFAULT_TIMEZONE } from '@platform/shared';
 import type {
   AgentName as AgentNameType,
   RoutineActionType as RoutineActionTypeT,
@@ -32,7 +32,7 @@ const DEFAULTS: RoutineFormValues = {
   action_config: { search_queries: [], archive_sources: false, max_sources: 10, subject: '', context: '' },
   frequency: RoutineFrequency.DAILY,
   time_of_day: '07:00',
-  timezone: 'Australia/Melbourne',
+  timezone: DEFAULT_TIMEZONE,
   show_on_dashboard: false,
   dashboard_title: '',
   is_active: true,

@@ -16,7 +16,7 @@ import {
   updateRoutine,
 } from '@/app/actions/routines';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { formatRelativeDate } from '@/lib/utils';
+import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
 import { useToast } from '@/providers/ToastProvider';
 import { Plus, Play, Pencil, Trash2 } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
@@ -164,12 +164,16 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
     {
       key: 'next',
       header: 'Next run',
-      render: (r) => (
-        <span className={styles.muted}>
-          {r.is_active ? formatRelativeDate(r.next_run_at) : '—'}
-        </span>
-      ),
-      width: '110px',
+      render: (r) =>
+        r.is_active ? (
+          <div className={styles.nameCell}>
+            <span>{formatRelativeDate(r.next_run_at, r.timezone)}</span>
+            <span className={styles.nameSub}>{formatTimeInTz(r.next_run_at, r.timezone)}</span>
+          </div>
+        ) : (
+          <span className={styles.muted}>—</span>
+        ),
+      width: '160px',
     },
     {
       key: 'last',
@@ -177,7 +181,10 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
       render: (r) =>
         r.last_run_at ? (
           <div className={styles.lastCell}>
-            <span className={styles.muted}>{formatRelativeDate(r.last_run_at)}</span>
+            <div className={styles.nameCell}>
+              <span className={styles.muted}>{formatRelativeDate(r.last_run_at, r.timezone)}</span>
+              <span className={styles.nameSub}>{formatTimeInTz(r.last_run_at, r.timezone)}</span>
+            </div>
             {r.last_status && (
               <StatusChip label={r.last_status} color={statusColor(r.last_status)} />
             )}
@@ -185,7 +192,7 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
         ) : (
           <span className={styles.muted}>Never</span>
         ),
-      width: '160px',
+      width: '200px',
     },
     {
       key: 'active',

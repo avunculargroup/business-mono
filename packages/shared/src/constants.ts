@@ -29,5 +29,12 @@ export const TAVILY_MONTHLY_LIMIT = 1000;
 // Researcher: Firecrawl free tier monthly limit
 export const FIRECRAWL_MONTHLY_LIMIT = 500;
 
-// Routine scheduler: how often the listener polls for due routines — 1 hour
-export const ROUTINE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+// Routine scheduler: how often the listener polls for due routines.
+// 5 minutes — keeps a routine configured for e.g. 7:00 AM firing within
+// ~5 minutes of its scheduled wall-clock time regardless of when the
+// agent server was last restarted.
+export const ROUTINE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+// Org-wide default timezone. Used as the fallback when creating routines
+// and as the reference timezone for day-boundary queries (e.g. "today's news").
+export const DEFAULT_TIMEZONE = 'Australia/Melbourne';

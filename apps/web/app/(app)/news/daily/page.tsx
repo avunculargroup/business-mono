@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CategoryChip } from '@/components/news/CategoryChip';
 import type { NewsCategory, NewsItemRecord } from '@platform/shared';
-import { NEWS_CATEGORY_LABELS } from '@platform/shared';
+import { NEWS_CATEGORY_LABELS, DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import styles from './DailyDigest.module.css';
 
 const ORDERED_CATEGORIES: NewsCategory[] = ['regulatory', 'corporate', 'macro', 'international'];
@@ -11,15 +11,13 @@ const ORDERED_CATEGORIES: NewsCategory[] = ['regulatory', 'corporate', 'macro', 
 export default async function DailyDigestPage() {
   const supabase = await createClient();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const { start, end } = dayBoundsInTz(DEFAULT_TIMEZONE);
 
   const { data } = await supabase
     .from('news_items')
     .select('id, title, url, source_name, published_at, summary, category, relevance_score')
-    .gte('fetched_at', today.toISOString())
-    .lt('fetched_at', tomorrow.toISOString())
+    .gte('fetched_at', start.toISOString())
+    .lt('fetched_at', end.toISOString())
     .neq('status', 'archived')
     .order('relevance_score', { ascending: false, nullsFirst: false })
     .order('published_at', { ascending: false, nullsFirst: false })
@@ -34,7 +32,8 @@ export default async function DailyDigestPage() {
     }
   }
 
-  const dateLabel = today.toLocaleDateString('en-AU', {
+  const dateLabel = start.toLocaleDateString('en-AU', {
+    timeZone: DEFAULT_TIMEZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -52,7 +51,7 @@ export default async function DailyDigestPage() {
       <div className={styles.container}>
         {activeCats.length === 0 ? (
           <div className={styles.empty}>
-            <p>No articles have been ingested today yet. Routines run at 07:00 AEST.</p>
+            <p>No articles have been ingested for today yet.</p>
             <Link href="/routines" className={styles.link}>
               Check routines
             </Link>
@@ -74,6 +73,7 @@ export default async function DailyDigestPage() {
                       {item.published_at && (
                         <span className={styles.date}>
                           {new Date(item.published_at).toLocaleDateString('en-AU', {
+                            timeZone: DEFAULT_TIMEZONE,
                             day: 'numeric',
                             month: 'short',
                           })}

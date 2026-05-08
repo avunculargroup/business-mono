@@ -64,7 +64,7 @@ export default async function DashboardPage() {
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
     supabase
       .from('routines')
-      .select('id, name, dashboard_title, last_run_at, last_result')
+      .select('id, name, dashboard_title, last_run_at, last_result, timezone')
       .eq('show_on_dashboard', true)
       .eq('is_active', true)
       .not('last_result', 'is', null)
@@ -168,6 +168,7 @@ export default async function DashboardPage() {
                 dashboard_title: r.dashboard_title,
                 last_run_at: r.last_run_at,
                 last_result: r.last_result as React.ComponentProps<typeof RoutineTile>['routine']['last_result'],
+                timezone: r.timezone,
               }}
             />
           ))}
