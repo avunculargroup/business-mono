@@ -57,6 +57,7 @@ function formatFrequencyLabel(row: RoutineRow): string {
 function formatActionLabel(actionType: string): string {
   if (actionType === 'research_digest') return 'Research digest';
   if (actionType === 'monitor_change') return 'Monitor change';
+  if (actionType === 'news_ingest') return 'News ingest';
   return actionType;
 }
 
@@ -299,19 +300,24 @@ function valuesToFormData(v: RoutineFormValues): FormData {
   fd.set('dashboard_title', v.dashboard_title ?? '');
   fd.set('is_active', v.is_active ? 'true' : 'false');
 
-  const cfg = v.action_config;
+  const cfg = v.action_config as Record<string, unknown>;
   if (v.action_type === 'research_digest') {
     fd.set('subject', String(cfg['subject'] ?? ''));
     fd.set('context', String(cfg['context'] ?? ''));
     fd.set('search_queries', Array.isArray(cfg['search_queries']) ? (cfg['search_queries'] as string[]).join('\n') : '');
     fd.set('archive_sources', cfg['archive_sources'] ? 'true' : 'false');
     fd.set('max_sources', String(cfg['max_sources'] ?? 10));
-  } else {
+  } else if (v.action_type === 'monitor_change') {
     fd.set('subject', String(cfg['subject'] ?? ''));
     fd.set('context', String(cfg['context'] ?? ''));
     fd.set('search_queries', Array.isArray(cfg['search_queries']) ? (cfg['search_queries'] as string[]).join('\n') : '');
     fd.set('notify_signal', cfg['notify_signal'] ? 'true' : 'false');
     if (cfg['notify_agent']) fd.set('notify_agent', String(cfg['notify_agent']));
+  } else if (v.action_type === 'news_ingest') {
+    fd.set('category', String(cfg['category'] ?? ''));
+    fd.set('queries', JSON.stringify(Array.isArray(cfg['queries']) ? cfg['queries'] : []));
+    fd.set('max_results_per_query', String(cfg['max_results_per_query'] ?? 15));
+    fd.set('max_curated', String(cfg['max_curated'] ?? 6));
   }
   return fd;
 }

@@ -29,7 +29,9 @@ export interface NewsIngestionConfig {
   category: NewsCategory;
   queries: string[];
   max_results_per_query: number;
-  search_depth: 'basic' | 'advanced';
+  // Hard cap on stories ingested per run after the LLM judge ranks the pool.
+  max_curated?: number;
+  search_depth?: 'basic' | 'advanced';
 }
 
 export interface NewsItemRecord {
