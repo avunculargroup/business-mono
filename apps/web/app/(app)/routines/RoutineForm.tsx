@@ -1,14 +1,71 @@
 'use client';
 
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { AgentName, RoutineActionType, RoutineFrequency, DEFAULT_TIMEZONE } from '@platform/shared';
+import {
+  AgentName,
+  RoutineActionType,
+  RoutineFrequency,
+  DEFAULT_TIMEZONE,
+  NewsCategory,
+  NEWS_CATEGORY_LABELS,
+} from '@platform/shared';
 import type {
   AgentName as AgentNameType,
   RoutineActionType as RoutineActionTypeT,
   RoutineFrequency as RoutineFrequencyT,
+  NewsCategory as NewsCategoryT,
 } from '@platform/shared';
 import styles from './routines.module.css';
+
+function ChipInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [input, setInput] = useState('');
+  const add = () => {
+    const v = input.trim();
+    if (v && !value.includes(v)) onChange([...value, v]);
+    setInput('');
+  };
+  return (
+    <div className={styles.chipArea}>
+      {value.map((t, i) => (
+        <span key={`${t}-${i}`} className={styles.chip}>
+          {t}
+          <button
+            type="button"
+            className={styles.chipRemove}
+            onClick={() => onChange(value.filter((x) => x !== t))}
+            aria-label={`Remove ${t}`}
+          >
+            <X size={12} strokeWidth={2} />
+          </button>
+        </span>
+      ))}
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+        onBlur={add}
+        placeholder={value.length === 0 ? (placeholder ?? 'Type and press Enter…') : 'Add more…'}
+        className={styles.chipInput}
+      />
+    </div>
+  );
+}
 
 export interface RoutineFormValues {
   name: string;
@@ -93,7 +150,14 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
       action_config:
         action_type === RoutineActionType.RESEARCH_DIGEST
           ? { subject: '', context: '', search_queries: [], archive_sources: false, max_sources: 10 }
-          : { subject: '', context: '', search_queries: [], notify_signal: false, notify_agent: null },
+          : action_type === RoutineActionType.MONITOR_CHANGE
+          ? { subject: '', context: '', search_queries: [], notify_signal: false, notify_agent: null }
+          : {
+              category: NewsCategory.REGULATORY,
+              queries: [],
+              max_results_per_query: 15,
+              max_curated: 6,
+            },
     }));
   };
 
@@ -103,6 +167,30 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
 
     if (!values.name.trim()) return setError('Name is required');
     const cfg = values.action_config as Record<string, unknown>;
+
+    if (values.action_type === RoutineActionType.NEWS_INGEST) {
+      const queries = (Array.isArray(cfg['queries']) ? (cfg['queries'] as string[]) : [])
+        .map((q) => q.trim())
+        .filter(Boolean);
+      if (!cfg['category']) return setError('Category is required');
+      if (queries.length === 0) return setError('Add at least one search query');
+      const max = Number(cfg['max_results_per_query'] ?? 15);
+      const cap = Number(cfg['max_curated'] ?? 6);
+      if (cap > max * queries.length) {
+        return setError('Curated cap cannot exceed results per query × number of queries');
+      }
+      onSubmit({
+        ...values,
+        action_config: {
+          category: cfg['category'],
+          queries,
+          max_results_per_query: max,
+          max_curated: cap,
+        },
+      });
+      return;
+    }
+
     if (!String(cfg['subject'] ?? '').trim()) return setError('Subject is required');
     const queries = searchQueriesText.split('\n').map((s) => s.trim()).filter(Boolean);
     if (queries.length === 0) return setError('At least one search query is required');
@@ -163,41 +251,108 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           >
             <option value={RoutineActionType.RESEARCH_DIGEST}>Research digest</option>
             <option value={RoutineActionType.MONITOR_CHANGE}>Monitor change</option>
+            <option value={RoutineActionType.NEWS_INGEST}>News ingest</option>
           </select>
         </div>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Subject</label>
-        <input
-          className={styles.input}
-          value={String(cfg['subject'] ?? '')}
-          onChange={(e) => updateConfig({ subject: e.target.value })}
-          placeholder="Daily Bitcoin headlines"
-        />
-      </div>
+      {values.action_type !== RoutineActionType.NEWS_INGEST && (
+        <>
+          <div className={styles.field}>
+            <label className={styles.label}>Subject</label>
+            <input
+              className={styles.input}
+              value={String(cfg['subject'] ?? '')}
+              onChange={(e) => updateConfig({ subject: e.target.value })}
+              placeholder="Daily Bitcoin headlines"
+            />
+          </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Context (optional)</label>
-        <textarea
-          className={styles.textarea}
-          value={String(cfg['context'] ?? '')}
-          onChange={(e) => updateConfig({ context: e.target.value })}
-          rows={3}
-          placeholder="Background or framing for the agent — e.g. focus on treasury news"
-        />
-      </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Context (optional)</label>
+            <textarea
+              className={styles.textarea}
+              value={String(cfg['context'] ?? '')}
+              onChange={(e) => updateConfig({ context: e.target.value })}
+              rows={3}
+              placeholder="Background or framing for the agent — e.g. focus on treasury news"
+            />
+          </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Search queries (one per line)</label>
-        <textarea
-          className={styles.textarea}
-          value={searchQueriesText}
-          onChange={(e) => setSearchQueriesText(e.target.value)}
-          rows={3}
-          placeholder={'bitcoin news today\nBTC price'}
-        />
-      </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Search queries (one per line)</label>
+            <textarea
+              className={styles.textarea}
+              value={searchQueriesText}
+              onChange={(e) => setSearchQueriesText(e.target.value)}
+              rows={3}
+              placeholder={'bitcoin news today\nBTC price'}
+            />
+          </div>
+        </>
+      )}
+
+      {values.action_type === RoutineActionType.NEWS_INGEST && (
+        <>
+          <div className={styles.field}>
+            <label className={styles.label}>Category</label>
+            <select
+              className={styles.input}
+              value={(cfg['category'] as string | undefined) ?? NewsCategory.REGULATORY}
+              onChange={(e) => updateConfig({ category: e.target.value as NewsCategoryT })}
+            >
+              {(Object.values(NewsCategory) as NewsCategoryT[]).map((c) => (
+                <option key={c} value={c}>
+                  {NEWS_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Search queries</label>
+            <ChipInput
+              value={Array.isArray(cfg['queries']) ? (cfg['queries'] as string[]) : []}
+              onChange={(next) => updateConfig({ queries: next })}
+              placeholder="e.g. ASIC Bitcoin regulation Australia 2026"
+            />
+            <span className={styles.hint}>
+              One query per chip. Press Enter to add. 2–4 angles per category works well.
+            </span>
+          </div>
+
+          <div className={styles.row}>
+            <div className={styles.field}>
+              <label className={styles.label}>Results per query</label>
+              <input
+                type="number"
+                min={5}
+                max={20}
+                className={styles.input}
+                value={Number(cfg['max_results_per_query'] ?? 15)}
+                onChange={(e) => updateConfig({ max_results_per_query: Number(e.target.value) })}
+              />
+              <span className={styles.hint}>
+                Raw articles Tavily returns per query before curation.
+              </span>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Curated cap</label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                className={styles.input}
+                value={Number(cfg['max_curated'] ?? 6)}
+                onChange={(e) => updateConfig({ max_curated: Number(e.target.value) })}
+              />
+              <span className={styles.hint}>
+                Top stories the LLM judge keeps. The rest are discarded.
+              </span>
+            </div>
+          </div>
+        </>
+      )}
 
       {values.action_type === RoutineActionType.RESEARCH_DIGEST && (
         <>

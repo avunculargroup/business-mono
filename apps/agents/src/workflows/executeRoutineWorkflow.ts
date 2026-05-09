@@ -56,6 +56,18 @@ const newsExtractionSchema = z.object({
     .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
 });
 
+const newsJudgeSchema = z.object({
+  shortlist: z
+    .array(
+      z.object({
+        index: z.number().int().nonnegative(),
+        reasoning: z.string().min(5).max(300),
+      }),
+    )
+    .min(1)
+    .max(20),
+});
+
 const fetchDueRoutines = createStep({
   id: 'fetch_due_routines',
   inputSchema: z.object({
@@ -365,19 +377,107 @@ async function extractNewsMetadata(input: {
   return parsed.data;
 }
 
+let newsJudgeAgent: Agent | null = null;
+function getNewsJudge(): Agent {
+  if (!newsJudgeAgent) {
+    newsJudgeAgent = new Agent({
+      id: 'newsJudge',
+      name: 'newsJudge',
+      instructions:
+        'You curate news for Bitcoin Treasury Solutions (BTS) — a Melbourne-based consultancy that helps Australian businesses adopt Bitcoin as a treasury asset. ' +
+        'You receive a list of candidate articles for a single category and must return a shortlist of the most relevant stories.\n\n' +
+        'Weigh: Australian relevance (AU regulators, AU companies, AU economy) HIGH; direct treasury or balance-sheet implications HIGH; binding regulatory action, court rulings, or tax positions MEDIUM-HIGH; novelty (genuine new information) MEDIUM. ' +
+        'Penalise: PR fluff, opinion columns without new facts, repackaged announcements, price-prediction clickbait.\n\n' +
+        'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
+        'Return ONLY a single JSON object — no prose, no code fences — shaped:\n' +
+        '  { "shortlist": [{ "index": <number>, "reasoning": "<10–30 word justification>" }] }\n' +
+        'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.',
+      model: getModelConfig(),
+    });
+  }
+  return newsJudgeAgent;
+}
+
+interface JudgeCandidate {
+  index: number;
+  title: string;
+  source: string;
+  summary: string;
+  score: number;
+  published_at: string | null;
+}
+
+async function rankNewsCandidates(input: {
+  category: NewsCategory;
+  candidates: JudgeCandidate[];
+  max: number;
+}): Promise<z.infer<typeof newsJudgeSchema> | null> {
+  const lines = input.candidates.map((c) =>
+    `${c.index}. ${c.title}\n   source: ${c.source} | published: ${c.published_at ?? 'unknown'} | tavily_score: ${c.score.toFixed(2)}\n   snippet: ${c.summary.slice(0, 400)}`,
+  ).join('\n\n');
+
+  const prompt =
+    `Category: ${input.category}\n` +
+    `Pick the top ${input.max} most relevant candidates from the list below.\n\n` +
+    `Candidates:\n${lines}\n\n` +
+    `Return the JSON object now.`;
+
+  const response = await getNewsJudge().generate([
+    { role: 'user', content: prompt },
+  ]);
+
+  const match = response.text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.warn('[news-ingest] judge returned no JSON object', {
+      preview: response.text.slice(0, 200),
+    });
+    return null;
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(match[0]);
+  } catch (err) {
+    console.warn('[news-ingest] judge JSON parse failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  const parsed = newsJudgeSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn('[news-ingest] judge schema validation failed', {
+      issues: parsed.error.issues,
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
 async function runNewsIngest(
   routine: z.infer<typeof routineSchema>,
 ): Promise<RoutineOutcome> {
   const cfg = routine.action_config as NewsIngestionConfig;
   const category = cfg.category;
   const queries = cfg.queries ?? [];
-  const maxPerQuery = cfg.max_results_per_query ?? 5;
+  const maxPerQuery = cfg.max_results_per_query ?? 15;
+  const maxCurated = cfg.max_curated ?? 6;
 
   const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
-  // Step 1: Collect Tavily news results across all queries, deduplicate by URL.
+  // ── Phase 1: gather + dedup ────────────────────────────────────────────────
+  // Cast a wide Tavily net, then strip URL + DB + semantic duplicates so the
+  // ranker only sees genuinely fresh candidates.
+
   const seen = new Set<string>();
-  const candidates: Array<{ url: string; title: string; summary: string; source: string; published_at: string | null; score: number }> = [];
+  const tavilyCandidates: Array<{
+    url: string;
+    title: string;
+    summary: string;
+    source: string;
+    published_at: string | null;
+    score: number;
+  }> = [];
 
   for (const query of queries) {
     try {
@@ -398,7 +498,7 @@ async function runNewsIngest(
       for (const r of data.results ?? []) {
         if (!seen.has(r.url)) {
           seen.add(r.url);
-          candidates.push({
+          tavilyCandidates.push({
             url: r.url,
             title: r.title,
             summary: r.content?.slice(0, 500) ?? '',
@@ -413,7 +513,9 @@ async function runNewsIngest(
     }
   }
 
-  if (candidates.length === 0) {
+  console.log('[news-ingest] tavily returned', tavilyCandidates.length, 'unique candidates for', category);
+
+  if (tavilyCandidates.length === 0) {
     const result: RoutineResult = { summary: 'No new articles found.', sources: [] };
     return {
       routine_id: routine.id, name: routine.name,
@@ -424,29 +526,26 @@ async function runNewsIngest(
     };
   }
 
-  // Step 2: Filter already-known URLs.
+  // URL dedup against the database.
   const { data: existing } = await supabase
     .from('news_items')
     .select('url')
-    .in('url', candidates.map((c) => c.url));
+    .in('url', tavilyCandidates.map((c) => c.url));
   const existingUrls = new Set((existing ?? []).map((r) => r.url as string));
-  const newCandidates = candidates.filter((c) => !existingUrls.has(c.url));
+  const urlFreshCandidates = tavilyCandidates.filter((c) => !existingUrls.has(c.url));
+  let itemsSkippedDuplicate = tavilyCandidates.length - urlFreshCandidates.length;
 
-  let itemsSkipped = candidates.length - newCandidates.length;
-  let itemsStored = 0;
-  const storedSources: NonNullable<RoutineResult['sources']> = [];
-
-  for (const item of newCandidates) {
+  // Per-candidate semantic dedup (cheap snippet embedding).
+  type FreshCandidate = (typeof urlFreshCandidates)[number] & { dedupEmbedding: number[] | null };
+  const fresh: FreshCandidate[] = [];
+  for (const item of urlFreshCandidates) {
     try {
-      // Step 3: Cheap snippet-based embedding for dedup.
       const dedupEmbRes = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
         input: `${item.title} ${item.summary}`.trim(),
         dimensions: EMBEDDING_DIMENSIONS,
       });
       const dedupEmbedding = dedupEmbRes.data[0]?.embedding ?? null;
-
-      // Step 4: Semantic deduplication — skip near-identical articles.
       if (dedupEmbedding) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: near } = await (supabase.rpc as any)('vector_search_news', {
@@ -457,12 +556,73 @@ async function runNewsIngest(
           filter_days: 3,
         });
         if (near && near.length > 0) {
-          itemsSkipped += 1;
+          itemsSkippedDuplicate += 1;
           continue;
         }
       }
+      fresh.push({ ...item, dedupEmbedding });
+    } catch (err) {
+      console.warn('[news-ingest] dedup failed — skipping candidate', {
+        url: item.url,
+        title: item.title,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
-      // Step 5: Fetch full article body via Jina Reader.
+  console.log('[news-ingest]', fresh.length, 'fresh after dedup');
+
+  // ── Phase 2: rank with the LLM judge ──────────────────────────────────────
+  // If the pool already fits the cap, skip the judge call.
+
+  let shortlist: FreshCandidate[];
+  if (fresh.length === 0) {
+    shortlist = [];
+  } else if (fresh.length <= maxCurated) {
+    shortlist = fresh;
+  } else {
+    let ranked: z.infer<typeof newsJudgeSchema> | null = null;
+    try {
+      ranked = await rankNewsCandidates({
+        category,
+        candidates: fresh.map((c, i) => ({
+          index: i,
+          title: c.title,
+          source: c.source,
+          summary: c.summary,
+          score: c.score,
+          published_at: c.published_at,
+        })),
+        max: maxCurated,
+      });
+    } catch (err) {
+      console.warn('[news-ingest] judge threw — falling back to top-N by Tavily score', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (ranked && ranked.shortlist.length > 0) {
+      shortlist = ranked.shortlist
+        .slice(0, maxCurated)
+        .map((s) => fresh[s.index])
+        .filter((c): c is FreshCandidate => Boolean(c));
+      console.log('[news-ingest] judge selected', shortlist.length, 'of', fresh.length);
+    } else {
+      shortlist = [...fresh].sort((a, b) => b.score - a.score).slice(0, maxCurated);
+      console.warn('[news-ingest] judge returned nothing usable — using top-N by Tavily score', {
+        fallback_count: shortlist.length,
+      });
+    }
+  }
+
+  // ── Phase 3: enrich + insert (only the shortlist) ─────────────────────────
+
+  let itemsStored = 0;
+  const storedSources: NonNullable<RoutineResult['sources']> = [];
+
+  for (const item of shortlist) {
+    try {
+      // Fetch full article body via Jina Reader.
       let bodyMarkdown: string | null = null;
       try {
         const fetched = await fetchUrl.execute!({ url: item.url } as never, {} as never) as
@@ -474,7 +634,7 @@ async function runNewsIngest(
         // body fetch failed; carry on with snippet-only enrichment
       }
 
-      // Step 6: Structured extraction (summary, key_points, topic_tags, AU relevance).
+      // Structured extraction (summary, key_points, topic_tags, AU relevance).
       const extractionInput = bodyMarkdown ?? item.summary;
       const truncated = extractionInput.slice(0, 12000);
       let extracted: z.infer<typeof newsExtractionSchema> | null = null;
@@ -492,16 +652,15 @@ async function runNewsIngest(
         });
       }
 
-      // Step 7: Final embedding on title + curated summary for higher-quality search.
+      // Final embedding on title + curated summary for higher-quality search.
       const finalSummary = extracted?.summary ?? item.summary;
       const finalEmbRes = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
         input: `${item.title}\n${finalSummary}`.trim(),
         dimensions: EMBEDDING_DIMENSIONS,
       });
-      const finalEmbedding = finalEmbRes.data[0]?.embedding ?? dedupEmbedding;
+      const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
 
-      // Step 8: Insert.
       await supabase.from('news_items').insert({
         title: item.title,
         url: item.url,
@@ -534,15 +693,17 @@ async function runNewsIngest(
     }
   }
 
+  console.log('[news-ingest] inserted', itemsStored, 'of', shortlist.length, 'shortlisted');
+
   const ingestResult: NewsIngestResult = {
     category,
-    items_found: candidates.length,
+    items_found: tavilyCandidates.length,
     items_stored: itemsStored,
-    items_skipped_duplicate: itemsSkipped,
+    items_skipped_duplicate: itemsSkippedDuplicate,
   };
 
   const result: RoutineResult = {
-    summary: `Stored ${itemsStored} new ${category} articles (${itemsSkipped} skipped as duplicates).`,
+    summary: `Stored ${itemsStored} new ${category} articles (${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`,
     sources: storedSources.slice(0, 5),
   };
 

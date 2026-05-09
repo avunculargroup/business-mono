@@ -3,10 +3,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { computeNextRunAt, DEFAULT_TIMEZONE } from '@platform/shared';
+import { computeNextRunAt, DEFAULT_TIMEZONE, NewsCategory } from '@platform/shared';
 
 const FREQUENCIES = ['daily', 'weekly', 'fortnightly'] as const;
 const AGENTS = ['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della'] as const;
+const NEWS_CATEGORIES = Object.values(NewsCategory) as [string, ...string[]];
 
 // Accept either a comma/newline separated string or an already-parsed array.
 const queriesSchema = z.preprocess((v) => {
@@ -38,6 +39,32 @@ const monitorChangeConfig = z.object({
   notify_agent: z.enum(AGENTS).optional().nullable(),
 });
 
+// queries arrive as a JSON-encoded string (FormData has no array type).
+const newsQueriesSchema = z.preprocess((v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // fall through to splitter for backwards-compatible plain strings
+    }
+    return v
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}, z.array(z.string().trim().min(1).max(200)).min(1, 'Add at least one search query').max(8, 'Up to 8 queries'));
+
+const newsIngestConfig = z.object({
+  action_type: z.literal('news_ingest'),
+  category: z.enum(NEWS_CATEGORIES, { errorMap: () => ({ message: 'Pick a category' }) }),
+  queries: newsQueriesSchema,
+  max_results_per_query: z.coerce.number().int().min(5).max(20).optional().default(15),
+  max_curated: z.coerce.number().int().min(1).max(10).optional().default(6),
+});
+
 const baseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().default(''),
@@ -50,10 +77,23 @@ const baseSchema = z.object({
   is_active: z.coerce.boolean().optional().default(true),
 });
 
-const createSchema = z.discriminatedUnion('action_type', [
-  baseSchema.merge(researchDigestConfig),
-  baseSchema.merge(monitorChangeConfig),
-]);
+const createSchema = z
+  .discriminatedUnion('action_type', [
+    baseSchema.merge(researchDigestConfig),
+    baseSchema.merge(monitorChangeConfig),
+    baseSchema.merge(newsIngestConfig),
+  ])
+  .superRefine((data, ctx) => {
+    if (data.action_type === 'news_ingest') {
+      if (data.max_curated > data.max_results_per_query * data.queries.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Curated cap cannot exceed results per query × number of queries',
+          path: ['max_curated'],
+        });
+      }
+    }
+  });
 
 function normalizeTime(t: string): string {
   return /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t;
@@ -69,12 +109,20 @@ function buildActionConfig(input: z.infer<typeof createSchema>): Record<string, 
       max_sources: input.max_sources,
     };
   }
+  if (input.action_type === 'monitor_change') {
+    return {
+      subject: input.subject,
+      context: input.context || undefined,
+      search_queries: input.search_queries,
+      notify_signal: input.notify_signal,
+      notify_agent: input.notify_agent ?? null,
+    };
+  }
   return {
-    subject: input.subject,
-    context: input.context || undefined,
-    search_queries: input.search_queries,
-    notify_signal: input.notify_signal,
-    notify_agent: input.notify_agent ?? null,
+    category: input.category,
+    queries: input.queries,
+    max_results_per_query: input.max_results_per_query,
+    max_curated: input.max_curated,
   };
 }
 
