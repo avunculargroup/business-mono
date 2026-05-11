@@ -872,6 +872,19 @@ export const executeRoutineWorkflow = createWorkflow({
     updated: z.number(),
     archived: z.number(),
   }),
+  // Mastra's built-in scheduler fires this every 5 minutes — preserves the
+  // cadence previously implemented by routineListener's setInterval. Each tick
+  // re-queries the routines table for rows whose next_run_at has passed, so
+  // a routine configured for e.g. 7:00 AM fires within ~5 minutes of its
+  // wall-clock time. PostgresStore advertises supportsConcurrentUpdates(),
+  // so the workflow can be auto-promoted to the evented engine here.
+  // triggered_at is unused by the steps; we pass a static marker so the
+  // schedule's payload doesn't go stale at module-load time.
+  schedule: {
+    cron: '*/5 * * * *',
+    timezone: 'UTC',
+    inputData: { triggered_at: 'scheduled' },
+  },
 })
   .then(fetchDueRoutines)
   .then(runRoutine)

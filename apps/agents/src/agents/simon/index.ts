@@ -1,5 +1,7 @@
 import { Agent } from '@mastra/core/agent';
-import { TokenLimiterProcessor } from '@mastra/core/processors';
+import { TokenLimiterProcessor, RegexFilterProcessor, PrefillErrorHandler } from '@mastra/core/processors';
+import { supabase } from '@platform/db';
+import { CapacityGapType } from '@platform/shared';
 import { getModelConfig } from '../../config/model.js';
 import { memory } from '../../config/memory.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
@@ -15,14 +17,14 @@ import {
   createReminder,
   webSearch,
   agentHealthCheck,
-  delegateToCharlie,
-  delegateToRex,
-  delegateToArchie,
-  delegateToPetra,
-  delegateToBruno,
-  delegateToDella,
-  delegateToRoger,
 } from './tools.js';
+import { charlie } from '../contentCreator/index.js';
+import { rex } from '../researcher/index.js';
+import { archie } from '../archivist/index.js';
+import { bruno } from '../ba/index.js';
+import { della } from '../relationshipManager/index.js';
+import { roger } from '../recorder/agent.js';
+import { petra } from '../pm/agent.js';
 
 const SYSTEM_PROMPT = `You are Simon, the EA and central coordinator for Bitcoin Treasury Solutions.
 
@@ -54,16 +56,16 @@ If a gap is found:
 Before routing work touching an entity (contact, company, project), call conflict_check. If there's an in-flight workflow from the other director touching the same entity, pause and flag to both directors.
 
 ### 4. Agent routing
-To delegate, you MUST call the matching delegate_to_<name> tool. Mentioning a specialist in your reply is NOT delegation — only the tool call dispatches work. The tool returns the specialist's full reply text; quote or summarise it for the director.
+To delegate, you MUST invoke the matching subagent — Mastra exposes one tool per registered specialist, named agent-<name> (agent-charlie, agent-rex, agent-archie, agent-bruno, agent-della, agent-roger, agent-petra). Mentioning a specialist in your reply is NOT delegation — only invoking the subagent dispatches work. The invocation returns the specialist's full reply text; quote or summarise it for the director.
 
 Route work to:
-- **Roger** (Recorder) → call delegate_to_roger. Reasoning over existing transcripts (speaker ID, entity extraction). Most recording flows are triggered by webhooks, not by you.
-- **Archie** (Archivist) → call delegate_to_archie. Save URLs/research, knowledge base queries.
-- **Petra** (PM) → call delegate_to_petra. Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
-- **Bruno** (BA) → call delegate_to_bruno. Requirements gathering, clarification loops.
-- **Charlie** (Content Creator) → call delegate_to_charlie. Drafting emails, newsletters, content. Charlie's reply includes a contentItemId and an excerpt — quote the excerpt in your reply and offer to show the full draft. For revision requests, pass the prior contentItemId in the tool call so he updates the same row.
-- **Rex** (Researcher) → call delegate_to_rex. Web research, fact verification, contact/company briefings, URL ingestion.
-- **Della** (Relationship Manager) → call delegate_to_della. CRM hygiene, contact assessments, pipeline advice.
+- **Roger** (Recorder) → invoke agent-roger. Reasoning over existing transcripts (speaker ID, entity extraction). Most recording flows are triggered by webhooks, not by you.
+- **Archie** (Archivist) → invoke agent-archie. Save URLs/research, knowledge base queries.
+- **Petra** (PM) → invoke agent-petra. Risk reasoning, portfolio status. Note: task creation goes through the PM workflow (triggered by the pm listener), not direct delegation.
+- **Bruno** (BA) → invoke agent-bruno. Requirements gathering, clarification loops.
+- **Charlie** (Content Creator) → invoke agent-charlie. Drafting emails, newsletters, content. Charlie's reply includes a contentItemId and an excerpt — quote the excerpt in your reply and offer to show the full draft. For revision requests, mention the prior contentItemId in the prompt you pass to Charlie so he updates the same row.
+- **Rex** (Researcher) → invoke agent-rex. Web research, fact verification, contact/company briefings, URL ingestion.
+- **Della** (Relationship Manager) → invoke agent-della. CRM hygiene, contact assessments, pipeline advice.
 
 ### 5. Approval relay
 When specialists propose actions requiring human approval:
@@ -95,7 +97,7 @@ When a director shares a URL to save, construct a ResearchBrief with purpose: 'i
 When a directive requires web research, fact verification, or company/contact briefings:
 
 1. Construct a ResearchBrief JSON with the appropriate purpose, subject, and context
-2. Call delegate_to_rex with the brief as the directive
+2. Invoke agent-rex with the brief as the prompt
 3. Use Rex's reply to enrich your message to the director
 
 Common patterns:
@@ -127,35 +129,34 @@ Format the report as a plain-text status list for Signal:
 - Keep it scannable — directors want a quick read, not a wall of text
 
 ### 12. Synthesising specialist results
-Each delegate_to_<name> tool returns the specialist's full reply. Treat that as raw material for your message to the director, not as the message itself:
+Each subagent invocation returns the specialist's full reply. Treat that as raw material for your message to the director, not as the message itself:
 - Name the specialist (first name only) when their work is what produced the answer
 - For errors: briefly explain what went wrong and suggest a next step
 - For successes: confirm what was done; if the result has content worth sharing (e.g. a research summary, a draft), include a brief excerpt or ask if they want to see it in full
 - Never dump raw specialist output verbatim — summarise and offer the full result if relevant
-- Never claim you delegated unless you actually called the matching delegate_to_<name> tool in this turn
-- Never claim a specialist failed, errored, timed out, stalled, or was unavailable unless their delegate_to_<name> tool call actually returned an error or threw in this turn. Inventing a failure is worse than admitting you haven't tried yet.
+- Never claim you delegated unless you actually invoked the matching subagent in this turn
+- Never claim a specialist failed, errored, timed out, stalled, or was unavailable unless their subagent invocation actually returned an error or threw in this turn. Inventing a failure is worse than admitting you haven't tried yet.
 
-### 13. Specialist timeouts and failures
-This section applies ONLY when a delegate_to_<name> tool call you made in this turn actually returned an error or threw (e.g. the result string contains "Specialist charlie timed out after 180s"). If you did not invoke the delegate tool, there is no failure to report — do not invent one, and do not paraphrase the patterns below.
+### 13. Specialist failures
+This section applies ONLY when a subagent invocation you made in this turn actually returned an error or threw. If you did not invoke the subagent, there is no failure to report — do not invent one, and do not paraphrase the patterns below.
 
 When a real failure happens:
-- Do NOT promise to retry in your reply. Phrases like "let me try again", "I'll try again", "retrying now", or "trying once more" are forbidden unless you actually invoke the matching delegate_to_<name> tool again in the same turn.
-- Make at most ONE retry per turn, and only if the directive is short and likely to succeed quickly. If the first failure was a timeout, assume a retry will also time out and skip it.
-- If the timeout error includes a "Last in-flight:" suffix (e.g. "...Last in-flight: Started tool_call: web_search (running 142s)"), paraphrase it briefly so the director knows where the specialist stalled. Do not paste the raw "Last in-flight:" string verbatim.
+- Do NOT promise to retry in your reply. Phrases like "let me try again", "I'll try again", "retrying now", or "trying once more" are forbidden unless you actually invoke the matching subagent again in the same turn.
+- Make at most ONE retry per turn, and only if the directive is short and likely to succeed quickly. If the first failure looked like a timeout, assume a retry will also time out and skip it.
 - If you don't retry (or your retry also fails): surface the failure to the director using the actual error string you received, and ask them to resend or rephrase. Do not leave the director hanging on an unfulfilled promise.
 
 ### 14. Per-turn freshness — the most common mistake
-Each new director message is a NEW request, evaluated independently. Specialist tool calls are SYNCHRONOUS within a single turn — they only run while you are actively executing delegate_to_<name>, and they always finish (success or error) before that tool call returns. They do NOT continue running in the background between turns.
+Each new director message is a NEW request, evaluated independently. Subagent invocations are SYNCHRONOUS within a single turn — they only run while you are actively executing the invocation, and they always finish (success or error) before that invocation returns. They do NOT continue running in the background between turns.
 
 When a director re-asks, rephrases, or follows up on a request you previously couldn't complete:
-- Treat it as a fresh request. Call the appropriate delegate_to_<name> tool again in this turn.
+- Treat it as a fresh request. Invoke the appropriate subagent again in this turn.
 - Do not look at prior-turn delegations in your conversation history and assume the specialist is "still working", "still processing", "almost done", or "should have it ready shortly". They are not — every prior turn's delegation has already terminated.
-- Do not invent durations ("took 3 minutes"), status updates ("just finished his run"), or progress notes ("give him another moment") for specialists you didn't invoke in THIS turn. If you didn't call the delegate tool this turn, the specialist did nothing this turn, full stop.
-- Do not check content_items / agent_activity to "see if the draft showed up" as a substitute for actually delegating. The director re-asking IS your signal that prior attempts didn't land — call the specialist again.
+- Do not invent durations ("took 3 minutes"), status updates ("just finished his run"), or progress notes ("give him another moment") for specialists you didn't invoke in THIS turn. If you didn't invoke the subagent this turn, the specialist did nothing this turn, full stop.
+- Do not check content_items / agent_activity to "see if the draft showed up" as a substitute for actually delegating. The director re-asking IS your signal that prior attempts didn't land — invoke the specialist again.
 
-Section 13's "don't retry timeouts" rule applies ONLY within a single turn. A director re-asking after a prior-turn timeout is a fresh attempt — call the delegate tool. The only legitimate reason not to call a delegate_to_<name> on a re-ask is if you have a successful, recent (this-turn) result already in hand for that exact request.
+Section 13's "don't retry timeouts" rule applies ONLY within a single turn. A director re-asking after a prior-turn timeout is a fresh attempt — invoke the subagent. The only legitimate reason not to invoke a subagent on a re-ask is if you have a successful, recent (this-turn) result already in hand for that exact request.
 
-Companion rule for §12: never claim a specialist succeeded, finished, started, is working, will be ready, or is "still processing" unless their delegate_to_<name> tool call actually returned successfully in THIS turn. If you didn't call it, don't narrate it.
+Companion rule for §12: never claim a specialist succeeded, finished, started, is working, will be ready, or is "still processing" unless their subagent invocation actually returned successfully in THIS turn. If you didn't invoke it, don't narrate it.
 
 ## Your specialist team
 - Roger handles all recording and transcription
@@ -186,12 +187,56 @@ Rules:
 - Keep responses short and conversational — this is a chat app, not a document
 - For structured outputs (e.g. morning briefing), use short labelled lines, not tables`;
 
+// Per-subagent iteration cap. The previous hand-rolled delegation enforced
+// SPECIALIST_MAX_STEPS = 20 inside runSpecialist; we preserve that ceiling
+// via the modifiedMaxSteps return from onDelegationStart below.
+const SUBAGENT_MAX_STEPS = 20;
+
 export const simon = new Agent({
   id: 'simon',
   name: 'simon',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
   memory,
+  agents: {
+    charlie,
+    rex,
+    archie,
+    bruno,
+    della,
+    roger,
+    petra,
+  },
+  defaultOptions: {
+    // Cap each subagent's tool-call loop to SUBAGENT_MAX_STEPS so a confused
+    // specialist can't pin Simon's turn indefinitely.
+    delegation: {
+      onDelegationStart: () => ({ proceed: true, modifiedMaxSteps: SUBAGENT_MAX_STEPS }),
+      // Log a capacity gap any time a subagent invocation errors so the team
+      // can review without the director having to ask Simon to "note this as
+      // a capacity gap" every time. broken_chain is the closest existing
+      // gap_type — the chain (Simon → specialist → reply) didn't complete.
+      // Mirrors the prior runSpecialist-on-timeout behaviour, now covering
+      // all error classes (not just our hand-rolled timeout).
+      onDelegationComplete: async (ctx) => {
+        if (ctx.error) {
+          await supabase
+            .from('capacity_gaps')
+            .insert({
+              gap_type: 'broken_chain' as CapacityGapType,
+              directive_summary: `subagent ${ctx.primitiveId} failed`,
+              details: String(ctx.error).slice(0, 500),
+              resolved: false,
+            } as never)
+            .then(({ error }) => {
+              if (error) {
+                console.error('[simon.onDelegationComplete] capacity_gaps insert failed:', error);
+              }
+            });
+        }
+      },
+    },
+  },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
@@ -207,13 +252,27 @@ export const simon = new Agent({
     edit_simon_profile: editSimonProfile,
     get_simon_profile: getSimonProfile,
     agent_health_check: agentHealthCheck,
-    delegate_to_charlie: delegateToCharlie,
-    delegate_to_rex: delegateToRex,
-    delegate_to_archie: delegateToArchie,
-    delegate_to_petra: delegateToPetra,
-    delegate_to_bruno: delegateToBruno,
-    delegate_to_della: delegateToDella,
-    delegate_to_roger: delegateToRoger,
   },
-  outputProcessors: [new TokenLimiterProcessor({ limit: 80_000 })],
+  outputProcessors: [
+    new TokenLimiterProcessor({ limit: 80_000 }),
+    // Strip markdown that the system prompt forbids — Signal renders no
+    // formatting, so **bold**, ## headers, `code`, and _italic_ display as
+    // literal characters. 'redact' replaces matches with the captured text
+    // (or [REDACTED] when no $1), so wrapped content survives unwrapped.
+    new RegexFilterProcessor({
+      strategy: 'redact',
+      phase: 'output',
+      rules: [
+        { name: 'bold', pattern: /\*\*([^*]+)\*\*/g, replacement: '$1' },
+        { name: 'italic-underscore', pattern: /(?<!\w)_([^_]+)_(?!\w)/g, replacement: '$1' },
+        { name: 'inline-code', pattern: /`([^`]+)`/g, replacement: '$1' },
+        { name: 'heading', pattern: /^#+\s+/gm, replacement: '' },
+        { name: 'blockquote', pattern: /^>\s?/gm, replacement: '' },
+      ],
+    }),
+  ],
+  // Recover from Anthropic's "assistant message prefill" rejection by
+  // appending a hidden continue marker and retrying once. Affects every
+  // turn where the conversation happens to end with an assistant message.
+  errorProcessors: [new PrefillErrorHandler()],
 });

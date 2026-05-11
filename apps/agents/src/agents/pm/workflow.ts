@@ -3,6 +3,25 @@ import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { petra } from './agent.js';
 
+// Schemas Petra returns via structuredOutput. Replaces the previous pattern
+// of asking for JSON in the prompt and regex-extracting it from response.text.
+const triageDecisionSchema = z.object({
+  project_id: z.string().nullable(),
+  assignee: z.string().nullable(),
+  due_date: z.string().nullable(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  requires_approval: z.boolean(),
+});
+
+const riskSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  likelihood: z.enum(['unlikely', 'possible', 'likely', 'certain']),
+  mitigation: z.string().nullable(),
+  project_id: z.string().nullable(),
+});
+
 // ─── Step 1: Triage incoming task proposal ─────────────────────────────────
 const triageInputSchema = z.object({
   title: z.string(),
@@ -50,11 +69,9 @@ Suggested priority: ${inputData.suggestedPriority ?? 'None'}
 
 Active projects: ${JSON.stringify(projects)}
 
-Return JSON: { "project_id": "uuid or null", "assignee": "name or null", "due_date": "ISO date or null", "priority": "low|medium|high|urgent", "requires_approval": true|false }
 requires_approval should be true only for the first 10 task creations in each project.`;
 
-    const response = await petra.generate([{ role: 'user', content: prompt }]);
-    let triage: Record<string, unknown> = {
+    const triageFallback: z.infer<typeof triageDecisionSchema> = {
       project_id: inputData.suggestedProjectId ?? null,
       assignee: inputData.suggestedAssignee ?? null,
       due_date: inputData.suggestedDueDate ?? null,
@@ -62,20 +79,28 @@ requires_approval should be true only for the first 10 task creations in each pr
       requires_approval: true,
     };
 
-    try {
-      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) triage = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-    } catch { /* use defaults */ }
+    const response = await petra.generate(
+      [{ role: 'user', content: prompt }],
+      {
+        structuredOutput: {
+          schema: triageDecisionSchema,
+          errorStrategy: 'fallback',
+          fallbackValue: triageFallback,
+        },
+      },
+    );
+
+    const triage = response.object ?? triageFallback;
 
     return {
       title: inputData.title,
       description: inputData.description,
-      projectId: (triage['project_id'] as string) ?? null,
-      assignee: (triage['assignee'] as string) ?? null,
-      dueDate: (triage['due_date'] as string) ?? null,
-      priority: (triage['priority'] as string) ?? 'medium',
+      projectId: triage.project_id,
+      assignee: triage.assignee,
+      dueDate: triage.due_date,
+      priority: triage.priority,
       sourceActivityId: inputData.sourceActivityId,
-      requiresApproval: (triage['requires_approval'] as boolean) ?? true,
+      requiresApproval: triage.requires_approval,
     };
   },
 });
@@ -188,26 +213,31 @@ const riskScan = createStep({
 Open tasks: ${JSON.stringify(tasks)}
 Active projects: ${JSON.stringify(projects)}
 
-Identify risks and return a JSON array of risk objects.`;
+Identify risks across the categories in your system prompt.`;
 
-    const response = await petra.generate([{ role: 'user', content: prompt }]);
-    let risks: Array<Record<string, unknown>> = [];
+    const response = await petra.generate(
+      [{ role: 'user', content: prompt }],
+      {
+        structuredOutput: {
+          schema: z.array(riskSchema),
+          errorStrategy: 'fallback',
+          fallbackValue: [],
+        },
+      },
+    );
 
-    try {
-      const jsonMatch = response.text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) risks = JSON.parse(jsonMatch[0]) as Array<Record<string, unknown>>;
-    } catch { /* no risks */ }
+    const risks = response.object ?? [];
 
     // Save identified risks
     for (const risk of risks) {
       await supabase.from('risk_register').insert({
-        title: risk['title'],
-        description: risk['description'],
-        severity: risk['severity'] ?? 'low',
-        likelihood: risk['likelihood'] ?? 'possible',
+        title: risk.title,
+        description: risk.description,
+        severity: risk.severity,
+        likelihood: risk.likelihood,
         status: 'identified',
-        mitigation: risk['mitigation'] ?? null,
-        project_id: risk['project_id'] ?? null,
+        mitigation: risk.mitigation,
+        project_id: risk.project_id,
       } as never);
     }
 

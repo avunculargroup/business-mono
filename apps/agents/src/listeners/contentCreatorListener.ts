@@ -2,6 +2,7 @@ import { createRealtimeClient } from '@platform/db';
 import { runDispatch } from '../lib/dispatchRunner.js';
 import { makeStepLogger } from '../lib/agentStepTelemetry.js';
 import { charlie } from '../agents/contentCreator/index.js';
+import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 
 const supabase = createRealtimeClient();
 
@@ -43,39 +44,15 @@ function parseContentOutput(text: string): { title: string | null; body: string 
   return { title: null, body: text };
 }
 
-let currentChannel: ReturnType<typeof supabase.channel> | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempt = 0;
-let hasEverSubscribed = false;
-
-function scheduleReconnect(reason?: string): void {
-  if (reconnectTimer !== null) return;
-  reconnectAttempt += 1;
-  const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
-  const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
-  console.log(
-    `[content-creator-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s` +
-    (reason ? ` (${reason})` : '')
-  );
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    startContentCreatorListener();
-  }, delay);
-}
-
 export function startContentCreatorListener(): void {
-  if (reconnectTimer !== null) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  if (currentChannel !== null) {
-    void supabase.removeChannel(currentChannel);
-  }
-
-  const channel = supabase
-    .channel('content-creator-dispatches')
-    .on(
+  subscribeWithReconnect({
+    client: supabase,
+    channelName: 'content-creator-dispatches',
+    logPrefix: '[content-creator-listener]',
+    onSubscribed: () => {
+      console.log('[content-creator-listener] Listening for Content Creator dispatches via Supabase Realtime');
+    },
+    attachHandlers: (channel) => channel.on(
       'postgres_changes' as never,
       { event: 'INSERT', schema: 'public', table: 'agent_activity' },
       async (payload: { new: ActivityRow }) => {
@@ -165,22 +142,6 @@ export function startContentCreatorListener(): void {
 
         console.log(`[content-creator-listener] Completed dispatch from activity ${row.id}`);
       }
-    )
-    .subscribe((status, err) => {
-      if (channel !== currentChannel) return;
-
-      console.log('[content-creator-listener] Subscription status:', status);
-      if (err) console.error('[content-creator-listener] Subscription error:', err);
-      if (status === 'SUBSCRIBED') {
-        hasEverSubscribed = true;
-        reconnectAttempt = 0;
-        console.log('[content-creator-listener] Listening for Content Creator dispatches via Supabase Realtime');
-      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-        scheduleReconnect(err ? String(err) : status);
-      } else if (status === 'CLOSED') {
-        scheduleReconnect('CLOSED');
-      }
-    });
-
-  currentChannel = channel;
+    ),
+  });
 }

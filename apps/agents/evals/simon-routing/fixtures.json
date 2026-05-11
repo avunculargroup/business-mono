@@ -1,0 +1,62 @@
+[
+  {
+    "input": "Draft a short LinkedIn post about Bitcoin treasury strategy for Australian SMBs.",
+    "expectedSubagent": "charlie",
+    "rationale": "Content drafting — Charlie."
+  },
+  {
+    "input": "Can you rewrite that draft to be more direct? The contentItemId is 123e4567-e89b-12d3-a456-426614174000.",
+    "expectedSubagent": "charlie",
+    "rationale": "Content revision (with contentItemId) — Charlie."
+  },
+  {
+    "input": "Save this link: https://www.lopp.net/bitcoin-information.html — we'll want it in the knowledge base.",
+    "expectedSubagent": "rex",
+    "rationale": "URL intake routes to Rex first to ingest; he hands off to Archie."
+  },
+  {
+    "input": "Look up everything you can find about Macquarie Group's stance on digital assets.",
+    "expectedSubagent": "rex",
+    "rationale": "Deep research request — Rex."
+  },
+  {
+    "input": "What do we know about CommSec from past meetings? Search the knowledge base.",
+    "expectedSubagent": "archie",
+    "rationale": "Explicit knowledge-base query — Archie."
+  },
+  {
+    "input": "I want to scope the new client onboarding playbook — gather requirements and clarification questions.",
+    "expectedSubagent": "bruno",
+    "rationale": "Requirements / clarification work — Bruno."
+  },
+  {
+    "input": "Pull a quick health check on our pipeline — which contacts have we not touched in 60 days?",
+    "expectedSubagent": "della",
+    "rationale": "CRM / pipeline hygiene — Della."
+  },
+  {
+    "input": "Anything overdue or at risk in the current portfolio? Give me Petra's read.",
+    "expectedSubagent": "petra",
+    "rationale": "Risk / portfolio status — Petra."
+  },
+  {
+    "input": "From the call yesterday, who did Roger think the second voice was?",
+    "expectedSubagent": "roger",
+    "rationale": "Transcript / speaker-ID reasoning — Roger."
+  },
+  {
+    "input": "Verify this claim from the article: Australia has more than 250 Bitcoin ATMs.",
+    "expectedSubagent": "rex",
+    "rationale": "Fact verification — Rex."
+  },
+  {
+    "input": "Draft an outreach email to Jane Smith (jane@example.com) following up on our Tuesday call.",
+    "expectedSubagent": "charlie",
+    "rationale": "Email drafting — Charlie."
+  },
+  {
+    "input": "Brief me on Aaron Whitman ahead of our 3pm meeting.",
+    "expectedSubagent": "rex",
+    "rationale": "Pre-meeting deep_research brief on a person — Rex."
+  }
+]

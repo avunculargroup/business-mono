@@ -8,7 +8,8 @@
     "build": "mastra build",
     "start": "node .mastra/output/index.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:eval": "tsx evals/simon-routing/run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.74",
@@ -16,10 +17,10 @@
     "@ai-sdk/provider": "^2.0.1",
     "@anthropic-ai/sdk": "^0.32.0",
     "@deepgram/sdk": "^3.9.0",
-    "@mastra/core": "^1.24.1",
-    "@mastra/memory": "^1.15.0",
-    "@mastra/observability": "^1.10.1",
-    "@mastra/pg": "^1.9.0",
+    "@mastra/core": "^1.32.1",
+    "@mastra/memory": "^1.17.5",
+    "@mastra/observability": "^1.11.1",
+    "@mastra/pg": "^1.10.0",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",
@@ -30,7 +31,8 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "mastra": "^1.5.0",
+    "mastra": "^1.8.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.5"
   }
 }
