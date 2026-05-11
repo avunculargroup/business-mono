@@ -8,7 +8,8 @@
     "build": "mastra build",
     "start": "node .mastra/output/index.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:eval": "tsx evals/simon-routing/run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.74",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "mastra": "^1.8.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.5"
   }
 }
