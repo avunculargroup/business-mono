@@ -35,6 +35,7 @@ Transform tasks into verifiable goals before implementing:
 ```
 ├── apps/
 │   ├── agents/          # Mastra AI agents server (Railway)
+│   │   └── evals/       # Routing-accuracy fixtures + runner (pnpm test:eval)
 │   └── web/             # Next.js frontend (Vercel) — future
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
@@ -79,12 +80,14 @@ Transform tasks into verifiable goals before implementing:
 - **Frontend**: Next.js (`apps/web`) → Vercel
 - **Agent Server**: Mastra AI (`apps/agents`) → Railway — TypeScript, ES2022 modules
 - **Database**: Supabase (Postgres + pgvector + RLS)
+- **Mastra storage**: Separate Postgres for thread memory, working memory, semantic recall, and the native scheduler — connection string is `MASTRA_DB_URL` (Railway Postgres recommended; Supabase direct works only with the IPv4 add-on). Distinct from the Supabase JS client used for app data.
+- **Observability**: `DefaultExporter` (local OTLP) is always on; `CloudExporter` ships traces to Mastra Cloud when `MASTRA_CLOUD_ACCESS_TOKEN` is set, otherwise self-disables.
 - **Communication**: Signal CLI (Simon's dedicated number)
 - **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB, Della analyses content)
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
-- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
+- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions) — used for both knowledge-base vectors AND Simon's semantic-recall memory
 - **Models**: `anthropic/claude-sonnet-4-5` for all agents
 
 ### TypeScript config (all packages)
@@ -116,7 +119,7 @@ Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
 
 ### Inter-agent communication rules
 
-1. **Via Simon**: Simon dispatches work to specialists and relays results to directors. Default path.
+1. **Via Simon**: Simon dispatches work to specialists and relays results to directors. Default path. Implemented as Mastra native subagent delegation — specialists are registered on Simon's `agents:` property and surface in tool calls as `agent-<name>` (e.g. `agent-charlie`, `agent-rex`).
 1. **Via database events**: Some agent outputs trigger other agents implicitly (e.g. Recorder proposes tasks → PM picks them up from `agent_activity`).
 1. **Read-only knowledge queries**: Any agent can query the Archivist's knowledge base directly. The only permitted direct cross-agent call.
 
@@ -184,7 +187,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 
 - **Packages**: `@platform/{name}`
 - **Agent names in code**: camelCase (`simon`, `recorder`, `contentCreator`)
-- **Tool names**: snake_case (`supabase_query`, `deepgram_transcribe`)
+- **Tool names**: snake_case (`supabase_query`, `deepgram_transcribe`). Exception: auto-generated subagent delegation tools are `agent-<name>` (hyphen) — produced by Mastra from the `agents:` map, not by us.
 - **Webhook routes**: `/webhooks/{service}`
 - **Database tables**: snake_case, plural (`knowledge_items`)
 - **TypeScript files**: camelCase for modules, PascalCase for components/classes
@@ -212,6 +215,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`packages/shared/src/types.ts`     |Shared TypeScript types and enums                                                                              |
 |`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
 |`infra/signal-cli/README.md`       |Sidecar deployment and registration instructions                                                               |
+|`apps/agents/evals/simon-routing/` |Routing-accuracy eval — fixtures + runner. `pnpm --filter @platform/agents test:eval`                          |
 
 -----
 
@@ -236,6 +240,8 @@ Read the relevant docs BEFORE writing code.
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 |Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
 |Fastmail JMAP polling, email-to-interaction sync         |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
+|Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing/`                           |Run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy before merging |
+|Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
 
