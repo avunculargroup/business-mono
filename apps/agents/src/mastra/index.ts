@@ -2,7 +2,7 @@ import { setDefaultResultOrder } from 'node:dns';
 import { resolve4 } from 'node:dns/promises';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
-import { Observability, SamplingStrategyType, DefaultExporter } from '@mastra/observability';
+import { Observability, SamplingStrategyType, DefaultExporter, CloudExporter } from '@mastra/observability';
 import type { Context } from 'hono';
 import { simon } from '../agents/simon/index.js';
 import { archie } from '../agents/archivist/index.js';
@@ -116,15 +116,16 @@ const storage = new PostgresStore({
 });
 
 // Observability mirrors agent/tool/workflow spans into agent_activity via a
-// SpanOutputProcessor so existing audit dashboards keep working. Adding an
-// OTLP exporter (Grafana/Honeycomb/Datadog) here later requires no changes
-// to call sites — they already create spans implicitly via Mastra primitives.
+// SpanOutputProcessor so existing audit dashboards keep working. The
+// CloudExporter self-disables when MASTRA_CLOUD_ACCESS_TOKEN is unset, so
+// registering it here is a no-op locally and ships traces to Mastra Cloud
+// in production once the env var is set on Railway.
 const observability = new Observability({
   configs: {
     default: {
       serviceName: 'bts-agents',
       sampling: { type: SamplingStrategyType.ALWAYS },
-      exporters: [new DefaultExporter()],
+      exporters: [new DefaultExporter(), new CloudExporter()],
       spanOutputProcessors: [new AgentActivitySpanProcessor()],
     },
   },
