@@ -2,6 +2,7 @@ import type { Mastra } from '@mastra/core';
 import { createRealtimeClient } from '@platform/db';
 import { petra } from '../agents/pm/agent.js';
 import type { ActivityNotes } from '../lib/dispatchRunner.js';
+import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 
 const supabase = createRealtimeClient();
 
@@ -25,27 +26,6 @@ type WorkflowInput = {
   suggestedDueDate?: string;
   suggestedPriority?: 'low' | 'medium' | 'high' | 'urgent';
 };
-
-let currentChannel: ReturnType<typeof supabase.channel> | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempt = 0;
-let hasEverSubscribed = false;
-let mastraInstance: Mastra | null = null;
-
-function scheduleReconnect(reason?: string): void {
-  if (reconnectTimer !== null) return;
-  reconnectAttempt += 1;
-  const delay = Math.min(5000 * Math.pow(2, reconnectAttempt - 1), 60000);
-  const scenario = hasEverSubscribed ? 'connection lost' : 'never connected';
-  console.log(
-    `[pm-listener] ${scenario} — reconnect attempt ${reconnectAttempt} in ${delay / 1000}s` +
-    (reason ? ` (${reason})` : '')
-  );
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    if (mastraInstance) startPMListener(mastraInstance);
-  }, delay);
-}
 
 async function parseDispatchToWorkflowInput(
   message: string,
@@ -89,20 +69,14 @@ Return ONLY a JSON object with these fields:
 }
 
 export function startPMListener(mastra: Mastra): void {
-  mastraInstance = mastra;
-
-  if (reconnectTimer !== null) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  if (currentChannel !== null) {
-    void supabase.removeChannel(currentChannel);
-  }
-
-  const channel = supabase
-    .channel('pm-dispatches')
-    .on(
+  subscribeWithReconnect({
+    client: supabase,
+    channelName: 'pm-dispatches',
+    logPrefix: '[pm-listener]',
+    onSubscribed: () => {
+      console.log('[pm-listener] Listening for PM dispatches via Supabase Realtime');
+    },
+    attachHandlers: (channel) => channel.on(
       'postgres_changes' as never,
       { event: 'INSERT', schema: 'public', table: 'agent_activity' },
       async (payload: { new: ActivityRow }) => {
@@ -244,22 +218,6 @@ export function startPMListener(mastra: Mastra): void {
           }
         }
       }
-    )
-    .subscribe((status, err) => {
-      if (channel !== currentChannel) return;
-
-      console.log('[pm-listener] Subscription status:', status);
-      if (err) console.error('[pm-listener] Subscription error:', err);
-      if (status === 'SUBSCRIBED') {
-        hasEverSubscribed = true;
-        reconnectAttempt = 0;
-        console.log('[pm-listener] Listening for PM dispatches via Supabase Realtime');
-      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-        scheduleReconnect(err ? String(err) : status);
-      } else if (status === 'CLOSED') {
-        scheduleReconnect('CLOSED');
-      }
-    });
-
-  currentChannel = channel;
+    ),
+  });
 }
