@@ -20,7 +20,6 @@ import { startWebDirectivesListener } from '../listeners/webDirectives.js';
 import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
-import { startRoutineListener } from '../listeners/routineListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
@@ -182,8 +181,8 @@ startContentCreatorListener();
 // rows from the recorder workflow and routes them through the PM workflow.
 startPMListener(mastra);
 
-// Start hourly routine check for scheduled agent routines
-startRoutineListener(mastra);
+// Routine scheduling is now handled by Mastra's built-in scheduler — see
+// `schedule` field on executeRoutineWorkflow in src/workflows/executeRoutineWorkflow.ts.
 
 // Start Fastmail JMAP polling loop
 startFastmailListener();
