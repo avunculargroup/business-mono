@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { TokenLimiterProcessor } from '@mastra/core/processors';
+import { TokenLimiterProcessor, RegexFilterProcessor, PrefillErrorHandler } from '@mastra/core/processors';
 import { getModelConfig } from '../../config/model.js';
 import { memory } from '../../config/memory.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
@@ -215,5 +215,26 @@ export const simon = new Agent({
     delegate_to_della: delegateToDella,
     delegate_to_roger: delegateToRoger,
   },
-  outputProcessors: [new TokenLimiterProcessor({ limit: 80_000 })],
+  outputProcessors: [
+    new TokenLimiterProcessor({ limit: 80_000 }),
+    // Strip markdown that the system prompt forbids — Signal renders no
+    // formatting, so **bold**, ## headers, `code`, and _italic_ display as
+    // literal characters. 'redact' replaces matches with the captured text
+    // (or [REDACTED] when no $1), so wrapped content survives unwrapped.
+    new RegexFilterProcessor({
+      strategy: 'redact',
+      phase: 'output',
+      rules: [
+        { name: 'bold', pattern: /\*\*([^*]+)\*\*/g, replacement: '$1' },
+        { name: 'italic-underscore', pattern: /(?<!\w)_([^_]+)_(?!\w)/g, replacement: '$1' },
+        { name: 'inline-code', pattern: /`([^`]+)`/g, replacement: '$1' },
+        { name: 'heading', pattern: /^#+\s+/gm, replacement: '' },
+        { name: 'blockquote', pattern: /^>\s?/gm, replacement: '' },
+      ],
+    }),
+  ],
+  // Recover from Anthropic's "assistant message prefill" rejection by
+  // appending a hidden continue marker and retrying once. Affects every
+  // turn where the conversation happens to end with an assistant message.
+  errorProcessors: [new PrefillErrorHandler()],
 });
