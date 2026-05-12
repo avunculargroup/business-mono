@@ -866,7 +866,7 @@ async function archiveSources(outcome: RoutineOutcome): Promise<number> {
 // ── Assemble workflow ────────────────────────────────────────────────────────
 
 export const executeRoutineWorkflow = createWorkflow({
-  id: 'execute_routine',
+  id: 'executeRoutine',
   inputSchema: z.object({ triggered_at: z.string() }),
   outputSchema: z.object({
     updated: z.number(),
