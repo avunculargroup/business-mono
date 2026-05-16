@@ -48,10 +48,10 @@ const routineSchema = z.object({
 const newsExtractionSchema = z.object({
   summary: z.string().min(40).max(500)
     .describe('A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
-  key_points: z.array(z.string()).min(3).max(7)
-    .describe('3–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
-  topic_tags: z.array(z.string()).min(3).max(8)
-    .describe('3–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
+  key_points: z.array(z.string()).min(2).max(7)
+    .describe('2–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
+  topic_tags: z.array(z.string()).min(2).max(8)
+    .describe('2–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
   australian_relevance: z.boolean()
     .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
 });
@@ -317,12 +317,8 @@ function getNewsExtractor(): Agent {
       instructions:
         'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
         'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
-        'Avoid marketing language. Topic tags must be lowercase and hyphenated.\n\n' +
-        'Return ONLY a single JSON object — no prose, no code fences — with these keys:\n' +
-        '  - summary: string, 2–3 neutral sentences (40–500 characters total)\n' +
-        '  - key_points: array of 3–7 short factual strings (claims, numbers, names, dates)\n' +
-        '  - topic_tags: array of 3–8 lowercase hyphenated tag strings (e.g. "etf", "asx-listed", "treasury-strategy")\n' +
-        '  - australian_relevance: boolean — true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.',
+        'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
+        'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
       model: getModelConfig(),
     });
   }
@@ -334,47 +330,49 @@ async function extractNewsMetadata(input: {
   source: string;
   category: NewsCategory;
   content: string;
-}): Promise<z.infer<typeof newsExtractionSchema> | null> {
-  const prompt =
+}): Promise<{
+  data: z.infer<typeof newsExtractionSchema> | null;
+  reason: string | null;
+}> {
+  const basePrompt =
     `Category hint: ${input.category}\n` +
     `Title: ${input.title}\n` +
     `Source: ${input.source}\n\n` +
     `Article:\n${input.content}\n\n` +
-    `Return the JSON object now.`;
+    `Extract: summary (2–3 sentences, 40–500 chars), key_points (2–7 factual bullets), ` +
+    `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean).`;
 
-  const response = await getNewsExtractor().generate([
-    { role: 'user', content: prompt },
-  ]);
+  // Two attempts max via Mastra structured output (JSON mode + schema-checked).
+  // 'strict' throws on validation failure; we catch and retry once with a nudge.
+  let lastError: string | null = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const prompt = attempt === 1
+      ? basePrompt
+      : `${basePrompt}\n\nYour previous response did not satisfy the schema. ` +
+        `Return ONLY a valid object matching the schema now — no prose, no code fences.`;
 
-  const match = response.text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    console.warn('[news-ingest] extraction returned no JSON object', {
-      title: input.title,
-      preview: response.text.slice(0, 200),
-    });
-    return null;
+    try {
+      const response = await getNewsExtractor().generate(
+        [{ role: 'user', content: prompt }],
+        {
+          structuredOutput: {
+            schema: newsExtractionSchema,
+            errorStrategy: 'strict',
+          },
+        },
+      );
+      const obj = response.object as z.infer<typeof newsExtractionSchema> | undefined;
+      if (obj) return { data: obj, reason: null };
+      lastError = 'no_object_returned';
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
   }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(match[0]);
-  } catch (err) {
-    console.warn('[news-ingest] extraction JSON parse failed', {
-      title: input.title,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
-
-  const parsed = newsExtractionSchema.safeParse(raw);
-  if (!parsed.success) {
-    console.warn('[news-ingest] extraction schema validation failed', {
-      title: input.title,
-      issues: parsed.error.issues,
-    });
-    return null;
-  }
-  return parsed.data;
+  console.warn('[news-ingest] extraction failed after retry', {
+    title: input.title,
+    reason: lastError,
+  });
+  return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
 }
 
 let newsJudgeAgent: Agent | null = null;
@@ -389,8 +387,6 @@ function getNewsJudge(): Agent {
         'Weigh: Australian relevance (AU regulators, AU companies, AU economy) HIGH; direct treasury or balance-sheet implications HIGH; binding regulatory action, court rulings, or tax positions MEDIUM-HIGH; novelty (genuine new information) MEDIUM. ' +
         'Penalise: PR fluff, opinion columns without new facts, repackaged announcements, price-prediction clickbait.\n\n' +
         'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
-        'Return ONLY a single JSON object — no prose, no code fences — shaped:\n' +
-        '  { "shortlist": [{ "index": <number>, "reasoning": "<10–30 word justification>" }] }\n' +
         'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.',
       model: getModelConfig(),
     });
@@ -418,40 +414,32 @@ async function rankNewsCandidates(input: {
 
   const prompt =
     `Category: ${input.category}\n` +
-    `Pick the top ${input.max} most relevant candidates from the list below.\n\n` +
-    `Candidates:\n${lines}\n\n` +
-    `Return the JSON object now.`;
+    `Pick the top ${input.max} most relevant candidates from the list below. ` +
+    `Each shortlist entry must use the index verbatim from the list.\n\n` +
+    `Candidates:\n${lines}`;
 
-  const response = await getNewsJudge().generate([
-    { role: 'user', content: prompt },
-  ]);
-
-  const match = response.text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    console.warn('[news-ingest] judge returned no JSON object', {
-      preview: response.text.slice(0, 200),
-    });
-    return null;
-  }
-
-  let raw: unknown;
   try {
-    raw = JSON.parse(match[0]);
+    const response = await getNewsJudge().generate(
+      [{ role: 'user', content: prompt }],
+      {
+        structuredOutput: {
+          schema: newsJudgeSchema,
+          errorStrategy: 'strict',
+        },
+      },
+    );
+    const obj = response.object as z.infer<typeof newsJudgeSchema> | undefined;
+    if (!obj) {
+      console.warn('[news-ingest] judge returned no object');
+      return null;
+    }
+    return obj;
   } catch (err) {
-    console.warn('[news-ingest] judge JSON parse failed', {
+    console.warn('[news-ingest] judge threw', {
       error: err instanceof Error ? err.message : String(err),
     });
     return null;
   }
-
-  const parsed = newsJudgeSchema.safeParse(raw);
-  if (!parsed.success) {
-    console.warn('[news-ingest] judge schema validation failed', {
-      issues: parsed.error.issues,
-    });
-    return null;
-  }
-  return parsed.data;
 }
 
 async function runNewsIngest(
@@ -618,6 +606,8 @@ async function runNewsIngest(
   // ── Phase 3: enrich + insert (only the shortlist) ─────────────────────────
 
   let itemsStored = 0;
+  let extractionFailures = 0;
+  const failedUrls: string[] = [];
   const storedSources: NonNullable<RoutineResult['sources']> = [];
 
   for (const item of shortlist) {
@@ -637,18 +627,20 @@ async function runNewsIngest(
       // Structured extraction (summary, key_points, topic_tags, AU relevance).
       const extractionInput = bodyMarkdown ?? item.summary;
       const truncated = extractionInput.slice(0, 12000);
-      let extracted: z.infer<typeof newsExtractionSchema> | null = null;
-      try {
-        extracted = await extractNewsMetadata({
+      const { data: extracted, reason: extractionReason } = await extractNewsMetadata({
+        title: item.title,
+        source: item.source,
+        category,
+        content: truncated,
+      });
+      const extractionOk = extracted !== null;
+      if (!extractionOk) {
+        extractionFailures += 1;
+        failedUrls.push(item.url);
+        console.warn('[news-ingest] extraction failed — inserting with extraction_failed status', {
           title: item.title,
-          source: item.source,
-          category,
-          content: truncated,
-        });
-      } catch (err) {
-        console.warn('[news-ingest] extraction threw — falling back to snippet', {
-          title: item.title,
-          error: err instanceof Error ? err.message : String(err),
+          url: item.url,
+          reason: extractionReason,
         });
       }
 
@@ -674,16 +666,19 @@ async function runNewsIngest(
         category: category as NewsCategory,
         relevance_score: Math.min(1, item.score),
         embedding: finalEmbedding as unknown as string,
+        status: extractionOk ? 'new' : 'extraction_failed',
         routine_id: routine.id,
         ingested_by: 'rex',
       });
       itemsStored += 1;
-      storedSources.push({
-        url: item.url,
-        title: item.title,
-        excerpt: finalSummary,
-        retrieved_at: new Date().toISOString(),
-      });
+      if (extractionOk) {
+        storedSources.push({
+          url: item.url,
+          title: item.title,
+          excerpt: finalSummary,
+          retrieved_at: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       console.warn('[news-ingest] item failed — skipping', {
         url: item.url,
@@ -693,17 +688,25 @@ async function runNewsIngest(
     }
   }
 
-  console.log('[news-ingest] inserted', itemsStored, 'of', shortlist.length, 'shortlisted');
+  console.log(
+    `[news-ingest] category=${category} stored=${itemsStored}/${shortlist.length} extraction_failures=${extractionFailures}`,
+  );
 
   const ingestResult: NewsIngestResult = {
     category,
     items_found: tavilyCandidates.length,
     items_stored: itemsStored,
     items_skipped_duplicate: itemsSkippedDuplicate,
+    extraction_failures: extractionFailures,
+    failed_urls: failedUrls,
   };
 
+  const summaryLine = extractionFailures > 0
+    ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`
+    : `Stored ${itemsStored} new ${category} articles (${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`;
+
   const result: RoutineResult = {
-    summary: `Stored ${itemsStored} new ${category} articles (${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`,
+    summary: summaryLine,
     sources: storedSources.slice(0, 5),
   };
 
@@ -771,18 +774,31 @@ const persistAndSchedule = createStep({
 
       await supabase.from('routines').update(update).eq('id', outcome.routine_id);
 
-      // Audit: one row per run.
+      // Audit: one row per run. For news_ingest we serialise the run stats as
+      // JSON in `notes` so failures are queryable from Supabase without having
+      // to dig through Railway logs:
+      //   SELECT created_at, notes::jsonb FROM agent_activity
+      //   WHERE action LIKE 'Routine run: News%' ORDER BY created_at DESC;
+      const isNewsIngest = outcome.action_type === 'news_ingest';
+      const newsNotes = isNewsIngest && outcome.news_ingest_result
+        ? JSON.stringify(outcome.news_ingest_result)
+        : null;
+      const activityStatus: 'auto' | 'error' = outcome.status === 'success'
+        ? (isNewsIngest && (outcome.news_ingest_result?.extraction_failures ?? 0) > 0
+            ? 'error'
+            : 'auto')
+        : 'error';
       await supabase.from('agent_activity').insert({
         agent_name: outcome.action_type === 'research_digest' ? 'rex' : 'rex',
         action: `Routine run: ${outcome.name}`,
-        status: outcome.status === 'success' ? 'auto' : 'error',
+        status: activityStatus,
         trigger_type: 'scheduled',
         entity_type: 'routine',
         entity_id: outcome.routine_id,
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.

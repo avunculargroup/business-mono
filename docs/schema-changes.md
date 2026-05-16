@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-05-16 — Add `extraction_failed` status to `news_items`
+
+**Migration:** `20260516000000_news_items_extraction_failed_status.sql`
+
+Extends the `news_items.status` CHECK constraint to allow a new value `'extraction_failed'` alongside `'new' | 'reviewed' | 'archived' | 'promoted'`.
+
+The `news_ingest` routine used to silently fall back to the raw Tavily snippet (and empty `key_points` / `topic_tags`) whenever the LLM metadata extraction call returned a response that did not parse as the expected JSON schema. The failures were invisible: `routines.last_status` was `'success'`, the rows were stored with `status='new'`, and the only signal was a `console.warn` in Railway. As a result ~61% of rows had empty `key_points`/`topic_tags` with a 500-char raw-page-boilerplate `summary`.
+
+The workflow now uses Mastra's structured-output API (with a single retry), and on failure inserts the row with `status='extraction_failed'` so it can be excluded from digests and re-extracted later.
+
+---
+
 ## 2026-05-02 — Fastmail account error tracking
 
 **Migration:** `20260502000000_fastmail_account_error_tracking.sql`

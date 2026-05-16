@@ -11,10 +11,11 @@ export const NewsCategory = {
 export type NewsCategory = (typeof NewsCategory)[keyof typeof NewsCategory];
 
 export const NewsStatus = {
-  NEW:      'new',
-  REVIEWED: 'reviewed',
-  ARCHIVED: 'archived',
-  PROMOTED: 'promoted',
+  NEW:                'new',
+  REVIEWED:           'reviewed',
+  ARCHIVED:           'archived',
+  PROMOTED:           'promoted',
+  EXTRACTION_FAILED:  'extraction_failed',
 } as const;
 export type NewsStatus = (typeof NewsStatus)[keyof typeof NewsStatus];
 
@@ -62,4 +63,8 @@ export interface NewsIngestResult {
   items_found: number;
   items_stored: number;
   items_skipped_duplicate: number;
+  // Rows inserted with status='extraction_failed' because the LLM call could
+  // not produce a valid structured response after one retry.
+  extraction_failures?: number;
+  failed_urls?: string[];
 }
