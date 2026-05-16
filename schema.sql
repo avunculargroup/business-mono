@@ -1317,7 +1317,7 @@ CREATE TABLE news_items (
                            coalesce(title, '') || ' ' || coalesce(summary, ''))
                        ) STORED,
   status               TEXT NOT NULL DEFAULT 'new'
-                         CHECK (status IN ('new','reviewed','archived','promoted')),
+                         CHECK (status IN ('new','reviewed','archived','promoted','extraction_failed')),
   knowledge_item_id    UUID REFERENCES knowledge_items(id) ON DELETE SET NULL,
   ingested_by          TEXT NOT NULL DEFAULT 'rex',
   routine_id           UUID REFERENCES routines(id) ON DELETE SET NULL,
