@@ -58,7 +58,9 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
   }
 
   if (state.currentChannel !== null) {
-    void client.removeChannel(state.currentChannel);
+    const channelToRemove = state.currentChannel;
+    state.currentChannel = null;
+    void client.removeChannel(channelToRemove);
   }
 
   const scheduleReconnect = (reason?: string): void => {
@@ -84,6 +86,14 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
     console.log(`${logPrefix} Subscription status:`, status);
     if (err) console.error(`${logPrefix} Subscription error:`, err);
     if (status === 'SUBSCRIBED') {
+      // Cancel any pending reconnect timer. Supabase's internal Phoenix socket
+      // reconnect re-joins channels automatically, so the channel can recover
+      // before our timer fires. Without this, the timer tears down the recovered
+      // channel and triggers another CLOSED, creating an infinite loop.
+      if (state.reconnectTimer !== null) {
+        clearTimeout(state.reconnectTimer);
+        state.reconnectTimer = null;
+      }
       state.hasEverSubscribed = true;
       state.reconnectAttempt = 0;
       onSubscribed?.();
