@@ -135,6 +135,7 @@ export const rex = new Agent({
     'Researcher. Web research, fact verification, contact/company briefings, URL ingestion (including podcast transcript discovery), and topic monitoring. Use for any directive that needs information from outside the knowledge base — investigating a company, verifying a claim, briefing for a meeting, or saving a shared URL. Input: a ResearchBrief-shaped directive (purpose, subject, context). Output: a research summary with sources, plus an ingestion result if a URL was supplied.',
   instructions: RESEARCHER_SYSTEM_PROMPT,
   model: getModelConfig(),
+  defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     query_news_items: queryNewsItems,
     search_web: searchWeb,

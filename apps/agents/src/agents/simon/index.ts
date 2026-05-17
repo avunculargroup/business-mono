@@ -208,6 +208,7 @@ export const simon = new Agent({
     petra,
   },
   defaultOptions: {
+    modelSettings: { maxOutputTokens: 8192 },
     // Cap each subagent's tool-call loop to SUBAGENT_MAX_STEPS so a confused
     // specialist can't pin Simon's turn indefinitely.
     delegation: {

@@ -190,6 +190,7 @@ export const charlie = new Agent({
     'Content creator. Drafts and revises emails, newsletters, LinkedIn/Twitter posts, and blog articles in BTS brand voice. Use whenever a directive asks for written content for an external (or internal-but-polished) audience. Always wrap the final draft in a single <content_output><title>…</title><body>…</body></content_output> block — that is the contract used by the persistence layer. Input: directive describing the content type, audience, and key points. Output: reasoning followed by a single <content_output> block.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
+  defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,
