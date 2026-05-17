@@ -75,6 +75,7 @@ export const archie = new Agent({
     'Knowledge manager. Saves URLs, articles, and curator notes to the knowledge base; runs hybrid (vector + graph + fulltext) searches across previously ingested material. Use when work involves "remembering" something, retrieving context from prior research, or persisting an item that arrived from elsewhere (e.g. after Rex ingests a URL). Input: a directive describing what to save or retrieve, plus any context. Output: a confirmation with knowledge_item ids on save, or matching items on retrieval.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
+  defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,

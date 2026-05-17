@@ -138,6 +138,7 @@ export const della = new Agent({
     'Relationship manager. Owns CRM hygiene, contact and company records, relationship health, pipeline advice. Use for assessing a contact, proposing CRM updates, surfacing pipeline next-steps, or summarising recent interactions with someone. Input: directive plus contact/company context. Output: assessment, recommended CRM writes (as proposed_actions for approval), or pipeline advice.',
   instructions: SYSTEM_PROMPT,
   model: getModelConfig(),
+  defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     supabase_query: supabaseQuery,
     supabase_insert: supabaseInsert,

@@ -320,6 +320,7 @@ function getNewsExtractor(): Agent {
         'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
         'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
       model: getModelConfig(),
+      defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
   }
   return newsExtractorAgent;
@@ -389,6 +390,7 @@ function getNewsJudge(): Agent {
         'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
         'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.',
       model: getModelConfig(),
+      defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
   }
   return newsJudgeAgent;
