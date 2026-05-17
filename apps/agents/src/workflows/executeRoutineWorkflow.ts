@@ -61,7 +61,8 @@ const newsJudgeSchema = z.object({
     .array(
       z.object({
         index: z.number().int().nonnegative(),
-        reasoning: z.string().min(5).max(300),
+        reasoning: z.string().min(5).max(500)
+          .describe('One short sentence (under 300 characters) explaining why this candidate was selected. Be terse — no preamble, no quotes, no restating the title.'),
       }),
     )
     .min(1)
@@ -388,7 +389,8 @@ function getNewsJudge(): Agent {
         'Weigh: Australian relevance (AU regulators, AU companies, AU economy) HIGH; direct treasury or balance-sheet implications HIGH; binding regulatory action, court rulings, or tax positions MEDIUM-HIGH; novelty (genuine new information) MEDIUM. ' +
         'Penalise: PR fluff, opinion columns without new facts, repackaged announcements, price-prediction clickbait.\n\n' +
         'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
-        'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.',
+        'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.\n\n' +
+        'Keep each reasoning to one short sentence (under 300 characters). No preamble, no restating the title, no quotes.',
       model: getModelConfig(),
       defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
