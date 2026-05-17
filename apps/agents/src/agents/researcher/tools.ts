@@ -405,7 +405,7 @@ export const queryNewsItems = createTool({
         .textSearch('fts', context.query, { type: 'websearch' })
         .eq('status', 'new')
         .order('published_at', { ascending: false, nullsFirst: false })
-        .limit(context.limit)
+        .limit(context.limit ?? 10)
         .then((r: { data: unknown[] | null }) => r.data ?? []),
     ]);
 

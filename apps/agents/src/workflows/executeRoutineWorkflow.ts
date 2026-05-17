@@ -447,7 +447,7 @@ async function rankNewsCandidates(input: {
 async function runNewsIngest(
   routine: z.infer<typeof routineSchema>,
 ): Promise<RoutineOutcome> {
-  const cfg = routine.action_config as NewsIngestionConfig;
+  const cfg = routine.action_config as unknown as NewsIngestionConfig;
   const category = cfg.category;
   const queries = cfg.queries ?? [];
   const maxPerQuery = cfg.max_results_per_query ?? 15;
