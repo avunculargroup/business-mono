@@ -51,7 +51,7 @@ export class FastmailJmapClient {
   // ── Session ────────────────────────────────────────────────────────────────
 
   async getSession(): Promise<{ accountId: string; apiUrl: string }> {
-    const res = await fetch(JMAP_WELL_KNOWN, {
+    const res = await this.fetchWithRetry(JMAP_WELL_KNOWN, {
       headers: { Authorization: this.authHeader },
     });
     if (res.status === 401) {
@@ -216,7 +216,7 @@ export class FastmailJmapClient {
     apiUrl: string,
     methodCalls: unknown[],
   ): Promise<Array<[string, unknown, string]>> {
-    const res = await fetch(apiUrl, {
+    const res = await this.fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: {
         Authorization: this.authHeader,
@@ -237,6 +237,29 @@ export class FastmailJmapClient {
 
     const data = (await res.json()) as { methodResponses: Array<[string, unknown, string]> };
     return data.methodResponses;
+  }
+
+  // fetch() throws TypeError for network-layer failures (DNS, connect timeout,
+  // socket reset) — HTTP errors do not throw. Retry those transient cases;
+  // surface anything else immediately.
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    const maxAttempts = 3;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fetch(url, init);
+      } catch (err) {
+        lastErr = err;
+        if (!(err instanceof TypeError) || attempt === maxAttempts) break;
+        const backoffMs = 1000 * 2 ** (attempt - 1);
+        console.warn(
+          `[fastmail-jmap] fetch ${url} failed (attempt ${attempt}/${maxAttempts}), ` +
+          `retrying in ${backoffMs}ms: ${err.message}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
+    throw lastErr;
   }
 }
 
