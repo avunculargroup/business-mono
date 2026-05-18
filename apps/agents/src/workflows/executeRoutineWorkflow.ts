@@ -54,6 +54,8 @@ const newsExtractionSchema = z.object({
     .describe('2–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
   australian_relevance: z.boolean()
     .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
+  bitcoin_relevance: z.boolean()
+    .describe('true if the article meaningfully discusses Bitcoin, cryptocurrency, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context. false for unrelated content (sports, entertainment, unrelated politics, etc.) even if a Bitcoin keyword appears in passing.'),
 });
 
 const newsJudgeSchema = z.object({
@@ -319,6 +321,7 @@ function getNewsExtractor(): Agent {
         'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
         'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
         'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
+        'Set bitcoin_relevance=false for any article that does not meaningfully touch Bitcoin, crypto, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context — even if the article was returned by a Bitcoin-themed search query. ' +
         'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
       model: getModelConfig(),
       defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
@@ -342,7 +345,8 @@ async function extractNewsMetadata(input: {
     `Source: ${input.source}\n\n` +
     `Article:\n${input.content}\n\n` +
     `Extract: summary (2–3 sentences, 40–500 chars), key_points (2–7 factual bullets), ` +
-    `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean).`;
+    `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
+    `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
 
   // Two attempts max via Mastra structured output (JSON mode + schema-checked).
   // 'strict' throws on validation failure; we catch and retry once with a nudge.
@@ -514,7 +518,7 @@ async function runNewsIngest(
       action_type: 'news_ingest', frequency: routine.frequency as RoutineFrequency,
       time_of_day: routine.time_of_day, timezone: routine.timezone,
       status: 'success', result, error: null,
-      news_ingest_result: { category, items_found: 0, items_stored: 0, items_skipped_duplicate: 0 },
+      news_ingest_result: { category, items_found: 0, items_stored: 0, items_skipped_duplicate: 0, items_filtered_irrelevant: 0 },
     };
   }
 
@@ -568,6 +572,7 @@ async function runNewsIngest(
   // If the pool already fits the cap, skip the judge call.
 
   let shortlist: FreshCandidate[];
+  let judgeFailed = false;
   if (fresh.length === 0) {
     shortlist = [];
   } else if (fresh.length <= maxCurated) {
@@ -588,7 +593,8 @@ async function runNewsIngest(
         max: maxCurated,
       });
     } catch (err) {
-      console.warn('[news-ingest] judge threw — falling back to top-N by Tavily score', {
+      judgeFailed = true;
+      console.warn('[news-ingest] judge threw — skipping run, no stories curated', {
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -600,9 +606,10 @@ async function runNewsIngest(
         .filter((c): c is FreshCandidate => Boolean(c));
       console.log('[news-ingest] judge selected', shortlist.length, 'of', fresh.length);
     } else {
-      shortlist = [...fresh].sort((a, b) => b.score - a.score).slice(0, maxCurated);
-      console.warn('[news-ingest] judge returned nothing usable — using top-N by Tavily score', {
-        fallback_count: shortlist.length,
+      shortlist = [];
+      judgeFailed = true;
+      console.warn('[news-ingest] judge returned nothing usable — skipping run, no stories curated', {
+        fresh_pool: fresh.length,
       });
     }
   }
@@ -611,6 +618,7 @@ async function runNewsIngest(
 
   let itemsStored = 0;
   let extractionFailures = 0;
+  let itemsFilteredIrrelevant = 0;
   const failedUrls: string[] = [];
   const storedSources: NonNullable<RoutineResult['sources']> = [];
 
@@ -646,6 +654,14 @@ async function runNewsIngest(
           url: item.url,
           reason: extractionReason,
         });
+      }
+
+      // Drop stories the extractor judged as neither Bitcoin- nor AU-relevant —
+      // both dimensions must fail for a drop, so a story can pass on either axis.
+      if (extracted && extracted.bitcoin_relevance === false && extracted.australian_relevance === false) {
+        itemsFilteredIrrelevant += 1;
+        console.warn('[news-ingest] filtered as irrelevant', { url: item.url, title: item.title });
+        continue;
       }
 
       // Final embedding on title + curated summary for higher-quality search.
@@ -693,7 +709,7 @@ async function runNewsIngest(
   }
 
   console.log(
-    `[news-ingest] category=${category} stored=${itemsStored}/${shortlist.length} extraction_failures=${extractionFailures}`,
+    `[news-ingest] category=${category} stored=${itemsStored}/${shortlist.length} extraction_failures=${extractionFailures} filtered=${itemsFilteredIrrelevant}`,
   );
 
   const ingestResult: NewsIngestResult = {
@@ -701,13 +717,17 @@ async function runNewsIngest(
     items_found: tavilyCandidates.length,
     items_stored: itemsStored,
     items_skipped_duplicate: itemsSkippedDuplicate,
+    items_filtered_irrelevant: itemsFilteredIrrelevant,
     extraction_failures: extractionFailures,
     failed_urls: failedUrls,
+    judge_failed: judgeFailed,
   };
 
-  const summaryLine = extractionFailures > 0
-    ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`
-    : `Stored ${itemsStored} new ${category} articles (${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`;
+  const summaryLine = judgeFailed
+    ? `No ${category} stories curated this run — the ranking judge failed; ${fresh.length} fresh candidates left unranked from a pool of ${tavilyCandidates.length}.`
+    : extractionFailures > 0
+      ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`
+      : `Stored ${itemsStored} new ${category} articles (${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`;
 
   const result: RoutineResult = {
     summary: summaryLine,
@@ -787,10 +807,14 @@ const persistAndSchedule = createStep({
       const newsNotes = isNewsIngest && outcome.news_ingest_result
         ? JSON.stringify(outcome.news_ingest_result)
         : null;
+      const newsHasAnomaly = isNewsIngest && outcome.news_ingest_result
+        ? (outcome.news_ingest_result.extraction_failures ?? 0) > 0
+          || outcome.news_ingest_result.judge_failed === true
+          || (outcome.news_ingest_result.items_stored === 0
+              && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
+        : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (isNewsIngest && (outcome.news_ingest_result?.extraction_failures ?? 0) > 0
-            ? 'error'
-            : 'auto')
+        ? (newsHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
         agent_name: outcome.action_type === 'research_digest' ? 'rex' : 'rex',
