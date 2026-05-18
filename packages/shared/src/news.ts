@@ -63,8 +63,14 @@ export interface NewsIngestResult {
   items_found: number;
   items_stored: number;
   items_skipped_duplicate: number;
+  // Stories the extractor judged as not Bitcoin- AND not AU-relevant; dropped
+  // before insert so they never reach the dashboard or vector index.
+  items_filtered_irrelevant?: number;
   // Rows inserted with status='extraction_failed' because the LLM call could
   // not produce a valid structured response after one retry.
   extraction_failures?: number;
   failed_urls?: string[];
+  // True when the LLM judge call failed or returned nothing — the run curated
+  // zero stories by design rather than falling back to raw Tavily ranking.
+  judge_failed?: boolean;
 }
