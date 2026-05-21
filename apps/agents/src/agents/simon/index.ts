@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { TokenLimiterProcessor, RegexFilterProcessor, PrefillErrorHandler } from '@mastra/core/processors';
 import { supabase } from '@platform/db';
 import { CapacityGapType } from '@platform/shared';
-import { getModelConfig } from '../../config/model.js';
+import { dynamicModelFor } from '../../config/model.js';
 import { memory } from '../../config/memory.js';
 import { supabaseQuery, supabaseInsert } from '../../tools/supabase.js';
 import { signalSend, signalReceive } from '../../tools/signal.js';
@@ -196,7 +196,7 @@ export const simon = new Agent({
   id: 'simon',
   name: 'simon',
   instructions: SYSTEM_PROMPT,
-  model: getModelConfig(),
+  model: dynamicModelFor('simon'),
   memory,
   agents: {
     charlie,

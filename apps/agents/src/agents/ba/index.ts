@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { MAX_CLARIFICATION_ROUNDS } from '@platform/shared';
-import { getModelConfig } from '../../config/model.js';
+import { dynamicModelFor } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
@@ -55,7 +55,7 @@ export const bruno = new Agent({
   description:
     'Business analyst. Turns ambiguous director requests into structured requirements: clarifying questions, acceptance criteria, scope, and conflicts with existing strategy. Use when a directive is large, vague, or cross-cutting and needs scoping before work starts. Input: the raw directive plus any background. Output: a structured requirements summary or a set of clarification questions.',
   instructions: SYSTEM_PROMPT,
-  model: getModelConfig(),
+  model: dynamicModelFor('bruno'),
   defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     supabase_query: supabaseQuery,

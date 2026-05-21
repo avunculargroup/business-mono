@@ -5,6 +5,7 @@ import { roger } from './agent.js';
 import { telnyxDownload } from './tools.js';
 import { deepgramTranscribe } from '../../tools/deepgram.js';
 import { logActivity } from '../../tools/activity.js';
+import { stepRequestContext } from '../../config/model.js';
 
 const DEEPGRAM_CALLBACK_BASE = process.env['RAILWAY_PUBLIC_DOMAIN']
   ? `https://${process.env['RAILWAY_PUBLIC_DOMAIN']}`
@@ -149,7 +150,10 @@ Transcript: ${inputData.transcript}
 
 Return a JSON object mapping speaker labels to names: { "Channel 0": "Alice", "Channel 1": "Bob Smith" }`;
 
-    const response = await roger.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate(
+      [{ role: 'user', content: prompt }],
+      { requestContext: stepRequestContext('recorder.identify_speakers') },
+    );
     let speakerMap: Record<string, string> = {};
 
     try {
@@ -205,7 +209,10 @@ Return a JSON object with:
 - commitments: Array of { who, what, by_when?, context }
 - mentioned_entities: Array of { name, type: "person"|"company"|"org", confidence }`;
 
-    const response = await roger.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate(
+      [{ role: 'user', content: prompt }],
+      { requestContext: stepRequestContext('recorder.extract_entities') },
+    );
     let extractedData: Record<string, unknown> = {};
 
     try {
@@ -270,7 +277,10 @@ Existing companies: ${JSON.stringify(companies)}
 
 Return JSON: { "matches": [{ "entity_name": "...", "type": "contact"|"company", "record_id": "...", "confidence": 0.95, "is_new": false }] }`;
 
-    const response = await roger.generate([{ role: 'user', content: prompt }]);
+    const response = await roger.generate(
+      [{ role: 'user', content: prompt }],
+      { requestContext: stepRequestContext('recorder.crm_match') },
+    );
     let allMatches: Array<Record<string, unknown>> = [];
 
     try {

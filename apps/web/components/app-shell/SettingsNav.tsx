@@ -7,6 +7,7 @@ import styles from './SettingsNav.module.css';
 const tabs = [
   { href: '/settings/team', label: 'Team Members' },
   { href: '/settings/integrations', label: 'Integrations' },
+  { href: '/settings/models', label: 'Models' },
 ];
 
 export function SettingsNav() {

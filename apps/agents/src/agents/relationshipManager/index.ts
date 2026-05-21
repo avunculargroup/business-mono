@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { getModelConfig } from '../../config/model.js';
+import { dynamicModelFor } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
@@ -137,7 +137,7 @@ export const della = new Agent({
   description:
     'Relationship manager. Owns CRM hygiene, contact and company records, relationship health, pipeline advice. Use for assessing a contact, proposing CRM updates, surfacing pipeline next-steps, or summarising recent interactions with someone. Input: directive plus contact/company context. Output: assessment, recommended CRM writes (as proposed_actions for approval), or pipeline advice.',
   instructions: SYSTEM_PROMPT,
-  model: getModelConfig(),
+  model: dynamicModelFor('della'),
   defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     supabase_query: supabaseQuery,

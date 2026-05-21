@@ -5,3 +5,4 @@ export * from './routines.js';
 export * from './computeNextRunAt.js';
 export * from './tz.js';
 export * from './news.js';
+export * from './modelScopes.js';
