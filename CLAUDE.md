@@ -213,6 +213,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`packages/db/src/client.ts`        |Supabase client initialisation                                                                                 |
 |`packages/db/src/rpc/`             |RPC wrappers for vector search, graph traversal                                                                |
 |`packages/shared/src/types.ts`     |Shared TypeScript types and enums                                                                              |
+|`packages/shared/src/modelScopes.ts`|Registry of every agent and AI-using workflow step that can be model-configured via `/settings/models`. Add new entries here whenever you add an agent or an LLM-calling workflow step|
 |`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
 |`infra/signal-cli/README.md`       |Sidecar deployment and registration instructions                                                               |
 |`apps/agents/evals/simon-routing/` |Routing-accuracy eval — fixtures + runner. `pnpm --filter @platform/agents test:eval`                          |
@@ -231,7 +232,7 @@ Read the relevant docs BEFORE writing code.
 |Content drafts, Content Creator agent                    |`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
 |Any agent (building, modifying, adding tools)            |`docs/agents/{agent-name}.md`                                |Triggers, capabilities, tools, schema deps, approval gates                                    |
 |Simon specifically                                       |`docs/agents/simon.md`                                       |Conflict detection flow, capacity awareness, morning briefing spec                            |
-|New agent or capability                                  |`docs/agents/simon.md` (capacity awareness)                  |Update `platform_capabilities` table when adding new capabilities                             |
+|New agent or capability                                  |`docs/agents/simon.md` (capacity awareness) + `packages/shared/src/modelScopes.ts`|Update `platform_capabilities` when adding new capabilities. Also register the agent in `MODEL_SCOPES` so it appears in `/settings/models` and picks up DB-backed model overrides|
 |Webhook handlers or external service integration         |`docs/webhooks.md`                                           |Payloads, authentication, handler logic                                                       |
 |Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth                        |
 |Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
@@ -242,6 +243,7 @@ Read the relevant docs BEFORE writing code.
 |Fastmail JMAP polling, email-to-interaction sync         |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
 |Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing/`                           |Run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy before merging |
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
+|New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
 
