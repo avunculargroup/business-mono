@@ -1714,6 +1714,33 @@ export type Database = {
           },
         ]
       }
+      model_configs: {
+        Row: {
+          created_at: string
+          id: string
+          model_id: string
+          scope_key: string
+          scope_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model_id: string
+          scope_key: string
+          scope_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model_id?: string
+          scope_key?: string
+          scope_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mvp_template_versions: {
         Row: {
           approved_by: string | null
