@@ -62,9 +62,8 @@ const newsJudgeSchema = z.object({
   shortlist: z
     .array(
       z.object({
-        index: z.number().int().nonnegative(),
-        reasoning: z.string().min(5).max(500)
-          .describe('One short sentence (under 300 characters) explaining why this candidate was selected. Be terse — no preamble, no quotes, no restating the title.'),
+        index: z.number().int().nonnegative()
+          .describe('The verbatim candidate index from the input list.'),
       }),
     )
     .min(1)
@@ -393,8 +392,8 @@ function getNewsJudge(): Agent {
         'Weigh: Australian relevance (AU regulators, AU companies, AU economy) HIGH; direct treasury or balance-sheet implications HIGH; binding regulatory action, court rulings, or tax positions MEDIUM-HIGH; novelty (genuine new information) MEDIUM. ' +
         'Penalise: PR fluff, opinion columns without new facts, repackaged announcements, price-prediction clickbait.\n\n' +
         'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
-        'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries.\n\n' +
-        'Keep each reasoning to one short sentence (under 300 characters). No preamble, no restating the title, no quotes.',
+        'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries. ' +
+        'Output ONLY the indices in the schema-defined shape — no prose, no reasoning, no code fences.',
       model: getModelConfig(),
       defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
@@ -415,39 +414,50 @@ async function rankNewsCandidates(input: {
   category: NewsCategory;
   candidates: JudgeCandidate[];
   max: number;
-}): Promise<z.infer<typeof newsJudgeSchema> | null> {
+}): Promise<{
+  data: z.infer<typeof newsJudgeSchema> | null;
+  reason: string | null;
+}> {
   const lines = input.candidates.map((c) =>
     `${c.index}. ${c.title}\n   source: ${c.source} | published: ${c.published_at ?? 'unknown'} | tavily_score: ${c.score.toFixed(2)}\n   snippet: ${c.summary.slice(0, 400)}`,
   ).join('\n\n');
 
-  const prompt =
+  const basePrompt =
     `Category: ${input.category}\n` +
     `Pick the top ${input.max} most relevant candidates from the list below. ` +
     `Each shortlist entry must use the index verbatim from the list.\n\n` +
     `Candidates:\n${lines}`;
 
-  try {
-    const response = await getNewsJudge().generate(
-      [{ role: 'user', content: prompt }],
-      {
-        structuredOutput: {
-          schema: newsJudgeSchema,
-          errorStrategy: 'strict',
+  // Two attempts: a corrective nudge on the second, mirroring the extractor.
+  let lastError: string | null = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const prompt = attempt === 1
+      ? basePrompt
+      : `${basePrompt}\n\nYour previous response did not satisfy the schema. ` +
+        `Return ONLY a valid object matching the schema now — an array of objects with an "index" field, no prose, no code fences.`;
+    try {
+      const response = await getNewsJudge().generate(
+        [{ role: 'user', content: prompt }],
+        {
+          structuredOutput: {
+            schema: newsJudgeSchema,
+            errorStrategy: 'strict',
+          },
         },
-      },
-    );
-    const obj = response.object as z.infer<typeof newsJudgeSchema> | undefined;
-    if (!obj) {
-      console.warn('[news-ingest] judge returned no object');
-      return null;
+      );
+      const obj = response.object as z.infer<typeof newsJudgeSchema> | undefined;
+      if (obj) return { data: obj, reason: null };
+      lastError = 'no_object_returned';
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
     }
-    return obj;
-  } catch (err) {
-    console.warn('[news-ingest] judge threw', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
   }
+  console.warn('[news-ingest] judge failed after retry', {
+    category: input.category,
+    candidate_count: input.candidates.length,
+    reason: lastError,
+  });
+  return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
 }
 
 async function runNewsIngest(
@@ -573,31 +583,24 @@ async function runNewsIngest(
 
   let shortlist: FreshCandidate[];
   let judgeFailed = false;
+  let judgeFailureReason: string | null = null;
   if (fresh.length === 0) {
     shortlist = [];
   } else if (fresh.length <= maxCurated) {
     shortlist = fresh;
   } else {
-    let ranked: z.infer<typeof newsJudgeSchema> | null = null;
-    try {
-      ranked = await rankNewsCandidates({
-        category,
-        candidates: fresh.map((c, i) => ({
-          index: i,
-          title: c.title,
-          source: c.source,
-          summary: c.summary,
-          score: c.score,
-          published_at: c.published_at,
-        })),
-        max: maxCurated,
-      });
-    } catch (err) {
-      judgeFailed = true;
-      console.warn('[news-ingest] judge threw — skipping run, no stories curated', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const { data: ranked, reason: rankReason } = await rankNewsCandidates({
+      category,
+      candidates: fresh.map((c, i) => ({
+        index: i,
+        title: c.title,
+        source: c.source,
+        summary: c.summary,
+        score: c.score,
+        published_at: c.published_at,
+      })),
+      max: maxCurated,
+    });
 
     if (ranked && ranked.shortlist.length > 0) {
       shortlist = ranked.shortlist
@@ -608,8 +611,10 @@ async function runNewsIngest(
     } else {
       shortlist = [];
       judgeFailed = true;
+      judgeFailureReason = rankReason ?? 'unknown';
       console.warn('[news-ingest] judge returned nothing usable — skipping run, no stories curated', {
         fresh_pool: fresh.length,
+        reason: judgeFailureReason,
       });
     }
   }
@@ -721,10 +726,12 @@ async function runNewsIngest(
     extraction_failures: extractionFailures,
     failed_urls: failedUrls,
     judge_failed: judgeFailed,
+    judge_failure_reason: judgeFailureReason ?? undefined,
   };
 
+  const judgeFailSuffix = judgeFailureReason ? ` (${judgeFailureReason})` : '';
   const summaryLine = judgeFailed
-    ? `No ${category} stories curated this run — the ranking judge failed; ${fresh.length} fresh candidates left unranked from a pool of ${tavilyCandidates.length}.`
+    ? `No ${category} stories curated this run — the ranking judge failed${judgeFailSuffix}; ${fresh.length} fresh candidates left unranked from a pool of ${tavilyCandidates.length}.`
     : extractionFailures > 0
       ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`
       : `Stored ${itemsStored} new ${category} articles (${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`;

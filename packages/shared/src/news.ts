@@ -73,4 +73,6 @@ export interface NewsIngestResult {
   // True when the LLM judge call failed or returned nothing — the run curated
   // zero stories by design rather than falling back to raw Tavily ranking.
   judge_failed?: boolean;
+  // Short reason captured when judge_failed=true, for operator diagnostics.
+  judge_failure_reason?: string;
 }
