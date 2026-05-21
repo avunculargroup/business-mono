@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { getModelConfig } from '../../config/model.js';
+import { dynamicModelFor } from '../../config/model.js';
 import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 
@@ -29,7 +29,7 @@ export const petra = new Agent({
   description:
     'Project manager. Risk identification across the task and project portfolio — overdue, blocked, stale, deadline-approaching, workload-concentrated. Use to ask about portfolio status, risks, or to reason about a specific task/project. Note: task creation flows go through the PM workflow (triggered by the pm listener), not direct delegation. Input: directive plus relevant task/project ids. Output: ranked risk list or status answer in JSON.',
   instructions: SYSTEM_PROMPT,
-  model: getModelConfig(),
+  model: dynamicModelFor('petra'),
   defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     supabase_query: supabaseQuery,

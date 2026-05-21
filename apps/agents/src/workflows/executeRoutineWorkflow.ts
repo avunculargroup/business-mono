@@ -30,7 +30,7 @@ import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
-import { getModelConfig } from '../config/model.js';
+import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
 
@@ -218,9 +218,10 @@ async function runResearchDigest(
     urgency: 'async',
   };
 
-  const response = await rex.generate([
-    { role: 'user', content: JSON.stringify(brief) },
-  ]);
+  const response = await rex.generate(
+    [{ role: 'user', content: JSON.stringify(brief) }],
+    { requestContext: stepRequestContext('executeRoutine.research_digest') },
+  );
 
   const parsed = extractResearchResult(response.text);
   const summary = parsed?.summary;
@@ -278,9 +279,10 @@ async function runMonitorChange(
     urgency: 'async',
   };
 
-  const response = await rex.generate([
-    { role: 'user', content: JSON.stringify(brief) },
-  ]);
+  const response = await rex.generate(
+    [{ role: 'user', content: JSON.stringify(brief) }],
+    { requestContext: stepRequestContext('executeRoutine.monitor_change') },
+  );
 
   const parsed = extractResearchResult(response.text);
   const monitor = parsed?.monitor;
@@ -322,7 +324,7 @@ function getNewsExtractor(): Agent {
         'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
         'Set bitcoin_relevance=false for any article that does not meaningfully touch Bitcoin, crypto, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context — even if the article was returned by a Bitcoin-themed search query. ' +
         'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
-      model: getModelConfig(),
+      model: dynamicModelFor('executeRoutine.news_extractor'),
       defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
   }
@@ -394,7 +396,7 @@ function getNewsJudge(): Agent {
         'Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. Be neutral.\n\n' +
         'Order entries from most to least relevant. Use the candidate indices verbatim. Return at most the requested number of entries. ' +
         'Output ONLY the indices in the schema-defined shape — no prose, no reasoning, no code fences.',
-      model: getModelConfig(),
+      model: dynamicModelFor('executeRoutine.news_judge'),
       defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
     });
   }

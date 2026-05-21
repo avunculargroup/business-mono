@@ -2,6 +2,7 @@ import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { petra } from './agent.js';
+import { stepRequestContext } from '../../config/model.js';
 
 // Schemas Petra returns via structuredOutput. Replaces the previous pattern
 // of asking for JSON in the prompt and regex-extracting it from response.text.
@@ -82,6 +83,7 @@ requires_approval should be true only for the first 10 task creations in each pr
     const response = await petra.generate(
       [{ role: 'user', content: prompt }],
       {
+        requestContext: stepRequestContext('pm.triage_task'),
         structuredOutput: {
           schema: triageDecisionSchema,
           errorStrategy: 'fallback',
@@ -218,6 +220,7 @@ Identify risks across the categories in your system prompt.`;
     const response = await petra.generate(
       [{ role: 'user', content: prompt }],
       {
+        requestContext: stepRequestContext('pm.risk_scan'),
         structuredOutput: {
           schema: z.array(riskSchema),
           errorStrategy: 'fallback',
