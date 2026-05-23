@@ -1,0 +1,40 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Typecheck, lint, and unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      # Unit + integration tests for apps/agents. All external services
+      # (Supabase, Anthropic, OpenAI, Signal, Fastmail, Telnyx, Zoom,
+      # Deepgram) are mocked at the module boundary, so no secrets are
+      # required. LLM-touching evals (apps/agents/test:eval) are NOT run
+      # here — invoke them on-demand locally.
+      - name: Test
+        run: pnpm test

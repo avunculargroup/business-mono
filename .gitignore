@@ -9,6 +9,9 @@ build/
 .mastra/
 *.tsbuildinfo
 
+# Test coverage
+coverage/
+
 # Environment
 .env
 .env.local

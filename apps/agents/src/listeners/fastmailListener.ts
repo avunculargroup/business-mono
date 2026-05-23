@@ -337,7 +337,7 @@ async function processEmail(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isExcluded(
+export function isExcluded(
   emailAddress: string,
   exclusions: Array<{ type: string; value: string }>,
 ): boolean {
@@ -388,7 +388,7 @@ async function findOrCreateContact(
   return { contactId: (created as { id: string }).id, isNew: true };
 }
 
-function parseDisplayName(name?: string): { firstName: string; lastName: string } {
+export function parseDisplayName(name?: string): { firstName: string; lastName: string } {
   if (!name || !name.trim()) return { firstName: '', lastName: '' };
   const trimmed = name.trim();
   const spaceIdx = trimmed.indexOf(' ');
