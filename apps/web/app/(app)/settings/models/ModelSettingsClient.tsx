@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
 import type { ModelOption, ModelScopeType } from '@platform/shared';
 import { upsertModelConfig, resetModelConfig } from '@/app/actions/modelConfigs';
+import { ModelCombobox } from './ModelCombobox';
 import styles from './modelSettings.module.css';
 
 export interface ScopeRow {
@@ -17,12 +18,20 @@ export interface ScopeRow {
   updatedAt: string | null;
 }
 
+export interface CatalogModel {
+  id: string;
+  name: string;
+  contextLength: number | null;
+}
+
 interface Props {
   rows: ScopeRow[];
   defaultModel: string;
   popularModels: ModelOption[];
+  catalogModels: CatalogModel[];
   workflowLabels: Record<string, string>;
   loadError: string | null;
+  catalogError: string | null;
 }
 
 function fmtDate(iso: string | null): string {
@@ -40,8 +49,10 @@ export function ModelSettingsClient({
   rows,
   defaultModel,
   popularModels,
+  catalogModels,
   workflowLabels,
   loadError,
+  catalogError,
 }: Props) {
   const agentRows = rows.filter((r) => r.type === 'agent');
   const stepRows = rows.filter((r) => r.type === 'workflow_step');
@@ -60,10 +71,15 @@ export function ModelSettingsClient({
     <div className={styles.container}>
       <section className={styles.intro}>
         <p className={styles.introText}>
-          Set the OpenRouter model used by each agent and workflow step. Changes take effect within ~30 seconds — the agent server caches lookups briefly. Leave a row at <span className={styles.code}>Default</span> to inherit the platform default (<span className={styles.code}>{defaultModel}</span>).
+          Pick the OpenRouter model used by each agent and workflow step. Changes take effect within ~30 seconds — the agent server caches lookups briefly. Use <span className={styles.code}>Use default</span> on a row to inherit the platform default (<span className={styles.code}>{defaultModel}</span>).
         </p>
         {loadError && (
           <p className={styles.warning}>Couldn't load current settings: {loadError}</p>
+        )}
+        {catalogError && (
+          <p className={styles.warning}>
+            {catalogError} — showing curated list only. Reload to retry.
+          </p>
         )}
       </section>
 
@@ -81,6 +97,7 @@ export function ModelSettingsClient({
               row={row}
               defaultModel={defaultModel}
               popularModels={popularModels}
+              catalogModels={catalogModels}
               fallbackLabel={null}
             />
           ))}
@@ -104,6 +121,7 @@ export function ModelSettingsClient({
                 row={row}
                 defaultModel={defaultModel}
                 popularModels={popularModels}
+                catalogModels={catalogModels}
                 fallbackLabel={
                   row.fallbackAgent
                     ? agentLabelsByKey.get(row.fallbackAgent) ?? row.fallbackAgent
@@ -122,6 +140,7 @@ interface ScopeListItemProps {
   row: ScopeRow;
   defaultModel: string;
   popularModels: ModelOption[];
+  catalogModels: CatalogModel[];
   fallbackLabel: string | null;
 }
 
@@ -129,6 +148,7 @@ function ScopeListItem({
   row,
   defaultModel,
   popularModels,
+  catalogModels,
   fallbackLabel,
 }: ScopeListItemProps) {
   const [value, setValue] = useState(row.modelId ?? '');
@@ -171,7 +191,6 @@ function ScopeListItem({
     });
   }
 
-  const listId = `models-${row.key.replace(/\./g, '-')}`;
   const effectivePlaceholder = fallbackLabel
     ? `Default (inherits from ${fallbackLabel})`
     : `Default (${defaultModel})`;
@@ -193,24 +212,14 @@ function ScopeListItem({
         <p className={styles.itemDesc}>{row.description}</p>
 
         <div className={styles.controls}>
-          <input
-            type="text"
-            className={styles.input}
-            list={listId}
-            placeholder={effectivePlaceholder}
+          <ModelCombobox
             value={value}
-            onChange={(e) => setValue(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            aria-label={`Model id for ${row.label}`}
+            onChange={setValue}
+            placeholder={effectivePlaceholder}
+            catalog={catalogModels}
+            popular={popularModels}
+            ariaLabel={`Model for ${row.label}`}
           />
-          <datalist id={listId}>
-            {popularModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </datalist>
           <Button
             variant="primary"
             size="sm"
