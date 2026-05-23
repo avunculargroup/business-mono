@@ -28,6 +28,12 @@ Transform tasks into verifiable goals before implementing:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - For multi-step tasks, state a brief plan with a verify step for each.
 
+### Run Tests While Developing
+- After any change to `apps/agents`, run `pnpm --filter @platform/agents test` before reporting work as done. The suite is fully mocked, runs in ~2s, and needs no secrets.
+- Also run `pnpm --filter @platform/agents typecheck` before submitting — both checks are gated by the GitHub Actions PR workflow (`.github/workflows/test.yml`), so red here = red on the PR.
+- When you add a new tool, listener helper, webhook, or pure utility, add a `*.test.ts` next to it. Reuse `test/factories.ts` and `test/mocks/supabase.ts` rather than building one-off fixtures.
+- LLM-touching evals (`pnpm --filter @platform/agents test:eval`) are NOT run in CI. Run them locally after changes to Simon's routing, specialist registrations, or any agent's system prompt.
+
 -----
 
 ## Monorepo Structure
@@ -35,7 +41,8 @@ Transform tasks into verifiable goals before implementing:
 ```
 ├── apps/
 │   ├── agents/          # Mastra AI agents server (Railway)
-│   │   └── evals/       # Routing-accuracy fixtures + runner (pnpm test:eval)
+│   │   ├── evals/       # LLM-touching evals (runEvals + scorers) — `pnpm test:eval`
+│   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
 │   └── web/             # Next.js frontend (Vercel) — future
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
@@ -216,7 +223,9 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`packages/shared/src/modelScopes.ts`|Registry of every agent and AI-using workflow step that can be model-configured via `/settings/models`. Add new entries here whenever you add an agent or an LLM-calling workflow step|
 |`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
 |`infra/signal-cli/README.md`       |Sidecar deployment and registration instructions                                                               |
-|`apps/agents/evals/simon-routing/` |Routing-accuracy eval — fixtures + runner. `pnpm --filter @platform/agents test:eval`                          |
+|`apps/agents/vitest.config.ts`     |Fast unit/integration test suite for the agent server. `pnpm test` (root) or `pnpm --filter @platform/agents test`. All external services are mocked — no secrets required.|
+|`apps/agents/test/`                |Shared Vitest helpers — `setup.ts` (env defaults), `mocks/supabase.ts` (chainable query-builder fake), `factories.ts` (webhook + JMAP + activity payload builders). Reuse these before inventing new fixtures.|
+|`apps/agents/evals/`               |LLM-touching evals via Mastra's `runEvals` + `createScorer`. `pnpm --filter @platform/agents test:eval` (real LLM, on-demand, not in CI). Add new `*.eval.ts` files alongside `simon-routing.eval.ts`; share scorers via `evals/scorers/`.|
 
 -----
 
@@ -241,7 +250,7 @@ Read the relevant docs BEFORE writing code.
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 |Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
 |Fastmail JMAP polling, email-to-interaction sync         |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
-|Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing/`                           |Run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy before merging |
+|Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing.eval.ts` + `apps/agents/evals/simon-routing/fixtures.json`|Add a fixture row, then run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy (real LLM) before merging|
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 |New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|
 
