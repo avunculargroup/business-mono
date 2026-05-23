@@ -26,7 +26,7 @@ const CONTENT_TYPE_KEYWORDS: Array<[string, string]> = [
   ['email', 'email'],
 ];
 
-function inferContentType(message: string): string {
+export function inferContentType(message: string): string {
   const lower = message.toLowerCase();
   for (const [keyword, type] of CONTENT_TYPE_KEYWORDS) {
     if (lower.includes(keyword)) return type;
@@ -34,7 +34,7 @@ function inferContentType(message: string): string {
   return 'email';
 }
 
-function parseContentOutput(text: string): { title: string | null; body: string } {
+export function parseContentOutput(text: string): { title: string | null; body: string } {
   const match = text.match(
     /<content_output>\s*<title>([\s\S]*?)<\/title>\s*<body>([\s\S]*?)<\/body>\s*<\/content_output>/
   );

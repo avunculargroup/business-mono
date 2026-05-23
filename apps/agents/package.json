@@ -9,7 +9,10 @@
     "start": "node .mastra/output/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test:eval": "tsx evals/simon-routing/run.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:eval": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.74",
@@ -31,8 +34,10 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
     "mastra": "^1.8.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.5"
+    "typescript": "^5.5",
+    "vitest": "^2.1.9"
   }
 }
