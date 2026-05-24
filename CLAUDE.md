@@ -43,7 +43,7 @@ Transform tasks into verifiable goals before implementing:
 │   ├── agents/          # Mastra AI agents server (Railway)
 │   │   ├── evals/       # LLM-touching evals (runEvals + scorers) — `pnpm test:eval`
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
-│   └── web/             # Next.js frontend (Vercel) — future
+│   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
 │   ├── shared/          # Shared types, constants, utilities
@@ -84,7 +84,7 @@ Transform tasks into verifiable goals before implementing:
 
 ## Tech Stack
 
-- **Frontend**: Next.js (`apps/web`) → Vercel
+- **Frontend**: Next.js 15 App Router (`apps/web`) → Vercel. Authenticated shell at `app/(app)/` with feature pages (activity, crm, projects, tasks, routines, content, simon, settings, etc.). Server actions in `apps/web/app/actions/` (e.g. `approvals.ts`, `modelConfigs.ts`, `fastmail.ts`).
 - **Agent Server**: Mastra AI (`apps/agents`) → Railway — TypeScript, ES2022 modules
 - **Database**: Supabase (Postgres + pgvector + RLS)
 - **Mastra storage**: Separate Postgres for thread memory, working memory, semantic recall, and the native scheduler — connection string is `MASTRA_DB_URL` (Railway Postgres recommended; Supabase direct works only with the IPv4 add-on). Distinct from the Supabase JS client used for app data.
@@ -95,7 +95,7 @@ Transform tasks into verifiable goals before implementing:
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
 - **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions) — used for both knowledge-base vectors AND Simon's semantic-recall memory
-- **Models**: `anthropic/claude-sonnet-4-5` for all agents
+- **Models**: `anthropic/claude-sonnet-4-5` is the default (`packages/shared/src/constants.ts`). Per-agent and per-workflow-step overrides are stored in the `model_configs` table and editable from `/settings/models`. Available choices come from `POPULAR_MODELS` in `packages/shared/src/modelScopes.ts`.
 
 ### TypeScript config (all packages)
 
@@ -130,6 +130,22 @@ Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
 1. **Via database events**: Some agent outputs trigger other agents implicitly (e.g. Recorder proposes tasks → PM picks them up from `agent_activity`).
 1. **Read-only knowledge queries**: Any agent can query the Archivist's knowledge base directly. The only permitted direct cross-agent call.
 
+### Workflows and listeners
+
+**Workflows** (registered in `apps/agents/src/mastra/index.ts`):
+- `recorderWorkflow` — transcription + entity extraction
+- `pmWorkflow` — task triage + risk scan
+- `executeRoutineWorkflow` — cron-driven routines from the `routines` table
+
+All other agents (Simon, Archivist, BA, Content Creator, Researcher, RM) are pure agents — no workflow file.
+
+**Listeners** (`apps/agents/src/listeners/`):
+- `webDirectivesListener` — Supabase Realtime, web UI directives
+- `signalListener` — polling loop for Simon's Signal number
+- `contentCreatorListener` — persists Charlie's draft outputs
+- `pmListener` — picks up Petra's proposed actions
+- `fastmailListener` — JMAP polling every 5 min, dispatches to Della
+
 ### Capacity awareness
 
 Simon checks for gaps before routing any directive: no agent for the task, missing tool on an existing agent, workload overload, or broken capability chain. When a gap is found, Simon surfaces what CAN/CANNOT be done and recommends alternatives. Gaps are logged to `capacity_gaps` and included in the morning briefing. See `docs/agents/simon.md` for the full spec.
@@ -156,6 +172,8 @@ Simon checks for gaps before routing any directive: no agent for the task, missi
 ## Approval Philosophy
 
 Every agent starts with maximum guardrails. Write operations graduate: one-at-a-time → batch approval → autonomous (notified after). Read-only is always auto-approved. Emails and public content are ALWAYS human-approved — no graduation.
+
+Implementation: approval state lives in `agent_activity.status`; the approve/reject handler is `apps/web/app/actions/approvals.ts`. PM's `requires_approval` boolean on tasks is the per-row gate.
 
 -----
 
@@ -201,6 +219,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 - **Env vars**: SCREAMING_SNAKE_CASE, prefixed by service (`TELNYX_API_KEY`)
 - **Railway internal URLs**: `http://{service-name}.railway.internal:{port}`
 - **Shared types**: live in `packages/shared` — do NOT duplicate between apps
+- **Agent file paths vs exports**: doc specs use kebab-case (`docs/agents/content-creator.md`), code directories use camelCase (`apps/agents/src/agents/contentCreator/`), and the exported agent variable uses the persona name (`charlie`). Subagent delegation tools auto-generate as `agent-<persona>` (e.g. `agent-charlie`).
 
 -----
 
@@ -218,7 +237,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`docs/agents/*.md`                 |Individual agent specifications                                                                                |
 |`packages/db/src/types/database.ts`|Generated Supabase types                                                                                       |
 |`packages/db/src/client.ts`        |Supabase client initialisation                                                                                 |
-|`packages/db/src/rpc/`             |RPC wrappers for vector search, graph traversal                                                                |
+|`packages/db/src/rpc/vectorSearch.ts`, `fulltextSearch.ts`, `graphTraverse.ts`, `newsSearch.ts`|Knowledge query wrappers — use these instead of writing raw RPC calls                              |
 |`packages/shared/src/types.ts`     |Shared TypeScript types and enums                                                                              |
 |`packages/shared/src/modelScopes.ts`|Registry of every agent and AI-using workflow step that can be model-configured via `/settings/models`. Add new entries here whenever you add an agent or an LLM-calling workflow step|
 |`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
@@ -258,15 +277,11 @@ Read the relevant docs BEFORE writing code.
 
 ### Source of truth boundaries
 
-|Topic                                   |Source of truth                    |
-|----------------------------------------|-----------------------------------|
-|What the platform looks like            |`bts-design` skill                 |
-|What the platform sounds like           |`docs/brand-voice.md`              |
-|CSS token names and values              |`bts-design` skill                 |
-|Banned words in copy                    |`docs/brand-voice.md`              |
-|Component states and specs              |`bts-design` skill                 |
-|Bitcoin terminology rules               |`docs/brand-voice.md`              |
-|Visual identity (colours, type, spacing)|`bts-design` skill                 |
-|Brand personality and tone              |`docs/brand-voice.md`              |
+|Topic                                            |Source of truth                                            |
+|-------------------------------------------------|-----------------------------------------------------------|
+|Visual identity, CSS tokens, component specs     |`bts-design` skill                                         |
+|Brand voice, banned words, Bitcoin terminology   |`docs/brand-voice.md`                                      |
+|Database schema                                  |`supabase/migrations/` (execution), `schema.sql` (reference)|
+|Per-agent / per-step model selection             |`model_configs` table via `/settings/models`               |
 
 If `docs/brand-voice.md` contains visual identity values (colours, hex codes), treat them as illustrative reference only — the implementation spec lives in the `bts-design` skill.
