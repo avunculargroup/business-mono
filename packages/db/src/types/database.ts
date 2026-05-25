@@ -1927,6 +1927,56 @@ export type Database = {
           },
         ]
       }
+      news_sources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          feed_url: string
+          id: string
+          is_active: boolean
+          last_error: string | null
+          last_scanned_at: string | null
+          last_status: string | null
+          name: string
+          site_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          feed_url: string
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_scanned_at?: string | null
+          last_status?: string | null
+          name: string
+          site_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          feed_url?: string
+          id?: string
+          is_active?: boolean
+          last_error?: string | null
+          last_scanned_at?: string | null
+          last_status?: string | null
+          name?: string
+          site_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_sources_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pain_point_log: {
         Row: {
           change_type: string

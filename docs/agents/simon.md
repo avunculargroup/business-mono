@@ -122,13 +122,14 @@ Mastra built-in memory + `agent_conversations` table. Thread-per-Signal-chat for
 - `conflict_check` — check agent_activity for overlapping workflows
 - `capacity_check` — query platform_capabilities and v_open_tasks for gap detection
 - `log_capacity_gap` — write to capacity_gaps when a gap is identified
+- `manage_news_sources` — list/add/enable/disable/remove `news_sources` (publications scanned daily for new articles). For Substack blogs, the feed is derived from the site URL; other publications need an RSS/Atom `feed_url`.
 - `notify_specialist` — dispatch work to any specialist agent
 - `log_activity` — write to agent_activity
 
 ## Schema Dependencies
 
 **Reads**: all views (`v_open_tasks`, `v_recent_interactions`, `v_contacts_overview`), `reminders`, `agent_conversations`, `agent_activity`, `platform_capabilities`, `capacity_gaps`
-**Writes**: `agent_activity`, `reminders`, `agent_conversations`, `capacity_gaps`
+**Writes**: `agent_activity`, `reminders`, `agent_conversations`, `capacity_gaps`, `news_sources`
 **Delegates writes to**: all specialist agents via their tools
 
 ## Approval Gates

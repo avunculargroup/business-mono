@@ -9,6 +9,7 @@ import { signalSend, signalReceive } from '../../tools/signal.js';
 import { logActivity } from '../../tools/activity.js';
 import { editSimonProfile } from '../../tools/edit-simon-profile.js';
 import { getSimonProfile } from '../../tools/get-simon-profile.js';
+import { manageNewsSources } from '../../tools/newsSources.js';
 import {
   conflictCheck,
   capacityCheck,
@@ -117,6 +118,9 @@ After the tool runs, check both the success and verified fields:
 To check the current profile state at any time, use the get_simon_profile tool. Use it before updating to see current state, or after updating to verify changes took effect.
 
 For agent-proposed changes, present as an approval card first and wait for explicit human approval before executing.
+
+### 11a. News sources
+When a director asks to add, list, enable/disable, or remove a news source (a publication to watch, e.g. "add Bitcoin Magazine as a news source" or "watch this Substack"), use the manage_news_sources tool. For a Substack blog, pass site_url and the feed is derived automatically; for other publications, ask for or pass the RSS/Atom feed_url. These sources are scanned daily and new articles land in the news feed. Confirm what changed (e.g. "Added Bitcoin Magazine to the news sources").
 
 ### 11. Health check
 When a director asks about agent status, system health, or whether agents are working, call agent_health_check. Use deep: true only when specifically asked for a thorough check or when the quick check shows concerning results (multiple silent or error-prone agents).
@@ -253,6 +257,7 @@ export const simon = new Agent({
     edit_simon_profile: editSimonProfile,
     get_simon_profile: getSimonProfile,
     agent_health_check: agentHealthCheck,
+    manage_news_sources: manageNewsSources,
   },
   outputProcessors: [
     new TokenLimiterProcessor({ limit: 80_000 }),

@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-05-25 — Add `news_sources` table and `news_source_scan` routine
+
+**Migration:** `20260525000000_add_news_sources.sql`
+
+- **`news_sources` table** — a user-curated list of publications to watch (e.g. Bitcoin Magazine, macro Substack blogs), managed from the web app (`/news/sources`) or by Simon (the `manage_news_sources` tool). Each row stores a display `name`, optional `site_url`, the `feed_url` (RSS/Atom, `UNIQUE`) actually scanned, an `is_active` flag, and per-source scan status (`last_scanned_at`, `last_status`, `last_error`). Distinct from the keyword-search `news_ingest` routines — sources name specific publications rather than search queries.
+- **`routines.action_type` constraint widened** to include `'news_source_scan'`. The new handler (`runNewsSourceScan` in `executeRoutineWorkflow.ts`) reads every active source's feed, keeps items within a lookback window, dedupes (URL + semantic) against `news_items`, enriches each via the existing extractor (which now also classifies the article's `category`), and inserts into `news_items`. Unlike `news_ingest`, it applies no LLM-judge ranking and no relevance drop — the user hand-picked the source.
+- **Seed** — one daily `'News: Source scan'` routine (`agent_name='rex'`, 06:30 Australia/Melbourne). It no-ops until sources are added.
+
+---
+
 ## 2026-05-16 — Add `extraction_failed` status to `news_items`
 
 **Migration:** `20260516000000_news_items_extraction_failed_status.sql`
