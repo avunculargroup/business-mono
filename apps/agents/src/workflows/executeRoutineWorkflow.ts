@@ -30,6 +30,7 @@ import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
+import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
@@ -462,6 +463,11 @@ async function rankNewsCandidates(input: {
   return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
 }
 
+// Cosine-similarity threshold above which two news candidates are treated as
+// the same underlying story (cross-source duplicate). Applied against both the
+// database and other candidates within the same ingest run.
+const NEWS_DEDUP_THRESHOLD = 0.88;
+
 async function runNewsIngest(
   routine: z.infer<typeof routineSchema>,
 ): Promise<RoutineOutcome> {
@@ -555,15 +561,27 @@ async function runNewsIngest(
       });
       const dedupEmbedding = dedupEmbRes.data[0]?.embedding ?? null;
       if (dedupEmbedding) {
+        // Duplicate of a story already stored in the database.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: near } = await (supabase.rpc as any)('vector_search_news', {
           query_embedding: dedupEmbedding,
-          match_threshold: 0.95,
+          match_threshold: NEWS_DEDUP_THRESHOLD,
           match_count: 1,
           filter_category: category,
           filter_days: 3,
         });
         if (near && near.length > 0) {
+          itemsSkippedDuplicate += 1;
+          continue;
+        }
+
+        // Duplicate of a candidate already accepted earlier in this same run —
+        // neither is in the DB yet, so the check above can't catch it.
+        const isBatchDuplicate = fresh.some(
+          (f) => f.dedupEmbedding !== null &&
+            cosineSimilarity(dedupEmbedding, f.dedupEmbedding) >= NEWS_DEDUP_THRESHOLD,
+        );
+        if (isBatchDuplicate) {
           itemsSkippedDuplicate += 1;
           continue;
         }
