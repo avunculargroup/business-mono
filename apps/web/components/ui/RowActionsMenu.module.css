@@ -9,15 +9,13 @@
   background: transparent;
   color: var(--color-text-tertiary);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s;
 }
 
 .trigger:hover,
 .trigger:focus-visible {
   background: var(--color-surface-subtle);
   color: var(--color-text-primary);
-  opacity: 1;
 }
 
 .trigger:focus-visible {
@@ -25,11 +23,6 @@
   outline-offset: 2px;
 }
 
-/* Show trigger when row is hovered — parent row must add a class */
-tr:hover .trigger,
-tr:focus-within .trigger {
-  opacity: 1;
-}
 
 .menu {
   position: fixed;
