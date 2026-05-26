@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
 import styles from './RowActionsMenu.module.css';
 
@@ -74,7 +75,7 @@ export function RowActionsMenu({ actions }: RowActionsMenuProps) {
       >
         <MoreHorizontal size={16} strokeWidth={1.5} />
       </button>
-      {open && position && (
+      {open && position && createPortal(
         <div
           ref={menuRef}
           className={styles.menu}
@@ -95,7 +96,8 @@ export function RowActionsMenu({ actions }: RowActionsMenuProps) {
               {action.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
