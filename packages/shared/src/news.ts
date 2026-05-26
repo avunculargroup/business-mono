@@ -35,6 +35,64 @@ export interface NewsIngestionConfig {
   search_depth?: 'basic' | 'advanced';
 }
 
+// Derive the feed URL the scan routine reads. A direct feedUrl always wins.
+// Otherwise, Substack publications expose their feed at <site>/feed, so we can
+// derive it from the homepage; other sites must supply feedUrl explicitly.
+// Returns null when no feed can be determined.
+export function resolveFeedUrl(
+  siteUrl: string | undefined | null,
+  feedUrl: string | undefined | null,
+): string | null {
+  const feed = feedUrl?.trim();
+  if (feed) return feed;
+  const site = siteUrl?.trim().replace(/\/+$/, '');
+  if (!site) return null;
+  try {
+    if (/(^|\.)substack\.com$/i.test(new URL(site).hostname)) {
+      return `${site}/feed`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+// A user-curated publication scanned via its RSS/Atom feed. Managed from the
+// web app (/news/sources) or by Simon. Distinct from the keyword-search
+// NewsIngestionConfig — sources name specific publications to watch.
+export interface NewsSourceRecord {
+  id: string;
+  name: string;
+  site_url: string | null;
+  feed_url: string;
+  is_active: boolean;
+  last_scanned_at: string | null;
+  last_status: 'success' | 'failed' | null;
+  last_error: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// action_config shape for a 'news_source_scan' routine. The routine scans every
+// active news_sources row, so config holds only per-run limits.
+export interface NewsSourceScanConfig {
+  // Max feed items to consider per source per run (default 10).
+  max_items_per_source?: number;
+  // Only consider feed items published within this many days (default 3).
+  lookback_days?: number;
+}
+
+export interface NewsSourceScanResult {
+  sources_scanned: number;
+  items_found: number;
+  items_stored: number;
+  items_skipped_duplicate: number;
+  extraction_failures?: number;
+  // Names of sources whose feed could not be fetched/parsed this run.
+  failed_sources?: string[];
+}
+
 export interface NewsItemRecord {
   id: string;
   title: string;

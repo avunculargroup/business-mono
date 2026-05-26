@@ -13,10 +13,12 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //  - research_digest: Rex pulls the latest on a topic; full digest is surfaced.
 //  - monitor_change: Rex detects whether the topic's state has changed vs last run.
 //  - news_ingest: Rex fetches fresh news articles into the news_items feed.
+//  - news_source_scan: Rex scans the user-curated news_sources feeds for new articles.
 export const RoutineActionType = {
-  RESEARCH_DIGEST: 'research_digest',
-  MONITOR_CHANGE:  'monitor_change',
-  NEWS_INGEST:     'news_ingest',
+  RESEARCH_DIGEST:   'research_digest',
+  MONITOR_CHANGE:    'monitor_change',
+  NEWS_INGEST:       'news_ingest',
+  NEWS_SOURCE_SCAN:  'news_source_scan',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 

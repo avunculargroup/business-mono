@@ -53,8 +53,9 @@ const workNav = [
   { href: '/decks', label: 'Decks', icon: Presentation },
   { href: '/routines', label: 'Routines', icon: Clock },
   { href: '/news', label: 'News feed', icon: Rss, children: [
-    { href: '/news',       label: 'Feed'          },
-    { href: '/news/daily', label: 'Daily digest'  },
+    { href: '/news',         label: 'Feed'          },
+    { href: '/news/daily',   label: 'Daily digest'  },
+    { href: '/news/sources', label: 'Sources'       },
   ]},
   { href: '/discovery', label: 'Discovery', icon: Search, children: [
     { href: '/crm/interviews', label: 'Interviews'  },
@@ -112,8 +113,9 @@ const moreNav: MoreNavSection[] = [
       { href: '/decks',     label: 'Decks',     icon: Presentation },
       { href: '/routines',  label: 'Routines',  icon: Clock       },
       { href: '/news', label: 'News feed', icon: Rss, children: [
-        { href: '/news',       label: 'Feed'         },
-        { href: '/news/daily', label: 'Daily digest' },
+        { href: '/news',         label: 'Feed'         },
+        { href: '/news/daily',   label: 'Daily digest' },
+        { href: '/news/sources', label: 'Sources'      },
       ]},
       { href: '/discovery', label: 'Discovery', icon: Search, children: [
         { href: '/crm/interviews',        label: 'Interviews' },

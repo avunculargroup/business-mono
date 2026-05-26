@@ -58,6 +58,7 @@ function formatActionLabel(actionType: string): string {
   if (actionType === 'research_digest') return 'Research digest';
   if (actionType === 'monitor_change') return 'Monitor change';
   if (actionType === 'news_ingest') return 'News ingest';
+  if (actionType === 'news_source_scan') return 'Source scan';
   return actionType;
 }
 

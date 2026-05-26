@@ -25,12 +25,16 @@ import type {
   NewsIngestionConfig,
   NewsCategory,
   NewsIngestResult,
+  NewsSourceScanConfig,
+  NewsSourceScanResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import Parser from 'rss-parser';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
+import { normalizeFeedItems } from '../lib/newsFeed.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
@@ -47,6 +51,8 @@ const routineSchema = z.object({
 });
 
 const newsExtractionSchema = z.object({
+  category: z.enum(['regulatory', 'corporate', 'macro', 'international'])
+    .describe('The single best-fit category: "regulatory" (ASIC/ATO/APRA/government policy), "corporate" (ASX/company treasury announcements), "macro" (RBA rates, AUD, inflation), or "international" (US/EU/global developments with AU implications).'),
   summary: z.string().min(40).max(500)
     .describe('A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
   key_points: z.array(z.string()).min(2).max(7)
@@ -157,6 +163,8 @@ const runRoutine = createStep({
           outcomes.push(await runMonitorChange(routine));
         } else if (routine.action_type === 'news_ingest') {
           outcomes.push(await runNewsIngest(routine));
+        } else if (routine.action_type === 'news_source_scan') {
+          outcomes.push(await runNewsSourceScan(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -335,18 +343,24 @@ function getNewsExtractor(): Agent {
 async function extractNewsMetadata(input: {
   title: string;
   source: string;
-  category: NewsCategory;
+  // When provided, a category hint the caller already knows (keyword routine).
+  // When omitted (source scan), the extractor classifies the article itself.
+  category?: NewsCategory;
   content: string;
 }): Promise<{
   data: z.infer<typeof newsExtractionSchema> | null;
   reason: string | null;
 }> {
+  const categoryLine = input.category
+    ? `Category hint: ${input.category}\n`
+    : `Classify this article into one of: regulatory, corporate, macro, international.\n`;
   const basePrompt =
-    `Category hint: ${input.category}\n` +
+    categoryLine +
     `Title: ${input.title}\n` +
     `Source: ${input.source}\n\n` +
     `Article:\n${input.content}\n\n` +
-    `Extract: summary (2–3 sentences, 40–500 chars), key_points (2–7 factual bullets), ` +
+    `Extract: category (best-fit of the four values), summary (2–3 sentences, 40–500 chars), ` +
+    `key_points (2–7 factual bullets), ` +
     `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
     `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
 
@@ -767,6 +781,266 @@ async function runNewsIngest(
     time_of_day: routine.time_of_day, timezone: routine.timezone,
     status: 'success', result, error: null,
     news_ingest_result: ingestResult,
+  };
+}
+
+// Shared RSS/Atom parser. rss-parser normalises both formats to a common
+// item shape with link/title/isoDate/contentSnippet/content fields.
+const rssParser = new Parser({ timeout: 20000 });
+
+async function runNewsSourceScan(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as unknown as NewsSourceScanConfig;
+  const maxPerSource = cfg.max_items_per_source ?? 10;
+  const lookbackDays = cfg.lookback_days ?? 3;
+  const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+
+  const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+
+  const baseOutcome = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'news_source_scan' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  // ── Load active sources ────────────────────────────────────────────────────
+  const { data: sources, error: sourcesError } = await supabase
+    .from('news_sources')
+    .select('id, name, feed_url')
+    .eq('is_active', true);
+
+  if (sourcesError) {
+    return {
+      ...baseOutcome,
+      status: 'failed',
+      result: null,
+      error: `Failed to load news_sources: ${sourcesError.message}`,
+    };
+  }
+
+  const activeSources = sources ?? [];
+  if (activeSources.length === 0) {
+    const result: RoutineResult = { summary: 'No active news sources configured.', sources: [] };
+    return {
+      ...baseOutcome,
+      status: 'success',
+      result,
+      error: null,
+    };
+  }
+
+  // ── Phase 1: gather feed items + record per-source scan status ──────────────
+  const seen = new Set<string>();
+  const candidates: Array<{
+    url: string;
+    title: string;
+    summary: string;
+    source: string;
+    published_at: string | null;
+  }> = [];
+  const failedSources: string[] = [];
+
+  for (const src of activeSources) {
+    const sourceId = src.id as string;
+    const sourceName = src.name as string;
+    const feedUrl = src.feed_url as string;
+    try {
+      const feed = await rssParser.parseURL(feedUrl);
+      const normalized = normalizeFeedItems(feed.items ?? [], {
+        sourceName,
+        cutoffMs: cutoff,
+        maxItems: maxPerSource,
+      });
+      for (const cand of normalized) {
+        if (seen.has(cand.url)) continue;
+        seen.add(cand.url);
+        candidates.push(cand);
+      }
+
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'success', last_error: null })
+        .eq('id', sourceId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failedSources.push(sourceName);
+      console.warn('[news-source-scan] feed failed', { source: sourceName, feed_url: feedUrl, error: message });
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'failed', last_error: message.slice(0, 500) })
+        .eq('id', sourceId);
+    }
+  }
+
+  console.log('[news-source-scan] gathered', candidates.length, 'candidates from', activeSources.length, 'sources');
+
+  // ── Dedup (URL + semantic), mirroring runNewsIngest phase 1 ─────────────────
+  let itemsSkippedDuplicate = 0;
+  type FreshCandidate = (typeof candidates)[number] & { dedupEmbedding: number[] | null };
+  const fresh: FreshCandidate[] = [];
+
+  if (candidates.length > 0) {
+    const { data: existing } = await supabase
+      .from('news_items')
+      .select('url')
+      .in('url', candidates.map((c) => c.url));
+    const existingUrls = new Set((existing ?? []).map((r) => r.url as string));
+    const urlFresh = candidates.filter((c) => !existingUrls.has(c.url));
+    itemsSkippedDuplicate += candidates.length - urlFresh.length;
+
+    for (const item of urlFresh) {
+      try {
+        const dedupEmbRes = await openai.embeddings.create({
+          model: EMBEDDING_MODEL,
+          input: `${item.title} ${item.summary}`.trim(),
+          dimensions: EMBEDDING_DIMENSIONS,
+        });
+        const dedupEmbedding = dedupEmbRes.data[0]?.embedding ?? null;
+        if (dedupEmbedding) {
+          // Category unknown until extraction, so dedup across all categories.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: near } = await (supabase.rpc as any)('vector_search_news', {
+            query_embedding: dedupEmbedding,
+            match_threshold: NEWS_DEDUP_THRESHOLD,
+            match_count: 1,
+            filter_category: null,
+            filter_days: 3,
+          });
+          if (near && near.length > 0) {
+            itemsSkippedDuplicate += 1;
+            continue;
+          }
+          const isBatchDuplicate = fresh.some(
+            (f) => f.dedupEmbedding !== null &&
+              cosineSimilarity(dedupEmbedding, f.dedupEmbedding) >= NEWS_DEDUP_THRESHOLD,
+          );
+          if (isBatchDuplicate) {
+            itemsSkippedDuplicate += 1;
+            continue;
+          }
+        }
+        fresh.push({ ...item, dedupEmbedding });
+      } catch (err) {
+        console.warn('[news-source-scan] dedup failed — skipping candidate', {
+          url: item.url,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  console.log('[news-source-scan]', fresh.length, 'fresh after dedup');
+
+  // ── Enrich + insert (no LLM judge, no relevance drop — trust the source) ────
+  let itemsStored = 0;
+  let extractionFailures = 0;
+  const storedSources: NonNullable<RoutineResult['sources']> = [];
+
+  for (const item of fresh) {
+    try {
+      let bodyMarkdown: string | null = null;
+      try {
+        const fetched = await fetchUrl.execute!({ url: item.url } as never, {} as never) as
+          | { title?: string; markdown?: string }
+          | undefined;
+        const md = fetched?.markdown?.trim();
+        if (md && md.length > 200) bodyMarkdown = md;
+      } catch {
+        // body fetch failed; carry on with snippet-only enrichment
+      }
+
+      const extractionInput = (bodyMarkdown ?? item.summary).slice(0, 12000);
+      const { data: extracted, reason: extractionReason } = await extractNewsMetadata({
+        title: item.title,
+        source: item.source,
+        content: extractionInput,
+        // category omitted — the extractor classifies the article itself.
+      });
+      const extractionOk = extracted !== null;
+      if (!extractionOk) {
+        extractionFailures += 1;
+        console.warn('[news-source-scan] extraction failed — inserting with extraction_failed status', {
+          title: item.title,
+          url: item.url,
+          reason: extractionReason,
+        });
+      }
+
+      const finalSummary = extracted?.summary ?? item.summary;
+      const finalEmbRes = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: `${item.title}\n${finalSummary}`.trim(),
+        dimensions: EMBEDDING_DIMENSIONS,
+      });
+      const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
+
+      await supabase.from('news_items').insert({
+        title: item.title,
+        url: item.url,
+        source_name: item.source,
+        published_at: item.published_at,
+        body_markdown: bodyMarkdown,
+        summary: finalSummary,
+        key_points: extracted?.key_points ?? [],
+        topic_tags: extracted?.topic_tags ?? [],
+        australian_relevance: extracted?.australian_relevance ?? false,
+        category: (extracted?.category ?? 'international') as NewsCategory,
+        relevance_score: null,
+        embedding: finalEmbedding as unknown as string,
+        status: extractionOk ? 'new' : 'extraction_failed',
+        routine_id: routine.id,
+        ingested_by: 'rex',
+      });
+      itemsStored += 1;
+      if (extractionOk) {
+        storedSources.push({
+          url: item.url,
+          title: item.title,
+          excerpt: finalSummary,
+          retrieved_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.warn('[news-source-scan] item failed — skipping', {
+        url: item.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  console.log(
+    `[news-source-scan] stored=${itemsStored}/${fresh.length} extraction_failures=${extractionFailures} failed_sources=${failedSources.length}`,
+  );
+
+  const scanResult: NewsSourceScanResult = {
+    sources_scanned: activeSources.length,
+    items_found: candidates.length,
+    items_stored: itemsStored,
+    items_skipped_duplicate: itemsSkippedDuplicate,
+    extraction_failures: extractionFailures,
+    failed_sources: failedSources,
+  };
+
+  const failSuffix = failedSources.length > 0 ? ` ${failedSources.length} source(s) failed to fetch.` : '';
+  const summaryLine =
+    `Scanned ${activeSources.length} source(s): stored ${itemsStored} new article(s) ` +
+    `(${itemsSkippedDuplicate} skipped as duplicates from ${candidates.length} feed items).${failSuffix}`;
+
+  const result: RoutineResult = {
+    summary: summaryLine,
+    sources: storedSources.slice(0, 5),
+    metadata: scanResult as unknown as Record<string, unknown>,
+  };
+
+  return {
+    ...baseOutcome,
+    status: 'success',
+    result,
+    error: null,
   };
 }
 
