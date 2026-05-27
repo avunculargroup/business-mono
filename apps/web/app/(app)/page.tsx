@@ -6,6 +6,7 @@ import { PipelineChip } from '@/components/ui/PipelineChip';
 import { Card } from '@/components/ui/Card';
 import { QuickAdd } from '@/components/dashboard/QuickAdd';
 import { RoutineTile } from '@/components/dashboard/RoutineTile';
+import { FearGreedIndicator } from '@/components/dashboard/FearGreedIndicator';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -82,6 +83,9 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader title="Dashboard" />
+      <div className={styles.banner}>
+        <FearGreedIndicator />
+      </div>
       <div className={styles.grid}>
         {/* Left column */}
         <div className={styles.left}>

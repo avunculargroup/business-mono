@@ -6,6 +6,11 @@
   max-width: var(--content-max-width);
 }
 
+.banner {
+  padding: var(--space-6) var(--space-6) 0;
+  max-width: var(--content-max-width);
+}
+
 @media (max-width: 1023px) {
   .grid {
     grid-template-columns: 1fr;
@@ -16,6 +21,10 @@
   .grid {
     padding: var(--space-4);
     gap: var(--space-4);
+  }
+
+  .banner {
+    padding: var(--space-4) var(--space-4) 0;
   }
 }
 
