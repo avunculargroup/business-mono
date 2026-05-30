@@ -381,6 +381,7 @@ async function extractNewsMetadata(input: {
             schema: newsExtractionSchema,
             errorStrategy: 'strict',
           },
+          requestContext: stepRequestContext('executeRoutine.news_extractor'),
         },
       );
       const obj = response.object as z.infer<typeof newsExtractionSchema> | undefined;
@@ -460,6 +461,7 @@ async function rankNewsCandidates(input: {
             schema: newsJudgeSchema,
             errorStrategy: 'strict',
           },
+          requestContext: stepRequestContext('executeRoutine.news_judge'),
         },
       );
       const obj = response.object as z.infer<typeof newsJudgeSchema> | undefined;
