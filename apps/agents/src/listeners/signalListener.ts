@@ -2,6 +2,7 @@ import { SignalClient } from '@platform/signal';
 import type { IncomingMessage } from '@platform/signal';
 import { supabase } from '@platform/db';
 import { simon } from '../agents/simon/index.js';
+import { findSuspendedRun, resumeFromReply } from './newsletterGate.js';
 import type { ConvMessage } from './types.js';
 
 const client = new SignalClient();
@@ -52,6 +53,22 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   const senderName = await resolveSenderName(sourceNumber, senderNumber);
 
   console.log(`[signal-listener] Message from ${senderName} (${senderNumber}): ${userMessage.slice(0, 80)}`);
+
+  // Newsletter gate intercept: if this sender has a newsletter run suspended at
+  // a human gate, treat the reply as the gate response and resume that run
+  // rather than routing it through Simon's general handler.
+  try {
+    const suspendedRun = await findSuspendedRun(senderNumber);
+    if (suspendedRun) {
+      console.log(`[signal-listener] Routing reply to suspended newsletter run ${suspendedRun.runId}`);
+      void client.sendTypingIndicator(senderNumber).catch(() => {});
+      const ack = await resumeFromReply(suspendedRun, userMessage);
+      await client.sendMessage({ recipients: [senderNumber], message: ack });
+      return;
+    }
+  } catch (err) {
+    console.error('[signal-listener] Newsletter gate handling failed, falling through to Simon:', err);
+  }
 
   // Ensure agent_conversations row exists for dual-write
   let { data: conv } = await supabase

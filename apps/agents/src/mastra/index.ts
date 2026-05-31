@@ -13,6 +13,7 @@ import { della } from '../agents/relationshipManager/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
+import { newsletterWorkflow } from '../workflows/newsletter/index.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -21,6 +22,7 @@ import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
+import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -75,6 +77,7 @@ export const mastra = new Mastra({
     recorder: recorderWorkflow,
     pm: pmWorkflow,
     executeRoutine: executeRoutineWorkflow,
+    newsletter: newsletterWorkflow,
   },
   server: {
     apiRoutes: [
@@ -116,3 +119,7 @@ startPMListener(mastra);
 
 // Start Fastmail JMAP polling loop
 startFastmailListener();
+
+// Keep the content_embeddings RAG store in sync (embed-on-write + backfill).
+// Powers the newsletter workflow's retrieval step.
+startContentEmbeddingListener();

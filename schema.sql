@@ -580,7 +580,8 @@ CREATE TABLE routines (
                     CHECK (agent_name IN
                       ('simon','roger','archie','petra','bruno','charlie','rex','della')),
   action_type       TEXT NOT NULL
-                    CHECK (action_type IN ('research_digest','monitor_change')),
+                    CHECK (action_type IN ('research_digest','monitor_change',
+                                           'news_ingest','news_source_scan','newsletter')),
   action_config     JSONB NOT NULL DEFAULT '{}'::jsonb,
   frequency         TEXT NOT NULL
                     CHECK (frequency IN ('daily','weekly','fortnightly')),
@@ -1543,3 +1544,58 @@ CREATE POLICY "Team members can manage documents"
 
 CREATE POLICY "Team members can manage document versions"
   ON document_versions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+
+-- ============================================================
+-- CONTENT EMBEDDINGS (migration: 20260531000000_add_content_embeddings)
+-- ============================================================
+-- RAG vector store for the newsletter workflow. Indexes content_items and
+-- interactions; embeddings are (re)generated in the app layer by
+-- contentEmbeddingListener, not a DB trigger. Search via the
+-- vector_search_content RPC.
+
+CREATE TABLE content_embeddings (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_table  TEXT NOT NULL CHECK (source_table IN ('content_items', 'interactions')),
+  source_id     UUID NOT NULL,
+  chunk_index   INT NOT NULL DEFAULT 0,
+  chunk_text    TEXT NOT NULL,
+  embedding     VECTOR(1536),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Indexes: content_embeddings_source_idx (source_table, source_id),
+--          content_embeddings_embedding_idx HNSW (embedding vector_cosine_ops)
+-- RPC: vector_search_content(query_embedding, match_threshold, match_count, filter_days, filter_source)
+
+
+-- ============================================================
+-- NEWSLETTER RUNS (migration: 20260531000001_add_newsletter_runs)
+-- ============================================================
+-- One row per newsletter workflow execution. Tracks the run lifecycle incl. the
+-- two human suspend gates, ties the run to its Mastra workflow_run_id for
+-- resume, and records the editorial scorecard + final content_item.
+
+CREATE TABLE newsletter_runs (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_run_id     TEXT UNIQUE NOT NULL,
+  trigger_source      TEXT NOT NULL CHECK (trigger_source IN ('signal', 'schedule', 'web')),
+  time_range          TEXT NOT NULL,
+  story_count_target  INT NOT NULL,
+  word_count_target   INT NOT NULL,
+  audience_context    TEXT,
+  status              TEXT NOT NULL DEFAULT 'running'
+                      CHECK (status IN ('running', 'suspended_gate1', 'suspended_gate2',
+                                        'suspended_hold', 'completed', 'failed', 'cancelled')),
+  approved_story_ids  TEXT[],
+  content_item_id     UUID REFERENCES content_items(id) ON DELETE SET NULL,
+  requested_by        UUID REFERENCES team_members(id),
+  requested_by_signal TEXT,
+  shortlist           JSONB DEFAULT '[]',
+  editorial_scores    JSONB DEFAULT '{}',
+  total_word_count    INT,
+  started_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at        TIMESTAMPTZ,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  notes               TEXT
+);
+-- Realtime-enabled so the /content page can show in-progress run status.
