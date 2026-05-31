@@ -519,3 +519,12 @@ Suggested sequence:
 - **Monitor creation via Signal vs UI:** To be decided once `research_monitors` is better understood in practice. Not blocking initial build.
 - **Curator notes for agent-ingested content:** The Researcher will prompt the human for annotation at ingestion time via Signal. Auto-generation will be introduced later once patterns are established.
 - **Tavily rate limiting:** Deferred — address when/if the free tier is hit in practice. Options are SearXNG sidecar on Railway or paid Tavily upgrade.
+
+-----
+
+## Role in the newsletter workflow
+
+Rex performs two steps inside `newsletterWorkflow`:
+
+1. **Story selection** (`newsletter.story_selection`): given the RAG-retrieved internal content pool, Rex clusters items into story angles, scores them, flags thin stories (`needs_research`), and returns a `StoryShortlist` of `storyCount + 2` candidates with a recommended set. On a gate-1 adjustment he re-ranks the shortlist (`newsletter.story_rerank`).
+2. **Research enrichment** (`newsletter.research_enrich`): for approved stories with thin internal data, Rex pulls up to ~3 external sources (via his existing `search_web` / `fetch_url` tools) into a structured `ResearchNote`. Internal BTS perspective leads; external research is supporting evidence only.

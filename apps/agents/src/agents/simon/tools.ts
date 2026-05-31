@@ -9,6 +9,7 @@ import { rex } from '../researcher/index.js';
 import { della } from '../relationshipManager/index.js';
 import { roger } from '../recorder/agent.js';
 import { petra } from '../pm/agent.js';
+import { startNewsletterRun } from '../../workflows/startNewsletterRun.js';
 import type { Agent } from '@mastra/core/agent';
 
 export const conflictCheck = createTool({
@@ -327,6 +328,47 @@ export const agentHealthCheck = createTool({
       mode: context.deep ? 'deep' : 'quick',
       agents: activityResults,
       liveness: livenessResults,
+    };
+  },
+});
+
+export const startNewsletter = createTool({
+  id: 'start_newsletter',
+  description:
+    'Kick off the newsletter workflow on demand. Rex selects stories from internal content + research, Charlie drafts them, an editor reviews, and the workflow pauses for human approval at two points (story selection, then the full draft) — both delivered to the requesting director over Signal. Use when a director asks you to put together / draft / generate a newsletter.',
+  inputSchema: z.object({
+    timeRange: z
+      .enum(['week', 'fortnight', 'month'])
+      .default('month')
+      .describe('Lookback window for internal content'),
+    storyCount: z.number().int().min(3).max(8).default(5).describe('Number of stories (3–8)'),
+    targetWordCount: z
+      .number()
+      .int()
+      .min(100)
+      .max(800)
+      .default(250)
+      .describe('Target words per story'),
+    audienceContext: z
+      .string()
+      .optional()
+      .describe('Optional audience override, e.g. "CFO audience". Leave blank for the default.'),
+  }),
+  execute: async (context) => {
+    const { runId, status } = await startNewsletterRun({
+      timeRange: context.timeRange,
+      storyCount: context.storyCount,
+      targetWordCount: context.targetWordCount,
+      audienceContext: context.audienceContext,
+      triggerSource: 'signal',
+    });
+    return {
+      runId,
+      status,
+      note:
+        status === 'suspended'
+          ? 'Newsletter started. I\'ve sent the candidate story shortlist for review — approve or adjust it there.'
+          : `Newsletter run ${runId} ended with status: ${status}.`,
     };
   },
 });

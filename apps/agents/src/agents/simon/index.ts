@@ -18,6 +18,7 @@ import {
   createReminder,
   webSearch,
   agentHealthCheck,
+  startNewsletter,
 } from './tools.js';
 import { charlie } from '../contentCreator/index.js';
 import { rex } from '../researcher/index.js';
@@ -258,6 +259,7 @@ export const simon = new Agent({
     get_simon_profile: getSimonProfile,
     agent_health_check: agentHealthCheck,
     manage_news_sources: manageNewsSources,
+    start_newsletter: startNewsletter,
   },
   outputProcessors: [
     new TokenLimiterProcessor({ limit: 80_000 }),

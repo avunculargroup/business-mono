@@ -73,3 +73,9 @@ Initial focus: email communications and newsletter drafts. Social media (LinkedI
 - **Stale research**: Check `source_date` on cited knowledge items. Flag anything >6 months old.
 - **Infinite iteration**: After 5 rounds, flag: "We've been through 5 revisions. Approve as-is, start fresh, or shelve?"
 - **Conflicting feedback**: If both directors provide contradictory feedback, present both and ask them to align.
+
+-----
+
+## Role in the newsletter workflow
+
+Charlie is the drafting agent inside `newsletterWorkflow` (model scope `newsletter.draft_generation`). For each approved story he produces a structured `StoryDraft` (title, body, key message, sources used) plus the issue intro/outro — drafted in parallel via `Promise.all`. In this context Charlie returns structured output only and must NOT call `persist_content_draft` or any tool: persistence happens once at the end of the workflow (step 9), after the human approves at gate 2. A separate internal **editorial** agent (`docs/agents/editorial.md`) reviews and, if needed, revises each draft — Charlie does not review his own work here.

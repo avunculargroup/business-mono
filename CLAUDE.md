@@ -136,15 +136,17 @@ Directors (Signal / Web UI) <-> Simon <-> Specialist Agents
 - `recorderWorkflow` — transcription + entity extraction
 - `pmWorkflow` — task triage + risk scan
 - `executeRoutineWorkflow` — cron-driven routines from the `routines` table
+- `newsletterWorkflow` — multi-stage newsletter generation (RAG retrieval → Rex story selection → Charlie drafting → editorial review) with two human Signal approval gates (suspend/resume). Launched on demand via Simon's `start_newsletter` tool or on a schedule via a `newsletter` routine; both call `startNewsletterRun`. Gate replies are resumed by `signalListener` (see `listeners/newsletterGate.ts`).
 
-All other agents (Simon, Archivist, BA, Content Creator, Researcher, RM) are pure agents — no workflow file.
+All other agents (Simon, Archivist, BA, Content Creator, Researcher, RM) are pure agents — no workflow file. The newsletter workflow also uses a dedicated internal **editorial** agent (`apps/agents/src/agents/editorial/`, exported as `editor`) that is NOT on Simon's roster and NOT in the `agent_activity.agent_name` CHECK — it is invoked only inside the workflow.
 
 **Listeners** (`apps/agents/src/listeners/`):
 - `webDirectivesListener` — Supabase Realtime, web UI directives
-- `signalListener` — polling loop for Simon's Signal number
+- `signalListener` — polling loop for Simon's Signal number (also intercepts replies to suspended newsletter gates)
 - `contentCreatorListener` — persists Charlie's draft outputs
 - `pmListener` — picks up Petra's proposed actions
 - `fastmailListener` — JMAP polling every 5 min, dispatches to Della
+- `contentEmbeddingListener` — keeps the `content_embeddings` RAG store in sync (embed-on-write + startup backfill) for the newsletter workflow
 
 ### Capacity awareness
 

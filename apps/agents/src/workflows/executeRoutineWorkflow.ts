@@ -32,6 +32,7 @@ import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import Parser from 'rss-parser';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
+import { startNewsletterRun } from './startNewsletterRun.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
@@ -165,6 +166,8 @@ const runRoutine = createStep({
           outcomes.push(await runNewsIngest(routine));
         } else if (routine.action_type === 'news_source_scan') {
           outcomes.push(await runNewsSourceScan(routine));
+        } else if (routine.action_type === 'newsletter') {
+          outcomes.push(await runNewsletter(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -253,6 +256,82 @@ async function runResearchDigest(
     result,
     error: null,
     archive_urls: cfg.archive_sources ? result.sources.map((s) => s.url).filter(Boolean) : [],
+  };
+}
+
+/** True when `date` is the first Monday of its month. */
+function isFirstMondayOfMonth(date: Date): boolean {
+  return date.getDay() === 1 && date.getDate() <= 7;
+}
+
+/**
+ * Launches the newsletter workflow. This handler does NOT run the newsletter
+ * inline — the newsletter is its own suspendable workflow with two human gates.
+ * startNewsletterRun creates the run, starts it (resolving at gate 1), and
+ * records the newsletter_runs row; the routine outcome just notes that the run
+ * was launched. The monthly_guard flag gates a weekly-firing routine down to a
+ * single run on the first Monday of each calendar month.
+ */
+async function runNewsletter(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as {
+    time_range?: 'week' | 'fortnight' | 'month';
+    story_count?: number;
+    target_word_count?: number;
+    audience_context?: string;
+    monthly_guard?: boolean;
+    one_off?: boolean;
+  };
+
+  const base: Omit<RoutineOutcome, 'status' | 'result' | 'error'> = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'newsletter',
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  if (cfg.monthly_guard) {
+    const now = new Date();
+    if (!isFirstMondayOfMonth(now)) {
+      return { ...base, status: 'success', result: { summary: 'Skipped — not the first Monday of the month.', sources: [] }, error: null };
+    }
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as unknown as { from: (t: string) => any };
+    const { data: existing } = await db
+      .from('newsletter_runs')
+      .select('id')
+      .gte('started_at', monthStart)
+      .not('status', 'in', '("failed","cancelled")')
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return { ...base, status: 'success', result: { summary: 'Skipped — a newsletter run already exists this month.', sources: [] }, error: null };
+    }
+  }
+
+  // One-shot web triggers deactivate the reusable routine after launching so it
+  // fires exactly once per click (the web action re-arms it next time). Done
+  // before launching so a crash mid-run can't leave it firing weekly.
+  if (cfg.one_off) {
+    await supabase.from('routines').update({ is_active: false }).eq('id', routine.id);
+  }
+
+  const { runId, status } = await startNewsletterRun({
+    timeRange: cfg.time_range ?? 'month',
+    storyCount: cfg.story_count ?? 5,
+    targetWordCount: cfg.target_word_count ?? 250,
+    audienceContext: cfg.audience_context,
+    triggerSource: cfg.one_off ? 'web' : 'schedule',
+  });
+
+  return {
+    ...base,
+    status: 'success',
+    result: { summary: `Newsletter run launched (${runId}, status: ${status}).`, sources: [], metadata: { run_id: runId, run_status: status } },
+    error: null,
   };
 }
 

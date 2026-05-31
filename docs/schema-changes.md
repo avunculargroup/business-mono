@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-05-31 — Newsletter workflow: `content_embeddings`, `newsletter_runs`, `newsletter` routine action
+
+**Migrations:** `20260531000000_add_content_embeddings.sql`, `20260531000001_add_newsletter_runs.sql`, `20260531000002_add_newsletter_routine_action.sql`
+
+Backs the new AI newsletter workflow (Rex selects stories → Charlie drafts → an editorial agent reviews → two human Signal approval gates → saved to `content_items`).
+
+- **`content_embeddings` table** — pgvector RAG store indexing `content_items` and `interactions` (`source_table` + `source_id`, chunked `chunk_text`, `embedding VECTOR(1536)`, HNSW `vector_cosine_ops`). Embeddings are (re)generated in the application layer by the new `contentEmbeddingListener` (embed-on-write when content reaches `approved`/`published` or an interaction gains a `summary`, plus a bounded startup backfill) — deliberately not a DB trigger, to keep the OpenAI key server-side. Queried via the **`vector_search_content`** RPC (cosine similarity, best chunk per source, optional recency window + source filter), modelled on `vector_search_news`.
+- **`newsletter_runs` table** — one row per workflow run. Tracks the lifecycle including the two suspend gates (`suspended_gate1`/`suspended_gate2`/`suspended_hold`), stores the Mastra `workflow_run_id` (for cross-process resume), `requested_by_signal` (so the Signal listener can match an inbound gate reply to the suspended run), the editorial scorecard, and the final `content_item_id`. Realtime-enabled for the `/content` in-progress status indicator.
+- **`routines.action_type` constraint widened** to include `'newsletter'`. The handler (`runNewsletter` in `executeRoutineWorkflow.ts`) only *launches* the newsletter — which is its own suspendable Mastra workflow — via `startNewsletterRun`, keeping the routine batch loop's semantics intact. A dormant (`is_active = FALSE`) "Monthly newsletter" routine is seeded with a `monthly_guard` flag that gates the weekly tick down to the first Monday of each calendar month and skips if a run already exists that month.
+
+Footer `{{...}}` placeholders resolve against the existing `company_records` table (`legal_name`, `trading_name`, `abn`, `website`, `tagline`) — no new company table was needed.
+
+---
+
 ## 2026-05-25 — Add `news_sources` table and `news_source_scan` routine
 
 **Migration:** `20260525000000_add_news_sources.sql`

@@ -161,3 +161,16 @@ protocol compliance.
 - **Capacity gap**: Surface what can be done, what can't, and recommend alternatives. Never silently fail or half-complete.
 - **Stale context**: Query database rather than relying on old conversation history.
 - **Signal delivery failure**: Queue and retry. Log to agent_activity.
+
+-----
+
+## Newsletter workflow (`start_newsletter` tool)
+
+When a director asks Simon to put together / draft / generate a newsletter, Simon calls the **`start_newsletter`** tool (it does NOT delegate to Charlie directly). The tool launches the suspendable `newsletterWorkflow` via `startNewsletterRun`, which immediately pauses at the first human gate.
+
+Simon then mediates the two approval gates over Signal:
+
+1. **Gate 1 — story selection.** The workflow sends a candidate shortlist. The director replies `go`/`approve`, or an adjustment (e.g. "swap 3 for B, more on regulation"). Anything that isn't an approval is treated as an adjustment and Rex revises the shortlist.
+2. **Gate 2 — final draft.** The workflow sends the full draft (attached) plus an editorial scorecard. The director replies `publish`, `revise <n>: <instruction>`, or `hold`.
+
+These gate replies are intercepted by the Signal listener (`listeners/newsletterGate.ts`) and resumed against the exact run — they bypass Simon's general handler. Simon only needs to *start* the run; the gate conversation flows through the workflow's suspend/resume. See `apps/agents/src/workflows/newsletter/` and `docs/newsletter-workflow-spec.md`.

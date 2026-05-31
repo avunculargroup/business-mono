@@ -5,8 +5,10 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { ContentForm } from './ContentForm';
+import { RunNewsletterModal } from './RunNewsletterModal';
+import { NewsletterRunStatus } from './NewsletterRunStatus';
 import { updateContentStatus } from '@/app/actions/content';
-import { Plus } from 'lucide-react';
+import { Plus, Newspaper } from 'lucide-react';
 import Link from 'next/link';
 import styles from './ContentBoard.module.css';
 
@@ -45,6 +47,7 @@ interface ContentBoardProps {
 export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showRunNewsletter, setShowRunNewsletter] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, startTransition] = useTransition();
   const [optimisticItems, setOptimisticStatus] = useOptimistic(
@@ -79,11 +82,16 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   return (
     <div>
       <div className={styles.toolbar}>
+        <Button variant="secondary" size="sm" onClick={() => setShowRunNewsletter(true)}>
+          <Newspaper size={16} strokeWidth={1.5} />
+          Run newsletter
+        </Button>
         <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
           <Plus size={16} strokeWidth={1.5} />
           New content
         </Button>
       </div>
+      <NewsletterRunStatus />
       {error && (
         <div className={styles.error} role="alert">
           Failed to update: {error}
@@ -148,6 +156,11 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
           onPendingChange={setIsSubmitting}
         />
       </SlideOver>
+
+      <RunNewsletterModal
+        open={showRunNewsletter}
+        onClose={() => setShowRunNewsletter(false)}
+      />
     </div>
   );
 }

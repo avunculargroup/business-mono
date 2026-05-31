@@ -116,12 +116,55 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'executeRoutine',
     fallbackAgent: 'rex',
   },
+
+  // ── Newsletter workflow steps ─────────────────────────────────────────────
+  {
+    key: 'newsletter.story_selection',
+    type: 'workflow_step',
+    label: 'Story selection',
+    description: 'Rex clusters retrieved content into a ranked newsletter story shortlist',
+    workflow: 'newsletter',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'newsletter.story_rerank',
+    type: 'workflow_step',
+    label: 'Story re-rank',
+    description: 'Rex revises the shortlist after human swap/adjust feedback at gate 1',
+    workflow: 'newsletter',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'newsletter.research_enrich',
+    type: 'workflow_step',
+    label: 'Research enrichment',
+    description: 'Rex supplements thin stories with external research before drafting',
+    workflow: 'newsletter',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'newsletter.draft_generation',
+    type: 'workflow_step',
+    label: 'Draft generation',
+    description: 'Charlie drafts each newsletter story plus the intro and outro',
+    workflow: 'newsletter',
+    fallbackAgent: 'charlie',
+  },
+  {
+    key: 'newsletter.editorial_review',
+    type: 'workflow_step',
+    label: 'Editorial review',
+    description: 'A separate editorial agent scores each draft against brand voice',
+    workflow: 'newsletter',
+    fallbackAgent: 'charlie',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
   recorder: 'Recorder',
   pm: 'PM',
   executeRoutine: 'Routines',
+  newsletter: 'Newsletter',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

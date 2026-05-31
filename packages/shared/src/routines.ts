@@ -14,11 +14,14 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //  - monitor_change: Rex detects whether the topic's state has changed vs last run.
 //  - news_ingest: Rex fetches fresh news articles into the news_items feed.
 //  - news_source_scan: Rex scans the user-curated news_sources feeds for new articles.
+//  - newsletter: launches the suspendable newsletter workflow (Rex selects, Charlie
+//    drafts, editorial reviews; suspends for human approval at two Signal gates).
 export const RoutineActionType = {
   RESEARCH_DIGEST:   'research_digest',
   MONITOR_CHANGE:    'monitor_change',
   NEWS_INGEST:       'news_ingest',
   NEWS_SOURCE_SCAN:  'news_source_scan',
+  NEWSLETTER:        'newsletter',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -46,9 +49,23 @@ export interface MonitorChangeConfig {
   last_digest?: string | null;
 }
 
+// Lookback window for the newsletter's internal-content retrieval.
+export type NewsletterTimeRange = 'week' | 'fortnight' | 'month';
+
+export interface NewsletterConfig {
+  time_range: NewsletterTimeRange;
+  story_count: number;       // 3–8
+  target_word_count: number; // per story
+  audience_context?: string;
+  // When true the routine only fires on the first Monday of the month and skips
+  // if a newsletter run already exists for the current calendar month.
+  monthly_guard?: boolean;
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
-  | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig);
+  | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
+  | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.
