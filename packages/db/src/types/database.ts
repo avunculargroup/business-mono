@@ -833,6 +833,36 @@ export type Database = {
           },
         ]
       }
+      content_embeddings: {
+        Row: {
+          chunk_index: number
+          chunk_text: string
+          created_at: string
+          embedding: string | null
+          id: string
+          source_id: string
+          source_table: string
+        }
+        Insert: {
+          chunk_index?: number
+          chunk_text: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          source_id: string
+          source_table: string
+        }
+        Update: {
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          source_id?: string
+          source_table?: string
+        }
+        Relationships: []
+      }
       content_items: {
         Row: {
           assigned_to: string | null
@@ -1977,6 +2007,87 @@ export type Database = {
           },
         ]
       }
+      newsletter_runs: {
+        Row: {
+          approved_story_ids: string[] | null
+          audience_context: string | null
+          completed_at: string | null
+          content_item_id: string | null
+          editorial_scores: Json | null
+          id: string
+          notes: string | null
+          requested_by: string | null
+          requested_by_signal: string | null
+          shortlist: Json | null
+          started_at: string
+          status: string
+          story_count_target: number
+          time_range: string
+          total_word_count: number | null
+          trigger_source: string
+          updated_at: string
+          word_count_target: number
+          workflow_run_id: string
+        }
+        Insert: {
+          approved_story_ids?: string[] | null
+          audience_context?: string | null
+          completed_at?: string | null
+          content_item_id?: string | null
+          editorial_scores?: Json | null
+          id?: string
+          notes?: string | null
+          requested_by?: string | null
+          requested_by_signal?: string | null
+          shortlist?: Json | null
+          started_at?: string
+          status?: string
+          story_count_target: number
+          time_range: string
+          total_word_count?: number | null
+          trigger_source: string
+          updated_at?: string
+          word_count_target: number
+          workflow_run_id: string
+        }
+        Update: {
+          approved_story_ids?: string[] | null
+          audience_context?: string | null
+          completed_at?: string | null
+          content_item_id?: string | null
+          editorial_scores?: Json | null
+          id?: string
+          notes?: string | null
+          requested_by?: string | null
+          requested_by_signal?: string | null
+          shortlist?: Json | null
+          started_at?: string
+          status?: string
+          story_count_target?: number
+          time_range?: string
+          total_word_count?: number | null
+          trigger_source?: string
+          updated_at?: string
+          word_count_target?: number
+          workflow_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_runs_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "newsletter_runs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pain_point_log: {
         Row: {
           change_type: string
@@ -3017,6 +3128,24 @@ export type Database = {
         Returns: {
           question_count: number
           validated: boolean
+        }[]
+      }
+      vector_search_content: {
+        Args: {
+          filter_days?: number
+          filter_source?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          body_excerpt: string
+          created_at: string
+          similarity: number
+          source_id: string
+          source_table: string
+          summary: string
+          title: string
         }[]
       }
       vector_search_news: {
