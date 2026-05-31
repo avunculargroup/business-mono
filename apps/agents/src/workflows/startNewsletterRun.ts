@@ -30,6 +30,7 @@ const PLATFORM_URL = process.env['PLATFORM_URL'] ?? '';
 
 interface RunResult {
   status: 'suspended' | 'success' | 'failed' | 'canceled' | string;
+  suspendPayload?: unknown;
   suspended?: string[][];
   steps?: Record<string, { suspendPayload?: unknown }>;
   result?: {
@@ -61,6 +62,9 @@ async function defaultApproverSignal(): Promise<string | null> {
 }
 
 function extractSuspendPayload(result: RunResult): GatePayload | null {
+  // WorkflowResult exposes the suspending step's payload at the top level; fall
+  // back to digging it out of the suspended step's result if absent.
+  if (result.suspendPayload) return result.suspendPayload as GatePayload;
   const path = result.suspended?.[0];
   if (!path || path.length === 0) return null;
   const stepId = path[path.length - 1];
