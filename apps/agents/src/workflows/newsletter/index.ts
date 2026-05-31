@@ -20,6 +20,7 @@ import {
   introOutroSchema,
   editorialReviewSchema,
   reviewedStorySchema,
+  newsletterStateSchema,
   gate1ResumeSchema,
   gate2ResumeSchema,
   type StoryCandidate,
@@ -487,6 +488,7 @@ const gate2Step = createStep({
     overLengthIds: z.array(z.string()),
   }),
   resumeSchema: gate2ResumeSchema,
+  stateSchema: newsletterStateSchema,
   suspendSchema: z.object({
     gate: z.literal('gate2'),
     message: z.string(),
@@ -501,9 +503,19 @@ const gate2Step = createStep({
     markdown: z.string(),
     totalWordCount: z.number(),
   }),
-  execute: async ({ inputData, resumeData, suspend }) => {
-    const { input, approvedStories, researchNotes, introOutro } = inputData;
-    let { reviewed, title, markdown, totalWordCount, overLengthIds } = inputData;
+  execute: async ({ inputData, resumeData, suspend, state, setState }) => {
+    const { input, approvedStories, researchNotes, introOutro, title } = inputData;
+
+    // A resumed step re-runs from the top, so prior revisions live in workflow
+    // state, not local vars. Fall back to the freshly assembled inputData on the
+    // first pass (no state yet).
+    const working = state?.working;
+    let reviewed = working?.reviewed ?? inputData.reviewed;
+    let markdown = working?.markdown ?? inputData.markdown;
+    let totalWordCount = working?.totalWordCount ?? inputData.totalWordCount;
+    let overLengthIds = working?.overLengthIds ?? inputData.overLengthIds;
+
+    const current = () => ({ input, approvedStories, reviewed, title, markdown, totalWordCount });
 
     const buildAndSuspend = async (held?: boolean): Promise<void> => {
       const message = buildGate2Message({
@@ -518,12 +530,12 @@ const gate2Step = createStep({
 
     if (!resumeData) {
       await buildAndSuspend();
-      return { input, approvedStories, reviewed, title, markdown, totalWordCount };
+      return current();
     }
 
     if (resumeData.decision === 'hold') {
       await buildAndSuspend(true);
-      return { input, approvedStories, reviewed, title, markdown, totalWordCount };
+      return current();
     }
 
     if (resumeData.decision === 'revise' && resumeData.storyNumber && resumeData.instruction) {
@@ -553,14 +565,17 @@ const gate2Step = createStep({
           });
           totalWordCount = reviewed.reduce((sum, s) => sum + s.word_count, 0);
           overLengthIds = overLengthStoryIds(reviewed, input.targetWordCount);
+
+          // Persist the revision so a later "publish" resume sees it.
+          await setState({ working: { reviewed, markdown, totalWordCount, overLengthIds } });
         }
       }
       await buildAndSuspend();
-      return { input, approvedStories, reviewed, title, markdown, totalWordCount };
+      return current();
     }
 
-    // decision === 'publish' → fall through to persist.
-    return { input, approvedStories, reviewed, title, markdown, totalWordCount };
+    // decision === 'publish' → fall through to persist with the latest draft.
+    return current();
   },
 });
 
@@ -627,6 +642,7 @@ const persistStep = createStep({
 export const newsletterWorkflow = createWorkflow({
   id: 'newsletter',
   inputSchema: newsletterInputSchema,
+  stateSchema: newsletterStateSchema,
   outputSchema: z.object({
     contentItemId: z.string(),
     title: z.string(),

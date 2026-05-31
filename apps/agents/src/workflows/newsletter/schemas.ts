@@ -144,3 +144,18 @@ export const reviewedStorySchema = z.object({
   review: editorialReviewSchema,
 });
 export type ReviewedStory = z.infer<typeof reviewedStorySchema>;
+
+// Workflow state. A resumed step re-executes from the top with fresh resumeData,
+// so the gate-2 revision loop must persist the working draft here (not in local
+// vars) to survive across resume cycles — otherwise a later "publish" would
+// save the pre-revision draft.
+export const newsletterStateSchema = z.object({
+  working: z
+    .object({
+      reviewed: z.array(reviewedStorySchema),
+      markdown: z.string(),
+      totalWordCount: z.number(),
+      overLengthIds: z.array(z.string()),
+    })
+    .optional(),
+});

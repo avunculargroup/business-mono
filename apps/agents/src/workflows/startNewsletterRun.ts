@@ -176,7 +176,10 @@ export async function startNewsletterRun(
     status: 'running',
   });
 
-  const result = (await run.start({ inputData: { ...input, requestedBySignal: signalNumber ?? undefined } })) as unknown as RunResult;
+  const result = (await run.start({
+    inputData: { ...input, requestedBySignal: signalNumber ?? undefined },
+    initialState: {},
+  })) as unknown as RunResult;
   await handleRunResult({ runId, result, signalNumber });
   return { runId, status: result.status };
 }
