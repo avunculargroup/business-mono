@@ -31,3 +31,27 @@ WHERE NOT EXISTS (
   SELECT 1 FROM routines r
   WHERE r.name = 'Monthly newsletter' AND r.action_type = 'newsletter'
 );
+
+-- Seed a single reusable "On-demand newsletter" routine for the /content
+-- "Run newsletter" button. It stays dormant (is_active = FALSE) until the web
+-- action arms it (writes the modal params into action_config and sets
+-- next_run_at = NOW(), is_active = TRUE). The action_config carries one_off =
+-- true so runNewsletter deactivates the routine again after launching the run —
+-- it fires exactly once per click rather than recurring.
+INSERT INTO routines (
+  name, description, agent_name, action_type, action_config,
+  frequency, time_of_day, timezone, next_run_at,
+  show_on_dashboard, dashboard_title, is_active
+)
+SELECT
+  'On-demand newsletter',
+  'One-shot newsletter run triggered from the content pipeline. Armed by the web app; deactivates itself after launching.',
+  'charlie', 'newsletter',
+  '{"time_range": "month", "story_count": 5, "target_word_count": 250, "one_off": true}'::jsonb,
+  'weekly', '08:00', 'Australia/Melbourne',
+  NOW(),
+  FALSE, NULL, FALSE
+WHERE NOT EXISTS (
+  SELECT 1 FROM routines r
+  WHERE r.name = 'On-demand newsletter' AND r.action_type = 'newsletter'
+);

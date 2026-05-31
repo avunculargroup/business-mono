@@ -281,6 +281,7 @@ async function runNewsletter(
     target_word_count?: number;
     audience_context?: string;
     monthly_guard?: boolean;
+    one_off?: boolean;
   };
 
   const base: Omit<RoutineOutcome, 'status' | 'result' | 'error'> = {
@@ -311,12 +312,19 @@ async function runNewsletter(
     }
   }
 
+  // One-shot web triggers deactivate the reusable routine after launching so it
+  // fires exactly once per click (the web action re-arms it next time). Done
+  // before launching so a crash mid-run can't leave it firing weekly.
+  if (cfg.one_off) {
+    await supabase.from('routines').update({ is_active: false }).eq('id', routine.id);
+  }
+
   const { runId, status } = await startNewsletterRun({
     timeRange: cfg.time_range ?? 'month',
     storyCount: cfg.story_count ?? 5,
     targetWordCount: cfg.target_word_count ?? 250,
     audienceContext: cfg.audience_context,
-    triggerSource: 'schedule',
+    triggerSource: cfg.one_off ? 'web' : 'schedule',
   });
 
   return {
