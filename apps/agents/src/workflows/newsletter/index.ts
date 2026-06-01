@@ -8,6 +8,7 @@ import { charlie } from '../../agents/contentCreator/index.js';
 import { editor } from '../../agents/editorial/index.js';
 import { embedText } from '../../lib/contentEmbeddings.js';
 import { scoreAndRank, TIME_RANGE_DAYS, NEWSLETTER_QUERY_SEED } from './retrieval.js';
+import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
 import { buildGate1Message, buildGate2Message } from './messages.js';
 import {
@@ -132,7 +133,7 @@ Use the source item ids in source_ids. Generate a unique story_id for each candi
     });
 
     // Ensure every candidate has a story_id even if the model omitted one.
-    const shortlist = response.object ?? fallback;
+    const shortlist = coerceToSchema(storyShortlistSchema, response.object ?? fallback);
     shortlist.candidates = shortlist.candidates.map((c) => ({
       ...c,
       story_id: c.story_id || randomUUID(),
@@ -197,7 +198,7 @@ Apply the instruction and return the revised shortlist. Keep ${input.storyCount}
           fallbackValue: shortlist,
         },
       });
-      const revised = response.object ?? shortlist;
+      const revised = coerceToSchema(storyShortlistSchema, response.object ?? shortlist);
       const revisedById = new Map(revised.candidates.map((c) => [c.story_id, c]));
       approvedStories = revised.recommended
         .map((id) => revisedById.get(id))
@@ -251,7 +252,7 @@ Return a structured research note for story_id ${story.story_id}.`;
           fallbackValue: fallback,
         },
       });
-      researchNotes.push(response.object ?? fallback);
+      researchNotes.push(coerceToSchema(researchNoteSchema, response.object ?? fallback));
     }
 
     return { input, approvedStories, researchNotes };
@@ -301,7 +302,7 @@ ${NO_TOOL_INSTRUCTION}`;
       fallbackValue: fallback,
     },
   });
-  const draft = response.object ?? fallback;
+  const draft = coerceToSchema(storyDraftSchema, response.object ?? fallback);
   return { ...draft, story_id: story.story_id, word_count: countWords(draft.body) };
 }
 
@@ -344,7 +345,7 @@ No exclamation marks. Plain, confident tone. ${NO_TOOL_INSTRUCTION}`;
             fallbackValue: { intro: '', outro: '' },
           },
         });
-        return response.object ?? { intro: '', outro: '' };
+        return coerceToSchema(introOutroSchema, response.object ?? { intro: '', outro: '' });
       })(),
     ]);
 
@@ -391,7 +392,7 @@ Score every rubric dimension, decide passes_gate (voice_match >= 7 AND audience_
       fallbackValue: fallback,
     },
   });
-  const review = response.object ?? fallback;
+  const review = coerceToSchema(editorialReviewSchema, response.object ?? fallback);
 
   // Use the editor's revision when the draft failed the gate and a revision
   // was supplied; otherwise keep Charlie's draft.
