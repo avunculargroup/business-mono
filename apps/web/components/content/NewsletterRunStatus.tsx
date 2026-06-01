@@ -7,6 +7,7 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useToast } from '@/providers/ToastProvider';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
+import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDisplay';
 import { submitNewsletterGateDecision } from '@/app/actions/newsletter';
 import styles from './NewsletterRunStatus.module.css';
 
@@ -129,9 +130,11 @@ function GatePanel({ run }: { run: NewsletterRun }) {
       {run.gate_message && <pre className={styles.gateMessage}>{run.gate_message}</pre>}
 
       {run.gate_draft_markdown && (
-        <details className={styles.draft}>
-          <summary className={styles.draftSummary}>View full draft</summary>
-          <pre className={styles.draftBody}>{run.gate_draft_markdown}</pre>
+        <details className={styles.draft} open>
+          <summary className={styles.draftSummary}>Full draft</summary>
+          <div className={styles.draftBody}>
+            <MarkdownRecordDisplay content={run.gate_draft_markdown} />
+          </div>
         </details>
       )}
 
