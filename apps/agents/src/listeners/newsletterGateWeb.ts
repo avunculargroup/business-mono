@@ -1,5 +1,5 @@
 import { createRealtimeClient } from '@platform/db';
-import { resumeNewsletterRun } from '../workflows/startNewsletterRun.js';
+import { resumeNewsletterRun, gateStepForStatus } from '../workflows/startNewsletterRun.js';
 import { gate1ResumeSchema, gate2ResumeSchema } from '../workflows/newsletter/schemas.js';
 import type { Gate1Resume, Gate2Resume } from '../workflows/newsletter/schemas.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
@@ -80,7 +80,11 @@ export async function handleGateRow(row: NewsletterRunRow): Promise<void> {
   }
 
   console.log('[newsletter-gate-web] Resuming', row.workflow_run_id, 'with', resumeData);
-  await resumeNewsletterRun({ runId: row.workflow_run_id, resumeData });
+  await resumeNewsletterRun({
+    runId: row.workflow_run_id,
+    resumeData,
+    step: gateStepForStatus(row.status),
+  });
 }
 
 /**

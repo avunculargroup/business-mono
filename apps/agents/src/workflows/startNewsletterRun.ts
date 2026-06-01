@@ -207,12 +207,23 @@ export async function startNewsletterRun(
   return { runId, status: result.status };
 }
 
-/** Resume a suspended run (gate reply from Signal). */
+/** Workflow step id to resume for a given suspended status. The newsletter
+ *  workflow has two suspendable steps (gate1, gate2), so resume() must name the
+ *  target step — omitting it makes Mastra fall back to the first step with a
+ *  resumeSchema (gate1) and reject a gate-2 payload (publish/revise/hold)
+ *  against gate-1's approve/adjust enum. gate2 and hold both re-enter gate2. */
+export type GateStepId = 'gate1' | 'gate2';
+export function gateStepForStatus(status: string): GateStepId {
+  return status === 'suspended_gate1' ? 'gate1' : 'gate2';
+}
+
+/** Resume a suspended run (gate reply from Signal or the /content page). */
 export async function resumeNewsletterRun(args: {
   runId: string;
   resumeData: unknown;
+  step: GateStepId;
 }): Promise<{ status: string }> {
-  const { runId, resumeData } = args;
+  const { runId, resumeData, step } = args;
 
   const { data: row } = await db
     .from('newsletter_runs')
@@ -224,7 +235,10 @@ export async function resumeNewsletterRun(args: {
   const mastra = await loadMastra();
   const workflow = mastra.getWorkflow('newsletter');
   const run = await workflow.createRun({ runId });
-  const result = (await run.resume({ resumeData: resumeData as never })) as unknown as RunResult;
+  const result = (await run.resume({
+    step,
+    resumeData: resumeData as never,
+  })) as unknown as RunResult;
   await handleRunResult({ runId, result, signalNumber });
   return { status: result.status };
 }

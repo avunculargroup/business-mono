@@ -10,6 +10,7 @@ vi.mock('@platform/db', () => ({
 }));
 vi.mock('../workflows/startNewsletterRun.js', () => ({
   resumeNewsletterRun: resumeSpy,
+  gateStepForStatus: (status: string) => (status === 'suspended_gate1' ? 'gate1' : 'gate2'),
 }));
 
 const { validateWebDecision, handleGateRow } = await import('./newsletterGateWeb.js');
@@ -76,7 +77,49 @@ describe('handleGateRow', () => {
     const builder = fakeSupabase.__buildersFor('newsletter_runs')[0];
     expect(builder?.update).toHaveBeenCalledWith({ pending_decision: null });
     expect(builder?.not).toHaveBeenCalledWith('pending_decision', 'is', null);
-    expect(resumeSpy).toHaveBeenCalledWith({ runId: 'run-1', resumeData: { decision: 'approve' } });
+    expect(resumeSpy).toHaveBeenCalledWith({
+      runId: 'run-1',
+      resumeData: { decision: 'approve' },
+      step: 'gate1',
+    });
+  });
+
+  it('resumes a gate-2 publish against the gate2 step', async () => {
+    fakeSupabase.__setResponse('newsletter_runs', {
+      data: [{ workflow_run_id: 'run-1' }],
+      error: null,
+    });
+
+    await handleGateRow({
+      workflow_run_id: 'run-1',
+      status: 'suspended_gate2',
+      pending_decision: { decision: 'publish' },
+    });
+
+    expect(resumeSpy).toHaveBeenCalledWith({
+      runId: 'run-1',
+      resumeData: { decision: 'publish' },
+      step: 'gate2',
+    });
+  });
+
+  it('resumes a hold decision against the gate2 step', async () => {
+    fakeSupabase.__setResponse('newsletter_runs', {
+      data: [{ workflow_run_id: 'run-1' }],
+      error: null,
+    });
+
+    await handleGateRow({
+      workflow_run_id: 'run-1',
+      status: 'suspended_hold',
+      pending_decision: { decision: 'hold' },
+    });
+
+    expect(resumeSpy).toHaveBeenCalledWith({
+      runId: 'run-1',
+      resumeData: { decision: 'hold' },
+      step: 'gate2',
+    });
   });
 
   it('does not resume when the claim affects no row (already taken)', async () => {
