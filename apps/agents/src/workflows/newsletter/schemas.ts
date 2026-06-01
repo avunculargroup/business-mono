@@ -12,7 +12,10 @@ export const newsletterInputSchema = z.object({
   timeRange: timeRangeSchema.default('month'),
   storyCount: z.number().int().min(3).max(8).default(5),
   targetWordCount: z.number().int().min(100).max(800).default(250),
-  audienceContext: z.string().optional(),
+  // Stored routine action_config writes `audience_context: null` when no
+  // override is given, so accept null here (not just undefined) — otherwise the
+  // routine-launched run fails Zod parse at the startNewsletterRun boundary.
+  audienceContext: z.string().nullish(),
   triggerSource: z.enum(['signal', 'schedule', 'web']).default('signal'),
   requestedBy: z.string().optional(),        // team_members.id
   requestedBySignal: z.string().optional(),  // sender E.164 for gate replies
