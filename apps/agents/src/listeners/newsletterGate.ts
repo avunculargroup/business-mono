@@ -71,15 +71,15 @@ export async function findSuspendedRun(senderNumber: string): Promise<SuspendedR
 export async function resumeFromReply(run: SuspendedRun, text: string): Promise<string> {
   if (run.status === 'suspended_gate1') {
     const resumeData = parseGate1Reply(text);
-    await resumeNewsletterRun({ runId: run.runId, resumeData });
+    await resumeNewsletterRun({ runId: run.runId, resumeData, step: 'gate1' });
     return resumeData.decision === 'approve'
       ? 'Approved — drafting the stories now. I\'ll send the full draft for review shortly.'
       : 'Got it — reworking the shortlist and I\'ll send the updated draft through.';
   }
 
-  // gate2 or hold both accept the gate-2 command set.
+  // gate2 or hold both accept the gate-2 command set and re-enter the gate2 step.
   const resumeData = parseGate2Reply(text);
-  await resumeNewsletterRun({ runId: run.runId, resumeData });
+  await resumeNewsletterRun({ runId: run.runId, resumeData, step: 'gate2' });
   switch (resumeData.decision) {
     case 'publish':
       return 'Publishing — saving it to the content pipeline now.';
