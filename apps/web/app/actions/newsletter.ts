@@ -67,3 +67,76 @@ export async function runNewsletter(formData: FormData) {
   revalidatePath('/content');
   return { success: true };
 }
+
+// ── Newsletter gate decisions ────────────────────────────────────────────────
+// The /content page approves a suspended newsletter run by writing the
+// director's decision to newsletter_runs.pending_decision. The agents-side
+// newsletterGateWeb listener claims it and resumes the workflow — the web app
+// never reaches Railway over HTTP, so this DB write is the handoff (mirrors how
+// runNewsletter arms a routine). The decision shapes match the workflow's
+// gate-1 / gate-2 resume schemas.
+
+const gate1DecisionSchema = z.object({
+  decision: z.literal('approve'),
+}).or(
+  z.object({
+    decision: z.literal('adjust'),
+    adjustment: z.string().trim().min(1).max(2000),
+  }),
+);
+
+const gate2DecisionSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('publish') }),
+  z.object({ decision: z.literal('hold') }),
+  z.object({
+    decision: z.literal('revise'),
+    storyNumber: z.coerce.number().int().min(1),
+    instruction: z.string().trim().min(1).max(2000),
+  }),
+]);
+
+type GateDecision =
+  | z.infer<typeof gate1DecisionSchema>
+  | z.infer<typeof gate2DecisionSchema>;
+
+export async function submitNewsletterGateDecision(
+  workflowRunId: string,
+  decision: GateDecision,
+) {
+  const supabase = await createClient();
+
+  // newsletter_runs isn't in the web Database types — cast at the boundary.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const { data: run, error: findError } = await db
+    .from('newsletter_runs')
+    .select('status')
+    .eq('workflow_run_id', workflowRunId)
+    .maybeSingle();
+  if (findError) return { error: findError.message };
+  if (!run) return { error: 'That newsletter run no longer exists.' };
+
+  const status = run.status as string;
+  const parsed =
+    status === 'suspended_gate1'
+      ? gate1DecisionSchema.safeParse(decision)
+      : status === 'suspended_gate2' || status === 'suspended_hold'
+        ? gate2DecisionSchema.safeParse(decision)
+        : null;
+
+  if (!parsed) {
+    return { error: 'This run isn\'t waiting for review right now.' };
+  }
+  if (!parsed.success) {
+    return { error: 'That decision doesn\'t match the current review step.' };
+  }
+
+  const { error: updateError } = await db
+    .from('newsletter_runs')
+    .update({ pending_decision: parsed.data })
+    .eq('workflow_run_id', workflowRunId);
+  if (updateError) return { error: updateError.message };
+
+  revalidatePath('/content');
+  return { success: true };
+}

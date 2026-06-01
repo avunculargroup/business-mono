@@ -97,7 +97,19 @@ async function handleRunResult(args: {
           ? 'suspended_hold'
           : 'suspended_gate2';
 
-    await db.from('newsletter_runs').update({ status }).eq('workflow_run_id', runId);
+    // Persist the gate context so the /content page can render the decision
+    // (Signal only ever got the message string + a markdown attachment). Clear
+    // any prior pending_decision so the claim that triggered this resume can't
+    // be re-processed against the freshly suspended state.
+    await db
+      .from('newsletter_runs')
+      .update({
+        status,
+        gate_message: payload.message,
+        gate_draft_markdown: payload.newsletterMarkdown ?? null,
+        pending_decision: null,
+      })
+      .eq('workflow_run_id', runId);
 
     if (signalNumber) {
       const attachments =
@@ -124,6 +136,9 @@ async function handleRunResult(args: {
         total_word_count: totalWordCount,
         editorial_scores: editorialScores,
         completed_at: new Date().toISOString(),
+        gate_message: null,
+        gate_draft_markdown: null,
+        pending_decision: null,
       })
       .eq('workflow_run_id', runId);
 
@@ -145,7 +160,11 @@ async function handleRunResult(args: {
   if (result.status === 'failed' || result.status === 'canceled') {
     await db
       .from('newsletter_runs')
-      .update({ status: 'failed', notes: String(result.error ?? result.status) })
+      .update({
+        status: 'failed',
+        notes: String(result.error ?? result.status),
+        pending_decision: null,
+      })
       .eq('workflow_run_id', runId);
     if (signalNumber) {
       await client.sendMessage({

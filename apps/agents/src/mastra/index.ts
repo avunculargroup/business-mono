@@ -23,6 +23,7 @@ import { startContentCreatorListener } from '../listeners/contentCreatorListener
 import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
+import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -123,3 +124,8 @@ startFastmailListener();
 // Keep the content_embeddings RAG store in sync (embed-on-write + backfill).
 // Powers the newsletter workflow's retrieval step.
 startContentEmbeddingListener();
+
+// Resume newsletter gates approved from the web /content page (the web app
+// can't reach this server over HTTP, so it writes to newsletter_runs and this
+// listener reacts). Mirrors the Signal gate path in newsletterGate.ts.
+startNewsletterGateWebListener();
