@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
+import { validateFeedUrl } from '@/lib/news/validateFeed';
 
 const REVALIDATE = '/news/sources';
 
@@ -29,6 +30,9 @@ export async function createNewsSource(formData: FormData) {
     return { error: 'Provide a feed URL (RSS/Atom), or a Substack site URL so the feed can be derived.' };
   }
 
+  const feedCheck = await validateFeedUrl(feedUrl);
+  if (!feedCheck.ok) return { error: feedCheck.error };
+
   const supabase = await createClient();
   const { error } = await supabase.from('news_sources').insert({
     name: input.name,
@@ -51,6 +55,9 @@ export async function updateNewsSource(id: string, formData: FormData) {
   if (!feedUrl) {
     return { error: 'Provide a feed URL (RSS/Atom), or a Substack site URL so the feed can be derived.' };
   }
+
+  const feedCheck = await validateFeedUrl(feedUrl);
+  if (!feedCheck.ok) return { error: feedCheck.error };
 
   const supabase = await createClient();
   const { error } = await supabase
