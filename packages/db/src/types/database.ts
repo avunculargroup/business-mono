@@ -2014,8 +2014,11 @@ export type Database = {
           completed_at: string | null
           content_item_id: string | null
           editorial_scores: Json | null
+          gate_draft_markdown: string | null
+          gate_message: string | null
           id: string
           notes: string | null
+          pending_decision: Json | null
           requested_by: string | null
           requested_by_signal: string | null
           shortlist: Json | null
@@ -2035,8 +2038,11 @@ export type Database = {
           completed_at?: string | null
           content_item_id?: string | null
           editorial_scores?: Json | null
+          gate_draft_markdown?: string | null
+          gate_message?: string | null
           id?: string
           notes?: string | null
+          pending_decision?: Json | null
           requested_by?: string | null
           requested_by_signal?: string | null
           shortlist?: Json | null
@@ -2056,8 +2062,11 @@ export type Database = {
           completed_at?: string | null
           content_item_id?: string | null
           editorial_scores?: Json | null
+          gate_draft_markdown?: string | null
+          gate_message?: string | null
           id?: string
           notes?: string | null
+          pending_decision?: Json | null
           requested_by?: string | null
           requested_by_signal?: string | null
           shortlist?: Json | null
