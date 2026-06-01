@@ -217,6 +217,19 @@ export function gateStepForStatus(status: string): GateStepId {
   return status === 'suspended_gate1' ? 'gate1' : 'gate2';
 }
 
+/** Which gate step (if any) the persisted Mastra snapshot is actually suspended
+ *  at. The snapshot is the source of truth for workflow state; the
+ *  newsletter_runs.status column only mirrors it. gate2 is checked first so a
+ *  run that has already advanced past gate1 resolves to gate2. Returns null when
+ *  neither gate is suspended (the run finished, failed, or is mid-resume). */
+export function pickSuspendedGate(
+  steps: Record<string, { status?: string } | undefined> | undefined,
+): GateStepId | null {
+  if (steps?.['gate2']?.status === 'suspended') return 'gate2';
+  if (steps?.['gate1']?.status === 'suspended') return 'gate1';
+  return null;
+}
+
 /** Resume a suspended run (gate reply from Signal or the /content page). */
 export async function resumeNewsletterRun(args: {
   runId: string;
@@ -234,6 +247,26 @@ export async function resumeNewsletterRun(args: {
 
   const mastra = await loadMastra();
   const workflow = mastra.getWorkflow('newsletter');
+
+  // Reconcile against the snapshot before resuming. `step` was derived from
+  // newsletter_runs.status, which only mirrors the workflow state — an old run's
+  // row can name a gate the snapshot has already moved past (e.g. status says
+  // gate2 but the snapshot is still suspended at gate1), and a Signal reply can
+  // race the /content page to resolve the same gate. In either case run.resume()
+  // throws "step was not suspended". Trust the snapshot and skip when it
+  // disagrees rather than crashing — the decision was for a gate that no longer
+  // exists, and its resumeData wouldn't match the real gate's schema anyway.
+  const state = await workflow.getWorkflowRunById(runId, { fields: ['steps'] });
+  const suspendedGate = pickSuspendedGate(state?.steps);
+  if (suspendedGate !== step) {
+    console.warn(
+      `[newsletter] Not resuming ${runId} at "${step}": the snapshot is ` +
+        `${suspendedGate ? `suspended at "${suspendedGate}"` : 'no longer suspended at a gate'}. ` +
+        'newsletter_runs.status is stale for this run (typically an old one); ignoring the decision.',
+    );
+    return { status: 'stale' };
+  }
+
   const run = await workflow.createRun({ runId });
   const result = (await run.resume({
     step,
