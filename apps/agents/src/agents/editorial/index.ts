@@ -9,8 +9,9 @@ import { dynamicModelFor } from '../../config/model.js';
 // conflating "write this" with "judge this" produces worse output. It is the
 // copy editor who has read everything BTS has published but never written for
 // it. It is internal to the workflow: not registered on Simon, not in the
-// agent_activity agent_name CHECK. Its model is configurable via the
-// `newsletter.editorial_review` scope.
+// agent_activity agent_name CHECK. Its model resolves via the
+// `newsletter.editorial_review` step scope first, then its own `editor` agent
+// scope, then the env default — both are configurable from /settings/models.
 
 function loadBrandVoiceFull(): string {
   const candidates = [
@@ -66,6 +67,6 @@ export const editor = new Agent({
   description:
     'Internal newsletter copy editor. Scores Charlie\'s drafts against BTS brand voice and audience fit, and revises any that fail the gate. Used only by the newsletter workflow.',
   instructions: EDITORIAL_SYSTEM_PROMPT,
-  model: dynamicModelFor('newsletter.editorial_review'),
+  model: dynamicModelFor('editor'),
   defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
 });

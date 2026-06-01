@@ -38,6 +38,12 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
   { key: 'charlie', type: 'agent', label: 'Charlie', description: 'Content creator' },
   { key: 'rex', type: 'agent', label: 'Rex', description: 'Researcher — web research and URL ingestion' },
   { key: 'della', type: 'agent', label: 'Della', description: 'Relationship manager — CRM hygiene' },
+  {
+    key: 'editor',
+    type: 'agent',
+    label: 'Editor',
+    description: 'Newsletter copy editor — brand-voice and audience-fit gate (internal to the newsletter workflow)',
+  },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
   {
@@ -156,7 +162,7 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Editorial review',
     description: 'A separate editorial agent scores each draft against brand voice',
     workflow: 'newsletter',
-    fallbackAgent: 'charlie',
+    fallbackAgent: 'editor',
   },
 ] as const;
 

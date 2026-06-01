@@ -141,4 +141,33 @@ describe('dynamicModelFor', () => {
     });
     expect(anthropicFactory).toHaveBeenCalledWith('claude-roger');
   });
+
+  it('resolves editorial review to the editor agent, never Charlie', async () => {
+    // The editor agent owns scope `editor` and the editorial_review step's
+    // fallbackAgent is `editor`, so a Charlie override must NOT leak into the
+    // editorial review. With no editor/step row it lands on the env default.
+    vi.stubEnv('ANTHROPIC_MODEL', 'anthropic/claude-default');
+    fake.__setResponse('model_configs', {
+      data: [{ scope_key: 'charlie', model_id: 'anthropic/claude-charlie' }],
+      error: null,
+    });
+    const { dynamicModelFor, stepRequestContext } = await loadFresh();
+    await dynamicModelFor('editor')({
+      requestContext: stepRequestContext('newsletter.editorial_review'),
+    });
+    expect(anthropicFactory).toHaveBeenCalledWith('claude-default');
+    expect(anthropicFactory).not.toHaveBeenCalledWith('claude-charlie');
+  });
+
+  it('uses the editor agent override for editorial review when no step row exists', async () => {
+    fake.__setResponse('model_configs', {
+      data: [{ scope_key: 'editor', model_id: 'anthropic/claude-editor' }],
+      error: null,
+    });
+    const { dynamicModelFor, stepRequestContext } = await loadFresh();
+    await dynamicModelFor('editor')({
+      requestContext: stepRequestContext('newsletter.editorial_review'),
+    });
+    expect(anthropicFactory).toHaveBeenCalledWith('claude-editor');
+  });
 });
