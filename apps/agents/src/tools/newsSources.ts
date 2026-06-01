@@ -2,6 +2,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { resolveFeedUrl } from '@platform/shared';
+import { validateFeed } from '../lib/validateFeed.js';
 
 export const manageNewsSources = createTool({
   id: 'manage_news_sources',
@@ -33,6 +34,10 @@ export const manageNewsSources = createTool({
       const feedUrl = resolveFeedUrl(ctx.site_url, ctx.feed_url);
       if (!feedUrl) {
         return { error: 'Provide feed_url (RSS/Atom URL), or a Substack site_url so the feed can be derived.' };
+      }
+      const validation = await validateFeed(feedUrl);
+      if (!validation.ok) {
+        return { error: `Could not read an RSS/Atom feed at ${feedUrl} (${validation.error}). The source was not added.` };
       }
       const { data, error } = await supabase
         .from('news_sources')
