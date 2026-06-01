@@ -1593,9 +1593,15 @@ CREATE TABLE newsletter_runs (
   shortlist           JSONB DEFAULT '[]',
   editorial_scores    JSONB DEFAULT '{}',
   total_word_count    INT,
+  -- Web approval path (migration: 20260601000000_add_newsletter_web_gates):
+  -- gate context persisted on suspend + the web → agents decision handoff slot.
+  gate_message        TEXT,
+  gate_draft_markdown TEXT,
+  pending_decision    JSONB,
   started_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at        TIMESTAMPTZ,
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   notes               TEXT
 );
--- Realtime-enabled so the /content page can show in-progress run status.
+-- Realtime-enabled so the /content page can show in-progress run status and
+-- the agents-side gate listener can react to web decisions.

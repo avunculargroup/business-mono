@@ -21,7 +21,7 @@ export function RunNewsletterModal({ open, onClose }: RunNewsletterModalProps) {
       error(result.error);
       return { error: result.error };
     }
-    success('Newsletter queued — I\'ll send the story shortlist to Signal for review shortly.');
+    success('Newsletter queued — the story shortlist will appear here for review shortly.');
     onClose();
     return null;
   };
@@ -81,7 +81,7 @@ export function RunNewsletterModal({ open, onClose }: RunNewsletterModalProps) {
         </div>
 
         <p className={styles.label}>
-          You&apos;ll review the story shortlist and the full draft over Signal before anything is saved.
+          You&apos;ll review the story shortlist and the full draft here before anything is saved.
         </p>
 
         {state?.error && <p className={styles.error}>{state.error}</p>}
