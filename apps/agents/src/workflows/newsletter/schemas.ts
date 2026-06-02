@@ -25,10 +25,14 @@ export type NewsletterInput = z.infer<typeof newsletterInputSchema>;
 // ── Step 1: retrieval ────────────────────────────────────────────────────────
 export const retrievedItemSchema = z.object({
   id: z.string(),
-  source_table: z.enum(['content_items', 'interactions']),
+  // news_items is the newsletter's primary source; content_items / interactions
+  // are supplementary internal context.
+  source_table: z.enum(['content_items', 'interactions', 'news_items']),
   title: z.string().nullable(),
   summary: z.string().nullable(),
   body_excerpt: z.string().nullable(),
+  // Source URL for news items (null for internal content) so Rex can cite it.
+  url: z.string().nullable(),
   similarity_score: z.number(),
   recency_score: z.number(),
   composite_score: z.number(),
@@ -147,6 +151,32 @@ export const reviewedStorySchema = z.object({
   review: editorialReviewSchema,
 });
 export type ReviewedStory = z.infer<typeof reviewedStorySchema>;
+
+// ── Workflow output ──────────────────────────────────────────────────────────
+// A finished run either persisted a newsletter or short-circuited because there
+// were no stories worth running. The no-stories branch never reaches a human
+// gate — there's nothing to approve — so it bails with a diagnostic reason.
+export const newsletterCompletedSchema = z.object({
+  contentItemId: z.string(),
+  title: z.string(),
+  storyCount: z.number(),
+  totalWordCount: z.number(),
+  editorialScores: z.record(z.number()),
+});
+export type NewsletterCompleted = z.infer<typeof newsletterCompletedSchema>;
+
+export const newsletterNoStoriesSchema = z.object({
+  noStories: z.literal(true),
+  reason: z.string(),
+  timeRange: timeRangeSchema,
+  candidatesFound: z.number(),
+});
+export type NewsletterNoStories = z.infer<typeof newsletterNoStoriesSchema>;
+
+export const newsletterOutputSchema = z.union([
+  newsletterCompletedSchema,
+  newsletterNoStoriesSchema,
+]);
 
 // Workflow state. A resumed step re-executes from the top with fresh resumeData,
 // so the gate-2 revision loop must persist the working draft here (not in local

@@ -1,4 +1,4 @@
-import type { ContentVectorSearchResult } from '@platform/db';
+import type { ContentVectorSearchResult, NewsVectorSearchResult } from '@platform/db';
 import type { RetrievedItem, TimeRange } from './schemas.js';
 
 // Pure ranking helpers for the newsletter retrieval step. Kept side-effect free
@@ -14,6 +14,55 @@ export const TIME_RANGE_DAYS: Record<TimeRange, number> = {
 // usually win, but a recent item beats a marginally-better-matching old one.
 const SIMILARITY_WEIGHT = 0.6;
 const RECENCY_WEIGHT = 0.4;
+
+// The newsletter is news-led: news_items is the primary source, internal
+// content (drafts, client interactions) is supplementary. A modest discount on
+// internal content keeps news ahead on close calls while still letting a strong
+// internal item surface.
+const SOURCE_WEIGHT: Record<RetrievedItem['source_table'], number> = {
+  news_items: 1,
+  content_items: 0.8,
+  interactions: 0.8,
+};
+
+// Common shape the ranker operates on — content and news search hits normalise
+// into this before scoring so a single composite/sort handles both.
+export interface RankableHit {
+  id: string;
+  source_table: RetrievedItem['source_table'];
+  title: string | null;
+  summary: string | null;
+  body_excerpt: string | null;
+  url: string | null;
+  created_at: string | null;
+  similarity: number;
+}
+
+export function contentHitToRankable(hit: ContentVectorSearchResult): RankableHit {
+  return {
+    id: hit.source_id,
+    source_table: hit.source_table,
+    title: hit.title,
+    summary: hit.summary,
+    body_excerpt: hit.body_excerpt,
+    url: null,
+    created_at: hit.created_at,
+    similarity: hit.similarity,
+  };
+}
+
+export function newsHitToRankable(hit: NewsVectorSearchResult): RankableHit {
+  return {
+    id: hit.id,
+    source_table: 'news_items',
+    title: hit.title,
+    summary: hit.summary,
+    body_excerpt: hit.summary,
+    url: hit.url,
+    created_at: hit.published_at,
+    similarity: hit.similarity,
+  };
+}
 
 /**
  * Linear time-decay over the lookback window. 1.0 = now, 0.0 = at/older than
@@ -33,11 +82,12 @@ export function recencyScore(
 }
 
 /**
- * Attach recency + composite scores to vector-search hits and return them
- * sorted by composite score (best first).
+ * Attach recency + composite scores to normalised search hits and return them
+ * sorted by composite score (best first). News and internal-content hits share
+ * one ranking; the per-source weight keeps the newsletter news-led.
  */
 export function scoreAndRank(
-  hits: ContentVectorSearchResult[],
+  hits: RankableHit[],
   timeRange: TimeRange,
   now: number = Date.now(),
 ): RetrievedItem[] {
@@ -45,13 +95,15 @@ export function scoreAndRank(
   return hits
     .map((hit) => {
       const recency = recencyScore(hit.created_at, windowDays, now);
-      const composite = SIMILARITY_WEIGHT * hit.similarity + RECENCY_WEIGHT * recency;
+      const base = SIMILARITY_WEIGHT * hit.similarity + RECENCY_WEIGHT * recency;
+      const composite = base * SOURCE_WEIGHT[hit.source_table];
       return {
-        id: hit.source_id,
+        id: hit.id,
         source_table: hit.source_table,
         title: hit.title,
         summary: hit.summary,
         body_excerpt: hit.body_excerpt,
+        url: hit.url,
         similarity_score: hit.similarity,
         recency_score: recency,
         composite_score: composite,

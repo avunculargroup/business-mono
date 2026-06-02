@@ -53,6 +53,32 @@ export function buildGate1Message(args: {
   return lines.join('\n');
 }
 
+/**
+ * Sent when a run finds no stories worth running. There's nothing to approve,
+ * so this isn't a gate prompt — it's a diagnostic that explains *why* it was
+ * empty and what the director can do about it.
+ */
+export function buildNoStoriesMessage(args: { timeRange: TimeRange; poolSize: number }): string {
+  const { timeRange, poolSize } = args;
+  const label = TIME_RANGE_LABEL[timeRange];
+
+  const diagnosis =
+    poolSize === 0
+      ? `I found nothing from the past ${label} relevant enough to build a newsletter from — no news or internal content in that window cleared the relevance bar.`
+      : `I pulled ${poolSize} candidate item${poolSize === 1 ? '' : 's'} from the past ${label}, but none could be shaped into a story worth running.`;
+
+  return [
+    'Newsletter — no stories to run',
+    '',
+    diagnosis,
+    '',
+    "No approval needed — there's nothing to publish. A few things that might help:",
+    '• Widen the window — ask for a "month" edition instead.',
+    '• Check the news pipeline is ingesting (Researcher / news sources).',
+    '• Add internal content the newsletter can draw on.',
+  ].join('\n');
+}
+
 export function buildGate2Message(args: {
   stories: ReviewedStory[];
   totalWordCount: number;

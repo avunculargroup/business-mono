@@ -355,20 +355,23 @@ export const startNewsletter = createTool({
       .describe('Optional audience override, e.g. "CFO audience". Leave blank for the default.'),
   }),
   execute: async (context) => {
-    const { runId, status } = await startNewsletterRun({
+    const { runId, status, reason } = await startNewsletterRun({
       timeRange: context.timeRange,
       storyCount: context.storyCount,
       targetWordCount: context.targetWordCount,
       audienceContext: context.audienceContext,
       triggerSource: 'signal',
     });
-    return {
-      runId,
-      status,
-      note:
-        status === 'suspended'
-          ? 'Newsletter started. I\'ve sent the candidate story shortlist for review — approve or adjust it there.'
-          : `Newsletter run ${runId} ended with status: ${status}.`,
-    };
+    let note: string;
+    if (status === 'suspended') {
+      note =
+        'Newsletter started. I\'ve sent the candidate story shortlist for review — approve or adjust it there.';
+    } else if (status === 'no_stories') {
+      // Nothing to approve — relay the diagnostic so the director knows why.
+      note = reason ?? 'No stories were relevant enough to run a newsletter this time.';
+    } else {
+      note = `Newsletter run ${runId} ended with status: ${status}.`;
+    }
+    return { runId, status, note };
   },
 });
