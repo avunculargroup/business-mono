@@ -151,6 +151,7 @@ async function handleRunResult(args: {
         total_word_count: totalWordCount,
         editorial_scores: editorialScores,
         completed_at: new Date().toISOString(),
+        current_step: 'persist',
         gate_message: null,
         gate_draft_markdown: null,
         pending_decision: null,
