@@ -29,13 +29,13 @@ import type {
   NewsSourceScanResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
-import Parser from 'rss-parser';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
+import { fetchFeed } from '../lib/fetchFeed.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
@@ -865,10 +865,6 @@ async function runNewsIngest(
   };
 }
 
-// Shared RSS/Atom parser. rss-parser normalises both formats to a common
-// item shape with link/title/isoDate/contentSnippet/content fields.
-const rssParser = new Parser({ timeout: 20000 });
-
 async function runNewsSourceScan(
   routine: z.infer<typeof routineSchema>,
 ): Promise<RoutineOutcome> {
@@ -930,7 +926,7 @@ async function runNewsSourceScan(
     const sourceName = src.name as string;
     const feedUrl = src.feed_url as string;
     try {
-      const feed = await rssParser.parseURL(feedUrl);
+      const feed = await fetchFeed(feedUrl);
       const normalized = normalizeFeedItems(feed.items ?? [], {
         sourceName,
         cutoffMs: cutoff,

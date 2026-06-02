@@ -7,11 +7,9 @@ vi.mock('@platform/db', () => ({
   get supabase() { return fake; },
 }));
 
-// Mock rss-parser so feed validation in the `add` path makes no network call.
-const { parseURL } = vi.hoisted(() => ({ parseURL: vi.fn() }));
-vi.mock('rss-parser', () => ({
-  default: vi.fn().mockImplementation(() => ({ parseURL })),
-}));
+// Mock fetchFeed so feed validation in the `add` path makes no network call.
+const { fetchFeed } = vi.hoisted(() => ({ fetchFeed: vi.fn() }));
+vi.mock('../lib/fetchFeed.js', () => ({ fetchFeed }));
 
 const { manageNewsSources } = await import('./newsSources.js');
 const { resolveFeedUrl } = await import('@platform/shared');
@@ -44,8 +42,8 @@ describe('manageNewsSources tool', () => {
     fake.__builders.length = 0;
     fake.__responses.clear();
     fake.from.mockClear();
-    parseURL.mockReset();
-    parseURL.mockResolvedValue({ items: [] });
+    fetchFeed.mockReset();
+    fetchFeed.mockResolvedValue({ items: [] });
   });
 
   it('lists sources ordered by name', async () => {
@@ -88,11 +86,11 @@ describe('manageNewsSources tool', () => {
   it('validates the resolved feed before inserting', async () => {
     fake.__setResponse('news_sources', { data: { id: 's4' }, error: null });
     await execute({ action: 'add', name: 'Bitcoin Magazine', feed_url: 'https://bitcoinmagazine.com/feed' });
-    expect(parseURL).toHaveBeenCalledWith('https://bitcoinmagazine.com/feed');
+    expect(fetchFeed).toHaveBeenCalledWith('https://bitcoinmagazine.com/feed');
   });
 
   it('rejects add when the feed cannot be parsed', async () => {
-    parseURL.mockRejectedValueOnce(new Error('Status code 404'));
+    fetchFeed.mockRejectedValueOnce(new Error('Status code 404'));
     const result = await execute({ action: 'add', name: 'Broken', feed_url: 'https://example.com/feed' });
     expect(result).toEqual({ error: expect.stringContaining('404') });
     expect(fake.__buildersFor('news_sources')).toHaveLength(0);
