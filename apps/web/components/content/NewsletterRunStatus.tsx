@@ -18,12 +18,21 @@ import styles from './NewsletterRunStatus.module.css';
 // newsletter_runs.pending_decision; the agents-side listener resumes the run.
 
 const ACTIVE_STATUSES = ['running', 'suspended_gate1', 'suspended_gate2', 'suspended_hold'];
+// Terminal states worth surfacing briefly so a director sees what happened. Old
+// ones are filtered out by a 24h window in the query (the realtime sub refreshes).
+const NOTICE_STATUSES = ['failed', 'no_stories'];
+const NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const STATUS_LABEL: Record<string, string> = {
   running: 'Newsletter starting…',
   suspended_gate1: 'Story selection sent for review',
   suspended_gate2: 'Draft ready for review',
   suspended_hold: 'Newsletter on hold',
+};
+
+const NOTICE_LABEL: Record<string, string> = {
+  failed: "Newsletter couldn't be completed",
+  no_stories: 'No stories to run',
 };
 
 interface NewsletterRun {
@@ -33,6 +42,7 @@ interface NewsletterRun {
   started_at: string;
   gate_message: string | null;
   gate_draft_markdown: string | null;
+  notes: string | null;
 }
 
 export function NewsletterRunStatus() {
@@ -42,10 +52,15 @@ export function NewsletterRunStatus() {
     // newsletter_runs isn't in the web Database types yet — cast at the boundary.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = createClient() as any;
+    // Active runs always show; terminal notices only if recent so old failures
+    // don't haunt the page forever.
+    const cutoff = new Date(Date.now() - NOTICE_WINDOW_MS).toISOString();
     const { data } = await supabase
       .from('newsletter_runs')
-      .select('workflow_run_id, status, time_range, started_at, gate_message, gate_draft_markdown')
-      .in('status', ACTIVE_STATUSES)
+      .select('workflow_run_id, status, time_range, started_at, gate_message, gate_draft_markdown, notes')
+      .or(
+        `status.in.(${ACTIVE_STATUSES.join(',')}),and(status.in.(${NOTICE_STATUSES.join(',')}),started_at.gt.${cutoff})`,
+      )
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -64,6 +79,19 @@ export function NewsletterRunStatus() {
   );
 
   if (!run) return null;
+
+  if (NOTICE_STATUSES.includes(run.status)) {
+    const reason = run.notes ?? run.gate_message;
+    const isFailure = run.status === 'failed';
+    return (
+      <div className={`${styles.banner} ${styles.notice}`} role="status">
+        <StatusChip label="Newsletter" color={isFailure ? 'destructive' : 'warning'} />
+        <span className={styles.label}>{NOTICE_LABEL[run.status] ?? run.status}</span>
+        <span className={styles.meta}>{run.time_range} edition</span>
+        {reason && <p className={styles.noticeReason}>{reason}</p>}
+      </div>
+    );
+  }
 
   const isGate =
     run.status === 'suspended_gate1' ||

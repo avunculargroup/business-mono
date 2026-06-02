@@ -2,13 +2,27 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RequestContext } from '@mastra/core/request-context';
 import { createFakeSupabase } from '../../test/mocks/supabase.js';
 
+// Build a fake LanguageModelV2 with doGenerate/doStream spies so the fallback
+// wrapper has the fields it reads (provider/modelId) and call sites to assert.
+function makeModel(provider: string, id: string) {
+  return {
+    provider,
+    id,
+    modelId: id,
+    specificationVersion: 'v2' as const,
+    supportedUrls: {},
+    doGenerate: vi.fn(async () => ({ provider, id, kind: 'generate' })),
+    doStream: vi.fn(async () => ({ provider, id, kind: 'stream' })),
+  };
+}
+
 // Anthropic factory returns a fn(modelId) → languageModel; capture the modelId
 // it's called with so we can assert which model was resolved.
-const anthropicFactory = vi.fn((id: string) => ({ provider: 'anthropic', id }));
+const anthropicFactory = vi.fn((id: string) => makeModel('anthropic', id));
 const createAnthropic = vi.fn(() => anthropicFactory);
 
 // OpenAI factory returns an object with .chat(modelId)
-const openaiChat = vi.fn((id: string) => ({ provider: 'openai', id }));
+const openaiChat = vi.fn((id: string) => makeModel('openai', id));
 const createOpenAI = vi.fn(() => ({ chat: openaiChat }));
 
 vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic }));
@@ -44,8 +58,8 @@ describe('buildModel via getModelConfig', () => {
     expect(model).toMatchObject({ provider: 'anthropic', id: 'claude-sonnet-4-5' });
   });
 
-  it('uses OpenRouter (via openai.chat) when OPENROUTER_API_KEY is set', async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test');
+  it('uses OpenRouter alone (via openai.chat) when only OPENROUTER_API_KEY is set', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     vi.stubEnv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-5');
     const { getModelConfig } = await loadFresh();
@@ -56,7 +70,45 @@ describe('buildModel via getModelConfig', () => {
     });
     // OpenRouter accepts the full provider-prefixed id verbatim.
     expect(openaiChat).toHaveBeenCalledWith('anthropic/claude-sonnet-4-5');
+    // No Anthropic fallback built, so the raw OpenRouter model is returned.
+    expect(createAnthropic).not.toHaveBeenCalled();
     expect(model).toMatchObject({ provider: 'openai', id: 'anthropic/claude-sonnet-4-5' });
+  });
+
+  it('wraps OpenRouter with an Anthropic fallback when both keys are set', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test');
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    vi.stubEnv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-5');
+    const { getModelConfig } = await loadFresh();
+    const model = getModelConfig();
+    // Primary is OpenRouter (verbatim id); fallback is the direct Anthropic
+    // model with the `anthropic/` prefix stripped.
+    expect(openaiChat).toHaveBeenCalledWith('anthropic/claude-sonnet-4-5');
+    expect(anthropicFactory).toHaveBeenCalledWith('claude-sonnet-4-5');
+    // The wrapper surfaces the primary's identity for telemetry.
+    expect(model).toMatchObject({ provider: 'openai', modelId: 'anthropic/claude-sonnet-4-5' });
+  });
+
+  it('fails over to Anthropic on a key-limit error, but re-throws others', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test');
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    vi.stubEnv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-5');
+    const { getModelConfig } = await loadFresh();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model = getModelConfig() as any;
+    const primary = openaiChat.mock.results[0]!.value;
+    const fallback = anthropicFactory.mock.results[0]!.value;
+
+    // Key-limit 403 → fail over to Anthropic.
+    primary.doGenerate.mockRejectedValueOnce({ statusCode: 403, message: 'Key limit exceeded' });
+    const result = await model.doGenerate({});
+    expect(fallback.doGenerate).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ provider: 'anthropic' });
+
+    // Any other error propagates without touching the fallback.
+    primary.doGenerate.mockRejectedValueOnce({ statusCode: 500, message: 'boom' });
+    await expect(model.doGenerate({})).rejects.toMatchObject({ statusCode: 500 });
+    expect(fallback.doGenerate).toHaveBeenCalledTimes(1);
   });
 
   it('throws when no provider key is set', async () => {

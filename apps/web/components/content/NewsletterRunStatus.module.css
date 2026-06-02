@@ -15,6 +15,23 @@
   font-weight: 500;
 }
 
+/* Terminal notice (failed / no-stories) — a glanceable banner that carries the
+   reason so a failure is visible on /content even when Signal couldn't deliver. */
+.notice {
+  flex-wrap: wrap;
+  border-left: 3px solid var(--color-destructive);
+}
+
+.noticeReason {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .meta {
   color: var(--color-text-tertiary);
   font-size: var(--text-xs);
