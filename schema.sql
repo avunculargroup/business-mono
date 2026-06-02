@@ -1585,7 +1585,8 @@ CREATE TABLE newsletter_runs (
   audience_context    TEXT,
   status              TEXT NOT NULL DEFAULT 'running'
                       CHECK (status IN ('running', 'suspended_gate1', 'suspended_gate2',
-                                        'suspended_hold', 'completed', 'failed', 'cancelled')),
+                                        'suspended_hold', 'completed', 'failed', 'cancelled',
+                                        'no_stories')),
   approved_story_ids  TEXT[],
   content_item_id     UUID REFERENCES content_items(id) ON DELETE SET NULL,
   requested_by        UUID REFERENCES team_members(id),

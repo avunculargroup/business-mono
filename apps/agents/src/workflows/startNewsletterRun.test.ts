@@ -19,7 +19,7 @@ vi.mock('../mastra/index.js', () => ({
   mastra: { getWorkflow: () => ({ getWorkflowRunById, createRun }) },
 }));
 
-const { notifySignal, resumeNewsletterRun, extractSuspendPayload } = await import(
+const { notifySignal, resumeNewsletterRun, extractSuspendPayload, handleRunResult } = await import(
   './startNewsletterRun.js'
 );
 
@@ -95,6 +95,56 @@ describe('notifySignal', () => {
     await expect(
       notifySignal({ recipients: ['+61390226516'], message: 'gate prompt' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('handleRunResult — no stories', () => {
+  beforeEach(() => {
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+    sendMessage.mockReset();
+  });
+
+  const noStoriesResult = {
+    status: 'bailed',
+    result: {
+      noStories: true as const,
+      reason: 'Newsletter — no stories to run\n\nI found nothing relevant.',
+      timeRange: 'fortnight',
+      candidatesFound: 0,
+    },
+  };
+
+  it('marks the run no_stories and records the diagnostic reason', async () => {
+    await handleRunResult({ runId: 'run-9', result: noStoriesResult, signalNumber: null });
+
+    const update = fakeSupabase
+      .__buildersFor('newsletter_runs')
+      .filter((b) => b.update.mock.calls.length > 0)
+      .at(-1);
+    expect(update?.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'no_stories',
+        notes: noStoriesResult.result.reason,
+        gate_message: noStoriesResult.result.reason,
+        gate_draft_markdown: null,
+        pending_decision: null,
+      }),
+    );
+  });
+
+  it('sends the reason to Signal when an approver number is known', async () => {
+    sendMessage.mockResolvedValueOnce({ timestamp: 1 });
+    await handleRunResult({
+      runId: 'run-9',
+      result: noStoriesResult,
+      signalNumber: '+15551234567',
+    });
+    expect(sendMessage).toHaveBeenCalledWith({
+      recipients: ['+15551234567'],
+      message: noStoriesResult.result.reason,
+    });
   });
 });
 

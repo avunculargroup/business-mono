@@ -43,19 +43,32 @@ const db = supabase as unknown as AnyClient;
 
 const PLATFORM_URL = process.env['PLATFORM_URL'] ?? '';
 
+interface CompletedResult {
+  contentItemId: string;
+  title: string;
+  storyCount: number;
+  totalWordCount: number;
+  editorialScores: Record<string, number>;
+}
+
+interface NoStoriesResult {
+  noStories: true;
+  reason: string;
+  timeRange: string;
+  candidatesFound: number;
+}
+
 interface RunResult {
-  status: 'suspended' | 'success' | 'failed' | 'canceled' | string;
+  status: 'suspended' | 'success' | 'failed' | 'canceled' | 'bailed' | string;
   suspendPayload?: unknown;
   suspended?: string[][];
   steps?: Record<string, { suspendPayload?: unknown }>;
-  result?: {
-    contentItemId: string;
-    title: string;
-    storyCount: number;
-    totalWordCount: number;
-    editorialScores: Record<string, number>;
-  };
+  result?: CompletedResult | NoStoriesResult;
   error?: unknown;
+}
+
+function isNoStories(result: CompletedResult | NoStoriesResult | undefined): result is NoStoriesResult {
+  return Boolean(result && 'noStories' in result && result.noStories);
 }
 
 interface GatePayload {
@@ -116,12 +129,34 @@ export function extractSuspendPayload(result: RunResult): GatePayload | null {
  * advance the newsletter_runs row. Shared by launch and resume so the gate
  * messaging is identical on every transition.
  */
-async function handleRunResult(args: {
+export async function handleRunResult(args: {
   runId: string;
   result: RunResult;
   signalNumber: string | null;
 }): Promise<void> {
   const { runId, result, signalNumber } = args;
+
+  // No-stories runs bail before any gate (status 'success' or 'bailed' depending
+  // on the Mastra engine path), carrying a diagnostic reason instead of a draft.
+  // There's nothing to approve, so end the run and tell the director why.
+  if (isNoStories(result.result)) {
+    const { reason } = result.result;
+    await db
+      .from('newsletter_runs')
+      .update({
+        status: 'no_stories',
+        notes: reason,
+        gate_message: reason,
+        gate_draft_markdown: null,
+        pending_decision: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('workflow_run_id', runId);
+    if (signalNumber) {
+      await notifySignal({ recipients: [signalNumber], message: reason });
+    }
+    return;
+  }
 
   if (result.status === 'suspended') {
     const payload = extractSuspendPayload(result);
@@ -161,7 +196,9 @@ async function handleRunResult(args: {
   }
 
   if (result.status === 'success' && result.result) {
-    const { contentItemId, title, storyCount, totalWordCount, editorialScores } = result.result;
+    // isNoStories returned above, so a successful result is the persisted shape.
+    const { contentItemId, title, storyCount, totalWordCount, editorialScores } =
+      result.result as CompletedResult;
     await db
       .from('newsletter_runs')
       .update({
@@ -209,10 +246,12 @@ async function handleRunResult(args: {
   }
 }
 
-/** Start a brand-new newsletter run. Resolves once the workflow hits gate 1. */
+/** Start a brand-new newsletter run. Resolves once the workflow hits gate 1, or
+ *  immediately with status 'no_stories' (and a reason) when there's nothing to
+ *  run — that branch bails before any gate. */
 export async function startNewsletterRun(
   rawInput: Partial<NewsletterInput>,
-): Promise<{ runId: string; status: string }> {
+): Promise<{ runId: string; status: string; reason?: string }> {
   const input = newsletterInputSchema.parse(rawInput);
   const signalNumber = input.requestedBySignal ?? (await defaultApproverSignal());
 
@@ -238,6 +277,11 @@ export async function startNewsletterRun(
     initialState: {},
   })) as unknown as RunResult;
   await handleRunResult({ runId, result, signalNumber });
+  // Normalise the no-stories bail (engine status 'success'/'bailed') into a
+  // stable contract callers can branch on, carrying the diagnostic reason.
+  if (isNoStories(result.result)) {
+    return { runId, status: 'no_stories', reason: result.result.reason };
+  }
   return { runId, status: result.status };
 }
 

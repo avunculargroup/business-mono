@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-02 — Newsletter `no_stories` terminal status
+
+**Migration:** `20260602000000_newsletter_no_stories_status.sql`
+
+Widens the `newsletter_runs.status` CHECK to allow `'no_stories'`. The newsletter retrieval step now draws primarily from `news_items` (via `vector_search_news`) with `content_items` / `interactions` as supplementary internal context. When retrieval + Rex's selection still produce no candidates, the workflow bails *before* the first approval gate — there is nothing to approve — and records a diagnostic reason in `notes` / `gate_message`. That terminal state is `no_stories`. Previously the run would suspend at gate 1 with an empty "0 stories" shortlist, asking the director to approve nothing.
+
+---
+
 ## 2026-05-31 — Newsletter workflow: `content_embeddings`, `newsletter_runs`, `newsletter` routine action
 
 **Migrations:** `20260531000000_add_content_embeddings.sql`, `20260531000001_add_newsletter_runs.sql`, `20260531000002_add_newsletter_routine_action.sql`

@@ -1,16 +1,22 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { supabase, contentVectorSearch } from '@platform/db';
+import { supabase, contentVectorSearch, newsVectorSearch } from '@platform/db';
 import { stepRequestContext } from '../../config/model.js';
 import { rex } from '../../agents/researcher/index.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { editor } from '../../agents/editorial/index.js';
 import { embedText } from '../../lib/contentEmbeddings.js';
-import { scoreAndRank, TIME_RANGE_DAYS, NEWSLETTER_QUERY_SEED } from './retrieval.js';
+import {
+  scoreAndRank,
+  contentHitToRankable,
+  newsHitToRankable,
+  TIME_RANGE_DAYS,
+  NEWSLETTER_QUERY_SEED,
+} from './retrieval.js';
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
-import { buildGate1Message, buildGate2Message } from './messages.js';
+import { buildGate1Message, buildGate2Message, buildNoStoriesMessage } from './messages.js';
 import {
   newsletterInputSchema,
   retrievedItemSchema,
@@ -22,6 +28,8 @@ import {
   editorialReviewSchema,
   reviewedStorySchema,
   newsletterStateSchema,
+  newsletterCompletedSchema,
+  newsletterOutputSchema,
   gate1ResumeSchema,
   gate2ResumeSchema,
   type StoryCandidate,
@@ -72,11 +80,21 @@ const retrieveStep = createStep({
   execute: async ({ inputData }) => {
     const input = inputData;
     const queryEmbedding = await embedText(NEWSLETTER_QUERY_SEED);
-    const hits = await contentVectorSearch(queryEmbedding, {
-      count: input.storyCount * 4,
-      days: TIME_RANGE_DAYS[input.timeRange],
-    });
-    const pool = scoreAndRank(hits, input.timeRange);
+    const days = TIME_RANGE_DAYS[input.timeRange];
+
+    // News is the primary source (most candidates); internal content
+    // supplements it. A lower-than-default news threshold (0.5, matching
+    // content) widens the ideation net — the pool is capped by count and the
+    // human/Rex curate from there.
+    const [newsHits, contentHits] = await Promise.all([
+      newsVectorSearch(queryEmbedding, { count: input.storyCount * 4, days, threshold: 0.5 }),
+      contentVectorSearch(queryEmbedding, { count: input.storyCount * 2, days }),
+    ]);
+
+    const pool = scoreAndRank(
+      [...newsHits.map(newsHitToRankable), ...contentHits.map(contentHitToRankable)],
+      input.timeRange,
+    );
     return { input, pool };
   },
 });
@@ -106,16 +124,16 @@ Lookback window: past ${input.timeRange}
 Brand voice summary:
 ${tone || '(none on file — apply plain, confident, no-hype BTS voice)'}
 
-Retrieved internal content pool (most relevant first):
+Retrieved content pool (most relevant first). This is news-led: items with source_table "news_items" are external Bitcoin news (the primary source, each with a url); "content_items" and "interactions" are BTS's own internal content and client conversations that can add an internal angle or supporting data.
 ${JSON.stringify(pool, null, 2)}
 
 Your tasks:
-1. Cluster related items into coherent story angles.
-2. Score each candidate on relevance, timeliness, and completeness of internal data.
-3. Flag stories that are relevant but thin on internal data (needs_research = true) and suggest research_queries.
+1. Cluster related items into coherent story angles, leading with the news and layering internal context where it strengthens the story.
+2. Score each candidate on relevance, timeliness, and completeness of available data.
+3. Flag stories that are relevant but thin on supporting data (needs_research = true) and suggest research_queries.
 4. Produce ${input.storyCount + 2} candidates and recommend the best ${input.storyCount}.
 
-Use the source item ids in source_ids. Generate a unique story_id for each candidate.`;
+Use the item ids in source_ids (and the news urls when citing). Generate a unique story_id for each candidate.`;
 
     const fallback = {
       candidates: [] as StoryCandidate[],
@@ -156,10 +174,23 @@ const gate1Step = createStep({
     input: newsletterInputSchema,
     approvedStories: z.array(storyCandidateSchema),
   }),
-  execute: async ({ inputData, resumeData, suspend }) => {
-    const { input, shortlist } = inputData;
+  execute: async ({ inputData, resumeData, suspend, bail }) => {
+    const { input, pool, shortlist } = inputData;
 
     if (!resumeData) {
+      // No candidates → nothing to approve. Don't suspend at the gate (an empty
+      // approval prompt is useless); end the run with a diagnostic reason so the
+      // director learns *why* it was empty instead of approving nothing.
+      if (shortlist.candidates.length === 0) {
+        const reason = buildNoStoriesMessage({ timeRange: input.timeRange, poolSize: pool.length });
+        return bail({
+          noStories: true as const,
+          reason,
+          timeRange: input.timeRange,
+          candidatesFound: 0,
+        });
+      }
+
       const message = buildGate1Message({
         candidates: shortlist.candidates,
         recommendedIds: shortlist.recommended,
@@ -591,13 +622,7 @@ const persistStep = createStep({
     markdown: z.string(),
     totalWordCount: z.number(),
   }),
-  outputSchema: z.object({
-    contentItemId: z.string(),
-    title: z.string(),
-    storyCount: z.number(),
-    totalWordCount: z.number(),
-    editorialScores: z.record(z.number()),
-  }),
+  outputSchema: newsletterCompletedSchema,
   execute: async ({ inputData, runId }) => {
     const { input, approvedStories, reviewed, title, markdown, totalWordCount } = inputData;
 
@@ -644,13 +669,8 @@ export const newsletterWorkflow = createWorkflow({
   id: 'newsletter',
   inputSchema: newsletterInputSchema,
   stateSchema: newsletterStateSchema,
-  outputSchema: z.object({
-    contentItemId: z.string(),
-    title: z.string(),
-    storyCount: z.number(),
-    totalWordCount: z.number(),
-    editorialScores: z.record(z.number()),
-  }),
+  // A run either persists a newsletter or bails with a no-stories diagnostic.
+  outputSchema: newsletterOutputSchema,
 })
   .then(retrieveStep)
   .then(selectStoriesStep)

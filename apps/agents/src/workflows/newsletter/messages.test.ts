@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildGate1Message, buildGate2Message, buildConfirmationMessage } from './messages.js';
+import {
+  buildGate1Message,
+  buildGate2Message,
+  buildConfirmationMessage,
+  buildNoStoriesMessage,
+} from './messages.js';
 import type { StoryCandidate, ReviewedStory } from './schemas.js';
 
 function candidate(id: string, title: string, completeness = 6, needsResearch = false): StoryCandidate {
@@ -81,6 +86,24 @@ describe('buildGate2Message', () => {
       held: true,
     });
     expect(msg).toContain('on hold');
+  });
+});
+
+describe('buildNoStoriesMessage', () => {
+  it('explains an empty pool and asks for no approval', () => {
+    const msg = buildNoStoriesMessage({ timeRange: 'fortnight', poolSize: 0 });
+    expect(msg).toContain('no stories to run');
+    expect(msg).toContain('past fortnight');
+    expect(msg).toContain('No approval needed');
+    expect(msg).toContain('month'); // suggests widening the window
+    // No empty "RECOMMENDED (0 stories)" approval prompt.
+    expect(msg).not.toContain('RECOMMENDED');
+  });
+
+  it('distinguishes a non-empty pool that produced no usable stories', () => {
+    const msg = buildNoStoriesMessage({ timeRange: 'week', poolSize: 3 });
+    expect(msg).toContain('3 candidate items');
+    expect(msg).toContain('past week');
   });
 });
 
