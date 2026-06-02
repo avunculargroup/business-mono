@@ -80,25 +80,26 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   };
 
   return (
-    <div>
-      <div className={styles.toolbar}>
-        <Button variant="secondary" size="sm" onClick={() => setShowRunNewsletter(true)}>
-          <Newspaper size={16} strokeWidth={1.5} />
-          Run newsletter
-        </Button>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-          <Plus size={16} strokeWidth={1.5} />
-          New content
-        </Button>
-      </div>
-      <NewsletterRunStatus />
-      {error && (
-        <div className={styles.error} role="alert">
-          Failed to update: {error}
-          <button onClick={() => setError(null)} className={styles.dismissError}>Dismiss</button>
+    <>
+      <div className={styles.page}>
+        <div className={styles.toolbar}>
+          <Button variant="secondary" size="sm" onClick={() => setShowRunNewsletter(true)}>
+            <Newspaper size={16} strokeWidth={1.5} />
+            Run newsletter
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+            <Plus size={16} strokeWidth={1.5} />
+            New content
+          </Button>
         </div>
-      )}
-      <div className={styles.board}>
+        <NewsletterRunStatus />
+        {error && (
+          <div className={styles.error} role="alert">
+            Failed to update: {error}
+            <button onClick={() => setError(null)} className={styles.dismissError}>Dismiss</button>
+          </div>
+        )}
+        <div className={styles.board}>
         {statusColumns.map((col) => {
           const colItems = optimisticItems.filter((i) => i.status === col.key);
           return (
@@ -137,6 +138,7 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
             </div>
           );
         })}
+        </div>
       </div>
 
       <SlideOver
@@ -161,6 +163,6 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
         open={showRunNewsletter}
         onClose={() => setShowRunNewsletter(false)}
       />
-    </div>
+    </>
   );
 }

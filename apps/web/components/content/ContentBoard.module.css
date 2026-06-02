@@ -1,15 +1,22 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
 .toolbar {
   display: flex;
   justify-content: flex-end;
-  padding: var(--space-4) var(--space-6) 0;
+  gap: var(--space-2);
 }
 
 .error {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  margin: 0 var(--space-6) var(--space-3);
   background: var(--color-destructive-subtle);
   color: var(--color-destructive);
   border-radius: var(--radius-md);
@@ -28,7 +35,6 @@
 .board {
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-6);
   overflow-x: auto;
 }
 
@@ -109,17 +115,17 @@
 }
 
 @media (max-width: 767px) {
+  .page {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+
   .board {
     flex-direction: column;
     overflow-x: visible;
-    padding: var(--space-3);
   }
 
   .column {
     min-width: 0;
-  }
-
-  .error {
-    margin: 0 var(--space-3) var(--space-3);
   }
 }
