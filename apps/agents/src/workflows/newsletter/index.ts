@@ -11,6 +11,7 @@ import { scoreAndRank, TIME_RANGE_DAYS, NEWSLETTER_QUERY_SEED } from './retrieva
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
 import { buildGate1Message, buildGate2Message } from './messages.js';
+import { markStep } from './progress.js';
 import {
   newsletterInputSchema,
   retrievedItemSchema,
@@ -69,7 +70,8 @@ const retrieveStep = createStep({
     input: newsletterInputSchema,
     pool: z.array(retrievedItemSchema),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'retrieve');
     const input = inputData;
     const queryEmbedding = await embedText(NEWSLETTER_QUERY_SEED);
     const hits = await contentVectorSearch(queryEmbedding, {
@@ -93,7 +95,8 @@ const selectStoriesStep = createStep({
     pool: z.array(retrievedItemSchema),
     shortlist: storyShortlistSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'select_stories');
     const { input, pool } = inputData;
     const tone = await fetchBrandTone();
 
@@ -156,7 +159,8 @@ const gate1Step = createStep({
     input: newsletterInputSchema,
     approvedStories: z.array(storyCandidateSchema),
   }),
-  execute: async ({ inputData, resumeData, suspend }) => {
+  execute: async ({ inputData, resumeData, suspend, runId }) => {
+    await markStep(runId, 'gate1');
     const { input, shortlist } = inputData;
 
     if (!resumeData) {
@@ -221,7 +225,8 @@ const researchStep = createStep({
     approvedStories: z.array(storyCandidateSchema),
     researchNotes: z.array(researchNoteSchema),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'research_enrich');
     const { input, approvedStories } = inputData;
     const needsResearch = approvedStories.filter(
       (s) => s.needs_research && s.data_completeness < 8,
@@ -320,7 +325,8 @@ const draftStep = createStep({
     drafts: z.array(storyDraftSchema),
     introOutro: introOutroSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'draft_generation');
     const { input, approvedStories, researchNotes } = inputData;
     const notesById = new Map(researchNotes.map((n) => [n.story_id, n]));
 
@@ -422,7 +428,8 @@ const reviewStep = createStep({
     reviewed: z.array(reviewedStorySchema),
     introOutro: introOutroSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'editorial_review');
     const { input, approvedStories, researchNotes, drafts, introOutro } = inputData;
     const reviewed = await Promise.all(drafts.map((d) => reviewDraft(d, input)));
     return { input, approvedStories, researchNotes, reviewed, introOutro };
@@ -455,7 +462,8 @@ const assembleStep = createStep({
     totalWordCount: z.number(),
     overLengthIds: z.array(z.string()),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'assemble');
     const { input, reviewed, introOutro } = inputData;
     const company = await fetchCompanyVars();
     const now = new Date();
@@ -504,7 +512,8 @@ const gate2Step = createStep({
     markdown: z.string(),
     totalWordCount: z.number(),
   }),
-  execute: async ({ inputData, resumeData, suspend, state, setState }) => {
+  execute: async ({ inputData, resumeData, suspend, state, setState, runId }) => {
+    await markStep(runId, 'gate2');
     const { input, approvedStories, researchNotes, introOutro, title } = inputData;
 
     // A resumed step re-runs from the top, so prior revisions live in workflow
@@ -599,6 +608,7 @@ const persistStep = createStep({
     editorialScores: z.record(z.number()),
   }),
   execute: async ({ inputData, runId }) => {
+    await markStep(runId, 'persist');
     const { input, approvedStories, reviewed, title, markdown, totalWordCount } = inputData;
 
     const { data: inserted, error } = await supabase

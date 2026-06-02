@@ -1598,6 +1598,10 @@ CREATE TABLE newsletter_runs (
   gate_message        TEXT,
   gate_draft_markdown TEXT,
   pending_decision    JSONB,
+  -- Fine-grained progress for the /content stepper (migration:
+  -- 20260602000000_add_newsletter_current_step): the workflow step currently
+  -- executing, written best-effort at the top of each step.
+  current_step        TEXT,
   started_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at        TIMESTAMPTZ,
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),

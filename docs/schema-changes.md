@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-02 — Add `newsletter_runs.current_step` for the /content progress widget
+
+**Migration:** `20260602000000_add_newsletter_current_step.sql`
+
+- **`newsletter_runs.current_step` column** (`TEXT`, nullable) — records which workflow step is executing (`retrieve`, `select_stories`, `gate1`, `research_enrich`, `draft_generation`, `editorial_review`, `assemble`, `gate2`, `persist`). `status` only tracks coarse lifecycle states, so the long stretches between the two human gates (research, drafting, editing, assembly) all read as a flat `'running'`. The newsletter workflow now writes `current_step` best-effort at the top of each step (`markStep`, mirroring the best-effort philosophy of `notifySignal` — progress display must never abort a run), letting the `/content` stepper show live movement during the slow drafting phase. The table is already in the `supabase_realtime` publication, so the new column streams to the web with no extra config.
+
+---
+
 ## 2026-05-31 — Newsletter workflow: `content_embeddings`, `newsletter_runs`, `newsletter` routine action
 
 **Migrations:** `20260531000000_add_content_embeddings.sql`, `20260531000001_add_newsletter_runs.sql`, `20260531000002_add_newsletter_routine_action.sql`
