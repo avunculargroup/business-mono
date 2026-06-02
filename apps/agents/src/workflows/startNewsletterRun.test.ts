@@ -19,7 +19,62 @@ vi.mock('../mastra/index.js', () => ({
   mastra: { getWorkflow: () => ({ getWorkflowRunById, createRun }) },
 }));
 
-const { notifySignal, resumeNewsletterRun } = await import('./startNewsletterRun.js');
+const { notifySignal, resumeNewsletterRun, extractSuspendPayload } = await import(
+  './startNewsletterRun.js'
+);
+
+describe('extractSuspendPayload', () => {
+  it('keys the gate off the suspended step id, not a payload.gate field', () => {
+    // The reported failure mode: the runtime surfaces an empty top-level
+    // suspendPayload, so the gate must come from the suspended path. A gate-1
+    // suspend must read as gate 1 (it previously defaulted to gate 2).
+    const payload = extractSuspendPayload({
+      status: 'suspended',
+      suspendPayload: {},
+      suspended: [['gate1']],
+      steps: { gate1: { suspendPayload: { message: 'pick stories' } } },
+    });
+    expect(payload).toEqual({
+      gate: 'gate1',
+      message: 'pick stories',
+      newsletterMarkdown: undefined,
+      held: undefined,
+    });
+  });
+
+  it('carries the gate-2 message, markdown and hold flag through', () => {
+    const payload = extractSuspendPayload({
+      status: 'suspended',
+      suspendPayload: {},
+      suspended: [['gate2']],
+      steps: {
+        gate2: { suspendPayload: { message: 'final draft', newsletterMarkdown: '# md', held: true } },
+      },
+    });
+    expect(payload).toEqual({
+      gate: 'gate2',
+      message: 'final draft',
+      newsletterMarkdown: '# md',
+      held: true,
+    });
+  });
+
+  it('falls back to the top-level payload when the step record is empty', () => {
+    const payload = extractSuspendPayload({
+      status: 'suspended',
+      suspendPayload: { message: 'from top', newsletterMarkdown: '# top' },
+      suspended: [['gate2']],
+      steps: { gate2: { suspendPayload: {} } },
+    });
+    expect(payload).toMatchObject({ gate: 'gate2', message: 'from top', newsletterMarkdown: '# top' });
+  });
+
+  it('returns null when nothing is suspended at a gate', () => {
+    expect(
+      extractSuspendPayload({ status: 'success', suspended: [], steps: {} }),
+    ).toBeNull();
+  });
+});
 
 describe('notifySignal', () => {
   beforeEach(() => {

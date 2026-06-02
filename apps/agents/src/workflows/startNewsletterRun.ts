@@ -85,15 +85,30 @@ async function defaultApproverSignal(): Promise<string | null> {
   return (data?.signal_number as string | null) ?? null;
 }
 
-function extractSuspendPayload(result: RunResult): GatePayload | null {
-  // WorkflowResult exposes the suspending step's payload at the top level; fall
-  // back to digging it out of the suspended step's result if absent.
-  if (result.suspendPayload) return result.suspendPayload as GatePayload;
+/**
+ * Resolve which gate a suspended run is at, plus its message/draft, from a
+ * WorkflowResult. The suspended *step id* (result.suspended) — not a `gate`
+ * field on the suspend payload — is authoritative: some Mastra runtime/version
+ * combos surface an empty or mis-shaped top-level `suspendPayload`, which made
+ * every gate read as gate 2 with a null message (so gate-1 prompts never
+ * persisted and gate-2 resumes targeted the wrong step). Read the gate from the
+ * path, then take the message/markdown/held from whichever payload location
+ * actually carries them (per-step record preferred over the top-level field).
+ * Exported for testing.
+ */
+export function extractSuspendPayload(result: RunResult): GatePayload | null {
   const path = result.suspended?.[0];
-  if (!path || path.length === 0) return null;
-  const stepId = path[path.length - 1];
-  const payload = stepId ? result.steps?.[stepId]?.suspendPayload : undefined;
-  return (payload as GatePayload | undefined) ?? null;
+  const stepId = path && path.length > 0 ? path[path.length - 1] : undefined;
+  if (stepId !== 'gate1' && stepId !== 'gate2') return null;
+  const top = (result.suspendPayload ?? {}) as Partial<GatePayload>;
+  const step = (result.steps?.[stepId]?.suspendPayload ?? {}) as Partial<GatePayload>;
+  const merged: Partial<GatePayload> = { ...top, ...step };
+  return {
+    gate: stepId,
+    message: merged.message ?? '',
+    newsletterMarkdown: merged.newsletterMarkdown,
+    held: merged.held,
+  };
 }
 
 /**
