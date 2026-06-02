@@ -1,4 +1,4 @@
-import { SignalClient } from '@platform/signal';
+import { SignalClient, type SendMessageParams } from '@platform/signal';
 import { supabase } from '@platform/db';
 import { buildConfirmationMessage } from './newsletter/messages.js';
 import { newsletterInputSchema, type NewsletterInput } from './newsletter/schemas.js';
@@ -19,6 +19,21 @@ async function loadMastra() {
 // start_newsletter tool, the routine handler, and the Signal gate-resume path.
 
 const client = new SignalClient();
+
+/**
+ * Send a Signal notification best-effort. Gate prompts and confirmations are
+ * notifications, not the system of record — the workflow is already
+ * suspended/persisted and resumable from /content. A send failure (e.g. an
+ * unregistered recipient returning a 400) must never abort run handling or mark
+ * the run errored. Exported for unit testing.
+ */
+export async function notifySignal(params: SendMessageParams): Promise<void> {
+  try {
+    await client.sendMessage(params);
+  } catch (err) {
+    console.warn('[newsletter] Signal notification failed (continuing):', err);
+  }
+}
 
 // newsletter_runs isn't in the generated Database types until types are
 // regenerated post-migration. Cast at the boundary.
@@ -121,7 +136,7 @@ async function handleRunResult(args: {
               ).toString('base64')}`,
             ]
           : undefined;
-      await client.sendMessage({ recipients: [signalNumber], message: payload.message, attachments });
+      await notifySignal({ recipients: [signalNumber], message: payload.message, attachments });
     }
     return;
   }
@@ -143,7 +158,7 @@ async function handleRunResult(args: {
       .eq('workflow_run_id', runId);
 
     if (signalNumber) {
-      await client.sendMessage({
+      await notifySignal({
         recipients: [signalNumber],
         message: buildConfirmationMessage({
           title,
@@ -167,7 +182,7 @@ async function handleRunResult(args: {
       })
       .eq('workflow_run_id', runId);
     if (signalNumber) {
-      await client.sendMessage({
+      await notifySignal({
         recipients: [signalNumber],
         message: "I hit a problem putting the newsletter together and couldn't finish it. Try again when you're ready.",
       });
