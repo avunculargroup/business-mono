@@ -5,13 +5,27 @@
 }
 
 @media (max-width: 1023px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
 }
 
 .editor {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--color-border);
+}
+
+@media (max-width: 1023px) {
+  .editor {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .textarea {
+    min-height: 50vh;
+  }
 }
 
 .textarea {
