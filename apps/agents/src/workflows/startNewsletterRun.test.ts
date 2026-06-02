@@ -148,6 +148,52 @@ describe('handleRunResult — no stories', () => {
   });
 });
 
+describe('handleRunResult — failed', () => {
+  beforeEach(() => {
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+    sendMessage.mockReset();
+  });
+
+  function lastUpdate() {
+    return fakeSupabase
+      .__buildersFor('newsletter_runs')
+      .filter((b) => b.update.mock.calls.length > 0)
+      .at(-1);
+  }
+
+  it('records a provider-limit-specific note and message for a key-limit error', async () => {
+    sendMessage.mockResolvedValueOnce({ timestamp: 1 });
+    const result = {
+      status: 'failed',
+      error: { statusCode: 403, message: 'Key limit exceeded (total limit)' },
+    };
+    await handleRunResult({ runId: 'run-7', result, signalNumber: '+15551234567' });
+
+    expect(lastUpdate()?.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        notes: "AI provider usage limit reached — the newsletter couldn't be generated.",
+        pending_decision: null,
+      }),
+    );
+    expect(sendMessage).toHaveBeenCalledWith({
+      recipients: ['+15551234567'],
+      message: expect.stringContaining('usage limit'),
+    });
+  });
+
+  it('falls back to the generic note/message for any other failure', async () => {
+    const result = { status: 'failed', error: new Error('something broke') };
+    await handleRunResult({ runId: 'run-8', result, signalNumber: null });
+
+    expect(lastUpdate()?.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', notes: 'Error: something broke' }),
+    );
+  });
+});
+
 describe('resumeNewsletterRun', () => {
   beforeEach(() => {
     fakeSupabase.from.mockClear();

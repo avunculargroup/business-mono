@@ -1,5 +1,6 @@
 import { SignalClient, type SendMessageParams } from '@platform/signal';
 import { supabase } from '@platform/db';
+import { isKeyLimitError } from '../lib/llmErrors.js';
 import { buildConfirmationMessage } from './newsletter/messages.js';
 import { newsletterInputSchema, type NewsletterInput } from './newsletter/schemas.js';
 
@@ -229,19 +230,26 @@ export async function handleRunResult(args: {
   }
 
   if (result.status === 'failed' || result.status === 'canceled') {
+    // A key/credit-limit rejection is an operational problem, not a transient
+    // glitch — say so plainly so the director knows retrying won't help until
+    // the provider quota is sorted.
+    const keyLimit = isKeyLimitError(result.error);
+    const notes = keyLimit
+      ? "AI provider usage limit reached — the newsletter couldn't be generated."
+      : String(result.error ?? result.status);
+    const message = keyLimit
+      ? "I couldn't build the newsletter — the AI provider's usage limit has been reached. It'll need topping up before I can try again."
+      : "I hit a problem putting the newsletter together and couldn't finish it. Try again when you're ready.";
     await db
       .from('newsletter_runs')
       .update({
         status: 'failed',
-        notes: String(result.error ?? result.status),
+        notes,
         pending_decision: null,
       })
       .eq('workflow_run_id', runId);
     if (signalNumber) {
-      await notifySignal({
-        recipients: [signalNumber],
-        message: "I hit a problem putting the newsletter together and couldn't finish it. Try again when you're ready.",
-      });
+      await notifySignal({ recipients: [signalNumber], message });
     }
   }
 }
