@@ -117,3 +117,11 @@ export function scoreAndRank(
 // once per run and used as the retrieval query.
 export const NEWSLETTER_QUERY_SEED =
   'Bitcoin treasury strategy, corporate adoption, regulatory developments, market intelligence, Australian finance context';
+
+// Similarity floor for the newsletter ideation pool. Deliberately low: with
+// text-embedding-3-small the absolute cosine of a short seed query against full
+// news articles sits around 0.2–0.4, so the old 0.5 floor starved the pool to a
+// handful and Rex returned "no relevant stories". This is only a noise floor —
+// the pool is actually bounded and ordered by the `count` cap, the composite
+// (similarity + recency + source) re-rank, and Rex's curation, not by this value.
+export const NEWSLETTER_RETRIEVAL_THRESHOLD = 0.2;

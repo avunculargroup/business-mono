@@ -6,10 +6,21 @@ import {
   contentHitToRankable,
   newsHitToRankable,
   TIME_RANGE_DAYS,
+  NEWSLETTER_RETRIEVAL_THRESHOLD,
   type RankableHit,
 } from './retrieval.js';
 
 const NOW = new Date('2026-05-31T00:00:00Z').getTime();
+
+describe('NEWSLETTER_RETRIEVAL_THRESHOLD', () => {
+  // Regression guard: text-embedding-3-small cosines for a short seed query run
+  // low (~0.2–0.4), so the ideation floor must stay well under the 0.5 that
+  // previously starved the pool and produced "no relevant stories".
+  it('stays a low ideation floor, not the old 0.5', () => {
+    expect(NEWSLETTER_RETRIEVAL_THRESHOLD).toBeLessThan(0.5);
+    expect(NEWSLETTER_RETRIEVAL_THRESHOLD).toBeGreaterThan(0);
+  });
+});
 
 describe('recencyScore', () => {
   it('returns 1 for an item created now', () => {
