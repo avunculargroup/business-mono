@@ -22,6 +22,21 @@ interface ChannelState {
 // Keyed by channelName so multiple listeners share no state.
 const states = new Map<string, ChannelState>();
 
+/**
+ * Concise, single-line description of a subscription error.
+ *
+ * Realtime hands us a normalized Error whose `cause` is the raw `CloseEvent`
+ * (with the whole `SafeWebSocket` — including the apikey/JWT in its URL).
+ * Logging the object directly dumps all of that to stdout on every transient
+ * 1006 close, which is both noisy and a credential leak. The Error's `message`
+ * (e.g. "socket closed: 1006") already carries everything actionable.
+ */
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return String(err);
+}
+
 function getState(channelName: string): ChannelState {
   let s = states.get(channelName);
   if (!s) {
@@ -84,7 +99,7 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
     if (channel !== state.currentChannel) return;
 
     console.log(`${logPrefix} Subscription status:`, status);
-    if (err) console.error(`${logPrefix} Subscription error:`, err);
+    if (err) console.error(`${logPrefix} Subscription error: ${describeError(err)}`);
     if (status === 'SUBSCRIBED') {
       // Cancel any pending reconnect timer. Supabase's internal Phoenix socket
       // reconnect re-joins channels automatically, so the channel can recover
@@ -98,7 +113,7 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
       state.reconnectAttempt = 0;
       onSubscribed?.();
     } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-      scheduleReconnect(err ? String(err) : status);
+      scheduleReconnect(err ? describeError(err) : status);
     } else if (status === 'CLOSED') {
       scheduleReconnect('CLOSED');
     }
