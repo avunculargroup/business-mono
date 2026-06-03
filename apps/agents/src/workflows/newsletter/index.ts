@@ -13,6 +13,7 @@ import {
   newsHitToRankable,
   TIME_RANGE_DAYS,
   NEWSLETTER_QUERY_SEED,
+  NEWSLETTER_RETRIEVAL_THRESHOLD,
 } from './retrieval.js';
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
@@ -83,12 +84,21 @@ const retrieveStep = createStep({
     const days = TIME_RANGE_DAYS[input.timeRange];
 
     // News is the primary source (most candidates); internal content
-    // supplements it. A lower-than-default news threshold (0.5, matching
-    // content) widens the ideation net — the pool is capped by count and the
-    // human/Rex curate from there.
+    // supplements it. Both use a low similarity floor
+    // (NEWSLETTER_RETRIEVAL_THRESHOLD) so the ideation net stays wide — the pool
+    // is capped by count, re-ranked by composite score, and the human/Rex curate
+    // from there.
     const [newsHits, contentHits] = await Promise.all([
-      newsVectorSearch(queryEmbedding, { count: input.storyCount * 4, days, threshold: 0.5 }),
-      contentVectorSearch(queryEmbedding, { count: input.storyCount * 2, days }),
+      newsVectorSearch(queryEmbedding, {
+        count: input.storyCount * 4,
+        days,
+        threshold: NEWSLETTER_RETRIEVAL_THRESHOLD,
+      }),
+      contentVectorSearch(queryEmbedding, {
+        count: input.storyCount * 2,
+        days,
+        threshold: NEWSLETTER_RETRIEVAL_THRESHOLD,
+      }),
     ]);
 
     const pool = scoreAndRank(
