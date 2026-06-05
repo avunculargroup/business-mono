@@ -279,6 +279,95 @@ CREATE TRIGGER brand_assets_updated_at
 
 
 -- ============================================================
+-- SOCIAL ACCOUNTS & VOICE
+-- ============================================================
+-- Voice source-of-truth tables (migration 20260605120000). Company voice canon
+-- moves out of docs/brand-voice.md into brand_voice (singleton, app-layer
+-- enforced); each social_accounts.voice_profile is the per-account application
+-- of that canon (umbrella + override). voice_snippets is the embeddable
+-- exemplar library. RLS allows authenticated + service_role (agents embed via
+-- service_role). See docs/brand-voice-migration-spec.md.
+
+-- Destinations a campaign posts from. A founder on X and on LinkedIn are
+-- separate rows. team_member_id is NULL for company accounts.
+CREATE TABLE social_accounts (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform            TEXT        NOT NULL
+                        CHECK (platform IN ('linkedin', 'twitter_x')),
+  account_type        TEXT        NOT NULL
+                        CHECK (account_type IN ('company', 'founder')),
+  display_name        TEXT        NOT NULL,
+  handle              TEXT,
+  profile_url         TEXT,
+  team_member_id      UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  voice_profile       JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
+  api_credentials_ref TEXT,                              -- Phase 2: secret-store ref only
+  created_by          UUID        REFERENCES team_members(id),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER social_accounts_updated_at
+  BEFORE UPDATE ON social_accounts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_social_accounts_platform ON social_accounts(platform);
+CREATE INDEX idx_social_accounts_member   ON social_accounts(team_member_id);
+
+-- Singleton company-voice canon (app-layer singleton, like company_profile).
+-- profile shares the social_accounts.voice_profile shape. Seeded in Step 3.
+CREATE TABLE brand_voice (
+  id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile                     JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  mission_summary             TEXT,
+  bitcoin_capitalisation_rule TEXT,
+  version                     TEXT        NOT NULL DEFAULT '1.0',
+  is_active                   BOOLEAN     NOT NULL DEFAULT TRUE,
+  updated_by                  UUID        REFERENCES team_members(id),
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER brand_voice_updated_at
+  BEFORE UPDATE ON brand_voice
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Embeddable exemplar library. social_account_id NULL = company canon. Embedded
+-- on save via text-embedding-3-small (HNSW index, pgvector 0.8.0).
+CREATE TABLE voice_snippets (
+  id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  social_account_id      UUID        REFERENCES social_accounts(id) ON DELETE CASCADE,  -- NULL = company canon
+  snippet_type           TEXT        NOT NULL
+                           CHECK (snippet_type IN (
+                             'phrase', 'opener', 'closer', 'transition',
+                             'paragraph', 'full_post', 'cta')),
+  body                   TEXT        NOT NULL,
+  curator_note           TEXT,
+  platform               TEXT        CHECK (platform IN ('linkedin', 'twitter_x')),  -- NULL = platform-agnostic
+  topic_tags             TEXT[]      NOT NULL DEFAULT '{}',
+  embedding              VECTOR(1536),
+  is_starred             BOOLEAN     NOT NULL DEFAULT FALSE,
+  source                 TEXT        NOT NULL DEFAULT 'manual'
+                           CHECK (source IN ('manual', 'promoted_from_post', 'agent')),
+  source_content_item_id UUID        REFERENCES content_items(id) ON DELETE SET NULL,
+  created_by             UUID        REFERENCES team_members(id),
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER voice_snippets_updated_at
+  BEFORE UPDATE ON voice_snippets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_voice_snippets_account   ON voice_snippets(social_account_id);
+CREATE INDEX idx_voice_snippets_type      ON voice_snippets(snippet_type);
+CREATE INDEX idx_voice_snippets_tags      ON voice_snippets USING GIN (topic_tags);
+CREATE INDEX idx_voice_snippets_starred   ON voice_snippets(is_starred) WHERE is_starred;
+CREATE INDEX idx_voice_snippets_embedding ON voice_snippets USING hnsw (embedding vector_cosine_ops);
+
+
+-- ============================================================
 -- KNOWLEDGE BASE (Archivist)
 -- ============================================================
 
@@ -632,6 +721,9 @@ ALTER TABLE agent_activity        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE platform_capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE capacity_gaps         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE routines              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE social_accounts       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brand_voice           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE voice_snippets        ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated team members can read and write everything
 CREATE POLICY "team_members_all" ON team_members
@@ -696,6 +788,18 @@ CREATE POLICY "capacity_gaps_all" ON capacity_gaps
 
 CREATE POLICY "routines_all" ON routines
   FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
+
+CREATE POLICY "social_accounts_all" ON social_accounts
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+
+CREATE POLICY "brand_voice_all" ON brand_voice
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+
+CREATE POLICY "voice_snippets_all" ON voice_snippets
+  FOR ALL USING (auth.role() IN ('authenticated', 'service_role'))
+  WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
 
 
 -- ============================================================
