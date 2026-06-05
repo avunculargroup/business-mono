@@ -32,6 +32,7 @@ import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
+import { shouldDropForRelevance } from './newsRelevance.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
@@ -571,6 +572,7 @@ async function runNewsIngest(
   const queries = cfg.queries ?? [];
   const maxPerQuery = cfg.max_results_per_query ?? 15;
   const maxCurated = cfg.max_curated ?? 6;
+  const relevanceFilter = cfg.relevance_filter ?? 'au_or_bitcoin';
 
   const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
@@ -776,9 +778,10 @@ async function runNewsIngest(
         });
       }
 
-      // Drop stories the extractor judged as neither Bitcoin- nor AU-relevant —
-      // both dimensions must fail for a drop, so a story can pass on either axis.
-      if (extracted && extracted.bitcoin_relevance === false && extracted.australian_relevance === false) {
+      // Drop stories that fail the routine's relevance filter. Default keeps a
+      // story if it passes on either the Bitcoin or AU axis; 'none' (e.g. macro)
+      // keeps everything the judge curated.
+      if (extracted && shouldDropForRelevance(relevanceFilter, extracted)) {
         itemsFilteredIrrelevant += 1;
         console.warn('[news-ingest] filtered as irrelevant', { url: item.url, title: item.title });
         continue;

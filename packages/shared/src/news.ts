@@ -26,6 +26,13 @@ export const NEWS_CATEGORY_LABELS: Record<NewsCategory, string> = {
   international: 'International',
 };
 
+export const NewsRelevanceFilter = {
+  AU_OR_BITCOIN: 'au_or_bitcoin', // default — drop only if neither AU nor Bitcoin relevant
+  BITCOIN:       'bitcoin',       // drop unless Bitcoin relevant
+  NONE:          'none',          // never drop on relevance — trust the LLM judge
+} as const;
+export type NewsRelevanceFilter = (typeof NewsRelevanceFilter)[keyof typeof NewsRelevanceFilter];
+
 export interface NewsIngestionConfig {
   category: NewsCategory;
   queries: string[];
@@ -33,6 +40,9 @@ export interface NewsIngestionConfig {
   // Hard cap on stories ingested per run after the LLM judge ranks the pool.
   max_curated?: number;
   search_depth?: 'basic' | 'advanced';
+  // Which relevance axes a story must satisfy to be kept. Omitted = 'au_or_bitcoin'
+  // (legacy behaviour). 'none' keeps everything the judge curated (used by macro).
+  relevance_filter?: NewsRelevanceFilter;
 }
 
 // Derive the feed URL the scan routine reads. A direct feedUrl always wins.
