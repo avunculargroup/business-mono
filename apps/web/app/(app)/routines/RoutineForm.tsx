@@ -10,13 +10,21 @@ import {
   DEFAULT_TIMEZONE,
   NewsCategory,
   NEWS_CATEGORY_LABELS,
+  NewsRelevanceFilter,
 } from '@platform/shared';
 import type {
   AgentName as AgentNameType,
   RoutineActionType as RoutineActionTypeT,
   RoutineFrequency as RoutineFrequencyT,
   NewsCategory as NewsCategoryT,
+  NewsRelevanceFilter as NewsRelevanceFilterT,
 } from '@platform/shared';
+
+const RELEVANCE_FILTER_LABELS: Record<NewsRelevanceFilterT, string> = {
+  au_or_bitcoin: 'Australian or Bitcoin (default)',
+  bitcoin: 'Bitcoin only',
+  none: 'Keep all curated stories',
+};
 import styles from './routines.module.css';
 
 function ChipInput({
@@ -157,6 +165,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
               queries: [],
               max_results_per_query: 15,
               max_curated: 6,
+              relevance_filter: NewsRelevanceFilter.AU_OR_BITCOIN,
             },
     }));
   };
@@ -186,6 +195,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           queries,
           max_results_per_query: max,
           max_curated: cap,
+          relevance_filter: (cfg['relevance_filter'] as NewsRelevanceFilterT | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN,
         },
       });
       return;
@@ -307,6 +317,24 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Relevance filter</label>
+            <select
+              className={styles.input}
+              value={(cfg['relevance_filter'] as string | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN}
+              onChange={(e) => updateConfig({ relevance_filter: e.target.value as NewsRelevanceFilterT })}
+            >
+              {(Object.values(NewsRelevanceFilter) as NewsRelevanceFilterT[]).map((f) => (
+                <option key={f} value={f}>
+                  {RELEVANCE_FILTER_LABELS[f]}
+                </option>
+              ))}
+            </select>
+            <span className={styles.hint}>
+              Stories failing this check are dropped after curation. Use “Keep all curated stories” for macro feeds that needn’t be Australian or Bitcoin specific.
+            </span>
           </div>
 
           <div className={styles.field}>
