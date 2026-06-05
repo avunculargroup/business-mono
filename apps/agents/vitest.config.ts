@@ -12,6 +12,7 @@ export default defineConfig({
       '@platform/db': `${here}../../packages/db/src/index.ts`,
       '@platform/shared': `${here}../../packages/shared/src/index.ts`,
       '@platform/signal': `${here}../../packages/signal/src/index.ts`,
+      '@platform/voice': `${here}../../packages/voice/src/index.ts`,
     },
   },
   test: {

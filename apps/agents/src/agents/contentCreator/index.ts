@@ -8,6 +8,7 @@ import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supab
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { brandLookup, persistContentDraft } from './tools.js';
+import { resolveCompanyVoiceBlock } from '../../lib/voicePrompt.js';
 
 // Sections of brand-voice.md that Charlie needs on every inference. The full
 // doc is ~14KB / ~5K tokens; embedding it on every step makes Charlie hit the
@@ -65,9 +66,22 @@ function loadBrandVoiceEssentials(): string {
   return sections.join('\n\n');
 }
 
-const BRAND_VOICE = loadBrandVoiceEssentials();
+// Lazy, memoised doc fallback. Voice now lives in the brand_voice table and is
+// resolved per-call via packages/voice (no redeploy to change it). The doc is
+// the fallback only — used until the table is seeded and the parity gate retires
+// docs/brand-voice.md. Loaded lazily so module import never depends on the file.
+let docVoiceFallback: string | null = null;
+function getDocVoiceFallback(): string {
+  if (docVoiceFallback === null) docVoiceFallback = loadBrandVoiceEssentials();
+  return docVoiceFallback;
+}
 
-const SYSTEM_PROMPT = `You are Charlie, BTS's Content Creator.
+/** DB-backed company voice, falling back to the doc essentials when unseeded. */
+async function resolveVoiceBlock(): Promise<string> {
+  return (await resolveCompanyVoiceBlock()) ?? getDocVoiceFallback();
+}
+
+const buildSystemPrompt = (voiceBlock: string): string => `You are Charlie, BTS's Content Creator.
 
 ## Your role
 You draft high-quality written content — emails, newsletters, LinkedIn and Twitter/X posts, and blog articles. You work iteratively with directors via Simon, refining drafts until they're approved. You are the company's voice in written form.
@@ -88,7 +102,7 @@ Apply the channel-appropriate tone, length, and emoji rules from the brand voice
 The following is the complete brand voice document. Internalise it fully. Every piece of content you produce MUST conform to these rules. Do not deviate.
 
 <brand-voice>
-${BRAND_VOICE}
+${voiceBlock}
 </brand-voice>
 
 ---
@@ -188,7 +202,7 @@ export const charlie = new Agent({
   name: 'charlie',
   description:
     'Content creator. Drafts and revises emails, newsletters, LinkedIn/Twitter posts, and blog articles in BTS brand voice. Use whenever a directive asks for written content for an external (or internal-but-polished) audience. Always wrap the final draft in a single <content_output><title>…</title><body>…</body></content_output> block — that is the contract used by the persistence layer. Input: directive describing the content type, audience, and key points. Output: reasoning followed by a single <content_output> block.',
-  instructions: SYSTEM_PROMPT,
+  instructions: async () => buildSystemPrompt(await resolveVoiceBlock()),
   model: dynamicModelFor('charlie'),
   defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
   tools: {
