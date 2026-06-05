@@ -817,6 +817,7 @@ async function runNewsIngest(
           title: item.title,
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
+          source: item.source,
         });
       }
     } catch (err) {
@@ -1079,6 +1080,7 @@ async function runNewsSourceScan(
           title: item.title,
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
+          source: item.source,
         });
       }
     } catch (err) {

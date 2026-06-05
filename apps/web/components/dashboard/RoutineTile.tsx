@@ -7,6 +7,7 @@ interface RoutineSource {
   url: string;
   title?: string;
   excerpt?: string;
+  source?: string;
 }
 
 interface RoutineResult {
@@ -47,9 +48,12 @@ export function RoutineTile({ routine }: RoutineTileProps) {
         <ul className={styles.list}>
           {sources.slice(0, 5).map((s) => (
             <li key={s.url} className={styles.item}>
-              <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
-                {s.title || s.url}
-              </a>
+              <span className={styles.headline}>
+                <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
+                  {s.title || s.url}
+                </a>
+                {s.source && <span className={styles.source}>{s.source}</span>}
+              </span>
               {s.excerpt && <span className={styles.excerpt}>{s.excerpt}</span>}
             </li>
           ))}
