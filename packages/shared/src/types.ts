@@ -328,6 +328,7 @@ export interface ResearchSource {
   title: string;
   excerpt: string;
   retrieved_at: string;
+  source?: string;
 }
 
 export interface ResearchBrief {

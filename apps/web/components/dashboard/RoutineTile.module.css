@@ -33,6 +33,17 @@
   gap: 2px;
 }
 
+.headline {
+  display: inline;
+}
+
+.source {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  margin-left: var(--space-2);
+  white-space: nowrap;
+}
+
 .link {
   color: var(--color-text-primary);
   text-decoration: none;
