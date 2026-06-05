@@ -366,6 +366,50 @@ CREATE INDEX idx_voice_snippets_tags      ON voice_snippets USING GIN (topic_tag
 CREATE INDEX idx_voice_snippets_starred   ON voice_snippets(is_starred) WHERE is_starred;
 CREATE INDEX idx_voice_snippets_embedding ON voice_snippets USING hnsw (embedding vector_cosine_ops);
 
+-- Semantic retrieval for packages/voice (migration 20260605130000). Top-N
+-- snippets by cosine similarity to a query embedding, scoped account+umbrella
+-- (or umbrella-only when p_account_id is NULL), platform-matched, starred-
+-- weighted. Default PUBLIC execute, like the other vector_search_* functions.
+CREATE OR REPLACE FUNCTION match_voice_snippets(
+  query_embedding  VECTOR(1536),
+  p_account_id     UUID    DEFAULT NULL,
+  p_platform       TEXT    DEFAULT NULL,
+  match_count      INT     DEFAULT 5,
+  star_boost       FLOAT   DEFAULT 0.05,
+  match_threshold  FLOAT   DEFAULT 0.0
+)
+RETURNS TABLE (
+  id                UUID,
+  social_account_id UUID,
+  snippet_type      TEXT,
+  body              TEXT,
+  curator_note      TEXT,
+  platform          TEXT,
+  topic_tags        TEXT[],
+  is_starred        BOOLEAN,
+  similarity        FLOAT,
+  score             FLOAT
+)
+LANGUAGE sql STABLE AS $$
+  SELECT
+    vs.id, vs.social_account_id, vs.snippet_type, vs.body, vs.curator_note,
+    vs.platform, vs.topic_tags, vs.is_starred,
+    1 - (vs.embedding <=> query_embedding) AS similarity,
+    (1 - (vs.embedding <=> query_embedding))
+      + (CASE WHEN vs.is_starred THEN star_boost ELSE 0 END) AS score
+  FROM voice_snippets vs
+  WHERE vs.embedding IS NOT NULL
+    AND (
+      (p_account_id IS NOT NULL
+        AND (vs.social_account_id = p_account_id OR vs.social_account_id IS NULL))
+      OR (p_account_id IS NULL AND vs.social_account_id IS NULL)
+    )
+    AND (p_platform IS NULL OR vs.platform = p_platform OR vs.platform IS NULL)
+    AND 1 - (vs.embedding <=> query_embedding) >= match_threshold
+  ORDER BY score DESC
+  LIMIT match_count;
+$$;
+
 
 -- ============================================================
 -- KNOWLEDGE BASE (Archivist)

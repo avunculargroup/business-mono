@@ -21,6 +21,21 @@ Pre-flight findings backing these choices are recorded in `docs/CAMPAIGNS_STEP0_
 
 ---
 
+## 2026-06-05 — `match_voice_snippets` RPC (voice retrieval)
+
+**Migration:** `20260605130000_add_match_voice_snippets.sql`
+
+Step 2 of the Social Campaigns build — the retrieval half of `packages/voice`. A `LANGUAGE sql STABLE` function returning the top-N `voice_snippets` by cosine similarity (`embedding <=> query_embedding`) to a query embedding, modelled on the existing `vector_search_*` functions.
+
+- **Scoping** — `p_account_id` set returns the account's own snippets *plus* company-canon (`social_account_id IS NULL`) snippets (umbrella + override); `p_account_id` NULL returns company-canon only (non-account content like a newsletter has no override).
+- **Platform** — matches the requested platform or platform-agnostic (`NULL`) rows; `p_platform` NULL imposes no filter.
+- **Starred weighting** — a flat `star_boost` (default 0.05) added to similarity so best-of-best exemplars rank up. Exposed as a parameter so Step 6 can tune it against real generations.
+- Default PUBLIC execute (authenticated + service_role), consistent with the other vector-search functions — no explicit GRANT.
+
+Consumed via `retrieveVoiceSnippets` in `packages/voice`. The merge half (umbrella + override, `vocabulary_avoid` unioned, Bitcoin rule always-on) is pure TypeScript in the same package.
+
+---
+
 ## 2026-06-02 — Newsletter `no_stories` terminal status
 
 **Migration:** `20260602000000_newsletter_no_stories_status.sql`
