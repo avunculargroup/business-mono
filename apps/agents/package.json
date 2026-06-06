@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:eval": "vitest run --config vitest.eval.config.ts"
+    "test:eval": "vitest run --config vitest.eval.config.ts",
+    "seed:voice": "tsx src/seeds/seedVoice.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.74",
@@ -27,6 +28,7 @@
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",
+    "@platform/voice": "workspace:*",
     "ai": "^4.3.0",
     "hono": "^4.12.8",
     "openai": "^4.68.0",

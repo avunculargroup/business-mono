@@ -6,6 +6,36 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-05 — Voice foundations: `social_accounts`, `brand_voice`, `voice_snippets`
+
+**Migration:** `20260605120000_add_voice_foundations.sql`
+
+Step 1 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`), and the structural half of the brand-voice migration (`docs/brand-voice-migration-spec.md`). Moves company voice from `docs/brand-voice.md` into tables and introduces per-account voice. Row content (the seeded `brand_voice` singleton and company-canon `voice_snippets`) lands in Step 3; this migration creates the structure.
+
+- **`social_accounts` table** — the destinations a campaign posts from, and the voice each writes in. A founder on X and the same founder on LinkedIn are separate rows. `platform` (`linkedin`/`twitter_x`, matching `content_items.type`), `account_type` (`company`/`founder`), `team_member_id` (NULL for company accounts), and a per-account `voice_profile` JSONB (the account-specific application/override of the company canon). `api_credentials_ref` is reserved for Phase 2 (a secret-store reference, never the secret).
+- **`brand_voice` table** — singleton company-voice canon, enforced at the application layer (same pattern as `company_profile`; no DB uniqueness constraint). `profile` JSONB shares the `social_accounts.voice_profile` shape so one editor/validator serves both. `bitcoin_capitalisation_rule` is a separate column because it is a hard editorial rule applied across all agent output, not a soft tone preference.
+- **`voice_snippets` table** — the embeddable exemplar library. `social_account_id` NULL = company canon (serves every voice); a scoped row is account-specific (`ON DELETE CASCADE`). `curator_note` (why a snippet demonstrates the voice) is first-class. `embedding VECTOR(1536)` (OpenAI `text-embedding-3-small`) with an **HNSW `vector_cosine_ops`** index — chosen in Step 0 after confirming pgvector 0.8.0 is installed (the project's established index form). `source_content_item_id` (`ON DELETE SET NULL`) closes the promote-from-post loop.
+- **RLS** — `authenticated` *and* `service_role` (with `WITH CHECK`), the project's real convention, because agents embed snippets via `service_role`. This is broader than the simplified `USING`-only snippet in the spec; the broader form is required for the embed-on-save path.
+
+Pre-flight findings backing these choices are recorded in `docs/CAMPAIGNS_STEP0_VERIFICATION.md`.
+
+---
+
+## 2026-06-05 — `match_voice_snippets` RPC (voice retrieval)
+
+**Migration:** `20260605130000_add_match_voice_snippets.sql`
+
+Step 2 of the Social Campaigns build — the retrieval half of `packages/voice`. A `LANGUAGE sql STABLE` function returning the top-N `voice_snippets` by cosine similarity (`embedding <=> query_embedding`) to a query embedding, modelled on the existing `vector_search_*` functions.
+
+- **Scoping** — `p_account_id` set returns the account's own snippets *plus* company-canon (`social_account_id IS NULL`) snippets (umbrella + override); `p_account_id` NULL returns company-canon only (non-account content like a newsletter has no override).
+- **Platform** — matches the requested platform or platform-agnostic (`NULL`) rows; `p_platform` NULL imposes no filter.
+- **Starred weighting** — a flat `star_boost` (default 0.05) added to similarity so best-of-best exemplars rank up. Exposed as a parameter so Step 6 can tune it against real generations.
+- Default PUBLIC execute (authenticated + service_role), consistent with the other vector-search functions — no explicit GRANT.
+
+Consumed via `retrieveVoiceSnippets` in `packages/voice`. The merge half (umbrella + override, `vocabulary_avoid` unioned, Bitcoin rule always-on) is pure TypeScript in the same package.
+
+---
+
 ## 2026-06-02 — Newsletter `no_stories` terminal status
 
 **Migration:** `20260602000000_newsletter_no_stories_status.sql`

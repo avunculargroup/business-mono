@@ -1,19 +1,38 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { BrandView } from '@/components/brand/BrandView';
+import { BrandHubTabs } from '@/components/brand/BrandHubTabs';
+import type { BrandVoiceRow, VoiceSnippetRow } from '@/components/brand/voiceTypes';
 
 export default async function BrandPage() {
   const supabase = await createClient();
+  // brand_voice / voice_snippets are not in the generated Database types yet.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
 
-  const { data: assets } = await supabase
-    .from('brand_assets')
-    .select('*')
-    .order('name');
+  const [{ data: assets }, { data: voice }, { data: snippets }] = await Promise.all([
+    supabase.from('brand_assets').select('*').order('name'),
+    db
+      .from('brand_voice')
+      .select('id, profile, mission_summary, bitcoin_capitalisation_rule, version')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from('voice_snippets')
+      .select('id, snippet_type, body, curator_note, platform, topic_tags, is_starred')
+      .is('social_account_id', null)
+      .order('is_starred', { ascending: false })
+      .order('created_at', { ascending: true }),
+  ]);
 
   return (
     <>
       <PageHeader title="Brand Hub" />
-      <BrandView assets={assets || []} />
+      <BrandHubTabs
+        voice={(voice as BrandVoiceRow) ?? null}
+        snippets={(snippets as VoiceSnippetRow[]) ?? []}
+        assets={assets || []}
+      />
     </>
   );
 }
