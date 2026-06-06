@@ -2,8 +2,36 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** Social Media Campaigns (incl. Brand Voice migration)
-**Status:** Build plan
-**Last updated:** 2026-06-04
+**Status:** In progress — Steps 0–3 built (code), Step 3 finish gated on merge
+**Last updated:** 2026-06-06
+
+-----
+
+## ▶ Current state — resume here
+
+Work lives on branch **`claude/social-campaigns-preflight-csqIF`** (not yet merged).
+Migrations apply to prod **on merge to `main`**, so the remaining Step 3 items are
+gated on that merge.
+
+| Step | State | Evidence |
+|------|-------|----------|
+| 0 — Pre-flight | ✅ done | `docs/CAMPAIGNS_STEP0_VERIFICATION.md` (commit `eeb68d9`) |
+| 1 — Schema foundations | ✅ written, **not yet applied to prod** | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); seeds `social_accounts`. Commit `a52280d` |
+| 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
+| 3 — Voice milestone | ⚠️ **code complete, not finished** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e` |
+
+**To finish Step 3 (do these in order, after the branch is merged so the tables exist):**
+
+1. **Apply migrations** — merge the branch to `main` (auto-applies via Supabase CLI), or apply manually. Confirm `brand_voice` / `voice_snippets` / `social_accounts` exist and accounts are seeded.
+2. **Seed voice content** — `pnpm --filter @platform/agents seed:voice` (idempotent; needs `SUPABASE_*` + `OPENAI_API_KEY`). Seeds the `brand_voice` row + canon `voice_snippets` (with embeddings) from `docs/brand-voice.md`.
+3. **Parity gate** (hard gate — see below) — generate one sample per content agent (Charlie, and the newsletter **editorial** agent which still reads the full doc); confirm table-sourced voice matches doc-era output.
+4. **Only if parity passes:** retire `docs/brand-voice.md` to a stub + update `CLAUDE.md` routing (voice → tables; visual → `bts-design` skill).
+
+**Known follow-ups (non-blocking):**
+- Founder-added snippets via the Brand Hub save with `embedding = null` (web has no OpenAI key by design). Needs a small agents-side embed backfill/listener (mirror `contentEmbeddingListener`). Canon snippets are embedded by `seed:voice`.
+- Account-voice editing with inheritance ghosting (Brand Hub) is deferred to the campaigns Accounts work; `ChipField` already supports locked chips for it.
+
+Then proceed to **Step 4 — Campaigns schema**.
 
 -----
 
