@@ -345,6 +345,50 @@ export type Database = {
           },
         ]
       }
+      brand_voice: {
+        Row: {
+          bitcoin_capitalisation_rule: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          mission_summary: string | null
+          profile: Json
+          updated_at: string
+          updated_by: string | null
+          version: string
+        }
+        Insert: {
+          bitcoin_capitalisation_rule?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          mission_summary?: string | null
+          profile?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: string
+        }
+        Update: {
+          bitcoin_capitalisation_rule?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          mission_summary?: string | null
+          profile?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_voice_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capacity_gaps: {
         Row: {
           created_at: string
@@ -2852,6 +2896,69 @@ export type Database = {
         }
         Relationships: []
       }
+      social_accounts: {
+        Row: {
+          account_type: string
+          api_credentials_ref: string | null
+          created_at: string
+          created_by: string | null
+          display_name: string
+          handle: string | null
+          id: string
+          is_active: boolean
+          platform: string
+          profile_url: string | null
+          team_member_id: string | null
+          updated_at: string
+          voice_profile: Json
+        }
+        Insert: {
+          account_type: string
+          api_credentials_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          handle?: string | null
+          id?: string
+          is_active?: boolean
+          platform: string
+          profile_url?: string | null
+          team_member_id?: string | null
+          updated_at?: string
+          voice_profile?: Json
+        }
+        Update: {
+          account_type?: string
+          api_credentials_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          handle?: string | null
+          id?: string
+          is_active?: boolean
+          platform?: string
+          profile_url?: string | null
+          team_member_id?: string | null
+          updated_at?: string
+          voice_profile?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_accounts_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -3013,6 +3120,79 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_snippets: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          curator_note: string | null
+          embedding: string | null
+          id: string
+          is_starred: boolean
+          platform: string | null
+          snippet_type: string
+          social_account_id: string | null
+          source: string
+          source_content_item_id: string | null
+          topic_tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          embedding?: string | null
+          id?: string
+          is_starred?: boolean
+          platform?: string | null
+          snippet_type: string
+          social_account_id?: string | null
+          source?: string
+          source_content_item_id?: string | null
+          topic_tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          embedding?: string | null
+          id?: string
+          is_starred?: boolean
+          platform?: string | null
+          snippet_type?: string
+          social_account_id?: string | null
+          source?: string
+          source_content_item_id?: string | null
+          topic_tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_snippets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_snippets_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_snippets_source_content_item_id_fkey"
+            columns: ["source_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       v_active_capabilities: {
@@ -3137,6 +3317,28 @@ export type Database = {
         Returns: {
           question_count: number
           validated: boolean
+        }[]
+      }
+      match_voice_snippets: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_account_id?: string
+          p_platform?: string
+          query_embedding: string
+          star_boost?: number
+        }
+        Returns: {
+          body: string
+          curator_note: string
+          id: string
+          is_starred: boolean
+          platform: string
+          score: number
+          similarity: number
+          snippet_type: string
+          social_account_id: string
+          topic_tags: string[]
         }[]
       }
       vector_search_content: {
