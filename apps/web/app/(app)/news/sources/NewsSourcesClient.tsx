@@ -97,12 +97,12 @@ export function NewsSourcesClient({ initialSources }: Props) {
           <span className={styles.nameText}>{r.name}</span>
           <a
             className={styles.nameSub}
-            href={r.feed_url}
+            href={r.feed_url ?? r.site_url ?? undefined}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
           >
-            {r.feed_url} <ExternalLink size={11} strokeWidth={1.5} />
+            {r.feed_url ?? r.site_url} <ExternalLink size={11} strokeWidth={1.5} />
           </a>
         </div>
       ),
@@ -142,7 +142,7 @@ export function NewsSourcesClient({ initialSources }: Props) {
   const initialValuesForEdit = (r: NewsSourceRecord): NewsSourceFormValues => ({
     name: r.name,
     site_url: r.site_url ?? '',
-    feed_url: r.feed_url,
+    feed_url: r.feed_url ?? '',
     is_active: r.is_active,
   });
 

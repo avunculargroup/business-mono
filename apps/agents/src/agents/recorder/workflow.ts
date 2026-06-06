@@ -6,10 +6,7 @@ import { telnyxDownload } from './tools.js';
 import { deepgramTranscribe } from '../../tools/deepgram.js';
 import { logActivity } from '../../tools/activity.js';
 import { stepRequestContext } from '../../config/model.js';
-
-const DEEPGRAM_CALLBACK_BASE = process.env['RAILWAY_PUBLIC_DOMAIN']
-  ? `https://${process.env['RAILWAY_PUBLIC_DOMAIN']}`
-  : 'http://localhost:3000';
+import { DEEPGRAM_CALLBACK_URL } from '../../lib/deepgramCallback.js';
 
 // ─── Step 1: Ingest audio ───────────────────────────────────────────────────
 const ingestAudio = createStep({
@@ -81,7 +78,7 @@ const transcribeAudio = createStep({
     };
     const suspend = params.suspend;
     const multichannel = inputData.channels === 'dual';
-    const callbackUrl = `${DEEPGRAM_CALLBACK_BASE}/webhooks/deepgram`;
+    const callbackUrl = DEEPGRAM_CALLBACK_URL;
 
     const result = await deepgramTranscribe.execute!(
       {

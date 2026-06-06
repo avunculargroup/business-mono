@@ -1754,3 +1754,76 @@ CREATE TABLE newsletter_runs (
 );
 -- Realtime-enabled so the /content page can show in-progress run status and
 -- the agents-side gate listener can react to web decisions.
+
+-- ============================================================
+-- PODCAST INGESTION (migration: 20260606000000 add_podcast_ingestion)
+-- ============================================================
+-- news_sources gains a source_type discriminator + podcast config (feed_url is
+-- now nullable; youtube sources use youtube_channel_url instead):
+--   source_type TEXT 'rss'|'podcast'|'youtube' (default 'rss')
+--   youtube_channel_url, transcribe_with_deepgram (default false),
+--   preferred_transcript_lang (default 'en'), max_backfill_episodes (default 25),
+--   max_episode_age_days
+
+-- One row per ingested episode; transcript_text lives here for display + FTS,
+-- embeddings live in transcript_segments.
+CREATE TABLE podcast_episodes (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id             UUID REFERENCES news_sources(id) ON DELETE SET NULL,
+  guid                  TEXT NOT NULL,
+  title                 TEXT NOT NULL,
+  description           TEXT,
+  episode_url           TEXT,
+  audio_url             TEXT,
+  audio_mime_type       TEXT,
+  duration_seconds      INT,
+  youtube_url           TEXT,
+  season                INT,
+  episode_number        INT,
+  image_url             TEXT,
+  published_at          TIMESTAMPTZ,
+  transcript_status     TEXT NOT NULL DEFAULT 'pending'
+    CHECK (transcript_status IN ('pending','resolving','transcribing','available','failed','skipped')),
+  transcript_source     TEXT CHECK (transcript_source IN ('feed_tag','youtube','deepgram','manual')),
+  transcript_format     TEXT CHECK (transcript_format IN ('json','vtt','srt','html','text')),
+  transcript_lang       TEXT,
+  transcript_text       TEXT,
+  transcript_raw_url    TEXT,
+  has_timestamps        BOOLEAN NOT NULL DEFAULT false,
+  deepgram_request_id   TEXT,
+  transcript_error      TEXT,
+  ingestion_origin      TEXT NOT NULL DEFAULT 'feed' CHECK (ingestion_origin IN ('feed','brief','manual')),
+  curator_note          TEXT,
+  topic_tags            TEXT[] NOT NULL DEFAULT '{}',
+  transcript_fetched_at TIMESTAMPTZ,
+  embedded_at           TIMESTAMPTZ,
+  fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
+  created_by            UUID REFERENCES team_members(id),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Dedupe: UNIQUE (source_id, guid) WHERE source_id IS NOT NULL (feed episodes);
+-- UNIQUE (guid) WHERE source_id IS NULL (ad-hoc/brief episodes). Plus indexes on
+-- deepgram_request_id, transcript_status, published_at, and a GIN index on fts.
+
+-- Chunked, embedded transcript content for RAG. start/end seconds NULL when the
+-- source had no timestamps; present for json/vtt/srt/deepgram (deep-links).
+CREATE TABLE transcript_segments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  episode_id    UUID NOT NULL REFERENCES podcast_episodes(id) ON DELETE CASCADE,
+  segment_index INT NOT NULL,
+  start_seconds NUMERIC(10,2),
+  end_seconds   NUMERIC(10,2),
+  speaker       TEXT,
+  content       TEXT NOT NULL,
+  token_count   INT,
+  embedding     VECTOR(1536),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops).
+
+-- Views: v_podcast_ingestion_status (health dashboard) and
+-- v_episodes_awaiting_action (stuck/errored episodes for Simon).
+-- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
+-- filter_days) — cosine search returning one row per matching segment, joined to
+-- episode + source for title/provenance/timestamp.

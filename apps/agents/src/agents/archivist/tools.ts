@@ -1,8 +1,15 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { resolveTranscript } from '../../lib/transcripts/resolveTranscript.js';
+import {
+  insertEpisode,
+  updateEpisode,
+  storeAvailableTranscript,
+} from '../../lib/transcripts/store.js';
 
 const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
@@ -27,6 +34,74 @@ export const webFetch = createTool({
     const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? context.url;
 
     return { url: context.url, title, rawContent: text.slice(0, 50000) };
+  },
+});
+
+export const ingestEpisode = createTool({
+  id: 'ingest_episode',
+  description:
+    'Ingest a one-off podcast episode or interview from an audio or YouTube URL and resolve its transcript. Use for spoken content with no clean feed — Simon forwards these with a reason. Creates a durable episode row and embeds the transcript so Rex can retrieve it. Deepgram transcription is allowed here (it is an explicit human decision to save this). Returns the episode id and resolution status.',
+  inputSchema: z.object({
+    audio_url: z.string().optional().describe('Direct audio file URL (the input to Deepgram)'),
+    youtube_url: z.string().optional().describe('YouTube video URL, if the episode is on YouTube'),
+    title: z.string().optional().describe('Episode title, if known'),
+    why: z.string().describe('Why this is worth saving — stored as the curator note and surfaced in retrieval'),
+  }),
+  execute: async (context) => {
+    const url = context.youtube_url ?? context.audio_url;
+    if (!url) throw new Error('Provide an audio_url or youtube_url to ingest.');
+
+    // guid = hash of the source URL — the dedupe key for ad-hoc episodes.
+    const guid = createHash('sha256').update(url).digest('hex');
+
+    const episodeId = await insertEpisode({
+      source_id: null,
+      guid,
+      title: context.title ?? url,
+      audio_url: context.audio_url ?? null,
+      youtube_url: context.youtube_url ?? null,
+      ingestion_origin: 'brief',
+      curator_note: context.why,
+      transcript_status: 'resolving',
+    });
+
+    // Same waterfall as the daily batch; feed-tag stage is skipped (no tags).
+    // Briefs allow Deepgram — the human already decided this is worth paying for.
+    const outcome = await resolveTranscript(
+      {
+        youtube_url: context.youtube_url ?? null,
+        audio_url: context.audio_url ?? null,
+        published_at: null,
+        transcriptTags: [],
+      },
+      { transcribe_with_deepgram: true, preferred_transcript_lang: 'en', max_episode_age_days: null },
+    );
+
+    if (outcome.kind === 'available') {
+      const { segments } = await storeAvailableTranscript(episodeId, outcome);
+      return { episode_id: episodeId, status: 'available', transcript_source: outcome.source, segments };
+    }
+    if (outcome.kind === 'transcribing') {
+      await updateEpisode(episodeId, {
+        transcript_status: 'transcribing',
+        deepgram_request_id: outcome.deepgramRequestId,
+      });
+      return {
+        episode_id: episodeId,
+        status: 'transcribing',
+        note: 'Submitted to Deepgram; the transcript will resolve when the callback fires.',
+      };
+    }
+    if (outcome.kind === 'failed') {
+      await updateEpisode(episodeId, { transcript_status: 'failed', transcript_error: outcome.error });
+      return { episode_id: episodeId, status: 'failed', error: outcome.error };
+    }
+    await updateEpisode(episodeId, { transcript_status: 'skipped' });
+    return {
+      episode_id: episodeId,
+      status: 'skipped',
+      note: 'No free transcript found and no audio URL to transcribe.',
+    };
   },
 });
 

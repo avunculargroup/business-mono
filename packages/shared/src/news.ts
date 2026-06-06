@@ -70,12 +70,27 @@ export function resolveFeedUrl(
 // A user-curated publication scanned via its RSS/Atom feed. Managed from the
 // web app (/news/sources) or by Simon. Distinct from the keyword-search
 // NewsIngestionConfig — sources name specific publications to watch.
+export type NewsSourceType = 'rss' | 'podcast' | 'youtube';
+
 export interface NewsSourceRecord {
   id: string;
   name: string;
   site_url: string | null;
-  feed_url: string;
+  // Nullable since 'youtube' sources have no RSS/podcast feed URL.
+  feed_url: string | null;
   is_active: boolean;
+  // Discriminator. 'rss' is the legacy default; 'podcast'/'youtube' are new.
+  source_type: NewsSourceType;
+  // Optional channel/playlist; for podcasts it aids the YouTube transcript fallback.
+  youtube_channel_url: string | null;
+  // The Deepgram opt-in gate — off by default so nothing spends money silently.
+  transcribe_with_deepgram: boolean;
+  // Filters multi-language <podcast:transcript> tags (default 'en').
+  preferred_transcript_lang: string;
+  // Cap on episodes ingested on first fetch of a new feed (default 25).
+  max_backfill_episodes: number;
+  // Skip Deepgram on episodes older than this; null = no cap.
+  max_episode_age_days: number | null;
   last_scanned_at: string | null;
   last_status: 'success' | 'failed' | null;
   last_error: string | null;

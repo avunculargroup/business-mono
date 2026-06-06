@@ -27,6 +27,8 @@ import type {
   NewsIngestResult,
   NewsSourceScanConfig,
   NewsSourceScanResult,
+  PodcastIngestConfig,
+  PodcastIngestResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
@@ -36,7 +38,15 @@ import { shouldDropForRelevance } from './newsRelevance.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
-import { fetchFeed } from '../lib/fetchFeed.js';
+import { fetchFeed, fetchPodcastFeed } from '../lib/fetchFeed.js';
+import { normalizePodcastItems } from '../lib/podcastFeed.js';
+import { resolveTranscript } from '../lib/transcripts/resolveTranscript.js';
+import {
+  insertEpisode,
+  updateEpisode,
+  fetchExistingGuids,
+  storeAvailableTranscript,
+} from '../lib/transcripts/store.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
@@ -141,6 +151,8 @@ interface RoutineOutcome {
   archive_urls?: string[];
   // news_ingest result counts:
   news_ingest_result?: NewsIngestResult;
+  // podcast_ingest result counts:
+  podcast_ingest_result?: PodcastIngestResult;
 }
 
 const runRoutine = createStep({
@@ -169,6 +181,8 @@ const runRoutine = createStep({
           outcomes.push(await runNewsSourceScan(routine));
         } else if (routine.action_type === 'newsletter') {
           outcomes.push(await runNewsletter(routine));
+        } else if (routine.action_type === 'podcast_ingest') {
+          outcomes.push(await runPodcastIngest(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -889,10 +903,15 @@ async function runNewsSourceScan(
   };
 
   // ── Load active sources ────────────────────────────────────────────────────
-  const { data: sources, error: sourcesError } = await supabase
+  // Filter to article feeds only — podcast/youtube sources live in the same
+  // table but are handled by runPodcastIngest. (source_type isn't in the
+  // generated types until post-migration regen, hence the boundary cast.)
+  const { data: sources, error: sourcesError } = await (supabase
     .from('news_sources')
     .select('id, name, feed_url')
-    .eq('is_active', true);
+    .eq('is_active', true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .eq('source_type' as any, 'rss') as any);
 
   if (sourcesError) {
     return {
@@ -1126,6 +1145,189 @@ async function runNewsSourceScan(
   };
 }
 
+// ── podcast_ingest ───────────────────────────────────────────────────────────
+// Scans active podcast news_sources, ingests new episodes (dedupe on guid,
+// backfill-capped on first fetch), and resolves each transcript through the
+// waterfall (feed tag → YouTube → Deepgram). Available transcripts are embedded
+// into transcript_segments this run; Deepgram submissions resolve later via the
+// /webhooks/deepgram handler. Mirrors runNewsSourceScan's shape.
+
+interface PodcastSourceRow {
+  id: string;
+  name: string;
+  feed_url: string | null;
+  transcribe_with_deepgram: boolean;
+  preferred_transcript_lang: string;
+  max_backfill_episodes: number;
+  max_episode_age_days: number | null;
+  last_scanned_at: string | null;
+}
+
+async function runPodcastIngest(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as unknown as PodcastIngestConfig;
+  const maxPerSource = cfg.max_items_per_source ?? 25;
+  const lookbackDays = cfg.lookback_days ?? 14;
+  const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+
+  const baseOutcome = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'podcast_ingest' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  // Load active podcast sources. New columns aren't in the generated types until
+  // post-migration regen, so we cast at the boundary.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sourcesRaw, error: sourcesError } = await (supabase
+    .from('news_sources')
+    .select(
+      'id, name, feed_url, transcribe_with_deepgram, preferred_transcript_lang, max_backfill_episodes, max_episode_age_days, last_scanned_at',
+    )
+    .eq('is_active', true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .eq('source_type' as any, 'podcast') as any);
+
+  if (sourcesError) {
+    return {
+      ...baseOutcome,
+      status: 'failed',
+      result: null,
+      error: `Failed to load podcast sources: ${(sourcesError as { message: string }).message}`,
+    };
+  }
+
+  const sources = (sourcesRaw ?? []) as PodcastSourceRow[];
+  const result: PodcastIngestResult = {
+    sources_scanned: 0,
+    episodes_found: 0,
+    episodes_new: 0,
+    transcripts_available: 0,
+    transcripts_transcribing: 0,
+    transcripts_skipped: 0,
+    transcripts_failed: 0,
+    segments_embedded: 0,
+    failed_sources: [],
+  };
+
+  for (const src of sources) {
+    if (!src.feed_url) continue;
+    result.sources_scanned += 1;
+    try {
+      const feed = await fetchPodcastFeed(src.feed_url);
+      const items = normalizePodcastItems(
+        (feed.items ?? []) as Parameters<typeof normalizePodcastItems>[0],
+        { cutoffMs: cutoff, maxItems: maxPerSource },
+      );
+      result.episodes_found += items.length;
+
+      const existingGuids = await fetchExistingGuids(src.id);
+      const isFirstFetch = !src.last_scanned_at || existingGuids.size === 0;
+
+      let newItems = items.filter((it) => !existingGuids.has(it.guid));
+      if (isFirstFetch && newItems.length > src.max_backfill_episodes) {
+        // First fetch of a new feed: cap to the newest N so adding an old show
+        // doesn't ingest a decade overnight.
+        newItems = [...newItems]
+          .sort((a, b) => {
+            const ta = a.published_at ? new Date(a.published_at).getTime() : 0;
+            const tb = b.published_at ? new Date(b.published_at).getTime() : 0;
+            return tb - ta;
+          })
+          .slice(0, src.max_backfill_episodes);
+      }
+
+      for (const item of newItems) {
+        const episodeId = await insertEpisode({
+          source_id: src.id,
+          guid: item.guid,
+          title: item.title,
+          description: item.description,
+          episode_url: item.episode_url,
+          audio_url: item.audio_url,
+          audio_mime_type: item.audio_mime_type,
+          duration_seconds: item.duration_seconds,
+          youtube_url: item.youtube_url,
+          season: item.season,
+          episode_number: item.episode_number,
+          image_url: item.image_url,
+          published_at: item.published_at,
+          ingestion_origin: 'feed',
+          transcript_status: 'resolving',
+        });
+        result.episodes_new += 1;
+
+        const outcome = await resolveTranscript(
+          {
+            youtube_url: item.youtube_url,
+            audio_url: item.audio_url,
+            published_at: item.published_at,
+            transcriptTags: item.transcriptTags,
+          },
+          {
+            transcribe_with_deepgram: src.transcribe_with_deepgram,
+            preferred_transcript_lang: src.preferred_transcript_lang,
+            max_episode_age_days: src.max_episode_age_days,
+          },
+        );
+
+        if (outcome.kind === 'available') {
+          const { segments } = await storeAvailableTranscript(episodeId, outcome);
+          result.transcripts_available += 1;
+          result.segments_embedded += segments;
+        } else if (outcome.kind === 'transcribing') {
+          await updateEpisode(episodeId, {
+            transcript_status: 'transcribing',
+            deepgram_request_id: outcome.deepgramRequestId,
+          });
+          result.transcripts_transcribing += 1;
+        } else if (outcome.kind === 'skipped') {
+          await updateEpisode(episodeId, { transcript_status: 'skipped' });
+          result.transcripts_skipped += 1;
+        } else {
+          await updateEpisode(episodeId, {
+            transcript_status: 'failed',
+            transcript_error: outcome.error,
+          });
+          result.transcripts_failed += 1;
+        }
+      }
+
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'success', last_error: null })
+        .eq('id', src.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      result.failed_sources!.push(src.name);
+      console.warn('[podcast-ingest] feed failed', { source: src.name, error: message });
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'failed', last_error: message.slice(0, 500) })
+        .eq('id', src.id);
+    }
+  }
+
+  const failSuffix = result.failed_sources!.length > 0 ? ` ${result.failed_sources!.length} source(s) failed to fetch.` : '';
+  const summary =
+    `Scanned ${result.sources_scanned} podcast source(s): ${result.episodes_new} new episode(s) — ` +
+    `${result.transcripts_available} transcribed (${result.segments_embedded} segments), ` +
+    `${result.transcripts_transcribing} awaiting Deepgram, ${result.transcripts_skipped} skipped, ` +
+    `${result.transcripts_failed} failed.${failSuffix}`;
+
+  return {
+    ...baseOutcome,
+    status: 'success',
+    result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
+    error: null,
+    podcast_ingest_result: result,
+  };
+}
+
 function extractResearchResult(text: string): ResearchResult | null {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -1187,6 +1389,14 @@ const persistAndSchedule = createStep({
       //   SELECT created_at, notes::jsonb FROM agent_activity
       //   WHERE action LIKE 'Routine run: News%' ORDER BY created_at DESC;
       const isNewsIngest = outcome.action_type === 'news_ingest';
+      const isPodcastIngest = outcome.action_type === 'podcast_ingest';
+      const podcastNotes = isPodcastIngest && outcome.podcast_ingest_result
+        ? JSON.stringify(outcome.podcast_ingest_result)
+        : null;
+      const podcastHasAnomaly = isPodcastIngest && outcome.podcast_ingest_result
+        ? outcome.podcast_ingest_result.transcripts_failed > 0
+          || (outcome.podcast_ingest_result.failed_sources?.length ?? 0) > 0
+        : false;
       const newsNotes = isNewsIngest && outcome.news_ingest_result
         ? JSON.stringify(outcome.news_ingest_result)
         : null;
@@ -1197,10 +1407,10 @@ const persistAndSchedule = createStep({
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (newsHasAnomaly ? 'error' : 'auto')
+        ? (newsHasAnomaly || podcastHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
-        agent_name: outcome.action_type === 'research_digest' ? 'rex' : 'rex',
+        agent_name: isPodcastIngest ? 'archie' : 'rex',
         action: `Routine run: ${outcome.name}`,
         status: activityStatus,
         trigger_type: 'scheduled',
@@ -1209,7 +1419,7 @@ const persistAndSchedule = createStep({
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: newsNotes ?? outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? podcastNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.

@@ -6,6 +6,21 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-06 — Podcast ingestion: `podcast_episodes`, `transcript_segments`, `news_sources` podcast columns
+
+**Migration:** `20260606120000_add_podcast_ingestion.sql`
+
+Backend for the podcast ingestion feature (`docs/podcast-ingestion-spec.md`, build plan `docs/podcast-ingestion-build-plan.md`). A podcast is just another feed, so the existing `news_sources` registry is reused with a `source_type` discriminator; episodes and their transcripts get dedicated tables.
+
+- **`news_sources` extended** — `source_type` (`rss`/`podcast`/`youtube`, default `rss`), `youtube_channel_url`, `transcribe_with_deepgram` (the Deepgram opt-in, default off), `preferred_transcript_lang`, `max_backfill_episodes`, `max_episode_age_days`. `feed_url` was `NOT NULL UNIQUE`; a `youtube` source has no feed URL, so it is now nullable with a **partial unique index** (`WHERE feed_url IS NOT NULL`) plus a per-type presence CHECK. The daily `news_source_scan` routine now filters to `source_type='rss'` so podcast rows don't get parsed as article feeds.
+- **`podcast_episodes` table** — one row per episode. Transcript state machine (`transcript_status`: pending→resolving→[transcribing]→available / skipped / failed), provenance (`transcript_source`, `transcript_format`, `has_timestamps`), Deepgram correlation (`deepgram_request_id`, indexed), and a `curator_note` for brief-driven ingestion. Dedupe: `UNIQUE (source_id, guid)` for feed episodes plus a **partial unique index on `guid WHERE source_id IS NULL`** for ad-hoc/brief episodes (NULLs are distinct in Postgres, so the composite unique misses them). FTS generated column mirrors `news_items`.
+- **`transcript_segments` table** — chunked, embedded transcript content for RAG. Per-chunk `start_seconds`/`end_seconds`/`speaker` (NULL when the source had no timestamps) so retrieval can deep-link to a moment. `embedding VECTOR(1536)` with an **HNSW `vector_cosine_ops`** index, matching `content_embeddings`. `ON DELETE CASCADE` from the episode.
+- **Views** — `v_podcast_ingestion_status` (health dashboard) and `v_episodes_awaiting_action` (stuck/errored episodes for Simon).
+- **RPC `vector_search_transcripts`** — cosine search over `transcript_segments` joined to episode + source. Unlike `vector_search_content`, returns **one row per matching segment** (not best-per-source) because timestamp deep-links need the individual segment.
+- **`routines_action_type_check`** extended with `podcast_ingest`; seeds one active daily `podcast_ingest` routine (`agent_name='archie'`), a no-op until podcast sources are added.
+
+---
+
 ## 2026-06-05 — Voice foundations: `social_accounts`, `brand_voice`, `voice_snippets`
 
 **Migration:** `20260605120000_add_voice_foundations.sql`
