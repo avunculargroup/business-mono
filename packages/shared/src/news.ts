@@ -33,6 +33,18 @@ export const NewsRelevanceFilter = {
 } as const;
 export type NewsRelevanceFilter = (typeof NewsRelevanceFilter)[keyof typeof NewsRelevanceFilter];
 
+// The relevance gate to apply when a routine's action_config omits relevance_filter.
+// Category-aware so the intent is durable: macro feeds cover global stories (Fed,
+// Treasuries, gold, de-dollarization) that are inherently neither Australian- nor
+// Bitcoin-specific, so they must NOT pass through the au_or_bitcoin gate or every
+// curated story gets dropped. Keeping this in code (rather than a one-off data
+// migration) means editing the routine can't silently reinstate the wrong default.
+export function defaultRelevanceFilter(category: NewsCategory): NewsRelevanceFilter {
+  return category === NewsCategory.MACRO
+    ? NewsRelevanceFilter.NONE
+    : NewsRelevanceFilter.AU_OR_BITCOIN;
+}
+
 export interface NewsIngestionConfig {
   category: NewsCategory;
   queries: string[];

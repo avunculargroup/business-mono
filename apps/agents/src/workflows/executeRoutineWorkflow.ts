@@ -28,7 +28,7 @@ import type {
   NewsSourceScanConfig,
   NewsSourceScanResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
@@ -572,7 +572,7 @@ async function runNewsIngest(
   const queries = cfg.queries ?? [];
   const maxPerQuery = cfg.max_results_per_query ?? 15;
   const maxCurated = cfg.max_curated ?? 6;
-  const relevanceFilter = cfg.relevance_filter ?? 'au_or_bitcoin';
+  const relevanceFilter = cfg.relevance_filter ?? defaultRelevanceFilter(category);
 
   const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 

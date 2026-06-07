@@ -11,6 +11,7 @@ import {
   NewsCategory,
   NEWS_CATEGORY_LABELS,
   NewsRelevanceFilter,
+  defaultRelevanceFilter,
 } from '@platform/shared';
 import type {
   AgentName as AgentNameType,
@@ -165,7 +166,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
               queries: [],
               max_results_per_query: 15,
               max_curated: 6,
-              relevance_filter: NewsRelevanceFilter.AU_OR_BITCOIN,
+              relevance_filter: defaultRelevanceFilter(NewsCategory.REGULATORY),
             },
     }));
   };
@@ -195,7 +196,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           queries,
           max_results_per_query: max,
           max_curated: cap,
-          relevance_filter: (cfg['relevance_filter'] as NewsRelevanceFilterT | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN,
+          relevance_filter: (cfg['relevance_filter'] as NewsRelevanceFilterT | undefined) ?? defaultRelevanceFilter(cfg['category'] as NewsCategoryT),
         },
       });
       return;
@@ -323,7 +324,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             <label className={styles.label}>Relevance filter</label>
             <select
               className={styles.input}
-              value={(cfg['relevance_filter'] as string | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN}
+              value={(cfg['relevance_filter'] as string | undefined) ?? defaultRelevanceFilter((cfg['category'] as NewsCategoryT | undefined) ?? NewsCategory.REGULATORY)}
               onChange={(e) => updateConfig({ relevance_filter: e.target.value as NewsRelevanceFilterT })}
             >
               {(Object.values(NewsRelevanceFilter) as NewsRelevanceFilterT[]).map((f) => (
