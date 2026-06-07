@@ -5,6 +5,7 @@ import { generateEmbedding } from '../../tools/openai.js';
 import { logActivity } from '../../tools/activity.js';
 import {
   webFetch,
+  ingestEpisode,
   vectorSearchTool,
   graphTraverseTool,
   fulltextSearchTool,
@@ -33,6 +34,9 @@ When given a YouTube URL:
 1. Fetch transcript using youtube_transcript
 2. Summarise key arguments and points
 3. Follow same process as URL processing
+
+### 2a. Episode ingestion (briefs)
+When Simon forwards a one-off podcast episode or interview to transcribe and save (an audio or YouTube link with a reason), use ingest_episode. Pass the audio_url and/or youtube_url, an optional title, and the reason as \`why\`. It runs the transcript waterfall (YouTube captions, then Deepgram if needed), stores a durable episode, and embeds the transcript for retrieval. If it returns status \`transcribing\`, the Deepgram transcript resolves later via callback — no further action needed.
 
 ### 3. Connection mapping
 After saving a new knowledge item:
@@ -83,6 +87,7 @@ export const archie = new Agent({
     log_activity: logActivity,
     web_fetch: webFetch,
     youtube_transcript: youtubeTranscript,
+    ingest_episode: ingestEpisode,
     vector_search: vectorSearchTool,
     graph_traverse: graphTraverseTool,
     fulltext_search: fulltextSearchTool,

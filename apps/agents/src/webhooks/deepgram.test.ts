@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildDeepgramCallbackEvent } from '../../test/factories.js';
+import { createFakeSupabase } from '../../test/mocks/supabase.js';
+
+const fake = createFakeSupabase();
+vi.mock('@platform/db', () => ({
+  get supabase() { return fake; },
+}));
 
 const resume = vi.fn().mockResolvedValue({ runId: 'r1' });
 const createRun = vi.fn().mockResolvedValue({ resume });
 const getWorkflow = vi.fn().mockReturnValue({ createRun });
-
 vi.mock('../mastra/index.js', () => ({
   mastra: { getWorkflow },
 }));
+
+const processPodcastTranscript = vi.fn().mockResolvedValue(undefined);
+vi.mock('../lib/transcripts/processPodcastTranscript.js', () => ({ processPodcastTranscript }));
 
 const { handleDeepgramWebhook } = await import('./deepgram.js');
 
@@ -24,6 +32,9 @@ describe('handleDeepgramWebhook', () => {
     resume.mockClear();
     createRun.mockClear();
     getWorkflow.mockClear();
+    processPodcastTranscript.mockClear();
+    // Default: no matching podcast episode → recorder resume path.
+    fake.__setResponse('podcast_episodes', { data: null, error: null });
   });
 
   it('resumes the recorder workflow keyed by request_id with the built transcript', async () => {
@@ -39,6 +50,7 @@ describe('handleDeepgramWebhook', () => {
     expect(res.status).toBe(200);
     expect(getWorkflow).toHaveBeenCalledWith('recorder');
     expect(createRun).toHaveBeenCalledWith({ runId: 'req_abc' });
+    expect(processPodcastTranscript).not.toHaveBeenCalled();
 
     const resumeArg = resume.mock.calls[0][0] as {
       resumeData: { transcript: string; requestId: string; channels: unknown };
@@ -59,11 +71,25 @@ describe('handleDeepgramWebhook', () => {
     expect(resumeArg.resumeData.transcript).toBe('[Speaker 0] First voice\n[Speaker 1] Second voice');
   });
 
+  it('routes to the podcast process path when an episode matches the request_id', async () => {
+    fake.__setResponse('podcast_episodes', { data: { id: 'episode_xyz' }, error: null });
+    const event = buildDeepgramCallbackEvent({ requestId: 'req_podcast' });
+
+    const res = await handleDeepgramWebhook(makeRequest(event));
+    expect(res.status).toBe(200);
+    expect(processPodcastTranscript).toHaveBeenCalledTimes(1);
+    expect(processPodcastTranscript.mock.calls[0][0]).toBe('episode_xyz');
+    // The recorder must NOT be resumed for a podcast callback.
+    expect(getWorkflow).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when request_id is missing', async () => {
     const event = { metadata: {}, results: { channels: [], utterances: [] } };
     const res = await handleDeepgramWebhook(makeRequest(event));
     expect(res.status).toBe(400);
     expect(createRun).not.toHaveBeenCalled();
+    expect(processPodcastTranscript).not.toHaveBeenCalled();
   });
 
   it('produces an empty transcript when utterances are missing', async () => {

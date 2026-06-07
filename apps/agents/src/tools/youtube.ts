@@ -54,6 +54,55 @@ async function fetchVideoMetadata(
   }
 }
 
+export interface YoutubeSegment {
+  start: number;
+  text: string;
+}
+
+export interface YoutubeSegments {
+  videoId: string;
+  title: string;
+  channel: string;
+  segments: YoutubeSegment[];
+}
+
+/**
+ * Fetch a YouTube transcript as structured, timestamped segments (start in
+ * seconds) rather than the pre-joined string `youtubeTranscript` returns. Used
+ * by the podcast transcript waterfall, where per-segment timestamps must survive
+ * into transcript_segments for deep-links. Throws when no captions exist.
+ */
+export async function fetchYoutubeSegments(videoUrl: string): Promise<YoutubeSegments> {
+  const videoId = extractVideoId(videoUrl);
+  if (!videoId) {
+    throw new Error(
+      'Could not extract YouTube video ID. Provide a valid YouTube URL or 11-character video ID.',
+    );
+  }
+
+  const { YoutubeTranscript } = await import('youtube-transcript');
+  const [raw, metadata] = await Promise.all([
+    YoutubeTranscript.fetchTranscript(videoId),
+    fetchVideoMetadata(videoId),
+  ]);
+
+  if (!raw.length) {
+    throw new Error(`No transcript available for video ${videoId}. The video may not have captions enabled.`);
+  }
+
+  // offset is ms (srv3) or seconds (classic) — same heuristic as youtubeTranscript.
+  const lastOffset = raw[raw.length - 1].offset;
+  const isMs = lastOffset > 36000;
+  const toSeconds = (val: number) => (isMs ? val / 1000 : val);
+
+  const segments: YoutubeSegment[] = raw.map((seg) => ({
+    start: toSeconds(seg.offset),
+    text: seg.text,
+  }));
+
+  return { videoId, title: metadata.title, channel: metadata.channel, segments };
+}
+
 export const youtubeTranscript = createTool({
   id: 'youtube_transcript',
   description:

@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import OpenAI from 'openai';
-import { supabase } from '@platform/db';
+import { supabase, transcriptVectorSearch } from '@platform/db';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
 
 // ============================================================
@@ -428,6 +428,64 @@ export const queryNewsItems = createTool({
         url: r['url'],
         source_name: r['source_name'] ?? null,
         relevance_score: (r['relevance_score'] ?? r['similarity']) ?? null,
+      })),
+    };
+  },
+});
+
+// ============================================================
+// query_transcripts — podcast/episode transcript segments (RAG)
+// ============================================================
+
+// Build a deep-link to the moment a segment occurs: YouTube uses a &t= seek,
+// audio uses a #t= media fragment. Null when neither URL is known.
+function transcriptDeepLink(
+  youtubeUrl: string | null,
+  audioUrl: string | null,
+  startSeconds: number | null,
+): string | null {
+  if (startSeconds === null) return youtubeUrl ?? audioUrl ?? null;
+  const t = Math.floor(startSeconds);
+  if (youtubeUrl) return `${youtubeUrl}${youtubeUrl.includes('?') ? '&' : '?'}t=${t}s`;
+  if (audioUrl) return `${audioUrl}#t=${t}`;
+  return null;
+}
+
+export const queryTranscripts = createTool({
+  id: 'query_transcripts',
+  description:
+    'Search ingested podcast/episode transcripts by meaning. Use for spoken-word content — podcast episodes, interviews, talks. Returns matching segments with the episode title, speaker, a timestamp, and a deep-link to that moment. Cite as "Episode title at MM:SS" using the deep_link.',
+  inputSchema: z.object({
+    query: z.string().describe('Natural language query or topic to search transcripts for'),
+    days: z.number().optional().describe('Only return segments from episodes published within this many days'),
+    limit: z.number().default(10).describe('Maximum segments to return'),
+  }),
+  execute: async (context) => {
+    const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+    const embRes = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: context.query,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
+    const embedding = embRes.data[0]?.embedding ?? [];
+
+    const rows = await transcriptVectorSearch(embedding, {
+      count: context.limit ?? 10,
+      days: context.days,
+    });
+
+    return {
+      count: rows.length,
+      results: rows.map((r) => ({
+        episode_id: r.episode_id,
+        episode_title: r.episode_title,
+        source_name: r.source_name,
+        speaker: r.speaker,
+        start_seconds: r.start_seconds,
+        content: r.content,
+        curator_note: r.curator_note,
+        deep_link: transcriptDeepLink(r.youtube_url, r.audio_url, r.start_seconds),
+        similarity: r.similarity,
       })),
     };
   },

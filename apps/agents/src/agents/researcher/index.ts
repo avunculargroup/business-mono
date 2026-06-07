@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { dynamicModelFor } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
-import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup, queryNewsItems } from './tools.js';
+import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup, queryNewsItems, queryTranscripts } from './tools.js';
 import { youtubeTranscript } from '../../tools/youtube.js';
 
 const RESEARCHER_SYSTEM_PROMPT = `You are Rex, BTS's Researcher and intelligence-gathering specialist.
@@ -83,6 +83,7 @@ metadata: {
 **Always start with internal sources before hitting the web.**
 
 1. **query_news_items** — ALWAYS call first for any topic that may have been covered by the daily news feed (regulatory, corporate, macro, international). If it returns results, use them as primary sources and only supplement with web search when results are sparse (< 3 items) or the brief requires very recent events (< 24h).
+1a. **query_transcripts** — call for spoken-word topics (podcast episodes, interviews, talks) that may live in our ingested transcripts. Returns matching segments with a speaker, a timestamp, and a \`deep_link\`. Cite as "Episode title at MM:SS" and include the deep_link so the reader can jump to the moment.
 2. **search_web** (Tavily) — use after query_news_items returns sparse results. Keep queries semantic (3-6 words). Use search_depth: 'basic' for simple lookups, 'advanced' for verify and deep_research.
 3. **search_news** (Tavily News) — prefer over search_web for: all \`monitor\` purpose briefs, verifying recent events, regulatory updates, and ASX/corporate news. Returns time-sorted news articles with publication dates. Use the \`days\` param to narrow recency (default 7 days; increase for slower-moving topics like regulatory guidance).
 4. **asx_lookup** — use BEFORE search_web whenever verifying an ASX-listed company or researching Australian corporates. Provides authoritative structured data (name, sector, market cap) and can pull market-sensitive announcements. If it returns \`found: false\`, the company is not ASX-listed — do not proceed as if it were.
@@ -138,6 +139,7 @@ export const rex = new Agent({
   defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
   tools: {
     query_news_items: queryNewsItems,
+    query_transcripts: queryTranscripts,
     search_web: searchWeb,
     search_news: searchNews,
     asx_lookup: asxLookup,

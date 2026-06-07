@@ -65,6 +65,22 @@ export async function embedText(text: string): Promise<number[]> {
 }
 
 /**
+ * Embed many strings in one OpenAI call (the API accepts an array input), in
+ * request order. Cheaper and fewer round trips than embedding chunk-by-chunk —
+ * used when embedding all of an episode's transcript segments at once. Returns
+ * [] when given no input.
+ */
+export async function embedTexts(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  const response = await openai.embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: texts,
+    dimensions: EMBEDDING_DIMENSIONS,
+  });
+  return response.data.map((d) => d.embedding);
+}
+
+/**
  * (Re)generate embeddings for one source row. Chunks the text, embeds each
  * chunk, and replaces any existing rows for this source (delete-then-insert) so
  * the operation is idempotent. No-op when text is empty.

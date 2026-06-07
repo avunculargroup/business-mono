@@ -13,7 +13,7 @@ const FEED_ACCEPT =
 
 const parser = new Parser();
 
-async function fetchText(url: string, headers: Record<string, string>): Promise<string> {
+export async function fetchText(url: string, headers: Record<string, string>): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
@@ -32,13 +32,12 @@ async function fetchText(url: string, headers: Record<string, string>): Promise<
 // blocks the direct request can't. The XML is handed to rss-parser via
 // parseString. X-Return-Format: html keeps Jina's response as raw markup so the
 // feed XML survives for the parser.
-export async function fetchFeed(feedUrl: string): Promise<Parser.Output<Record<string, unknown>>> {
-  let xml: string;
+async function fetchFeedXml(feedUrl: string): Promise<string> {
   try {
-    xml = await fetchText(feedUrl, { 'User-Agent': BROWSER_UA, Accept: FEED_ACCEPT });
+    return await fetchText(feedUrl, { 'User-Agent': BROWSER_UA, Accept: FEED_ACCEPT });
   } catch (directErr) {
     try {
-      xml = await fetchText(`https://r.jina.ai/${encodeURIComponent(feedUrl)}`, {
+      return await fetchText(`https://r.jina.ai/${encodeURIComponent(feedUrl)}`, {
         'User-Agent': 'Mozilla/5.0 (compatible; BTSResearcher/1.0)',
         'X-Return-Format': 'html',
       });
@@ -48,5 +47,35 @@ export async function fetchFeed(feedUrl: string): Promise<Parser.Output<Record<s
       throw new Error(`direct fetch failed (${direct}); Jina Reader fallback failed (${proxy})`);
     }
   }
-  return parser.parseString(xml);
+}
+
+export async function fetchFeed(feedUrl: string): Promise<Parser.Output<Record<string, unknown>>> {
+  return parser.parseString(await fetchFeedXml(feedUrl));
+}
+
+// Podcast feeds carry tags the default parser drops: the Podcasting 2.0
+// <podcast:transcript> element (often repeated for multiple formats/languages),
+// <itunes:duration>, season/episode numbers, and artwork. A parser configured
+// with these customFields surfaces them on each item. keepArray:true on
+// transcript preserves every <podcast:transcript> entry so the waterfall can
+// pick the best format/language.
+const podcastParser = new Parser<
+  Record<string, unknown>,
+  Record<string, unknown>
+>({
+  customFields: {
+    item: [
+      ['podcast:transcript', 'podcastTranscripts', { keepArray: true }],
+      ['itunes:duration', 'itunesDuration'],
+      ['itunes:season', 'itunesSeason'],
+      ['itunes:episode', 'itunesEpisode'],
+      ['itunes:image', 'itunesImage'],
+    ],
+  },
+});
+
+export async function fetchPodcastFeed(
+  feedUrl: string,
+): Promise<Parser.Output<Record<string, unknown>>> {
+  return podcastParser.parseString(await fetchFeedXml(feedUrl));
 }
