@@ -2005,41 +2005,59 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          feed_url: string
+          feed_url: string | null
           id: string
           is_active: boolean
           last_error: string | null
           last_scanned_at: string | null
           last_status: string | null
+          max_backfill_episodes: number
+          max_episode_age_days: number | null
           name: string
+          preferred_transcript_lang: string
           site_url: string | null
+          source_type: string
+          transcribe_with_deepgram: boolean
           updated_at: string
+          youtube_channel_url: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          feed_url: string
+          feed_url?: string | null
           id?: string
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          max_backfill_episodes?: number
+          max_episode_age_days?: number | null
           name: string
+          preferred_transcript_lang?: string
           site_url?: string | null
+          source_type?: string
+          transcribe_with_deepgram?: boolean
           updated_at?: string
+          youtube_channel_url?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          feed_url?: string
+          feed_url?: string | null
           id?: string
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          max_backfill_episodes?: number
+          max_episode_age_days?: number | null
           name?: string
+          preferred_transcript_lang?: string
           site_url?: string | null
+          source_type?: string
+          transcribe_with_deepgram?: boolean
           updated_at?: string
+          youtube_channel_url?: string | null
         }
         Relationships: [
           {
@@ -2341,6 +2359,126 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: []
+      }
+      podcast_episodes: {
+        Row: {
+          audio_mime_type: string | null
+          audio_url: string | null
+          created_at: string
+          created_by: string | null
+          curator_note: string | null
+          deepgram_request_id: string | null
+          description: string | null
+          duration_seconds: number | null
+          embedded_at: string | null
+          episode_number: number | null
+          episode_url: string | null
+          fts: unknown
+          guid: string
+          has_timestamps: boolean
+          id: string
+          image_url: string | null
+          ingestion_origin: string
+          published_at: string | null
+          season: number | null
+          source_id: string | null
+          title: string
+          topic_tags: string[]
+          transcript_error: string | null
+          transcript_fetched_at: string | null
+          transcript_format: string | null
+          transcript_lang: string | null
+          transcript_raw_url: string | null
+          transcript_source: string | null
+          transcript_status: string
+          transcript_text: string | null
+          updated_at: string
+          youtube_url: string | null
+        }
+        Insert: {
+          audio_mime_type?: string | null
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          deepgram_request_id?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          embedded_at?: string | null
+          episode_number?: number | null
+          episode_url?: string | null
+          fts?: unknown
+          guid: string
+          has_timestamps?: boolean
+          id?: string
+          image_url?: string | null
+          ingestion_origin?: string
+          published_at?: string | null
+          season?: number | null
+          source_id?: string | null
+          title: string
+          topic_tags?: string[]
+          transcript_error?: string | null
+          transcript_fetched_at?: string | null
+          transcript_format?: string | null
+          transcript_lang?: string | null
+          transcript_raw_url?: string | null
+          transcript_source?: string | null
+          transcript_status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Update: {
+          audio_mime_type?: string | null
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          deepgram_request_id?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          embedded_at?: string | null
+          episode_number?: number | null
+          episode_url?: string | null
+          fts?: unknown
+          guid?: string
+          has_timestamps?: boolean
+          id?: string
+          image_url?: string | null
+          ingestion_origin?: string
+          published_at?: string | null
+          season?: number | null
+          source_id?: string | null
+          title?: string
+          topic_tags?: string[]
+          transcript_error?: string | null
+          transcript_fetched_at?: string | null
+          transcript_format?: string | null
+          transcript_lang?: string | null
+          transcript_raw_url?: string | null
+          transcript_source?: string | null
+          transcript_status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_episodes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_episodes_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_key_contacts: {
         Row: {
@@ -3120,6 +3258,67 @@ export type Database = {
         }
         Relationships: []
       }
+      transcript_segments: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          end_seconds: number | null
+          episode_id: string
+          id: string
+          segment_index: number
+          speaker: string | null
+          start_seconds: number | null
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          end_seconds?: number | null
+          episode_id: string
+          id?: string
+          segment_index: number
+          speaker?: string | null
+          start_seconds?: number | null
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          end_seconds?: number | null
+          episode_id?: string
+          id?: string
+          segment_index?: number
+          speaker?: string | null
+          start_seconds?: number | null
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "podcast_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_episodes_awaiting_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_podcast_ingestion_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_snippets: {
         Row: {
           body: string
@@ -3234,6 +3433,18 @@ export type Database = {
         }
         Relationships: []
       }
+      v_episodes_awaiting_action: {
+        Row: {
+          deepgram_request_id: string | null
+          id: string | null
+          source_name: string | null
+          title: string | null
+          transcribe_with_deepgram: boolean | null
+          transcript_error: string | null
+          transcript_status: string | null
+        }
+        Relationships: []
+      }
       v_open_tasks: {
         Row: {
           assigned_to_name: string | null
@@ -3265,6 +3476,23 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_podcast_ingestion_status: {
+        Row: {
+          audio_url: string | null
+          embedded_at: string | null
+          has_timestamps: boolean | null
+          id: string | null
+          published_at: string | null
+          source_name: string | null
+          title: string | null
+          transcribe_with_deepgram: boolean | null
+          transcript_error: string | null
+          transcript_source: string | null
+          transcript_status: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
       }
       v_recent_interactions: {
         Row: {
@@ -3375,6 +3603,29 @@ export type Database = {
           summary: string
           title: string
           url: string
+        }[]
+      }
+      vector_search_transcripts: {
+        Args: {
+          filter_days?: number
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          audio_url: string
+          content: string
+          curator_note: string
+          end_seconds: number
+          episode_id: string
+          episode_title: string
+          published_at: string
+          segment_id: string
+          similarity: number
+          source_name: string
+          speaker: string
+          start_seconds: number
+          youtube_url: string
         }[]
       }
     }
