@@ -1,0 +1,239 @@
+.container {
+  padding: var(--space-6);
+  max-width: 980px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  width: fit-content;
+}
+
+.back:hover {
+  color: var(--color-accent-hover);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.headerMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+}
+
+.headerMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sourceChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.audio {
+  width: 100%;
+  height: 44px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+}
+
+.stateNote {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ── Transcript ── */
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.segment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.segmentHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.timestamp {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-accent-hover);
+  cursor: pointer;
+}
+
+.timestamp:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.timestamp:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+.speaker {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.segmentText {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+.plainTranscript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.plainTranscript p {
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Provenance ── */
+
+.provenance {
+  position: sticky;
+  top: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.provList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.provRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.provLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.provValue {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  text-align: right;
+}
+
+.note {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.noteLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.note p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.tag {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 800px) {
+  .body { grid-template-columns: 1fr; }
+  .provenance { position: static; }
+}

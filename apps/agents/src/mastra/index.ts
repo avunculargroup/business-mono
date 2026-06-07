@@ -24,6 +24,7 @@ import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
+import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -129,3 +130,8 @@ startContentEmbeddingListener();
 // can't reach this server over HTTP, so it writes to newsletter_runs and this
 // listener reacts). Mirrors the Signal gate path in newsletterGate.ts.
 startNewsletterGateWebListener();
+
+// Re-run the transcript waterfall for an episode when the web /news/podcasts
+// pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same
+// DB-driven pattern as the newsletter gate above.
+startPodcastActionListener();

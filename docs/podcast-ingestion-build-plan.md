@@ -1,6 +1,6 @@
 # Podcast Ingestion & Transcripts — Build Plan / Handoff
 
-**Status:** Backend complete (tests + typecheck green); web UI deferred. **Spec:** `docs/podcast-ingestion-spec.md`.
+**Status:** Backend + web UI complete (tests + typecheck + lint green). **Spec:** `docs/podcast-ingestion-spec.md`.
 This doc is the living source of truth for a multi-session feature. Update the checklists as
 work lands. The spec is the *what*; this doc is the *how* and the *where we are*.
 
@@ -98,7 +98,34 @@ which run `pnpm --filter @platform/db generate-types` to drop the boundary casts
 
 ---
 
-## Deferred: Web app (next session)
+## Web app — done
+
+All four pieces below shipped, surfaced under News (`/news/podcasts` dashboard + list,
+`/news/podcasts/[id]` detail, and the type-aware `/news/sources` form). Nav entry added to the
+sidebar's News group. `pnpm typecheck` + `pnpm lint` + `pnpm --filter @platform/agents test`
+(300 tests) all green.
+
+**Per-row re-run mechanism (the open decision) — resolved:** mirror the newsletter-gate web path.
+A new migration adds `podcast_episodes.pending_action` (`refetch`/`deepgram`/`retry`); the web
+server action `apps/web/app/actions/podcasts.ts` writes it, and a new Realtime listener
+`apps/agents/src/listeners/podcastActionListener.ts` claims it atomically and re-runs the
+waterfall for that one episode via the shared `apps/agents/src/lib/transcripts/reResolve.ts`
+(`reResolveEpisode`, reusing `resolveTranscript` + `store.ts`). No HTTP from web → agents, in
+keeping with the rest of the platform. The same path backs the web "Ingest an episode" brief
+entry (ad-hoc `source_id=NULL` row, Deepgram opt-in).
+
+- [x] **Type-aware source form** — `NewsSourceForm` reshapes by `source_type` with ≤150ms reveal;
+  Deepgram money switch (warning helper line); `newsSources` server action + `NewsSourceFormValues`
+  + the Simon-facing `manageNewsSources` tool all extended. Feed list row gains type chip, episode
+  count, transcript-coverage %, and a gold Deepgram dot.
+- [x] **Ingestion dashboard** (`v_podcast_ingestion_status`) — KPI cards, transcript-source stacked
+  bar / spend gauge, 30-day ingestion-over-time SVG area chart, per-feed health.
+- [x] **Embedded media** — click-to-play `youtube-nocookie` facade (`YouTubeFacade`) + audio
+  fallback (`MediaEmbed`); `?start=` deep-links; `extractVideoId` ported to `apps/web/lib/podcasts.ts`.
+- [x] **Episode list & detail** — filters + per-row actions (Fetch transcript / Transcribe with
+  Deepgram / Retry); detail with media, clickable-timestamp transcript, provenance panel, brief entry.
+
+### Original brief (for reference)
 
 Surfaces **inside the existing news/content area**, not a new top-level section. Everything
 goes through the `bts-design` skill (tokens, type, motion) and `docs/brand-voice.md` (microcopy,
@@ -132,10 +159,9 @@ session). Numbers in `JetBrains Mono`.
 
 ## Other follow-ups (deferred)
 
-- **Adding a podcast source today** requires a direct DB insert into `news_sources` with
-  `source_type='podcast'` (or build the type-aware web form above). The Simon-facing
-  `manageNewsSources` tool (`apps/agents/src/tools/newsSources.ts`) was left unchanged this pass —
-  extend its schema with the podcast fields when wiring the UI so Simon can register feeds too.
+- ~~**Adding a podcast source today** requires a direct DB insert~~ — done. Use the type-aware
+  `/news/sources` form, or Simon via the now-extended `manageNewsSources` tool
+  (`apps/agents/src/tools/newsSources.ts`), which accepts `source_type` + the podcast/youtube fields.
 - Archive raw Deepgram VTT/SRT to the storage bucket (we paid for it); feed-tag raw optional.
 - Relevance gating before embedding (only if pgvector noise becomes a problem) — would add an
   LLM step and a `modelScopes` entry then.

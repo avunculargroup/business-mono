@@ -1,0 +1,70 @@
+.frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--color-text-primary);
+}
+
+.iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.facade {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface-subtle);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.facade::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 25, 21, 0.18);
+  transition: background var(--duration-base) var(--ease-default);
+}
+
+.facade:hover::after {
+  background: rgba(26, 25, 21, 0.32);
+}
+
+.playButton {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding-left: 3px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--duration-base) var(--ease-in-out);
+}
+
+.facade:hover .playButton {
+  transform: scale(1.06);
+}
+
+.audio {
+  width: 100%;
+  height: 40px;
+}
