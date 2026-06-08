@@ -2379,6 +2379,7 @@ export type Database = {
           id: string
           image_url: string | null
           ingestion_origin: string
+          pending_action: string | null
           published_at: string | null
           season: number | null
           source_id: string | null
@@ -2413,6 +2414,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingestion_origin?: string
+          pending_action?: string | null
           published_at?: string | null
           season?: number | null
           source_id?: string | null
@@ -2447,6 +2449,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingestion_origin?: string
+          pending_action?: string | null
           published_at?: string | null
           season?: number | null
           source_id?: string | null
