@@ -11,6 +11,7 @@ COPY apps/agents/package.json ./apps/agents/
 COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/signal/package.json ./packages/signal/
+COPY packages/voice/package.json ./packages/voice/
 
 RUN pnpm install --no-frozen-lockfile
 
