@@ -49,6 +49,32 @@ export async function handleEpisodeActionRow(row: EpisodeActionRow): Promise<voi
 }
 
 /**
+ * Sweep for episodes whose pending_action was written while we were disconnected.
+ * Realtime postgres_changes only delivers events that occur while the channel is
+ * SUBSCRIBED, so any web action submitted during a CHANNEL_ERROR / socket-close
+ * gap is dropped and the row sits in 'resolving' forever. Running this on every
+ * (re)connect catches up on those missed rows; handleEpisodeActionRow's atomic
+ * claim keeps it safe against a concurrently delivered Realtime event.
+ * Exported for unit testing.
+ */
+export async function reconcilePendingActions(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as unknown as { from: (t: string) => any };
+  const { data, error } = await db
+    .from('podcast_episodes')
+    .select('id, pending_action')
+    .not('pending_action', 'is', null);
+  if (error || !data) return;
+  for (const row of data as EpisodeActionRow[]) {
+    try {
+      await handleEpisodeActionRow(row);
+    } catch (err) {
+      console.error('[podcast-action] Error reconciling episode action:', row.id, err);
+    }
+  }
+}
+
+/**
  * Subscribe to podcast_episodes and re-run the waterfall for any episode whose
  * web-requested action has been written to pending_action.
  */
@@ -59,6 +85,8 @@ export function startPodcastActionListener(): void {
     logPrefix: '[podcast-action]',
     onSubscribed: () => {
       console.log('[podcast-action] Listening for episode re-run actions via Supabase Realtime');
+      // Catch up on any actions missed while the subscription was down.
+      void reconcilePendingActions();
     },
     attachHandlers: (channel) =>
       channel.on(
