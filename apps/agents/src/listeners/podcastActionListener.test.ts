@@ -18,7 +18,9 @@ vi.mock('../lib/transcripts/reResolve.js', () => ({
   reResolveEpisode: reResolveSpy,
 }));
 
-const { handleEpisodeActionRow } = await import('./podcastActionListener.js');
+const { handleEpisodeActionRow, reconcilePendingActions } = await import(
+  './podcastActionListener.js'
+);
 
 describe('handleEpisodeActionRow', () => {
   beforeEach(() => {
@@ -60,6 +62,37 @@ describe('handleEpisodeActionRow', () => {
     await handleEpisodeActionRow({ id: 'ep-1', pending_action: 'explode' });
 
     expect(fakeSupabase.from).toHaveBeenCalledWith('podcast_episodes');
+    expect(reResolveSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcilePendingActions', () => {
+  beforeEach(() => {
+    reResolveSpy.mockClear();
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+  });
+
+  it('sweeps and re-resolves episodes whose pending action Realtime missed', async () => {
+    fakeSupabase.__setResponse('podcast_episodes', {
+      data: [{ id: 'ep-9', pending_action: 'refetch' }],
+      error: null,
+    });
+
+    await reconcilePendingActions();
+
+    const builder = fakeSupabase.__buildersFor('podcast_episodes')[0];
+    expect(builder?.select).toHaveBeenCalledWith('id, pending_action');
+    expect(builder?.not).toHaveBeenCalledWith('pending_action', 'is', null);
+    expect(reResolveSpy).toHaveBeenCalledWith('ep-9', { forceDeepgram: false });
+  });
+
+  it('does nothing when no episode carries a pending action', async () => {
+    fakeSupabase.__setResponse('podcast_episodes', { data: [], error: null });
+
+    await reconcilePendingActions();
+
     expect(reResolveSpy).not.toHaveBeenCalled();
   });
 });
