@@ -112,11 +112,14 @@ export async function resolveTranscript(
   // ── 2. YouTube captions (explicit link only — no fuzzy title matching) ──────
   if (episode.youtube_url) {
     try {
-      const yt = await fetchYoutubeSegments(episode.youtube_url);
+      const yt = await fetchYoutubeSegments(
+        episode.youtube_url,
+        source.preferred_transcript_lang,
+      );
       if (yt.segments.length > 0) {
         const segments: TimedSegment[] = yt.segments.map((s) => ({
           start: s.start,
-          end: null,
+          end: s.end,
           speaker: null,
           text: s.text,
         }));
@@ -124,7 +127,7 @@ export async function resolveTranscript(
           kind: 'available',
           source: 'youtube',
           format: null,
-          language: source.preferred_transcript_lang,
+          language: yt.language,
           text: segments.map((s) => s.text).join('\n').trim(),
           segments,
           hasTimestamps: true,

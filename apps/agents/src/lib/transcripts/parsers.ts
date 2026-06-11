@@ -114,19 +114,27 @@ export function parseJson(raw: string): ParsedTranscript {
   return { text: joinText(segments), segments, hasTimestamps };
 }
 
-// Strip tags/entities to plain text. No timestamps → a single untimed segment.
-export function parseHtml(raw: string): ParsedTranscript {
-  const text = raw
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<br\s*\/?>(?=\S)/gi, ' ')
-    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+// Decode the small set of HTML entities feed transcripts and YouTube captions
+// emit. &amp; is decoded first so double-encoded forms (&amp;#39;) resolve too.
+export function decodeEntities(text: string): string {
+  return text
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
+    .replace(/&quot;/g, '"');
+}
+
+// Strip tags/entities to plain text. No timestamps → a single untimed segment.
+export function parseHtml(raw: string): ParsedTranscript {
+  const text = decodeEntities(
+    raw
+      .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<br\s*\/?>(?=\S)/gi, ' ')
+      .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+      .replace(/<[^>]+>/g, ''),
+  )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

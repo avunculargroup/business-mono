@@ -44,8 +44,8 @@ describe('resolveTranscript waterfall', () => {
   it('2. falls through to YouTube when the feed tag fetch fails', async () => {
     fetchText.mockRejectedValue(new Error('403'));
     fetchYoutubeSegments.mockResolvedValue({
-      videoId: 'v', title: 't', channel: 'c',
-      segments: [{ start: 0, text: 'spoken words' }],
+      videoId: 'v', title: 't', channel: 'c', language: 'en',
+      segments: [{ start: 0, end: 2.5, text: 'spoken words' }],
     });
     const out = await resolveTranscript(
       { transcriptTags: [{ url: 'https://x/t.vtt', mimeType: 'text/vtt' }], youtube_url: 'https://youtu.be/dQw4w9WgXcQ' },
@@ -55,8 +55,11 @@ describe('resolveTranscript waterfall', () => {
     if (out.kind === 'available') {
       expect(out.source).toBe('youtube');
       expect(out.hasTimestamps).toBe(true);
-      expect(out.segments[0]).toMatchObject({ start: 0, text: 'spoken words' });
+      expect(out.language).toBe('en');
+      expect(out.segments[0]).toMatchObject({ start: 0, end: 2.5, text: 'spoken words' });
     }
+    // The per-feed preferred language must reach the YouTube fetch.
+    expect(fetchYoutubeSegments).toHaveBeenCalledWith('https://youtu.be/dQw4w9WgXcQ', 'en');
   });
 
   it('3. falls through to Deepgram (opted in) when YouTube has no captions', async () => {
