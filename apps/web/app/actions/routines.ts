@@ -65,6 +65,12 @@ const newsIngestConfig = z.object({
   max_curated: z.coerce.number().int().min(1).max(10).optional().default(6),
 });
 
+const newsCurationConfig = z.object({
+  action_type: z.literal('news_curation'),
+  max_stories: z.coerce.number().int().min(1).max(6).optional().default(6),
+  lookback_hours: z.coerce.number().int().min(6).max(72).optional().default(24),
+});
+
 const baseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().default(''),
@@ -82,6 +88,7 @@ const createSchema = z
     baseSchema.merge(researchDigestConfig),
     baseSchema.merge(monitorChangeConfig),
     baseSchema.merge(newsIngestConfig),
+    baseSchema.merge(newsCurationConfig),
   ])
   .superRefine((data, ctx) => {
     if (data.action_type === 'news_ingest') {
@@ -116,6 +123,13 @@ function buildActionConfig(input: z.infer<typeof createSchema>): Record<string, 
       search_queries: input.search_queries,
       notify_signal: input.notify_signal,
       notify_agent: input.notify_agent ?? null,
+    };
+  }
+  if (input.action_type === 'news_curation') {
+    return {
+      max_stories: input.max_stories,
+      lookback_hours: input.lookback_hours,
+      more_news_url: '/news',
     };
   }
   return {

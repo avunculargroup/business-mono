@@ -14,6 +14,11 @@ interface RoutineResult {
   summary?: string;
   digest?: string;
   sources?: RoutineSource[];
+  metadata?: {
+    mood_summary?: string;
+    more_news_url?: string;
+    headline_image_url?: string;
+  };
 }
 
 interface RoutineTileProps {
@@ -31,6 +36,9 @@ export function RoutineTile({ routine }: RoutineTileProps) {
   const title = routine.dashboard_title || routine.name;
   const result = routine.last_result;
   const sources = result?.sources ?? [];
+  const mood = result?.metadata?.mood_summary;
+  const moreNewsUrl = result?.metadata?.more_news_url;
+  const headlineImage = result?.metadata?.headline_image_url;
 
   return (
     <Card>
@@ -44,9 +52,16 @@ export function RoutineTile({ routine }: RoutineTileProps) {
         )}
       </div>
 
+      {headlineImage && (
+        // eslint-disable-next-line @next/next/no-img-element -- remote, unknown host; avoids next/image remotePatterns config
+        <img src={headlineImage} alt="" className={styles.headlineImage} />
+      )}
+
+      {mood && <p className={styles.summary}>{mood}</p>}
+
       {sources.length > 0 ? (
         <ul className={styles.list}>
-          {sources.slice(0, 5).map((s) => (
+          {sources.slice(0, 6).map((s) => (
             <li key={s.url} className={styles.item}>
               <span className={styles.headline}>
                 <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
@@ -58,16 +73,22 @@ export function RoutineTile({ routine }: RoutineTileProps) {
             </li>
           ))}
         </ul>
-      ) : result?.summary ? (
+      ) : mood ? null : result?.summary ? (
         <p className={styles.summary}>{result.summary.slice(0, 320)}</p>
       ) : (
         <p className={styles.empty}>Awaiting first run</p>
       )}
 
       <div className={styles.footer}>
-        <Link href="/routines" className={styles.viewLink}>
-          View routine →
-        </Link>
+        {moreNewsUrl ? (
+          <Link href={moreNewsUrl} className={styles.viewLink}>
+            More news →
+          </Link>
+        ) : (
+          <Link href="/routines" className={styles.viewLink}>
+            View routine →
+          </Link>
+        )}
       </div>
     </Card>
   );

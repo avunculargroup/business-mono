@@ -122,6 +122,22 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'executeRoutine',
     fallbackAgent: 'rex',
   },
+  {
+    key: 'executeRoutine.news_curation_select',
+    type: 'workflow_step',
+    label: 'News curation — select',
+    description: 'Editor selects and ranks the best ≤6 stories across news and podcasts',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'editor',
+  },
+  {
+    key: 'executeRoutine.news_curation_summary',
+    type: 'workflow_step',
+    label: 'News curation — mood summary',
+    description: 'Charlie writes the one-sentence mood/topic summary for the curated set',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'charlie',
+  },
 
   // ── Newsletter workflow steps ─────────────────────────────────────────────
   {
