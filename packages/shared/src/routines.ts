@@ -18,6 +18,8 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    drafts, editorial reviews; suspends for human approval at two Signal gates).
 //  - podcast_ingest: Archie scans podcast news_sources, ingests new episodes, and
 //    resolves each transcript via the waterfall (feed tag → YouTube → Deepgram).
+//  - news_curation: Charlie/editor curate the day's best news_items + podcast_episodes
+//    into a dashboard tile (mood summary, ≤6 ranked stories, headline image, more-news link).
 export const RoutineActionType = {
   RESEARCH_DIGEST:   'research_digest',
   MONITOR_CHANGE:    'monitor_change',
@@ -25,6 +27,7 @@ export const RoutineActionType = {
   NEWS_SOURCE_SCAN:  'news_source_scan',
   NEWSLETTER:        'newsletter',
   PODCAST_INGEST:    'podcast_ingest',
+  NEWS_CURATION:     'news_curation',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -89,11 +92,42 @@ export interface PodcastIngestResult {
   failed_sources?: string[];
 }
 
+// action_config shape for a 'news_curation' routine. Curates the day's best
+// news_items + podcast_episodes into a dashboard tile.
+export interface NewsCurationConfig {
+  // Max items to feature on the tile (default 6, hard-capped at 6).
+  max_stories?: number;
+  // Only consider items fetched/published within this many hours (default 24).
+  lookback_hours?: number;
+  // Where the tile's "More news" footer link points (default '/news').
+  more_news_url?: string;
+}
+
+// One curated item on the news_curation tile — either a news article or a podcast episode.
+export interface NewsCurationStory {
+  kind: 'news' | 'podcast';
+  id: string;
+  title: string;
+  url: string;
+  source_name: string;
+  category: string;
+  image_url?: string;
+}
+
+// Structured payload persisted under routines.last_result.metadata for news_curation.
+export interface NewsCurationResult {
+  mood_summary: string;
+  stories: NewsCurationStory[];
+  more_news_url: string;
+  headline_image_url?: string;
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
   | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig)
-  | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig);
+  | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig)
+  | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

@@ -22,6 +22,7 @@ export interface FakeQueryBuilder {
   upsert: Mock;
   delete: Mock;
   eq: Mock;
+  neq: Mock;
   not: Mock;
   in: Mock;
   lte: Mock;
@@ -76,6 +77,7 @@ function makeBuilder(table: string, response: SupabaseResponse): FakeQueryBuilde
   builder.upsert = vi.fn(() => Promise.resolve(builder.__response));
   builder.delete = passthrough('delete');
   builder.eq = passthrough('eq');
+  builder.neq = passthrough('neq');
   builder.not = passthrough('not');
   builder.in = passthrough('in');
   builder.lte = passthrough('lte');

@@ -714,7 +714,8 @@ CREATE TABLE routines (
                       ('simon','roger','archie','petra','bruno','charlie','rex','della')),
   action_type       TEXT NOT NULL
                     CHECK (action_type IN ('research_digest','monitor_change',
-                                           'news_ingest','news_source_scan','newsletter')),
+                                           'news_ingest','news_source_scan','newsletter',
+                                           'podcast_ingest','news_curation')),
   action_config     JSONB NOT NULL DEFAULT '{}'::jsonb,
   frequency         TEXT NOT NULL
                     CHECK (frequency IN ('daily','weekly','fortnightly')),

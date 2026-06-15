@@ -29,13 +29,19 @@ import type {
   NewsSourceScanResult,
   PodcastIngestConfig,
   PodcastIngestResult,
+  NewsCurationConfig,
+  NewsCurationStory,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
 import { rex } from '../agents/researcher/index.js';
+import { charlie } from '../agents/contentCreator/index.js';
+import { editor } from '../agents/editorial/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
+import { coerceToSchema } from './newsletter/coerce.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
+import { fetchOgImage } from '../lib/fetchOgImage.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
@@ -88,6 +94,24 @@ const newsJudgeSchema = z.object({
     )
     .min(1)
     .max(20),
+});
+
+const curationSelectSchema = z.object({
+  selected: z
+    .array(
+      z.object({
+        index: z.number().int().nonnegative()
+          .describe('The verbatim candidate index from the input list.'),
+      }),
+    )
+    .min(1)
+    .max(6)
+    .describe('The chosen items, ordered from most to least important.'),
+});
+
+const curationMoodSchema = z.object({
+  mood_summary: z.string().min(1).max(240)
+    .describe('One catchy sentence (no exclamation marks) summarising the overall mood and topics.'),
 });
 
 const fetchDueRoutines = createStep({
@@ -184,6 +208,8 @@ const runRoutine = createStep({
           outcomes.push(await runNewsletter(routine));
         } else if (routine.action_type === 'podcast_ingest') {
           outcomes.push(await runPodcastIngest(routine));
+        } else if (routine.action_type === 'news_curation') {
+          outcomes.push(await runNewsCuration(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -274,6 +300,210 @@ async function runResearchDigest(
     archive_urls: cfg.archive_sources ? result.sources.map((s) => s.url).filter(Boolean) : [],
   };
 }
+
+/** One normalized item in the curation candidate pool. */
+interface CurationCandidate extends NewsCurationStory {
+  summary: string;
+  published_at: string | null;
+}
+
+/**
+ * Curates the day's best stories across BOTH the news_items feed and ingested
+ * podcast_episodes into a dashboard tile. The editor selects and ranks ≤6 items;
+ * Charlie writes a one-sentence mood summary; the headline item's image (podcast
+ * feed artwork, or a best-effort og:image for news) is surfaced on the tile.
+ */
+export async function runNewsCuration(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as NewsCurationConfig;
+  const maxStories = Math.min(cfg.max_stories ?? 6, 6);
+  const lookbackHours = cfg.lookback_hours ?? 24;
+  const moreNewsUrl = cfg.more_news_url ?? '/news';
+  const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000).toISOString();
+
+  const base: Omit<RoutineOutcome, 'status' | 'result' | 'error'> = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'news_curation',
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  // ── Build a unified candidate pool: news articles + podcast episodes ─────────
+  const [newsRes, podcastRes] = await Promise.all([
+    supabase
+      .from('news_items')
+      .select('id, title, url, summary, category, source_name, relevance_score, published_at')
+      .gte('fetched_at', since)
+      .neq('status', 'archived')
+      .order('relevance_score', { ascending: false, nullsFirst: false })
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(60),
+    supabase
+      .from('podcast_episodes')
+      .select('id, title, description, episode_url, youtube_url, audio_url, image_url, published_at, source:news_sources(name)')
+      .gte('published_at', since)
+      .order('published_at', { ascending: false })
+      .limit(20),
+  ]);
+
+  if (newsRes.error) {
+    return { ...base, status: 'failed', result: null, error: `news_items query failed: ${newsRes.error.message}` };
+  }
+  if (podcastRes.error) {
+    return { ...base, status: 'failed', result: null, error: `podcast_episodes query failed: ${podcastRes.error.message}` };
+  }
+
+  const newsCandidates: CurationCandidate[] = (newsRes.data ?? []).map((r) => ({
+    kind: 'news',
+    id: r.id as string,
+    title: r.title as string,
+    url: r.url as string,
+    source_name: (r.source_name as string) ?? 'News',
+    category: (r.category as string) ?? 'news',
+    summary: (r.summary as string | null) ?? '',
+    published_at: (r.published_at as string | null) ?? null,
+  }));
+
+  const podcastCandidates: CurationCandidate[] = (podcastRes.data ?? []).map((r) => {
+    const rawSource = (r as { source?: unknown }).source;
+    const src = Array.isArray(rawSource) ? rawSource[0] : rawSource;
+    const sourceName = (src as { name?: string } | null)?.name ?? 'Podcast';
+    return {
+      kind: 'podcast',
+      id: r.id as string,
+      title: r.title as string,
+      url: (r.episode_url as string | null) ?? (r.youtube_url as string | null) ?? (r.audio_url as string | null) ?? '',
+      source_name: sourceName,
+      category: 'podcast',
+      image_url: (r.image_url as string | null) ?? undefined,
+      summary: (r.description as string | null) ?? '',
+      published_at: (r.published_at as string | null) ?? null,
+    };
+  });
+
+  // News first, then podcasts — indices below address this merged list.
+  const candidates = [...newsCandidates, ...podcastCandidates];
+
+  if (candidates.length === 0) {
+    return {
+      ...base,
+      status: 'success',
+      error: null,
+      result: {
+        summary: 'No fresh news to curate today.',
+        sources: [],
+        metadata: { mood_summary: '', stories: [], more_news_url: moreNewsUrl },
+      },
+    };
+  }
+
+  // ── Editor selects + ranks the best ≤maxStories ──────────────────────────────
+  const candidateLines = candidates
+    .map(
+      (c, i) =>
+        `${i}. [${c.kind}] ${c.title}\n   source: ${c.source_name} | category: ${c.category} | published: ${c.published_at ?? 'unknown'}\n   summary: ${c.summary.slice(0, 300)}`,
+    )
+    .join('\n\n');
+
+  const selectPrompt = `You are curating today's best Bitcoin and treasury news for the BTS home dashboard. From the candidates below (news articles and podcast episodes), pick the ${maxStories} most relevant, newsworthy, and distinct items — weighting Australian relevance, treasury and balance-sheet implications, and genuine novelty. Avoid near-duplicates and aim for a mix of formats and topics. Order them from most to least important. Return ONLY the candidate indices verbatim in the schema shape.
+
+Candidates:
+${candidateLines}`;
+
+  let selected: CurationCandidate[] = [];
+  try {
+    const resp = await editor.generate([{ role: 'user', content: selectPrompt }], {
+      requestContext: stepRequestContext('executeRoutine.news_curation_select'),
+      structuredOutput: {
+        schema: curationSelectSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { selected: [] },
+      },
+    });
+    const picked = coerceToSchema(curationSelectSchema, resp.object ?? { selected: [] });
+    const seen = new Set<number>();
+    selected = picked.selected
+      .map((s) => s.index)
+      .filter((i) => Number.isInteger(i) && i >= 0 && i < candidates.length && !seen.has(i) && seen.add(i))
+      .map((i) => candidates[i])
+      .slice(0, maxStories);
+  } catch (err) {
+    console.warn('[news-curation] editor selection failed:', err);
+  }
+
+  // Fallback: if the editor produced nothing usable, take the top ranked candidates.
+  if (selected.length === 0) selected = candidates.slice(0, maxStories);
+
+  const stories: NewsCurationStory[] = selected.map((c) => ({
+    kind: c.kind,
+    id: c.id,
+    title: c.title,
+    url: c.url,
+    source_name: c.source_name,
+    category: c.category,
+    image_url: c.image_url,
+  }));
+
+  // ── Charlie writes the one-sentence mood summary ─────────────────────────────
+  const moodPrompt = `Write ONE catchy sentence (max 200 characters, no exclamation marks, BTS brand voice) summarising the overall mood and the main topics across these stories. "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
+
+${stories.map((s, i) => `${i + 1}. ${s.title} (${s.source_name})`).join('\n')}
+
+${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
+
+  let moodSummary = '';
+  try {
+    const resp = await charlie.generate([{ role: 'user', content: moodPrompt }], {
+      requestContext: stepRequestContext('executeRoutine.news_curation_summary'),
+      structuredOutput: {
+        schema: curationMoodSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { mood_summary: '' },
+      },
+    });
+    moodSummary = coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
+  } catch (err) {
+    console.warn('[news-curation] Charlie mood summary failed:', err);
+  }
+
+  // ── Headline image: podcast feed artwork, else best-effort og:image ──────────
+  let headlineImageUrl: string | undefined;
+  const headline = stories[0];
+  if (headline) {
+    if (headline.kind === 'podcast') {
+      headlineImageUrl = headline.image_url;
+    } else if (headline.url) {
+      headlineImageUrl = (await fetchOgImage(headline.url)) ?? undefined;
+    }
+  }
+
+  const retrievedAt = new Date().toISOString();
+  const result: RoutineResult = {
+    summary: moodSummary || `Curated ${stories.length} ${stories.length === 1 ? 'story' : 'stories'}.`,
+    // Reuse sources[] so the existing tile lists the items with zero extra work.
+    sources: stories.map((s) => ({
+      url: s.url,
+      title: s.title,
+      source: s.source_name,
+      excerpt: '',
+      retrieved_at: retrievedAt,
+    })),
+    metadata: {
+      mood_summary: moodSummary,
+      stories,
+      more_news_url: moreNewsUrl,
+      headline_image_url: headlineImageUrl,
+    },
+  };
+
+  return { ...base, status: 'success', result, error: null };
+}
+
+const NEWS_CURATION_NO_TOOL_INSTRUCTION =
+  'Return ONLY the structured object. Do not call any tool (no persist_content_draft, no supabase tools).';
 
 /** True when `date` is the first Monday of its month. */
 function isFirstMondayOfMonth(date: Date): boolean {
