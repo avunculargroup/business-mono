@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CategoryChip } from '@/components/news/CategoryChip';
+import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import type { NewsCategory, NewsItemRecord } from '@platform/shared';
 import { NEWS_CATEGORY_LABELS, DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import styles from './DailyDigest.module.css';
@@ -87,7 +88,7 @@ export default async function DailyDigestPage() {
                         rel="noopener noreferrer"
                         className={styles.itemLink}
                       >
-                        {item.title}
+                        {cleanNewsTitle(item.title)}
                       </a>
                     </h3>
                     {item.summary && (

@@ -7,6 +7,7 @@ import { NEWS_CATEGORY_LABELS } from '@platform/shared';
 import type { NewsCategory, NewsStatus, NewsItemRecord } from '@platform/shared';
 import { CategoryChip } from './CategoryChip';
 import { NewsCard } from './NewsCard';
+import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './NewsFeed.module.css';
 
 const CATEGORIES: Array<NewsCategory | 'all'> = [
@@ -169,7 +170,7 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                       rel="noopener noreferrer"
                       className={styles.digestLink}
                     >
-                      {item.title}
+                      {cleanNewsTitle(item.title)}
                     </a>
                   </div>
                 ))}
