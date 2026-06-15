@@ -35,6 +35,7 @@ import { rex } from '../agents/researcher/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
+import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
@@ -621,10 +622,11 @@ async function runNewsIngest(
       if (!res.ok) continue;
       const data = await res.json() as { results?: Array<{ url: string; title: string; content: string; score: number; published_date?: string; source?: string }> };
       for (const r of data.results ?? []) {
-        if (!seen.has(r.url)) {
-          seen.add(r.url);
+        const url = normalizeNewsUrl(r.url);
+        if (!seen.has(url)) {
+          seen.add(url);
           tavilyCandidates.push({
-            url: r.url,
+            url,
             title: r.title,
             summary: r.content?.slice(0, 500) ?? '',
             source: (r.source ?? new URL(r.url).hostname).replace(/^www\./, ''),
@@ -674,11 +676,14 @@ async function runNewsIngest(
       if (dedupEmbedding) {
         // Duplicate of a story already stored in the database.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Compare across all categories, not just this routine's — the same
+        // story is often surfaced by two category routines (e.g. a Forbes
+        // article landing in both "corporate" and "regulatory").
         const { data: near } = await (supabase.rpc as any)('vector_search_news', {
           query_embedding: dedupEmbedding,
           match_threshold: NEWS_DEDUP_THRESHOLD,
           match_count: 1,
-          filter_category: category,
+          filter_category: null,
           filter_days: 3,
         });
         if (near && near.length > 0) {
@@ -734,7 +739,7 @@ async function runNewsIngest(
     });
 
     if (ranked && ranked.shortlist.length > 0) {
-      shortlist = ranked.shortlist
+      shortlist = dedupeShortlistIndices(ranked.shortlist)
         .slice(0, maxCurated)
         .map((s) => fresh[s.index])
         .filter((c): c is FreshCandidate => Boolean(c));
@@ -810,7 +815,7 @@ async function runNewsIngest(
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
 
-      await supabase.from('news_items').insert({
+      const { error: insertError } = await supabase.from('news_items').insert({
         title: item.title,
         url: item.url,
         source_name: item.source,
@@ -827,6 +832,18 @@ async function runNewsIngest(
         routine_id: routine.id,
         ingested_by: 'rex',
       });
+      // A failed insert (e.g. a UNIQUE(url) collision from a late-detected
+      // duplicate) must not be counted as stored or surfaced in the dashboard
+      // sources — otherwise the same article appears twice in the tile.
+      if (insertError) {
+        if (insertError.code === '23505') itemsSkippedDuplicate += 1;
+        console.warn('[news-ingest] insert skipped', {
+          url: item.url,
+          title: item.title,
+          error: insertError.message,
+        });
+        continue;
+      }
       itemsStored += 1;
       if (extractionOk) {
         storedSources.push({
