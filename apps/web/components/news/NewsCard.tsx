@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
+import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
 
@@ -122,7 +123,7 @@ export function NewsCard({
           rel="noopener noreferrer"
           className={styles.titleLink}
         >
-          {title}
+          {cleanNewsTitle(title)}
           <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
         </a>
       </h4>
