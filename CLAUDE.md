@@ -33,6 +33,7 @@ Transform tasks into verifiable goals before implementing:
 - Also run `pnpm --filter @platform/agents typecheck` before submitting — both checks are gated by the GitHub Actions PR workflow (`.github/workflows/test.yml`), so red here = red on the PR.
 - When you add a new tool, listener helper, webhook, or pure utility, add a `*.test.ts` next to it. Reuse `test/factories.ts` and `test/mocks/supabase.ts` rather than building one-off fixtures.
 - LLM-touching evals (`pnpm --filter @platform/agents test:eval`) are NOT run in CI. Run them locally after changes to Simon's routing, specialist registrations, or any agent's system prompt.
+- `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.ts` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. It currently covers the pure `lib/` utilities (no jsdom/component tests yet — add `environment: 'jsdom'` + React Testing Library if/when that's needed). Root `pnpm test` runs both apps via Turborepo, so both are gated by the PR workflow.
 
 -----
 
