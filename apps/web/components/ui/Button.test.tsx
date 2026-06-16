@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 
 import { Button } from './Button';
+import { hasLocalClass } from '@/test/cssClass';
 
 describe('Button', () => {
   it('renders its children', () => {
@@ -49,5 +50,30 @@ describe('Button', () => {
     const ref = createRef<HTMLButtonElement>();
     render(<Button ref={ref}>Ref</Button>);
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it.each(['primary', 'secondary', 'ghost', 'destructive'] as const)(
+    'maps variant="%s" to the matching variant class',
+    (variant) => {
+      render(<Button variant={variant}>X</Button>);
+      expect(hasLocalClass(screen.getByRole('button'), variant)).toBe(true);
+    },
+  );
+
+  it.each(['sm', 'md', 'lg'] as const)('maps size="%s" to the matching size class', (size) => {
+    render(<Button size={size}>X</Button>);
+    expect(hasLocalClass(screen.getByRole('button'), size)).toBe(true);
+  });
+
+  it('defaults to the primary/md classes', () => {
+    render(<Button>X</Button>);
+    const button = screen.getByRole('button');
+    expect(hasLocalClass(button, 'primary')).toBe(true);
+    expect(hasLocalClass(button, 'md')).toBe(true);
+  });
+
+  it('adds the loading class while loading', () => {
+    render(<Button loading>X</Button>);
+    expect(hasLocalClass(screen.getByRole('button'), 'loading')).toBe(true);
   });
 });
