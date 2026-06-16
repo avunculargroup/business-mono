@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { fetchText } from '../../lib/fetchFeed.js';
 import { resolveTranscript } from '../../lib/transcripts/resolveTranscript.js';
 import {
   insertEpisode,
@@ -13,6 +14,13 @@ import {
 
 const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
+// Hard cap on a fetched page body. We only keep the first 50 K chars of stripped
+// text, so there is no reason to buffer (let alone regex-strip) a multi-MB page.
+// fetchText streams and aborts past the cap, so a giant body is never fully held
+// — the same OOM guard the transcript waterfall uses (the agents host runs a
+// small heap that a few global .replace() passes over a large string can exhaust).
+const MAX_WEB_FETCH_BYTES = 5 * 1024 * 1024;
+
 export const webFetch = createTool({
   id: 'web_fetch',
   description: 'Fetch and extract content from a URL',
@@ -20,15 +28,19 @@ export const webFetch = createTool({
     url: z.string().describe('URL to fetch'),
   }),
   execute: async (context) => {
-    const response = await fetch(context.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PlatformArchivist/1.0)' },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${context.url}: ${response.statusText}`);
+    let html: string;
+    try {
+      html = await fetchText(
+        context.url,
+        { 'User-Agent': 'Mozilla/5.0 (compatible; PlatformArchivist/1.0)' },
+        MAX_WEB_FETCH_BYTES,
+      );
+    } catch (err) {
+      throw new Error(
+        `Failed to fetch ${context.url}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
-    const html = await response.text();
     // Strip HTML tags for raw content
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? context.url;
