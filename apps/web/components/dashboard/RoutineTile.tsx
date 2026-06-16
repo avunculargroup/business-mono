@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
+import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './RoutineTile.module.css';
 
 interface RoutineSource {
@@ -65,7 +66,7 @@ export function RoutineTile({ routine }: RoutineTileProps) {
             <li key={s.url} className={styles.item}>
               <span className={styles.headline}>
                 <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
-                  {s.title || s.url}
+                  {s.title ? cleanNewsTitle(s.title) : s.url}
                 </a>
                 {s.source && <span className={styles.source}>{s.source}</span>}
               </span>
