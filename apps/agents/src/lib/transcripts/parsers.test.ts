@@ -89,6 +89,15 @@ describe('parseHtml', () => {
     expect(out.text).toContain('Hello & welcome');
     expect(out.text).toContain('Line two');
   });
+
+  it('bounds the regex chain on an oversized body instead of processing it whole', () => {
+    // A >2M-char body must not be fed whole into the chained global .replace()
+    // passes (the OOM site). Leading content survives; the output stays bounded.
+    const huge = '<p>start</p>' + '<span>x</span>'.repeat(400_000);
+    const out = parseHtml(huge);
+    expect(out.text).toContain('start');
+    expect(out.text.length).toBeLessThanOrEqual(2_000_000);
+  });
 });
 
 describe('parsePlainText', () => {

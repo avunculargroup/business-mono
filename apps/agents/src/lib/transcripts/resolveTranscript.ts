@@ -22,11 +22,15 @@ const BROWSER_UA =
   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 // Hard cap on a fetched feed-tag transcript. Real transcripts are tiny — even a
-// 3-hour show is a few hundred KB of text — so 12 MB is far above any honest
-// transcript while still bounding the memory a single malformed/oversized tag
-// can demand. Without it, a giant body is buffered and regex-processed whole,
-// which OOM-kills the whole ingestion run (and every other source with it).
-const MAX_TRANSCRIPT_BYTES = 12 * 1024 * 1024;
+// 3-hour show is a few hundred KB of text, and markup inflation keeps the worst
+// honest case around a megabyte — so 2 MB is still generous headroom. The first
+// pass set this to 12 MB, but the agents host runs a small heap (~256 MB) that
+// sits near its ceiling at baseline, and a 12 MB body fed through parseHtml's
+// ~10 chained regex .replace() passes (each allocating a fresh multi-MB string)
+// still spiked enough transient garbage to OOM mid-replace. 2 MB bounds both that
+// regex spike and the downstream chunk/embed fan-out a single oversized tag can
+// demand. On overflow fetchText throws and the waterfall falls through.
+const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
 
 // What the routine/brief passes in. transcriptTags come from the feed item's
 // <podcast:transcript> elements (empty for ad-hoc/brief episodes).

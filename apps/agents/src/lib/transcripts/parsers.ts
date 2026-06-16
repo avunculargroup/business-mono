@@ -126,10 +126,22 @@ export function decodeEntities(text: string): string {
     .replace(/&quot;/g, '"');
 }
 
+// Hard ceiling on the input to the regex chain below. parseHtml runs ~10 chained
+// global .replace() passes, each allocating a fresh full-size string; on the
+// memory-constrained agents host (heap ~256 MB, near its ceiling at baseline) a
+// multi-MB input spikes enough transient garbage to OOM mid-replace. The feed-tag
+// byte cap is the first line of defence; this guards every other caller too (the
+// fetch byte count can undercount a multibyte-decoded body, and ad-hoc/future
+// callers are uncapped). An honest transcript is a few hundred KB, so 2M chars is
+// far above any real one; truncating a pathological body mid-markup is fine for
+// best-effort plain text.
+const MAX_HTML_PARSE_CHARS = 2_000_000;
+
 // Strip tags/entities to plain text. No timestamps → a single untimed segment.
 export function parseHtml(raw: string): ParsedTranscript {
+  const input = raw.length > MAX_HTML_PARSE_CHARS ? raw.slice(0, MAX_HTML_PARSE_CHARS) : raw;
   const text = decodeEntities(
-    raw
+    input
       .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
       .replace(/<br\s*\/?>(?=\S)/gi, ' ')
       .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
