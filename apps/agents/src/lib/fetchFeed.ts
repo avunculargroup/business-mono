@@ -13,13 +13,53 @@ const FEED_ACCEPT =
 
 const parser = new Parser();
 
-export async function fetchText(url: string, headers: Record<string, string>): Promise<string> {
+// Stream the body, decoding as we go but aborting the moment the byte count
+// crosses maxBytes, so an oversized response (e.g. a podcast transcript tag that
+// points at a multi-hundred-MB file or a full HTML page) never gets fully
+// buffered. Buffering it then running regex .replace() passes over it is exactly
+// what OOM-kills the ingestion routine. The Content-Length header is checked
+// first as a cheap early-out; missing/lying headers are caught by the running
+// tally. Falls back to res.text() when the runtime gives no readable stream.
+async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error(`response too large (${declared} bytes > ${maxBytes} byte cap)`);
+  }
+  if (!res.body) return await res.text();
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        throw new Error(`response exceeded ${maxBytes} byte cap`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    // Stops the download on the oversized-throw path; a no-op once fully read.
+    await reader.cancel().catch(() => {});
+  }
+}
+
+export async function fetchText(
+  url: string,
+  headers: Record<string, string>,
+  maxBytes?: number,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
     const res = await fetch(url, { headers, redirect: 'follow', signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
+    return maxBytes === undefined ? await res.text() : await readTextCapped(res, maxBytes);
   } finally {
     clearTimeout(timer);
   }

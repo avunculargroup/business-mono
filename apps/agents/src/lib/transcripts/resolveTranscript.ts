@@ -21,6 +21,13 @@ const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// Hard cap on a fetched feed-tag transcript. Real transcripts are tiny — even a
+// 3-hour show is a few hundred KB of text — so 12 MB is far above any honest
+// transcript while still bounding the memory a single malformed/oversized tag
+// can demand. Without it, a giant body is buffered and regex-processed whole,
+// which OOM-kills the whole ingestion run (and every other source with it).
+const MAX_TRANSCRIPT_BYTES = 12 * 1024 * 1024;
+
 // What the routine/brief passes in. transcriptTags come from the feed item's
 // <podcast:transcript> elements (empty for ad-hoc/brief episodes).
 export interface ResolveEpisodeInput {
@@ -89,7 +96,11 @@ export async function resolveTranscript(
     const best = selectBestTranscriptTag(tags, source.preferred_transcript_lang);
     if (best) {
       try {
-        const raw = await fetchText(best.url, { 'User-Agent': BROWSER_UA, Accept: '*/*' });
+        const raw = await fetchText(
+          best.url,
+          { 'User-Agent': BROWSER_UA, Accept: '*/*' },
+          MAX_TRANSCRIPT_BYTES,
+        );
         const parsed = parseByFormat(raw, best.format);
         if (parsed.text) {
           return {
