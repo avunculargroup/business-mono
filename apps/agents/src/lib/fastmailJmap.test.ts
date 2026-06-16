@@ -42,6 +42,17 @@ describe('extractBody', () => {
     // textBody=='' makes the factory skip the text body part entirely
     expect(extractBody(email)).toBe('');
   });
+
+  it('caps a pathologically large HTML body before the regex chain runs', () => {
+    // A multi-MB HTML body must not be fed whole into stripHtml's chained global
+    // .replace() passes — that is the OOM site (Runtime_RegExpReplaceRT) on the
+    // memory-constrained agents host. Truncating mid-markup is acceptable here.
+    const huge = '<p>' + 'a'.repeat(3_000_000) + '</p>';
+    const email = buildJmapEmail({ textBody: '', htmlBody: huge });
+    const out = extractBody(email);
+    expect(out.length).toBeLessThanOrEqual(1_000_000);
+    expect(out.length).toBeGreaterThan(0);
+  });
 });
 
 describe('shouldSkipEmail', () => {
