@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
+  // Use the automatic JSX runtime (like Next.js) so components and *.test.tsx
+  // files don't need React in scope.
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@platform/db': `${here}../../packages/db/src/index.ts`,
@@ -17,7 +20,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Pure-logic tests run in node; component tests (*.test.tsx) need a DOM.
     environment: 'node',
+    environmentMatchGlobs: [['**/*.test.tsx', 'jsdom']],
+    setupFiles: ['./test/setup.ts'],
     include: ['{app,components,hooks,lib}/**/*.test.{ts,tsx}'],
     exclude: ['.next/**', 'node_modules/**'],
     testTimeout: 10_000,
