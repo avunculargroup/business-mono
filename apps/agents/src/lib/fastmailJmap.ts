@@ -200,6 +200,11 @@ export class FastmailJmapClient {
               'receivedAt', 'bodyValues', 'textBody', 'htmlBody', 'headers',
             ],
             fetchAllBodyValues: true,
+            // Cap each body value server-side so a multi-MB marketing/newsletter
+            // email is never fetched (let alone regex-stripped) in full — the
+            // memory-constrained agents host OOMs on chained .replace() passes
+            // over a large body. 1 MB is far above any legitimate email body.
+            maxBodyValueBytes: 1_048_576,
           },
           'eg',
         ],
@@ -299,7 +304,20 @@ export function extractBody(email: JmapEmail): string {
   return '';
 }
 
-function stripHtml(html: string): string {
+// Hard ceiling on the input to the regex chain below. stripHtml runs ~10 chained
+// global .replace() passes, each allocating a fresh full-size string; on the
+// memory-constrained agents host (heap ~256 MB, near its ceiling at baseline) a
+// multi-MB HTML email — marketing/newsletter mail routinely is — spikes enough
+// transient garbage to OOM mid-replace (Runtime_RegExpReplaceRT). The JMAP
+// maxBodyValueBytes request param is the first line of defence; this guards every
+// caller too (ad-hoc/future callers, and bodies decoded past the octet cap). A
+// real email body is tens of KB, so 1M chars is far above any legitimate one;
+// truncating a pathological body mid-markup is fine for best-effort plain text.
+const MAX_STRIP_HTML_CHARS = 1_000_000;
+
+function stripHtml(rawHtml: string): string {
+  const html =
+    rawHtml.length > MAX_STRIP_HTML_CHARS ? rawHtml.slice(0, MAX_STRIP_HTML_CHARS) : rawHtml;
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
