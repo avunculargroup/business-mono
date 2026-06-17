@@ -4,6 +4,14 @@ import {
   shouldSkipEmail,
   FastmailJmapClient,
   JmapAuthError,
+  findHeader,
+  getMessageId,
+  parseAuthResults,
+  isAuthFail,
+  parsePlusTag,
+  extractResearchSlug,
+  attachmentCount,
+  hasPdfAttachment,
 } from './fastmailJmap.js';
 import { buildJmapEmail } from '../../test/factories.js';
 
@@ -99,6 +107,111 @@ describe('shouldSkipEmail', () => {
   });
 });
 
+describe('header / address helpers', () => {
+  describe('findHeader', () => {
+    it('matches case-insensitively and returns the first value', () => {
+      const headers = [
+        { name: 'Message-ID', value: '<a@x>' },
+        { name: 'message-id', value: '<b@x>' },
+      ];
+      expect(findHeader(headers, 'message-id')).toBe('<a@x>');
+      expect(findHeader(headers, 'Nope')).toBeUndefined();
+    });
+  });
+
+  describe('getMessageId', () => {
+    it('strips angle brackets', () => {
+      const email = buildJmapEmail({ headers: [{ name: 'Message-ID', value: '  <abc.123@mail> ' }] });
+      expect(getMessageId(email)).toBe('abc.123@mail');
+    });
+    it('handles the Message-Id casing variant', () => {
+      const email = buildJmapEmail({ headers: [{ name: 'Message-Id', value: '<x@y>' }] });
+      expect(getMessageId(email)).toBe('x@y');
+    });
+    it('returns null when absent', () => {
+      expect(getMessageId(buildJmapEmail({ headers: [] }))).toBeNull();
+    });
+  });
+
+  describe('parseAuthResults', () => {
+    it('parses spf, dkim and dmarc verdicts from one header', () => {
+      const headers = [{
+        name: 'Authentication-Results',
+        value: 'mx.fastmail.com; dkim=pass header.d=gromen.com; spf=pass smtp.mailfrom=gromen.com; dmarc=pass',
+      }];
+      expect(parseAuthResults(headers)).toEqual({ spf: 'pass', dkim: 'pass', dmarc: 'pass' });
+    });
+    it('takes the first verdict per method across multiple headers', () => {
+      const headers = [
+        { name: 'Authentication-Results', value: 'a; spf=fail' },
+        { name: 'Authentication-Results', value: 'b; dkim=pass' },
+      ];
+      expect(parseAuthResults(headers)).toEqual({ spf: 'fail', dkim: 'pass', dmarc: null });
+    });
+    it('returns nulls when no Authentication-Results header is present', () => {
+      expect(parseAuthResults([{ name: 'From', value: 'x' }])).toEqual({ spf: null, dkim: null, dmarc: null });
+    });
+  });
+
+  describe('isAuthFail', () => {
+    it('is true when spf or dkim failed', () => {
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=fail; dkim=pass' }])).toBe(true);
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=pass; dkim=fail' }])).toBe(true);
+    });
+    it('is false for pass / softfail / none / missing', () => {
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=pass; dkim=pass' }])).toBe(false);
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=softfail' }])).toBe(false);
+      expect(isAuthFail([])).toBe(false);
+    });
+  });
+
+  describe('parsePlusTag', () => {
+    it('extracts the tag after the plus, lowercased', () => {
+      expect(parsePlusTag('research+Gromen@btreasury.com.au')).toBe('gromen');
+    });
+    it('returns null when there is no plus tag', () => {
+      expect(parsePlusTag('research@btreasury.com.au')).toBeNull();
+      expect(parsePlusTag('research+@x')).toBeNull();
+    });
+  });
+
+  describe('extractResearchSlug', () => {
+    it('finds the plus tag from a To recipient', () => {
+      const email = buildJmapEmail({ to: [{ email: 'research+bitwise@btreasury.com.au' }] });
+      expect(extractResearchSlug(email)).toBe('bitwise');
+    });
+    it('scans Cc when To has no plus tag', () => {
+      const email = buildJmapEmail({
+        to: [{ email: 'someone@btreasury.com.au' }],
+        cc: [{ email: 'research+alden@btreasury.com.au' }],
+      });
+      expect(extractResearchSlug(email)).toBe('alden');
+    });
+    it('returns null when no recipient is plus-addressed', () => {
+      const email = buildJmapEmail({ to: [{ email: 'plain@btreasury.com.au' }], cc: [] });
+      expect(extractResearchSlug(email)).toBeNull();
+    });
+  });
+
+  describe('attachment helpers', () => {
+    it('counts attachment-disposition and named parts', () => {
+      const email = buildJmapEmail({
+        attachments: [
+          { type: 'application/pdf', name: 'memo.pdf', disposition: 'attachment' },
+          { type: 'image/png', name: null, disposition: 'inline' }, // tracking pixel — not counted
+        ],
+      });
+      expect(attachmentCount(email)).toBe(1);
+    });
+    it('detects a PDF by MIME type or .pdf filename', () => {
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'application/pdf' }] }))).toBe(true);
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'application/octet-stream', name: 'Report.PDF' }] }))).toBe(true);
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'image/png', name: 'logo.png' }] }))).toBe(false);
+      expect(hasPdfAttachment(buildJmapEmail({}))).toBe(false);
+    });
+  });
+});
+
 describe('FastmailJmapClient', () => {
   const fetchMock = vi.fn();
   beforeEach(() => {
@@ -152,6 +265,37 @@ describe('FastmailJmapClient', () => {
     const out = await client.getEmails('acc', 'https://api/', []);
     expect(out).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('getMailboxIdByName resolves a folder case-insensitively', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Mailbox/get', { list: [
+            { id: 'mb_inbox', name: 'Inbox', role: 'inbox' },
+            { id: 'mb_research', name: 'Research', role: null },
+          ] }, 'mb']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const id = await client.getMailboxIdByName('acc', 'https://api/', 'research');
+    expect(id).toBe('mb_research');
+  });
+
+  it('getMailboxIdByName returns null when the folder does not exist', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Mailbox/get', { list: [{ id: 'mb_inbox', name: 'Inbox', role: 'inbox' }] }, 'mb']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const id = await client.getMailboxIdByName('acc', 'https://api/', 'Research');
+    expect(id).toBeNull();
   });
 
   it('queryEmailIds uses Email/queryChanges when sinceQueryState is provided', async () => {

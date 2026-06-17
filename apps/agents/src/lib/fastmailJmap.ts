@@ -18,6 +18,15 @@ export interface JmapAddress {
   email: string;
 }
 
+export interface JmapAttachment {
+  partId?: string;
+  blobId?: string;
+  type?: string | null;        // MIME type, e.g. 'application/pdf'
+  name?: string | null;        // filename
+  size?: number;
+  disposition?: string | null; // 'attachment' | 'inline' | null
+}
+
 export interface JmapEmail {
   id: string;
   subject: string | null;
@@ -29,6 +38,7 @@ export interface JmapEmail {
   textBody:    Array<{ partId: string }>;
   htmlBody:    Array<{ partId: string }>;
   headers:     Array<{ name: string; value: string }>;
+  attachments?: JmapAttachment[];
 }
 
 interface JmapSession {
@@ -90,6 +100,25 @@ export class FastmailJmapClient {
     if (!sent)  throw new Error(`No sent mailbox found for ${this.username}`);
 
     return { inboxId: inbox.id, sentId: sent.id };
+  }
+
+  /**
+   * Resolves a user-created folder by its (leaf) name, case-insensitively.
+   * Returns null when no such folder exists so the caller can warn and skip
+   * rather than crash the whole poll — e.g. the research folder isn't set up yet.
+   */
+  async getMailboxIdByName(
+    accountId: string,
+    apiUrl: string,
+    name: string,
+  ): Promise<string | null> {
+    const res = await this.callMethod(apiUrl, [
+      ['Mailbox/get', { accountId, ids: null, properties: ['id', 'name', 'role'] }, 'mb'],
+    ]);
+    const mailboxes = (res[0][1] as { list: Array<{ id: string; name: string }> }).list;
+    const target = name.trim().toLowerCase();
+    const match = mailboxes.find((m) => m.name?.trim().toLowerCase() === target);
+    return match ? match.id : null;
   }
 
   // ── Email query ────────────────────────────────────────────────────────────
@@ -198,6 +227,9 @@ export class FastmailJmapClient {
             properties: [
               'id', 'subject', 'from', 'to', 'cc',
               'receivedAt', 'bodyValues', 'textBody', 'htmlBody', 'headers',
+              // attachments metadata only (partId/type/name/size) — no blob
+              // download; lets the research path flag PDFs and count attachments.
+              'attachments',
             ],
             fetchAllBodyValues: true,
             // Cap each body value server-side so a multi-MB marketing/newsletter
@@ -332,15 +364,107 @@ function stripHtml(rawHtml: string): string {
     .trim();
 }
 
+// ── Header / address helpers ────────────────────────────────────────────────
+
+type Header = { name: string; value: string };
+
+/** First header value matching `name` (case-insensitive), or undefined. */
+export function findHeader(headers: Header[], name: string): string | undefined {
+  const target = name.toLowerCase();
+  return headers.find((h) => h.name.toLowerCase() === target)?.value;
+}
+
+/** The RFC 5322 Message-ID with surrounding angle brackets stripped, or null. */
+export function getMessageId(email: JmapEmail): string | null {
+  const raw = findHeader(email.headers, 'Message-ID') ?? findHeader(email.headers, 'Message-Id');
+  if (!raw) return null;
+  return raw.trim().replace(/^<|>$/g, '') || null;
+}
+
+/**
+ * Parses the SPF/DKIM/DMARC verdicts out of any Authentication-Results headers.
+ * Returns the first non-null verdict found per method, lowercased
+ * (e.g. 'pass', 'fail', 'softfail', 'none'). Missing methods are null.
+ */
+export function parseAuthResults(
+  headers: Header[],
+): { spf: string | null; dkim: string | null; dmarc: string | null } {
+  const result: { spf: string | null; dkim: string | null; dmarc: string | null } = {
+    spf: null,
+    dkim: null,
+    dmarc: null,
+  };
+  const verdict = (value: string, method: string): string | null => {
+    // matches e.g. "spf=pass" / "dkim = fail" — token after '=' up to space/semicolon
+    const m = value.match(new RegExp(`\\b${method}\\s*=\\s*([a-z]+)`, 'i'));
+    return m ? m[1].toLowerCase() : null;
+  };
+  for (const h of headers) {
+    if (h.name.toLowerCase() !== 'authentication-results') continue;
+    result.spf ??= verdict(h.value, 'spf');
+    result.dkim ??= verdict(h.value, 'dkim');
+    result.dmarc ??= verdict(h.value, 'dmarc');
+  }
+  return result;
+}
+
+/** True when SPF or DKIM explicitly failed — the reject condition for research mail. */
+export function isAuthFail(headers: Header[]): boolean {
+  const { spf, dkim } = parseAuthResults(headers);
+  return spf === 'fail' || dkim === 'fail';
+}
+
+/** The plus-address tag of a single address (`research+gromen@x` → `gromen`), or null. */
+export function parsePlusTag(address: string): string | null {
+  const local = address.trim().toLowerCase().split('@')[0];
+  if (!local) return null;
+  const plus = local.indexOf('+');
+  if (plus === -1) return null;
+  const tag = local.slice(plus + 1);
+  return tag || null;
+}
+
+/**
+ * Finds the research source slug from a delivered email by scanning To + Cc for
+ * a plus-addressed recipient. Returns the first plus-tag found, or null.
+ */
+export function extractResearchSlug(email: JmapEmail): string | null {
+  const recipients = [...(email.to ?? []), ...(email.cc ?? [])];
+  for (const r of recipients) {
+    const tag = parsePlusTag(r.email);
+    if (tag) return tag;
+  }
+  return null;
+}
+
+/** Count of real attachments (disposition 'attachment', or any named part). */
+export function attachmentCount(email: JmapEmail): number {
+  return (email.attachments ?? []).filter(
+    (a) => a.disposition === 'attachment' || (a.name != null && a.name !== ''),
+  ).length;
+}
+
+/** True when any attachment is a PDF (by MIME type or .pdf filename). */
+export function hasPdfAttachment(email: JmapEmail): boolean {
+  return (email.attachments ?? []).some(
+    (a) =>
+      (a.type ?? '').toLowerCase() === 'application/pdf' ||
+      (a.name ?? '').toLowerCase().endsWith('.pdf'),
+  );
+}
+
 // ── Email filtering ───────────────────────────────────────────────────────────
 
 /**
  * Returns true if the email should be silently skipped.
  * Checks for spam scores, marketing/bulk headers, and auto-generated mail.
+ *
+ * NOTE: this is the CRM-sync filter. It deliberately skips bulk/list mail
+ * (List-Unsubscribe, Precedence: bulk, campaign headers) — which is exactly
+ * what newsletters are — so the research-folder listener must NOT apply it.
  */
 export function shouldSkipEmail(headers: Array<{ name: string; value: string }>): boolean {
-  const hdr = (name: string): string | undefined =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
+  const hdr = (name: string): string | undefined => findHeader(headers, name);
 
   // Fastmail's own spam flags
   const spamStatus = hdr('X-Spam-Status');
