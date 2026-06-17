@@ -36,4 +36,9 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", ".mastra/output/index.mjs"]
+# --max-old-space-size gives V8 explicit heap headroom instead of auto-sizing to
+# ~256 MB (the ceiling the OOM crashes hit). Keep this in step with the Railway
+# startCommand in railway.toml, which overrides this CMD on Railway. 512 MB
+# assumes the container has at least ~1 GB RAM — keep it below the memory limit
+# or the OS OOM-killer will SIGKILL the process instead.
+CMD ["node", "--max-old-space-size=512", ".mastra/output/index.mjs"]

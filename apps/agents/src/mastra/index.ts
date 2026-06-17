@@ -53,12 +53,33 @@ const storage = new PostgresStore({
 // CloudExporter self-disables when MASTRA_CLOUD_ACCESS_TOKEN is unset, so
 // registering it here is a no-op locally and ships traces to Mastra Cloud
 // in production once the env var is set on Railway.
+//
+// DefaultExporter is the local-OTLP exporter that backs the Studio trace view.
+// It buffers whole spans — and agent/LLM spans carry very large attributes (full
+// prompts, completions, tool args/results) — in an in-memory batch queue. In
+// production there is no local collector draining that queue, so it grows without
+// bound and pins the small (~256 MB) Railway heap at its ceiling; the recurring
+// "heap out of memory" crash inside a regex .replace() was that exhaustion
+// surfacing at the next allocation, not a transient regex spike. So enable it
+// only in development (where `mastra dev` runs the collector behind Studio), or
+// when explicitly opted in for a one-off prod trace-capture session. Sampling
+// stays ALWAYS and the AgentActivitySpanProcessor stays registered, so the
+// agent_activity audit trail is unchanged — only the heavy local trace buffer is
+// dropped in production.
+const enableLocalTraceExport =
+  process.env['NODE_ENV'] !== 'production' ||
+  process.env['MASTRA_DEFAULT_EXPORTER'] === 'true';
+
+const exporters = enableLocalTraceExport
+  ? [new DefaultExporter(), new CloudExporter()]
+  : [new CloudExporter()];
+
 const observability = new Observability({
   configs: {
     default: {
       serviceName: 'bts-agents',
       sampling: { type: SamplingStrategyType.ALWAYS },
-      exporters: [new DefaultExporter(), new CloudExporter()],
+      exporters,
       spanOutputProcessors: [new AgentActivitySpanProcessor()],
     },
   },
