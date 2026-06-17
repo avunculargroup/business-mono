@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-17 — Email newsletter sources + Rex relevance rubric
+
+**Migration:** `20260617000000_add_email_news_sources_and_rubric.sql`
+
+Extends the news ingestion stack to a third source type — paid email newsletters that never surface via RSS or podcast (Gromen *Tree Rings*, Bitwise CIO memos, Fidelity Digital Assets, Lyn Alden Premium). Per `docs/news-source-email-spec.md`, but scoped to **extend the existing pipeline** rather than build a parallel one: email items land in the same `news_items` table and `/news` UI as RSS/podcast. Newsletters arrive at per-source plus-addresses (`research+{slug}@<domain>`) filed into a dedicated Fastmail folder, polled by a listener (`researchMailListener`, Phase 3) — so this is **not** a cron routine and `routines_action_type_check` is unchanged.
+
+- **`news_sources` extended** — `'email'` added to `source_type`. Email columns: `slug` (plus-address suffix + URL slug, **partial unique index** `WHERE slug IS NOT NULL`), `inbound_address` (the computed `research+{slug}@<domain>`), `sender_allowlist` (`TEXT[]`, may start empty and seed from the first email's From via "Trust this sender"). Shared curation fields for the Rex rubric across all source types: `tier` (`tier_1`/`tier_2`/`tier_3`, nullable) and `relevance_threshold` (`NUMERIC(3,2)`, default `0.70`). The `news_sources_feed_required` CHECK gains a third arm: `source_type='email'` requires `inbound_address`.
+- **`news_items` extended** — `source_id` FK → `news_sources` (`ON DELETE SET NULL`); legacy rows linked by `source_name` text only, email items carry the FK. `ingestion_ref` (email Message-ID) is the idempotency key, deduped via a **partial unique index** `(source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL` *before* the existing URL + semantic dedup. `canonical_url` keeps the real "view in browser" link (`url` stays `NOT NULL UNIQUE` and is synthesized from the Message-ID for emails without a URL, leaving the existing dedup path untouched). Email metadata: `author`, `has_pdf_attachment`, `attachment_count`. Rex rubric output: `relevance_reasoning` (candid internal voice), `curator_notes` (Rex's suggestion, human-editable), `rex_metadata` JSONB (dimension scores, flags, `rubric_version`).
+- **Fastmail** — `fastmail_accounts.research_folder` (the folder the research listener polls) and `fastmail_sync_state.research_query_state` (its JMAP incremental marker), keeping research mail wholly separate from the Inbox/Sent CRM sync (no `interactions`, no Della dispatch).
+
+---
+
 ## 2026-06-06 — Podcast ingestion: `podcast_episodes`, `transcript_segments`, `news_sources` podcast columns
 
 **Migration:** `20260606120000_add_podcast_ingestion.sql`
