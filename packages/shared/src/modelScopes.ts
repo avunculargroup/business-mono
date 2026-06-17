@@ -123,6 +123,14 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'rex',
   },
   {
+    key: 'executeRoutine.news_rubric_score',
+    type: 'workflow_step',
+    label: 'News relevance rubric',
+    description: 'Rex scores an ingested item on material/novelty/citation and drafts summary + curator notes (shared by email and feed ingestion)',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'rex',
+  },
+  {
     key: 'executeRoutine.news_curation_select',
     type: 'workflow_step',
     label: 'News curation — select',
