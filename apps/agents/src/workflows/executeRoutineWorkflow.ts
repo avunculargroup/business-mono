@@ -49,7 +49,7 @@ import { fetchFeed, fetchPodcastFeed } from '../lib/fetchFeed.js';
 import { normalizePodcastItems } from '../lib/podcastFeed.js';
 import { resolveTranscript } from '../lib/transcripts/resolveTranscript.js';
 import {
-  insertEpisode,
+  insertEpisodeIfNew,
   updateEpisode,
   fetchExistingGuids,
   storeAvailableTranscript,
@@ -1489,7 +1489,7 @@ async function runPodcastIngest(
       }
 
       for (const item of newItems) {
-        const episodeId = await insertEpisode({
+        const episodeId = await insertEpisodeIfNew({
           source_id: src.id,
           guid: item.guid,
           title: item.title,
@@ -1506,6 +1506,10 @@ async function runPodcastIngest(
           ingestion_origin: 'feed',
           transcript_status: 'resolving',
         });
+        // Null = a row with this guid already exists (seen on a prior run, or the
+        // feed repeated the guid in this batch). Expected, not a failure — skip
+        // it rather than letting the unique-violation abort the whole feed.
+        if (episodeId === null) continue;
         result.episodes_new += 1;
 
         const outcome = await resolveTranscript(

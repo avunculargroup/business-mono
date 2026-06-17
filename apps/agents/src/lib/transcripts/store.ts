@@ -58,6 +58,23 @@ export async function insertEpisode(row: EpisodeInsert): Promise<string> {
   return (data as { id: string }).id;
 }
 
+/**
+ * Insert one episode, or return null if a row with the same guid already exists
+ * for this source. During feed ingestion a duplicate guid is an EXPECTED
+ * condition — the episode was ingested on a prior run, or the feed repeats a
+ * guid within one batch — so it must not abort the whole feed. Postgres reports
+ * the unique-index violation (podcast_episodes_source_guid_uniq /
+ * podcast_episodes_adhoc_guid_uniq) as code 23505; any other error still throws.
+ */
+export async function insertEpisodeIfNew(row: EpisodeInsert): Promise<string | null> {
+  const { data, error } = await episodes().insert(row).select('id').single();
+  if (error) {
+    if ((error as { code?: string }).code === '23505') return null;
+    throw new Error(`podcast_episodes insert failed: ${error.message}`);
+  }
+  return (data as { id: string }).id;
+}
+
 /** The guids already ingested for a source — used to dedupe new feed items. */
 export async function fetchExistingGuids(sourceId: string): Promise<Set<string>> {
   const { data, error } = await episodes().select('guid').eq('source_id', sourceId);
