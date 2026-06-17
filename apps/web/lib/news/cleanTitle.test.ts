@@ -13,6 +13,17 @@ describe('cleanNewsTitle', () => {
     expect(cleanNewsTitle('Story | Reuters')).toBe('Story');
   });
 
+  it('peels stacked source/section suffixes, not just the last one', () => {
+    expect(
+      cleanNewsTitle(
+        'Hyperscale Data Treasury Update – Company Announcement - FT.com - Financial Times',
+      ),
+    ).toBe('Hyperscale Data Treasury Update');
+    expect(
+      cleanNewsTitle('Cybersecurity Failures – Cyber Law Watch - K&L Gates'),
+    ).toBe('Cybersecurity Failures');
+  });
+
   it('trims surrounding whitespace', () => {
     expect(cleanNewsTitle('  Padded title - Source  ')).toBe('Padded title');
   });

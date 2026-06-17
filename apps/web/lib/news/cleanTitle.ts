@@ -5,6 +5,11 @@
  * is redundant. This strips a trailing " - / | / – / — <Publication>" segment so
  * the title reads on its own and the source lives only in the badge.
  *
+ * Aggregators sometimes stack several of these, e.g.
+ * "… Common Stock – Company Announcement - FT.com - Financial Times", so we peel
+ * the trailing segments off one at a time until the tail no longer looks like a
+ * source/section label.
+ *
  * Only a short, source-like trailing segment is removed — separators must be
  * space-padded (so "U.S.-Iran" is never split) and the remaining title must keep
  * some content.
@@ -12,16 +17,22 @@
 const SOURCE_SUFFIX = /\s+[-–—|]\s+([^-–—|]{1,60})$/;
 
 export function cleanNewsTitle(title: string): string {
-  const trimmed = title.trim();
-  const match = SOURCE_SUFFIX.exec(trimmed);
-  if (!match) return trimmed;
+  let current = title.trim();
 
-  const suffix = match[1]!.trim();
-  // A publication name is short and isn't a sentence — bail out otherwise so we
-  // don't eat a legitimate trailing clause.
-  if (suffix.split(/\s+/).length > 6) return trimmed;
-  if (/[.!?]$/.test(suffix)) return trimmed;
+  for (;;) {
+    const match = SOURCE_SUFFIX.exec(current);
+    if (!match) break;
 
-  const stripped = trimmed.slice(0, match.index).trim();
-  return stripped.length >= 3 ? stripped : trimmed;
+    const suffix = match[1]!.trim();
+    // A publication/section label is short and isn't a sentence — stop peeling
+    // otherwise so we don't eat a legitimate trailing clause.
+    if (suffix.split(/\s+/).length > 6) break;
+    if (/[.!?]$/.test(suffix)) break;
+
+    const stripped = current.slice(0, match.index).trim();
+    if (stripped.length < 3) break;
+    current = stripped;
+  }
+
+  return current;
 }
