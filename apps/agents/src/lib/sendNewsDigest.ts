@@ -2,21 +2,18 @@
  * Delivers a news_curation routine result to the team by email.
  *
  * Recipients are every team_member with an account email (resolved from
- * auth.users). The message is sent from a dedicated Fastmail login configured
- * via env vars — distinct from the polled CRM accounts in `fastmail_accounts` —
- * so the digest never touches the inbound CRM pipeline.
+ * auth.users). The message is sent from the avuncular@fastmail.com Fastmail
+ * login, reusing the app-password already stored in `fastmail_accounts` (no
+ * separate secret), as the hq@btreasury.com.au send identity that account owns.
+ * Sending is independent of the inbound CRM poll — it never creates interactions.
  *
- * This is best-effort: when the sender isn't configured, or an individual send
+ * This is best-effort: when the sender token is missing, or an individual send
  * fails, it logs and continues. It never throws, so emailing can never fail the
  * routine itself (per the "auto-send, log failures, routine still succeeds"
  * decision).
  *
  * Env:
- *   FASTMAIL_DIGEST_USERNAME   JMAP login (app-password username) that owns the From identity
- *   FASTMAIL_DIGEST_TOKEN      Fastmail app-specific password
- *   FASTMAIL_DIGEST_FROM       From address (default hq@btreasury.com.au)
- *   FASTMAIL_DIGEST_FROM_NAME  From display name (default: company trading name)
- *   WEB_APP_URL                Absolute base for the "More news" link (optional)
+ *   WEB_APP_URL   Absolute base for the "More news" link (optional; button omitted if unset)
  */
 
 import { supabase } from '@platform/db';
@@ -24,10 +21,14 @@ import type { RoutineResult } from '@platform/shared';
 import { FastmailJmapClient, type JmapAddress } from './fastmailJmap.js';
 import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js';
 
-const DEFAULT_FROM = 'hq@btreasury.com.au';
+// The Fastmail login whose stored token sends the digest, and the send-identity
+// (an alias on that account) the message is From. Both live on the same account
+// already managed in fastmail_accounts, so no extra credential is needed.
+const SENDER_ACCOUNT_USERNAME = 'avuncular@fastmail.com';
+const SENDER_FROM_EMAIL = 'hq@btreasury.com.au';
 
 export interface DigestDeliveryResult {
-  /** False when the sender env vars are absent — nothing was attempted. */
+  /** False when no sender token is available in fastmail_accounts — nothing was attempted. */
   configured: boolean;
   attempted: number;
   sent: number;
@@ -44,10 +45,11 @@ export async function deliverNewsDigest(
   routine: DigestRoutineRef,
   result: RoutineResult,
 ): Promise<DigestDeliveryResult> {
-  const username = process.env['FASTMAIL_DIGEST_USERNAME'];
-  const token = process.env['FASTMAIL_DIGEST_TOKEN'];
-  if (!username || !token) {
-    console.warn('[news-digest] FASTMAIL_DIGEST_USERNAME/TOKEN not set — skipping email delivery');
+  const token = await loadSenderToken();
+  if (!token) {
+    console.warn(
+      `[news-digest] No Fastmail token for ${SENDER_ACCOUNT_USERNAME} in fastmail_accounts — skipping email delivery`,
+    );
     return { configured: false, attempted: 0, sent: 0, failed: 0 };
   }
 
@@ -58,9 +60,6 @@ export async function deliverNewsDigest(
       return { configured: true, attempted: 0, sent: 0, failed: 0 };
     }
 
-    const fromEmail = process.env['FASTMAIL_DIGEST_FROM'] ?? DEFAULT_FROM;
-    const fromName = process.env['FASTMAIL_DIGEST_FROM_NAME'] ?? company.name;
-
     const { subject, html, text } = renderNewsDigestEmail({
       title: routine.title,
       result,
@@ -69,15 +68,18 @@ export async function deliverNewsDigest(
       company,
     });
 
-    const client = new FastmailJmapClient(username, token);
+    const client = new FastmailJmapClient(SENDER_ACCOUNT_USERNAME, token);
     const { accountId, apiUrl } = await client.getSession();
     const identities = await client.getIdentities(accountId, apiUrl);
     const identity =
-      identities.find((i) => i.email.toLowerCase() === fromEmail.toLowerCase()) ?? identities[0];
-    if (!identity) throw new Error(`No JMAP identity available to send from on ${username}`);
+      identities.find((i) => i.email.toLowerCase() === SENDER_FROM_EMAIL.toLowerCase()) ??
+      identities[0];
+    if (!identity) {
+      throw new Error(`No JMAP identity available to send from on ${SENDER_ACCOUNT_USERNAME}`);
+    }
     const { draftsId, sentId } = await client.getDraftsAndSentMailboxIds(accountId, apiUrl);
 
-    const from: JmapAddress = { name: fromName, email: identity.email };
+    const from: JmapAddress = { name: company.name, email: identity.email };
 
     let sent = 0;
     let failed = 0;
@@ -113,6 +115,21 @@ export async function deliverNewsDigest(
     await logSendFailure(routine, null, message);
     return { configured: true, attempted: 0, sent: 0, failed: 0 };
   }
+}
+
+/** The app-specific password for the sending account, from fastmail_accounts. */
+async function loadSenderToken(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('fastmail_accounts')
+    .select('token')
+    .eq('username', SENDER_ACCOUNT_USERNAME)
+    .maybeSingle();
+  if (error) {
+    console.error('[news-digest] Failed to load sender token:', error.message);
+    return null;
+  }
+  const token = (data as { token?: string } | null)?.token;
+  return token ?? null;
 }
 
 /** Team members with a usable account email, as JMAP addresses. */

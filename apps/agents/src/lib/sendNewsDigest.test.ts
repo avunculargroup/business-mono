@@ -29,23 +29,31 @@ vi.mock('./fastmailJmap.js', () => ({
 
 import { deliverNewsDigest } from './sendNewsDigest.js';
 
-const TABLE_DATA: Record<string, unknown> = {
-  team_members: [
-    { id: 'u1', full_name: 'Chris Pollard' },
-    { id: 'u2', full_name: 'Carolyn Crawford' },
-  ],
-  company_records: [
-    { type_key: 'trading_name', value: 'Bitcoin Treasury Solutions' },
-    { type_key: 'abn', value: '82683088173' },
-    { type_key: 'website', value: 'https://www.bitcointreasurysolutions.com.au' },
-  ],
-};
+let TABLE_DATA: Record<string, unknown> = {};
+
+function resetTableData() {
+  TABLE_DATA = {
+    // .eq().maybeSingle() resolves to this single row.
+    fastmail_accounts: { token: 'app-pw' },
+    team_members: [
+      { id: 'u1', full_name: 'Chris Pollard' },
+      { id: 'u2', full_name: 'Carolyn Crawford' },
+    ],
+    company_records: [
+      { type_key: 'trading_name', value: 'Bitcoin Treasury Solutions' },
+      { type_key: 'abn', value: '82683088173' },
+      { type_key: 'website', value: 'https://www.bitcointreasurysolutions.com.au' },
+    ],
+  };
+}
 
 function wireSupabase() {
   h.from.mockImplementation((table: string) => {
     const resp = { data: TABLE_DATA[table] ?? null, error: null };
     const builder: Record<string, unknown> = {
       select: () => builder,
+      eq: () => builder,
+      maybeSingle: () => Promise.resolve(resp),
       insert: () => Promise.resolve({ data: null, error: null }),
       then: (onFulfilled: (v: unknown) => unknown) => Promise.resolve(resp).then(onFulfilled),
     };
@@ -86,23 +94,19 @@ const routine = { id: 'routine_1', title: 'Daily news curation' };
 describe('deliverNewsDigest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTableData();
     wireSupabase();
     wireJmap();
   });
 
-  it('skips entirely when the sender env vars are absent', async () => {
-    // setup.ts does not set these, but be explicit in case of leakage.
-    vi.stubEnv('FASTMAIL_DIGEST_USERNAME', '');
-    vi.stubEnv('FASTMAIL_DIGEST_TOKEN', '');
+  it('skips entirely when no sender token exists in fastmail_accounts', async () => {
+    TABLE_DATA.fastmail_accounts = null;
     const out = await deliverNewsDigest(routine, result);
     expect(out).toEqual({ configured: false, attempted: 0, sent: 0, failed: 0 });
     expect(h.sendHtmlEmail).not.toHaveBeenCalled();
   });
 
-  it('sends one email per team member from the configured identity', async () => {
-    vi.stubEnv('FASTMAIL_DIGEST_USERNAME', 'hq@btreasury.com.au');
-    vi.stubEnv('FASTMAIL_DIGEST_TOKEN', 'app-pw');
-
+  it('sends one email per team member from the hq@ send identity', async () => {
     const out = await deliverNewsDigest(routine, result);
 
     expect(out).toEqual({ configured: true, attempted: 2, sent: 2, failed: 0 });
@@ -121,8 +125,6 @@ describe('deliverNewsDigest', () => {
   });
 
   it('counts per-recipient failures without throwing', async () => {
-    vi.stubEnv('FASTMAIL_DIGEST_USERNAME', 'hq@btreasury.com.au');
-    vi.stubEnv('FASTMAIL_DIGEST_TOKEN', 'app-pw');
     h.sendHtmlEmail.mockRejectedValueOnce(new Error('mailbox over quota'));
 
     const out = await deliverNewsDigest(routine, result);
@@ -133,8 +135,6 @@ describe('deliverNewsDigest', () => {
   });
 
   it('does not throw when session setup fails — routine stays unaffected', async () => {
-    vi.stubEnv('FASTMAIL_DIGEST_USERNAME', 'hq@btreasury.com.au');
-    vi.stubEnv('FASTMAIL_DIGEST_TOKEN', 'app-pw');
     h.getSession.mockRejectedValueOnce(new Error('401 Unauthorized'));
 
     const out = await deliverNewsDigest(routine, result);
