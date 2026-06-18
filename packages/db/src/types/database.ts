@@ -1308,6 +1308,7 @@ export type Database = {
           is_active: boolean
           last_error: string | null
           last_error_at: string | null
+          research_folder: string | null
           token: string
           updated_at: string
           username: string
@@ -1321,6 +1322,7 @@ export type Database = {
           is_active?: boolean
           last_error?: string | null
           last_error_at?: string | null
+          research_folder?: string | null
           token: string
           updated_at?: string
           username: string
@@ -1334,6 +1336,7 @@ export type Database = {
           is_active?: boolean
           last_error?: string | null
           last_error_at?: string | null
+          research_folder?: string | null
           token?: string
           updated_at?: string
           username?: string
@@ -1372,6 +1375,7 @@ export type Database = {
           inbox_query_state: string | null
           jmap_account_id: string | null
           last_synced_at: string | null
+          research_query_state: string | null
           sent_query_state: string | null
           updated_at: string
         }
@@ -1381,6 +1385,7 @@ export type Database = {
           inbox_query_state?: string | null
           jmap_account_id?: string | null
           last_synced_at?: string | null
+          research_query_state?: string | null
           sent_query_state?: string | null
           updated_at?: string
         }
@@ -1390,6 +1395,7 @@ export type Database = {
           inbox_query_state?: string | null
           jmap_account_id?: string | null
           last_synced_at?: string | null
+          research_query_state?: string | null
           sent_query_state?: string | null
           updated_at?: string
         }
@@ -1913,20 +1919,29 @@ export type Database = {
       }
       news_items: {
         Row: {
+          attachment_count: number
           australian_relevance: boolean
+          author: string | null
           body_markdown: string | null
+          canonical_url: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at: string
+          curator_notes: string | null
           embedding: string | null
           fetched_at: string
           fts: unknown
+          has_pdf_attachment: boolean
           id: string
           ingested_by: string
+          ingestion_ref: string | null
           key_points: Json
           knowledge_item_id: string | null
           published_at: string | null
+          relevance_reasoning: string | null
           relevance_score: number | null
+          rex_metadata: Json
           routine_id: string | null
+          source_id: string | null
           source_name: string
           status: string
           summary: string | null
@@ -1937,20 +1952,29 @@ export type Database = {
           url_hash: string | null
         }
         Insert: {
+          attachment_count?: number
           australian_relevance?: boolean
+          author?: string | null
           body_markdown?: string | null
+          canonical_url?: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at?: string
+          curator_notes?: string | null
           embedding?: string | null
           fetched_at?: string
           fts?: unknown
+          has_pdf_attachment?: boolean
           id?: string
           ingested_by?: string
+          ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
           published_at?: string | null
+          relevance_reasoning?: string | null
           relevance_score?: number | null
+          rex_metadata?: Json
           routine_id?: string | null
+          source_id?: string | null
           source_name?: string
           status?: string
           summary?: string | null
@@ -1961,20 +1985,29 @@ export type Database = {
           url_hash?: string | null
         }
         Update: {
+          attachment_count?: number
           australian_relevance?: boolean
+          author?: string | null
           body_markdown?: string | null
+          canonical_url?: string | null
           category?: Database["public"]["Enums"]["news_category"]
           created_at?: string
+          curator_notes?: string | null
           embedding?: string | null
           fetched_at?: string
           fts?: unknown
+          has_pdf_attachment?: boolean
           id?: string
           ingested_by?: string
+          ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
           published_at?: string | null
+          relevance_reasoning?: string | null
           relevance_score?: number | null
+          rex_metadata?: Json
           routine_id?: string | null
+          source_id?: string | null
           source_name?: string
           status?: string
           summary?: string | null
@@ -1999,6 +2032,13 @@ export type Database = {
             referencedRelation: "routines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "news_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
         ]
       }
       news_sources: {
@@ -2007,6 +2047,7 @@ export type Database = {
           created_by: string | null
           feed_url: string | null
           id: string
+          inbound_address: string | null
           is_active: boolean
           last_error: string | null
           last_scanned_at: string | null
@@ -2015,8 +2056,12 @@ export type Database = {
           max_episode_age_days: number | null
           name: string
           preferred_transcript_lang: string
+          relevance_threshold: number
+          sender_allowlist: string[]
           site_url: string | null
+          slug: string | null
           source_type: string
+          tier: string | null
           transcribe_with_deepgram: boolean
           updated_at: string
           youtube_channel_url: string | null
@@ -2026,6 +2071,7 @@ export type Database = {
           created_by?: string | null
           feed_url?: string | null
           id?: string
+          inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
@@ -2034,8 +2080,12 @@ export type Database = {
           max_episode_age_days?: number | null
           name: string
           preferred_transcript_lang?: string
+          relevance_threshold?: number
+          sender_allowlist?: string[]
           site_url?: string | null
+          slug?: string | null
           source_type?: string
+          tier?: string | null
           transcribe_with_deepgram?: boolean
           updated_at?: string
           youtube_channel_url?: string | null
@@ -2045,6 +2095,7 @@ export type Database = {
           created_by?: string | null
           feed_url?: string | null
           id?: string
+          inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
@@ -2053,8 +2104,12 @@ export type Database = {
           max_episode_age_days?: number | null
           name?: string
           preferred_transcript_lang?: string
+          relevance_threshold?: number
+          sender_allowlist?: string[]
           site_url?: string | null
+          slug?: string | null
           source_type?: string
+          tier?: string | null
           transcribe_with_deepgram?: boolean
           updated_at?: string
           youtube_channel_url?: string | null

@@ -5,12 +5,13 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
 import { validateFeedUrl } from '@/lib/news/validateFeed';
+import { slugify, computeInboundAddress, parseSenderAllowlist } from '@/lib/news/emailSource';
 
 const REVALIDATE = '/news/sources';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  source_type: z.enum(['rss', 'podcast', 'youtube']).default('rss'),
+  source_type: z.enum(['rss', 'podcast', 'youtube', 'email']).default('rss'),
   site_url: z.string().trim().url('Site URL must be a valid URL').optional().or(z.literal('')),
   feed_url: z.string().trim().url('Feed URL must be a valid URL').optional().or(z.literal('')),
   youtube_channel_url: z
@@ -25,6 +26,12 @@ const schema = z.object({
   max_backfill_episodes: z.coerce.number().int().positive().optional().default(25),
   // Empty string → undefined → null (no cap).
   max_episode_age_days: z.coerce.number().int().positive().optional(),
+  // Email source fields.
+  slug: z.string().trim().optional().default(''),
+  tier: z.enum(['tier_1', 'tier_2', 'tier_3']).optional().or(z.literal('')),
+  relevance_threshold: z.coerce.number().min(0).max(1).optional().default(0.7),
+  // Newline/comma-separated From addresses or domains.
+  sender_allowlist: z.string().optional().default(''),
 });
 
 type SourceInput = z.infer<typeof schema>;
@@ -38,6 +45,12 @@ function parse(formData: FormData) {
 
 // Resolve the per-type feed/channel fields, or return an error message.
 function resolveLocation(input: SourceInput): { feed_url: string | null; error?: string } {
+  if (input.source_type === 'email') {
+    if (!slugify(input.slug)) {
+      return { feed_url: null, error: 'Provide a slug for the email source (used in its inbound address).' };
+    }
+    return { feed_url: null };
+  }
   if (input.source_type === 'youtube') {
     if (!input.youtube_channel_url) {
       return { feed_url: null, error: 'Provide a YouTube channel or playlist URL.' };
@@ -57,7 +70,8 @@ function resolveLocation(input: SourceInput): { feed_url: string | null; error?:
   return { feed_url: feedUrl };
 }
 
-// Build the news_sources row. Transcript settings only apply to podcast/youtube.
+// Build the news_sources row. Transcript settings only apply to podcast/youtube;
+// slug/inbound_address/allowlist/tier/threshold apply to email.
 function buildRow(input: SourceInput, feedUrl: string | null) {
   const base = {
     name: input.name,
@@ -67,6 +81,21 @@ function buildRow(input: SourceInput, feedUrl: string | null) {
     youtube_channel_url: input.youtube_channel_url || null,
     is_active: input.is_active,
   };
+  if (input.source_type === 'email') {
+    const slug = slugify(input.slug);
+    return {
+      ...base,
+      site_url: null,
+      feed_url: null,
+      youtube_channel_url: null,
+      transcribe_with_deepgram: false,
+      slug,
+      inbound_address: computeInboundAddress(slug),
+      sender_allowlist: parseSenderAllowlist(input.sender_allowlist),
+      tier: input.tier || null,
+      relevance_threshold: input.relevance_threshold,
+    };
+  }
   if (input.source_type === 'rss') {
     return { ...base, transcribe_with_deepgram: false };
   }

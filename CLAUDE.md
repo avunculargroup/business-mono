@@ -91,7 +91,7 @@ Transform tasks into verifiable goals before implementing:
 - **Mastra storage**: Separate Postgres for thread memory, working memory, semantic recall, and the native scheduler — connection string is `MASTRA_DB_URL` (Railway Postgres recommended; Supabase direct works only with the IPv4 add-on). Distinct from the Supabase JS client used for app data.
 - **Observability**: `DefaultExporter` (local OTLP) is always on; `CloudExporter` ships traces to Mastra Cloud when `MASTRA_CLOUD_ACCESS_TOKEN` is set, otherwise self-disables.
 - **Communication**: Signal CLI (Simon's dedicated number)
-- **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB, Della analyses content)
+- **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB). Two paths off one JMAP client: CRM mail (Inbox/Sent → `interactions` → Della) and research newsletters (a per-account research folder → `news_items` via the news pipeline).
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
@@ -146,7 +146,8 @@ All other agents (Simon, Archivist, BA, Content Creator, Researcher, RM) are pur
 - `signalListener` — polling loop for Simon's Signal number (also intercepts replies to suspended newsletter gates)
 - `contentCreatorListener` — persists Charlie's draft outputs
 - `pmListener` — picks up Petra's proposed actions
-- `fastmailListener` — JMAP polling every 5 min, dispatches to Della
+- `fastmailListener` — JMAP polling every 5 min, dispatches to Della (CRM email → `interactions`)
+- `researchMailListener` — JMAP polling every 5 min of each account's research folder for paid email newsletters (`research+{slug}@<domain>`), routed by slug to a `source_type='email'` `news_sources` row, validated (sender allowlist + SPF/DKIM), HTML→markdown, and fed through the shared `ingestNewsItem` pipeline into `news_items`. Separate from `fastmailListener` — never creates `interactions` or dispatches to Della, and deliberately skips the CRM `shouldSkipEmail` filter (newsletters carry the bulk/List-Unsubscribe headers it drops on). See `apps/agents/src/listeners/researchMailListener.ts`.
 - `contentEmbeddingListener` — keeps the `content_embeddings` RAG store in sync (embed-on-write + startup backfill) for the newsletter workflow
 - `newsletterGateWebListener` — Supabase Realtime on `newsletter_runs`; resumes a suspended newsletter gate when the `/content` page writes a `pending_decision` (the web-side counterpart to the Signal gate path)
 
@@ -273,6 +274,9 @@ Read the relevant docs BEFORE writing code.
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 |Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
 |Fastmail JMAP polling, email-to-interaction sync         |`apps/agents/src/lib/fastmailJmap.ts` + `apps/agents/src/listeners/fastmailListener.ts`|JMAP client, skip logic, contact matching, Della dispatch|
+|Email newsletter ingestion (news feed, not CRM)          |`apps/agents/src/listeners/researchMailListener.ts` + `apps/agents/src/lib/newsletterExtract.ts` + `apps/agents/src/workflows/ingestNewsItem.ts`|Research-folder poll, plus-address routing, HTML→markdown, shared ingest pipeline. Spec: `docs/news-source-email-spec.md`|
+|News relevance scoring (Rex rubric)                       |`apps/agents/src/workflows/newsRubric.ts` + `newsExtract.ts`|3-dimension rubric (material/novelty/citation), structured output; shared by all news ingestion|
+|News sources / feed web UI (incl. email sources)         |`apps/web/app/(app)/news/sources/` + `apps/web/app/actions/newsSources.ts` + `apps/web/lib/news/emailSource.ts`|Source CRUD, per-type form, inbound-address computation|
 |Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing.eval.ts` + `apps/agents/evals/simon-routing/fixtures.json`|Add a fixture row, then run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy (real LLM) before merging|
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 |New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|

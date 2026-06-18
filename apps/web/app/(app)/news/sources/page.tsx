@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { NewsSourcesClient, type SourceStats } from './NewsSourcesClient';
+import { RESEARCH_INBOUND_DOMAIN } from '@/lib/news/emailSource';
 import type { NewsSourceRecord } from '@platform/shared';
 
 export default async function NewsSourcesPage() {
@@ -28,6 +29,7 @@ export default async function NewsSourcesPage() {
       <NewsSourcesClient
         initialSources={(sources ?? []) as unknown as NewsSourceRecord[]}
         stats={stats}
+        inboundDomain={RESEARCH_INBOUND_DOMAIN}
       />
     </>
   );

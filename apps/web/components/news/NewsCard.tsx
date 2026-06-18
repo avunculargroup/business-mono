@@ -18,6 +18,8 @@ interface NewsCardProps {
   summary: string | null;
   category: NewsCategory;
   status: NewsStatus;
+  relevanceScore?: number | null;
+  curatorNotes?: string | null;
   onStatusChange?: (id: string, status: NewsStatus) => void;
 }
 
@@ -39,6 +41,8 @@ export function NewsCard({
   summary,
   category,
   status: initialStatus,
+  relevanceScore,
+  curatorNotes,
   onStatusChange,
 }: NewsCardProps) {
   const [status, setStatus] = useState<NewsStatus>(initialStatus);
@@ -114,6 +118,11 @@ export function NewsCard({
             <span className={styles.date}>{formatDate(publishedAt)}</span>
           </>
         )}
+        {relevanceScore != null && (
+          <span className={styles.score} title="Rex relevance score">
+            {relevanceScore.toFixed(2)}
+          </span>
+        )}
       </div>
 
       <h4 className={styles.title}>
@@ -129,6 +138,13 @@ export function NewsCard({
       </h4>
 
       {summary && <p className={styles.summary}>{summary}</p>}
+
+      {curatorNotes && (
+        <div className={styles.curatorNote}>
+          <span className={styles.curatorNoteLabel}>Why this matters</span>
+          <span className={styles.curatorNoteBody}>{curatorNotes}</span>
+        </div>
+      )}
 
       <div className={styles.actions}>
         {status === 'new' && (
