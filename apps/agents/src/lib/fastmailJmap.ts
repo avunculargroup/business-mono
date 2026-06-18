@@ -11,11 +11,21 @@
 
 const JMAP_WELL_KNOWN = 'https://api.fastmail.com/.well-known/jmap';
 
+// Read paths use core + mail; sending additionally needs the submission spec.
+const DEFAULT_USING = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
+const SUBMISSION_USING = [...DEFAULT_USING, 'urn:ietf:params:jmap:submission'];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface JmapAddress {
   name?: string;
   email: string;
+}
+
+export interface JmapIdentity {
+  id: string;
+  email: string;
+  name: string | null;
 }
 
 export interface JmapAttachment {
@@ -247,11 +257,135 @@ export class FastmailJmapClient {
     return results;
   }
 
+  // ── Sending (Email/set + EmailSubmission) ───────────────────────────────────
+
+  /**
+   * Lists the account's sending identities (id + from-address). The submission
+   * spec is required in the `using` set. Used to resolve which identity to send
+   * an outbound digest from.
+   */
+  async getIdentities(accountId: string, apiUrl: string): Promise<JmapIdentity[]> {
+    const res = await this.callMethod(
+      apiUrl,
+      [['Identity/get', { accountId, ids: null }, 'i']],
+      SUBMISSION_USING,
+    );
+    const list = (res[0][1] as { list?: Array<{ id: string; email: string; name?: string | null }> }).list ?? [];
+    return list.map((i) => ({ id: i.id, email: i.email, name: i.name ?? null }));
+  }
+
+  /** Resolves the Drafts and Sent mailbox ids by role (needed to compose + file a sent message). */
+  async getDraftsAndSentMailboxIds(
+    accountId: string,
+    apiUrl: string,
+  ): Promise<{ draftsId: string; sentId: string }> {
+    const res = await this.callMethod(apiUrl, [
+      ['Mailbox/get', { accountId, ids: null, properties: ['id', 'role'] }, 'mb'],
+    ]);
+    const mailboxes = (res[0][1] as { list: Array<{ id: string; role: string | null }> }).list;
+    const drafts = mailboxes.find((m) => m.role === 'drafts');
+    const sent = mailboxes.find((m) => m.role === 'sent');
+    if (!drafts) throw new Error(`No drafts mailbox found for ${this.username}`);
+    if (!sent) throw new Error(`No sent mailbox found for ${this.username}`);
+    return { draftsId: drafts.id, sentId: sent.id };
+  }
+
+  /**
+   * Composes an HTML (+ plain-text) email and submits it for delivery in a single
+   * JMAP request: Email/set creates the message as a draft, then EmailSubmission/set
+   * sends it and — on success — moves it out of Drafts into Sent and clears $draft.
+   * Throws if either the create or the submission is rejected.
+   */
+  async sendHtmlEmail(params: {
+    accountId: string;
+    apiUrl: string;
+    identityId: string;
+    draftsId: string;
+    sentId: string;
+    from: JmapAddress;
+    to: JmapAddress[];
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    const res = await this.callMethod(
+      params.apiUrl,
+      [
+        [
+          'Email/set',
+          {
+            accountId: params.accountId,
+            create: {
+              draft: {
+                mailboxIds: { [params.draftsId]: true },
+                keywords: { $draft: true, $seen: true },
+                from: [params.from],
+                to: params.to,
+                subject: params.subject,
+                bodyValues: {
+                  text: { value: params.text },
+                  html: { value: params.html },
+                },
+                textBody: [{ partId: 'text', type: 'text/plain' }],
+                htmlBody: [{ partId: 'html', type: 'text/html' }],
+              },
+            },
+          },
+          '0',
+        ],
+        [
+          'EmailSubmission/set',
+          {
+            accountId: params.accountId,
+            // On a successful send, patch the email: replace its mailboxes with
+            // Sent and drop the $draft flag so it doesn't linger in Drafts.
+            onSuccessUpdateEmail: {
+              '#sendIt': {
+                mailboxIds: { [params.sentId]: true },
+                'keywords/$draft': null,
+              },
+            },
+            create: {
+              sendIt: {
+                emailId: '#draft',
+                identityId: params.identityId,
+                envelope: {
+                  mailFrom: { email: params.from.email },
+                  rcptTo: params.to.map((t) => ({ email: t.email })),
+                },
+              },
+            },
+          },
+          '1',
+        ],
+      ],
+      SUBMISSION_USING,
+    );
+
+    const emailSet = res[0][1] as {
+      notCreated?: Record<string, { type: string; description?: string }>;
+    };
+    if (emailSet.notCreated?.draft) {
+      const e = emailSet.notCreated.draft;
+      throw new Error(`JMAP Email/set failed: ${e.type}${e.description ? ` — ${e.description}` : ''}`);
+    }
+    const subSet = res[1][1] as {
+      notCreated?: Record<string, { type: string; description?: string }>;
+    };
+    if (subSet.notCreated?.sendIt) {
+      const e = subSet.notCreated.sendIt;
+      throw new Error(
+        `JMAP EmailSubmission/set failed: ${e.type}${e.description ? ` — ${e.description}` : ''}`,
+      );
+    }
+  }
+
   // ── HTTP helper ────────────────────────────────────────────────────────────
 
   private async callMethod(
     apiUrl: string,
     methodCalls: unknown[],
+    using: string[] = DEFAULT_USING,
   ): Promise<Array<[string, unknown, string]>> {
     const res = await this.fetchWithRetry(apiUrl, {
       method: 'POST',
@@ -260,7 +394,7 @@ export class FastmailJmapClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        using: ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'],
+        using,
         methodCalls,
       }),
     });
