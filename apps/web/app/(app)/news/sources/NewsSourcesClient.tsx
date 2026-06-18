@@ -16,7 +16,7 @@ import {
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
 import { useToast } from '@/providers/ToastProvider';
-import { Plus, Pencil, Trash2, ExternalLink, Rss, Mic, Youtube } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Rss, Mic, Youtube, Mail } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
 import type { NewsSourceRecord, NewsSourceType } from '@platform/shared';
 import styles from './sources.module.css';
@@ -29,6 +29,7 @@ export interface SourceStats {
 interface Props {
   initialSources: NewsSourceRecord[];
   stats: Record<string, SourceStats>;
+  inboundDomain: string;
 }
 
 function statusColor(status: string | null): 'neutral' | 'success' | 'destructive' {
@@ -41,6 +42,7 @@ const TYPE_META: Record<NewsSourceType, { label: string; icon: typeof Rss }> = {
   rss: { label: 'Article', icon: Rss },
   podcast: { label: 'Podcast', icon: Mic },
   youtube: { label: 'YouTube', icon: Youtube },
+  email: { label: 'Email', icon: Mail },
 };
 
 function valuesToFormData(v: NewsSourceFormValues): FormData {
@@ -55,10 +57,14 @@ function valuesToFormData(v: NewsSourceFormValues): FormData {
   fd.set('preferred_transcript_lang', v.preferred_transcript_lang);
   fd.set('max_backfill_episodes', String(v.max_backfill_episodes));
   fd.set('max_episode_age_days', v.max_episode_age_days == null ? '' : String(v.max_episode_age_days));
+  fd.set('slug', v.slug);
+  fd.set('tier', v.tier);
+  fd.set('relevance_threshold', String(v.relevance_threshold));
+  fd.set('sender_allowlist', v.sender_allowlist);
   return fd;
 }
 
-export function NewsSourcesClient({ initialSources, stats }: Props) {
+export function NewsSourcesClient({ initialSources, stats, inboundDomain }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [editSource, setEditSource] = useState<NewsSourceRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NewsSourceRecord | null>(null);
@@ -123,16 +129,20 @@ export function NewsSourcesClient({ initialSources, stats }: Props) {
                 {meta.label}
               </span>
             </span>
-            {link && (
-              <a
-                className={styles.nameSub}
-                href={link}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {link} <ExternalLink size={11} strokeWidth={1.5} />
-              </a>
+            {r.source_type === 'email' ? (
+              r.inbound_address && <span className={styles.nameSub}>{r.inbound_address}</span>
+            ) : (
+              link && (
+                <a
+                  className={styles.nameSub}
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {link} <ExternalLink size={11} strokeWidth={1.5} />
+                </a>
+              )
             )}
           </div>
         );
@@ -215,14 +225,19 @@ export function NewsSourcesClient({ initialSources, stats }: Props) {
     preferred_transcript_lang: r.preferred_transcript_lang ?? 'en',
     max_backfill_episodes: r.max_backfill_episodes ?? 25,
     max_episode_age_days: r.max_episode_age_days,
+    slug: r.slug ?? '',
+    tier: r.tier ?? 'tier_2',
+    relevance_threshold: r.relevance_threshold ?? 0.7,
+    sender_allowlist: (r.sender_allowlist ?? []).join('\n'),
   });
 
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
         <p className={styles.intro}>
-          Sources scanned daily for new content — article feeds, podcasts, and YouTube channels.
-          Podcast and YouTube episodes are transcribed and embedded for research.
+          Sources scanned daily for new content — article feeds, podcasts, YouTube channels, and email
+          newsletters. Podcast and YouTube episodes are transcribed and embedded; newsletters are
+          received at a per-source inbound address and ingested into the feed.
         </p>
         <Button onClick={() => setShowCreate(true)}>
           <Plus size={16} strokeWidth={1.5} />
@@ -239,7 +254,7 @@ export function NewsSourcesClient({ initialSources, stats }: Props) {
       />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add source" size="md">
-        <NewsSourceForm onSubmit={handleCreate} submitting={submitting} onCancel={() => setShowCreate(false)} />
+        <NewsSourceForm onSubmit={handleCreate} submitting={submitting} onCancel={() => setShowCreate(false)} inboundDomain={inboundDomain} />
       </Modal>
 
       <Modal open={editSource !== null} onClose={() => setEditSource(null)} title="Edit source" size="md">
@@ -249,6 +264,7 @@ export function NewsSourcesClient({ initialSources, stats }: Props) {
             onSubmit={handleUpdate}
             submitting={submitting}
             onCancel={() => setEditSource(null)}
+            inboundDomain={inboundDomain}
           />
         )}
       </Modal>

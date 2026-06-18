@@ -83,6 +83,7 @@ export function buildJmapEmail(overrides: {
   textBody?: string;
   htmlBody?: string;
   headers?: Array<{ name: string; value: string }>;
+  attachments?: Array<{ type?: string | null; name?: string | null; disposition?: string | null; size?: number }>;
 } = {}) {
   const textPartId = 't1';
   const htmlPartId = 'h1';
@@ -100,6 +101,7 @@ export function buildJmapEmail(overrides: {
     textBody: overrides.textBody === '' ? [] : [{ partId: textPartId }],
     htmlBody: [{ partId: htmlPartId }],
     headers: overrides.headers ?? [],
+    attachments: overrides.attachments ?? [],
   };
 }
 

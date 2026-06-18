@@ -22,6 +22,7 @@ import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
+import { startResearchMailListener } from '../listeners/researchMailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
@@ -140,8 +141,12 @@ startPMListener(mastra);
 // Routine scheduling is now handled by Mastra's built-in scheduler — see
 // `schedule` field on executeRoutineWorkflow in src/workflows/executeRoutineWorkflow.ts.
 
-// Start Fastmail JMAP polling loop
+// Start Fastmail JMAP polling loop (CRM email → interactions → Della)
 startFastmailListener();
+
+// Poll each account's research folder for paid newsletters → news_items
+// (separate from the CRM sync; never creates interactions).
+startResearchMailListener();
 
 // Keep the content_embeddings RAG store in sync (embed-on-write + backfill).
 // Powers the newsletter workflow's retrieval step.

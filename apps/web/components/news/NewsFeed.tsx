@@ -114,6 +114,8 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                 summary={item.summary}
                 category={item.category}
                 status={item.status}
+                relevanceScore={item.relevance_score}
+                curatorNotes={item.curator_notes}
                 onStatusChange={handleStatusChange}
               />
             ))}

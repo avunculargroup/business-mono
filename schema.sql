@@ -963,6 +963,7 @@ CREATE TABLE IF NOT EXISTS fastmail_accounts (
   display_name          TEXT,
   is_active             BOOLEAN     NOT NULL DEFAULT true,
   watched_addresses     TEXT[]      NOT NULL DEFAULT '{}', -- empty = all; non-empty = filter by these aliases
+  research_folder       TEXT,                              -- Fastmail folder of research newsletters; polled by researchMailListener (not CRM)
   last_error            TEXT,
   last_error_at         TIMESTAMPTZ,
   consecutive_failures  INTEGER     NOT NULL DEFAULT 0,
@@ -1005,6 +1006,7 @@ CREATE TABLE IF NOT EXISTS fastmail_sync_state (
   jmap_account_id   TEXT,
   inbox_query_state TEXT,
   sent_query_state  TEXT,
+  research_query_state TEXT,                                -- JMAP incremental marker for the research folder
   last_synced_at    TIMESTAMPTZ,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -1446,12 +1448,56 @@ CREATE TYPE news_category AS ENUM (
   'international'  -- US/EU/global regulation with AU implications
 );
 
+-- One row per upstream source feeding news_items. source_type discriminates the
+-- ingestion path: rss/podcast read feed_url, youtube reads youtube_channel_url,
+-- email receives newsletters at inbound_address (research+{slug}@<domain>) filed
+-- into a Fastmail folder polled by researchMailListener.
+-- (migrations: 20260525000000 base, 20260606120000 podcast/youtube,
+--  20260617000000 email + Rex rubric curation fields)
+CREATE TABLE news_sources (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                      TEXT        NOT NULL,
+  site_url                  TEXT,
+  feed_url                  TEXT,                              -- rss/podcast only; UNIQUE where present
+  source_type               TEXT        NOT NULL DEFAULT 'rss'
+                              CHECK (source_type IN ('rss','podcast','youtube','email')),
+  -- podcast / youtube config
+  youtube_channel_url       TEXT,
+  transcribe_with_deepgram  BOOLEAN     NOT NULL DEFAULT false,
+  preferred_transcript_lang TEXT        NOT NULL DEFAULT 'en',
+  max_backfill_episodes     INT         NOT NULL DEFAULT 25,
+  max_episode_age_days      INT,
+  -- email config
+  slug                      TEXT,                              -- plus-address suffix + URL slug; UNIQUE where present
+  inbound_address           TEXT,                              -- research+{slug}@<domain>
+  sender_allowlist          TEXT[]      NOT NULL DEFAULT '{}', -- approved From addresses/domains
+  -- shared curation (Rex rubric)
+  tier                      TEXT        CHECK (tier IS NULL OR tier IN ('tier_1','tier_2','tier_3')),
+  relevance_threshold       NUMERIC(3,2) NOT NULL DEFAULT 0.70,
+  is_active                 BOOLEAN     NOT NULL DEFAULT true,
+  last_scanned_at           TIMESTAMPTZ,
+  last_status               TEXT        CHECK (last_status IN ('success','failed')),
+  last_error                TEXT,
+  created_by                UUID        REFERENCES team_members(id),
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT news_sources_feed_required CHECK (
+       (source_type IN ('rss','podcast') AND feed_url IS NOT NULL)
+    OR (source_type = 'youtube' AND youtube_channel_url IS NOT NULL)
+    OR (source_type = 'email' AND inbound_address IS NOT NULL) )
+);
+-- UNIQUE (feed_url) WHERE feed_url IS NOT NULL; UNIQUE (slug) WHERE slug IS NOT NULL.
+
 CREATE TABLE news_items (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title                TEXT NOT NULL,
-  url                  TEXT NOT NULL UNIQUE,
+  url                  TEXT NOT NULL UNIQUE,        -- synthesized from Message-ID for email items without a URL
   url_hash             TEXT GENERATED ALWAYS AS (md5(url)) STORED,
+  source_id            UUID REFERENCES news_sources(id) ON DELETE SET NULL,  -- configured source (email always; rss/podcast going forward)
   source_name          TEXT NOT NULL DEFAULT '',
+  ingestion_ref        TEXT,                        -- email Message-ID; idempotency key, deduped before url/semantic dedup
+  canonical_url        TEXT,                        -- real "view in browser"/original link (email items)
+  author               TEXT,
   published_at         TIMESTAMPTZ,
   fetched_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   body_markdown        TEXT,
@@ -1461,6 +1507,11 @@ CREATE TABLE news_items (
   topic_tags           TEXT[] NOT NULL DEFAULT '{}',
   australian_relevance BOOLEAN NOT NULL DEFAULT TRUE,
   relevance_score      NUMERIC(3,2),
+  relevance_reasoning  TEXT,                        -- Rex rubric: candid internal justification
+  curator_notes        TEXT,                        -- pre-filled with Rex's suggestion, human-editable
+  rex_metadata         JSONB NOT NULL DEFAULT '{}'::jsonb,  -- dimension scores, flags, rubric_version
+  has_pdf_attachment   BOOLEAN NOT NULL DEFAULT FALSE,
+  attachment_count     INT NOT NULL DEFAULT 0,
   embedding            VECTOR(1536),
   fts                  TSVECTOR GENERATED ALWAYS AS (
                          to_tsvector('english',
@@ -1474,6 +1525,11 @@ CREATE TABLE news_items (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- One item per (source, Message-ID) for email idempotency; legacy NULL refs unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS news_items_source_ingestion_ref_uniq
+  ON news_items (source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS news_items_source_idx ON news_items (source_id);
 
 -- RPC: semantic search on news_items
 CREATE OR REPLACE FUNCTION vector_search_news(
