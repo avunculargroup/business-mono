@@ -79,6 +79,21 @@ describe('renderNewsDigestEmail', () => {
     expect(noBase.html).not.toContain('Read more news');
   });
 
+  it('shows the BTS icon as the header avatar only when a base URL is available', () => {
+    const withBase = renderNewsDigestEmail({
+      title: 'X',
+      result: sampleResult(),
+      date,
+      company,
+      webAppUrl: 'https://app.example/',
+    });
+    expect(withBase.html).toContain('src="https://app.example/android-chrome-192x192.png"');
+
+    // No base URL → no way to make the logo absolute, so it's omitted.
+    const noBase = renderNewsDigestEmail({ title: 'X', result: sampleResult(), date, company });
+    expect(noBase.html).not.toContain('android-chrome-192x192.png');
+  });
+
   it('puts ABN and website in the footer', () => {
     const { html } = renderNewsDigestEmail({ title: 'X', result: sampleResult(), date, company });
     expect(html).toContain('ABN 82683088173');
