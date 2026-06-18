@@ -7,6 +7,7 @@ import { RoutineTile } from '@/components/dashboard/RoutineTile';
 import { FearGreedIndicator } from '@/components/dashboard/FearGreedIndicator';
 import { BitcoinPriceAUD } from '@/components/dashboard/BitcoinPriceAUD';
 import { BlockHeight } from '@/components/dashboard/BlockHeight';
+import { OpenRouterCredits } from '@/components/dashboard/OpenRouterCredits';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -55,6 +56,7 @@ export default async function DashboardPage() {
         <FearGreedIndicator />
         <BitcoinPriceAUD />
         <BlockHeight />
+        <OpenRouterCredits />
       </div>
       <div className={styles.grid}>
         {/* Left column */}
