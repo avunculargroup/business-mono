@@ -352,4 +352,93 @@ describe('FastmailJmapClient', () => {
     const out = await client.queryEmailIds('acc', 'https://api/', 'mb', undefined);
     expect(out).toEqual({ emailIds: ['a', 'b'], newQueryState: 'qs0', didFallback: true });
   });
+
+  it('getIdentities requests the submission spec and maps identities', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Identity/get', { list: [
+            { id: 'id1', email: 'hq@btreasury.com.au', name: 'BTS' },
+            { id: 'id2', email: 'chris@btreasury.com.au', name: null },
+          ] }, 'i']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const out = await client.getIdentities('acc', 'https://api/');
+    expect(out).toEqual([
+      { id: 'id1', email: 'hq@btreasury.com.au', name: 'BTS' },
+      { id: 'id2', email: 'chris@btreasury.com.au', name: null },
+    ]);
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.using).toContain('urn:ietf:params:jmap:submission');
+  });
+
+  it('sendHtmlEmail creates a draft then submits it, moving it to Sent', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            ['Email/set', { created: { draft: { id: 'em1' } } }, '0'],
+            ['EmailSubmission/set', { created: { sendIt: { id: 'sub1' } } }, '1'],
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    await client.sendHtmlEmail({
+      accountId: 'acc',
+      apiUrl: 'https://api/',
+      identityId: 'id1',
+      draftsId: 'd',
+      sentId: 's',
+      from: { name: 'BTS', email: 'hq@btreasury.com.au' },
+      to: [{ email: 'chris@btreasury.com.au' }],
+      subject: 'News',
+      html: '<p>hi</p>',
+      text: 'hi',
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.using).toContain('urn:ietf:params:jmap:submission');
+    const [emailSet, submissionSet] = body.methodCalls;
+    expect(emailSet[0]).toBe('Email/set');
+    expect(emailSet[1].create.draft.mailboxIds).toEqual({ d: true });
+    expect(emailSet[1].create.draft.subject).toBe('News');
+    expect(submissionSet[0]).toBe('EmailSubmission/set');
+    expect(submissionSet[1].create.sendIt.emailId).toBe('#draft');
+    expect(submissionSet[1].create.sendIt.identityId).toBe('id1');
+    expect(submissionSet[1].onSuccessUpdateEmail['#sendIt'].mailboxIds).toEqual({ s: true });
+  });
+
+  it('sendHtmlEmail throws when the submission is rejected', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            ['Email/set', { created: { draft: { id: 'em1' } } }, '0'],
+            ['EmailSubmission/set', { notCreated: { sendIt: { type: 'forbiddenFrom', description: 'bad identity' } } }, '1'],
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    await expect(
+      client.sendHtmlEmail({
+        accountId: 'acc',
+        apiUrl: 'https://api/',
+        identityId: 'id1',
+        draftsId: 'd',
+        sentId: 's',
+        from: { email: 'hq@btreasury.com.au' },
+        to: [{ email: 'chris@btreasury.com.au' }],
+        subject: 'News',
+        html: '<p>hi</p>',
+        text: 'hi',
+      }),
+    ).rejects.toThrow(/forbiddenFrom/);
+  });
 });

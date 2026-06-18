@@ -43,6 +43,7 @@ import { shouldDropForRelevance } from './newsRelevance.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
 import { fetchOgImage } from '../lib/fetchOgImage.js';
+import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
@@ -484,6 +485,10 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
       headline_image_url: headlineImageUrl,
     },
   };
+
+  // Email the curated digest to the team. Best-effort: deliverNewsDigest never
+  // throws, so a delivery problem can't fail the routine.
+  await deliverNewsDigest({ id: routine.id, title: routine.name }, result);
 
   return { ...base, status: 'success', result, error: null };
 }

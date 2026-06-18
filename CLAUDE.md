@@ -91,7 +91,7 @@ Transform tasks into verifiable goals before implementing:
 - **Mastra storage**: Separate Postgres for thread memory, working memory, semantic recall, and the native scheduler — connection string is `MASTRA_DB_URL` (Railway Postgres recommended; Supabase direct works only with the IPv4 add-on). Distinct from the Supabase JS client used for app data.
 - **Observability**: `DefaultExporter` (local OTLP) is always on; `CloudExporter` ships traces to Mastra Cloud when `MASTRA_CLOUD_ACCESS_TOKEN` is set, otherwise self-disables.
 - **Communication**: Signal CLI (Simon's dedicated number)
-- **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB). Two paths off one JMAP client: CRM mail (Inbox/Sent → `interactions` → Della) and research newsletters (a per-account research folder → `news_items` via the news pipeline).
+- **Email**: Fastmail JMAP (polling every 5 min, accounts stored in DB). Two inbound paths off one JMAP client: CRM mail (Inbox/Sent → `interactions` → Della) and research newsletters (a per-account research folder → `news_items` via the news pipeline). One outbound path: the `news_curation` routine emails the curated digest to all team members after each run (`apps/agents/src/lib/sendNewsDigest.ts` → branded HTML via `newsDigestEmail.ts` → JMAP `Email/set` + `EmailSubmission` in `fastmailJmap.ts`), sent from a dedicated `FASTMAIL_DIGEST_*` login kept separate from the polled CRM accounts.
 - **Phone Recording**: Telnyx Voice API (dual-channel, auto-record)
 - **Video Recording**: Zoom webhooks (recording-ready events)
 - **Transcription**: Deepgram Nova-3 (callback/webhook pattern, multichannel)
