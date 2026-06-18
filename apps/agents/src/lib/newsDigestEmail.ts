@@ -121,6 +121,16 @@ function resolveMoreNewsUrl(result: RoutineResult, webAppUrl?: string): string |
   return null; // relative path with no base — can't be clicked from an inbox
 }
 
+/**
+ * Absolute URL of the BTS icon (the brand mark email clients show as the avatar).
+ * Email clients don't reliably render inline SVG, so we point at the hosted PNG
+ * the web app already serves; null when there's no base URL to make it absolute.
+ */
+function resolveLogoUrl(webAppUrl?: string): string | null {
+  if (!webAppUrl) return null;
+  return webAppUrl.replace(/\/$/, '') + '/android-chrome-192x192.png';
+}
+
 export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmail {
   const { result, company } = input;
   const meta = (result.metadata ?? {}) as { mood_summary?: string; headline_image_url?: string };
@@ -128,6 +138,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   const headlineImage = meta.headline_image_url;
   const items = digestItems(result);
   const moreNewsUrl = resolveMoreNewsUrl(result, input.webAppUrl);
+  const logoUrl = resolveLogoUrl(input.webAppUrl);
 
   const dateStr = new Intl.DateTimeFormat('en-AU', {
     day: 'numeric',
@@ -173,6 +184,10 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
     ? `<tr><td style="padding:0 0 20px 0;font-family:${FONT_DISPLAY};font-size:20px;line-height:1.4;color:${C.textPrimary};">${escapeHtml(mood)}</td></tr>`
     : '';
 
+  const logoHtml = logoUrl
+    ? `<tr><td style="padding:0 0 16px 0;"><img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company.name)}" width="40" height="40" style="display:block;width:40px;height:40px;" /></td></tr>`
+    : '';
+
   const moreNewsHtml = moreNewsUrl
     ? `<tr><td style="padding:20px 0 0 0;border-top:1px solid ${C.border};">
          <a href="${escapeHtml(moreNewsUrl)}" style="display:inline-block;background:${C.accent};color:#1A1915;font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Read more news</a>
@@ -203,6 +218,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
         <tr>
           <td style="padding:28px 28px 0 28px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              ${logoHtml}
               <tr>
                 <td style="font-family:${FONT_BODY};font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${C.textTertiary};padding-bottom:4px;">${escapeHtml(input.title)}</td>
               </tr>
