@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Macro Indicators — Panel Prototype</title>
+
+<!--
+  ============================================================
+  PROTOTYPE — Macro Indicators panel
+  Faithful render of DESIGN_BRIEF.md tokens for the Session 3 build.
+  This is a reference for the React/Next port, not the product.
+
+  REACT PORT CONTRACT
+  -------------------
+  Component: <IndicatorCard row={...} series={[...]} />
+    row    = one v_indicator_latest row
+    series = v_indicator_series rows for this indicator (sparkline)
+
+  THE COLOUR RULE (the whole point — do not "fix" this):
+    Deltas are NEVER good/bad coloured. No green-up, no red-down.
+    A rising M2 is the thesis, not a "success". Colour-coding it green
+    would make the dashboard argue against BTS on its own screen.
+      - delta value + arrow .... text-primary / text-secondary, neutral
+      - direction ............... conveyed by the arrow glyph alone
+      - gold ..................... reserved for FRESHNESS only
+                                   (a print released within ~7 days)
+      - revision chip ........... neutral surface-subtle, informational
+    success-green / destructive-red stay in compliance & contracts,
+    where up/down genuinely maps to good/bad. Not here.
+
+  Values below are ILLUSTRATIVE, not real economic prints.
+  AU CPI is intentionally absent — is_active=false until the ABS
+  adapter exists (see ../sql/seed.sql).
+  ============================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --color-bg: #FAFAF8;
+    --color-surface: #FFFFFF;
+    --color-surface-subtle: #F4F4F1;
+    --color-border: #E8E6E0;
+    --color-text-primary: #1A1915;
+    --color-text-secondary: #6B6860;
+    --color-text-tertiary: #9E9C96;
+    --color-gold: #C9A84C;
+    --color-gold-light: #F0E4C0;
+    --color-gold-dark: #9A7A2E;
+
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+
+    --shadow-sm: 0 1px 3px rgba(26, 25, 21, 0.06), 0 1px 2px rgba(26, 25, 21, 0.04);
+    --shadow-md: 0 4px 12px rgba(26, 25, 21, 0.08), 0 2px 4px rgba(26, 25, 21, 0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 80px;
+  }
+
+  .wrap { max-width: 1200px; margin: 0 auto; }
+
+  /* ── Panel header ─────────────────────────────────────── */
+  .panel-head { margin-bottom: 8px; }
+  .panel-head h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+  }
+  .panel-head p {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin-top: 4px;
+    max-width: 56ch;
+  }
+
+  /* ── Prototype-only controls (not part of product) ────── */
+  .proto-bar {
+    display: flex; align-items: center; gap: 12px;
+    margin: 24px 0 36px;
+    padding: 10px 14px;
+    background: var(--color-surface-subtle);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .proto-bar span {
+    font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--color-text-tertiary); font-weight: 500;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--color-border);
+         border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .seg button {
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    border: none; background: transparent; color: var(--color-text-secondary);
+    padding: 6px 14px; cursor: pointer; transition: background 120ms ease, color 120ms ease;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--color-gold-light); color: var(--color-text-primary);
+  }
+  .seg button:focus-visible { outline: 2px solid var(--color-gold); outline-offset: -2px; }
+
+  /* ── Group eyebrow ────────────────────────────────────── */
+  .group { margin-top: 40px; }
+  .group:first-of-type { margin-top: 0; }
+  .group-label {
+    font-size: 12px; font-weight: 500; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--color-text-secondary);
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .group-label::after {
+    content: ""; flex: 1; height: 1px; background: var(--color-border);
+  }
+
+  /* ── Card grid ────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    padding: 20px 22px 18px;
+    transition: box-shadow 200ms ease, transform 200ms ease;
+    cursor: pointer;
+  }
+  .card:hover, .card:focus-visible {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    outline: none;
+  }
+  .card:focus-visible {
+    border-color: var(--color-gold);
+    box-shadow: var(--shadow-md), 0 0 0 3px rgba(201, 168, 76, 0.15);
+  }
+
+  .card-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .label { font-size: 16px; font-weight: 600; }
+  .cat {
+    font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--color-text-tertiary); font-weight: 500;
+  }
+
+  /* Freshness marker — the ONLY place gold appears as a signal */
+  .fresh {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--color-gold-dark); font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .fresh .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--color-gold);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18);
+  }
+
+  .value-row { display: flex; align-items: baseline; gap: 6px; margin: 14px 0 2px; }
+  .value {
+    font-family: var(--font-mono); font-weight: 500;
+    font-size: 30px; letter-spacing: -0.02em; line-height: 1;
+  }
+  .unit { font-size: 13px; color: var(--color-text-secondary); font-weight: 500; }
+
+  /* The delta — NEUTRAL. No green, no red. Arrow carries direction. */
+  .delta {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--font-mono); font-size: 13px;
+    color: var(--color-text-primary); margin-top: 6px;
+  }
+  .delta .arrow { color: var(--color-text-secondary); font-size: 12px; }
+  .delta .pct { color: var(--color-text-secondary); }
+  .delta.flat { color: var(--color-text-secondary); }
+
+  .secondary-stat {
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--color-text-secondary); margin-top: 3px;
+  }
+  .secondary-stat .k {
+    font-family: var(--font-body); letter-spacing: 0.03em;
+    text-transform: uppercase; font-size: 10px; color: var(--color-text-tertiary);
+    margin-right: 6px;
+  }
+
+  .asat {
+    font-size: 13px; color: var(--color-text-secondary);
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-border);
+  }
+  .next { font-size: 12px; color: var(--color-text-tertiary); margin-top: 3px; }
+
+  /* Revision chip — informational, neutral, not a warning */
+  .chip {
+    display: inline-block; margin-top: 10px;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 2px 8px;
+  }
+
+  .spark { margin-top: 14px; height: 36px; }
+  .spark svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* ── Skeleton ─────────────────────────────────────────── */
+  .sk { background: var(--color-surface-subtle); border-radius: var(--radius-sm); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  .skeleton .sk { animation: pulse 1.4s ease-in-out infinite; }
+  .skeleton .card { cursor: default; }
+  .sk-label { height: 16px; width: 52%; }
+  .sk-value { height: 30px; width: 64%; margin: 16px 0 8px; }
+  .sk-line  { height: 12px; width: 40%; margin-top: 8px; }
+  .sk-spark { height: 36px; width: 100%; margin-top: 16px; }
+
+  .foot {
+    margin-top: 40px; font-size: 12px; color: var(--color-text-tertiary);
+    max-width: 64ch; line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="panel-head">
+    <h1>Macro Indicators</h1>
+    <p>The slower signals beneath the tickers — money, prices, and the policy rates that set the cost of holding cash.</p>
+  </div>
+
+  <div class="proto-bar" role="group" aria-label="Prototype controls">
+    <span>Prototype</span>
+    <div class="seg">
+      <button id="btn-live" aria-pressed="true" onclick="setState('live')">Live data</button>
+      <button id="btn-load" aria-pressed="false" onclick="setState('loading')">Loading</button>
+    </div>
+  </div>
+
+  <div id="panel"></div>
+
+  <p class="foot">
+    Values shown are illustrative. AU CPI is intentionally absent until the ABS adapter ships —
+    the panel reads <code>v_indicator_latest</code>, which filters to active indicators only.
+    Deltas are rendered neutral by design: direction is shown, but rising or falling is never
+    coloured as good or bad.
+  </p>
+</div>
+
+<script>
+  // ── Mock rows shaped like v_indicator_latest (+ series) ────
+  const DATA = {
+    local: [
+      {
+        short_label: 'RBA Cash Rate', category: 'Policy rate', unit: '%',
+        value: 3.85, decimals: 2,
+        change_since_prior: -0.25, pct_change_since_prior: null,
+        period_label: 'May 2026', released_label: '20 May',
+        days_since_release: 31, expected_next: '8 Jul',
+        is_revision: false, superseded_value: null,
+        series: [4.35, 4.35, 4.35, 4.10, 4.10, 3.85, 3.85]
+      },
+      {
+        short_label: 'AU Broad Money', category: 'Money supply', unit: 'AUD bn',
+        value: 2998.4, decimals: 1,
+        change_since_prior: 17.2, pct_change_since_prior: 0.58,
+        period_label: 'Apr 2026', released_label: '31 May',
+        days_since_release: 3, expected_next: '30 Jun',
+        is_revision: false, superseded_value: null,
+        series: [2901, 2918, 2939, 2955, 2967, 2981, 2998]
+      }
+    ],
+    global: [
+      {
+        short_label: 'Fed Funds', category: 'Policy rate', unit: '%',
+        value: 4.33, decimals: 2,
+        change_since_prior: -0.25, pct_change_since_prior: null,
+        period_label: 'May 2026', released_label: '1 Jun',
+        days_since_release: 19, expected_next: '1 Jul',
+        is_revision: false, superseded_value: null,
+        series: [5.33, 5.08, 4.83, 4.83, 4.58, 4.33, 4.33]
+      },
+      {
+        short_label: 'US M2', category: 'Money supply', unit: 'USD bn',
+        value: 21987.5, decimals: 1,
+        change_since_prior: 85.4, pct_change_since_prior: 0.39,
+        period_label: 'Apr 2026', released_label: '27 May',
+        days_since_release: 24, expected_next: '25 Jun',
+        is_revision: true, superseded_value: 21980.0,
+        series: [21610, 21702, 21788, 21845, 21902, 21987]
+      },
+      {
+        short_label: 'US CPI', category: 'Inflation', unit: 'index',
+        value: 322.8, decimals: 1,
+        change_since_prior: 1.30, pct_change_since_prior: 0.40,
+        yoy: 3.2,
+        period_label: 'May 2026', released_label: '11 Jun',
+        days_since_release: 9, expected_next: '11 Jul',
+        is_revision: false, superseded_value: null,
+        series: [312.4, 314.9, 317.1, 319.0, 321.5, 322.8]
+      }
+    ]
+  };
+
+  const FRESH_DAYS = 7;
+
+  const fmt = (n, d) =>
+    n.toLocaleString('en-AU', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  // Sparkline: gold line, restrained. No fills, no dots except the last.
+  function sparkline(series) {
+    const w = 240, h = 36, pad = 3;
+    const min = Math.min(...series), max = Math.max(...series);
+    const span = (max - min) || 1;
+    const pts = series.map((v, i) => {
+      const x = pad + (i / (series.length - 1)) * (w - pad * 2);
+      const y = h - pad - ((v - min) / span) * (h - pad * 2);
+      return [x, y];
+    });
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const last = pts[pts.length - 1];
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${d}" fill="none" stroke="var(--color-gold)" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.5"
+              fill="var(--color-gold-dark)" />
+    </svg>`;
+  }
+
+  function deltaHtml(row) {
+    const c = row.change_since_prior;
+    if (c === 0 || c === null) {
+      return `<div class="delta flat">unchanged on prior</div>`;
+    }
+    const up = c > 0;
+    const arrow = up ? '&#9650;' : '&#9660;';   // ▲ ▼ — neutral, direction only
+    const sign = up ? '+' : '−';
+    const mag = fmt(Math.abs(c), row.decimals);
+    const pct = row.pct_change_since_prior != null
+      ? ` <span class="pct">(${up ? '+' : '−'}${Math.abs(row.pct_change_since_prior).toFixed(2)}%)</span>`
+      : '';
+    return `<div class="delta">
+      <span class="arrow">${arrow}</span>${sign}${mag}${pct}
+      <span class="pct">on prior</span>
+    </div>`;
+  }
+
+  function card(row) {
+    const fresh = row.days_since_release <= FRESH_DAYS
+      ? `<span class="fresh"><span class="dot"></span>new</span>` : '';
+    const revision = row.is_revision
+      ? `<div class="chip">revised from ${fmt(row.superseded_value, row.decimals)}</div>` : '';
+    const yoy = row.yoy != null
+      ? `<div class="secondary-stat"><span class="k">YoY</span>+${row.yoy.toFixed(1)}%</div>` : '';
+    return `<div class="card" tabindex="0">
+      <div class="card-top">
+        <div>
+          <div class="label">${row.short_label}</div>
+          <div class="cat">${row.category}</div>
+        </div>
+        ${fresh}
+      </div>
+      <div class="value-row">
+        <span class="value">${fmt(row.value, row.decimals)}</span>
+        <span class="unit">${row.unit}</span>
+      </div>
+      ${deltaHtml(row)}
+      ${yoy}
+      ${revision}
+      <div class="spark">${sparkline(row.series)}</div>
+      <div class="asat">${row.period_label} &middot; released ${row.released_label}</div>
+      <div class="next">next release ~ ${row.expected_next}</div>
+    </div>`;
+  }
+
+  function skeletonCard() {
+    return `<div class="card">
+      <div class="sk sk-label"></div>
+      <div class="sk sk-value"></div>
+      <div class="sk sk-line"></div>
+      <div class="sk sk-spark"></div>
+    </div>`;
+  }
+
+  function group(label, rows, loading) {
+    const cards = loading
+      ? rows.map(skeletonCard).join('')
+      : rows.map(card).join('');
+    return `<section class="group">
+      <div class="group-label">${label}</div>
+      <div class="grid">${cards}</div>
+    </section>`;
+  }
+
+  function render(state) {
+    const loading = state === 'loading';
+    document.getElementById('panel').className = loading ? 'skeleton' : '';
+    document.getElementById('panel').innerHTML =
+      group('Local', DATA.local, loading) +
+      group('Global', DATA.global, loading);
+  }
+
+  function setState(state) {
+    document.getElementById('btn-live').setAttribute('aria-pressed', state === 'live');
+    document.getElementById('btn-load').setAttribute('aria-pressed', state === 'loading');
+    render(state);
+  }
+
+  render('live');
+</script>
+</body>
+</html>
