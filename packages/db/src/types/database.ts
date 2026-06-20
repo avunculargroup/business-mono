@@ -3624,6 +3624,43 @@ export type Database = {
         }
         Relationships: []
       }
+      v_indicator_latest: {
+        Row: {
+          indicator_id: string | null
+          name: string | null
+          short_label: string | null
+          region: string | null
+          category: string | null
+          unit: string | null
+          decimals: number | null
+          period_date: string | null
+          current_value: number | null
+          released_at: string | null
+          is_revision: boolean | null
+          superseded_value: number | null
+          prior_value: number | null
+          change_since_prior: number | null
+          pct_change_since_prior: number | null
+          year_ago_value: number | null
+          year_ago_period: string | null
+          yoy_change: number | null
+          yoy_pct_change: number | null
+          days_since_release: number | null
+          typical_release_gap_days: number | null
+          expected_next_release: string | null
+        }
+        Relationships: []
+      }
+      v_indicator_series: {
+        Row: {
+          indicator_id: string | null
+          short_label: string | null
+          period_date: string | null
+          value: number | null
+          released_at: string | null
+        }
+        Relationships: []
+      }
       v_open_tasks: {
         Row: {
           assigned_to_name: string | null

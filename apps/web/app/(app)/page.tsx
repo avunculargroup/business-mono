@@ -8,6 +8,7 @@ import { FearGreedIndicator } from '@/components/dashboard/FearGreedIndicator';
 import { BitcoinPriceAUD } from '@/components/dashboard/BitcoinPriceAUD';
 import { BlockHeight } from '@/components/dashboard/BlockHeight';
 import { OpenRouterCredits } from '@/components/dashboard/OpenRouterCredits';
+import { MacroIndicators } from '@/components/dashboard/MacroIndicators';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -27,6 +28,8 @@ export default async function DashboardPage() {
     { data: activeProjects },
     { data: allContacts },
     { data: dashboardRoutines },
+    { data: indicatorLatest },
+    { data: indicatorSeries },
   ] = await Promise.all([
     supabase
       .from('tasks')
@@ -47,6 +50,8 @@ export default async function DashboardPage() {
       .eq('is_active', true)
       .not('last_result', 'is', null)
       .order('last_run_at', { ascending: false }),
+    supabase.from('v_indicator_latest').select('*'),
+    supabase.from('v_indicator_series').select('*'),
   ]);
 
   return (
@@ -58,6 +63,7 @@ export default async function DashboardPage() {
         <BlockHeight />
         <OpenRouterCredits />
       </div>
+      <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
       <div className={styles.grid}>
         {/* Left column */}
         <div className={styles.left}>
