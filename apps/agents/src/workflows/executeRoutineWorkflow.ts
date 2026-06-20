@@ -31,8 +31,10 @@ import type {
   PodcastIngestResult,
   NewsCurationConfig,
   NewsCurationStory,
+  IndicatorPollResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
+import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { editor } from '../agents/editorial/index.js';
@@ -144,7 +146,7 @@ const fetchDueRoutines = createStep({
 
 // ── Step 2: Run each routine ─────────────────────────────────────────────────
 
-interface RoutineOutcome {
+export interface RoutineOutcome {
   routine_id: string;
   name: string;
   action_type: RoutineActionType;
@@ -165,6 +167,8 @@ interface RoutineOutcome {
   news_ingest_result?: NewsIngestResult;
   // podcast_ingest result counts:
   podcast_ingest_result?: PodcastIngestResult;
+  // indicator_poll result counts:
+  indicator_poll_result?: IndicatorPollResult;
 }
 
 const runRoutine = createStep({
@@ -197,6 +201,8 @@ const runRoutine = createStep({
           outcomes.push(await runPodcastIngest(routine));
         } else if (routine.action_type === 'news_curation') {
           outcomes.push(await runNewsCuration(routine));
+        } else if (routine.action_type === 'indicator_poll') {
+          outcomes.push(await runIndicatorPoll(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -1555,6 +1561,13 @@ const persistAndSchedule = createStep({
       //   WHERE action LIKE 'Routine run: News%' ORDER BY created_at DESC;
       const isNewsIngest = outcome.action_type === 'news_ingest';
       const isPodcastIngest = outcome.action_type === 'podcast_ingest';
+      const isIndicatorPoll = outcome.action_type === 'indicator_poll';
+      const indicatorNotes = isIndicatorPoll && outcome.indicator_poll_result
+        ? JSON.stringify(outcome.indicator_poll_result)
+        : null;
+      const indicatorHasAnomaly = isIndicatorPoll && outcome.indicator_poll_result
+        ? outcome.indicator_poll_result.failed.length > 0
+        : false;
       const podcastNotes = isPodcastIngest && outcome.podcast_ingest_result
         ? JSON.stringify(outcome.podcast_ingest_result)
         : null;
@@ -1572,10 +1585,10 @@ const persistAndSchedule = createStep({
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (newsHasAnomaly || podcastHasAnomaly ? 'error' : 'auto')
+        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
-        agent_name: isPodcastIngest ? 'archie' : 'rex',
+        agent_name: isPodcastIngest ? 'archie' : isIndicatorPoll ? 'simon' : 'rex',
         action: `Routine run: ${outcome.name}`,
         status: activityStatus,
         trigger_type: 'scheduled',
@@ -1584,7 +1597,7 @@ const persistAndSchedule = createStep({
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: newsNotes ?? podcastNotes ?? outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.
