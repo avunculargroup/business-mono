@@ -20,6 +20,9 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    resolves each transcript via the waterfall (feed tag → YouTube → Deepgram).
 //  - news_curation: Charlie/editor curate the day's best news_items + podcast_episodes
 //    into a dashboard tile (mood summary, ≤6 ranked stories, headline image, more-news link).
+//  - indicator_poll: Simon polls each due economic_indicator via its provider adapter
+//    (FRED/RBA), upserts observations with revision handling, and proposes a content beat
+//    (Charlie draft) on a qualifying new print.
 export const RoutineActionType = {
   RESEARCH_DIGEST:   'research_digest',
   MONITOR_CHANGE:    'monitor_change',
@@ -28,6 +31,7 @@ export const RoutineActionType = {
   NEWSLETTER:        'newsletter',
   PODCAST_INGEST:    'podcast_ingest',
   NEWS_CURATION:     'news_curation',
+  INDICATOR_POLL:    'indicator_poll',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -122,12 +126,32 @@ export interface NewsCurationResult {
   headline_image_url?: string;
 }
 
+// action_config shape for an 'indicator_poll' routine. Polls economic_indicators.
+export interface IndicatorPollConfig {
+  // How many historical periods to pull the first time an indicator is seen,
+  // so YoY and the sparkline aren't empty on day one (default 18, ~range 12–24).
+  backfill_periods?: number;
+}
+
+// Structured payload persisted under routines.last_result.metadata for indicator_poll,
+// and serialised into agent_activity.notes so quiet days stay on the record.
+export interface IndicatorPollResult {
+  indicators_polled: number;
+  observations_inserted: number;
+  observations_superseded: number;
+  no_op: number;
+  beats_proposed: number;
+  // Provider/indicator labels whose fetch or parse failed this run (sweep continues).
+  failed: string[];
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
   | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig)
   | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig)
-  | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig);
+  | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig)
+  | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

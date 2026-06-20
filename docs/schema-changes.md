@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-20 — Economic indicators: `indicator_poll` routine (Session 2)
+
+**Migration:** `20260620000001_add_indicator_poll_routine.sql`
+
+Session 2 (ingest workflow) wiring. Extends `routines_action_type_check` with `'indicator_poll'` and seeds one active daily routine (`agent_name='simon'`, 08:00 Australia/Melbourne, `action_config={"backfill_periods":18}`). The poll runs inside the existing `executeRoutineWorkflow` (new `runIndicatorPoll` handler): for each active indicator that is due per its own `poll_frequency` (weekly indicators poll only on Mondays) and whose provider has an adapter (FRED/RBA; ABS deferred), it fetches via the provider adapter, applies the fetch-date `released_at` fallback, runs the insert/supersede/no-op revision rules, and — for an already-tracked series printing a new latest value, when `alert_on_new_print` or `alert_change_threshold` fires and no beat was proposed in the last 7 days — writes an `agent_activity` `proposed_actions:[{agent:'charlie'}]` row that `contentCreatorListener` turns into a `content_items` **draft** (publish wall respected). No schema change beyond the CHECK + seed; the data layer (tables/views) shipped in `20260620000000`.
+
+---
+
 ## 2026-06-20 — Economic indicators: `economic_indicators`, `indicator_observations`, two views
 
 **Migration:** `20260620000000_add_economic_indicators.sql`

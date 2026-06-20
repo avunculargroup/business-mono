@@ -1499,6 +1499,77 @@ export type Database = {
           },
         ]
       }
+      economic_indicators: {
+        Row: {
+          alert_change_threshold: number | null
+          alert_on_new_print: boolean
+          category: string
+          created_at: string
+          created_by: string | null
+          decimals: number
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          poll_frequency: string
+          provider: string
+          provider_series_code: string | null
+          provider_table_ref: string | null
+          region: string
+          short_label: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          alert_change_threshold?: number | null
+          alert_on_new_print?: boolean
+          category: string
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          poll_frequency?: string
+          provider: string
+          provider_series_code?: string | null
+          provider_table_ref?: string | null
+          region: string
+          short_label: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          alert_change_threshold?: number | null
+          alert_on_new_print?: boolean
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string
+          provider_series_code?: string | null
+          provider_table_ref?: string | null
+          region?: string
+          short_label?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_indicators_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           contact_id: string | null
@@ -1588,6 +1659,56 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indicator_observations: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_id: string
+          is_current: boolean
+          is_revision: boolean
+          period_date: string
+          raw: Json
+          released_at: string
+          source: string
+          superseded_value: number | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_id: string
+          is_current?: boolean
+          is_revision?: boolean
+          period_date: string
+          raw?: Json
+          released_at: string
+          source: string
+          superseded_value?: number | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_id?: string
+          is_current?: boolean
+          is_revision?: boolean
+          period_date?: string
+          raw?: Json
+          released_at?: string
+          source?: string
+          superseded_value?: number | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "economic_indicators"
             referencedColumns: ["id"]
           },
         ]
