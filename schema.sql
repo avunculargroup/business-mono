@@ -1884,3 +1884,73 @@ CREATE TABLE transcript_segments (
 -- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
 -- filter_days) — cosine search returning one row per matching segment, joined to
 -- episode + source for title/provenance/timestamp.
+
+
+-- ============================================================
+-- ECONOMIC INDICATORS (migration: 20260620000000_add_economic_indicators)
+-- ============================================================
+-- Slow-moving macro series (money supply, inflation, policy rates) persisted as
+-- a time series, beneath the live tickers. Source-discriminated registry +
+-- ingestion-agnostic observation table with revision/supersession handling.
+-- Spec: docs/features/economic-indicators/.
+
+-- Registry: one row per tracked series.
+CREATE TABLE economic_indicators (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                   TEXT NOT NULL,
+  short_label            TEXT NOT NULL,
+  region                 TEXT NOT NULL CHECK (region IN ('au','us','global')),
+  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation')),
+  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs')),
+  provider_series_code   TEXT,                     -- FRED series_id, e.g. 'M2SL'
+  provider_table_ref     TEXT,                     -- RBA/ABS table or dataflow ref, e.g. 'D3'
+  unit                   TEXT NOT NULL,            -- 'percent','aud_billion','usd_billion','index'
+  decimals               INT  NOT NULL DEFAULT 2,
+  -- Operational poll cadence (how often we hit the API), NOT the data's natural
+  -- frequency. Natural frequency is computed in v_indicator_latest, never stored.
+  poll_frequency         TEXT NOT NULL DEFAULT 'daily' CHECK (poll_frequency IN ('daily','weekly')),
+  alert_on_new_print     BOOLEAN NOT NULL DEFAULT TRUE,
+  alert_change_threshold NUMERIC,                  -- NULL = print-only
+  is_active              BOOLEAN NOT NULL DEFAULT TRUE,
+  notes                  TEXT,
+  created_by             UUID REFERENCES team_members(id),
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Observation time series: one row per (indicator, period, vintage). Append/
+-- supersede-only — no updated_at, never edited in place (clean audit trail).
+-- period_date is normalised to the FIRST day of the period (see adapter-contract.md);
+-- released_at is when the provider published (v1: workflow substitutes fetch date).
+CREATE TABLE indicator_observations (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  indicator_id     UUID NOT NULL REFERENCES economic_indicators(id) ON DELETE CASCADE,
+  period_date      DATE NOT NULL,
+  value            NUMERIC(18,4) NOT NULL,
+  released_at      DATE NOT NULL,
+  is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage of this period
+  is_revision      BOOLEAN NOT NULL DEFAULT FALSE,  -- supersedes an earlier value for this period
+  superseded_value NUMERIC(18,4),
+  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','manual')),
+  raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Trigger: economic_indicators_updated_at (BEFORE UPDATE → update_updated_at()).
+-- Indexes: idx_indicator_obs_indicator (indicator_id);
+--          idx_indicator_obs_period (indicator_id, period_date DESC);
+--          idx_indicator_obs_current (indicator_id, is_current) WHERE is_current;
+--          uq_indicator_obs_vintage UNIQUE (indicator_id, period_date, released_at);
+--          idx_economic_indicators_region (region);
+--          idx_economic_indicators_active (is_active) WHERE is_active.
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role (agents poll via service_role).
+-- Seed: six v1 indicators (RBA cash rate, Fed funds, US M2, AU broad money, US CPI;
+--       AU CPI seeded is_active=false until the ABS adapter exists).
+
+-- Views:
+--   v_indicator_series — current-vintage observations for an indicator, oldest→newest
+--     (sparklines + Rex). Columns: indicator_id, short_label, period_date, value, released_at.
+--   v_indicator_latest — one row per active indicator: current value, change-since-prior,
+--     YoY (via a calendar-year period_date join — frequency-agnostic, gap-tolerant),
+--     and a computed cadence (median release gap → expected_next_release). Nothing stored.
+--     Component picks the YoY column by category: yoy_change (policy_rate, pp) vs
+--     yoy_pct_change (inflation = the rate; money_supply = the debasement rate).

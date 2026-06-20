@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-20 — Economic indicators: `economic_indicators`, `indicator_observations`, two views
+
+**Migration:** `20260620000000_add_economic_indicators.sql`
+
+Session 1 (data layer) of the Economic Indicators feature (`docs/features/economic-indicators/`). Adds the slow-moving macro layer (money supply, inflation, policy rates) beneath the existing live tickers, persisted as a time series so it serves both the dashboard and the agents (Rex citing exact figures; a fresh print triggering a content beat). This migration is the schema only — the ingest workflow (Session 2) and dashboard panel (Session 3) are separate, gated for review.
+
+- **`economic_indicators` table** — the source-discriminated registry, one row per tracked series. `region` (`au`/`us`/`global`, drives local/global grouping), `category` (`policy_rate`/`money_supply`/`inflation`), `provider` (`fred`/`rba`/`abs` — the adapter discriminator), `provider_series_code` (FRED series_id) / `provider_table_ref` (RBA/ABS table or dataflow). `poll_frequency` (`daily`/`weekly`) is **stored deliberately** as operational config — it is how often we hit the API, distinct from the data's natural frequency, which is *computed* in `v_indicator_latest` and never stored. `alert_on_new_print` + optional `alert_change_threshold` gate the content-beat proposal. `updated_at` trigger reuses the shared `update_updated_at()`.
+- **`indicator_observations` table** — the observation time series, agnostic to which provider delivered it. One row per **(indicator, period, vintage)**: uniqueness is `(indicator_id, period_date, released_at)` so multiple revisions of one period coexist. `period_date` (reference period, normalised to the first day of the period) is deliberately distinct from `released_at` (when the provider published — v1 substitutes the fetch date). Revisions flip the prior row's `is_current=false`, set `is_revision=true` and `superseded_value`. Append/supersede-only: **no `updated_at`**, never edited in place, which is what makes it a clean audit trail.
+- **Views (computed, nothing stored)** — `v_indicator_series` (current-vintage observations oldest→newest, for sparklines and Rex) and `v_indicator_latest` (one row per active indicator: current value, change-since-prior, and YoY via a **calendar-year `period_date` join** — frequency-agnostic and gap-tolerant, which works because adapters normalise `period_date` to first-of-period — plus a computed cadence: median release gap → `expected_next_release`). The view exposes both `yoy_change` (pp, for policy rates) and `yoy_pct_change` (the rate itself, for inflation/money supply); the component picks by `category`.
+- **RLS** — `"<table>_all"` FOR ALL to `authenticated` + `service_role` (with `WITH CHECK`), matching the project convention for tables agents write to (the scheduled poll runs as `service_role`).
+- **Seed** — six v1 indicators (RBA cash rate target, US Fed funds, US M2, AU broad money, US CPI; **AU CPI seeded `is_active=false`** until the ABS adapter exists). FRED series codes are stable; the RBA target column headers and the ABS dataflow must be confirmed against the live sources at Session 2 build. `routines_action_type_check` is **unchanged** here — the `'indicator_poll'` action type and the routine row land in Session 2 with the workflow.
+
+---
+
 ## 2026-06-17 — Email newsletter sources + Rex relevance rubric
 
 **Migration:** `20260617000000_add_email_news_sources_and_rubric.sql`
