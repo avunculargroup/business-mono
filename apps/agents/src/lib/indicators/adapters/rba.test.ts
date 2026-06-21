@@ -8,7 +8,7 @@ function fixture(name: string): string {
 
 describe('parseTableRef', () => {
   it('lower-cases the table and applies the default column when none is given', () => {
-    expect(parseTableRef('D3')).toEqual({ table: 'd3', columnMatch: 'Broad money' });
+    expect(parseTableRef('D3')).toEqual({ table: 'd3', columnMatch: 'DMABMS' });
     expect(parseTableRef('F1.1')).toEqual({ table: 'f1.1', columnMatch: 'FIRMMCRT' });
   });
   it('honours an explicit "table:column" matcher', () => {
@@ -24,15 +24,28 @@ describe('parseCsv', () => {
 });
 
 describe('parseRbaCsv', () => {
-  it('selects the target column by label, normalises end-of-month dates, skips blanks', () => {
-    const res = parseRbaCsv(fixture('rba-d3.csv'), 'Broad money');
+  it('selects seasonally-adjusted Broad money by its DMABMS Series ID, skips blanks', () => {
+    // The D3 default matcher. Feb's SA cell is blank → skipped; Jan + Mar remain,
+    // normalised end-of-month → first-of-month.
+    const res = parseRbaCsv(fixture('rba-d3.csv'), 'DMABMS');
     expect(res.ok).toBe(true);
     if (!res.ok) return;
 
-    // Feb's Broad-money cell is blank → skipped; Jan + Mar remain, first-of-month.
     expect(res.observations.map((o) => o.periodDate)).toEqual(['2026-01-01', '2026-03-01']);
     expect(res.observations.map((o) => o.value)).toEqual([2890.7, 2912.8]);
     expect(res.observations[0].releasedAt).toBeNull();
+  });
+
+  it('label "Broad money" alone matches the Original column — why the default uses DMABMS', () => {
+    // "Broad money" is a substring of both the Original and "Broad money:
+    // Seasonally adjusted" titles; the Original column (DMABMN) comes first, so a
+    // bare label match silently picks the non-SA series. This is the trap the
+    // DMABMS default avoids.
+    const res = parseRbaCsv(fixture('rba-d3.csv'), 'Broad money');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // Original column has all three months populated (2885.0 / 2900.0 / 2908.0).
+    expect(res.observations.map((o) => o.value)).toEqual([2885.0, 2900.0, 2908.0]);
   });
 
   it('matches a column by Series ID mnemonic too', () => {

@@ -31,7 +31,11 @@ import { parseRbaDateToFirstOfMonth } from '../period.js';
 // Best-guess defaults — CONFIRM against the live CSV at build (see seed notes).
 const DEFAULT_COLUMN: Record<string, string> = {
   'f1.1': 'FIRMMCRT', // Cash Rate Target series ID (confirmed against live F1.1 CSV)
-  d3: 'Broad money',  // D3 "Broad money" column label
+  // D3 carries TWO broad-money columns — "Broad money" (Original, DMABMN) and
+  // "Broad money: Seasonally adjusted" (DMABMS). The label "Broad money" is a
+  // substring of both and matches the Original first; target the SA Series ID
+  // directly, which the seed intends. (Confirmed against live D3 CSV.)
+  d3: 'DMABMS',
 };
 
 /** Split "{table}:{columnMatch}" → its parts. Table is lower-cased for the URL. */
