@@ -11,7 +11,7 @@
  * See docs/features/economic-indicators/adapter-contract.md.
  */
 
-export type Provider = 'fred' | 'rba' | 'abs';
+export type Provider = 'fred' | 'rba' | 'abs' | 'oecd';
 
 /** What every adapter returns, per observation. The DB columns
  *  period_date / value / released_at / raw map 1:1 onto this. */
