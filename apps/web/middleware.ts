@@ -31,8 +31,11 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === '/login';
+  // Public share links (/share/<id>) resolve files for unauthenticated
+  // visitors; RLS keeps them limited to files marked public.
+  const isPublicShare = request.nextUrl.pathname.startsWith('/share/');
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isPublicShare) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);

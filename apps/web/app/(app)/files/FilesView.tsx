@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Search, X, Download, Pencil, Trash2, Eye, EyeOff,
-  FileText, FileImage, File, Tag, Files,
+  FileText, FileImage, File, Tag, Files, Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -364,6 +364,17 @@ export function FilesView({ initialFiles }: { initialFiles: PlatformFile[] }) {
     }
   };
 
+  const handleCopyLink = async (file: PlatformFile, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/share/${file.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Share link copied');
+    } catch {
+      toast.error('Could not copy link');
+    }
+  };
+
   const openRename = (file: PlatformFile, e: React.MouseEvent) => {
     e.stopPropagation();
     setRenameTarget(file);
@@ -580,6 +591,17 @@ export function FilesView({ initialFiles }: { initialFiles: PlatformFile[] }) {
                     ? <EyeOff size={13} strokeWidth={1.5} />
                     : <Eye size={13} strokeWidth={1.5} />}
                 </button>
+                {file.is_public && (
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={(e) => handleCopyLink(file, e)}
+                    aria-label="Copy share link"
+                    title="Copy share link"
+                  >
+                    <Link2 size={13} strokeWidth={1.5} />
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.actionBtn}
@@ -761,6 +783,17 @@ export function FilesView({ initialFiles }: { initialFiles: PlatformFile[] }) {
             <div className={styles.previewPanelHeader}>
               <span className={styles.previewPanelTitle}>{previewFile.name}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                {previewFile.is_public && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => handleCopyLink(previewFile, e)}
+                    aria-label="Copy share link"
+                  >
+                    <Link2 size={14} strokeWidth={1.5} />
+                    Copy link
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
