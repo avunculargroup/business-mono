@@ -169,6 +169,7 @@ Simon checks for gaps before routing any directive: no agent for the task, missi
 |Content Creator|Agent           |`docs/agents/content-creator.md`             |Content drafting, iteration, brand consistency                         |
 |Researcher     |Workflow + Agent|`docs/agents/researcher-agent-spec.md`       |Web research, fact verification, URL ingestion, topic monitoring       |
 |Della (RM)     |Agent           |`docs/agents/relationship-manager.md`        |CRM management, relationship health, pipeline advice                   |
+|Lex            |Agent           |`docs/agents/compliance.md`                  |Compliance review (AFSL/AR) — flags advice-framed content drafts; logs verdicts, never auto-approves|
 
 **Agent vs Workflow**: Use Agent for open-ended judgment tasks; Workflow for deterministic pipelines; Hybrid where a pipeline has reasoning steps.
 

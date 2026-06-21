@@ -2342,6 +2342,130 @@ export type Database = {
           },
         ]
       }
+      onchain_indicators: {
+        Row: {
+          alert_config: Json
+          created_at: string
+          created_by: string | null
+          decimals: number
+          derivation: string
+          derivation_spec: Json
+          id: string
+          is_active: boolean
+          is_displayed: boolean
+          key: string
+          metric_group: string
+          name: string
+          notes: string | null
+          poll_frequency: string
+          provider: string | null
+          provider_metric_code: string | null
+          short_label: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          alert_config?: Json
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          derivation?: string
+          derivation_spec?: Json
+          id?: string
+          is_active?: boolean
+          is_displayed?: boolean
+          key: string
+          metric_group: string
+          name: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string | null
+          provider_metric_code?: string | null
+          short_label: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          alert_config?: Json
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          derivation?: string
+          derivation_spec?: Json
+          id?: string
+          is_active?: boolean
+          is_displayed?: boolean
+          key?: string
+          metric_group?: string
+          name?: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string | null
+          provider_metric_code?: string | null
+          short_label?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_indicators_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onchain_observations: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_id: string
+          ingested_at: string
+          is_current: boolean
+          is_revision: boolean
+          observed_at: string
+          raw: Json
+          source: string
+          superseded_value: number | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_id: string
+          ingested_at?: string
+          is_current?: boolean
+          is_revision?: boolean
+          observed_at: string
+          raw?: Json
+          source: string
+          superseded_value?: number | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_id?: string
+          ingested_at?: string
+          is_current?: boolean
+          is_revision?: boolean
+          observed_at?: string
+          raw?: Json
+          source?: string
+          superseded_value?: number | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "onchain_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pain_point_log: {
         Row: {
           change_type: string
@@ -3631,6 +3755,17 @@ export type Database = {
         }
         Relationships: []
       }
+      v_hash_ribbons: {
+        Row: {
+          hash_rate_eh_s: number | null
+          ma30: number | null
+          ma60: number | null
+          observed_at: string | null
+          signal: string | null
+          spread_pct: number | null
+        }
+        Relationships: []
+      }
       v_indicator_latest: {
         Row: {
           category: string | null
@@ -3680,6 +3815,41 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_indicator_latest"
             referencedColumns: ["indicator_id"]
+          },
+        ]
+      }
+      v_onchain_dashboard: {
+        Row: {
+          change_since_prior: number | null
+          days_since_observed: number | null
+          decimals: number | null
+          key: string | null
+          metric_group: string | null
+          name: string | null
+          observed_at: string | null
+          pct_change_since_prior: number | null
+          short_label: string | null
+          signal: string | null
+          unit: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
+      v_onchain_series: {
+        Row: {
+          indicator_id: string | null
+          key: string | null
+          observed_at: string | null
+          short_label: string | null
+          value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "onchain_indicators"
+            referencedColumns: ["id"]
           },
         ]
       }

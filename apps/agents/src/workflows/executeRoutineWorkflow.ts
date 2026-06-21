@@ -32,9 +32,11 @@ import type {
   NewsCurationConfig,
   NewsCurationStory,
   IndicatorPollResult,
+  OnchainPollResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
 import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
+import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { editor } from '../agents/editorial/index.js';
@@ -169,6 +171,8 @@ export interface RoutineOutcome {
   podcast_ingest_result?: PodcastIngestResult;
   // indicator_poll result counts:
   indicator_poll_result?: IndicatorPollResult;
+  // onchain_poll result counts:
+  onchain_poll_result?: OnchainPollResult;
 }
 
 const runRoutine = createStep({
@@ -203,6 +207,8 @@ const runRoutine = createStep({
           outcomes.push(await runNewsCuration(routine));
         } else if (routine.action_type === 'indicator_poll') {
           outcomes.push(await runIndicatorPoll(routine));
+        } else if (routine.action_type === 'onchain_poll') {
+          outcomes.push(await runOnchainPoll(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -1562,11 +1568,18 @@ const persistAndSchedule = createStep({
       const isNewsIngest = outcome.action_type === 'news_ingest';
       const isPodcastIngest = outcome.action_type === 'podcast_ingest';
       const isIndicatorPoll = outcome.action_type === 'indicator_poll';
+      const isOnchainPoll = outcome.action_type === 'onchain_poll';
       const indicatorNotes = isIndicatorPoll && outcome.indicator_poll_result
         ? JSON.stringify(outcome.indicator_poll_result)
         : null;
       const indicatorHasAnomaly = isIndicatorPoll && outcome.indicator_poll_result
         ? outcome.indicator_poll_result.failed.length > 0
+        : false;
+      const onchainNotes = isOnchainPoll && outcome.onchain_poll_result
+        ? JSON.stringify(outcome.onchain_poll_result)
+        : null;
+      const onchainHasAnomaly = isOnchainPoll && outcome.onchain_poll_result
+        ? outcome.onchain_poll_result.failed.length > 0
         : false;
       const podcastNotes = isPodcastIngest && outcome.podcast_ingest_result
         ? JSON.stringify(outcome.podcast_ingest_result)
@@ -1585,10 +1598,10 @@ const persistAndSchedule = createStep({
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly ? 'error' : 'auto')
+        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly || onchainHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
-        agent_name: isPodcastIngest ? 'archie' : isIndicatorPoll ? 'simon' : 'rex',
+        agent_name: isPodcastIngest ? 'archie' : (isIndicatorPoll || isOnchainPoll) ? 'simon' : 'rex',
         action: `Routine run: ${outcome.name}`,
         status: activityStatus,
         trigger_type: 'scheduled',
@@ -1597,7 +1610,7 @@ const persistAndSchedule = createStep({
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? onchainNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.

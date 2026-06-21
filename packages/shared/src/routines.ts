@@ -23,6 +23,10 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //  - indicator_poll: Simon polls each due economic_indicator via its provider adapter
 //    (FRED/RBA), upserts observations with revision handling, and proposes a content beat
 //    (Charlie draft) on a qualifying new print.
+//  - onchain_poll: Simon polls each active on-chain indicator via its provider adapter
+//    (mempool/coinmetrics), upserts raw observations with revision handling, lets the
+//    views derive the rest, and proposes a (compliance-sensitive) content beat on a
+//    Hash-Ribbons signal change, an MVRV band cross, or a large hash-rate drop.
 export const RoutineActionType = {
   RESEARCH_DIGEST:   'research_digest',
   MONITOR_CHANGE:    'monitor_change',
@@ -32,6 +36,7 @@ export const RoutineActionType = {
   PODCAST_INGEST:    'podcast_ingest',
   NEWS_CURATION:     'news_curation',
   INDICATOR_POLL:    'indicator_poll',
+  ONCHAIN_POLL:      'onchain_poll',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -145,13 +150,33 @@ export interface IndicatorPollResult {
   failed: string[];
 }
 
+// action_config shape for an 'onchain_poll' routine. Polls onchain_indicators.
+export interface OnchainPollConfig {
+  // How many days of history to pull the first time an indicator is seen. Hash
+  // Ribbons needs 60 days of hash rate to compute, so default generously (90).
+  backfill_days?: number;
+}
+
+// Structured payload persisted under routines.last_result.metadata for onchain_poll,
+// and serialised into agent_activity.notes so quiet days stay on the record.
+export interface OnchainPollResult {
+  indicators_polled: number;
+  observations_inserted: number;
+  observations_superseded: number;
+  no_op: number;
+  beats_proposed: number;
+  // Provider/indicator labels whose fetch or parse failed this run (sweep continues).
+  failed: string[];
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
   | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig)
   | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig)
   | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig)
-  | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig);
+  | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig)
+  | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

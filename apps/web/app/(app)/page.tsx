@@ -9,6 +9,7 @@ import { BitcoinPriceAUD } from '@/components/dashboard/BitcoinPriceAUD';
 import { BlockHeight } from '@/components/dashboard/BlockHeight';
 import { OpenRouterCredits } from '@/components/dashboard/OpenRouterCredits';
 import { MacroIndicators } from '@/components/dashboard/MacroIndicators';
+import { OnchainIndicators } from '@/components/dashboard/OnchainIndicators';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -30,6 +31,8 @@ export default async function DashboardPage() {
     { data: dashboardRoutines },
     { data: indicatorLatest },
     { data: indicatorSeries },
+    { data: onchainLatest },
+    { data: onchainSeries },
   ] = await Promise.all([
     supabase
       .from('tasks')
@@ -52,6 +55,8 @@ export default async function DashboardPage() {
       .order('last_run_at', { ascending: false }),
     supabase.from('v_indicator_latest').select('*'),
     supabase.from('v_indicator_series').select('*'),
+    supabase.from('v_onchain_dashboard').select('*'),
+    supabase.from('v_onchain_series').select('*'),
   ]);
 
   return (
@@ -64,6 +69,7 @@ export default async function DashboardPage() {
         <OpenRouterCredits />
       </div>
       <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
+      <OnchainIndicators latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <div className={styles.grid}>
         {/* Left column */}
         <div className={styles.left}>

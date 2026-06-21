@@ -617,7 +617,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
 CREATE TABLE agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name        TEXT NOT NULL
-                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
+                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'lex')),
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
@@ -664,7 +664,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 CREATE TABLE platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name      TEXT NOT NULL
-                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
+                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'lex')),
   capability      TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
                   CHECK (status IN ('active', 'planned', 'unavailable')),
@@ -715,7 +715,8 @@ CREATE TABLE routines (
   action_type       TEXT NOT NULL
                     CHECK (action_type IN ('research_digest','monitor_change',
                                            'news_ingest','news_source_scan','newsletter',
-                                           'podcast_ingest','news_curation','indicator_poll')),
+                                           'podcast_ingest','news_curation','indicator_poll',
+                                           'onchain_poll')),
   action_config     JSONB NOT NULL DEFAULT '{}'::jsonb,
   frequency         TEXT NOT NULL
                     CHECK (frequency IN ('daily','weekly','fortnightly')),
@@ -1957,3 +1958,91 @@ CREATE TABLE indicator_observations (
 --     and a computed cadence (median release gap → expected_next_release). Nothing stored.
 --     Component picks the YoY column by category: yoy_change (policy_rate, pp) vs
 --     yoy_pct_change (inflation = the rate; money_supply = the debasement rate).
+
+
+-- ============================================================
+-- ON-CHAIN INDICATORS (migration: 20260621170000_add_onchain_indicators)
+-- ============================================================
+-- Bitcoin network & on-chain metrics (hash rate, difficulty, Hash Ribbons, fee
+-- share, pool concentration, MVRV, realised price, active addresses). Sibling of
+-- economic_indicators, reusing its registry + observation-series pattern, but a
+-- SEPARATE table: on-chain data is daily (no period-vs-release gap) and several
+-- DISPLAY metrics are DERIVED from others. Spec: docs/features/onchain-indicators/.
+--
+-- STORAGE: onchain_observations holds ONLY raw fetched series. Derived display
+-- metrics (fee_share, realised_price, hash_ribbons) are computed in the views,
+-- never stored. MVRV is fetched directly from Coin Metrics (a normal fetched row).
+
+-- Registry: one row per indicator — display metrics AND the raw inputs that feed
+-- derived ones (is_displayed=false). Derived rows have provider=NULL + a
+-- derivation_spec and are never polled.
+CREATE TABLE onchain_indicators (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key                   TEXT NOT NULL UNIQUE,          -- stable slug, e.g. 'hash_rate'
+  name                  TEXT NOT NULL,
+  short_label           TEXT NOT NULL,
+  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation')),
+  derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
+  provider              TEXT CHECK (provider IN ('mempool','coinmetrics')),  -- NULL for derived
+  provider_metric_code  TEXT,                          -- e.g. CM 'CapRealUSD'; NULL for derived
+  derivation_spec       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- documents derived formula; NOT executed
+  unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc'
+  decimals              INT  NOT NULL DEFAULT 2,
+  poll_frequency        TEXT NOT NULL DEFAULT 'daily' CHECK (poll_frequency IN ('daily')),
+  is_displayed          BOOLEAN NOT NULL DEFAULT TRUE, -- true = headline card; false = raw input
+  alert_config          JSONB NOT NULL DEFAULT '{}'::jsonb,  -- what proposes a content beat
+  is_active             BOOLEAN NOT NULL DEFAULT TRUE,
+  notes                 TEXT,
+  created_by            UUID REFERENCES team_members(id),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Derived rows carry no provider; fetched rows must have one.
+  CONSTRAINT onchain_derivation_provider CHECK (
+    (derivation = 'derived' AND provider IS NULL) OR
+    (derivation = 'fetched' AND provider IS NOT NULL)
+  )
+);
+
+-- Observation time series: raw fetched values only. One row per (indicator, day,
+-- vintage). Append/supersede-only — no updated_at. observed_at is the UTC day the
+-- value pertains to. value is NUMERIC(24,6) (realised cap ~1e12; ratios precise).
+CREATE TABLE onchain_observations (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  indicator_id     UUID NOT NULL REFERENCES onchain_indicators(id) ON DELETE CASCADE,
+  observed_at      DATE NOT NULL,
+  value            NUMERIC(24,6) NOT NULL,
+  is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage for this observed_at
+  is_revision      BOOLEAN NOT NULL DEFAULT FALSE,
+  superseded_value NUMERIC(24,6),
+  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics')),
+  raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ingested_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Trigger: onchain_indicators_updated_at (BEFORE UPDATE → update_updated_at()).
+-- Indexes: idx_onchain_obs_indicator (indicator_id);
+--          idx_onchain_obs_observed (indicator_id, observed_at DESC);
+--          idx_onchain_obs_current (indicator_id, is_current) WHERE is_current;
+--          uq_onchain_obs_vintage UNIQUE (indicator_id, observed_at, ingested_at);
+--          idx_onchain_indicators_group (metric_group);
+--          idx_onchain_indicators_active (is_active) WHERE is_active;
+--          idx_onchain_indicators_displayed (is_displayed) WHERE is_displayed.
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role (agents poll via service_role).
+-- Seed: 8 display metrics (hash_rate, next_difficulty_adjustment, pool_concentration_top,
+--       fee_share[derived], hash_ribbons[derived], mvrv, realised_price[derived],
+--       active_addresses) + 5 raw inputs (miner_revenue_total, miner_fees_total,
+--       realised_cap, supply, difficulty).
+
+-- Views:
+--   v_onchain_series — current observations per indicator, oldest→newest (sparklines + Rex).
+--     Columns: indicator_id, key, short_label, observed_at, value.
+--   v_hash_ribbons — 30d/60d MA of hash_rate, spread_pct, and signal
+--     (capitulation/recovery/neutral). NB: ROWS BETWEEN N PRECEDING counts ROWS not
+--     calendar days — assumes daily-contiguous hash_rate rows (a polling gap shortens
+--     the window). Only emits once 60 days of history exist.
+--   v_onchain_dashboard — one row per DISPLAY metric (fetched + derived), uniform shape:
+--     key, name, short_label, metric_group, unit, decimals, value, observed_at,
+--     change_since_prior, pct_change_since_prior, days_since_observed, signal. Fetched
+--     read their latest current observation (with day-over-day deltas); derived
+--     (fee_share, realised_price, hash_ribbons) are computed inline. Derived metrics
+--     carry NULL deltas in v1.

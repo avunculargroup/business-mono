@@ -2,6 +2,7 @@ import { createRealtimeClient } from '@platform/db';
 import { runDispatch } from '../lib/dispatchRunner.js';
 import { makeStepLogger } from '../lib/agentStepTelemetry.js';
 import { charlie } from '../agents/contentCreator/index.js';
+import { recordComplianceReview } from '../agents/compliance/index.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 
 const supabase = createRealtimeClient();
@@ -131,6 +132,26 @@ export function startContentCreatorListener(): void {
             }
 
             console.log(`[content-creator-listener] Saved draft to content_items ${contentItemId}`);
+
+            // Compliance gate: beats flagged compliance-sensitive (e.g. on-chain
+            // valuation framing) get a Lex review logged against the draft before
+            // it reaches the human approval wall. Advisory — never auto-publishes.
+            if (dispatch.context?.['compliance_sensitive']) {
+              try {
+                const verdict = await recordComplianceReview({
+                  contentItemId,
+                  title: parsed.title,
+                  body: parsed.body,
+                  parentActivityId: row.id,
+                });
+                console.log(
+                  `[content-creator-listener] Lex compliance review for ${contentItemId}: ${verdict.passes ? 'passed' : 'flagged'}`,
+                );
+              } catch (err) {
+                console.error('[content-creator-listener] Compliance review failed:', err);
+              }
+            }
+
             return {
               entityType: 'content_items',
               entityId: contentItemId,
