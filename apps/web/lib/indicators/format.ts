@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   policy_rate: 'Policy rate',
   money_supply: 'Money supply',
   inflation: 'Inflation',
+  activity: 'Activity',
 };
 
 export function unitLabel(unit: string | null): string {
@@ -70,8 +71,10 @@ export function computeDelta(row: IndicatorLatest): Delta {
   const decimals = row.decimals ?? 2;
   const sign = up ? '+' : '−'; // − minus sign
   const magnitude = `${sign}${formatValue(Math.abs(c), decimals)}`;
+  // A 0-centred diffusion index (activity) can cross zero, so a percent change is
+  // meaningless (−0.4 from 26.7 is not "−101%"). Absolute points only.
   const pct =
-    row.pct_change_since_prior != null
+    row.category !== 'activity' && row.pct_change_since_prior != null
       ? `${sign}${Math.abs(row.pct_change_since_prior).toFixed(2)}%`
       : null;
   return { kind: up ? 'up' : 'down', magnitude, pct };
@@ -85,6 +88,7 @@ export interface YoyStat {
 /**
  * The view exposes both YoY columns; the card picks by category:
  *   policy_rate  → yoy_change      (percentage points)
+ *   activity     → yoy_change      (diffusion-index points; pct is meaningless)
  *   inflation    → yoy_pct_change  (the annual inflation rate)
  *   money_supply → yoy_pct_change  (the money-growth / debasement rate)
  */
@@ -93,6 +97,12 @@ export function pickYoy(row: IndicatorLatest): YoyStat | null {
     if (row.yoy_change == null) return null;
     const sign = row.yoy_change >= 0 ? '+' : '−';
     return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoy_change).toFixed(row.decimals ?? 2)}pp` };
+  }
+  // Activity is a 0-centred diffusion index — YoY as absolute points, not percent.
+  if (row.category === 'activity') {
+    if (row.yoy_change == null) return null;
+    const sign = row.yoy_change >= 0 ? '+' : '−';
+    return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoy_change).toFixed(row.decimals ?? 1)} pts` };
   }
   if (row.yoy_pct_change == null) return null;
   const sign = row.yoy_pct_change >= 0 ? '+' : '−';

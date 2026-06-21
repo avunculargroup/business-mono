@@ -1900,8 +1900,8 @@ CREATE TABLE economic_indicators (
   name                   TEXT NOT NULL,
   short_label            TEXT NOT NULL,
   region                 TEXT NOT NULL CHECK (region IN ('au','us','global')),
-  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation')),
-  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs')),
+  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation','activity')),
+  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs','oecd')),
   provider_series_code   TEXT,                     -- FRED series_id, e.g. 'M2SL'
   provider_table_ref     TEXT,                     -- RBA/ABS table or dataflow ref, e.g. 'D3'
   unit                   TEXT NOT NULL,            -- 'percent','aud_billion','usd_billion','index'
@@ -1931,7 +1931,7 @@ CREATE TABLE indicator_observations (
   is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage of this period
   is_revision      BOOLEAN NOT NULL DEFAULT FALSE,  -- supersedes an earlier value for this period
   superseded_value NUMERIC(18,4),
-  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','manual')),
+  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','oecd','manual')),
   raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -1945,6 +1945,9 @@ CREATE TABLE indicator_observations (
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role (agents poll via service_role).
 -- Seed: six v1 indicators (RBA cash rate, Fed funds, US M2, AU broad money, US CPI;
 --       AU CPI seeded is_active=false until the ABS adapter exists).
+--       + activity category (migration 20260621000000): US Manufacturing Activity
+--       (Philly Fed, FRED, live) and AU Business Confidence (OECD, is_active=false
+--       until an 'oecd' SDMX adapter exists).
 
 -- Views:
 --   v_indicator_series — current-vintage observations for an indicator, oldest→newest

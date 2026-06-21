@@ -45,6 +45,7 @@ describe('labels', () => {
     expect(unitLabel('usd_billion')).toBe('USD bn');
     expect(unitLabel('percent')).toBe('%');
     expect(categoryLabel('policy_rate')).toBe('Policy rate');
+    expect(categoryLabel('activity')).toBe('Activity');
     expect(unitLabel(null)).toBe('');
   });
 });
@@ -86,6 +87,13 @@ describe('computeDelta', () => {
     expect(computeDelta(row({ change_since_prior: 0 })).kind).toBe('flat');
     expect(computeDelta(row({ change_since_prior: null })).kind).toBe('flat');
   });
+  it('suppresses percent for a 0-centred activity diffusion index', () => {
+    // Philly Fed: 26.7 → -0.4, a -27.1 point move that pct would render as ~ -101%.
+    const d = computeDelta(
+      row({ category: 'activity', decimals: 1, change_since_prior: -27.1, pct_change_since_prior: -101.5 }),
+    );
+    expect(d).toEqual({ kind: 'down', magnitude: '−27.1', pct: null });
+  });
 });
 
 describe('pickYoy (category-driven)', () => {
@@ -95,6 +103,10 @@ describe('pickYoy (category-driven)', () => {
   });
   it('uses percent for inflation / money supply', () => {
     expect(pickYoy(row({ category: 'money_supply' }))).toEqual({ label: 'YoY', text: '+1.9%' });
+  });
+  it('uses absolute points for an activity diffusion index', () => {
+    const y = pickYoy(row({ category: 'activity', decimals: 1, yoy_change: -5.2, yoy_pct_change: -130 }));
+    expect(y).toEqual({ label: 'vs 1yr', text: '−5.2 pts' });
   });
   it('returns null when the relevant column is null', () => {
     expect(pickYoy(row({ category: 'money_supply', yoy_pct_change: null }))).toBeNull();
