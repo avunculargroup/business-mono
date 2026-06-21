@@ -1,0 +1,8 @@
+{
+  "pools": [
+    { "name": "Foundry USA", "share": 0.287, "blockCount": 41 },
+    { "name": "AntPool", "share": 0.21, "blockCount": 30 },
+    { "name": "ViaBTF", "share": 0.12, "blockCount": 17 },
+    { "name": "Unknown", "share": 0.02, "blockCount": 3 }
+  ]
+}
