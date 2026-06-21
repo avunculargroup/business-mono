@@ -44,6 +44,12 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Editor',
     description: 'Newsletter copy editor — brand-voice and audience-fit gate (internal to the newsletter workflow)',
   },
+  {
+    key: 'lex',
+    type: 'agent',
+    label: 'Lex',
+    description: 'Compliance reviewer — flags advice-framed content (AFSL/AR) on draft persistence',
+  },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
   {
@@ -187,6 +193,15 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     description: 'A separate editorial agent scores each draft against brand voice',
     workflow: 'newsletter',
     fallbackAgent: 'editor',
+  },
+
+  // ── Content compliance review (Lex, on draft persistence) ──────────────────
+  {
+    key: 'content.compliance_review',
+    type: 'workflow_step',
+    label: 'Compliance review',
+    description: 'Lex reviews a persisted draft for advice risk (buy/sell framing, price prediction)',
+    fallbackAgent: 'lex',
   },
 ] as const;
 
