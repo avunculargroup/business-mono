@@ -1711,6 +1711,28 @@ CREATE POLICY "platform_files_objects_delete" ON storage.objects
   USING (bucket_id = 'platform-files');
 
 -- ============================================================
+-- PLATFORM FILES — PUBLIC SHARE ACCESS
+-- (migration: 20260621120000_platform_files_public_share)
+-- The /share/<id> route resolves files for anon visitors, but
+-- only while the file is public. Flipping back to private revokes.
+-- ============================================================
+
+CREATE POLICY "platform_files_public_select" ON platform_files
+  FOR SELECT TO anon
+  USING (is_public = true);
+
+CREATE POLICY "platform_files_objects_public_select" ON storage.objects
+  FOR SELECT TO anon
+  USING (
+    bucket_id = 'platform-files'
+    AND EXISTS (
+      SELECT 1 FROM platform_files pf
+      WHERE pf.storage_path = storage.objects.name
+        AND pf.is_public = true
+    )
+  );
+
+-- ============================================================
 -- DOCUMENTS — general-purpose document writing
 -- (migration: 20260429000000_add_documents_table)
 -- ============================================================
