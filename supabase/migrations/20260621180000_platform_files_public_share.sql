@@ -1,6 +1,6 @@
 -- ============================================================
 -- PLATFORM FILES — PUBLIC SHARE ACCESS
--- (migration: 20260621120000_platform_files_public_share)
+-- (migration: 20260621180000_platform_files_public_share)
 -- Lets the /share/<id> route resolve a file for unauthenticated
 -- (anon) visitors, but ONLY while the file is marked public.
 -- Toggling a file back to private immediately revokes access.
