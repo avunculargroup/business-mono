@@ -172,9 +172,21 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
     })
     .join('');
 
+  // When no story yields a usable image, render a branded "Daily News" banner so
+  // the digest never opens with a blank space. Pure markup (no external asset)
+  // keeps it reliable across email clients and lets us show the live date.
+  const fallbackBannerHtml = `<tr><td style="padding:0 0 20px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.textPrimary};border-radius:12px;">
+          <tr><td style="padding:36px 28px;border-left:4px solid ${C.accent};border-radius:12px;">
+            <div style="font-family:${FONT_BODY};font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${C.accent};">Daily News</div>
+            <div style="font-family:${FONT_DISPLAY};font-size:24px;line-height:1.3;color:${C.surface};margin-top:6px;">${escapeHtml(dateStr)}</div>
+          </td></tr>
+        </table>
+      </td></tr>`;
+
   const headlineImageHtml = headlineImage && safeHref(headlineImage)
     ? `<tr><td style="padding:0 0 20px 0;"><img src="${escapeHtml(headlineImage)}" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border-radius:12px;" /></td></tr>`
-    : '';
+    : fallbackBannerHtml;
 
   const moodHtml = mood
     ? `<tr><td style="padding:0 0 20px 0;font-family:${FONT_DISPLAY};font-size:20px;line-height:1.4;color:${C.textPrimary};">${escapeHtml(mood)}</td></tr>`

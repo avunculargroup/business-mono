@@ -468,14 +468,23 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
     console.warn('[news-curation] Charlie mood summary failed:', err);
   }
 
-  // ── Headline image: podcast feed artwork, else best-effort og:image ──────────
+  // ── Headline image: walk the ranked stories and use the first that resolves ──
+  // (podcast feed artwork, else best-effort og:image). Falling through to the
+  // second/third story means a single missing og:image no longer leaves the
+  // digest — email and dashboard tile — without any image.
   let headlineImageUrl: string | undefined;
-  const headline = stories[0];
-  if (headline) {
-    if (headline.kind === 'podcast') {
-      headlineImageUrl = headline.image_url;
-    } else if (headline.url) {
-      headlineImageUrl = (await fetchOgImage(headline.url)) ?? undefined;
+  for (const story of stories) {
+    if (story.kind === 'podcast') {
+      if (story.image_url) {
+        headlineImageUrl = story.image_url;
+        break;
+      }
+    } else if (story.url) {
+      const og = await fetchOgImage(story.url);
+      if (og) {
+        headlineImageUrl = og;
+        break;
+      }
     }
   }
 
