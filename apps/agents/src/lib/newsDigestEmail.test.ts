@@ -79,7 +79,9 @@ describe('renderNewsDigestEmail', () => {
     expect(noBase.html).not.toContain('Read more news');
   });
 
-  it('shows the BTS icon as the header avatar only when a base URL is available', () => {
+  it('always shows the BTS icon as the header avatar from a public URL, independent of webAppUrl', () => {
+    const logoSrc = 'src="https://hq.btreasury.com.au/share/55d6f441-956e-4fec-a937-d5e37fb99727"';
+
     const withBase = renderNewsDigestEmail({
       title: 'X',
       result: sampleResult(),
@@ -87,10 +89,11 @@ describe('renderNewsDigestEmail', () => {
       company,
       webAppUrl: 'https://app.example/',
     });
-    expect(withBase.html).toContain('src="https://app.example/android-chrome-192x192.png"');
+    expect(withBase.html).toContain(logoSrc);
 
-    // No base URL → no way to make the logo absolute, so it's omitted.
+    // The logo no longer depends on the internal app's (auth-gated) base URL.
     const noBase = renderNewsDigestEmail({ title: 'X', result: sampleResult(), date, company });
+    expect(noBase.html).toContain(logoSrc);
     expect(noBase.html).not.toContain('android-chrome-192x192.png');
   });
 

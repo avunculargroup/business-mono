@@ -122,14 +122,11 @@ function resolveMoreNewsUrl(result: RoutineResult, webAppUrl?: string): string |
 }
 
 /**
- * Absolute URL of the BTS icon (the brand mark email clients show as the avatar).
- * Email clients don't reliably render inline SVG, so we point at the hosted PNG
- * the web app already serves; null when there's no base URL to make it absolute.
+ * Public URL of the BTS brand mark shown as the email header avatar.
+ * Must stay publicly reachable (no auth) so email clients can load it — the
+ * internal app's own asset paths sit behind login and 403 to image loaders.
  */
-function resolveLogoUrl(webAppUrl?: string): string | null {
-  if (!webAppUrl) return null;
-  return webAppUrl.replace(/\/$/, '') + '/android-chrome-192x192.png';
-}
+const LOGO_URL = 'https://hq.btreasury.com.au/share/55d6f441-956e-4fec-a937-d5e37fb99727';
 
 export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmail {
   const { result, company } = input;
@@ -138,7 +135,6 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   const headlineImage = meta.headline_image_url;
   const items = digestItems(result);
   const moreNewsUrl = resolveMoreNewsUrl(result, input.webAppUrl);
-  const logoUrl = resolveLogoUrl(input.webAppUrl);
 
   const dateStr = new Intl.DateTimeFormat('en-AU', {
     day: 'numeric',
@@ -184,9 +180,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
     ? `<tr><td style="padding:0 0 20px 0;font-family:${FONT_DISPLAY};font-size:20px;line-height:1.4;color:${C.textPrimary};">${escapeHtml(mood)}</td></tr>`
     : '';
 
-  const logoHtml = logoUrl
-    ? `<tr><td style="padding:0 0 16px 0;"><img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company.name)}" width="40" height="40" style="display:block;width:40px;height:40px;" /></td></tr>`
-    : '';
+  const logoHtml = `<tr><td style="padding:0 0 16px 0;"><img src="${escapeHtml(LOGO_URL)}" alt="${escapeHtml(company.name)}" width="40" height="40" style="display:block;width:40px;height:40px;" /></td></tr>`;
 
   const moreNewsHtml = moreNewsUrl
     ? `<tr><td style="padding:20px 0 0 0;border-top:1px solid ${C.border};">
