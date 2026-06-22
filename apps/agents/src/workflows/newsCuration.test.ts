@@ -128,6 +128,33 @@ describe('runNewsCuration', () => {
     expect(meta['headline_image_url']).toBe('https://og.example.com/headline.jpg');
   });
 
+  it('falls back to the next story image when the headline has no og:image', async () => {
+    setPool([newsItem(0), newsItem(1)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });
+    // First story yields no image, second one does.
+    fetchOgImage
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('https://og.example.com/second.jpg');
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(fetchOgImage).toHaveBeenNthCalledWith(1, 'https://news.example.com/0');
+    expect(fetchOgImage).toHaveBeenNthCalledWith(2, 'https://news.example.com/1');
+    expect(meta['headline_image_url']).toBe('https://og.example.com/second.jpg');
+  });
+
+  it('leaves the headline image undefined when no story resolves one', async () => {
+    setPool([newsItem(0), newsItem(1)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });
+    fetchOgImage.mockResolvedValue(null);
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(meta['headline_image_url']).toBeUndefined();
+  });
+
   it('returns an empty curated set when there is no fresh content', async () => {
     setPool([], []);
 

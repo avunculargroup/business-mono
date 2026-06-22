@@ -63,6 +63,15 @@ describe('renderNewsDigestEmail', () => {
     expect(html).toContain('src="https://img.example/og.png"');
   });
 
+  it('falls back to a branded "Daily News" banner with the date when no headline image resolves', () => {
+    const result = sampleResult();
+    delete (result.metadata as { headline_image_url?: string }).headline_image_url;
+    const { html } = renderNewsDigestEmail({ title: 'Daily news curation', result, date, company });
+    expect(html).not.toContain('<img src="https://img.example/og.png"');
+    expect(html).toContain('Daily News');
+    expect(html).toContain('18 June 2026');
+  });
+
   it('renders the "More news" button only when the link can be made absolute', () => {
     const withBase = renderNewsDigestEmail({
       title: 'X',
