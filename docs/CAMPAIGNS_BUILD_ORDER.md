@@ -2,36 +2,38 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** Social Media Campaigns (incl. Brand Voice migration)
-**Status:** In progress — Steps 0–3 built (code), Step 3 finish gated on merge
-**Last updated:** 2026-06-06
+**Status:** In progress — Steps 0–2 done & merged; Step 3 seeded (parity gate pending); Step 4 written (gated on merge)
+**Last updated:** 2026-06-22
 
 -----
 
 ## ▶ Current state — resume here
 
-Work lives on branch **`claude/social-campaigns-preflight-csqIF`** (not yet merged).
-Migrations apply to prod **on merge to `main`**, so the remaining Step 3 items are
-gated on that merge.
+Steps 0–3 code merged to `main` via **PR #232** (`claude/social-campaigns-preflight-csqIF`),
+so the voice foundations migrations are **applied to prod** (`social_accounts` seeded;
+`brand_voice` / `voice_snippets` / `match_voice_snippets` live). Step 4 (campaigns schema)
+is written on branch **`claude/social-campaigns-build-order-xDKFW`**, not yet merged —
+migrations apply to prod **on merge to `main`**.
 
 | Step | State | Evidence |
 |------|-------|----------|
 | 0 — Pre-flight | ✅ done | `docs/CAMPAIGNS_STEP0_VERIFICATION.md` (commit `eeb68d9`) |
-| 1 — Schema foundations | ✅ written, **not yet applied to prod** | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); seeds `social_accounts`. Commit `a52280d` |
+| 1 — Schema foundations | ✅ done, **applied to prod** (PR #232) | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); `social_accounts` seeded (6 rows). Commit `a52280d` |
 | 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
-| 3 — Voice milestone | ⚠️ **code complete, not finished** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e` |
+| 3 — Voice milestone | ⚠️ **seeded; parity gate + doc retirement pending** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e`. `seed:voice` run (founder confirmed `brand_voice` + canon `voice_snippets` populated). |
+| 4 — Campaigns schema | ✅ **written, gated on merge** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
 
-**To finish Step 3 (do these in order, after the branch is merged so the tables exist):**
+**Step 3 remaining (the hard parity gate — needs a secrets-equipped env: OpenAI + model key):**
 
-1. **Apply migrations** — merge the branch to `main` (auto-applies via Supabase CLI), or apply manually. Confirm `brand_voice` / `voice_snippets` / `social_accounts` exist and accounts are seeded.
-2. **Seed voice content** — `pnpm --filter @platform/agents seed:voice` (idempotent; needs `SUPABASE_*` + `OPENAI_API_KEY`). Seeds the `brand_voice` row + canon `voice_snippets` (with embeddings) from `docs/brand-voice.md`.
-3. **Parity gate** (hard gate — see below) — generate one sample per content agent (Charlie, and the newsletter **editorial** agent which still reads the full doc); confirm table-sourced voice matches doc-era output.
+1. ~~Apply migrations~~ ✅ (PR #232). 2. ~~Seed voice content~~ ✅ (`seed:voice` run by founder).
+3. **Parity gate** (hard gate — see below) — generate one sample per content agent (Charlie, and the newsletter **editorial** agent which still reads the full doc); confirm table-sourced voice matches doc-era output. **Not runnable in the web env** (no OpenAI/model secrets) — run locally. A ready-to-paste prompt for this exists in the session history.
 4. **Only if parity passes:** retire `docs/brand-voice.md` to a stub + update `CLAUDE.md` routing (voice → tables; visual → `bts-design` skill).
 
 **Known follow-ups (non-blocking):**
 - Founder-added snippets via the Brand Hub save with `embedding = null` (web has no OpenAI key by design). Needs a small agents-side embed backfill/listener (mirror `contentEmbeddingListener`). Canon snippets are embedded by `seed:voice`.
 - Account-voice editing with inheritance ghosting (Brand Hub) is deferred to the campaigns Accounts work; `ChipField` already supports locked chips for it.
 
-Then proceed to **Step 4 — Campaigns schema**.
+**Next:** merge the Step 4 branch (applies the campaigns migration to prod), then **Step 5 — Agent scaffolding (Margot, Lex)**. The Step 3 parity gate is independent and can be closed out in parallel from a local env.
 
 -----
 
