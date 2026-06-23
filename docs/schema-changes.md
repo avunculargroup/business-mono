@@ -6,6 +6,28 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-22 — Campaigns schema: strategy, beats, variants, compliance, metrics
+
+**Migration:** `20260622000000_add_campaigns_schema.sql`
+
+Step 4 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`), per `docs/social-campaigns-spec.md`. The strategy layer above the existing content pipeline: a campaign produces ordered beats, each beat fans out into per-account, per-platform variants that reuse `content_items`. `social_accounts` / `brand_voice` / `voice_snippets` already existed (Step 1).
+
+- **`campaigns`** — the strategy container + global cadence config. `strategy` JSONB **locks at the application layer** once `status = plan_approved` (no DB enforcement); major pivots require a new campaign. `audience_filter` conditions the copy (it is not a recipient list — social is broadcast). `post_slots` + `posts_per_week` drive Phase-1 planning targets; precise dispatch is Phase 2. `timezone` defaults to `Australia/Melbourne`.
+- **`campaign_accounts`** — composite-PK join of which accounts a campaign fans out to (`ON DELETE CASCADE` from `campaigns`).
+- **`campaign_beats`** — ordered platform-agnostic core messages. `status` is a light roll-up (`planned`/`generating`/`variants_ready`/`complete`); authoritative state lives on the variant rows.
+- **`content_items` (ALTER)** — reused **as** the variant. Adds `campaign_id` / `beat_id` / `social_account_id` (all `ON DELETE SET NULL`), `is_thread`, `char_count`, the Lex compliance columns (`compliance_status`, `compliance_classification`, `needs_disclaimer`, `disclaimer_snippet_id`, `compliance_rationale`, `compliance_checked_at`, `compliance_overridden_by`), and `approved_by` / `approved_at`. New columns are nullable (or default false) so existing non-campaign rows are unaffected. The **`source` CHECK** is dropped and re-added extended from `manual`/`coordinator_agent`/`content_agent`/`archivist_agent` to also include **`margot`** and **`charlie`** (the live constraint already carried `archivist_agent`, which is preserved). The existing `type` and `status` CHECKs already cover the variant values, so they are untouched.
+- **`thread_segments`** — ordered child rows of a threaded variant, `UNIQUE (content_item_id, sequence)`, `ON DELETE CASCADE`.
+- **`content_images`** — images at variant level, or (for threads) at segment level via `thread_segment_id` (NULL = applies to the post). Bytes live in the private Supabase bucket via `packages/storage`; the row holds path + alt text + crop. `source` reserves `ai_generated` for Phase 2.
+- **`platform_specs`** — editable per-platform limits (`UNIQUE platform`), so a limit change is a row edit, not a deploy. Conformance is enforced in the app (at generation and at save), not by a DB constraint. **Seeded** X (280 / premium 25000) and LinkedIn (3000).
+- **`compliance_snippets`** — keyed (`UNIQUE`), versioned, reusable disclaimers Lex selects from; `applies_to` lets them be shared with Contracts/Compliance. **Seeded** `general_advice_warning` and `no_personal_advice` (AU general-advice framing, on-voice). Created before the `content_items` ALTER because `disclaimer_snippet_id` FKs it.
+- **`post_metrics`** — manual post-hoc numbers, one row per published variant (`UNIQUE content_item_id`), updated in place — no snapshots — with a platform-flexible `extra` JSONB.
+- **Views** — `v_campaign_overview` (progress + timeline, with `end_date` = `start_date + duration_weeks*7`), `v_campaign_matrix` (every variant with beat/account/platform/status/compliance), `v_ready_to_post` (approved + scheduled variants with the resolved disclaimer text). Thread segments and images are fetched per-row by the app — a view can't cleanly nest ordered children.
+- **RLS** — `authenticated` *and* `service_role` with `WITH CHECK` on all new tables, matching the Step 1 convention (agents write via `service_role`).
+
+Type generation (`pnpm db:generate-types`) is a post-merge follow-up once the migration applies on `main`.
+
+---
+
 ## 2026-06-05 — Voice foundations: `social_accounts`, `brand_voice`, `voice_snippets`
 
 **Migration:** `20260605120000_add_voice_foundations.sql`
