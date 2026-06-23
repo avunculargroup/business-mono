@@ -113,5 +113,31 @@ export async function resumeStrategyRun(args: {
     step,
     resumeData: resumeData as never,
   })) as unknown as RunResult;
+
+  // On Gate 2 approval the campaign is now plan_approved with a persisted
+  // schedule_plan. Fan out into one variant run per (beat × account). Fire-and-
+  // track: don't block the resume on the variant generations (each runs Charlie
+  // + Lex). fanOutCampaign atomically claims plan_approved → active, so this is
+  // safe to trigger unconditionally — it no-ops if the campaign isn't ready or
+  // was already fanned out. Lazy import to avoid pulling the variant workflow
+  // graph into gate-1 resumes.
+  void (async () => {
+    try {
+      // The campaign row keeps workflow_run_id set through plan approval; resolve
+      // it to the campaign id (the run input isn't carried on the resume call).
+      const { data: campaign } = await db
+        .from('campaigns')
+        .select('id')
+        .eq('workflow_run_id', runId)
+        .maybeSingle();
+      const campaignId = (campaign as { id: string } | null)?.id;
+      if (!campaignId) return;
+      const { fanOutCampaign } = await import('./fanOut.js');
+      await fanOutCampaign({ campaignId });
+    } catch (err) {
+      console.error('[strategy] fan-out trigger failed:', err);
+    }
+  })();
+
   return { status: result.status };
 }

@@ -226,3 +226,41 @@ export async function submitCampaignGateDecision(
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
 }
+
+// ── Ready-to-post queue (Step 8) ──────────────────────────────────────────────
+
+const markPostedSchema = z.object({
+  url: z.string().trim().url('Paste the live post URL.').max(2000),
+});
+
+/** Mark an approved variant as posted: record the live URL and advance it to
+ *  published. Guarded to approved variants so a double-submit can't clobber a
+ *  row that already moved on. */
+export async function markVariantPosted(
+  contentItemId: string,
+  campaignId: string,
+  input: unknown,
+): Promise<{ success?: true; error?: string }> {
+  const parsed = markPostedSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid URL' };
+
+  const supabase = (await createClient()) as unknown as AnyDb;
+  const { data, error } = await supabase
+    .from('content_items')
+    .update({
+      published_url: parsed.data.url,
+      published_at: new Date().toISOString(),
+      status: 'published',
+    })
+    .eq('id', contentItemId)
+    .eq('status', 'approved')
+    .select('id');
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) {
+    return { error: 'This variant is no longer ready to post — refresh the queue.' };
+  }
+
+  revalidatePath(`/campaigns/${campaignId}/queue`);
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { success: true };
+}

@@ -37,9 +37,11 @@ build-order doc's "resume here" table for the authoritative per-step state.
 - **Strategy lock = application-layer** in `app/actions/campaigns.ts` (gate decisions are rejected once `status` is past `strategy_approved`).
 - **Launch pattern**: the wizard writes `campaigns.pending_decision = { decision: 'start' }`; `strategyGateWeb` reacts and calls `startStrategyRun` (no run id yet). Gate resumes reuse the same `pending_decision` channel once `workflow_run_id` is set.
 
+- **8** Fan-out (`apps/agents/src/workflows/strategy/fanOut.ts`) — on Gate 2 approval, `resumeStrategyRun` fires `fanOutCampaign`, which atomically claims `plan_approved → active` and spawns one Variant Generation run per `schedule_plan` entry (`startVariantRun`), stamping each variant's `scheduled_for`. Fire-and-track, sequential in the background. Web: `CampaignMatrix` (agenda + coverage-grid toggle, `v_campaign_matrix`) on the campaign detail; ready-to-post queue (`app/(app)/campaigns/[id]/queue/`, `ReadyToPostQueue`, `v_ready_to_post`) with copy-out, copy-by-segment for threads, and mark-as-posted (`markVariantPosted`). No new migration. Built end-to-end; typecheck/lint clean, tests green; **needs a live pass**.
+
 ## Next
 
-**Step 8 — Fan-out.** On plan approval, spawn one Variant Generation run per (beat × account) from the persisted `schedule_plan`. Then the matrix view + ready-to-post queue. See `docs/CAMPAIGNS_BUILD_ORDER.md` Step 8.
+**Step 9 — Loops & polish.** Compliance re-run on edit (application layer), metrics entry UI, and promote-from-post → voice snippets. See `docs/CAMPAIGNS_BUILD_ORDER.md` Step 9.
 
 ## Verify locally
 
