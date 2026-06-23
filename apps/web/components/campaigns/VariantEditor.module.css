@@ -230,6 +230,45 @@
   outline-offset: 2px;
 }
 
+.editSegment {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.editSegment .textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.segRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.segRemove:hover {
+  color: var(--color-destructive);
+}
+
+.addSegment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
 .resolved {
   display: flex;
   align-items: center;

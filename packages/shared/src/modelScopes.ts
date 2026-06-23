@@ -219,6 +219,40 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'lex',
   },
 
+  // ── Campaign strategy workflow steps ──────────────────────────────────────
+  {
+    key: 'strategy.research',
+    type: 'workflow_step',
+    label: 'Strategy research',
+    description: 'Rex gathers current context (trends, competitors, regulation) for the campaign — optional branch',
+    workflow: 'strategy',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'strategy.audience',
+    type: 'workflow_step',
+    label: 'Audience analysis',
+    description: 'Bruno characterises the audience segment (pain points, framing) for the campaign — optional branch',
+    workflow: 'strategy',
+    fallbackAgent: 'bruno',
+  },
+  {
+    key: 'strategy.synthesise',
+    type: 'workflow_step',
+    label: 'Strategy synthesis',
+    description: 'Margot turns a campaign objective + audience + voice into a structured strategy',
+    workflow: 'strategy',
+    fallbackAgent: 'margot',
+  },
+  {
+    key: 'strategy.plan_beats',
+    type: 'workflow_step',
+    label: 'Beat planning',
+    description: 'Margot plans the ordered, platform-agnostic beats for the campaign',
+    workflow: 'strategy',
+    fallbackAgent: 'margot',
+  },
+
   // ── Content compliance review (Lex, on draft persistence) ──────────────────
   {
     key: 'content.compliance_review',
@@ -235,6 +269,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   executeRoutine: 'Routines',
   newsletter: 'Newsletter',
   variant: 'Variant Generation',
+  strategy: 'Campaign Strategy',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

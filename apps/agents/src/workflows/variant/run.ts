@@ -1,4 +1,4 @@
-import { variantGateResumeSchema, type VariantGateResume } from './schemas.js';
+import { variantGateResumeSchema, type VariantGateResume, type VariantInput } from './schemas.js';
 
 // Resume orchestration for the Variant Generation workflow. The workflow has a
 // single suspendable step (gate3), so resume targeting is unambiguous — no
@@ -11,6 +11,32 @@ import { variantGateResumeSchema, type VariantGateResume } from './schemas.js';
 // don't drag those into unrelated module loads. Mirrors startNewsletterRun.
 async function loadMastra() {
   return (await import('../../mastra/index.js')).mastra;
+}
+
+interface VariantRunResult {
+  status: string;
+  result?: { contentItemId?: string };
+}
+
+/** Start a brand-new variant run for one (beat × account). Resolves once the
+ *  run suspends at Gate 3 (having generated copy, run compliance, persisted the
+ *  content_item draft + gate_state). Returns the new content_item id so the
+ *  caller (campaign fan-out) can stamp its scheduled_for. */
+export async function startVariantRun(
+  input: VariantInput,
+): Promise<{ runId: string; status: string; contentItemId: string | null }> {
+  const mastra = await loadMastra();
+  const workflow = mastra.getWorkflow('variant');
+  const run = await workflow.createRun();
+  const result = (await run.start({
+    inputData: input,
+    initialState: {},
+  })) as unknown as VariantRunResult;
+  return {
+    runId: run.runId,
+    status: result.status,
+    contentItemId: result.result?.contentItemId ?? null,
+  };
 }
 
 /** Validate a web-submitted decision against the gate resume schema. Pure —

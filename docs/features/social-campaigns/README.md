@@ -28,10 +28,24 @@ build-order doc's "resume here" table for the authoritative per-step state.
 - **4** Campaigns schema — `supabase/migrations/20260622000000_add_campaigns_schema.sql`.
 - **5** Margot agent (`apps/agents/src/agents/margot/`). **Lex converged on the shared compliance agent** (`apps/agents/src/agents/compliance/`, from the on-chain feature) — not a second `lex`.
 - **6** Variant Generation workflow (`apps/agents/src/workflows/variant/`) + Gate 3 web editor (`apps/web/components/campaigns/VariantEditor.tsx`, `app/(app)/campaigns/variants/[id]/page.tsx`) + the `variantGateWeb` resume listener. Built end-to-end; needs a live pass.
+- **7** Campaign Strategy workflow (`apps/agents/src/workflows/strategy/`) — resolve-context → Margot strategy synthesis → **Gate 1** → Margot beat plan + deterministic schedule → **Gate 2** → persist beats + `schedule_plan`, lock strategy (`status=plan_approved`). Migration `20260623000000` adds the campaign gate columns (`workflow_run_id`/`gate_state`/`pending_decision`/`schedule_plan`). Web: creation wizard (`apps/web/components/campaigns/CampaignWizard.tsx`, `app/(app)/campaigns/new/`), list (`app/(app)/campaigns/page.tsx`), and the canvas + two gate panels (`CampaignWorkspace.tsx`, `app/(app)/campaigns/[id]/page.tsx`); server actions in `app/actions/campaigns.ts`; `strategyGateWeb` listener launches/resumes. Margot is now on Simon's roster (+ a routing eval fixture). Built end-to-end; typecheck + tests green; **needs a live pass** (Studio + a real wizard run with secrets).
 
-## Next
+### Step 7 decisions (open questions, settled with the documented Phase-1 defaults)
 
-**Step 7 — Campaign Strategy Workflow.** See [`STEP7_HANDOFF.md`](./STEP7_HANDOFF.md).
+- **`posts_per_week` = total** across accounts (not per-account). Drives `schedule.ts`.
+- **Approved schedule lives on `campaigns.schedule_plan`** (JSONB) — Step 8 fan-out reads it; not recomputed.
+- **Strategy lock = application-layer** in `app/actions/campaigns.ts` (gate decisions are rejected once `status` is past `strategy_approved`).
+- **Launch pattern**: the wizard writes `campaigns.pending_decision = { decision: 'start' }`; `strategyGateWeb` reacts and calls `startStrategyRun` (no run id yet). Gate resumes reuse the same `pending_decision` channel once `workflow_run_id` is set.
+
+- **8** Fan-out (`apps/agents/src/workflows/strategy/fanOut.ts`) — on Gate 2 approval, `resumeStrategyRun` fires `fanOutCampaign`, which atomically claims `plan_approved → active` and spawns one Variant Generation run per `schedule_plan` entry (`startVariantRun`), stamping each variant's `scheduled_for`. Fire-and-track, sequential in the background. Web: `CampaignMatrix` (agenda + coverage-grid toggle, `v_campaign_matrix`) on the campaign detail; ready-to-post queue (`app/(app)/campaigns/[id]/queue/`, `ReadyToPostQueue`, `v_ready_to_post`) with copy-out, copy-by-segment for threads, and mark-as-posted (`markVariantPosted`). No new migration. Built end-to-end; typecheck/lint clean, tests green; **needs a live pass**.
+
+- **9** Loops & polish — **compliance re-run on edit** (`editVariantCopy` action + inline editing in `VariantEditor`; `complianceRecheck` listener re-runs Lex and resets the compliance fields, so a cleared verdict never survives an edit), **metrics entry** (`savePostMetrics` + platform-aware inline fields in `PublishedPosts`), and **promote-from-post → voice snippets** (`promotePostToSnippet`, `source=promoted_from_post`). No new migration. Built end-to-end; typecheck/lint clean, tests green; **needs a live pass**.
+
+- **10** Optional branches — Rex (research) and Bruno (audience analysis) wired as conditional steps before strategy synthesis (`workflows/strategy/index.ts`). Pure heuristics decide whether each runs (`shouldRunResearch`, `shouldRunAudienceAnalysis`), both best-effort, output folded into the synthesis prompt; `strategy.research`/`strategy.audience` in `MODEL_SCOPES`. Built; **needs a live pass**.
+
+## Status
+
+**Steps 0–10 are built — the Social Campaigns feature is code-complete.** Everything from Step 6 onward is mocked-tested and awaits a live pass with secrets (LLM calls + Supabase Realtime gate handoffs).
 
 ## Verify locally
 

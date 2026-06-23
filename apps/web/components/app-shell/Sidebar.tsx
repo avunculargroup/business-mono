@@ -24,6 +24,7 @@ import {
   Globe,
   HardDrive,
   ScrollText,
+  Megaphone,
   X,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
@@ -49,6 +50,7 @@ const workNav = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/projects', label: 'Projects', icon: FolderOpen },
   { href: '/content', label: 'Content', icon: FileText },
+  { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
   { href: '/docs', label: 'Docs', icon: ScrollText },
   { href: '/decks', label: 'Decks', icon: Presentation },
   { href: '/routines', label: 'Routines', icon: Clock },
@@ -110,6 +112,7 @@ const moreNav: MoreNavSection[] = [
       { href: '/tasks',     label: 'Tasks',     icon: CheckSquare },
       { href: '/projects',  label: 'Projects',  icon: FolderOpen  },
       { href: '/content',   label: 'Content',   icon: FileText    },
+      { href: '/campaigns', label: 'Campaigns', icon: Megaphone   },
       { href: '/docs',      label: 'Docs',      icon: ScrollText  },
       { href: '/decks',     label: 'Decks',     icon: Presentation },
       { href: '/routines',  label: 'Routines',  icon: Clock       },

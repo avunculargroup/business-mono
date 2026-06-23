@@ -1862,6 +1862,15 @@ CREATE TABLE campaigns (
   strategy_approved_by UUID REFERENCES team_members(id),
   plan_approved_at     TIMESTAMPTZ,
   plan_approved_by     UUID REFERENCES team_members(id),
+  -- Step 7 strategy-workflow gate columns (20260623000000): the wizard can't
+  -- reach the agents server, so the campaign row carries the gate handoff. A
+  -- pending_decision of { decision: 'start' } launches the run; a gate resume
+  -- payload advances it; gate_state holds the suspend preview; schedule_plan
+  -- holds the approved (beat × account) schedule for Step 8 fan-out.
+  workflow_run_id      TEXT,
+  gate_state           JSONB,
+  pending_decision     JSONB,
+  schedule_plan        JSONB,
   created_by           UUID REFERENCES team_members(id),
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()

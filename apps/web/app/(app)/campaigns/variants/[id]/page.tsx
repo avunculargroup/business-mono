@@ -1,7 +1,10 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { VariantEditor } from '@/components/campaigns/VariantEditor';
+import styles from '../../campaigns.module.css';
 
 // Variant review (Gate 3). Deep-linked per variant — the campaign matrix
 // (Step 8) links here, and the suspended variant carries its gate_state so the
@@ -16,15 +19,24 @@ export default async function VariantReviewPage({ params }: { params: Promise<{ 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase as any)
     .from('content_items')
-    .select('id, status, workflow_run_id, gate_state')
+    .select('id, status, workflow_run_id, gate_state, campaign_id')
     .eq('id', id)
     .maybeSingle();
 
   if (!data) notFound();
 
+  // Link back to the parent campaign when this variant belongs to one; otherwise
+  // up to the campaigns list.
+  const backHref = data.campaign_id ? `/campaigns/${data.campaign_id}` : '/campaigns';
+  const backLabel = data.campaign_id ? 'Back to campaign' : 'Back to campaigns';
+
   return (
     <>
       <PageHeader title="Variant review" />
+      <Link href={backHref} className={styles.back}>
+        <ArrowLeft size={14} strokeWidth={1.5} />
+        {backLabel}
+      </Link>
       <VariantEditor contentItemId={data.id} status={data.status} gateState={data.gate_state ?? null} />
     </>
   );

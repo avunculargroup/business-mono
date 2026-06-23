@@ -16,6 +16,7 @@ import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
 import { newsletterWorkflow } from '../workflows/newsletter/index.js';
 import { variantWorkflow } from '../workflows/variant/index.js';
+import { strategyWorkflow } from '../workflows/strategy/index.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -28,6 +29,8 @@ import { startResearchMailListener } from '../listeners/researchMailListener.js'
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
+import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
+import { startComplianceRecheckListener } from '../listeners/complianceRecheck.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
@@ -107,6 +110,7 @@ export const mastra = new Mastra({
     executeRoutine: executeRoutineWorkflow,
     newsletter: newsletterWorkflow,
     variant: variantWorkflow,
+    strategy: strategyWorkflow,
   },
   server: {
     apiRoutes: [
@@ -165,6 +169,15 @@ startNewsletterGateWebListener();
 // Resume variant Gate 3 decisions made in the /campaigns variant editor (same
 // web→DB→agents pattern: the editor writes content_items.pending_decision).
 startVariantGateWebListener();
+
+// Launch + resume the Campaign Strategy workflow's two gates from the /campaigns
+// wizard (same web→DB→agents pattern: the wizard writes campaigns.pending_decision
+// — a 'start' signal to launch, or a gate decision to resume).
+startStrategyGateWebListener();
+
+// Re-run Lex on a campaign variant whose copy was edited (the web edit sets
+// compliance_status = 'pending'); a cleared verdict must not survive an edit.
+startComplianceRecheckListener();
 
 // Re-run the transcript waterfall for an episode when the web /news/podcasts
 // pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same
