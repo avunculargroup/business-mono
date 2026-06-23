@@ -389,6 +389,192 @@ export type Database = {
           },
         ]
       }
+      campaign_accounts: {
+        Row: {
+          campaign_id: string
+          social_account_id: string
+        }
+        Insert: {
+          campaign_id: string
+          social_account_id: string
+        }
+        Update: {
+          campaign_id?: string
+          social_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_accounts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_accounts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_accounts_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_accounts_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
+      campaign_beats: {
+        Row: {
+          campaign_id: string
+          core_message: string
+          created_at: string
+          id: string
+          prefer_thread: boolean
+          rationale: string | null
+          sequence: number
+          status: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          core_message: string
+          created_at?: string
+          id?: string
+          prefer_thread?: boolean
+          rationale?: string | null
+          sequence: number
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          core_message?: string
+          created_at?: string
+          id?: string
+          prefer_thread?: boolean
+          rationale?: string | null
+          sequence?: number
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_beats_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_beats_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          audience_filter: Json
+          audience_persona: string | null
+          created_at: string
+          created_by: string | null
+          duration_weeks: number | null
+          id: string
+          name: string
+          objective: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          post_slots: Json
+          posts_per_week: number | null
+          start_date: string | null
+          status: string
+          strategy: Json
+          strategy_approved_at: string | null
+          strategy_approved_by: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          audience_filter?: Json
+          audience_persona?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_weeks?: number | null
+          id?: string
+          name: string
+          objective?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          post_slots?: Json
+          posts_per_week?: number | null
+          start_date?: string | null
+          status?: string
+          strategy?: Json
+          strategy_approved_at?: string | null
+          strategy_approved_by?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          audience_filter?: Json
+          audience_persona?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_weeks?: number | null
+          id?: string
+          name?: string
+          objective?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          post_slots?: Json
+          posts_per_week?: number | null
+          start_date?: string | null
+          status?: string
+          strategy?: Json
+          strategy_approved_at?: string | null
+          strategy_approved_by?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_plan_approved_by_fkey"
+            columns: ["plan_approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_strategy_approved_by_fkey"
+            columns: ["strategy_approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capacity_gaps: {
         Row: {
           created_at: string
@@ -789,6 +975,53 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_snippets: {
+        Row: {
+          applies_to: string[]
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          key: string
+          label: string | null
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          applies_to?: string[]
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          label?: string | null
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          applies_to?: string[]
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string | null
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_snippets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           bitcoin_literacy: string | null
@@ -907,20 +1140,111 @@ export type Database = {
         }
         Relationships: []
       }
-      content_items: {
+      content_images: {
         Row: {
-          assigned_to: string | null
-          body: string | null
+          alt_text: string | null
+          content_item_id: string
           created_at: string
           created_by: string | null
           id: string
+          platform_crop: string | null
+          sort_order: number
+          source: string
+          storage_path: string
+          thread_segment_id: string | null
+        }
+        Insert: {
+          alt_text?: string | null
+          content_item_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_crop?: string | null
+          sort_order?: number
+          source?: string
+          storage_path: string
+          thread_segment_id?: string | null
+        }
+        Update: {
+          alt_text?: string | null
+          content_item_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_crop?: string | null
+          sort_order?: number
+          source?: string
+          storage_path?: string
+          thread_segment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_images_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_images_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_images_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_images_thread_segment_id_fkey"
+            columns: ["thread_segment_id"]
+            isOneToOne: false
+            referencedRelation: "thread_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_items: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          assigned_to: string | null
+          beat_id: string | null
+          body: string | null
+          campaign_id: string | null
+          char_count: number | null
+          compliance_checked_at: string | null
+          compliance_classification: string | null
+          compliance_overridden_by: string | null
+          compliance_rationale: string | null
+          compliance_status: string | null
+          created_at: string
+          created_by: string | null
+          disclaimer_snippet_id: string | null
+          gate_state: Json | null
+          id: string
+          is_thread: boolean
+          needs_disclaimer: boolean
           pain_point_id: string | null
+          pending_decision: Json | null
           published_at: string | null
           published_url: string | null
           question_count: number
           research_links: Json
           scheduled_for: string | null
           score: number | null
+          social_account_id: string | null
           source: string | null
           source_interaction_id: string | null
           status: string
@@ -929,20 +1253,37 @@ export type Database = {
           type: string
           updated_at: string
           validated: boolean
+          workflow_run_id: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to?: string | null
+          beat_id?: string | null
           body?: string | null
+          campaign_id?: string | null
+          char_count?: number | null
+          compliance_checked_at?: string | null
+          compliance_classification?: string | null
+          compliance_overridden_by?: string | null
+          compliance_rationale?: string | null
+          compliance_status?: string | null
           created_at?: string
           created_by?: string | null
+          disclaimer_snippet_id?: string | null
+          gate_state?: Json | null
           id?: string
+          is_thread?: boolean
+          needs_disclaimer?: boolean
           pain_point_id?: string | null
+          pending_decision?: Json | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
           research_links?: Json
           scheduled_for?: string | null
           score?: number | null
+          social_account_id?: string | null
           source?: string | null
           source_interaction_id?: string | null
           status?: string
@@ -951,20 +1292,37 @@ export type Database = {
           type: string
           updated_at?: string
           validated?: boolean
+          workflow_run_id?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to?: string | null
+          beat_id?: string | null
           body?: string | null
+          campaign_id?: string | null
+          char_count?: number | null
+          compliance_checked_at?: string | null
+          compliance_classification?: string | null
+          compliance_overridden_by?: string | null
+          compliance_rationale?: string | null
+          compliance_status?: string | null
           created_at?: string
           created_by?: string | null
+          disclaimer_snippet_id?: string | null
+          gate_state?: Json | null
           id?: string
+          is_thread?: boolean
+          needs_disclaimer?: boolean
           pain_point_id?: string | null
+          pending_decision?: Json | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
           research_links?: Json
           scheduled_for?: string | null
           score?: number | null
+          social_account_id?: string | null
           source?: string | null
           source_interaction_id?: string | null
           status?: string
@@ -973,11 +1331,47 @@ export type Database = {
           type?: string
           updated_at?: string
           validated?: boolean
+          workflow_run_id?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "content_items_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "content_items_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_beat_id_fkey"
+            columns: ["beat_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_beats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_compliance_overridden_by_fkey"
+            columns: ["compliance_overridden_by"]
             isOneToOne: false
             referencedRelation: "team_members"
             referencedColumns: ["id"]
@@ -990,11 +1384,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "content_items_disclaimer_snippet_id_fkey"
+            columns: ["disclaimer_snippet_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_snippets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "content_items_pain_point_id_fkey"
             columns: ["pain_point_id"]
             isOneToOne: false
             referencedRelation: "pain_points"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
           },
           {
             foreignKeyName: "content_items_source_interaction_id_fkey"
@@ -2334,6 +2749,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "newsletter_runs_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "newsletter_runs_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "newsletter_runs_requested_by_fkey"
             columns: ["requested_by"]
             isOneToOne: false
@@ -2667,6 +3096,45 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_specs: {
+        Row: {
+          hashtag_guidance: string | null
+          id: string
+          image_specs: Json
+          max_chars: number
+          max_images_per_post: number | null
+          max_thread_segments: number | null
+          notes: string | null
+          platform: string
+          premium_max_chars: number | null
+          updated_at: string
+        }
+        Insert: {
+          hashtag_guidance?: string | null
+          id?: string
+          image_specs?: Json
+          max_chars: number
+          max_images_per_post?: number | null
+          max_thread_segments?: number | null
+          notes?: string | null
+          platform: string
+          premium_max_chars?: number | null
+          updated_at?: string
+        }
+        Update: {
+          hashtag_guidance?: string | null
+          id?: string
+          image_specs?: Json
+          max_chars?: number
+          max_images_per_post?: number | null
+          max_thread_segments?: number | null
+          notes?: string | null
+          platform?: string
+          premium_max_chars?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       podcast_episodes: {
         Row: {
           audio_mime_type: string | null
@@ -2786,6 +3254,77 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_metrics: {
+        Row: {
+          clicks: number | null
+          comments: number | null
+          content_item_id: string
+          extra: Json
+          id: string
+          impressions: number | null
+          platform: string | null
+          reactions: number | null
+          recorded_at: string
+          recorded_by: string | null
+          reposts: number | null
+        }
+        Insert: {
+          clicks?: number | null
+          comments?: number | null
+          content_item_id: string
+          extra?: Json
+          id?: string
+          impressions?: number | null
+          platform?: string | null
+          reactions?: number | null
+          recorded_at?: string
+          recorded_by?: string | null
+          reposts?: number | null
+        }
+        Update: {
+          clicks?: number | null
+          comments?: number | null
+          content_item_id?: string
+          extra?: Json
+          id?: string
+          impressions?: number | null
+          platform?: string | null
+          reactions?: number | null
+          recorded_at?: string
+          recorded_by?: string | null
+          reposts?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_metrics_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: true
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_metrics_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: true
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_metrics_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: true
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_metrics_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -3568,6 +4107,58 @@ export type Database = {
         }
         Relationships: []
       }
+      thread_segments: {
+        Row: {
+          body: string
+          char_count: number | null
+          content_item_id: string
+          created_at: string
+          id: string
+          sequence: number
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          char_count?: number | null
+          content_item_id: string
+          created_at?: string
+          id?: string
+          sequence: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          char_count?: number | null
+          content_item_id?: string
+          created_at?: string
+          id?: string
+          sequence?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thread_segments_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_segments_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_segments_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transcript_segments: {
         Row: {
           content: string
@@ -3694,10 +4285,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "voice_snippets_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "voice_snippets_source_content_item_id_fkey"
             columns: ["source_content_item_id"]
             isOneToOne: false
             referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_snippets_source_content_item_id_fkey"
+            columns: ["source_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_snippets_source_content_item_id_fkey"
+            columns: ["source_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
             referencedColumns: ["id"]
           },
         ]
@@ -3725,6 +4337,67 @@ export type Database = {
           phase?: string | null
           status?: string | null
           tools_required?: string[] | null
+        }
+        Relationships: []
+      }
+      v_campaign_matrix: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          beat_id: string | null
+          beat_sequence: number | null
+          beat_title: string | null
+          campaign_id: string | null
+          char_count: number | null
+          compliance_classification: string | null
+          compliance_status: string | null
+          id: string | null
+          is_thread: boolean | null
+          needs_disclaimer: boolean | null
+          platform: string | null
+          scheduled_for: string | null
+          status: string | null
+          type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_beat_id_fkey"
+            columns: ["beat_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_beats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_campaign_overview: {
+        Row: {
+          approved_count: number | null
+          days_remaining: number | null
+          duration_weeks: number | null
+          end_date: string | null
+          flagged_count: number | null
+          id: string | null
+          name: string | null
+          objective: string | null
+          pending_count: number | null
+          published_count: number | null
+          start_date: string | null
+          status: string | null
+          total_variants: number | null
         }
         Relationships: []
       }
@@ -3901,6 +4574,37 @@ export type Database = {
           youtube_url: string | null
         }
         Relationships: []
+      }
+      v_ready_to_post: {
+        Row: {
+          account_name: string | null
+          body: string | null
+          campaign_id: string | null
+          disclaimer_text: string | null
+          id: string | null
+          is_thread: boolean | null
+          platform: string | null
+          profile_url: string | null
+          scheduled_for: string | null
+          title: string | null
+          type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_overview"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_recent_interactions: {
         Row: {
