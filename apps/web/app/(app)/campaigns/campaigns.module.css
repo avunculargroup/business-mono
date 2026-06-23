@@ -40,6 +40,22 @@
   background: var(--color-surface-subtle);
 }
 
+/* Back-link shown under the page header on the deep campaign screens. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  margin-bottom: var(--space-4);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-accent-hover);
+}
+
 /* Campaign detail stack — workspace + matrix + published, evenly spaced. */
 .detailStack {
   display: flex;
