@@ -10,6 +10,8 @@ import { bruno } from '../agents/ba/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { della } from '../agents/relationshipManager/index.js';
+import { margot } from '../agents/margot/index.js';
+import { lex } from '../agents/lex/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
@@ -71,6 +73,8 @@ export const mastra = new Mastra({
     charlie,
     rex,
     della,
+    margot,
+    lex,
   },
   storage,
   observability,

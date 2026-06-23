@@ -22,6 +22,7 @@ migrations apply to prod **on merge to `main`**.
 | 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
 | 3 — Voice milestone | ⚠️ **seeded; parity gate + doc retirement pending** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e`. `seed:voice` run (founder confirmed `brand_voice` + canon `voice_snippets` populated). |
 | 4 — Campaigns schema | ✅ **written, gated on merge** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
+| 5 — Agents (Margot, Lex) | ✅ **written, gated on merge** | specs `docs/agents/margot.md` + `lex.md`; agents `apps/agents/src/agents/{margot,lex}/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`); migration `20260622010000_add_campaign_agents.sql` adds `margot`/`lex` to the `agent_name` CHECKs + `VALID_AGENT_NAMES`. Typecheck + 253 tests green. Charlie confirmed reading `packages/voice`. |
 
 **Step 3 remaining (the hard parity gate — needs a secrets-equipped env: OpenAI + model key):**
 
@@ -33,7 +34,11 @@ migrations apply to prod **on merge to `main`**.
 - Founder-added snippets via the Brand Hub save with `embedding = null` (web has no OpenAI key by design). Needs a small agents-side embed backfill/listener (mirror `contentEmbeddingListener`). Canon snippets are embedded by `seed:voice`.
 - Account-voice editing with inheritance ghosting (Brand Hub) is deferred to the campaigns Accounts work; `ChipField` already supports locked chips for it.
 
-**Next:** merge the Step 4 branch (applies the campaigns migration to prod), then **Step 5 — Agent scaffolding (Margot, Lex)**. The Step 3 parity gate is independent and can be closed out in parallel from a local env.
+**Next:** merge the branch (applies the Step 4 + Step 5 migrations to prod), then **Step 6 — Variant Generation Workflow** (the leaf: resolve-context → Charlie → Lex → persist → Gate 3, with stubbed beat data). The Step 3 parity gate is independent and can be closed out in parallel from a local env.
+
+**Deferred from Step 5 (do in Step 7):** wiring Margot onto Simon's conversational roster (`simon.agents` + a routing line + a `simon-routing.eval.ts` fixture). Held back until the Campaign Strategy workflow she re-enters exists, so the routing eval can be run against real behaviour. Margot + Lex are registered in the top-level Mastra `agents:` map now, so both are reachable standalone in Studio for the Step 5 isolation check.
+
+> **Note on local testing:** the agent-server code now lists `margot`/`lex` in `VALID_AGENT_NAMES`, but the matching `agent_name` CHECK only accepts them once `20260622010000_add_campaign_agents.sql` is applied. Apply the migration (or merge) before exercising Margot/Lex against a DB, or their `agent_activity` inserts will fail the CHECK. In prod the code and migration ship together on merge, so there's no gap.
 
 -----
 

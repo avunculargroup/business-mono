@@ -617,7 +617,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
 CREATE TABLE agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name        TEXT NOT NULL
-                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
+                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'margot', 'lex')),
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
@@ -664,7 +664,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 CREATE TABLE platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name      TEXT NOT NULL
-                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della')),
+                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'margot', 'lex')),
   capability      TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
                   CHECK (status IN ('active', 'planned', 'unavailable')),
@@ -711,7 +711,7 @@ CREATE TABLE routines (
   description       TEXT,
   agent_name        TEXT NOT NULL
                     CHECK (agent_name IN
-                      ('simon','roger','archie','petra','bruno','charlie','rex','della')),
+                      ('simon','roger','archie','petra','bruno','charlie','rex','della','margot','lex')),
   action_type       TEXT NOT NULL
                     CHECK (action_type IN ('research_digest','monitor_change',
                                            'news_ingest','news_source_scan','newsletter')),

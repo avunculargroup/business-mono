@@ -44,6 +44,18 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Editor',
     description: 'Newsletter copy editor — brand-voice and audience-fit gate (internal to the newsletter workflow)',
   },
+  {
+    key: 'margot',
+    type: 'agent',
+    label: 'Margot',
+    description: 'Marketer — campaign strategy and beat planning (campaigns workflow)',
+  },
+  {
+    key: 'lex',
+    type: 'agent',
+    label: 'Lex',
+    description: 'Compliance officer — advice-risk classification and disclaimers (campaigns workflow)',
+  },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
   {

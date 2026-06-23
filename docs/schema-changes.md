@@ -6,6 +6,14 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-22 — Campaign agents: register Margot and Lex in the `agent_name` CHECKs
+
+**Migration:** `20260622010000_add_campaign_agents.sql`
+
+Step 5 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`). Margot (marketer/strategist) and Lex (compliance officer) are new first-class agents (`docs/agents/margot.md`, `docs/agents/lex.md`). Both log to `agent_activity`, so the `agent_name` CHECK on `agent_activity`, `platform_capabilities`, and `routines` is extended from the eight existing agents to also include **`margot`** and **`lex`**. Each change is a strict superset of the prior constraint — safe against existing rows. The agent-server's `VALID_AGENT_NAMES` gate (`agentActivityProcessor.ts`) is updated to match so their spans are recorded. The newsletter `editor` agent is intentionally **not** added — it is internal to the newsletter workflow and does not log directly.
+
+---
+
 ## 2026-06-22 — Campaigns schema: strategy, beats, variants, compliance, metrics
 
 **Migration:** `20260622000000_add_campaigns_schema.sql`
