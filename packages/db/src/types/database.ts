@@ -494,13 +494,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           duration_weeks: number | null
+          gate_state: Json | null
           id: string
           name: string
           objective: string | null
+          pending_decision: Json | null
           plan_approved_at: string | null
           plan_approved_by: string | null
           post_slots: Json
           posts_per_week: number | null
+          schedule_plan: Json | null
           start_date: string | null
           status: string
           strategy: Json
@@ -508,6 +511,7 @@ export type Database = {
           strategy_approved_by: string | null
           timezone: string
           updated_at: string
+          workflow_run_id: string | null
         }
         Insert: {
           audience_filter?: Json
@@ -515,13 +519,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           duration_weeks?: number | null
+          gate_state?: Json | null
           id?: string
           name: string
           objective?: string | null
+          pending_decision?: Json | null
           plan_approved_at?: string | null
           plan_approved_by?: string | null
           post_slots?: Json
           posts_per_week?: number | null
+          schedule_plan?: Json | null
           start_date?: string | null
           status?: string
           strategy?: Json
@@ -529,6 +536,7 @@ export type Database = {
           strategy_approved_by?: string | null
           timezone?: string
           updated_at?: string
+          workflow_run_id?: string | null
         }
         Update: {
           audience_filter?: Json
@@ -536,13 +544,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           duration_weeks?: number | null
+          gate_state?: Json | null
           id?: string
           name?: string
           objective?: string | null
+          pending_decision?: Json | null
           plan_approved_at?: string | null
           plan_approved_by?: string | null
           post_slots?: Json
           posts_per_week?: number | null
+          schedule_plan?: Json | null
           start_date?: string | null
           status?: string
           strategy?: Json
@@ -550,6 +561,7 @@ export type Database = {
           strategy_approved_by?: string | null
           timezone?: string
           updated_at?: string
+          workflow_run_id?: string | null
         }
         Relationships: [
           {
