@@ -617,7 +617,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_conversations;
 CREATE TABLE agent_activity (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name        TEXT NOT NULL
-                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'lex')),
+                    CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'margot', 'lex')),
   action            TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'approved', 'rejected', 'auto', 'error')),
@@ -664,7 +664,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE agent_activity;
 CREATE TABLE platform_capabilities (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_name      TEXT NOT NULL
-                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'lex')),
+                  CHECK (agent_name IN ('simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'margot', 'lex')),
   capability      TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'active'
                   CHECK (status IN ('active', 'planned', 'unavailable')),
@@ -711,7 +711,7 @@ CREATE TABLE routines (
   description       TEXT,
   agent_name        TEXT NOT NULL
                     CHECK (agent_name IN
-                      ('simon','roger','archie','petra','bruno','charlie','rex','della')),
+                      ('simon','roger','archie','petra','bruno','charlie','rex','della','margot','lex')),
   action_type       TEXT NOT NULL
                     CHECK (action_type IN ('research_digest','monitor_change',
                                            'news_ingest','news_source_scan','newsletter',
@@ -1836,6 +1836,260 @@ CREATE TABLE newsletter_runs (
 -- the agents-side gate listener can react to web decisions.
 
 -- ============================================================
+-- SOCIAL CAMPAIGNS (migration: 20260622000000_add_campaigns_schema)
+-- ============================================================
+-- The strategy layer above the content pipeline. social_accounts / brand_voice /
+-- voice_snippets already exist (voice foundations, above). A campaign produces
+-- ordered beats; each beat fans out into per-account, per-platform variants that
+-- reuse content_items. Two new agents (Margot, Lex) drive it via Mastra workflows.
+
+CREATE TABLE campaigns (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                 TEXT NOT NULL,
+  objective            TEXT,
+  status               TEXT NOT NULL DEFAULT 'draft'
+                       CHECK (status IN ('draft', 'strategy_approved', 'plan_approved',
+                                         'active', 'paused', 'completed', 'archived')),
+  strategy             JSONB NOT NULL DEFAULT '{}'::jsonb,  -- locks at app layer once plan_approved
+  audience_filter      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  audience_persona     TEXT,
+  start_date           DATE,
+  duration_weeks       INT,
+  posts_per_week       INT,
+  post_slots           JSONB NOT NULL DEFAULT '{}'::jsonb,
+  timezone             TEXT NOT NULL DEFAULT 'Australia/Melbourne',
+  strategy_approved_at TIMESTAMPTZ,
+  strategy_approved_by UUID REFERENCES team_members(id),
+  plan_approved_at     TIMESTAMPTZ,
+  plan_approved_by     UUID REFERENCES team_members(id),
+  created_by           UUID REFERENCES team_members(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER campaigns_updated_at
+  BEFORE UPDATE ON campaigns
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_campaigns_status ON campaigns(status);
+CREATE INDEX idx_campaigns_start  ON campaigns(start_date);
+
+-- Join: which accounts participate in a campaign (each beat fans out to all).
+CREATE TABLE campaign_accounts (
+  campaign_id       UUID NOT NULL REFERENCES campaigns(id)       ON DELETE CASCADE,
+  social_account_id UUID NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
+  PRIMARY KEY (campaign_id, social_account_id)
+);
+
+CREATE INDEX idx_campaign_accounts_campaign ON campaign_accounts(campaign_id);
+
+-- Ordered platform-agnostic core messages. Variants live in content_items.
+CREATE TABLE campaign_beats (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id   UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  sequence      INT  NOT NULL,
+  title         TEXT,
+  core_message  TEXT NOT NULL,
+  rationale     TEXT,
+  prefer_thread BOOLEAN NOT NULL DEFAULT false,
+  status        TEXT NOT NULL DEFAULT 'planned'
+                CHECK (status IN ('planned', 'generating', 'variants_ready', 'complete')),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER campaign_beats_updated_at
+  BEFORE UPDATE ON campaign_beats
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_campaign_beats_campaign ON campaign_beats(campaign_id);
+
+-- Keyed reusable disclaimers Lex selects from. Shared across Social/Contracts/Compliance.
+CREATE TABLE compliance_snippets (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key         TEXT NOT NULL UNIQUE,
+  label       TEXT,
+  body        TEXT NOT NULL,
+  version     TEXT NOT NULL DEFAULT '1.0',
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  applies_to  TEXT[] NOT NULL DEFAULT '{}',
+  created_by  UUID REFERENCES team_members(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER compliance_snippets_updated_at
+  BEFORE UPDATE ON compliance_snippets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Editable per-platform limits (enforced in the app, not by constraint).
+CREATE TABLE platform_specs (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform            TEXT NOT NULL UNIQUE CHECK (platform IN ('linkedin', 'twitter_x')),
+  max_chars           INT NOT NULL,
+  premium_max_chars   INT,
+  max_thread_segments INT,
+  max_images_per_post INT,
+  image_specs         JSONB NOT NULL DEFAULT '{}'::jsonb,
+  hashtag_guidance    TEXT,
+  notes               TEXT,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER platform_specs_updated_at
+  BEFORE UPDATE ON platform_specs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- content_items reused AS the variant: campaign/beat/account links + thread,
+-- compliance, and approval state. source CHECK extended with 'margot','charlie'.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS campaign_id               UUID REFERENCES campaigns(id)           ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS beat_id                   UUID REFERENCES campaign_beats(id)      ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS social_account_id         UUID REFERENCES social_accounts(id)     ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS is_thread                 BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS char_count                INT,
+  ADD COLUMN IF NOT EXISTS compliance_status         TEXT
+    CHECK (compliance_status IN ('pending', 'cleared', 'flagged', 'overridden')),
+  ADD COLUMN IF NOT EXISTS compliance_classification TEXT
+    CHECK (compliance_classification IN ('educational', 'general_advice', 'personal_opinion')),
+  ADD COLUMN IF NOT EXISTS needs_disclaimer          BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS disclaimer_snippet_id     UUID REFERENCES compliance_snippets(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS compliance_rationale      TEXT,
+  ADD COLUMN IF NOT EXISTS compliance_checked_at     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS compliance_overridden_by  UUID REFERENCES team_members(id),
+  ADD COLUMN IF NOT EXISTS approved_by               UUID REFERENCES team_members(id),
+  ADD COLUMN IF NOT EXISTS approved_at               TIMESTAMPTZ;
+
+-- source CHECK now: manual, coordinator_agent, content_agent, archivist_agent, margot, charlie
+ALTER TABLE content_items DROP CONSTRAINT IF EXISTS content_items_source_check;
+ALTER TABLE content_items ADD CONSTRAINT content_items_source_check
+  CHECK (source IN ('manual', 'coordinator_agent', 'content_agent', 'archivist_agent', 'margot', 'charlie'));
+
+CREATE INDEX idx_content_items_campaign   ON content_items(campaign_id);
+CREATE INDEX idx_content_items_beat       ON content_items(beat_id);
+CREATE INDEX idx_content_items_account    ON content_items(social_account_id);
+CREATE INDEX idx_content_items_compliance ON content_items(compliance_status);
+
+-- Variant Gate 3 web-approval columns (migration: 20260622020000). The variant
+-- editor renders gate_state and writes the decision to pending_decision; the
+-- variantGateWeb listener claims it and resumes workflow_run_id. Mirrors the
+-- newsletter_runs gate columns.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS workflow_run_id  TEXT,
+  ADD COLUMN IF NOT EXISTS gate_state       JSONB,
+  ADD COLUMN IF NOT EXISTS pending_decision JSONB;
+
+-- Ordered child rows of a threaded content_item.
+CREATE TABLE thread_segments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id UUID NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  sequence        INT  NOT NULL,
+  body            TEXT NOT NULL,
+  char_count      INT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (content_item_id, sequence)
+);
+
+CREATE TRIGGER thread_segments_updated_at
+  BEFORE UPDATE ON thread_segments
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_thread_segments_item ON thread_segments(content_item_id);
+
+-- Images at variant level, or (for threads) at segment level. Bytes in the
+-- private Supabase bucket via packages/storage; this row holds path + alt + crop.
+CREATE TABLE content_images (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id   UUID NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  thread_segment_id UUID REFERENCES thread_segments(id) ON DELETE CASCADE,  -- NULL = applies to the post
+  storage_path      TEXT NOT NULL,
+  alt_text          TEXT,
+  platform_crop     TEXT,
+  sort_order        INT NOT NULL DEFAULT 0,
+  source            TEXT NOT NULL DEFAULT 'upload' CHECK (source IN ('upload', 'ai_generated')),
+  created_by        UUID REFERENCES team_members(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_content_images_item    ON content_images(content_item_id);
+CREATE INDEX idx_content_images_segment ON content_images(thread_segment_id);
+
+-- Manual post-hoc metrics, one row per published variant (UNIQUE), updated in place.
+CREATE TABLE post_metrics (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id UUID NOT NULL UNIQUE REFERENCES content_items(id) ON DELETE CASCADE,
+  platform        TEXT,
+  impressions     INT,
+  reactions       INT,
+  comments        INT,
+  reposts         INT,
+  clicks          INT,
+  extra           JSONB NOT NULL DEFAULT '{}'::jsonb,
+  recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  recorded_by     UUID REFERENCES team_members(id)
+);
+
+CREATE INDEX idx_post_metrics_item ON post_metrics(content_item_id);
+
+-- Views: campaign progress, the variant matrix, and the ready-to-post queue.
+CREATE VIEW v_campaign_overview AS
+  SELECT
+    c.id, c.name, c.objective, c.status, c.start_date, c.duration_weeks,
+    (c.start_date + (c.duration_weeks * 7))                 AS end_date,
+    ((c.start_date + (c.duration_weeks * 7)) - CURRENT_DATE) AS days_remaining,
+    COUNT(ci.id)                                            AS total_variants,
+    COUNT(ci.id) FILTER (WHERE ci.status = 'published')     AS published_count,
+    COUNT(ci.id) FILTER (WHERE ci.status = 'approved')      AS approved_count,
+    COUNT(ci.id) FILTER (WHERE ci.status IN ('draft', 'review')) AS pending_count,
+    COUNT(ci.id) FILTER (WHERE ci.compliance_status = 'flagged') AS flagged_count
+  FROM campaigns c
+  LEFT JOIN content_items ci ON ci.campaign_id = c.id
+  GROUP BY c.id
+  ORDER BY c.start_date DESC;
+
+CREATE VIEW v_campaign_matrix AS
+  SELECT
+    ci.id, ci.campaign_id, ci.beat_id,
+    cb.sequence AS beat_sequence, cb.title AS beat_title,
+    sa.id AS account_id, sa.display_name AS account_name, sa.platform,
+    ci.type, ci.is_thread, ci.status, ci.scheduled_for,
+    ci.compliance_status, ci.compliance_classification, ci.needs_disclaimer, ci.char_count
+  FROM content_items ci
+  JOIN campaign_beats cb  ON cb.id = ci.beat_id
+  JOIN social_accounts sa ON sa.id = ci.social_account_id
+  WHERE ci.campaign_id IS NOT NULL
+  ORDER BY cb.sequence ASC, sa.display_name ASC;
+
+CREATE VIEW v_ready_to_post AS
+  SELECT
+    ci.id, ci.campaign_id, ci.title, ci.body, ci.type, ci.is_thread, ci.scheduled_for,
+    sa.display_name AS account_name, sa.platform, sa.profile_url,
+    cs.body AS disclaimer_text
+  FROM content_items ci
+  JOIN social_accounts sa          ON sa.id = ci.social_account_id
+  LEFT JOIN compliance_snippets cs ON cs.id = ci.disclaimer_snippet_id
+  WHERE ci.status = 'approved' AND ci.campaign_id IS NOT NULL
+  ORDER BY ci.scheduled_for ASC NULLS LAST;
+
+-- RLS: authenticated OR service_role, consistent with the rest of the platform.
+ALTER TABLE campaigns           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE campaign_accounts   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE campaign_beats      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE compliance_snippets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_specs      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE thread_segments     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content_images      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_metrics        ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "campaigns_all"           ON campaigns           FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "campaign_accounts_all"   ON campaign_accounts   FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "campaign_beats_all"      ON campaign_beats      FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "compliance_snippets_all" ON compliance_snippets FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "platform_specs_all"      ON platform_specs      FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "thread_segments_all"     ON thread_segments     FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "content_images_all"      ON content_images      FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+CREATE POLICY "post_metrics_all"        ON post_metrics        FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
 -- PODCAST INGESTION (migration: 20260606000000 add_podcast_ingestion)
 -- ============================================================
 -- news_sources gains a source_type discriminator + podcast config (feed_url is

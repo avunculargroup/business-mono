@@ -10,10 +10,12 @@ import { bruno } from '../agents/ba/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { della } from '../agents/relationshipManager/index.js';
+import { margot } from '../agents/margot/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
 import { newsletterWorkflow } from '../workflows/newsletter/index.js';
+import { variantWorkflow } from '../workflows/variant/index.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -25,6 +27,7 @@ import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startResearchMailListener } from '../listeners/researchMailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
+import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
@@ -94,6 +97,7 @@ export const mastra = new Mastra({
     charlie,
     rex,
     della,
+    margot,
   },
   storage,
   observability,
@@ -102,6 +106,7 @@ export const mastra = new Mastra({
     pm: pmWorkflow,
     executeRoutine: executeRoutineWorkflow,
     newsletter: newsletterWorkflow,
+    variant: variantWorkflow,
   },
   server: {
     apiRoutes: [
@@ -156,6 +161,10 @@ startContentEmbeddingListener();
 // can't reach this server over HTTP, so it writes to newsletter_runs and this
 // listener reacts). Mirrors the Signal gate path in newsletterGate.ts.
 startNewsletterGateWebListener();
+
+// Resume variant Gate 3 decisions made in the /campaigns variant editor (same
+// web→DB→agents pattern: the editor writes content_items.pending_decision).
+startVariantGateWebListener();
 
 // Re-run the transcript waterfall for an episode when the web /news/podcasts
 // pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same

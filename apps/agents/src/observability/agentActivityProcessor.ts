@@ -13,7 +13,7 @@ const MIRRORED_SPAN_TYPES: ReadonlySet<SpanType> = new Set([
 ]);
 
 // Valid agent names that match the database constraint
-const VALID_AGENT_NAMES = new Set(['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della']);
+const VALID_AGENT_NAMES = new Set(['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della', 'margot']);
 
 // Span rows are mirrored under trigger_type='agent'. The originating span type
 // (agent_run/workflow_run/tool_call/...) lives in notes.spanType, so the

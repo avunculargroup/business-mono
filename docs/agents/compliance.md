@@ -52,3 +52,21 @@ it fails; a minimally-changed neutral version).
   status/notes/rewrite mapping and `recordComplianceReview` insert plumbing (mocked).
 - Eval (not in CI): `apps/agents/evals/lex-compliance.eval.ts` — advice-framed vs
   context-framed fixtures.
+
+## Second use: campaign variant compliance (Social Campaigns)
+
+Lex is also the compliance step in the **Variant Generation workflow**
+(`apps/agents/src/workflows/variant/`). Same persona and advisory stance, but a
+**different verdict shape** suited to social posts: instead of pass/fail it
+classifies each variant as `educational` / `general_advice` / `personal_opinion`,
+decides `needs_disclaimer`, and selects a keyed `compliance_snippets` disclaimer.
+
+- The workflow calls the shared `lex` agent with its own prompt
+  (`workflows/variant/prompts.ts → buildLexPrompt`) and structured-output schema
+  (`workflows/variant/schemas.ts → lexVerdictSchema`); the agent's system prompt
+  supplies the compliance persona, the per-call schema drives the output.
+- Model resolves via the `variant.compliance_check` step scope first, then the
+  `lex` agent scope (same as `content.compliance_review`).
+- Its verdict is persisted on the `content_item` (the variant) and logged to
+  `agent_activity` under `lex` by the workflow's persist step — advisory only;
+  the human decides at Gate 3.

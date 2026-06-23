@@ -45,6 +45,12 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     description: 'Newsletter copy editor — brand-voice and audience-fit gate (internal to the newsletter workflow)',
   },
   {
+    key: 'margot',
+    type: 'agent',
+    label: 'Margot',
+    description: 'Marketer — campaign strategy and beat planning (campaigns workflow)',
+  },
+  {
     key: 'lex',
     type: 'agent',
     label: 'Lex',
@@ -195,6 +201,24 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'editor',
   },
 
+  // ── Variant generation workflow steps ─────────────────────────────────────
+  {
+    key: 'variant.generate_copy',
+    type: 'workflow_step',
+    label: 'Generate copy',
+    description: 'Charlie writes platform-conformant copy for one campaign variant',
+    workflow: 'variant',
+    fallbackAgent: 'charlie',
+  },
+  {
+    key: 'variant.compliance_check',
+    type: 'workflow_step',
+    label: 'Compliance check',
+    description: 'Lex classifies advice risk and decides on a disclaimer for the variant',
+    workflow: 'variant',
+    fallbackAgent: 'lex',
+  },
+
   // ── Content compliance review (Lex, on draft persistence) ──────────────────
   {
     key: 'content.compliance_review',
@@ -210,6 +234,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   pm: 'PM',
   executeRoutine: 'Routines',
   newsletter: 'Newsletter',
+  variant: 'Variant Generation',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

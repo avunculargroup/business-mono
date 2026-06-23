@@ -2,36 +2,48 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** Social Media Campaigns (incl. Brand Voice migration)
-**Status:** In progress — Steps 0–3 built (code), Step 3 finish gated on merge
-**Last updated:** 2026-06-06
+**Status:** In progress — Steps 0–2 done & merged; Step 3 seeded (parity gate pending); Step 4 written (gated on merge)
+**Last updated:** 2026-06-22
 
 -----
 
 ## ▶ Current state — resume here
 
-Work lives on branch **`claude/social-campaigns-preflight-csqIF`** (not yet merged).
-Migrations apply to prod **on merge to `main`**, so the remaining Step 3 items are
-gated on that merge.
+Steps 0–3 code merged to `main` via **PR #232** (`claude/social-campaigns-preflight-csqIF`),
+so the voice foundations migrations are **applied to prod** (`social_accounts` seeded;
+`brand_voice` / `voice_snippets` / `match_voice_snippets` live). Step 4 (campaigns schema)
+is written on branch **`claude/social-campaigns-build-order-xDKFW`**, not yet merged —
+migrations apply to prod **on merge to `main`**.
 
 | Step | State | Evidence |
 |------|-------|----------|
 | 0 — Pre-flight | ✅ done | `docs/CAMPAIGNS_STEP0_VERIFICATION.md` (commit `eeb68d9`) |
-| 1 — Schema foundations | ✅ written, **not yet applied to prod** | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); seeds `social_accounts`. Commit `a52280d` |
+| 1 — Schema foundations | ✅ done, **applied to prod** (PR #232) | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); `social_accounts` seeded (6 rows). Commit `a52280d` |
 | 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
-| 3 — Voice milestone | ⚠️ **code complete, not finished** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e` |
+| 3 — Voice milestone | ⚠️ **seeded; parity gate + doc retirement pending** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e`. `seed:voice` run (founder confirmed `brand_voice` + canon `voice_snippets` populated). |
+| 4 — Campaigns schema | ✅ **written, gated on merge** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
+| 5 — Agents (Margot, Lex) | ✅ **written, gated on merge** | spec `docs/agents/margot.md`; agent `apps/agents/src/agents/margot/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`). **Lex converged on the existing shared compliance agent** (`agents/compliance/`, added by the on-chain feature on `main`) rather than a second `lex` — the variant workflow reuses it with a campaign-specific prompt + classification/disclaimer schema (see `docs/agents/compliance.md`). Migration `20260622010000` adds `margot` to the `agent_name` CHECKs (+ `VALID_AGENT_NAMES`) and re-affirms `lex`. Charlie confirmed reading `packages/voice`. |
+| 6 — Variant Generation Workflow | ⚠️ **built end-to-end; needs a live pass** | Workflow `apps/agents/src/workflows/variant/` (resolve-context → Charlie → Lex → persist → **Gate 3**, threads + single-variant regen). Web gate plumbing: migration `20260622020000` (content_items `workflow_run_id`/`gate_state`/`pending_decision`), `variantGateWeb` listener + `resumeVariantRun`. UI: `apps/web/components/campaigns/VariantEditor.tsx` (platform-mimic preview, live char counter, Lex chip, approve / request-change) + `app/(app)/campaigns/variants/[id]/page.tsx` + `submitVariantGateDecision` action. agents + web typecheck clean, 282 agents tests green. **Remaining:** live end-to-end verification (needs secrets + a stub campaign/beat); image slot + alt text and inline copy-edit are deferred (Step 9). |
 
-**To finish Step 3 (do these in order, after the branch is merged so the tables exist):**
+**Step 3 remaining (the hard parity gate — needs a secrets-equipped env: OpenAI + model key):**
 
-1. **Apply migrations** — merge the branch to `main` (auto-applies via Supabase CLI), or apply manually. Confirm `brand_voice` / `voice_snippets` / `social_accounts` exist and accounts are seeded.
-2. **Seed voice content** — `pnpm --filter @platform/agents seed:voice` (idempotent; needs `SUPABASE_*` + `OPENAI_API_KEY`). Seeds the `brand_voice` row + canon `voice_snippets` (with embeddings) from `docs/brand-voice.md`.
-3. **Parity gate** (hard gate — see below) — generate one sample per content agent (Charlie, and the newsletter **editorial** agent which still reads the full doc); confirm table-sourced voice matches doc-era output.
+1. ~~Apply migrations~~ ✅ (PR #232). 2. ~~Seed voice content~~ ✅ (`seed:voice` run by founder).
+3. **Parity gate** (hard gate — see below) — generate one sample per content agent (Charlie, and the newsletter **editorial** agent which still reads the full doc); confirm table-sourced voice matches doc-era output. **Not runnable in the web env** (no OpenAI/model secrets) — run locally. A ready-to-paste prompt for this exists in the session history.
 4. **Only if parity passes:** retire `docs/brand-voice.md` to a stub + update `CLAUDE.md` routing (voice → tables; visual → `bts-design` skill).
 
 **Known follow-ups (non-blocking):**
 - Founder-added snippets via the Brand Hub save with `embedding = null` (web has no OpenAI key by design). Needs a small agents-side embed backfill/listener (mirror `contentEmbeddingListener`). Canon snippets are embedded by `seed:voice`.
 - Account-voice editing with inheritance ghosting (Brand Hub) is deferred to the campaigns Accounts work; `ChipField` already supports locked chips for it.
 
-Then proceed to **Step 4 — Campaigns schema**.
+**Next:** a **live end-to-end pass** of Step 6 (see below), then **Step 7 — Campaign Strategy Workflow** (Margot, Gate 1/Gate 2) — where Margot's Simon-roster wiring (deferred from Step 5) lands. The Step 3 parity gate remains independent.
+
+**Live verification of Step 6 (do once secrets are available):** apply the branch migrations, insert one `campaigns` row (with a `strategy` JSONB) and one `campaign_beats` row, then run the `variant` workflow with `{ campaignId, beatId, socialAccountId }` (use a seeded `social_accounts` id). It persists a `content_items` draft + suspends at Gate 3, writing `gate_state` + `workflow_run_id`. Open `/campaigns/variants/<contentItemId>` to see the variant editor; approve or request a change. The web writes `pending_decision`; the `variantGateWeb` listener resumes the run. (You can also resume directly in Studio with `{ decision: 'approve' | 'request_change' }`.)
+
+**Deferred Step-6 sub-items (fold into Step 9 / publishing):** image slot + alt text (needs `content_images` upload via `packages/storage`), inline copy editing with compliance re-run (Step 9), and showing the resolved voice block in the editor (not currently in `gate_state`).
+
+**Deferred from Step 5 (do in Step 7):** wiring Margot onto Simon's conversational roster (`simon.agents` + a routing line + a `simon-routing.eval.ts` fixture). Held back until the Campaign Strategy workflow she re-enters exists, so the routing eval can be run against real behaviour. Margot + Lex are registered in the top-level Mastra `agents:` map now, so both are reachable standalone in Studio for the Step 5 isolation check.
+
+> **Note on local testing:** the agent-server code now lists `margot`/`lex` in `VALID_AGENT_NAMES`, but the matching `agent_name` CHECK only accepts them once `20260622010000_add_campaign_agents.sql` is applied. Apply the migration (or merge) before exercising Margot/Lex against a DB, or their `agent_activity` inserts will fail the CHECK. In prod the code and migration ship together on merge, so there's no gap.
 
 -----
 
@@ -153,7 +165,7 @@ One migration:
 
 Spec-first, per project convention:
 
-- Write `docs/agents/margot.md` and `docs/agents/lex.md` (canonical names, roles, boundaries, I/O).
+- Write `docs/agents/margot.md` (canonical name, role, boundaries, I/O). For Lex, reuse/extend the shared compliance agent doc `docs/agents/compliance.md` rather than a separate file — `lex` already exists on `main`.
 - Then the Mastra agent definitions. Charlie, Bruno, Rex already exist — confirm Charlie reads `packages/voice`.
 
 **Done when:** Margot and Lex instantiate and respond sensibly in isolation (Studio or a test harness).
