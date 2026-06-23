@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { ShieldCheck, AlertTriangle, Flag, RefreshCw, Check, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShieldCheck, AlertTriangle, Flag, RefreshCw, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { useToast } from '@/providers/ToastProvider';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
-import { submitVariantGateDecision } from '@/app/actions/campaigns';
+import { submitVariantGateDecision, editVariantCopy } from '@/app/actions/campaigns';
 import styles from './VariantEditor.module.css';
 
 // The Gate 3 surface: a platform-mimic preview of the generated variant, a live
@@ -77,10 +78,14 @@ export function VariantEditor({
   gateState: GateState | null;
 }) {
   const { success, error } = useToast();
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showChange, setShowChange] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [showRationale, setShowRationale] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editBody, setEditBody] = useState(gateState?.preview?.body ?? '');
+  const [editSegments, setEditSegments] = useState<string[]>(gateState?.preview?.segments ?? []);
 
   const preview = gateState?.preview ?? null;
 
@@ -123,6 +128,24 @@ export function VariantEditor({
       success(confirmation);
       setShowChange(false);
       setInstruction('');
+    });
+  };
+
+  const saveEdit = () => {
+    if (!preview) return;
+    startTransition(async () => {
+      const result = await editVariantCopy(contentItemId, {
+        isThread: preview.isThread,
+        body: preview.isThread ? '' : editBody.trim(),
+        segments: preview.isThread ? editSegments.map((s) => s.trim()).filter(Boolean) : [],
+      });
+      if (result.error) {
+        error(result.error);
+        return;
+      }
+      success('Saved — Lex is re-checking the edited copy.');
+      setEditing(false);
+      router.refresh();
     });
   };
 
@@ -210,7 +233,75 @@ export function VariantEditor({
             <RefreshCw size={16} strokeWidth={1.5} />
             Request a change
           </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => {
+              setEditBody(preview.body);
+              setEditSegments(preview.segments);
+              setEditing((v) => !v);
+            }}
+          >
+            <Pencil size={16} strokeWidth={1.5} />
+            Edit copy
+          </Button>
         </div>
+
+        {editing && (
+          <div className={styles.changeForm}>
+            {preview.isThread ? (
+              <>
+                {editSegments.map((seg, i) => (
+                  <div key={i} className={styles.editSegment}>
+                    <span className={styles.segmentNo}>{i + 1}/</span>
+                    <textarea
+                      className={styles.textarea}
+                      value={seg}
+                      onChange={(e) =>
+                        setEditSegments((prev) => prev.map((s, idx) => (idx === i ? e.target.value : s)))
+                      }
+                      rows={2}
+                    />
+                    {editSegments.length > 1 && (
+                      <button
+                        type="button"
+                        className={styles.segRemove}
+                        onClick={() => setEditSegments((prev) => prev.filter((_, idx) => idx !== i))}
+                        aria-label="Remove segment"
+                      >
+                        <X size={16} strokeWidth={1.5} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className={styles.addSegment}
+                  onClick={() => setEditSegments((prev) => [...prev, ''])}
+                >
+                  <Plus size={16} strokeWidth={1.5} />
+                  Add segment
+                </button>
+              </>
+            ) : (
+              <textarea
+                className={styles.textarea}
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                rows={6}
+              />
+            )}
+            <div className={styles.actions}>
+              <Button variant="primary" size="sm" loading={isPending} onClick={saveEdit}>
+                <Check size={16} strokeWidth={1.5} />
+                Save copy
+              </Button>
+              <Button variant="ghost" size="sm" disabled={isPending} onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         {showChange && (
           <div className={styles.changeForm}>

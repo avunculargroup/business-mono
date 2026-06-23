@@ -30,6 +30,7 @@ import { startContentEmbeddingListener } from '../listeners/contentEmbeddingList
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
+import { startComplianceRecheckListener } from '../listeners/complianceRecheck.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
@@ -173,6 +174,10 @@ startVariantGateWebListener();
 // wizard (same web→DB→agents pattern: the wizard writes campaigns.pending_decision
 // — a 'start' signal to launch, or a gate decision to resume).
 startStrategyGateWebListener();
+
+// Re-run Lex on a campaign variant whose copy was edited (the web edit sets
+// compliance_status = 'pending'); a cleared verdict must not survive an edit.
+startComplianceRecheckListener();
 
 // Re-run the transcript waterfall for an episode when the web /news/podcasts
 // pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same

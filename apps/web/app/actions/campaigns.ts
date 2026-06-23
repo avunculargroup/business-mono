@@ -264,3 +264,183 @@ export async function markVariantPosted(
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
 }
+
+// ── Loops & polish (Step 9) ───────────────────────────────────────────────────
+
+/** Codepoint count — closer to how platforms count than UTF-16 .length. */
+function charCount(text: string): number {
+  return Array.from(text).length;
+}
+
+const editCopySchema = z.object({
+  isThread: z.boolean(),
+  body: z.string().trim().max(30000).default(''),
+  segments: z.array(z.string().trim().min(1)).default([]),
+});
+
+/**
+ * Edit a campaign variant's copy. Resets compliance to pending (a cleared
+ * verdict must not survive an edit) so the agents complianceRecheck listener
+ * re-runs Lex. Patches the suspended gate_state preview so the editor shows the
+ * edited text immediately, while the new verdict fills in shortly.
+ */
+export async function editVariantCopy(
+  contentItemId: string,
+  input: unknown,
+): Promise<{ success?: true; error?: string }> {
+  const parsed = editCopySchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid copy' };
+  const { isThread, body, segments } = parsed.data;
+  if (isThread && segments.length === 0) return { error: 'A thread needs at least one segment.' };
+  if (!isThread && !body) return { error: 'The post body cannot be empty.' };
+
+  const supabase = (await createClient()) as unknown as AnyDb;
+
+  const { data: existing } = await supabase
+    .from('content_items')
+    .select('gate_state')
+    .eq('id', contentItemId)
+    .maybeSingle();
+  if (!existing) return { error: 'Variant not found.' };
+
+  // Patch the suspended preview's copy so the editor reflects the edit at once.
+  const gateState = (existing as { gate_state: { preview?: Record<string, unknown> } | null }).gate_state;
+  const patchedGate =
+    gateState?.preview != null
+      ? {
+          ...gateState,
+          preview: {
+            ...gateState.preview,
+            isThread,
+            body,
+            segments,
+            charCount: isThread
+              ? charCount(segments.map((s, i) => `${i + 1}/ ${s}`).join('\n\n'))
+              : charCount(body),
+          },
+        }
+      : gateState;
+
+  const { error } = await supabase
+    .from('content_items')
+    .update({
+      body: body || null,
+      is_thread: isThread,
+      char_count: isThread ? null : charCount(body),
+      compliance_status: 'pending',
+      compliance_checked_at: null,
+      gate_state: patchedGate,
+    })
+    .eq('id', contentItemId);
+  if (error) return { error: error.message };
+
+  // Replace thread segments wholesale.
+  await supabase.from('thread_segments').delete().eq('content_item_id', contentItemId);
+  if (isThread && segments.length > 0) {
+    const rows = segments.map((b, i) => ({
+      content_item_id: contentItemId,
+      sequence: i + 1,
+      body: b,
+      char_count: charCount(b),
+    }));
+    const { error: segErr } = await supabase.from('thread_segments').insert(rows);
+    if (segErr) return { error: segErr.message };
+  }
+
+  revalidatePath(`/campaigns/variants/${contentItemId}`);
+  return { success: true };
+}
+
+const metricsSchema = z.object({
+  impressions: z.number().int().min(0).nullable().optional(),
+  reactions: z.number().int().min(0).nullable().optional(),
+  comments: z.number().int().min(0).nullable().optional(),
+  reposts: z.number().int().min(0).nullable().optional(),
+  clicks: z.number().int().min(0).nullable().optional(),
+});
+
+/** Save (upsert) manual post-hoc metrics for a published variant. One row per
+ *  content_item (UNIQUE), updated in place — no snapshots. */
+export async function savePostMetrics(
+  contentItemId: string,
+  campaignId: string,
+  platform: string,
+  input: unknown,
+): Promise<{ success?: true; error?: string }> {
+  const parsed = metricsSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid metrics' };
+
+  const supabase = (await createClient()) as unknown as AnyDb;
+  const {
+    data: { user },
+  } = await (await createClient()).auth.getUser();
+
+  const { error } = await supabase.from('post_metrics').upsert(
+    {
+      content_item_id: contentItemId,
+      platform,
+      impressions: parsed.data.impressions ?? null,
+      reactions: parsed.data.reactions ?? null,
+      comments: parsed.data.comments ?? null,
+      reposts: parsed.data.reposts ?? null,
+      clicks: parsed.data.clicks ?? null,
+      recorded_at: new Date().toISOString(),
+      recorded_by: user?.id ?? null,
+    },
+    { onConflict: 'content_item_id' },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { success: true };
+}
+
+const promoteSchema = z.object({
+  body: z.string().trim().min(1, 'Nothing to save.'),
+  curator_note: z.string().trim().min(1, 'Add a note on why this post demonstrates the voice.'),
+  snippet_type: z
+    .enum(['phrase', 'opener', 'closer', 'transition', 'paragraph', 'full_post', 'cta'])
+    .default('full_post'),
+  topic_tags: z.array(z.string()).default([]),
+});
+
+/** Promote a strong published post into the voice exemplar library. Saved
+ *  against the post's own account (source = promoted_from_post), with the
+ *  founder's curator note. The agents embed-on-write keeps it retrievable. */
+export async function promotePostToSnippet(
+  contentItemId: string,
+  campaignId: string,
+  input: unknown,
+): Promise<{ success?: true; error?: string }> {
+  const parsed = promoteSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid snippet' };
+
+  const supabase = (await createClient()) as unknown as AnyDb;
+  const {
+    data: { user },
+  } = await (await createClient()).auth.getUser();
+
+  // The post's account + platform anchor the snippet to that voice.
+  const { data: item } = await supabase
+    .from('content_items')
+    .select('social_account_id, type')
+    .eq('id', contentItemId)
+    .maybeSingle();
+  const account = item as { social_account_id: string | null; type: string | null } | null;
+
+  const { error } = await supabase.from('voice_snippets').insert({
+    social_account_id: account?.social_account_id ?? null,
+    snippet_type: parsed.data.snippet_type,
+    body: parsed.data.body,
+    curator_note: parsed.data.curator_note,
+    platform: account?.type === 'linkedin' || account?.type === 'twitter_x' ? account.type : null,
+    topic_tags: parsed.data.topic_tags,
+    source: 'promoted_from_post',
+    source_content_item_id: contentItemId,
+    created_by: user?.id ?? null,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { success: true };
+}
