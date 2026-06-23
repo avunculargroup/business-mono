@@ -221,6 +221,22 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
 
   // ── Campaign strategy workflow steps ──────────────────────────────────────
   {
+    key: 'strategy.research',
+    type: 'workflow_step',
+    label: 'Strategy research',
+    description: 'Rex gathers current context (trends, competitors, regulation) for the campaign — optional branch',
+    workflow: 'strategy',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'strategy.audience',
+    type: 'workflow_step',
+    label: 'Audience analysis',
+    description: 'Bruno characterises the audience segment (pain points, framing) for the campaign — optional branch',
+    workflow: 'strategy',
+    fallbackAgent: 'bruno',
+  },
+  {
     key: 'strategy.synthesise',
     type: 'workflow_step',
     label: 'Strategy synthesis',

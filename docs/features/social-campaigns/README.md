@@ -41,11 +41,11 @@ build-order doc's "resume here" table for the authoritative per-step state.
 
 - **9** Loops & polish — **compliance re-run on edit** (`editVariantCopy` action + inline editing in `VariantEditor`; `complianceRecheck` listener re-runs Lex and resets the compliance fields, so a cleared verdict never survives an edit), **metrics entry** (`savePostMetrics` + platform-aware inline fields in `PublishedPosts`), and **promote-from-post → voice snippets** (`promotePostToSnippet`, `source=promoted_from_post`). No new migration. Built end-to-end; typecheck/lint clean, tests green; **needs a live pass**.
 
-## Next
+- **10** Optional branches — Rex (research) and Bruno (audience analysis) wired as conditional steps before strategy synthesis (`workflows/strategy/index.ts`). Pure heuristics decide whether each runs (`shouldRunResearch`, `shouldRunAudienceAnalysis`), both best-effort, output folded into the synthesis prompt; `strategy.research`/`strategy.audience` in `MODEL_SCOPES`. Built; **needs a live pass**.
 
-**Step 10 — Optional branches.** Wire Rex (research) and Bruno (audience analysis) as conditional branches into the strategy workflow. Genuinely deferrable. See `docs/CAMPAIGNS_BUILD_ORDER.md` Step 10.
+## Status
 
-The Phase-1 arc (Steps 0–9) is feature-complete pending live passes.
+**Steps 0–10 are built — the Social Campaigns feature is code-complete.** Everything from Step 6 onward is mocked-tested and awaits a live pass with secrets (LLM calls + Supabase Realtime gate handoffs).
 
 ## Verify locally
 

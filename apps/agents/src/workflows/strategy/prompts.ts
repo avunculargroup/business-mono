@@ -33,7 +33,86 @@ ${ctx.audiencePersona ? `Audience persona: ${ctx.audiencePersona}` : ''}
 ## Company brand voice (the umbrella every BTS message answers to)
 ${ctx.voiceBlock ?? '(brand voice not available — rely on the BTS stance: plain, credible, calm; capital-B Bitcoin = network, lowercase b = unit; no hype.)'}
 
-${ctx.priorLearnings ? `## Prior-campaign learnings\n${ctx.priorLearnings}` : ''}`;
+${ctx.priorLearnings ? `## Prior-campaign learnings\n${ctx.priorLearnings}` : ''}
+
+${ctx.researchBrief ? `## Research brief (Rex)\n${ctx.researchBrief}` : ''}
+
+${ctx.audienceAnalysis ? `## Audience analysis (Bruno)\n${ctx.audienceAnalysis}` : ''}`;
+}
+
+// ── Optional branches (Step 10) ───────────────────────────────────────────────
+
+const RESEARCH_SIGNALS = [
+  'trend',
+  'trends',
+  'competitor',
+  'competitors',
+  'current',
+  'latest',
+  'recent',
+  'news',
+  'market',
+  'announcement',
+  'regulation',
+  'regulatory',
+  'this year',
+  'this quarter',
+  'right now',
+  'today',
+];
+
+/** Whether the objective warrants a Rex research branch — it references current
+ *  events, competitors, or trends. Pure (keyword heuristic) so it's testable and
+ *  free; no LLM gate. A year reference (2024+) also trips it. */
+export function shouldRunResearch(objective: string): boolean {
+  const text = objective.toLowerCase();
+  if (RESEARCH_SIGNALS.some((s) => text.includes(s))) return true;
+  return /\b20(2[4-9]|[3-9]\d)\b/.test(text);
+}
+
+/** Whether to run Bruno's audience-analysis branch — the audience_filter names a
+ *  real CRM segment (an industry or pipeline stage) worth characterising. Pure. */
+export function shouldRunAudienceAnalysis(filter: Record<string, unknown>): boolean {
+  const nonEmpty = (v: unknown): boolean =>
+    Array.isArray(v) ? v.filter((x) => x != null && String(x).trim() !== '').length > 0 : false;
+  return nonEmpty(filter['industry']) || nonEmpty(filter['pipeline_stage']);
+}
+
+/** Build Rex's research-brief prompt for the campaign objective. Prose output —
+ *  a tight brief the synthesis step folds in, not a structured object. */
+export function buildResearchPrompt(ctx: StrategyContext): string {
+  return `Research the current context for a BTS social media campaign so the strategist can ground it in what's actually happening now.
+
+## Campaign objective
+${ctx.objective}
+
+## What to return
+A tight brief (≤6 short bullet points) covering only what's decision-useful:
+- Relevant current developments, regulatory shifts, or market context in the Australian Bitcoin-treasury space.
+- What competitors or adjacent voices are saying on this topic.
+- Any timely hook the campaign could legitimately ride.
+
+Cite specifics where you can. No hype, no price predictions, no recommendations. If you can't verify something, say so rather than guessing. Keep it to the brief — the strategist writes the strategy, not you.`;
+}
+
+/** Build Bruno's audience-analysis prompt. CRM company names (matched on the
+ *  audience_filter) are supplied as context when available. Prose output. */
+export function buildAudiencePrompt(ctx: StrategyContext, companyNames: string[]): string {
+  const audience = formatAudienceFilter(ctx.audienceFilter);
+  return `Characterise the audience for a BTS social media campaign so the strategist can frame the copy to their real concerns. This is context-conditioning — social is broadcast, not a recipient list.
+
+## Audience
+${audience ? `Filter: ${audience}` : '(no structured filter)'}
+${ctx.audiencePersona ? `Persona: ${ctx.audiencePersona}` : ''}
+${companyNames.length ? `Representative companies from the CRM in this segment: ${companyNames.join(', ')}` : ''}
+
+## What to return
+A short analysis (≤6 short bullet points):
+- The pain points and objections this audience actually has about Bitcoin on a corporate balance sheet.
+- The framing and language that lands with finance leaders (and what reads as hype to them).
+- What this segment needs to hear to move from sceptical to curious.
+
+Plain, specific, no jargon dumps. No recommendations to buy or allocate — this is about how to talk to them, not what to tell them to do.`;
 }
 
 /** Build Margot's strategy-synthesis prompt. Emits the structured strategy

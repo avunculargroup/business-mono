@@ -96,6 +96,11 @@ export const strategyContextSchema = z.object({
   voiceBlock: z.string().nullable(),
   // Formatted prior-campaign learnings (empty string when there are none).
   priorLearnings: z.string(),
+  // Optional enrichment from the conditional branches (empty when skipped):
+  // Rex's research brief and Bruno's audience analysis. Read by the synthesis
+  // prompt when present. See Step 10 (optional branches).
+  researchBrief: z.string().default(''),
+  audienceAnalysis: z.string().default(''),
   accounts: z.array(accountRefSchema),
   postSlots: z.array(scheduleSlotSchema),
   postsPerWeek: z.number(),

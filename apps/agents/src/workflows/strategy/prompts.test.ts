@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { buildStrategyPrompt, buildBeatPlanPrompt, formatPriorLearnings } from './prompts.js';
+import {
+  buildStrategyPrompt,
+  buildBeatPlanPrompt,
+  buildResearchPrompt,
+  buildAudiencePrompt,
+  formatPriorLearnings,
+  shouldRunResearch,
+  shouldRunAudienceAnalysis,
+} from './prompts.js';
 import type { StrategyContext, StrategyObject } from './schemas.js';
 
 function makeCtx(overrides: Partial<StrategyContext> = {}): StrategyContext {
@@ -11,6 +19,8 @@ function makeCtx(overrides: Partial<StrategyContext> = {}): StrategyContext {
     audiencePersona: 'AU CFOs at family offices.',
     voiceBlock: '**Persona:** plain, confident advisor',
     priorLearnings: '',
+    researchBrief: '',
+    audienceAnalysis: '',
     accounts: [
       { id: 'a1', platform: 'linkedin', display_name: 'BTS — Company' },
       { id: 'a2', platform: 'twitter_x', display_name: 'Chris (X)' },
@@ -75,6 +85,61 @@ describe('buildBeatPlanPrompt', () => {
     const prompt = buildBeatPlanPrompt(makeCtx(), strategy, 'Reorder so the strongest beat opens.');
     expect(prompt).toContain('Requested change');
     expect(prompt).toContain('Reorder so the strongest beat opens.');
+  });
+});
+
+describe('shouldRunResearch', () => {
+  it('triggers on current-events / competitor / trend signals', () => {
+    expect(shouldRunResearch('Respond to the latest ASIC regulatory guidance')).toBe(true);
+    expect(shouldRunResearch('How we compare to competitors on custody')).toBe(true);
+    expect(shouldRunResearch('Ride the current market narrative')).toBe(true);
+  });
+  it('triggers on a recent year reference', () => {
+    expect(shouldRunResearch('Our 2026 treasury thesis')).toBe(true);
+  });
+  it('skips an evergreen, internal objective', () => {
+    expect(shouldRunResearch('Explain why volatility is not risk on a treasury horizon')).toBe(false);
+  });
+});
+
+describe('shouldRunAudienceAnalysis', () => {
+  it('runs when an industry or pipeline stage is set', () => {
+    expect(shouldRunAudienceAnalysis({ industry: ['Asset Management'] })).toBe(true);
+    expect(shouldRunAudienceAnalysis({ pipeline_stage: ['warm'] })).toBe(true);
+  });
+  it('skips an empty or filter-less segment', () => {
+    expect(shouldRunAudienceAnalysis({})).toBe(false);
+    expect(shouldRunAudienceAnalysis({ industry: [], pipeline_stage: [] })).toBe(false);
+    expect(shouldRunAudienceAnalysis({ bitcoin_literacy_min: 'intermediate' })).toBe(false);
+  });
+});
+
+describe('buildResearchPrompt', () => {
+  it('asks Rex for a tight, recommendation-free brief on the objective', () => {
+    const prompt = buildResearchPrompt(makeCtx());
+    expect(prompt).toContain('Reframe volatility as not the same as risk');
+    expect(prompt).toContain('No hype, no price predictions');
+  });
+});
+
+describe('buildAudiencePrompt', () => {
+  it('includes the filter, persona, and any CRM company names', () => {
+    const prompt = buildAudiencePrompt(makeCtx(), ['Acme Capital', 'Beta Family Office']);
+    expect(prompt).toContain('industry: Asset Management');
+    expect(prompt).toContain('AU CFOs at family offices.');
+    expect(prompt).toContain('Acme Capital, Beta Family Office');
+  });
+});
+
+describe('branch output in the synthesis prompt', () => {
+  it('folds in the research brief and audience analysis when present', () => {
+    const prompt = buildStrategyPrompt(
+      makeCtx({ researchBrief: '- ASIC issued new guidance', audienceAnalysis: '- CFOs fear volatility' }),
+    );
+    expect(prompt).toContain('Research brief (Rex)');
+    expect(prompt).toContain('ASIC issued new guidance');
+    expect(prompt).toContain('Audience analysis (Bruno)');
+    expect(prompt).toContain('CFOs fear volatility');
   });
 });
 

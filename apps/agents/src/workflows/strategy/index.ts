@@ -4,10 +4,16 @@ import { supabase } from '@platform/db';
 import { stepRequestContext } from '../../config/model.js';
 import { resolveCompanyVoiceBlock } from '../../lib/voicePrompt.js';
 import { margot } from '../../agents/margot/index.js';
+import { rex } from '../../agents/researcher/index.js';
+import { bruno } from '../../agents/ba/index.js';
 import {
   buildStrategyPrompt,
   buildBeatPlanPrompt,
+  buildResearchPrompt,
+  buildAudiencePrompt,
   formatPriorLearnings,
+  shouldRunResearch,
+  shouldRunAudienceAnalysis,
 } from './prompts.js';
 import { buildSchedule, finaliseSchedulePlan } from './schedule.js';
 import { buildBeatRows } from './persist.js';
@@ -79,6 +85,34 @@ async function planBeats(
     },
   );
   return beatPlanSchema.parse(response.object ?? fallback);
+}
+
+/** Rex research branch — a prose brief, best-effort. Optional enrichment, so a
+ *  failure (rate limit, model error) yields '' rather than aborting the run. */
+async function runResearch(ctx: StrategyContext): Promise<string> {
+  try {
+    const response = await rex.generate([{ role: 'user', content: buildResearchPrompt(ctx) }], {
+      requestContext: stepRequestContext('strategy.research'),
+    });
+    return response.text?.trim() ?? '';
+  } catch (err) {
+    console.warn('[strategy] research branch failed (continuing):', err);
+    return '';
+  }
+}
+
+/** Bruno audience-analysis branch — a prose analysis, best-effort. */
+async function runAudienceAnalysis(ctx: StrategyContext, companyNames: string[]): Promise<string> {
+  try {
+    const response = await bruno.generate(
+      [{ role: 'user', content: buildAudiencePrompt(ctx, companyNames) }],
+      { requestContext: stepRequestContext('strategy.audience') },
+    );
+    return response.text?.trim() ?? '';
+  } catch (err) {
+    console.warn('[strategy] audience branch failed (continuing):', err);
+    return '';
+  }
 }
 
 /** Compute the schedule for a beat plan from the campaign cadence. */
@@ -210,6 +244,56 @@ const resolveContextStep = createStep({
       startDate: c.start_date ?? null,
     });
     return { ctx };
+  },
+});
+
+// Optional branch: Rex research. Runs only when the objective references current
+// events/competitors/trends; otherwise passes ctx through untouched. Its output
+// is cached in the run snapshot, so a gate resume never re-runs it.
+const researchStep = createStep({
+  id: 'research',
+  inputSchema: z.object({ ctx: strategyContextSchema }),
+  outputSchema: z.object({ ctx: strategyContextSchema }),
+  execute: async ({ inputData }) => {
+    const { ctx } = inputData;
+    if (!shouldRunResearch(ctx.objective)) return { ctx };
+    const researchBrief = await runResearch(ctx);
+    return { ctx: { ...ctx, researchBrief } };
+  },
+});
+
+// Optional branch: Bruno audience analysis. Runs only when the audience_filter
+// names a real CRM segment; pulls a few representative companies as context.
+const audienceStep = createStep({
+  id: 'audience',
+  inputSchema: z.object({ ctx: strategyContextSchema }),
+  outputSchema: z.object({ ctx: strategyContextSchema }),
+  execute: async ({ inputData }) => {
+    const { ctx } = inputData;
+    if (!shouldRunAudienceAnalysis(ctx.audienceFilter)) return { ctx };
+
+    // Light CRM lookup: representative companies in the filtered industries.
+    let companyNames: string[] = [];
+    const industries = Array.isArray(ctx.audienceFilter['industry'])
+      ? (ctx.audienceFilter['industry'] as unknown[]).filter((x) => typeof x === 'string')
+      : [];
+    if (industries.length > 0) {
+      try {
+        const { data } = await db
+          .from('companies')
+          .select('name')
+          .in('industry', industries as string[])
+          .limit(8);
+        companyNames = ((data ?? []) as Array<{ name: string | null }>)
+          .map((c) => c.name)
+          .filter((n): n is string => Boolean(n));
+      } catch (err) {
+        console.warn('[strategy] audience CRM lookup failed (continuing):', err);
+      }
+    }
+
+    const audienceAnalysis = await runAudienceAnalysis(ctx, companyNames);
+    return { ctx: { ...ctx, audienceAnalysis } };
   },
 });
 
@@ -387,6 +471,8 @@ export const strategyWorkflow = createWorkflow({
   outputSchema: strategyResultSchema,
 })
   .then(resolveContextStep)
+  .then(researchStep)
+  .then(audienceStep)
   .then(synthesiseStep)
   .then(gate1Step)
   .then(planBeatsStep)
