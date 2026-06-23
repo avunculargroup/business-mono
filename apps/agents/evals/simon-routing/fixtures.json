@@ -58,5 +58,10 @@
     "input": "Brief me on Aaron Whitman ahead of our 3pm meeting.",
     "expectedSubagent": "rex",
     "rationale": "Pre-meeting deep_research brief on a person — Rex."
+  },
+  {
+    "input": "I want to rethink the angle on beat 3 of the treasury-volatility campaign — it's landing flat. What's a sharper strategic framing?",
+    "expectedSubagent": "margot",
+    "rationale": "Campaign strategy / beat angle — Margot."
   }
 ]

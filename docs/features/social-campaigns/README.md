@@ -28,10 +28,18 @@ build-order doc's "resume here" table for the authoritative per-step state.
 - **4** Campaigns schema — `supabase/migrations/20260622000000_add_campaigns_schema.sql`.
 - **5** Margot agent (`apps/agents/src/agents/margot/`). **Lex converged on the shared compliance agent** (`apps/agents/src/agents/compliance/`, from the on-chain feature) — not a second `lex`.
 - **6** Variant Generation workflow (`apps/agents/src/workflows/variant/`) + Gate 3 web editor (`apps/web/components/campaigns/VariantEditor.tsx`, `app/(app)/campaigns/variants/[id]/page.tsx`) + the `variantGateWeb` resume listener. Built end-to-end; needs a live pass.
+- **7** Campaign Strategy workflow (`apps/agents/src/workflows/strategy/`) — resolve-context → Margot strategy synthesis → **Gate 1** → Margot beat plan + deterministic schedule → **Gate 2** → persist beats + `schedule_plan`, lock strategy (`status=plan_approved`). Migration `20260623000000` adds the campaign gate columns (`workflow_run_id`/`gate_state`/`pending_decision`/`schedule_plan`). Web: creation wizard (`apps/web/components/campaigns/CampaignWizard.tsx`, `app/(app)/campaigns/new/`), list (`app/(app)/campaigns/page.tsx`), and the canvas + two gate panels (`CampaignWorkspace.tsx`, `app/(app)/campaigns/[id]/page.tsx`); server actions in `app/actions/campaigns.ts`; `strategyGateWeb` listener launches/resumes. Margot is now on Simon's roster (+ a routing eval fixture). Built end-to-end; typecheck + tests green; **needs a live pass** (Studio + a real wizard run with secrets).
+
+### Step 7 decisions (open questions, settled with the documented Phase-1 defaults)
+
+- **`posts_per_week` = total** across accounts (not per-account). Drives `schedule.ts`.
+- **Approved schedule lives on `campaigns.schedule_plan`** (JSONB) — Step 8 fan-out reads it; not recomputed.
+- **Strategy lock = application-layer** in `app/actions/campaigns.ts` (gate decisions are rejected once `status` is past `strategy_approved`).
+- **Launch pattern**: the wizard writes `campaigns.pending_decision = { decision: 'start' }`; `strategyGateWeb` reacts and calls `startStrategyRun` (no run id yet). Gate resumes reuse the same `pending_decision` channel once `workflow_run_id` is set.
 
 ## Next
 
-**Step 7 — Campaign Strategy Workflow.** See [`STEP7_HANDOFF.md`](./STEP7_HANDOFF.md).
+**Step 8 — Fan-out.** On plan approval, spawn one Variant Generation run per (beat × account) from the persisted `schedule_plan`. Then the matrix view + ready-to-post queue. See `docs/CAMPAIGNS_BUILD_ORDER.md` Step 8.
 
 ## Verify locally
 
