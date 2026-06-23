@@ -1890,6 +1890,15 @@ CREATE INDEX idx_content_items_beat       ON content_items(beat_id);
 CREATE INDEX idx_content_items_account    ON content_items(social_account_id);
 CREATE INDEX idx_content_items_compliance ON content_items(compliance_status);
 
+-- Variant Gate 3 web-approval columns (migration: 20260622020000). The variant
+-- editor renders gate_state and writes the decision to pending_decision; the
+-- variantGateWeb listener claims it and resumes workflow_run_id. Mirrors the
+-- newsletter_runs gate columns.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS workflow_run_id  TEXT,
+  ADD COLUMN IF NOT EXISTS gate_state       JSONB,
+  ADD COLUMN IF NOT EXISTS pending_decision JSONB;
+
 -- Ordered child rows of a threaded content_item.
 CREATE TABLE thread_segments (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

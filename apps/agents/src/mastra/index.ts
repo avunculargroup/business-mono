@@ -27,6 +27,7 @@ import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
+import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -135,3 +136,7 @@ startContentEmbeddingListener();
 // can't reach this server over HTTP, so it writes to newsletter_runs and this
 // listener reacts). Mirrors the Signal gate path in newsletterGate.ts.
 startNewsletterGateWebListener();
+
+// Resume variant Gate 3 decisions made in the /campaigns variant editor (same
+// web→DB→agents pattern: the editor writes content_items.pending_decision).
+startVariantGateWebListener();

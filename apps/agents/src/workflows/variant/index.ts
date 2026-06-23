@@ -343,25 +343,36 @@ const gateStep = createStep({
       charCount: charCount(),
     });
 
-    const suspendAtGate = () =>
-      suspend({
-        gate: 'gate3' as const,
-        contentItemId,
-        preview: {
-          platform: ctx.platform,
-          accountName: ctx.accountDisplayName,
-          isThread: isThreadVariant(draft),
-          title: draft.title,
-          body: draft.body,
-          segments: draft.segments.map((s) => s.body),
-          charCount: charCount(),
-          charLimit: ctx.platformSpec.max_chars,
-          classification: verdict.classification,
-          needsDisclaimer: verdict.needs_disclaimer,
-          disclaimerKey: verdict.disclaimer_key,
-          rationale: verdict.rationale,
-        },
-      });
+    const gatePayload = () => ({
+      gate: 'gate3' as const,
+      contentItemId,
+      preview: {
+        platform: ctx.platform,
+        accountName: ctx.accountDisplayName,
+        isThread: isThreadVariant(draft),
+        title: draft.title,
+        body: draft.body,
+        segments: draft.segments.map((s) => s.body),
+        charCount: charCount(),
+        charLimit: ctx.platformSpec.max_chars,
+        classification: verdict.classification,
+        needsDisclaimer: verdict.needs_disclaimer,
+        disclaimerKey: verdict.disclaimer_key,
+        rationale: verdict.rationale,
+      },
+    });
+
+    // Persist the gate context so the variant editor can render the suspended
+    // variant, and the run id so the web decision can resume it. Mirrors how the
+    // newsletter run persists gate_message on suspend. Then suspend.
+    const suspendAtGate = async () => {
+      const payload = gatePayload();
+      await db
+        .from('content_items')
+        .update({ workflow_run_id: runId ?? null, gate_state: payload, pending_decision: null } as never)
+        .eq('id', contentItemId);
+      await suspend(payload);
+    };
 
     if (!resumeData) {
       await suspendAtGate();
@@ -378,13 +389,15 @@ const gateStep = createStep({
       return result('suspended');
     }
 
-    // approve
+    // approve — clear the gate context so the variant leaves the editor queue.
     const { error } = await db
       .from('content_items')
       .update({
         status: 'approved',
         approved_by: resumeData.approvedBy ?? null,
         approved_at: new Date().toISOString(),
+        gate_state: null,
+        pending_decision: null,
       } as never)
       .eq('id', contentItemId);
     if (error) throw new Error(`Failed to approve variant: ${error.message}`);

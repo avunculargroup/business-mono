@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-22 — Variant Gate 3 web-approval columns on `content_items`
+
+**Migration:** `20260622020000_add_variant_gate_columns.sql`
+
+Step 6 of the Social Campaigns build. The Variant Generation workflow suspends at Gate 3 for human approval; the variant editor in the web app drives it. Mirroring the newsletter web gate (`newsletter_runs.gate_message`/`pending_decision`), three nullable columns are added to `content_items` (which *is* the variant) so the suspended gate context and the web→agents decision handoff have a home:
+
+- **`workflow_run_id`** (TEXT) — the Mastra run to resume, written when the gate suspends.
+- **`gate_state`** (JSONB) — the suspend preview payload the variant editor renders (platform, copy/segments, char count + limit, Lex verdict).
+- **`pending_decision`** (JSONB) — the web writes the approve / request-change decision here; the `variantGateWeb` listener claims it atomically and resumes the run.
+
+All nullable, so existing non-variant `content_items` rows are unaffected.
+
+---
+
 ## 2026-06-22 — Campaign agents: register Margot and Lex in the `agent_name` CHECKs
 
 **Migration:** `20260622010000_add_campaign_agents.sql`
