@@ -176,6 +176,24 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'newsletter',
     fallbackAgent: 'editor',
   },
+
+  // ── Variant generation workflow steps ─────────────────────────────────────
+  {
+    key: 'variant.generate_copy',
+    type: 'workflow_step',
+    label: 'Generate copy',
+    description: 'Charlie writes platform-conformant copy for one campaign variant',
+    workflow: 'variant',
+    fallbackAgent: 'charlie',
+  },
+  {
+    key: 'variant.compliance_check',
+    type: 'workflow_step',
+    label: 'Compliance check',
+    description: 'Lex classifies advice risk and decides on a disclaimer for the variant',
+    workflow: 'variant',
+    fallbackAgent: 'lex',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
@@ -183,6 +201,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   pm: 'PM',
   executeRoutine: 'Routines',
   newsletter: 'Newsletter',
+  variant: 'Variant Generation',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

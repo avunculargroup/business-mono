@@ -16,6 +16,7 @@ import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
 import { newsletterWorkflow } from '../workflows/newsletter/index.js';
+import { variantWorkflow } from '../workflows/variant/index.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
 import { handleZoomWebhook } from '../webhooks/zoom.js';
 import { handleDeepgramWebhook } from '../webhooks/deepgram.js';
@@ -83,6 +84,7 @@ export const mastra = new Mastra({
     pm: pmWorkflow,
     executeRoutine: executeRoutineWorkflow,
     newsletter: newsletterWorkflow,
+    variant: variantWorkflow,
   },
   server: {
     apiRoutes: [
