@@ -5,11 +5,13 @@ export { graphTraverse } from './rpc/graphTraverse.js';
 export { fulltextSearch } from './rpc/fulltextSearch.js';
 export { contentVectorSearch } from './rpc/contentSearch.js';
 export { newsVectorSearch } from './rpc/newsSearch.js';
+export { transcriptVectorSearch } from './rpc/transcriptSearch.js';
 export type { VectorSearchResult } from './rpc/vectorSearch.js';
 export type { GraphTraverseResult } from './rpc/graphTraverse.js';
 export type { FulltextSearchResult } from './rpc/fulltextSearch.js';
 export type { ContentVectorSearchResult } from './rpc/contentSearch.js';
 export type { NewsVectorSearchResult } from './rpc/newsSearch.js';
+export type { TranscriptVectorSearchResult } from './rpc/transcriptSearch.js';
 
 // Web app client factories (cookie-based auth via @supabase/ssr)
 export { createServerSupabaseClient } from './server.js';

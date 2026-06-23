@@ -24,7 +24,7 @@ All nullable, so existing non-variant `content_items` rows are unaffected.
 
 **Migration:** `20260622010000_add_campaign_agents.sql`
 
-Step 5 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`). Margot (marketer/strategist) and Lex (compliance officer) are new first-class agents (`docs/agents/margot.md`, `docs/agents/lex.md`). Both log to `agent_activity`, so the `agent_name` CHECK on `agent_activity`, `platform_capabilities`, and `routines` is extended from the eight existing agents to also include **`margot`** and **`lex`**. Each change is a strict superset of the prior constraint — safe against existing rows. The agent-server's `VALID_AGENT_NAMES` gate (`agentActivityProcessor.ts`) is updated to match so their spans are recorded. The newsletter `editor` agent is intentionally **not** added — it is internal to the newsletter workflow and does not log directly.
+Step 5 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`). Margot (marketer/strategist) is a new first-class agent (`docs/agents/margot.md`) and logs to `agent_activity`, so the `agent_name` CHECK on `agent_activity`, `platform_capabilities`, and `routines` is extended to include **`margot`**; `VALID_AGENT_NAMES` (`agentActivityProcessor.ts`) gains `margot` so its spans are recorded. **`lex`** (the shared compliance officer) was already added to `agent_activity` + `platform_capabilities` by the on-chain indicators feature (`20260621170002`); this migration re-affirms it and extends it to `routines`. Lex stays out of `VALID_AGENT_NAMES` (it logs via its own explicit insert, not the span processor — matching the on-chain feature, to avoid double-logging). Each change is a strict superset of the prior constraint — safe against existing rows. The campaigns compliance role reuses the existing `lex` agent (`docs/agents/compliance.md`), not a second one.
 
 ---
 
@@ -47,6 +47,52 @@ Step 4 of the Social Campaigns build (`docs/CAMPAIGNS_BUILD_ORDER.md`), per `doc
 - **RLS** — `authenticated` *and* `service_role` with `WITH CHECK` on all new tables, matching the Step 1 convention (agents write via `service_role`).
 
 Type generation (`pnpm db:generate-types`) is a post-merge follow-up once the migration applies on `main`.
+## 2026-06-20 — Economic indicators: `indicator_poll` routine (Session 2)
+
+**Migration:** `20260620000001_add_indicator_poll_routine.sql`
+
+Session 2 (ingest workflow) wiring. Extends `routines_action_type_check` with `'indicator_poll'` and seeds one active daily routine (`agent_name='simon'`, 08:00 Australia/Melbourne, `action_config={"backfill_periods":18}`). The poll runs inside the existing `executeRoutineWorkflow` (new `runIndicatorPoll` handler): for each active indicator that is due per its own `poll_frequency` (weekly indicators poll only on Mondays) and whose provider has an adapter (FRED/RBA; ABS deferred), it fetches via the provider adapter, applies the fetch-date `released_at` fallback, runs the insert/supersede/no-op revision rules, and — for an already-tracked series printing a new latest value, when `alert_on_new_print` or `alert_change_threshold` fires and no beat was proposed in the last 7 days — writes an `agent_activity` `proposed_actions:[{agent:'charlie'}]` row that `contentCreatorListener` turns into a `content_items` **draft** (publish wall respected). No schema change beyond the CHECK + seed; the data layer (tables/views) shipped in `20260620000000`.
+
+---
+
+## 2026-06-20 — Economic indicators: `economic_indicators`, `indicator_observations`, two views
+
+**Migration:** `20260620000000_add_economic_indicators.sql`
+
+Session 1 (data layer) of the Economic Indicators feature (`docs/features/economic-indicators/`). Adds the slow-moving macro layer (money supply, inflation, policy rates) beneath the existing live tickers, persisted as a time series so it serves both the dashboard and the agents (Rex citing exact figures; a fresh print triggering a content beat). This migration is the schema only — the ingest workflow (Session 2) and dashboard panel (Session 3) are separate, gated for review.
+
+- **`economic_indicators` table** — the source-discriminated registry, one row per tracked series. `region` (`au`/`us`/`global`, drives local/global grouping), `category` (`policy_rate`/`money_supply`/`inflation`), `provider` (`fred`/`rba`/`abs` — the adapter discriminator), `provider_series_code` (FRED series_id) / `provider_table_ref` (RBA/ABS table or dataflow). `poll_frequency` (`daily`/`weekly`) is **stored deliberately** as operational config — it is how often we hit the API, distinct from the data's natural frequency, which is *computed* in `v_indicator_latest` and never stored. `alert_on_new_print` + optional `alert_change_threshold` gate the content-beat proposal. `updated_at` trigger reuses the shared `update_updated_at()`.
+- **`indicator_observations` table** — the observation time series, agnostic to which provider delivered it. One row per **(indicator, period, vintage)**: uniqueness is `(indicator_id, period_date, released_at)` so multiple revisions of one period coexist. `period_date` (reference period, normalised to the first day of the period) is deliberately distinct from `released_at` (when the provider published — v1 substitutes the fetch date). Revisions flip the prior row's `is_current=false`, set `is_revision=true` and `superseded_value`. Append/supersede-only: **no `updated_at`**, never edited in place, which is what makes it a clean audit trail.
+- **Views (computed, nothing stored)** — `v_indicator_series` (current-vintage observations oldest→newest, for sparklines and Rex) and `v_indicator_latest` (one row per active indicator: current value, change-since-prior, and YoY via a **calendar-year `period_date` join** — frequency-agnostic and gap-tolerant, which works because adapters normalise `period_date` to first-of-period — plus a computed cadence: median release gap → `expected_next_release`). The view exposes both `yoy_change` (pp, for policy rates) and `yoy_pct_change` (the rate itself, for inflation/money supply); the component picks by `category`.
+- **RLS** — `"<table>_all"` FOR ALL to `authenticated` + `service_role` (with `WITH CHECK`), matching the project convention for tables agents write to (the scheduled poll runs as `service_role`).
+- **Seed** — six v1 indicators (RBA cash rate target, US Fed funds, US M2, AU broad money, US CPI; **AU CPI seeded `is_active=false`** until the ABS adapter exists). FRED series codes are stable; the RBA target column headers and the ABS dataflow must be confirmed against the live sources at Session 2 build. `routines_action_type_check` is **unchanged** here — the `'indicator_poll'` action type and the routine row land in Session 2 with the workflow.
+
+---
+
+## 2026-06-17 — Email newsletter sources + Rex relevance rubric
+
+**Migration:** `20260617000000_add_email_news_sources_and_rubric.sql`
+
+Extends the news ingestion stack to a third source type — paid email newsletters that never surface via RSS or podcast (Gromen *Tree Rings*, Bitwise CIO memos, Fidelity Digital Assets, Lyn Alden Premium). Per `docs/news-source-email-spec.md`, but scoped to **extend the existing pipeline** rather than build a parallel one: email items land in the same `news_items` table and `/news` UI as RSS/podcast. Newsletters arrive at per-source plus-addresses (`research+{slug}@<domain>`) filed into a dedicated Fastmail folder, polled by a listener (`researchMailListener`, Phase 3) — so this is **not** a cron routine and `routines_action_type_check` is unchanged.
+
+- **`news_sources` extended** — `'email'` added to `source_type`. Email columns: `slug` (plus-address suffix + URL slug, **partial unique index** `WHERE slug IS NOT NULL`), `inbound_address` (the computed `research+{slug}@<domain>`), `sender_allowlist` (`TEXT[]`, may start empty and seed from the first email's From via "Trust this sender"). Shared curation fields for the Rex rubric across all source types: `tier` (`tier_1`/`tier_2`/`tier_3`, nullable) and `relevance_threshold` (`NUMERIC(3,2)`, default `0.70`). The `news_sources_feed_required` CHECK gains a third arm: `source_type='email'` requires `inbound_address`.
+- **`news_items` extended** — `source_id` FK → `news_sources` (`ON DELETE SET NULL`); legacy rows linked by `source_name` text only, email items carry the FK. `ingestion_ref` (email Message-ID) is the idempotency key, deduped via a **partial unique index** `(source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL` *before* the existing URL + semantic dedup. `canonical_url` keeps the real "view in browser" link (`url` stays `NOT NULL UNIQUE` and is synthesized from the Message-ID for emails without a URL, leaving the existing dedup path untouched). Email metadata: `author`, `has_pdf_attachment`, `attachment_count`. Rex rubric output: `relevance_reasoning` (candid internal voice), `curator_notes` (Rex's suggestion, human-editable), `rex_metadata` JSONB (dimension scores, flags, `rubric_version`).
+- **Fastmail** — `fastmail_accounts.research_folder` (the folder the research listener polls) and `fastmail_sync_state.research_query_state` (its JMAP incremental marker), keeping research mail wholly separate from the Inbox/Sent CRM sync (no `interactions`, no Della dispatch).
+
+---
+
+## 2026-06-06 — Podcast ingestion: `podcast_episodes`, `transcript_segments`, `news_sources` podcast columns
+
+**Migration:** `20260606120000_add_podcast_ingestion.sql`
+
+Backend for the podcast ingestion feature (`docs/podcast-ingestion-spec.md`, build plan `docs/podcast-ingestion-build-plan.md`). A podcast is just another feed, so the existing `news_sources` registry is reused with a `source_type` discriminator; episodes and their transcripts get dedicated tables.
+
+- **`news_sources` extended** — `source_type` (`rss`/`podcast`/`youtube`, default `rss`), `youtube_channel_url`, `transcribe_with_deepgram` (the Deepgram opt-in, default off), `preferred_transcript_lang`, `max_backfill_episodes`, `max_episode_age_days`. `feed_url` was `NOT NULL UNIQUE`; a `youtube` source has no feed URL, so it is now nullable with a **partial unique index** (`WHERE feed_url IS NOT NULL`) plus a per-type presence CHECK. The daily `news_source_scan` routine now filters to `source_type='rss'` so podcast rows don't get parsed as article feeds.
+- **`podcast_episodes` table** — one row per episode. Transcript state machine (`transcript_status`: pending→resolving→[transcribing]→available / skipped / failed), provenance (`transcript_source`, `transcript_format`, `has_timestamps`), Deepgram correlation (`deepgram_request_id`, indexed), and a `curator_note` for brief-driven ingestion. Dedupe: `UNIQUE (source_id, guid)` for feed episodes plus a **partial unique index on `guid WHERE source_id IS NULL`** for ad-hoc/brief episodes (NULLs are distinct in Postgres, so the composite unique misses them). FTS generated column mirrors `news_items`.
+- **`transcript_segments` table** — chunked, embedded transcript content for RAG. Per-chunk `start_seconds`/`end_seconds`/`speaker` (NULL when the source had no timestamps) so retrieval can deep-link to a moment. `embedding VECTOR(1536)` with an **HNSW `vector_cosine_ops`** index, matching `content_embeddings`. `ON DELETE CASCADE` from the episode.
+- **Views** — `v_podcast_ingestion_status` (health dashboard) and `v_episodes_awaiting_action` (stuck/errored episodes for Simon).
+- **RPC `vector_search_transcripts`** — cosine search over `transcript_segments` joined to episode + source. Unlike `vector_search_content`, returns **one row per matching segment** (not best-per-source) because timestamp deep-links need the individual segment.
+- **`routines_action_type_check`** extended with `podcast_ingest`; seeds one active daily `podcast_ingest` routine (`agent_name='archie'`), a no-op until podcast sources are added.
 
 ---
 

@@ -11,7 +11,6 @@ import { charlie } from '../agents/contentCreator/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { della } from '../agents/relationshipManager/index.js';
 import { margot } from '../agents/margot/index.js';
-import { lex } from '../agents/lex/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
@@ -25,9 +24,11 @@ import { startSignalListener } from '../listeners/signalListener.js';
 import { startContentCreatorListener } from '../listeners/contentCreatorListener.js';
 import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
+import { startResearchMailListener } from '../listeners/researchMailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
+import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -56,12 +57,33 @@ const storage = new PostgresStore({
 // CloudExporter self-disables when MASTRA_CLOUD_ACCESS_TOKEN is unset, so
 // registering it here is a no-op locally and ships traces to Mastra Cloud
 // in production once the env var is set on Railway.
+//
+// DefaultExporter is the local-OTLP exporter that backs the Studio trace view.
+// It buffers whole spans — and agent/LLM spans carry very large attributes (full
+// prompts, completions, tool args/results) — in an in-memory batch queue. In
+// production there is no local collector draining that queue, so it grows without
+// bound and pins the small (~256 MB) Railway heap at its ceiling; the recurring
+// "heap out of memory" crash inside a regex .replace() was that exhaustion
+// surfacing at the next allocation, not a transient regex spike. So enable it
+// only in development (where `mastra dev` runs the collector behind Studio), or
+// when explicitly opted in for a one-off prod trace-capture session. Sampling
+// stays ALWAYS and the AgentActivitySpanProcessor stays registered, so the
+// agent_activity audit trail is unchanged — only the heavy local trace buffer is
+// dropped in production.
+const enableLocalTraceExport =
+  process.env['NODE_ENV'] !== 'production' ||
+  process.env['MASTRA_DEFAULT_EXPORTER'] === 'true';
+
+const exporters = enableLocalTraceExport
+  ? [new DefaultExporter(), new CloudExporter()]
+  : [new CloudExporter()];
+
 const observability = new Observability({
   configs: {
     default: {
       serviceName: 'bts-agents',
       sampling: { type: SamplingStrategyType.ALWAYS },
-      exporters: [new DefaultExporter(), new CloudExporter()],
+      exporters,
       spanOutputProcessors: [new AgentActivitySpanProcessor()],
     },
   },
@@ -76,7 +98,6 @@ export const mastra = new Mastra({
     rex,
     della,
     margot,
-    lex,
   },
   storage,
   observability,
@@ -125,8 +146,12 @@ startPMListener(mastra);
 // Routine scheduling is now handled by Mastra's built-in scheduler — see
 // `schedule` field on executeRoutineWorkflow in src/workflows/executeRoutineWorkflow.ts.
 
-// Start Fastmail JMAP polling loop
+// Start Fastmail JMAP polling loop (CRM email → interactions → Della)
 startFastmailListener();
+
+// Poll each account's research folder for paid newsletters → news_items
+// (separate from the CRM sync; never creates interactions).
+startResearchMailListener();
 
 // Keep the content_embeddings RAG store in sync (embed-on-write + backfill).
 // Powers the newsletter workflow's retrieval step.
@@ -140,3 +165,8 @@ startNewsletterGateWebListener();
 // Resume variant Gate 3 decisions made in the /campaigns variant editor (same
 // web→DB→agents pattern: the editor writes content_items.pending_decision).
 startVariantGateWebListener();
+
+// Re-run the transcript waterfall for an episode when the web /news/podcasts
+// pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same
+// DB-driven pattern as the newsletter gate above.
+startPodcastActionListener();

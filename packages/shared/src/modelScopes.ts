@@ -54,7 +54,7 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     key: 'lex',
     type: 'agent',
     label: 'Lex',
-    description: 'Compliance officer — advice-risk classification and disclaimers (campaigns workflow)',
+    description: 'Compliance reviewer — flags advice-framed content (AFSL/AR) on draft persistence',
   },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
@@ -134,6 +134,30 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'executeRoutine',
     fallbackAgent: 'rex',
   },
+  {
+    key: 'executeRoutine.news_rubric_score',
+    type: 'workflow_step',
+    label: 'News relevance rubric',
+    description: 'Rex scores an ingested item on material/novelty/citation and drafts summary + curator notes (shared by email and feed ingestion)',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'executeRoutine.news_curation_select',
+    type: 'workflow_step',
+    label: 'News curation — select',
+    description: 'Editor selects and ranks the best ≤6 stories across news and podcasts',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'editor',
+  },
+  {
+    key: 'executeRoutine.news_curation_summary',
+    type: 'workflow_step',
+    label: 'News curation — mood summary',
+    description: 'Charlie writes the one-sentence mood/topic summary for the curated set',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'charlie',
+  },
 
   // ── Newsletter workflow steps ─────────────────────────────────────────────
   {
@@ -192,6 +216,15 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Compliance check',
     description: 'Lex classifies advice risk and decides on a disclaimer for the variant',
     workflow: 'variant',
+    fallbackAgent: 'lex',
+  },
+
+  // ── Content compliance review (Lex, on draft persistence) ──────────────────
+  {
+    key: 'content.compliance_review',
+    type: 'workflow_step',
+    label: 'Compliance review',
+    description: 'Lex reviews a persisted draft for advice risk (buy/sell framing, price prediction)',
     fallbackAgent: 'lex',
   },
 ] as const;

@@ -27,16 +27,39 @@ import type {
   NewsIngestResult,
   NewsSourceScanConfig,
   NewsSourceScanResult,
+  PodcastIngestConfig,
+  PodcastIngestResult,
+  NewsCurationConfig,
+  NewsCurationStory,
+  IndicatorPollResult,
+  OnchainPollResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
+import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
+import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { rex } from '../agents/researcher/index.js';
+import { charlie } from '../agents/contentCreator/index.js';
+import { editor } from '../agents/editorial/index.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
+import { coerceToSchema } from './newsletter/coerce.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
+import { extractNewsMetadata } from './newsExtract.js';
+import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
+import { fetchOgImage } from '../lib/fetchOgImage.js';
+import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
-import { fetchFeed } from '../lib/fetchFeed.js';
+import { fetchFeed, fetchPodcastFeed } from '../lib/fetchFeed.js';
+import { normalizePodcastItems } from '../lib/podcastFeed.js';
+import { resolveTranscript } from '../lib/transcripts/resolveTranscript.js';
+import {
+  insertEpisodeIfNew,
+  updateEpisode,
+  fetchExistingGuids,
+  storeAvailableTranscript,
+} from '../lib/transcripts/store.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
@@ -52,21 +75,6 @@ const routineSchema = z.object({
   timezone: z.string(),
 });
 
-const newsExtractionSchema = z.object({
-  category: z.enum(['regulatory', 'corporate', 'macro', 'international'])
-    .describe('The single best-fit category: "regulatory" (ASIC/ATO/APRA/government policy), "corporate" (ASX/company treasury announcements), "macro" (RBA rates, AUD, inflation), or "international" (US/EU/global developments with AU implications).'),
-  summary: z.string().min(40).max(500)
-    .describe('A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
-  key_points: z.array(z.string()).min(2).max(7)
-    .describe('2–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
-  topic_tags: z.array(z.string()).min(2).max(8)
-    .describe('2–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
-  australian_relevance: z.boolean()
-    .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
-  bitcoin_relevance: z.boolean()
-    .describe('true if the article meaningfully discusses Bitcoin, cryptocurrency, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context. false for unrelated content (sports, entertainment, unrelated politics, etc.) even if a Bitcoin keyword appears in passing.'),
-});
-
 const newsJudgeSchema = z.object({
   shortlist: z
     .array(
@@ -77,6 +85,24 @@ const newsJudgeSchema = z.object({
     )
     .min(1)
     .max(20),
+});
+
+const curationSelectSchema = z.object({
+  selected: z
+    .array(
+      z.object({
+        index: z.number().int().nonnegative()
+          .describe('The verbatim candidate index from the input list.'),
+      }),
+    )
+    .min(1)
+    .max(6)
+    .describe('The chosen items, ordered from most to least important.'),
+});
+
+const curationMoodSchema = z.object({
+  mood_summary: z.string().min(1).max(240)
+    .describe('One catchy sentence (no exclamation marks) summarising the overall mood and topics.'),
 });
 
 const fetchDueRoutines = createStep({
@@ -122,7 +148,7 @@ const fetchDueRoutines = createStep({
 
 // ── Step 2: Run each routine ─────────────────────────────────────────────────
 
-interface RoutineOutcome {
+export interface RoutineOutcome {
   routine_id: string;
   name: string;
   action_type: RoutineActionType;
@@ -141,6 +167,12 @@ interface RoutineOutcome {
   archive_urls?: string[];
   // news_ingest result counts:
   news_ingest_result?: NewsIngestResult;
+  // podcast_ingest result counts:
+  podcast_ingest_result?: PodcastIngestResult;
+  // indicator_poll result counts:
+  indicator_poll_result?: IndicatorPollResult;
+  // onchain_poll result counts:
+  onchain_poll_result?: OnchainPollResult;
 }
 
 const runRoutine = createStep({
@@ -169,6 +201,14 @@ const runRoutine = createStep({
           outcomes.push(await runNewsSourceScan(routine));
         } else if (routine.action_type === 'newsletter') {
           outcomes.push(await runNewsletter(routine));
+        } else if (routine.action_type === 'podcast_ingest') {
+          outcomes.push(await runPodcastIngest(routine));
+        } else if (routine.action_type === 'news_curation') {
+          outcomes.push(await runNewsCuration(routine));
+        } else if (routine.action_type === 'indicator_poll') {
+          outcomes.push(await runIndicatorPoll(routine));
+        } else if (routine.action_type === 'onchain_poll') {
+          outcomes.push(await runOnchainPoll(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -259,6 +299,223 @@ async function runResearchDigest(
     archive_urls: cfg.archive_sources ? result.sources.map((s) => s.url).filter(Boolean) : [],
   };
 }
+
+/** One normalized item in the curation candidate pool. */
+interface CurationCandidate extends NewsCurationStory {
+  summary: string;
+  published_at: string | null;
+}
+
+/**
+ * Curates the day's best stories across BOTH the news_items feed and ingested
+ * podcast_episodes into a dashboard tile. The editor selects and ranks ≤6 items;
+ * Charlie writes a one-sentence mood summary; the headline item's image (podcast
+ * feed artwork, or a best-effort og:image for news) is surfaced on the tile.
+ */
+export async function runNewsCuration(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as NewsCurationConfig;
+  const maxStories = Math.min(cfg.max_stories ?? 6, 6);
+  const lookbackHours = cfg.lookback_hours ?? 24;
+  const moreNewsUrl = cfg.more_news_url ?? '/news';
+  const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000).toISOString();
+
+  const base: Omit<RoutineOutcome, 'status' | 'result' | 'error'> = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'news_curation',
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  // ── Build a unified candidate pool: news articles + podcast episodes ─────────
+  const [newsRes, podcastRes] = await Promise.all([
+    supabase
+      .from('news_items')
+      .select('id, title, url, summary, category, source_name, relevance_score, published_at')
+      .gte('fetched_at', since)
+      .neq('status', 'archived')
+      .order('relevance_score', { ascending: false, nullsFirst: false })
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(60),
+    supabase
+      .from('podcast_episodes')
+      .select('id, title, description, episode_url, youtube_url, audio_url, image_url, published_at, source:news_sources(name)')
+      .gte('published_at', since)
+      .order('published_at', { ascending: false })
+      .limit(20),
+  ]);
+
+  if (newsRes.error) {
+    return { ...base, status: 'failed', result: null, error: `news_items query failed: ${newsRes.error.message}` };
+  }
+  if (podcastRes.error) {
+    return { ...base, status: 'failed', result: null, error: `podcast_episodes query failed: ${podcastRes.error.message}` };
+  }
+
+  const newsCandidates: CurationCandidate[] = (newsRes.data ?? []).map((r) => ({
+    kind: 'news',
+    id: r.id as string,
+    title: r.title as string,
+    url: r.url as string,
+    source_name: (r.source_name as string) ?? 'News',
+    category: (r.category as string) ?? 'news',
+    summary: (r.summary as string | null) ?? '',
+    published_at: (r.published_at as string | null) ?? null,
+  }));
+
+  const podcastCandidates: CurationCandidate[] = (podcastRes.data ?? []).map((r) => {
+    const rawSource = (r as { source?: unknown }).source;
+    const src = Array.isArray(rawSource) ? rawSource[0] : rawSource;
+    const sourceName = (src as { name?: string } | null)?.name ?? 'Podcast';
+    return {
+      kind: 'podcast',
+      id: r.id as string,
+      title: r.title as string,
+      url: (r.episode_url as string | null) ?? (r.youtube_url as string | null) ?? (r.audio_url as string | null) ?? '',
+      source_name: sourceName,
+      category: 'podcast',
+      image_url: (r.image_url as string | null) ?? undefined,
+      summary: (r.description as string | null) ?? '',
+      published_at: (r.published_at as string | null) ?? null,
+    };
+  });
+
+  // News first, then podcasts — indices below address this merged list.
+  const candidates = [...newsCandidates, ...podcastCandidates];
+
+  if (candidates.length === 0) {
+    return {
+      ...base,
+      status: 'success',
+      error: null,
+      result: {
+        summary: 'No fresh news to curate today.',
+        sources: [],
+        metadata: { mood_summary: '', stories: [], more_news_url: moreNewsUrl },
+      },
+    };
+  }
+
+  // ── Editor selects + ranks the best ≤maxStories ──────────────────────────────
+  const candidateLines = candidates
+    .map(
+      (c, i) =>
+        `${i}. [${c.kind}] ${c.title}\n   source: ${c.source_name} | category: ${c.category} | published: ${c.published_at ?? 'unknown'}\n   summary: ${c.summary.slice(0, 300)}`,
+    )
+    .join('\n\n');
+
+  const selectPrompt = `You are curating today's best Bitcoin and treasury news for the BTS home dashboard. From the candidates below (news articles and podcast episodes), pick the ${maxStories} most relevant, newsworthy, and distinct items — weighting Australian relevance, treasury and balance-sheet implications, and genuine novelty. Avoid near-duplicates and aim for a mix of formats and topics. Order them from most to least important. Return ONLY the candidate indices verbatim in the schema shape.
+
+Candidates:
+${candidateLines}`;
+
+  let selected: CurationCandidate[] = [];
+  try {
+    const resp = await editor.generate([{ role: 'user', content: selectPrompt }], {
+      requestContext: stepRequestContext('executeRoutine.news_curation_select'),
+      structuredOutput: {
+        schema: curationSelectSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { selected: [] },
+      },
+    });
+    const picked = coerceToSchema(curationSelectSchema, resp.object ?? { selected: [] });
+    const seen = new Set<number>();
+    selected = picked.selected
+      .map((s) => s.index)
+      .filter((i) => Number.isInteger(i) && i >= 0 && i < candidates.length && !seen.has(i) && seen.add(i))
+      .map((i) => candidates[i])
+      .slice(0, maxStories);
+  } catch (err) {
+    console.warn('[news-curation] editor selection failed:', err);
+  }
+
+  // Fallback: if the editor produced nothing usable, take the top ranked candidates.
+  if (selected.length === 0) selected = candidates.slice(0, maxStories);
+
+  const stories: NewsCurationStory[] = selected.map((c) => ({
+    kind: c.kind,
+    id: c.id,
+    title: c.title,
+    url: c.url,
+    source_name: c.source_name,
+    category: c.category,
+    image_url: c.image_url,
+  }));
+
+  // ── Charlie writes the one-sentence mood summary ─────────────────────────────
+  const moodPrompt = `Write ONE catchy sentence (max 200 characters, no exclamation marks, BTS brand voice) summarising the overall mood and the main topics across these stories. "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
+
+${stories.map((s, i) => `${i + 1}. ${s.title} (${s.source_name})`).join('\n')}
+
+${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
+
+  let moodSummary = '';
+  try {
+    const resp = await charlie.generate([{ role: 'user', content: moodPrompt }], {
+      requestContext: stepRequestContext('executeRoutine.news_curation_summary'),
+      structuredOutput: {
+        schema: curationMoodSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { mood_summary: '' },
+      },
+    });
+    moodSummary = coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
+  } catch (err) {
+    console.warn('[news-curation] Charlie mood summary failed:', err);
+  }
+
+  // ── Headline image: walk the ranked stories and use the first that resolves ──
+  // (podcast feed artwork, else best-effort og:image). Falling through to the
+  // second/third story means a single missing og:image no longer leaves the
+  // digest — email and dashboard tile — without any image.
+  let headlineImageUrl: string | undefined;
+  for (const story of stories) {
+    if (story.kind === 'podcast') {
+      if (story.image_url) {
+        headlineImageUrl = story.image_url;
+        break;
+      }
+    } else if (story.url) {
+      const og = await fetchOgImage(story.url);
+      if (og) {
+        headlineImageUrl = og;
+        break;
+      }
+    }
+  }
+
+  const retrievedAt = new Date().toISOString();
+  const result: RoutineResult = {
+    summary: moodSummary || `Curated ${stories.length} ${stories.length === 1 ? 'story' : 'stories'}.`,
+    // Reuse sources[] so the existing tile lists the items with zero extra work.
+    sources: stories.map((s) => ({
+      url: s.url,
+      title: s.title,
+      source: s.source_name,
+      excerpt: '',
+      retrieved_at: retrievedAt,
+    })),
+    metadata: {
+      mood_summary: moodSummary,
+      stories,
+      more_news_url: moreNewsUrl,
+      headline_image_url: headlineImageUrl,
+    },
+  };
+
+  // Email the curated digest to the team. Best-effort: deliverNewsDigest never
+  // throws, so a delivery problem can't fail the routine.
+  await deliverNewsDigest({ id: routine.id, title: routine.name }, result);
+
+  return { ...base, status: 'success', result, error: null };
+}
+
+const NEWS_CURATION_NO_TOOL_INSTRUCTION =
+  'Return ONLY the structured object. Do not call any tool (no persist_content_draft, no supabase tools).';
 
 /** True when `date` is the first Monday of its month. */
 function isFirstMondayOfMonth(date: Date): boolean {
@@ -401,83 +658,6 @@ async function runMonitorChange(
   };
 }
 
-let newsExtractorAgent: Agent | null = null;
-function getNewsExtractor(): Agent {
-  if (!newsExtractorAgent) {
-    newsExtractorAgent = new Agent({
-      id: 'newsExtractor',
-      name: 'newsExtractor',
-      instructions:
-        'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
-        'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
-        'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
-        'Set bitcoin_relevance=false for any article that does not meaningfully touch Bitcoin, crypto, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context — even if the article was returned by a Bitcoin-themed search query. ' +
-        'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
-      model: dynamicModelFor('executeRoutine.news_extractor'),
-      defaultOptions: { modelSettings: { maxOutputTokens: 8192 } },
-    });
-  }
-  return newsExtractorAgent;
-}
-
-async function extractNewsMetadata(input: {
-  title: string;
-  source: string;
-  // When provided, a category hint the caller already knows (keyword routine).
-  // When omitted (source scan), the extractor classifies the article itself.
-  category?: NewsCategory;
-  content: string;
-}): Promise<{
-  data: z.infer<typeof newsExtractionSchema> | null;
-  reason: string | null;
-}> {
-  const categoryLine = input.category
-    ? `Category hint: ${input.category}\n`
-    : `Classify this article into one of: regulatory, corporate, macro, international.\n`;
-  const basePrompt =
-    categoryLine +
-    `Title: ${input.title}\n` +
-    `Source: ${input.source}\n\n` +
-    `Article:\n${input.content}\n\n` +
-    `Extract: category (best-fit of the four values), summary (2–3 sentences, 40–500 chars), ` +
-    `key_points (2–7 factual bullets), ` +
-    `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
-    `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
-
-  // Two attempts max via Mastra structured output (JSON mode + schema-checked).
-  // 'strict' throws on validation failure; we catch and retry once with a nudge.
-  let lastError: string | null = null;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const prompt = attempt === 1
-      ? basePrompt
-      : `${basePrompt}\n\nYour previous response did not satisfy the schema. ` +
-        `Return ONLY a valid object matching the schema now — no prose, no code fences.`;
-
-    try {
-      const response = await getNewsExtractor().generate(
-        [{ role: 'user', content: prompt }],
-        {
-          structuredOutput: {
-            schema: newsExtractionSchema,
-            errorStrategy: 'strict',
-          },
-          requestContext: stepRequestContext('executeRoutine.news_extractor'),
-        },
-      );
-      const obj = response.object as z.infer<typeof newsExtractionSchema> | undefined;
-      if (obj) return { data: obj, reason: null };
-      lastError = 'no_object_returned';
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-    }
-  }
-  console.warn('[news-ingest] extraction failed after retry', {
-    title: input.title,
-    reason: lastError,
-  });
-  return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
-}
-
 let newsJudgeAgent: Agent | null = null;
 function getNewsJudge(): Agent {
   if (!newsJudgeAgent) {
@@ -572,7 +752,7 @@ async function runNewsIngest(
   const queries = cfg.queries ?? [];
   const maxPerQuery = cfg.max_results_per_query ?? 15;
   const maxCurated = cfg.max_curated ?? 6;
-  const relevanceFilter = cfg.relevance_filter ?? 'au_or_bitcoin';
+  const relevanceFilter = cfg.relevance_filter ?? defaultRelevanceFilter(category);
 
   const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
@@ -607,10 +787,11 @@ async function runNewsIngest(
       if (!res.ok) continue;
       const data = await res.json() as { results?: Array<{ url: string; title: string; content: string; score: number; published_date?: string; source?: string }> };
       for (const r of data.results ?? []) {
-        if (!seen.has(r.url)) {
-          seen.add(r.url);
+        const url = normalizeNewsUrl(r.url);
+        if (!seen.has(url)) {
+          seen.add(url);
           tavilyCandidates.push({
-            url: r.url,
+            url,
             title: r.title,
             summary: r.content?.slice(0, 500) ?? '',
             source: (r.source ?? new URL(r.url).hostname).replace(/^www\./, ''),
@@ -660,11 +841,14 @@ async function runNewsIngest(
       if (dedupEmbedding) {
         // Duplicate of a story already stored in the database.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Compare across all categories, not just this routine's — the same
+        // story is often surfaced by two category routines (e.g. a Forbes
+        // article landing in both "corporate" and "regulatory").
         const { data: near } = await (supabase.rpc as any)('vector_search_news', {
           query_embedding: dedupEmbedding,
           match_threshold: NEWS_DEDUP_THRESHOLD,
           match_count: 1,
-          filter_category: category,
+          filter_category: null,
           filter_days: 3,
         });
         if (near && near.length > 0) {
@@ -720,7 +904,7 @@ async function runNewsIngest(
     });
 
     if (ranked && ranked.shortlist.length > 0) {
-      shortlist = ranked.shortlist
+      shortlist = dedupeShortlistIndices(ranked.shortlist)
         .slice(0, maxCurated)
         .map((s) => fresh[s.index])
         .filter((c): c is FreshCandidate => Boolean(c));
@@ -796,7 +980,7 @@ async function runNewsIngest(
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
 
-      await supabase.from('news_items').insert({
+      const { error: insertError } = await supabase.from('news_items').insert({
         title: item.title,
         url: item.url,
         source_name: item.source,
@@ -813,6 +997,18 @@ async function runNewsIngest(
         routine_id: routine.id,
         ingested_by: 'rex',
       });
+      // A failed insert (e.g. a UNIQUE(url) collision from a late-detected
+      // duplicate) must not be counted as stored or surfaced in the dashboard
+      // sources — otherwise the same article appears twice in the tile.
+      if (insertError) {
+        if (insertError.code === '23505') itemsSkippedDuplicate += 1;
+        console.warn('[news-ingest] insert skipped', {
+          url: item.url,
+          title: item.title,
+          error: insertError.message,
+        });
+        continue;
+      }
       itemsStored += 1;
       if (extractionOk) {
         storedSources.push({
@@ -889,10 +1085,15 @@ async function runNewsSourceScan(
   };
 
   // ── Load active sources ────────────────────────────────────────────────────
-  const { data: sources, error: sourcesError } = await supabase
+  // Filter to article feeds only — podcast/youtube sources live in the same
+  // table but are handled by runPodcastIngest. (source_type isn't in the
+  // generated types until post-migration regen, hence the boundary cast.)
+  const { data: sources, error: sourcesError } = await (supabase
     .from('news_sources')
     .select('id, name, feed_url')
-    .eq('is_active', true);
+    .eq('is_active', true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .eq('source_type' as any, 'rss') as any);
 
   if (sourcesError) {
     return {
@@ -1126,6 +1327,193 @@ async function runNewsSourceScan(
   };
 }
 
+// ── podcast_ingest ───────────────────────────────────────────────────────────
+// Scans active podcast news_sources, ingests new episodes (dedupe on guid,
+// backfill-capped on first fetch), and resolves each transcript through the
+// waterfall (feed tag → YouTube → Deepgram). Available transcripts are embedded
+// into transcript_segments this run; Deepgram submissions resolve later via the
+// /webhooks/deepgram handler. Mirrors runNewsSourceScan's shape.
+
+interface PodcastSourceRow {
+  id: string;
+  name: string;
+  feed_url: string | null;
+  transcribe_with_deepgram: boolean;
+  preferred_transcript_lang: string;
+  max_backfill_episodes: number;
+  max_episode_age_days: number | null;
+  last_scanned_at: string | null;
+}
+
+async function runPodcastIngest(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as unknown as PodcastIngestConfig;
+  const maxPerSource = cfg.max_items_per_source ?? 25;
+  const lookbackDays = cfg.lookback_days ?? 14;
+  const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+
+  const baseOutcome = {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'podcast_ingest' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+  };
+
+  // Load active podcast sources. New columns aren't in the generated types until
+  // post-migration regen, so we cast at the boundary.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sourcesRaw, error: sourcesError } = await (supabase
+    .from('news_sources')
+    .select(
+      'id, name, feed_url, transcribe_with_deepgram, preferred_transcript_lang, max_backfill_episodes, max_episode_age_days, last_scanned_at',
+    )
+    .eq('is_active', true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .eq('source_type' as any, 'podcast') as any);
+
+  if (sourcesError) {
+    return {
+      ...baseOutcome,
+      status: 'failed',
+      result: null,
+      error: `Failed to load podcast sources: ${(sourcesError as { message: string }).message}`,
+    };
+  }
+
+  const sources = (sourcesRaw ?? []) as PodcastSourceRow[];
+  const result: PodcastIngestResult = {
+    sources_scanned: 0,
+    episodes_found: 0,
+    episodes_new: 0,
+    transcripts_available: 0,
+    transcripts_transcribing: 0,
+    transcripts_skipped: 0,
+    transcripts_failed: 0,
+    segments_embedded: 0,
+    failed_sources: [],
+  };
+
+  for (const src of sources) {
+    if (!src.feed_url) continue;
+    result.sources_scanned += 1;
+    try {
+      const feed = await fetchPodcastFeed(src.feed_url);
+      const items = normalizePodcastItems(
+        (feed.items ?? []) as Parameters<typeof normalizePodcastItems>[0],
+        { cutoffMs: cutoff, maxItems: maxPerSource },
+      );
+      result.episodes_found += items.length;
+
+      const existingGuids = await fetchExistingGuids(src.id);
+      const isFirstFetch = !src.last_scanned_at || existingGuids.size === 0;
+
+      let newItems = items.filter((it) => !existingGuids.has(it.guid));
+      if (isFirstFetch && newItems.length > src.max_backfill_episodes) {
+        // First fetch of a new feed: cap to the newest N so adding an old show
+        // doesn't ingest a decade overnight.
+        newItems = [...newItems]
+          .sort((a, b) => {
+            const ta = a.published_at ? new Date(a.published_at).getTime() : 0;
+            const tb = b.published_at ? new Date(b.published_at).getTime() : 0;
+            return tb - ta;
+          })
+          .slice(0, src.max_backfill_episodes);
+      }
+
+      for (const item of newItems) {
+        const episodeId = await insertEpisodeIfNew({
+          source_id: src.id,
+          guid: item.guid,
+          title: item.title,
+          description: item.description,
+          episode_url: item.episode_url,
+          audio_url: item.audio_url,
+          audio_mime_type: item.audio_mime_type,
+          duration_seconds: item.duration_seconds,
+          youtube_url: item.youtube_url,
+          season: item.season,
+          episode_number: item.episode_number,
+          image_url: item.image_url,
+          published_at: item.published_at,
+          ingestion_origin: 'feed',
+          transcript_status: 'resolving',
+        });
+        // Null = a row with this guid already exists (seen on a prior run, or the
+        // feed repeated the guid in this batch). Expected, not a failure — skip
+        // it rather than letting the unique-violation abort the whole feed.
+        if (episodeId === null) continue;
+        result.episodes_new += 1;
+
+        const outcome = await resolveTranscript(
+          {
+            youtube_url: item.youtube_url,
+            audio_url: item.audio_url,
+            published_at: item.published_at,
+            transcriptTags: item.transcriptTags,
+          },
+          {
+            transcribe_with_deepgram: src.transcribe_with_deepgram,
+            preferred_transcript_lang: src.preferred_transcript_lang,
+            max_episode_age_days: src.max_episode_age_days,
+          },
+        );
+
+        if (outcome.kind === 'available') {
+          const { segments } = await storeAvailableTranscript(episodeId, outcome);
+          result.transcripts_available += 1;
+          result.segments_embedded += segments;
+        } else if (outcome.kind === 'transcribing') {
+          await updateEpisode(episodeId, {
+            transcript_status: 'transcribing',
+            deepgram_request_id: outcome.deepgramRequestId,
+          });
+          result.transcripts_transcribing += 1;
+        } else if (outcome.kind === 'skipped') {
+          await updateEpisode(episodeId, { transcript_status: 'skipped' });
+          result.transcripts_skipped += 1;
+        } else {
+          await updateEpisode(episodeId, {
+            transcript_status: 'failed',
+            transcript_error: outcome.error,
+          });
+          result.transcripts_failed += 1;
+        }
+      }
+
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'success', last_error: null })
+        .eq('id', src.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      result.failed_sources!.push(src.name);
+      console.warn('[podcast-ingest] feed failed', { source: src.name, error: message });
+      await supabase
+        .from('news_sources')
+        .update({ last_scanned_at: new Date().toISOString(), last_status: 'failed', last_error: message.slice(0, 500) })
+        .eq('id', src.id);
+    }
+  }
+
+  const failSuffix = result.failed_sources!.length > 0 ? ` ${result.failed_sources!.length} source(s) failed to fetch.` : '';
+  const summary =
+    `Scanned ${result.sources_scanned} podcast source(s): ${result.episodes_new} new episode(s) — ` +
+    `${result.transcripts_available} transcribed (${result.segments_embedded} segments), ` +
+    `${result.transcripts_transcribing} awaiting Deepgram, ${result.transcripts_skipped} skipped, ` +
+    `${result.transcripts_failed} failed.${failSuffix}`;
+
+  return {
+    ...baseOutcome,
+    status: 'success',
+    result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
+    error: null,
+    podcast_ingest_result: result,
+  };
+}
+
 function extractResearchResult(text: string): ResearchResult | null {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -1187,6 +1575,28 @@ const persistAndSchedule = createStep({
       //   SELECT created_at, notes::jsonb FROM agent_activity
       //   WHERE action LIKE 'Routine run: News%' ORDER BY created_at DESC;
       const isNewsIngest = outcome.action_type === 'news_ingest';
+      const isPodcastIngest = outcome.action_type === 'podcast_ingest';
+      const isIndicatorPoll = outcome.action_type === 'indicator_poll';
+      const isOnchainPoll = outcome.action_type === 'onchain_poll';
+      const indicatorNotes = isIndicatorPoll && outcome.indicator_poll_result
+        ? JSON.stringify(outcome.indicator_poll_result)
+        : null;
+      const indicatorHasAnomaly = isIndicatorPoll && outcome.indicator_poll_result
+        ? outcome.indicator_poll_result.failed.length > 0
+        : false;
+      const onchainNotes = isOnchainPoll && outcome.onchain_poll_result
+        ? JSON.stringify(outcome.onchain_poll_result)
+        : null;
+      const onchainHasAnomaly = isOnchainPoll && outcome.onchain_poll_result
+        ? outcome.onchain_poll_result.failed.length > 0
+        : false;
+      const podcastNotes = isPodcastIngest && outcome.podcast_ingest_result
+        ? JSON.stringify(outcome.podcast_ingest_result)
+        : null;
+      const podcastHasAnomaly = isPodcastIngest && outcome.podcast_ingest_result
+        ? outcome.podcast_ingest_result.transcripts_failed > 0
+          || (outcome.podcast_ingest_result.failed_sources?.length ?? 0) > 0
+        : false;
       const newsNotes = isNewsIngest && outcome.news_ingest_result
         ? JSON.stringify(outcome.news_ingest_result)
         : null;
@@ -1197,10 +1607,10 @@ const persistAndSchedule = createStep({
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (newsHasAnomaly ? 'error' : 'auto')
+        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly || onchainHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
-        agent_name: outcome.action_type === 'research_digest' ? 'rex' : 'rex',
+        agent_name: isPodcastIngest ? 'archie' : (isIndicatorPoll || isOnchainPoll) ? 'simon' : 'rex',
         action: `Routine run: ${outcome.name}`,
         status: activityStatus,
         trigger_type: 'scheduled',
@@ -1209,7 +1619,7 @@ const persistAndSchedule = createStep({
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: newsNotes ?? outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? onchainNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.

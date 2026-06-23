@@ -16,13 +16,20 @@ import {
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
 import { useToast } from '@/providers/ToastProvider';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Rss, Mic, Youtube, Mail } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
-import type { NewsSourceRecord } from '@platform/shared';
+import type { NewsSourceRecord, NewsSourceType } from '@platform/shared';
 import styles from './sources.module.css';
+
+export interface SourceStats {
+  episodes: number;
+  available: number;
+}
 
 interface Props {
   initialSources: NewsSourceRecord[];
+  stats: Record<string, SourceStats>;
+  inboundDomain: string;
 }
 
 function statusColor(status: string | null): 'neutral' | 'success' | 'destructive' {
@@ -31,16 +38,33 @@ function statusColor(status: string | null): 'neutral' | 'success' | 'destructiv
   return 'neutral';
 }
 
+const TYPE_META: Record<NewsSourceType, { label: string; icon: typeof Rss }> = {
+  rss: { label: 'Article', icon: Rss },
+  podcast: { label: 'Podcast', icon: Mic },
+  youtube: { label: 'YouTube', icon: Youtube },
+  email: { label: 'Email', icon: Mail },
+};
+
 function valuesToFormData(v: NewsSourceFormValues): FormData {
   const fd = new FormData();
   fd.set('name', v.name);
+  fd.set('source_type', v.source_type);
   fd.set('site_url', v.site_url);
   fd.set('feed_url', v.feed_url);
+  fd.set('youtube_channel_url', v.youtube_channel_url);
   fd.set('is_active', v.is_active ? 'true' : 'false');
+  fd.set('transcribe_with_deepgram', v.transcribe_with_deepgram ? 'true' : 'false');
+  fd.set('preferred_transcript_lang', v.preferred_transcript_lang);
+  fd.set('max_backfill_episodes', String(v.max_backfill_episodes));
+  fd.set('max_episode_age_days', v.max_episode_age_days == null ? '' : String(v.max_episode_age_days));
+  fd.set('slug', v.slug);
+  fd.set('tier', v.tier);
+  fd.set('relevance_threshold', String(v.relevance_threshold));
+  fd.set('sender_allowlist', v.sender_allowlist);
   return fd;
 }
 
-export function NewsSourcesClient({ initialSources }: Props) {
+export function NewsSourcesClient({ initialSources, stats, inboundDomain }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [editSource, setEditSource] = useState<NewsSourceRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NewsSourceRecord | null>(null);
@@ -92,20 +116,71 @@ export function NewsSourcesClient({ initialSources }: Props) {
     {
       key: 'name',
       header: 'Source',
-      render: (r) => (
-        <div className={styles.nameCell}>
-          <span className={styles.nameText}>{r.name}</span>
-          <a
-            className={styles.nameSub}
-            href={r.feed_url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {r.feed_url} <ExternalLink size={11} strokeWidth={1.5} />
-          </a>
-        </div>
-      ),
+      render: (r) => {
+        const meta = TYPE_META[r.source_type] ?? TYPE_META.rss;
+        const Icon = meta.icon;
+        const link = r.feed_url ?? r.youtube_channel_url ?? r.site_url;
+        return (
+          <div className={styles.nameCell}>
+            <span className={styles.nameRow}>
+              <span className={styles.nameText}>{r.name}</span>
+              <span className={styles.typeChip}>
+                <Icon size={11} strokeWidth={1.5} />
+                {meta.label}
+              </span>
+            </span>
+            {r.source_type === 'email' ? (
+              r.inbound_address && <span className={styles.nameSub}>{r.inbound_address}</span>
+            ) : (
+              link && (
+                <a
+                  className={styles.nameSub}
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {link} <ExternalLink size={11} strokeWidth={1.5} />
+                </a>
+              )
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'episodes',
+      header: 'Episodes',
+      render: (r) => {
+        if (r.source_type === 'rss') return <span className={styles.muted}>—</span>;
+        const s = stats[r.id] ?? { episodes: 0, available: 0 };
+        const coverage = s.episodes > 0 ? Math.round((s.available / s.episodes) * 100) : 0;
+        return (
+          <div className={styles.episodesCell}>
+            <span className={styles.mono}>{s.episodes}</span>
+            {s.episodes > 0 && (
+              <span className={styles.coverage}>
+                <span className={styles.mono}>{coverage}%</span> transcribed
+              </span>
+            )}
+          </div>
+        );
+      },
+      width: '140px',
+    },
+    {
+      key: 'deepgram',
+      header: 'Deepgram',
+      render: (r) =>
+        r.source_type === 'podcast' ? (
+          <span className={styles.deepgramCell}>
+            <span className={`${styles.dot} ${r.transcribe_with_deepgram ? styles.dotOn : ''}`} />
+            {r.transcribe_with_deepgram ? 'On' : 'Off'}
+          </span>
+        ) : (
+          <span className={styles.muted}>—</span>
+        ),
+      width: '110px',
     },
     {
       key: 'last',
@@ -119,7 +194,7 @@ export function NewsSourcesClient({ initialSources }: Props) {
         ) : (
           <span className={styles.muted}>Never</span>
         ),
-      width: '200px',
+      width: '190px',
     },
     {
       key: 'active',
@@ -141,16 +216,28 @@ export function NewsSourcesClient({ initialSources }: Props) {
 
   const initialValuesForEdit = (r: NewsSourceRecord): NewsSourceFormValues => ({
     name: r.name,
+    source_type: r.source_type,
     site_url: r.site_url ?? '',
-    feed_url: r.feed_url,
+    feed_url: r.feed_url ?? '',
+    youtube_channel_url: r.youtube_channel_url ?? '',
     is_active: r.is_active,
+    transcribe_with_deepgram: r.transcribe_with_deepgram,
+    preferred_transcript_lang: r.preferred_transcript_lang ?? 'en',
+    max_backfill_episodes: r.max_backfill_episodes ?? 25,
+    max_episode_age_days: r.max_episode_age_days,
+    slug: r.slug ?? '',
+    tier: r.tier ?? 'tier_2',
+    relevance_threshold: r.relevance_threshold ?? 0.7,
+    sender_allowlist: (r.sender_allowlist ?? []).join('\n'),
   });
 
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
         <p className={styles.intro}>
-          Publications scanned daily for new articles. Add a site and the scan stores new posts in the news feed.
+          Sources scanned daily for new content — article feeds, podcasts, YouTube channels, and email
+          newsletters. Podcast and YouTube episodes are transcribed and embedded; newsletters are
+          received at a per-source inbound address and ingested into the feed.
         </p>
         <Button onClick={() => setShowCreate(true)}>
           <Plus size={16} strokeWidth={1.5} />
@@ -163,20 +250,21 @@ export function NewsSourcesClient({ initialSources }: Props) {
         data={sources}
         rowKey={(r) => r.id}
         rowActions={rowActions}
-        emptyState={<span>No news sources yet. Add a publication to start scanning its feed.</span>}
+        emptyState={<span>No sources yet. Add a publication, podcast, or channel to start scanning.</span>}
       />
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add news source" size="md">
-        <NewsSourceForm onSubmit={handleCreate} submitting={submitting} onCancel={() => setShowCreate(false)} />
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add source" size="md">
+        <NewsSourceForm onSubmit={handleCreate} submitting={submitting} onCancel={() => setShowCreate(false)} inboundDomain={inboundDomain} />
       </Modal>
 
-      <Modal open={editSource !== null} onClose={() => setEditSource(null)} title="Edit news source" size="md">
+      <Modal open={editSource !== null} onClose={() => setEditSource(null)} title="Edit source" size="md">
         {editSource && (
           <NewsSourceForm
             initialValues={initialValuesForEdit(editSource)}
             onSubmit={handleUpdate}
             submitting={submitting}
             onCancel={() => setEditSource(null)}
+            inboundDomain={inboundDomain}
           />
         )}
       </Modal>

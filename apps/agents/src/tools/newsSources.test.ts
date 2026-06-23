@@ -62,7 +62,7 @@ describe('manageNewsSources tool', () => {
       site_url: 'https://bitcoinmagazine.com',
       feed_url: 'https://bitcoinmagazine.com/feed',
     });
-    expect(result).toEqual({ id: 's2', feed_url: 'https://bitcoinmagazine.com/feed' });
+    expect(result).toEqual({ id: 's2', source_type: 'rss', feed_url: 'https://bitcoinmagazine.com/feed' });
     const builder = fake.__buildersFor('news_sources')[0];
     expect(builder.insert).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Bitcoin Magazine',
@@ -74,7 +74,47 @@ describe('manageNewsSources tool', () => {
   it('derives a Substack feed when adding without feed_url', async () => {
     fake.__setResponse('news_sources', { data: { id: 's3' }, error: null });
     const result = await execute({ action: 'add', name: 'Lyn Alden', site_url: 'https://lynalden.substack.com' });
-    expect(result).toEqual({ id: 's3', feed_url: 'https://lynalden.substack.com/feed' });
+    expect(result).toEqual({ id: 's3', source_type: 'rss', feed_url: 'https://lynalden.substack.com/feed' });
+  });
+
+  it('adds a podcast source with Deepgram off by default and no RSS validation', async () => {
+    fake.__setResponse('news_sources', { data: { id: 'p1' }, error: null });
+    const result = await execute({
+      action: 'add',
+      name: 'What Bitcoin Did',
+      source_type: 'podcast',
+      feed_url: 'https://feeds.example.com/wbd',
+    });
+    expect(result).toEqual({ id: 'p1', source_type: 'podcast', feed_url: 'https://feeds.example.com/wbd' });
+    expect(fetchFeed).not.toHaveBeenCalled(); // podcast feeds are not RSS-validated
+    const builder = fake.__buildersFor('news_sources')[0];
+    expect(builder.insert).toHaveBeenCalledWith(expect.objectContaining({
+      source_type: 'podcast',
+      transcribe_with_deepgram: false,
+    }));
+  });
+
+  it('adds a youtube source from a channel url with no feed', async () => {
+    fake.__setResponse('news_sources', { data: { id: 'y1' }, error: null });
+    const result = await execute({
+      action: 'add',
+      name: 'Some Channel',
+      source_type: 'youtube',
+      youtube_channel_url: 'https://youtube.com/@somechannel',
+    });
+    expect(result).toEqual({ id: 'y1', source_type: 'youtube', feed_url: null });
+    const builder = fake.__buildersFor('news_sources')[0];
+    expect(builder.insert).toHaveBeenCalledWith(expect.objectContaining({
+      source_type: 'youtube',
+      feed_url: null,
+      youtube_channel_url: 'https://youtube.com/@somechannel',
+    }));
+  });
+
+  it('rejects a youtube source with no channel url', async () => {
+    const result = await execute({ action: 'add', name: 'No Channel', source_type: 'youtube' });
+    expect(result).toEqual({ error: expect.stringContaining('youtube_channel_url is required') });
+    expect(fake.__buildersFor('news_sources')).toHaveLength(0);
   });
 
   it('rejects add when no feed can be resolved', async () => {

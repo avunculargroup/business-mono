@@ -1,10 +1,25 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import { vectorSearch, graphTraverse, fulltextSearch } from '@platform/db';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@platform/shared';
+import { fetchText } from '../../lib/fetchFeed.js';
+import { resolveTranscript } from '../../lib/transcripts/resolveTranscript.js';
+import {
+  insertEpisode,
+  updateEpisode,
+  storeAvailableTranscript,
+} from '../../lib/transcripts/store.js';
 
 const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+
+// Hard cap on a fetched page body. We only keep the first 50 K chars of stripped
+// text, so there is no reason to buffer (let alone regex-strip) a multi-MB page.
+// fetchText streams and aborts past the cap, so a giant body is never fully held
+// — the same OOM guard the transcript waterfall uses (the agents host runs a
+// small heap that a few global .replace() passes over a large string can exhaust).
+const MAX_WEB_FETCH_BYTES = 5 * 1024 * 1024;
 
 export const webFetch = createTool({
   id: 'web_fetch',
@@ -13,20 +28,92 @@ export const webFetch = createTool({
     url: z.string().describe('URL to fetch'),
   }),
   execute: async (context) => {
-    const response = await fetch(context.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PlatformArchivist/1.0)' },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${context.url}: ${response.statusText}`);
+    let html: string;
+    try {
+      html = await fetchText(
+        context.url,
+        { 'User-Agent': 'Mozilla/5.0 (compatible; PlatformArchivist/1.0)' },
+        MAX_WEB_FETCH_BYTES,
+      );
+    } catch (err) {
+      throw new Error(
+        `Failed to fetch ${context.url}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
-    const html = await response.text();
     // Strip HTML tags for raw content
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? context.url;
 
     return { url: context.url, title, rawContent: text.slice(0, 50000) };
+  },
+});
+
+export const ingestEpisode = createTool({
+  id: 'ingest_episode',
+  description:
+    'Ingest a one-off podcast episode or interview from an audio or YouTube URL and resolve its transcript. Use for spoken content with no clean feed — Simon forwards these with a reason. Creates a durable episode row and embeds the transcript so Rex can retrieve it. Deepgram transcription is allowed here (it is an explicit human decision to save this). Returns the episode id and resolution status.',
+  inputSchema: z.object({
+    audio_url: z.string().optional().describe('Direct audio file URL (the input to Deepgram)'),
+    youtube_url: z.string().optional().describe('YouTube video URL, if the episode is on YouTube'),
+    title: z.string().optional().describe('Episode title, if known'),
+    why: z.string().describe('Why this is worth saving — stored as the curator note and surfaced in retrieval'),
+  }),
+  execute: async (context) => {
+    const url = context.youtube_url ?? context.audio_url;
+    if (!url) throw new Error('Provide an audio_url or youtube_url to ingest.');
+
+    // guid = hash of the source URL — the dedupe key for ad-hoc episodes.
+    const guid = createHash('sha256').update(url).digest('hex');
+
+    const episodeId = await insertEpisode({
+      source_id: null,
+      guid,
+      title: context.title ?? url,
+      audio_url: context.audio_url ?? null,
+      youtube_url: context.youtube_url ?? null,
+      ingestion_origin: 'brief',
+      curator_note: context.why,
+      transcript_status: 'resolving',
+    });
+
+    // Same waterfall as the daily batch; feed-tag stage is skipped (no tags).
+    // Briefs allow Deepgram — the human already decided this is worth paying for.
+    const outcome = await resolveTranscript(
+      {
+        youtube_url: context.youtube_url ?? null,
+        audio_url: context.audio_url ?? null,
+        published_at: null,
+        transcriptTags: [],
+      },
+      { transcribe_with_deepgram: true, preferred_transcript_lang: 'en', max_episode_age_days: null },
+    );
+
+    if (outcome.kind === 'available') {
+      const { segments } = await storeAvailableTranscript(episodeId, outcome);
+      return { episode_id: episodeId, status: 'available', transcript_source: outcome.source, segments };
+    }
+    if (outcome.kind === 'transcribing') {
+      await updateEpisode(episodeId, {
+        transcript_status: 'transcribing',
+        deepgram_request_id: outcome.deepgramRequestId,
+      });
+      return {
+        episode_id: episodeId,
+        status: 'transcribing',
+        note: 'Submitted to Deepgram; the transcript will resolve when the callback fires.',
+      };
+    }
+    if (outcome.kind === 'failed') {
+      await updateEpisode(episodeId, { transcript_status: 'failed', transcript_error: outcome.error });
+      return { episode_id: episodeId, status: 'failed', error: outcome.error };
+    }
+    await updateEpisode(episodeId, { transcript_status: 'skipped' });
+    return {
+      episode_id: episodeId,
+      status: 'skipped',
+      note: 'No free transcript found and no audio URL to transcribe.',
+    };
   },
 });
 

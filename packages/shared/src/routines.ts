@@ -16,12 +16,27 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //  - news_source_scan: Rex scans the user-curated news_sources feeds for new articles.
 //  - newsletter: launches the suspendable newsletter workflow (Rex selects, Charlie
 //    drafts, editorial reviews; suspends for human approval at two Signal gates).
+//  - podcast_ingest: Archie scans podcast news_sources, ingests new episodes, and
+//    resolves each transcript via the waterfall (feed tag → YouTube → Deepgram).
+//  - news_curation: Charlie/editor curate the day's best news_items + podcast_episodes
+//    into a dashboard tile (mood summary, ≤6 ranked stories, headline image, more-news link).
+//  - indicator_poll: Simon polls each due economic_indicator via its provider adapter
+//    (FRED/RBA), upserts observations with revision handling, and proposes a content beat
+//    (Charlie draft) on a qualifying new print.
+//  - onchain_poll: Simon polls each active on-chain indicator via its provider adapter
+//    (mempool/coinmetrics), upserts raw observations with revision handling, lets the
+//    views derive the rest, and proposes a (compliance-sensitive) content beat on a
+//    Hash-Ribbons signal change, an MVRV band cross, or a large hash-rate drop.
 export const RoutineActionType = {
   RESEARCH_DIGEST:   'research_digest',
   MONITOR_CHANGE:    'monitor_change',
   NEWS_INGEST:       'news_ingest',
   NEWS_SOURCE_SCAN:  'news_source_scan',
   NEWSLETTER:        'newsletter',
+  PODCAST_INGEST:    'podcast_ingest',
+  NEWS_CURATION:     'news_curation',
+  INDICATOR_POLL:    'indicator_poll',
+  ONCHAIN_POLL:      'onchain_poll',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -62,10 +77,106 @@ export interface NewsletterConfig {
   monthly_guard?: boolean;
 }
 
+// action_config shape for a 'podcast_ingest' routine. Like news_source_scan, the
+// routine scans every active podcast news_sources row, so config holds only
+// per-run limits — the per-feed knobs (Deepgram opt-in, backfill cap, language)
+// live on news_sources.
+export interface PodcastIngestConfig {
+  // Max feed items to consider per source per run (default 25).
+  max_items_per_source?: number;
+  // Only consider feed items published within this many days (default 14).
+  lookback_days?: number;
+}
+
+export interface PodcastIngestResult {
+  sources_scanned: number;
+  episodes_found: number;
+  episodes_new: number;
+  transcripts_available: number;
+  transcripts_transcribing: number;
+  transcripts_skipped: number;
+  transcripts_failed: number;
+  segments_embedded: number;
+  // Names of sources whose feed could not be fetched/parsed this run.
+  failed_sources?: string[];
+}
+
+// action_config shape for a 'news_curation' routine. Curates the day's best
+// news_items + podcast_episodes into a dashboard tile.
+export interface NewsCurationConfig {
+  // Max items to feature on the tile (default 6, hard-capped at 6).
+  max_stories?: number;
+  // Only consider items fetched/published within this many hours (default 24).
+  lookback_hours?: number;
+  // Where the tile's "More news" footer link points (default '/news').
+  more_news_url?: string;
+}
+
+// One curated item on the news_curation tile — either a news article or a podcast episode.
+export interface NewsCurationStory {
+  kind: 'news' | 'podcast';
+  id: string;
+  title: string;
+  url: string;
+  source_name: string;
+  category: string;
+  image_url?: string;
+}
+
+// Structured payload persisted under routines.last_result.metadata for news_curation.
+export interface NewsCurationResult {
+  mood_summary: string;
+  stories: NewsCurationStory[];
+  more_news_url: string;
+  headline_image_url?: string;
+}
+
+// action_config shape for an 'indicator_poll' routine. Polls economic_indicators.
+export interface IndicatorPollConfig {
+  // How many historical periods to pull the first time an indicator is seen,
+  // so YoY and the sparkline aren't empty on day one (default 18, ~range 12–24).
+  backfill_periods?: number;
+}
+
+// Structured payload persisted under routines.last_result.metadata for indicator_poll,
+// and serialised into agent_activity.notes so quiet days stay on the record.
+export interface IndicatorPollResult {
+  indicators_polled: number;
+  observations_inserted: number;
+  observations_superseded: number;
+  no_op: number;
+  beats_proposed: number;
+  // Provider/indicator labels whose fetch or parse failed this run (sweep continues).
+  failed: string[];
+}
+
+// action_config shape for an 'onchain_poll' routine. Polls onchain_indicators.
+export interface OnchainPollConfig {
+  // How many days of history to pull the first time an indicator is seen. Hash
+  // Ribbons needs 60 days of hash rate to compute, so default generously (90).
+  backfill_days?: number;
+}
+
+// Structured payload persisted under routines.last_result.metadata for onchain_poll,
+// and serialised into agent_activity.notes so quiet days stay on the record.
+export interface OnchainPollResult {
+  indicators_polled: number;
+  observations_inserted: number;
+  observations_superseded: number;
+  no_op: number;
+  beats_proposed: number;
+  // Provider/indicator labels whose fetch or parse failed this run (sweep continues).
+  failed: string[];
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
-  | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig);
+  | ({ action_type: typeof RoutineActionType.NEWSLETTER } & NewsletterConfig)
+  | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig)
+  | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig)
+  | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig)
+  | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

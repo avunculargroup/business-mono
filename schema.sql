@@ -714,7 +714,9 @@ CREATE TABLE routines (
                       ('simon','roger','archie','petra','bruno','charlie','rex','della','margot','lex')),
   action_type       TEXT NOT NULL
                     CHECK (action_type IN ('research_digest','monitor_change',
-                                           'news_ingest','news_source_scan','newsletter')),
+                                           'news_ingest','news_source_scan','newsletter',
+                                           'podcast_ingest','news_curation','indicator_poll',
+                                           'onchain_poll')),
   action_config     JSONB NOT NULL DEFAULT '{}'::jsonb,
   frequency         TEXT NOT NULL
                     CHECK (frequency IN ('daily','weekly','fortnightly')),
@@ -962,6 +964,7 @@ CREATE TABLE IF NOT EXISTS fastmail_accounts (
   display_name          TEXT,
   is_active             BOOLEAN     NOT NULL DEFAULT true,
   watched_addresses     TEXT[]      NOT NULL DEFAULT '{}', -- empty = all; non-empty = filter by these aliases
+  research_folder       TEXT,                              -- Fastmail folder of research newsletters; polled by researchMailListener (not CRM)
   last_error            TEXT,
   last_error_at         TIMESTAMPTZ,
   consecutive_failures  INTEGER     NOT NULL DEFAULT 0,
@@ -1004,6 +1007,7 @@ CREATE TABLE IF NOT EXISTS fastmail_sync_state (
   jmap_account_id   TEXT,
   inbox_query_state TEXT,
   sent_query_state  TEXT,
+  research_query_state TEXT,                                -- JMAP incremental marker for the research folder
   last_synced_at    TIMESTAMPTZ,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -1445,12 +1449,56 @@ CREATE TYPE news_category AS ENUM (
   'international'  -- US/EU/global regulation with AU implications
 );
 
+-- One row per upstream source feeding news_items. source_type discriminates the
+-- ingestion path: rss/podcast read feed_url, youtube reads youtube_channel_url,
+-- email receives newsletters at inbound_address (research+{slug}@<domain>) filed
+-- into a Fastmail folder polled by researchMailListener.
+-- (migrations: 20260525000000 base, 20260606120000 podcast/youtube,
+--  20260617000000 email + Rex rubric curation fields)
+CREATE TABLE news_sources (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                      TEXT        NOT NULL,
+  site_url                  TEXT,
+  feed_url                  TEXT,                              -- rss/podcast only; UNIQUE where present
+  source_type               TEXT        NOT NULL DEFAULT 'rss'
+                              CHECK (source_type IN ('rss','podcast','youtube','email')),
+  -- podcast / youtube config
+  youtube_channel_url       TEXT,
+  transcribe_with_deepgram  BOOLEAN     NOT NULL DEFAULT false,
+  preferred_transcript_lang TEXT        NOT NULL DEFAULT 'en',
+  max_backfill_episodes     INT         NOT NULL DEFAULT 25,
+  max_episode_age_days      INT,
+  -- email config
+  slug                      TEXT,                              -- plus-address suffix + URL slug; UNIQUE where present
+  inbound_address           TEXT,                              -- research+{slug}@<domain>
+  sender_allowlist          TEXT[]      NOT NULL DEFAULT '{}', -- approved From addresses/domains
+  -- shared curation (Rex rubric)
+  tier                      TEXT        CHECK (tier IS NULL OR tier IN ('tier_1','tier_2','tier_3')),
+  relevance_threshold       NUMERIC(3,2) NOT NULL DEFAULT 0.70,
+  is_active                 BOOLEAN     NOT NULL DEFAULT true,
+  last_scanned_at           TIMESTAMPTZ,
+  last_status               TEXT        CHECK (last_status IN ('success','failed')),
+  last_error                TEXT,
+  created_by                UUID        REFERENCES team_members(id),
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT news_sources_feed_required CHECK (
+       (source_type IN ('rss','podcast') AND feed_url IS NOT NULL)
+    OR (source_type = 'youtube' AND youtube_channel_url IS NOT NULL)
+    OR (source_type = 'email' AND inbound_address IS NOT NULL) )
+);
+-- UNIQUE (feed_url) WHERE feed_url IS NOT NULL; UNIQUE (slug) WHERE slug IS NOT NULL.
+
 CREATE TABLE news_items (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title                TEXT NOT NULL,
-  url                  TEXT NOT NULL UNIQUE,
+  url                  TEXT NOT NULL UNIQUE,        -- synthesized from Message-ID for email items without a URL
   url_hash             TEXT GENERATED ALWAYS AS (md5(url)) STORED,
+  source_id            UUID REFERENCES news_sources(id) ON DELETE SET NULL,  -- configured source (email always; rss/podcast going forward)
   source_name          TEXT NOT NULL DEFAULT '',
+  ingestion_ref        TEXT,                        -- email Message-ID; idempotency key, deduped before url/semantic dedup
+  canonical_url        TEXT,                        -- real "view in browser"/original link (email items)
+  author               TEXT,
   published_at         TIMESTAMPTZ,
   fetched_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   body_markdown        TEXT,
@@ -1460,6 +1508,11 @@ CREATE TABLE news_items (
   topic_tags           TEXT[] NOT NULL DEFAULT '{}',
   australian_relevance BOOLEAN NOT NULL DEFAULT TRUE,
   relevance_score      NUMERIC(3,2),
+  relevance_reasoning  TEXT,                        -- Rex rubric: candid internal justification
+  curator_notes        TEXT,                        -- pre-filled with Rex's suggestion, human-editable
+  rex_metadata         JSONB NOT NULL DEFAULT '{}'::jsonb,  -- dimension scores, flags, rubric_version
+  has_pdf_attachment   BOOLEAN NOT NULL DEFAULT FALSE,
+  attachment_count     INT NOT NULL DEFAULT 0,
   embedding            VECTOR(1536),
   fts                  TSVECTOR GENERATED ALWAYS AS (
                          to_tsvector('english',
@@ -1473,6 +1526,11 @@ CREATE TABLE news_items (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- One item per (source, Message-ID) for email idempotency; legacy NULL refs unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS news_items_source_ingestion_ref_uniq
+  ON news_items (source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS news_items_source_idx ON news_items (source_id);
 
 -- RPC: semantic search on news_items
 CREATE OR REPLACE FUNCTION vector_search_news(
@@ -1651,6 +1709,28 @@ CREATE POLICY "platform_files_objects_update" ON storage.objects
 CREATE POLICY "platform_files_objects_delete" ON storage.objects
   FOR DELETE TO authenticated, service_role
   USING (bucket_id = 'platform-files');
+
+-- ============================================================
+-- PLATFORM FILES — PUBLIC SHARE ACCESS
+-- (migration: 20260621120000_platform_files_public_share)
+-- The /share/<id> route resolves files for anon visitors, but
+-- only while the file is public. Flipping back to private revokes.
+-- ============================================================
+
+CREATE POLICY "platform_files_public_select" ON platform_files
+  FOR SELECT TO anon
+  USING (is_public = true);
+
+CREATE POLICY "platform_files_objects_public_select" ON storage.objects
+  FOR SELECT TO anon
+  USING (
+    bucket_id = 'platform-files'
+    AND EXISTS (
+      SELECT 1 FROM platform_files pf
+      WHERE pf.storage_path = storage.objects.name
+        AND pf.is_public = true
+    )
+  );
 
 -- ============================================================
 -- DOCUMENTS — general-purpose document writing
@@ -2010,3 +2090,235 @@ CREATE POLICY "platform_specs_all"      ON platform_specs      FOR ALL USING (au
 CREATE POLICY "thread_segments_all"     ON thread_segments     FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
 CREATE POLICY "content_images_all"      ON content_images      FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
 CREATE POLICY "post_metrics_all"        ON post_metrics        FOR ALL USING (auth.role() IN ('authenticated', 'service_role')) WITH CHECK (auth.role() IN ('authenticated', 'service_role'));
+-- PODCAST INGESTION (migration: 20260606000000 add_podcast_ingestion)
+-- ============================================================
+-- news_sources gains a source_type discriminator + podcast config (feed_url is
+-- now nullable; youtube sources use youtube_channel_url instead):
+--   source_type TEXT 'rss'|'podcast'|'youtube' (default 'rss')
+--   youtube_channel_url, transcribe_with_deepgram (default false),
+--   preferred_transcript_lang (default 'en'), max_backfill_episodes (default 25),
+--   max_episode_age_days
+
+-- One row per ingested episode; transcript_text lives here for display + FTS,
+-- embeddings live in transcript_segments.
+CREATE TABLE podcast_episodes (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id             UUID REFERENCES news_sources(id) ON DELETE SET NULL,
+  guid                  TEXT NOT NULL,
+  title                 TEXT NOT NULL,
+  description           TEXT,
+  episode_url           TEXT,
+  audio_url             TEXT,
+  audio_mime_type       TEXT,
+  duration_seconds      INT,
+  youtube_url           TEXT,
+  season                INT,
+  episode_number        INT,
+  image_url             TEXT,
+  published_at          TIMESTAMPTZ,
+  transcript_status     TEXT NOT NULL DEFAULT 'pending'
+    CHECK (transcript_status IN ('pending','resolving','transcribing','available','failed','skipped')),
+  transcript_source     TEXT CHECK (transcript_source IN ('feed_tag','youtube','deepgram','manual')),
+  transcript_format     TEXT CHECK (transcript_format IN ('json','vtt','srt','html','text')),
+  transcript_lang       TEXT,
+  transcript_text       TEXT,
+  transcript_raw_url    TEXT,
+  has_timestamps        BOOLEAN NOT NULL DEFAULT false,
+  deepgram_request_id   TEXT,
+  transcript_error      TEXT,
+  ingestion_origin      TEXT NOT NULL DEFAULT 'feed' CHECK (ingestion_origin IN ('feed','brief','manual')),
+  curator_note          TEXT,
+  topic_tags            TEXT[] NOT NULL DEFAULT '{}',
+  transcript_fetched_at TIMESTAMPTZ,
+  embedded_at           TIMESTAMPTZ,
+  fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
+  created_by            UUID REFERENCES team_members(id),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Dedupe: UNIQUE (source_id, guid) WHERE source_id IS NOT NULL (feed episodes);
+-- UNIQUE (guid) WHERE source_id IS NULL (ad-hoc/brief episodes). Plus indexes on
+-- deepgram_request_id, transcript_status, published_at, and a GIN index on fts.
+
+-- Chunked, embedded transcript content for RAG. start/end seconds NULL when the
+-- source had no timestamps; present for json/vtt/srt/deepgram (deep-links).
+CREATE TABLE transcript_segments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  episode_id    UUID NOT NULL REFERENCES podcast_episodes(id) ON DELETE CASCADE,
+  segment_index INT NOT NULL,
+  start_seconds NUMERIC(10,2),
+  end_seconds   NUMERIC(10,2),
+  speaker       TEXT,
+  content       TEXT NOT NULL,
+  token_count   INT,
+  embedding     VECTOR(1536),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops).
+
+-- Views: v_podcast_ingestion_status (health dashboard) and
+-- v_episodes_awaiting_action (stuck/errored episodes for Simon).
+-- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
+-- filter_days) — cosine search returning one row per matching segment, joined to
+-- episode + source for title/provenance/timestamp.
+
+
+-- ============================================================
+-- ECONOMIC INDICATORS (migration: 20260620000000_add_economic_indicators)
+-- ============================================================
+-- Slow-moving macro series (money supply, inflation, policy rates) persisted as
+-- a time series, beneath the live tickers. Source-discriminated registry +
+-- ingestion-agnostic observation table with revision/supersession handling.
+-- Spec: docs/features/economic-indicators/.
+
+-- Registry: one row per tracked series.
+CREATE TABLE economic_indicators (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                   TEXT NOT NULL,
+  short_label            TEXT NOT NULL,
+  region                 TEXT NOT NULL CHECK (region IN ('au','us','global')),
+  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation','activity')),
+  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs','oecd')),
+  provider_series_code   TEXT,                     -- FRED series_id, e.g. 'M2SL'
+  provider_table_ref     TEXT,                     -- RBA/ABS table or dataflow ref, e.g. 'D3'
+  unit                   TEXT NOT NULL,            -- 'percent','aud_billion','usd_billion','index'
+  decimals               INT  NOT NULL DEFAULT 2,
+  -- Operational poll cadence (how often we hit the API), NOT the data's natural
+  -- frequency. Natural frequency is computed in v_indicator_latest, never stored.
+  poll_frequency         TEXT NOT NULL DEFAULT 'daily' CHECK (poll_frequency IN ('daily','weekly')),
+  alert_on_new_print     BOOLEAN NOT NULL DEFAULT TRUE,
+  alert_change_threshold NUMERIC,                  -- NULL = print-only
+  is_active              BOOLEAN NOT NULL DEFAULT TRUE,
+  notes                  TEXT,
+  created_by             UUID REFERENCES team_members(id),
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Observation time series: one row per (indicator, period, vintage). Append/
+-- supersede-only — no updated_at, never edited in place (clean audit trail).
+-- period_date is normalised to the FIRST day of the period (see adapter-contract.md);
+-- released_at is when the provider published (v1: workflow substitutes fetch date).
+CREATE TABLE indicator_observations (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  indicator_id     UUID NOT NULL REFERENCES economic_indicators(id) ON DELETE CASCADE,
+  period_date      DATE NOT NULL,
+  value            NUMERIC(18,4) NOT NULL,
+  released_at      DATE NOT NULL,
+  is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage of this period
+  is_revision      BOOLEAN NOT NULL DEFAULT FALSE,  -- supersedes an earlier value for this period
+  superseded_value NUMERIC(18,4),
+  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','oecd','manual')),
+  raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Trigger: economic_indicators_updated_at (BEFORE UPDATE → update_updated_at()).
+-- Indexes: idx_indicator_obs_indicator (indicator_id);
+--          idx_indicator_obs_period (indicator_id, period_date DESC);
+--          idx_indicator_obs_current (indicator_id, is_current) WHERE is_current;
+--          uq_indicator_obs_vintage UNIQUE (indicator_id, period_date, released_at);
+--          idx_economic_indicators_region (region);
+--          idx_economic_indicators_active (is_active) WHERE is_active.
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role (agents poll via service_role).
+-- Seed: six v1 indicators (RBA cash rate, Fed funds, US M2, AU broad money, US CPI;
+--       AU CPI seeded is_active=false until the ABS adapter exists).
+--       + activity category (migration 20260621000000): US Manufacturing Activity
+--       (Philly Fed, FRED, live) and AU Business Confidence (OECD, is_active=false
+--       until an 'oecd' SDMX adapter exists).
+
+-- Views:
+--   v_indicator_series — current-vintage observations for an indicator, oldest→newest
+--     (sparklines + Rex). Columns: indicator_id, short_label, period_date, value, released_at.
+--   v_indicator_latest — one row per active indicator: current value, change-since-prior,
+--     YoY (via a calendar-year period_date join — frequency-agnostic, gap-tolerant),
+--     and a computed cadence (median release gap → expected_next_release). Nothing stored.
+--     Component picks the YoY column by category: yoy_change (policy_rate, pp) vs
+--     yoy_pct_change (inflation = the rate; money_supply = the debasement rate).
+
+
+-- ============================================================
+-- ON-CHAIN INDICATORS (migration: 20260621170000_add_onchain_indicators)
+-- ============================================================
+-- Bitcoin network & on-chain metrics (hash rate, difficulty, Hash Ribbons, fee
+-- share, pool concentration, MVRV, realised price, active addresses). Sibling of
+-- economic_indicators, reusing its registry + observation-series pattern, but a
+-- SEPARATE table: on-chain data is daily (no period-vs-release gap) and several
+-- DISPLAY metrics are DERIVED from others. Spec: docs/features/onchain-indicators/.
+--
+-- STORAGE: onchain_observations holds ONLY raw fetched series. Derived display
+-- metrics (fee_share, realised_price, hash_ribbons) are computed in the views,
+-- never stored. MVRV is fetched directly from Coin Metrics (a normal fetched row).
+
+-- Registry: one row per indicator — display metrics AND the raw inputs that feed
+-- derived ones (is_displayed=false). Derived rows have provider=NULL + a
+-- derivation_spec and are never polled.
+CREATE TABLE onchain_indicators (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key                   TEXT NOT NULL UNIQUE,          -- stable slug, e.g. 'hash_rate'
+  name                  TEXT NOT NULL,
+  short_label           TEXT NOT NULL,
+  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation')),
+  derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
+  provider              TEXT CHECK (provider IN ('mempool','coinmetrics')),  -- NULL for derived
+  provider_metric_code  TEXT,                          -- e.g. CM 'CapRealUSD'; NULL for derived
+  derivation_spec       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- documents derived formula; NOT executed
+  unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc'
+  decimals              INT  NOT NULL DEFAULT 2,
+  poll_frequency        TEXT NOT NULL DEFAULT 'daily' CHECK (poll_frequency IN ('daily')),
+  is_displayed          BOOLEAN NOT NULL DEFAULT TRUE, -- true = headline card; false = raw input
+  alert_config          JSONB NOT NULL DEFAULT '{}'::jsonb,  -- what proposes a content beat
+  is_active             BOOLEAN NOT NULL DEFAULT TRUE,
+  notes                 TEXT,
+  created_by            UUID REFERENCES team_members(id),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Derived rows carry no provider; fetched rows must have one.
+  CONSTRAINT onchain_derivation_provider CHECK (
+    (derivation = 'derived' AND provider IS NULL) OR
+    (derivation = 'fetched' AND provider IS NOT NULL)
+  )
+);
+
+-- Observation time series: raw fetched values only. One row per (indicator, day,
+-- vintage). Append/supersede-only — no updated_at. observed_at is the UTC day the
+-- value pertains to. value is NUMERIC(24,6) (realised cap ~1e12; ratios precise).
+CREATE TABLE onchain_observations (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  indicator_id     UUID NOT NULL REFERENCES onchain_indicators(id) ON DELETE CASCADE,
+  observed_at      DATE NOT NULL,
+  value            NUMERIC(24,6) NOT NULL,
+  is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage for this observed_at
+  is_revision      BOOLEAN NOT NULL DEFAULT FALSE,
+  superseded_value NUMERIC(24,6),
+  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics')),
+  raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ingested_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Trigger: onchain_indicators_updated_at (BEFORE UPDATE → update_updated_at()).
+-- Indexes: idx_onchain_obs_indicator (indicator_id);
+--          idx_onchain_obs_observed (indicator_id, observed_at DESC);
+--          idx_onchain_obs_current (indicator_id, is_current) WHERE is_current;
+--          uq_onchain_obs_vintage UNIQUE (indicator_id, observed_at, ingested_at);
+--          idx_onchain_indicators_group (metric_group);
+--          idx_onchain_indicators_active (is_active) WHERE is_active;
+--          idx_onchain_indicators_displayed (is_displayed) WHERE is_displayed.
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role (agents poll via service_role).
+-- Seed: 8 display metrics (hash_rate, next_difficulty_adjustment, pool_concentration_top,
+--       fee_share[derived], hash_ribbons[derived], mvrv, realised_price[derived],
+--       active_addresses) + 5 raw inputs (miner_revenue_total, miner_fees_total,
+--       realised_cap, supply, difficulty).
+
+-- Views:
+--   v_onchain_series — current observations per indicator, oldest→newest (sparklines + Rex).
+--     Columns: indicator_id, key, short_label, observed_at, value.
+--   v_hash_ribbons — 30d/60d MA of hash_rate, spread_pct, and signal
+--     (capitulation/recovery/neutral). NB: ROWS BETWEEN N PRECEDING counts ROWS not
+--     calendar days — assumes daily-contiguous hash_rate rows (a polling gap shortens
+--     the window). Only emits once 60 days of history exist.
+--   v_onchain_dashboard — one row per DISPLAY metric (fetched + derived), uniform shape:
+--     key, name, short_label, metric_group, unit, decimals, value, observed_at,
+--     change_since_prior, pct_change_since_prior, days_since_observed, signal. Fetched
+--     read their latest current observation (with day-over-day deltas); derived
+--     (fee_share, realised_price, hash_ribbons) are computed inline. Derived metrics
+--     carry NULL deltas in v1.

@@ -11,6 +11,7 @@ import {
   NewsCategory,
   NEWS_CATEGORY_LABELS,
   NewsRelevanceFilter,
+  defaultRelevanceFilter,
 } from '@platform/shared';
 import type {
   AgentName as AgentNameType,
@@ -160,12 +161,14 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           ? { subject: '', context: '', search_queries: [], archive_sources: false, max_sources: 10 }
           : action_type === RoutineActionType.MONITOR_CHANGE
           ? { subject: '', context: '', search_queries: [], notify_signal: false, notify_agent: null }
+          : action_type === RoutineActionType.NEWS_CURATION
+          ? { max_stories: 6, lookback_hours: 24 }
           : {
               category: NewsCategory.REGULATORY,
               queries: [],
               max_results_per_query: 15,
               max_curated: 6,
-              relevance_filter: NewsRelevanceFilter.AU_OR_BITCOIN,
+              relevance_filter: defaultRelevanceFilter(NewsCategory.REGULATORY),
             },
     }));
   };
@@ -195,7 +198,19 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           queries,
           max_results_per_query: max,
           max_curated: cap,
-          relevance_filter: (cfg['relevance_filter'] as NewsRelevanceFilterT | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN,
+          relevance_filter: (cfg['relevance_filter'] as NewsRelevanceFilterT | undefined) ?? defaultRelevanceFilter(cfg['category'] as NewsCategoryT),
+        },
+      });
+      return;
+    }
+
+    if (values.action_type === RoutineActionType.NEWS_CURATION) {
+      onSubmit({
+        ...values,
+        action_config: {
+          max_stories: Number(cfg['max_stories'] ?? 6),
+          lookback_hours: Number(cfg['lookback_hours'] ?? 24),
+          more_news_url: '/news',
         },
       });
       return;
@@ -262,11 +277,13 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             <option value={RoutineActionType.RESEARCH_DIGEST}>Research digest</option>
             <option value={RoutineActionType.MONITOR_CHANGE}>Monitor change</option>
             <option value={RoutineActionType.NEWS_INGEST}>News ingest</option>
+            <option value={RoutineActionType.NEWS_CURATION}>News curation</option>
           </select>
         </div>
       </div>
 
-      {values.action_type !== RoutineActionType.NEWS_INGEST && (
+      {values.action_type !== RoutineActionType.NEWS_INGEST &&
+        values.action_type !== RoutineActionType.NEWS_CURATION && (
         <>
           <div className={styles.field}>
             <label className={styles.label}>Subject</label>
@@ -323,7 +340,7 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             <label className={styles.label}>Relevance filter</label>
             <select
               className={styles.input}
-              value={(cfg['relevance_filter'] as string | undefined) ?? NewsRelevanceFilter.AU_OR_BITCOIN}
+              value={(cfg['relevance_filter'] as string | undefined) ?? defaultRelevanceFilter((cfg['category'] as NewsCategoryT | undefined) ?? NewsCategory.REGULATORY)}
               onChange={(e) => updateConfig({ relevance_filter: e.target.value as NewsRelevanceFilterT })}
             >
               {(Object.values(NewsRelevanceFilter) as NewsRelevanceFilterT[]).map((f) => (
@@ -380,6 +397,37 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             </div>
           </div>
         </>
+      )}
+
+      {values.action_type === RoutineActionType.NEWS_CURATION && (
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label}>Max stories</label>
+            <input
+              type="number"
+              min={1}
+              max={6}
+              className={styles.input}
+              value={Number(cfg['max_stories'] ?? 6)}
+              onChange={(e) => updateConfig({ max_stories: Number(e.target.value) })}
+            />
+            <span className={styles.hint}>Items featured on the dashboard tile (up to 6).</span>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Lookback (hours)</label>
+            <input
+              type="number"
+              min={6}
+              max={72}
+              className={styles.input}
+              value={Number(cfg['lookback_hours'] ?? 24)}
+              onChange={(e) => updateConfig({ lookback_hours: Number(e.target.value) })}
+            />
+            <span className={styles.hint}>
+              How far back to pull news and podcast episodes from.
+            </span>
+          </div>
+        </div>
       )}
 
       {values.action_type === RoutineActionType.RESEARCH_DIGEST && (

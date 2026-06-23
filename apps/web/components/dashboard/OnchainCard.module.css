@@ -1,0 +1,193 @@
+/* On-chain metric card. Mirrors IndicatorCard, with a neutral signal chip and a
+   colour-neutral MVRV range marker. No detail route in v1 — no hover-lift. */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* Freshness marker — the only place gold appears as a signal. */
+.fresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  color: var(--color-accent-dark);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent-base);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: var(--space-3) 0 2px;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* Delta — neutral. Arrow carries direction; never green/red. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  margin-top: 6px;
+}
+
+.arrow {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+}
+
+/* ── Hash-Ribbons signal chip — neutral, never a buy/sell colour ───────────── */
+.signalRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 2px;
+  flex-wrap: wrap;
+}
+
+.signalChip {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-transform: capitalize;
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+}
+
+/* All three states share the same neutral treatment — the WORD carries the
+   meaning, not the colour. This is a deliberate compliance choice (AFSL/AR). */
+.signalChip[data-signal='recovery'],
+.signalChip[data-signal='capitulation'],
+.signalChip[data-signal='neutral'] {
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border-color: var(--color-border);
+}
+
+.signalMeta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ── MVRV range marker — colour-neutral historical context ─────────────────── */
+.range {
+  margin-top: var(--space-3);
+}
+
+.rangeTrack {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+}
+
+.rangeFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--color-accent-glow);
+}
+
+.rangeMark {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-accent-base);
+  border: 2px solid var(--color-surface);
+  transform: translate(-50%, -50%);
+}
+
+.rangeScale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 6px;
+}
+
+.spark {
+  margin-top: var(--space-3);
+  height: 36px;
+}
+
+.spark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-2);
+}
+
+.asat {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin: var(--space-3) 0;
+}

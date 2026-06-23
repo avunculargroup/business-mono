@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "asset": "btc",
+      "time": "2026-06-19T00:00:00.000000000Z",
+      "CapMVRVCur": "2.05",
+      "CapRealUSD": "738000000000",
+      "SplyCur": "19790000",
+      "AdrActCnt": "910000"
+    },
+    {
+      "asset": "btc",
+      "time": "2026-06-20T00:00:00.000000000Z",
+      "CapMVRVCur": "2.10",
+      "CapRealUSD": "740000000000",
+      "SplyCur": "19800000",
+      "AdrActCnt": "920000"
+    }
+  ]
+}

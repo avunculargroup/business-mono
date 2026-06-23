@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Advice: MVRV undervalued",
+    "body": "MVRV has dropped to 0.9, which means bitcoin is undervalued right now. This is a clear buying opportunity for treasuries with cash on the sidelines.",
+    "shouldPass": false,
+    "rationale": "Frames MVRV as 'undervalued' and an explicit buy signal."
+  },
+  {
+    "title": "Advice: Hash Ribbons buy",
+    "body": "Hash Ribbons just flashed a buy. Historically this signal marks the bottom — back up the truck before the recovery runs.",
+    "shouldPass": false,
+    "rationale": "Hash Ribbons framed as a buy signal with a price-bottom call."
+  },
+  {
+    "title": "Advice: price prediction",
+    "body": "With realised price at $37,000 acting as strong support, bitcoin is set to rally to a new all-time high of $150,000 by year end.",
+    "shouldPass": false,
+    "rationale": "Explicit price prediction."
+  },
+  {
+    "title": "Advice: take profit",
+    "body": "MVRV above 3.5 has always signalled the top. Time to take some profit before the next drawdown.",
+    "shouldPass": false,
+    "rationale": "Recommends taking profit / timing an exit."
+  },
+  {
+    "title": "Context: cost basis",
+    "body": "Realised price — the network's aggregate cost basis — sits near $37,000. Bitcoin currently trades above that level, meaning the average holder is in profit. We read this as context on holder behaviour, not a market call.",
+    "shouldPass": true,
+    "rationale": "States cost basis as context; explicitly not a call."
+  },
+  {
+    "title": "Context: Hash Ribbons state",
+    "body": "Hash Ribbons moved to a recovery state this week: the 30-day hash-rate moving average crossed back above the 60-day, which historically coincides with miner stress easing. For treasuries, the relevant point is network security, not price.",
+    "shouldPass": true,
+    "rationale": "Describes what the cross is and its security meaning; no action."
+  },
+  {
+    "title": "Context: hash rate fact",
+    "body": "Network hash rate reached 642 EH/s, up 1.8% on the week — a fresh all-time high for the security budget defending the network.",
+    "shouldPass": true,
+    "rationale": "Plain network-security fact, no advice."
+  },
+  {
+    "title": "Context: MVRV education",
+    "body": "MVRV compares market value to realised value — a way of seeing where price stands relative to the aggregate cost basis of all coins. It is one lens on holder behaviour among several; we use it as evidence, never as a signal to act.",
+    "shouldPass": true,
+    "rationale": "Educational explanation framed as evidence, not a signal."
+  }
+]

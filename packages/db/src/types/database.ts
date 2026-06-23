@@ -1299,6 +1299,77 @@ export type Database = {
         }
         Relationships: []
       }
+      economic_indicators: {
+        Row: {
+          alert_change_threshold: number | null
+          alert_on_new_print: boolean
+          category: string
+          created_at: string
+          created_by: string | null
+          decimals: number
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          poll_frequency: string
+          provider: string
+          provider_series_code: string | null
+          provider_table_ref: string | null
+          region: string
+          short_label: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          alert_change_threshold?: number | null
+          alert_on_new_print?: boolean
+          category: string
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          poll_frequency?: string
+          provider: string
+          provider_series_code?: string | null
+          provider_table_ref?: string | null
+          region: string
+          short_label: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          alert_change_threshold?: number | null
+          alert_on_new_print?: boolean
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string
+          provider_series_code?: string | null
+          provider_table_ref?: string | null
+          region?: string
+          short_label?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_indicators_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fastmail_accounts: {
         Row: {
           consecutive_failures: number
@@ -1308,6 +1379,7 @@ export type Database = {
           is_active: boolean
           last_error: string | null
           last_error_at: string | null
+          research_folder: string | null
           token: string
           updated_at: string
           username: string
@@ -1321,6 +1393,7 @@ export type Database = {
           is_active?: boolean
           last_error?: string | null
           last_error_at?: string | null
+          research_folder?: string | null
           token: string
           updated_at?: string
           username: string
@@ -1334,6 +1407,7 @@ export type Database = {
           is_active?: boolean
           last_error?: string | null
           last_error_at?: string | null
+          research_folder?: string | null
           token?: string
           updated_at?: string
           username?: string
@@ -1372,6 +1446,7 @@ export type Database = {
           inbox_query_state: string | null
           jmap_account_id: string | null
           last_synced_at: string | null
+          research_query_state: string | null
           sent_query_state: string | null
           updated_at: string
         }
@@ -1381,6 +1456,7 @@ export type Database = {
           inbox_query_state?: string | null
           jmap_account_id?: string | null
           last_synced_at?: string | null
+          research_query_state?: string | null
           sent_query_state?: string | null
           updated_at?: string
         }
@@ -1390,6 +1466,7 @@ export type Database = {
           inbox_query_state?: string | null
           jmap_account_id?: string | null
           last_synced_at?: string | null
+          research_query_state?: string | null
           sent_query_state?: string | null
           updated_at?: string
         }
@@ -1583,6 +1660,63 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team_members"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      indicator_observations: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_id: string
+          is_current: boolean
+          is_revision: boolean
+          period_date: string
+          raw: Json
+          released_at: string
+          source: string
+          superseded_value: number | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_id: string
+          is_current?: boolean
+          is_revision?: boolean
+          period_date: string
+          raw?: Json
+          released_at: string
+          source: string
+          superseded_value?: number | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_id?: string
+          is_current?: boolean
+          is_revision?: boolean
+          period_date?: string
+          raw?: Json
+          released_at?: string
+          source?: string
+          superseded_value?: number | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "economic_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indicator_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "v_indicator_latest"
+            referencedColumns: ["indicator_id"]
           },
         ]
       }
@@ -1913,20 +2047,29 @@ export type Database = {
       }
       news_items: {
         Row: {
+          attachment_count: number
           australian_relevance: boolean
+          author: string | null
           body_markdown: string | null
+          canonical_url: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at: string
+          curator_notes: string | null
           embedding: string | null
           fetched_at: string
           fts: unknown
+          has_pdf_attachment: boolean
           id: string
           ingested_by: string
+          ingestion_ref: string | null
           key_points: Json
           knowledge_item_id: string | null
           published_at: string | null
+          relevance_reasoning: string | null
           relevance_score: number | null
+          rex_metadata: Json
           routine_id: string | null
+          source_id: string | null
           source_name: string
           status: string
           summary: string | null
@@ -1937,20 +2080,29 @@ export type Database = {
           url_hash: string | null
         }
         Insert: {
+          attachment_count?: number
           australian_relevance?: boolean
+          author?: string | null
           body_markdown?: string | null
+          canonical_url?: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at?: string
+          curator_notes?: string | null
           embedding?: string | null
           fetched_at?: string
           fts?: unknown
+          has_pdf_attachment?: boolean
           id?: string
           ingested_by?: string
+          ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
           published_at?: string | null
+          relevance_reasoning?: string | null
           relevance_score?: number | null
+          rex_metadata?: Json
           routine_id?: string | null
+          source_id?: string | null
           source_name?: string
           status?: string
           summary?: string | null
@@ -1961,20 +2113,29 @@ export type Database = {
           url_hash?: string | null
         }
         Update: {
+          attachment_count?: number
           australian_relevance?: boolean
+          author?: string | null
           body_markdown?: string | null
+          canonical_url?: string | null
           category?: Database["public"]["Enums"]["news_category"]
           created_at?: string
+          curator_notes?: string | null
           embedding?: string | null
           fetched_at?: string
           fts?: unknown
+          has_pdf_attachment?: boolean
           id?: string
           ingested_by?: string
+          ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
           published_at?: string | null
+          relevance_reasoning?: string | null
           relevance_score?: number | null
+          rex_metadata?: Json
           routine_id?: string | null
+          source_id?: string | null
           source_name?: string
           status?: string
           summary?: string | null
@@ -1999,47 +2160,87 @@ export type Database = {
             referencedRelation: "routines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "news_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
         ]
       }
       news_sources: {
         Row: {
           created_at: string
           created_by: string | null
-          feed_url: string
+          feed_url: string | null
           id: string
+          inbound_address: string | null
           is_active: boolean
           last_error: string | null
           last_scanned_at: string | null
           last_status: string | null
+          max_backfill_episodes: number
+          max_episode_age_days: number | null
           name: string
+          preferred_transcript_lang: string
+          relevance_threshold: number
+          sender_allowlist: string[]
           site_url: string | null
+          slug: string | null
+          source_type: string
+          tier: string | null
+          transcribe_with_deepgram: boolean
           updated_at: string
+          youtube_channel_url: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          feed_url: string
+          feed_url?: string | null
           id?: string
+          inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          max_backfill_episodes?: number
+          max_episode_age_days?: number | null
           name: string
+          preferred_transcript_lang?: string
+          relevance_threshold?: number
+          sender_allowlist?: string[]
           site_url?: string | null
+          slug?: string | null
+          source_type?: string
+          tier?: string | null
+          transcribe_with_deepgram?: boolean
           updated_at?: string
+          youtube_channel_url?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          feed_url?: string
+          feed_url?: string | null
           id?: string
+          inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          max_backfill_episodes?: number
+          max_episode_age_days?: number | null
           name?: string
+          preferred_transcript_lang?: string
+          relevance_threshold?: number
+          sender_allowlist?: string[]
           site_url?: string | null
+          slug?: string | null
+          source_type?: string
+          tier?: string | null
+          transcribe_with_deepgram?: boolean
           updated_at?: string
+          youtube_channel_url?: string | null
         }
         Relationships: [
           {
@@ -2137,6 +2338,130 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onchain_indicators: {
+        Row: {
+          alert_config: Json
+          created_at: string
+          created_by: string | null
+          decimals: number
+          derivation: string
+          derivation_spec: Json
+          id: string
+          is_active: boolean
+          is_displayed: boolean
+          key: string
+          metric_group: string
+          name: string
+          notes: string | null
+          poll_frequency: string
+          provider: string | null
+          provider_metric_code: string | null
+          short_label: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          alert_config?: Json
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          derivation?: string
+          derivation_spec?: Json
+          id?: string
+          is_active?: boolean
+          is_displayed?: boolean
+          key: string
+          metric_group: string
+          name: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string | null
+          provider_metric_code?: string | null
+          short_label: string
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          alert_config?: Json
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          derivation?: string
+          derivation_spec?: Json
+          id?: string
+          is_active?: boolean
+          is_displayed?: boolean
+          key?: string
+          metric_group?: string
+          name?: string
+          notes?: string | null
+          poll_frequency?: string
+          provider?: string | null
+          provider_metric_code?: string | null
+          short_label?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_indicators_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onchain_observations: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_id: string
+          ingested_at: string
+          is_current: boolean
+          is_revision: boolean
+          observed_at: string
+          raw: Json
+          source: string
+          superseded_value: number | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_id: string
+          ingested_at?: string
+          is_current?: boolean
+          is_revision?: boolean
+          observed_at: string
+          raw?: Json
+          source: string
+          superseded_value?: number | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_id?: string
+          ingested_at?: string
+          is_current?: boolean
+          is_revision?: boolean
+          observed_at?: string
+          raw?: Json
+          source?: string
+          superseded_value?: number | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "onchain_indicators"
             referencedColumns: ["id"]
           },
         ]
@@ -2341,6 +2666,129 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: []
+      }
+      podcast_episodes: {
+        Row: {
+          audio_mime_type: string | null
+          audio_url: string | null
+          created_at: string
+          created_by: string | null
+          curator_note: string | null
+          deepgram_request_id: string | null
+          description: string | null
+          duration_seconds: number | null
+          embedded_at: string | null
+          episode_number: number | null
+          episode_url: string | null
+          fts: unknown
+          guid: string
+          has_timestamps: boolean
+          id: string
+          image_url: string | null
+          ingestion_origin: string
+          pending_action: string | null
+          published_at: string | null
+          season: number | null
+          source_id: string | null
+          title: string
+          topic_tags: string[]
+          transcript_error: string | null
+          transcript_fetched_at: string | null
+          transcript_format: string | null
+          transcript_lang: string | null
+          transcript_raw_url: string | null
+          transcript_source: string | null
+          transcript_status: string
+          transcript_text: string | null
+          updated_at: string
+          youtube_url: string | null
+        }
+        Insert: {
+          audio_mime_type?: string | null
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          deepgram_request_id?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          embedded_at?: string | null
+          episode_number?: number | null
+          episode_url?: string | null
+          fts?: unknown
+          guid: string
+          has_timestamps?: boolean
+          id?: string
+          image_url?: string | null
+          ingestion_origin?: string
+          pending_action?: string | null
+          published_at?: string | null
+          season?: number | null
+          source_id?: string | null
+          title: string
+          topic_tags?: string[]
+          transcript_error?: string | null
+          transcript_fetched_at?: string | null
+          transcript_format?: string | null
+          transcript_lang?: string | null
+          transcript_raw_url?: string | null
+          transcript_source?: string | null
+          transcript_status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Update: {
+          audio_mime_type?: string | null
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          deepgram_request_id?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          embedded_at?: string | null
+          episode_number?: number | null
+          episode_url?: string | null
+          fts?: unknown
+          guid?: string
+          has_timestamps?: boolean
+          id?: string
+          image_url?: string | null
+          ingestion_origin?: string
+          pending_action?: string | null
+          published_at?: string | null
+          season?: number | null
+          source_id?: string | null
+          title?: string
+          topic_tags?: string[]
+          transcript_error?: string | null
+          transcript_fetched_at?: string | null
+          transcript_format?: string | null
+          transcript_lang?: string | null
+          transcript_raw_url?: string | null
+          transcript_source?: string | null
+          transcript_status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_episodes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_episodes_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_key_contacts: {
         Row: {
@@ -3120,6 +3568,67 @@ export type Database = {
         }
         Relationships: []
       }
+      transcript_segments: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          end_seconds: number | null
+          episode_id: string
+          id: string
+          segment_index: number
+          speaker: string | null
+          start_seconds: number | null
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          end_seconds?: number | null
+          episode_id: string
+          id?: string
+          segment_index: number
+          speaker?: string | null
+          start_seconds?: number | null
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          end_seconds?: number | null
+          episode_id?: string
+          id?: string
+          segment_index?: number
+          speaker?: string | null
+          start_seconds?: number | null
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "podcast_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_episodes_awaiting_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_podcast_ingestion_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_snippets: {
         Row: {
           body: string
@@ -3234,6 +3743,116 @@ export type Database = {
         }
         Relationships: []
       }
+      v_episodes_awaiting_action: {
+        Row: {
+          deepgram_request_id: string | null
+          id: string | null
+          source_name: string | null
+          title: string | null
+          transcribe_with_deepgram: boolean | null
+          transcript_error: string | null
+          transcript_status: string | null
+        }
+        Relationships: []
+      }
+      v_hash_ribbons: {
+        Row: {
+          hash_rate_eh_s: number | null
+          ma30: number | null
+          ma60: number | null
+          observed_at: string | null
+          signal: string | null
+          spread_pct: number | null
+        }
+        Relationships: []
+      }
+      v_indicator_latest: {
+        Row: {
+          category: string | null
+          change_since_prior: number | null
+          current_value: number | null
+          days_since_release: number | null
+          decimals: number | null
+          expected_next_release: string | null
+          indicator_id: string | null
+          is_revision: boolean | null
+          name: string | null
+          pct_change_since_prior: number | null
+          period_date: string | null
+          prior_value: number | null
+          region: string | null
+          released_at: string | null
+          short_label: string | null
+          superseded_value: number | null
+          typical_release_gap_days: number | null
+          unit: string | null
+          year_ago_period: string | null
+          year_ago_value: number | null
+          yoy_change: number | null
+          yoy_pct_change: number | null
+        }
+        Relationships: []
+      }
+      v_indicator_series: {
+        Row: {
+          indicator_id: string | null
+          period_date: string | null
+          released_at: string | null
+          short_label: string | null
+          value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "economic_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indicator_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "v_indicator_latest"
+            referencedColumns: ["indicator_id"]
+          },
+        ]
+      }
+      v_onchain_dashboard: {
+        Row: {
+          change_since_prior: number | null
+          days_since_observed: number | null
+          decimals: number | null
+          key: string | null
+          metric_group: string | null
+          name: string | null
+          observed_at: string | null
+          pct_change_since_prior: number | null
+          short_label: string | null
+          signal: string | null
+          unit: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
+      v_onchain_series: {
+        Row: {
+          indicator_id: string | null
+          key: string | null
+          observed_at: string | null
+          short_label: string | null
+          value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onchain_observations_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "onchain_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_open_tasks: {
         Row: {
           assigned_to_name: string | null
@@ -3265,6 +3884,23 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_podcast_ingestion_status: {
+        Row: {
+          audio_url: string | null
+          embedded_at: string | null
+          has_timestamps: boolean | null
+          id: string | null
+          published_at: string | null
+          source_name: string | null
+          title: string | null
+          transcribe_with_deepgram: boolean | null
+          transcript_error: string | null
+          transcript_source: string | null
+          transcript_status: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
       }
       v_recent_interactions: {
         Row: {
@@ -3375,6 +4011,29 @@ export type Database = {
           summary: string
           title: string
           url: string
+        }[]
+      }
+      vector_search_transcripts: {
+        Args: {
+          filter_days?: number
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          audio_url: string
+          content: string
+          curator_note: string
+          end_seconds: number
+          episode_id: string
+          episode_title: string
+          published_at: string
+          segment_id: string
+          similarity: number
+          source_name: string
+          speaker: string
+          start_seconds: number
+          youtube_url: string
         }[]
       }
     }

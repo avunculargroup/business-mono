@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { createClient } from '@deepgram/sdk';
+import { createClient, CallbackUrl } from '@deepgram/sdk';
 
 const deepgram = createClient(process.env['DEEPGRAM_API_KEY'] ?? '');
 
@@ -14,11 +14,14 @@ export const deepgramTranscribe = createTool({
     diarize: z.boolean().default(true).describe('Enable speaker diarisation for single-channel'),
   }),
   execute: async (context) => {
+    // The callback URL must be passed via transcribeUrlCallback (the async
+    // method) — NOT as a `callback` option to transcribeUrl, which is synchronous
+    // and rejects a callback with "Callback cannot be provided as an option to a
+    // synchronous transcription."
     const options: Record<string, unknown> = {
       model: 'nova-3',
       punctuate: true,
       utterances: true,
-      callback: context.callbackUrl,
     };
 
     if (context.multichannel) {
@@ -27,14 +30,17 @@ export const deepgramTranscribe = createTool({
       options['diarize'] = true;
     }
 
-    const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
+    const { result, error } = await deepgram.listen.prerecorded.transcribeUrlCallback(
       { url: context.audioUrl },
-      options as Parameters<typeof deepgram.listen.prerecorded.transcribeUrl>[1]
+      new CallbackUrl(context.callbackUrl),
+      options as Parameters<typeof deepgram.listen.prerecorded.transcribeUrlCallback>[2]
     );
 
     if (error) throw new Error(`Deepgram transcription failed: ${String(error)}`);
 
-    const requestId = result?.metadata?.request_id ?? '';
+    // The async callback response returns request_id at the top level, not under
+    // metadata (that's the synchronous shape).
+    const requestId = result?.request_id ?? '';
     return { requestId };
   },
 });

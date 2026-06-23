@@ -22,7 +22,7 @@ migrations apply to prod **on merge to `main`**.
 | 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
 | 3 — Voice milestone | ⚠️ **seeded; parity gate + doc retirement pending** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e`. `seed:voice` run (founder confirmed `brand_voice` + canon `voice_snippets` populated). |
 | 4 — Campaigns schema | ✅ **written, gated on merge** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
-| 5 — Agents (Margot, Lex) | ✅ **written, gated on merge** | specs `docs/agents/margot.md` + `lex.md`; agents `apps/agents/src/agents/{margot,lex}/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`); migration `20260622010000_add_campaign_agents.sql` adds `margot`/`lex` to the `agent_name` CHECKs + `VALID_AGENT_NAMES`. Typecheck + 253 tests green. Charlie confirmed reading `packages/voice`. |
+| 5 — Agents (Margot, Lex) | ✅ **written, gated on merge** | spec `docs/agents/margot.md`; agent `apps/agents/src/agents/margot/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`). **Lex converged on the existing shared compliance agent** (`agents/compliance/`, added by the on-chain feature on `main`) rather than a second `lex` — the variant workflow reuses it with a campaign-specific prompt + classification/disclaimer schema (see `docs/agents/compliance.md`). Migration `20260622010000` adds `margot` to the `agent_name` CHECKs (+ `VALID_AGENT_NAMES`) and re-affirms `lex`. Charlie confirmed reading `packages/voice`. |
 | 6 — Variant Generation Workflow | ⚠️ **built end-to-end; needs a live pass** | Workflow `apps/agents/src/workflows/variant/` (resolve-context → Charlie → Lex → persist → **Gate 3**, threads + single-variant regen). Web gate plumbing: migration `20260622020000` (content_items `workflow_run_id`/`gate_state`/`pending_decision`), `variantGateWeb` listener + `resumeVariantRun`. UI: `apps/web/components/campaigns/VariantEditor.tsx` (platform-mimic preview, live char counter, Lex chip, approve / request-change) + `app/(app)/campaigns/variants/[id]/page.tsx` + `submitVariantGateDecision` action. agents + web typecheck clean, 282 agents tests green. **Remaining:** live end-to-end verification (needs secrets + a stub campaign/beat); image slot + alt text and inline copy-edit are deferred (Step 9). |
 
 **Step 3 remaining (the hard parity gate — needs a secrets-equipped env: OpenAI + model key):**
@@ -165,7 +165,7 @@ One migration:
 
 Spec-first, per project convention:
 
-- Write `docs/agents/margot.md` and `docs/agents/lex.md` (canonical names, roles, boundaries, I/O).
+- Write `docs/agents/margot.md` (canonical name, role, boundaries, I/O). For Lex, reuse/extend the shared compliance agent doc `docs/agents/compliance.md` rather than a separate file — `lex` already exists on `main`.
 - Then the Mastra agent definitions. Charlie, Bruno, Rex already exist — confirm Charlie reads `packages/voice`.
 
 **Done when:** Margot and Lex instantiate and respond sensibly in isolation (Studio or a test harness).

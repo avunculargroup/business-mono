@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
+import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
 
@@ -17,6 +18,8 @@ interface NewsCardProps {
   summary: string | null;
   category: NewsCategory;
   status: NewsStatus;
+  relevanceScore?: number | null;
+  curatorNotes?: string | null;
   onStatusChange?: (id: string, status: NewsStatus) => void;
 }
 
@@ -38,6 +41,8 @@ export function NewsCard({
   summary,
   category,
   status: initialStatus,
+  relevanceScore,
+  curatorNotes,
   onStatusChange,
 }: NewsCardProps) {
   const [status, setStatus] = useState<NewsStatus>(initialStatus);
@@ -113,6 +118,11 @@ export function NewsCard({
             <span className={styles.date}>{formatDate(publishedAt)}</span>
           </>
         )}
+        {relevanceScore != null && (
+          <span className={styles.score} title="Rex relevance score">
+            {relevanceScore.toFixed(2)}
+          </span>
+        )}
       </div>
 
       <h4 className={styles.title}>
@@ -122,12 +132,19 @@ export function NewsCard({
           rel="noopener noreferrer"
           className={styles.titleLink}
         >
-          {title}
+          {cleanNewsTitle(title)}
           <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
         </a>
       </h4>
 
       {summary && <p className={styles.summary}>{summary}</p>}
+
+      {curatorNotes && (
+        <div className={styles.curatorNote}>
+          <span className={styles.curatorNoteLabel}>Why this matters</span>
+          <span className={styles.curatorNoteBody}>{curatorNotes}</span>
+        </div>
+      )}
 
       <div className={styles.actions}>
         {status === 'new' && (

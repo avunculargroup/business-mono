@@ -4,6 +4,14 @@ import {
   shouldSkipEmail,
   FastmailJmapClient,
   JmapAuthError,
+  findHeader,
+  getMessageId,
+  parseAuthResults,
+  isAuthFail,
+  parsePlusTag,
+  extractResearchSlug,
+  attachmentCount,
+  hasPdfAttachment,
 } from './fastmailJmap.js';
 import { buildJmapEmail } from '../../test/factories.js';
 
@@ -41,6 +49,17 @@ describe('extractBody', () => {
     const email = buildJmapEmail({ textBody: '', htmlBody: '' });
     // textBody=='' makes the factory skip the text body part entirely
     expect(extractBody(email)).toBe('');
+  });
+
+  it('caps a pathologically large HTML body before the regex chain runs', () => {
+    // A multi-MB HTML body must not be fed whole into stripHtml's chained global
+    // .replace() passes — that is the OOM site (Runtime_RegExpReplaceRT) on the
+    // memory-constrained agents host. Truncating mid-markup is acceptable here.
+    const huge = '<p>' + 'a'.repeat(3_000_000) + '</p>';
+    const email = buildJmapEmail({ textBody: '', htmlBody: huge });
+    const out = extractBody(email);
+    expect(out.length).toBeLessThanOrEqual(1_000_000);
+    expect(out.length).toBeGreaterThan(0);
   });
 });
 
@@ -85,6 +104,111 @@ describe('shouldSkipEmail', () => {
   it('keeps normal emails', () => {
     expect(shouldSkipEmail([{ name: 'From', value: 'alice@example.com' }])).toBe(false);
     expect(shouldSkipEmail([])).toBe(false);
+  });
+});
+
+describe('header / address helpers', () => {
+  describe('findHeader', () => {
+    it('matches case-insensitively and returns the first value', () => {
+      const headers = [
+        { name: 'Message-ID', value: '<a@x>' },
+        { name: 'message-id', value: '<b@x>' },
+      ];
+      expect(findHeader(headers, 'message-id')).toBe('<a@x>');
+      expect(findHeader(headers, 'Nope')).toBeUndefined();
+    });
+  });
+
+  describe('getMessageId', () => {
+    it('strips angle brackets', () => {
+      const email = buildJmapEmail({ headers: [{ name: 'Message-ID', value: '  <abc.123@mail> ' }] });
+      expect(getMessageId(email)).toBe('abc.123@mail');
+    });
+    it('handles the Message-Id casing variant', () => {
+      const email = buildJmapEmail({ headers: [{ name: 'Message-Id', value: '<x@y>' }] });
+      expect(getMessageId(email)).toBe('x@y');
+    });
+    it('returns null when absent', () => {
+      expect(getMessageId(buildJmapEmail({ headers: [] }))).toBeNull();
+    });
+  });
+
+  describe('parseAuthResults', () => {
+    it('parses spf, dkim and dmarc verdicts from one header', () => {
+      const headers = [{
+        name: 'Authentication-Results',
+        value: 'mx.fastmail.com; dkim=pass header.d=gromen.com; spf=pass smtp.mailfrom=gromen.com; dmarc=pass',
+      }];
+      expect(parseAuthResults(headers)).toEqual({ spf: 'pass', dkim: 'pass', dmarc: 'pass' });
+    });
+    it('takes the first verdict per method across multiple headers', () => {
+      const headers = [
+        { name: 'Authentication-Results', value: 'a; spf=fail' },
+        { name: 'Authentication-Results', value: 'b; dkim=pass' },
+      ];
+      expect(parseAuthResults(headers)).toEqual({ spf: 'fail', dkim: 'pass', dmarc: null });
+    });
+    it('returns nulls when no Authentication-Results header is present', () => {
+      expect(parseAuthResults([{ name: 'From', value: 'x' }])).toEqual({ spf: null, dkim: null, dmarc: null });
+    });
+  });
+
+  describe('isAuthFail', () => {
+    it('is true when spf or dkim failed', () => {
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=fail; dkim=pass' }])).toBe(true);
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=pass; dkim=fail' }])).toBe(true);
+    });
+    it('is false for pass / softfail / none / missing', () => {
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=pass; dkim=pass' }])).toBe(false);
+      expect(isAuthFail([{ name: 'Authentication-Results', value: 'x; spf=softfail' }])).toBe(false);
+      expect(isAuthFail([])).toBe(false);
+    });
+  });
+
+  describe('parsePlusTag', () => {
+    it('extracts the tag after the plus, lowercased', () => {
+      expect(parsePlusTag('research+Gromen@btreasury.com.au')).toBe('gromen');
+    });
+    it('returns null when there is no plus tag', () => {
+      expect(parsePlusTag('research@btreasury.com.au')).toBeNull();
+      expect(parsePlusTag('research+@x')).toBeNull();
+    });
+  });
+
+  describe('extractResearchSlug', () => {
+    it('finds the plus tag from a To recipient', () => {
+      const email = buildJmapEmail({ to: [{ email: 'research+bitwise@btreasury.com.au' }] });
+      expect(extractResearchSlug(email)).toBe('bitwise');
+    });
+    it('scans Cc when To has no plus tag', () => {
+      const email = buildJmapEmail({
+        to: [{ email: 'someone@btreasury.com.au' }],
+        cc: [{ email: 'research+alden@btreasury.com.au' }],
+      });
+      expect(extractResearchSlug(email)).toBe('alden');
+    });
+    it('returns null when no recipient is plus-addressed', () => {
+      const email = buildJmapEmail({ to: [{ email: 'plain@btreasury.com.au' }], cc: [] });
+      expect(extractResearchSlug(email)).toBeNull();
+    });
+  });
+
+  describe('attachment helpers', () => {
+    it('counts attachment-disposition and named parts', () => {
+      const email = buildJmapEmail({
+        attachments: [
+          { type: 'application/pdf', name: 'memo.pdf', disposition: 'attachment' },
+          { type: 'image/png', name: null, disposition: 'inline' }, // tracking pixel — not counted
+        ],
+      });
+      expect(attachmentCount(email)).toBe(1);
+    });
+    it('detects a PDF by MIME type or .pdf filename', () => {
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'application/pdf' }] }))).toBe(true);
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'application/octet-stream', name: 'Report.PDF' }] }))).toBe(true);
+      expect(hasPdfAttachment(buildJmapEmail({ attachments: [{ type: 'image/png', name: 'logo.png' }] }))).toBe(false);
+      expect(hasPdfAttachment(buildJmapEmail({}))).toBe(false);
+    });
   });
 });
 
@@ -143,6 +267,37 @@ describe('FastmailJmapClient', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('getMailboxIdByName resolves a folder case-insensitively', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Mailbox/get', { list: [
+            { id: 'mb_inbox', name: 'Inbox', role: 'inbox' },
+            { id: 'mb_research', name: 'Research', role: null },
+          ] }, 'mb']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const id = await client.getMailboxIdByName('acc', 'https://api/', 'research');
+    expect(id).toBe('mb_research');
+  });
+
+  it('getMailboxIdByName returns null when the folder does not exist', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Mailbox/get', { list: [{ id: 'mb_inbox', name: 'Inbox', role: 'inbox' }] }, 'mb']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const id = await client.getMailboxIdByName('acc', 'https://api/', 'Research');
+    expect(id).toBeNull();
+  });
+
   it('queryEmailIds uses Email/queryChanges when sinceQueryState is provided', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -196,5 +351,94 @@ describe('FastmailJmapClient', () => {
     const client = new FastmailJmapClient('user@example.com', 'tok');
     const out = await client.queryEmailIds('acc', 'https://api/', 'mb', undefined);
     expect(out).toEqual({ emailIds: ['a', 'b'], newQueryState: 'qs0', didFallback: true });
+  });
+
+  it('getIdentities requests the submission spec and maps identities', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [['Identity/get', { list: [
+            { id: 'id1', email: 'hq@btreasury.com.au', name: 'BTS' },
+            { id: 'id2', email: 'chris@btreasury.com.au', name: null },
+          ] }, 'i']],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const out = await client.getIdentities('acc', 'https://api/');
+    expect(out).toEqual([
+      { id: 'id1', email: 'hq@btreasury.com.au', name: 'BTS' },
+      { id: 'id2', email: 'chris@btreasury.com.au', name: null },
+    ]);
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.using).toContain('urn:ietf:params:jmap:submission');
+  });
+
+  it('sendHtmlEmail creates a draft then submits it, moving it to Sent', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            ['Email/set', { created: { draft: { id: 'em1' } } }, '0'],
+            ['EmailSubmission/set', { created: { sendIt: { id: 'sub1' } } }, '1'],
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    await client.sendHtmlEmail({
+      accountId: 'acc',
+      apiUrl: 'https://api/',
+      identityId: 'id1',
+      draftsId: 'd',
+      sentId: 's',
+      from: { name: 'BTS', email: 'hq@btreasury.com.au' },
+      to: [{ email: 'chris@btreasury.com.au' }],
+      subject: 'News',
+      html: '<p>hi</p>',
+      text: 'hi',
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.using).toContain('urn:ietf:params:jmap:submission');
+    const [emailSet, submissionSet] = body.methodCalls;
+    expect(emailSet[0]).toBe('Email/set');
+    expect(emailSet[1].create.draft.mailboxIds).toEqual({ d: true });
+    expect(emailSet[1].create.draft.subject).toBe('News');
+    expect(submissionSet[0]).toBe('EmailSubmission/set');
+    expect(submissionSet[1].create.sendIt.emailId).toBe('#draft');
+    expect(submissionSet[1].create.sendIt.identityId).toBe('id1');
+    expect(submissionSet[1].onSuccessUpdateEmail['#sendIt'].mailboxIds).toEqual({ s: true });
+  });
+
+  it('sendHtmlEmail throws when the submission is rejected', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          methodResponses: [
+            ['Email/set', { created: { draft: { id: 'em1' } } }, '0'],
+            ['EmailSubmission/set', { notCreated: { sendIt: { type: 'forbiddenFrom', description: 'bad identity' } } }, '1'],
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    await expect(
+      client.sendHtmlEmail({
+        accountId: 'acc',
+        apiUrl: 'https://api/',
+        identityId: 'id1',
+        draftsId: 'd',
+        sentId: 's',
+        from: { email: 'hq@btreasury.com.au' },
+        to: [{ email: 'chris@btreasury.com.au' }],
+        subject: 'News',
+        html: '<p>hi</p>',
+        text: 'hi',
+      }),
+    ).rejects.toThrow(/forbiddenFrom/);
   });
 });

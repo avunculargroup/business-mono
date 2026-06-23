@@ -5,7 +5,10 @@ import { resolveVoiceContext } from '@platform/voice';
 import { formatResolvedVoice } from '../../lib/voicePrompt.js';
 import { stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
-import { lex } from '../../agents/lex/index.js';
+// Lex is the shared compliance agent (added by the on-chain feature). The
+// variant workflow drives it with its own campaign-specific prompt + schema
+// (classification + disclaimer) — the persona is the same compliance officer.
+import { lex } from '../../agents/compliance/index.js';
 import { buildCharliePrompt, buildLexPrompt, charCountOf, isThreadVariant, variantCopyText } from './prompts.js';
 import { buildContentItemRow, buildThreadSegmentRows } from './persist.js';
 import {

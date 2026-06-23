@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { defaultRelevanceFilter, NewsCategory } from '@platform/shared';
 import { shouldDropForRelevance } from './newsRelevance.js';
 
 // The relevance gate runs after the LLM judge has curated the shortlist, so it
@@ -37,5 +38,23 @@ describe('shouldDropForRelevance', () => {
         expect(shouldDropForRelevance('none', rel)).toBe(false);
       }
     });
+  });
+});
+
+// The workflow falls back to this when a routine's action_config omits
+// relevance_filter. Macro must default to 'none' so a global macro story
+// (neither AU- nor Bitcoin-specific) isn't dropped by the au_or_bitcoin gate.
+describe('defaultRelevanceFilter', () => {
+  it("returns 'none' for macro so its global stories survive the gate", () => {
+    expect(defaultRelevanceFilter(NewsCategory.MACRO)).toBe('none');
+    const globalMacroStory = { australian_relevance: false, bitcoin_relevance: false };
+    expect(shouldDropForRelevance(defaultRelevanceFilter(NewsCategory.MACRO), globalMacroStory)).toBe(false);
+  });
+
+  it("returns 'au_or_bitcoin' for every non-macro category", () => {
+    for (const category of Object.values(NewsCategory)) {
+      if (category === NewsCategory.MACRO) continue;
+      expect(defaultRelevanceFilter(category)).toBe('au_or_bitcoin');
+    }
   });
 });

@@ -33,6 +33,18 @@ export const NewsRelevanceFilter = {
 } as const;
 export type NewsRelevanceFilter = (typeof NewsRelevanceFilter)[keyof typeof NewsRelevanceFilter];
 
+// The relevance gate to apply when a routine's action_config omits relevance_filter.
+// Category-aware so the intent is durable: macro feeds cover global stories (Fed,
+// Treasuries, gold, de-dollarization) that are inherently neither Australian- nor
+// Bitcoin-specific, so they must NOT pass through the au_or_bitcoin gate or every
+// curated story gets dropped. Keeping this in code (rather than a one-off data
+// migration) means editing the routine can't silently reinstate the wrong default.
+export function defaultRelevanceFilter(category: NewsCategory): NewsRelevanceFilter {
+  return category === NewsCategory.MACRO
+    ? NewsRelevanceFilter.NONE
+    : NewsRelevanceFilter.AU_OR_BITCOIN;
+}
+
 export interface NewsIngestionConfig {
   category: NewsCategory;
   queries: string[];
@@ -67,15 +79,43 @@ export function resolveFeedUrl(
   return null;
 }
 
-// A user-curated publication scanned via its RSS/Atom feed. Managed from the
+// A user-curated publication scanned via its RSS/Atom feed, watched as a
+// podcast/YouTube channel, or received as an email newsletter. Managed from the
 // web app (/news/sources) or by Simon. Distinct from the keyword-search
 // NewsIngestionConfig — sources name specific publications to watch.
+export type NewsSourceType = 'rss' | 'podcast' | 'youtube' | 'email';
+
+// Visual prominence / Rex calibration tier, shared across source types.
+export type NewsTier = 'tier_1' | 'tier_2' | 'tier_3';
+
 export interface NewsSourceRecord {
   id: string;
   name: string;
   site_url: string | null;
-  feed_url: string;
+  // Nullable since 'youtube'/'email' sources have no RSS/podcast feed URL.
+  feed_url: string | null;
   is_active: boolean;
+  // Discriminator. 'rss' is the legacy default; 'podcast'/'youtube'/'email' are new.
+  source_type: NewsSourceType;
+  // Optional channel/playlist; for podcasts it aids the YouTube transcript fallback.
+  youtube_channel_url: string | null;
+  // The Deepgram opt-in gate — off by default so nothing spends money silently.
+  transcribe_with_deepgram: boolean;
+  // Filters multi-language <podcast:transcript> tags (default 'en').
+  preferred_transcript_lang: string;
+  // Cap on episodes ingested on first fetch of a new feed (default 25).
+  max_backfill_episodes: number;
+  // Skip Deepgram on episodes older than this; null = no cap.
+  max_episode_age_days: number | null;
+  // Email source fields. slug is the plus-address suffix + URL slug;
+  // inbound_address is the computed research+{slug}@<domain>; sender_allowlist
+  // is the approved From addresses/domains (may be empty pre-onboarding).
+  slug: string | null;
+  inbound_address: string | null;
+  sender_allowlist: string[];
+  // Shared Rex-rubric curation fields.
+  tier: NewsTier | null;
+  relevance_threshold: number;
   last_scanned_at: string | null;
   last_status: 'success' | 'failed' | null;
   last_error: string | null;
@@ -108,7 +148,14 @@ export interface NewsItemRecord {
   title: string;
   url: string;
   url_hash: string;
+  // Configured source this item came from (email always; rss/podcast going forward).
+  source_id: string | null;
   source_name: string;
+  // Email Message-ID — idempotency key. Null for feed-ingested items.
+  ingestion_ref: string | null;
+  // Real "view in browser"/original link, distinct from the synthetic url (email).
+  canonical_url: string | null;
+  author: string | null;
   published_at: string | null;
   fetched_at: string;
   body_markdown: string | null;
@@ -118,6 +165,12 @@ export interface NewsItemRecord {
   topic_tags: string[];
   australian_relevance: boolean;
   relevance_score: number | null;
+  // Rex rubric output.
+  relevance_reasoning: string | null;
+  curator_notes: string | null;
+  rex_metadata: Record<string, unknown>;
+  has_pdf_attachment: boolean;
+  attachment_count: number;
   status: NewsStatus;
   knowledge_item_id: string | null;
   ingested_by: string;
