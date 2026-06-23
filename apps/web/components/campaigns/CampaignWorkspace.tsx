@@ -147,11 +147,21 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
       )}
 
       {hasOpenGate && gate?.gate === 'gate1' && (
-        <Gate1Panel strategy={gate.strategy} isPending={isPending} submitted={submitted} onSubmit={submit} />
+        // Key on the content so a regenerated strategy (request-change loop)
+        // remounts the panel — resetting the latched "submitted" state and
+        // re-seeding the edit fields from the new strategy.
+        <Gate1Panel
+          key={JSON.stringify(gate.strategy)}
+          strategy={gate.strategy}
+          isPending={isPending}
+          submitted={submitted}
+          onSubmit={submit}
+        />
       )}
 
       {hasOpenGate && gate?.gate === 'gate2' && (
         <Gate2Panel
+          key={JSON.stringify(gate.beats)}
           beats={gate.beats}
           schedule={gate.schedule}
           isPending={isPending}

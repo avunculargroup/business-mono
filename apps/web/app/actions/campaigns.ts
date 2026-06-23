@@ -370,10 +370,11 @@ export async function savePostMetrics(
   const parsed = metricsSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid metrics' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const client = await createClient();
   const {
     data: { user },
-  } = await (await createClient()).auth.getUser();
+  } = await client.auth.getUser();
+  const supabase = client as unknown as AnyDb;
 
   const { error } = await supabase.from('post_metrics').upsert(
     {
@@ -415,10 +416,11 @@ export async function promotePostToSnippet(
   const parsed = promoteSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid snippet' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const client = await createClient();
   const {
     data: { user },
-  } = await (await createClient()).auth.getUser();
+  } = await client.auth.getUser();
+  const supabase = client as unknown as AnyDb;
 
   // The post's account + platform anchor the snippet to that voice.
   const { data: item } = await supabase

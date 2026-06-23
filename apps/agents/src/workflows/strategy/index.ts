@@ -434,6 +434,15 @@ const gate2Step = createStep({
     }
 
     // Persist beats, then stamp their ids onto the schedule for Step 8 fan-out.
+    // Delete-before-insert so a retried approval (e.g. the campaign update below
+    // failed on a prior attempt) can't duplicate beats — idempotent. Safe here:
+    // no content_items reference these beats until fan-out, which is after
+    // plan_approved.
+    const { error: clearErr } = await db
+      .from('campaign_beats')
+      .delete()
+      .eq('campaign_id', ctx.campaignId);
+    if (clearErr) throw new Error(`Failed to clear prior campaign_beats: ${clearErr.message}`);
     const beatRows = buildBeatRows(ctx.campaignId, beatPlan.beats);
     const { data: inserted, error: beatErr } = await db
       .from('campaign_beats')

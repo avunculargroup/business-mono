@@ -97,11 +97,22 @@ export async function fanOutCampaign(args: {
   for (const { input, scheduledFor } of planned) {
     try {
       const { contentItemId } = await startVariantRun(input);
-      if (contentItemId && scheduledFor) {
-        await db
-          .from('content_items')
-          .update({ scheduled_for: scheduledFor } as never)
-          .eq('id', contentItemId);
+      // The variant run suspends at Gate 3, so its top-level result may not carry
+      // the step output (contentItemId can be null). The persist step already
+      // wrote the row before suspending, so stamp scheduled_for by the unique
+      // (campaign, beat, account) triple — robust to the suspended-run shape, and
+      // falling back to the returned id when present.
+      if (scheduledFor) {
+        const stamp = db.from('content_items').update({ scheduled_for: scheduledFor } as never);
+        if (contentItemId) {
+          await stamp.eq('id', contentItemId);
+        } else {
+          await stamp
+            .eq('campaign_id', input.campaignId)
+            .eq('beat_id', input.beatId)
+            .eq('social_account_id', input.socialAccountId)
+            .is('scheduled_for', null);
+        }
       }
       spawned += 1;
     } catch (err) {
