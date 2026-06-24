@@ -19,6 +19,9 @@ type ContentItem = {
   status: string;
   scheduled_for: string | null;
   created_by: string | null;
+  campaign_name: string | null;
+  account_name: string | null;
+  platform: string | null;
 };
 
 const statusColumns = [
@@ -121,10 +124,19 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, item.id)}
                   >
+                    {item.campaign_name && (
+                      <span className={styles.cardCampaign}>{item.campaign_name}</span>
+                    )}
                     <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
                     <div className={styles.cardMeta}>
                       <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
-                      {item.created_by && (
+                      {item.account_name && (
+                        <span className={styles.cardAccount}>
+                          {item.platform === 'twitter_x' ? 'X' : item.platform === 'linkedin' ? 'LinkedIn' : null}
+                          {item.platform ? ' · ' : ''}{item.account_name}
+                        </span>
+                      )}
+                      {!item.account_name && item.created_by && (
                         <span className={styles.assignee}>Assigned</span>
                       )}
                     </div>
