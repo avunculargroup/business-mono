@@ -124,7 +124,12 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
-  resize: vertical;
+  resize: none;
+  /* Auto-grows to fit content (see AutoGrowTextarea). min-height keeps empty
+     fields looking like inputs; max-height is a safety valve for huge pastes. */
+  min-height: calc(2 * 1.5em + 2 * var(--space-3));
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .textarea:focus {
@@ -193,7 +198,11 @@
 .beatRationale {
   font-size: 14px;
   line-height: 1.5;
-  resize: vertical;
+  resize: none;
+  /* Auto-grows to fit content (see AutoGrowTextarea). */
+  min-height: calc(1.5em + 2 * var(--space-2));
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .beatRationale {
@@ -334,4 +343,16 @@
   line-height: 1.6;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .wrap {
+    gap: var(--space-4);
+  }
+
+  .panel {
+    padding: var(--space-4);
+  }
 }

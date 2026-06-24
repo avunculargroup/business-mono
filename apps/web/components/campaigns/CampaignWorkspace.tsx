@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, RefreshCw, Lock, Loader, MessageSquare, ListOrdered } from 'lucide-react';
 import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
+import { AutoGrowTextarea } from '@/components/ui/AutoGrowTextarea';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { submitCampaignGateDecision } from '@/app/actions/campaigns';
 import styles from './CampaignWorkspace.module.css';
@@ -227,14 +228,14 @@ function Gate1Panel({
         </p>
       </header>
 
-      <Field label="Content pillars (one per line)" value={pillars} onChange={setPillars} rows={3} />
-      <Field label="Key messages (one per line)" value={messages} onChange={setMessages} rows={3} />
-      <Field label="Audience summary" value={audience} onChange={setAudience} rows={2} />
-      <Field label="Tone guidance" value={tone} onChange={setTone} rows={2} />
-      <Field label="Hooks (one per line)" value={hooks} onChange={setHooks} rows={2} />
-      <Field label="Hashtags (one per line)" value={hashtags} onChange={setHashtags} rows={2} />
-      <Field label="Do not say (one per line)" value={doNotSay} onChange={setDoNotSay} rows={2} />
-      <Field label="Success signals (one per line)" value={signals} onChange={setSignals} rows={2} />
+      <Field label="Content pillars (one per line)" value={pillars} onChange={setPillars} />
+      <Field label="Key messages (one per line)" value={messages} onChange={setMessages} />
+      <Field label="Audience summary" value={audience} onChange={setAudience} />
+      <Field label="Tone guidance" value={tone} onChange={setTone} />
+      <Field label="Hooks (one per line)" value={hooks} onChange={setHooks} />
+      <Field label="Hashtags (one per line)" value={hashtags} onChange={setHashtags} />
+      <Field label="Do not say (one per line)" value={doNotSay} onChange={setDoNotSay} />
+      <Field label="Success signals (one per line)" value={signals} onChange={setSignals} />
 
       <GateActions
         isPending={isPending}
@@ -314,18 +315,16 @@ function Gate2Panel({
                 onChange={(e) => update(i, { title: e.target.value })}
                 placeholder="Beat title"
               />
-              <textarea
+              <AutoGrowTextarea
                 className={styles.beatMessage}
                 value={beat.core_message}
                 onChange={(e) => update(i, { core_message: e.target.value })}
-                rows={2}
                 placeholder="Core message — the one platform-agnostic idea"
               />
-              <textarea
+              <AutoGrowTextarea
                 className={styles.beatRationale}
                 value={beat.rationale}
                 onChange={(e) => update(i, { rationale: e.target.value })}
-                rows={1}
                 placeholder="Rationale"
               />
               <label className={styles.threadToggle}>
@@ -454,17 +453,15 @@ function Field({
   label,
   value,
   onChange,
-  rows,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  rows: number;
 }) {
   return (
     <label className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
-      <textarea className={styles.textarea} value={value} onChange={(e) => onChange(e.target.value)} rows={rows} />
+      <AutoGrowTextarea className={styles.textarea} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }
@@ -537,12 +534,11 @@ function GateActions({
       </div>
       {showChange && (
         <div className={styles.changeForm}>
-          <textarea
+          <AutoGrowTextarea
             className={styles.textarea}
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             placeholder={changePlaceholder}
-            rows={3}
           />
           <Button
             variant="primary"
