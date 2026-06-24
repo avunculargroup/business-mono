@@ -83,9 +83,42 @@ export async function handleStrategyGateRow(row: StrategyGateRow): Promise<void>
 }
 
 /**
+ * Catch-up scan for any campaign carrying an unprocessed pending_decision —
+ * recovering decisions written while this server (or its Realtime subscription)
+ * was down, which postgres_changes never replays. Runs once after the first
+ * successful subscribe, so the scan can't miss a write that lands during boot:
+ * anything written before is caught here, anything after by Realtime. Each row
+ * goes through the same atomic-claim handler, so this can't double-process a
+ * decision a live event also delivered.
+ */
+export async function backfillPendingDecisions(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as unknown as { from: (t: string) => any };
+  const { data, error } = await db
+    .from('campaigns')
+    .select('id, status, workflow_run_id, gate_state, pending_decision')
+    .not('pending_decision', 'is', null);
+  if (error) {
+    console.error('[strategy-gate-web] Backfill scan failed:', error.message);
+    return;
+  }
+  const rows = (data ?? []) as StrategyGateRow[];
+  if (rows.length === 0) return;
+  console.log(`[strategy-gate-web] Backfill: processing ${rows.length} pending decision(s)`);
+  for (const row of rows) {
+    try {
+      await handleStrategyGateRow(row);
+    } catch (err) {
+      console.error('[strategy-gate-web] Backfill error for campaign', row.id, err);
+    }
+  }
+}
+
+/**
  * Subscribe to campaigns and start/resume any run whose web decision has been
  * written to pending_decision.
  */
+let didBackfill = false;
 export function startStrategyGateWebListener(): void {
   subscribeWithReconnect({
     client: supabase,
@@ -93,6 +126,12 @@ export function startStrategyGateWebListener(): void {
     logPrefix: '[strategy-gate-web]',
     onSubscribed: () => {
       console.log('[strategy-gate-web] Listening for web gate decisions via Supabase Realtime');
+      // Once per process, after the subscription is live (so the scan can't race
+      // a write that lands during boot): recover any decision missed while down.
+      if (!didBackfill) {
+        didBackfill = true;
+        void backfillPendingDecisions();
+      }
     },
     attachHandlers: (channel) =>
       channel.on(
