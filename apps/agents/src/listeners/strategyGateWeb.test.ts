@@ -23,7 +23,7 @@ vi.mock('../workflows/strategy/run.js', async () => {
   };
 });
 
-const { handleStrategyGateRow } = await import('./strategyGateWeb.js');
+const { handleStrategyGateRow, backfillPendingDecisions } = await import('./strategyGateWeb.js');
 
 function claimSucceeds() {
   fakeSupabase.__setResponse('campaigns', { data: [{ id: 'camp-1' }], error: null });
@@ -129,5 +129,37 @@ describe('handleStrategyGateRow', () => {
       pending_decision: { decision: 'approve' },
     });
     expect(resumeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('backfillPendingDecisions', () => {
+  beforeEach(() => {
+    startSpy.mockClear();
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+  });
+
+  it('processes a campaign left with a start decision while the listener was down', async () => {
+    // The scan and the claim both read `campaigns`; one response serves both.
+    fakeSupabase.__setResponse('campaigns', {
+      data: [
+        { id: 'camp-1', status: 'draft', workflow_run_id: null, gate_state: null, pending_decision: { decision: 'start' } },
+      ],
+      error: null,
+    });
+
+    await backfillPendingDecisions();
+
+    // It filtered to rows with a pending decision, then launched the run.
+    const scan = fakeSupabase.__buildersFor('campaigns')[0];
+    expect(scan?.not).toHaveBeenCalledWith('pending_decision', 'is', null);
+    expect(startSpy).toHaveBeenCalledWith({ campaignId: 'camp-1' });
+  });
+
+  it('does nothing when no campaign is pending', async () => {
+    fakeSupabase.__setResponse('campaigns', { data: [], error: null });
+    await backfillPendingDecisions();
+    expect(startSpy).not.toHaveBeenCalled();
   });
 });

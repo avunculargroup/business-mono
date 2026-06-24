@@ -1883,6 +1883,14 @@ CREATE TRIGGER campaigns_updated_at
 CREATE INDEX idx_campaigns_status ON campaigns(status);
 CREATE INDEX idx_campaigns_start  ON campaigns(start_date);
 
+-- Realtime (20260624000000): the strategyGateWeb / variantGateWeb listeners react
+-- to pending_decision writes via postgres_changes, so campaigns and content_items
+-- must be in the publication. REPLICA IDENTITY FULL carries the JSONB gate columns.
+ALTER TABLE campaigns REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE campaigns;
+ALTER TABLE content_items REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE content_items;
+
 -- Join: which accounts participate in a campaign (each beat fans out to all).
 CREATE TABLE campaign_accounts (
   campaign_id       UUID NOT NULL REFERENCES campaigns(id)       ON DELETE CASCADE,
