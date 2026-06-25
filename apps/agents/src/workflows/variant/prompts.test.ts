@@ -5,6 +5,7 @@ import {
   variantCopyText,
   buildCharliePrompt,
   buildLexPrompt,
+  platformFormatRules,
 } from './prompts.js';
 import type { VariantContext, CharlieVariant } from './schemas.js';
 
@@ -117,6 +118,59 @@ describe('buildCharliePrompt', () => {
     const prompt = buildCharliePrompt(makeCtx(), 'Make the opening sharper.');
     expect(prompt).toContain('Requested change');
     expect(prompt).toContain('Make the opening sharper.');
+  });
+
+  it('injects LinkedIn formatting rules — hook/fold, short paragraphs, hashtags at end', () => {
+    const prompt = buildCharliePrompt(makeCtx());
+    expect(prompt).toContain('LinkedIn formatting — follow rigorously');
+    expect(prompt).toContain('…more');
+    expect(prompt).toContain('Short paragraphs');
+    expect(prompt).toContain('1,200–2,500 characters');
+    expect(prompt).toContain('hashtags together at the very end');
+  });
+
+  it('injects X single-post formatting rules — punchy, scannable, sparing hashtags', () => {
+    const ctx = makeCtx({
+      platform: 'twitter_x',
+      platformSpec: { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25, premium_max_chars: 25000 },
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).toContain('X (Twitter) formatting — follow rigorously');
+    expect(prompt).toContain('100–250 characters');
+    expect(prompt).toContain('At most 1–2 hashtags');
+  });
+
+  it('injects X thread formatting rules — segment count and a standalone first segment', () => {
+    const ctx = makeCtx({
+      platform: 'twitter_x',
+      platformSpec: { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25, premium_max_chars: 25000 },
+      beat: { ...makeCtx().beat, prefer_thread: true },
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).toContain('5–10 segments');
+    expect(prompt).toContain('FIRST segment must hook and stand on its own');
+  });
+});
+
+describe('platformFormatRules', () => {
+  const liSpec = { platform: 'linkedin' as const, max_chars: 3000 };
+  const xSpec = { platform: 'twitter_x' as const, max_chars: 280 };
+
+  it('gives LinkedIn the fold-aware hook + paragraph rules with the spec ceiling', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false);
+    expect(rules).toContain('…more');
+    expect(rules).toContain('3000-character hard ceiling');
+    expect(rules).toContain('Short paragraphs');
+  });
+
+  it('gives X a single-post target distinct from the thread rules', () => {
+    const single = platformFormatRules('twitter_x', xSpec, false);
+    expect(single).toContain('100–250 characters');
+    expect(single).not.toContain('segments');
+
+    const thread = platformFormatRules('twitter_x', xSpec, true);
+    expect(thread).toContain('5–10 segments');
+    expect(thread).toContain('280 characters');
   });
 });
 
