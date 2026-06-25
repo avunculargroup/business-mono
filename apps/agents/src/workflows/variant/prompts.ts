@@ -35,6 +35,42 @@ const NO_TOOL_INSTRUCTION =
   'Return ONLY the structured object. Do not call any tool (no persist_content_draft, no supabase tools) — persistence happens later in the workflow.';
 
 /**
+ * Platform-specific formatting conventions Charlie must follow rigorously, on top
+ * of the structural format block (single vs thread) and the char ceiling. Kept
+ * pure and separate so it can be unit-tested, and kept consistent with
+ * docs/brand-voice.md (channel formality, content length, structure).
+ */
+export function platformFormatRules(
+  platform: VariantContext['platform'],
+  platformSpec: VariantContext['platformSpec'],
+  wantsThread: boolean,
+): string {
+  const max = platformSpec.max_chars;
+
+  if (platform === 'linkedin') {
+    return [
+      `- Open with a hook that lands in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`,
+      `- Short paragraphs — one or two sentences each, separated by a blank line. No walls of text.`,
+      `- Aim for 1,200–2,500 characters: a deliberate, readable length well under the ${max}-character hard ceiling. Semi-formal register.`,
+      `- Group any hashtags together at the very end, never sprinkled through the body.`,
+    ].join('\n');
+  }
+
+  // twitter_x
+  if (wantsThread) {
+    return [
+      `- 5–10 segments (≈7 is the sweet spot), one idea per segment, each at or under ${max} characters.`,
+      `- The FIRST segment must hook and stand on its own — in the feed it is the only part most people see.`,
+      `- Keep every segment scannable and self-contained. Conversational register. Hashtags sparingly — 1–2 across the whole thread.`,
+    ].join('\n');
+  }
+  return [
+    `- Aim for 100–250 characters — punchy, scannable, one clear idea. ${max} is the hard ceiling, not the target.`,
+    `- Conversational register. At most 1–2 hashtags, and only where they earn their place.`,
+  ].join('\n');
+}
+
+/**
  * Build Charlie's generation prompt for one variant. Threads are only requested
  * on twitter_x when the beat prefers one; LinkedIn is always a single post.
  */
@@ -70,6 +106,9 @@ ${hashtags ? `Hashtags available (use sparingly, per platform norm): ${hashtags}
 ${platformSpec.hashtag_guidance ? `Hashtag guidance: ${platformSpec.hashtag_guidance}` : ''}
 
 ## ${formatBlock}
+
+## ${platformLabel} formatting — follow rigorously
+${platformFormatRules(platform, platformSpec, wantsThread)}
 
 ## Hard rules
 - "Bitcoin" (capital B) = the network/protocol; "bitcoin" (lowercase b) = the currency/unit. Get this right every time.
