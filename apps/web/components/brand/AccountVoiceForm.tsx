@@ -5,14 +5,21 @@ import { Lock, RotateCcw } from 'lucide-react';
 import { updateAccountVoice } from '@/app/actions/voice';
 import { useToast } from '@/providers/ToastProvider';
 import { ChipField } from './ChipField';
+import { SnippetsPanel } from './SnippetsPanel';
 import { lockedAvoidWords } from './accountVoice';
-import type { SocialAccountRow, VoiceProfile } from './voiceTypes';
+import type { SocialAccountRow, VoiceProfile, VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 
 interface AccountVoiceFormProps {
   account: SocialAccountRow;
   company: VoiceProfile;
   bitcoinRule: string | null;
+  canonSnippets: VoiceSnippetRow[];
+  ownSnippets: VoiceSnippetRow[];
+  onAddSnippet: () => void;
+  onEditSnippet: (snippet: VoiceSnippetRow) => void;
+  onToggleStarSnippet: (snippet: VoiceSnippetRow) => void;
+  onDeleteSnippet: (snippet: VoiceSnippetRow) => void;
   onSuccess: () => void;
   onPendingChange?: (pending: boolean) => void;
 }
@@ -65,6 +72,12 @@ export function AccountVoiceForm({
   account,
   company,
   bitcoinRule,
+  canonSnippets,
+  ownSnippets,
+  onAddSnippet,
+  onEditSnippet,
+  onToggleStarSnippet,
+  onDeleteSnippet,
   onSuccess,
   onPendingChange,
 }: AccountVoiceFormProps) {
@@ -253,6 +266,18 @@ export function AccountVoiceForm({
           <span className={styles.hint}>Enforced from Company Voice — not overridable here.</span>
         </div>
       )}
+
+      <div className={styles.voiceDivider}>Snippets</div>
+      <SnippetsPanel
+        title="Snippets"
+        emptyDescription="Exemplars specific to this account's voice. Canon snippets from Company Voice apply here too — add this account's own to sharpen it further."
+        canonSnippets={canonSnippets}
+        ownSnippets={ownSnippets}
+        onAdd={onAddSnippet}
+        onEdit={onEditSnippet}
+        onToggleStar={onToggleStarSnippet}
+        onDelete={onDeleteSnippet}
+      />
     </form>
   );
 }

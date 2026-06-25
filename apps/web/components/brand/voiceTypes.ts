@@ -48,6 +48,7 @@ export interface VoiceSnippetRow {
   platform: 'linkedin' | 'twitter_x' | null;
   topic_tags: string[];
   is_starred: boolean;
+  social_account_id: string | null;
 }
 
 export const SNIPPET_TYPES: SnippetType[] = [

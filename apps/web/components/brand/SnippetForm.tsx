@@ -9,13 +9,15 @@ import styles from '@/app/(app)/brand/voice.module.css';
 
 interface SnippetFormProps {
   snippet?: VoiceSnippetRow | null;
+  /** Scope for a new snippet: null/omitted saves to company canon. Ignored when editing — scope doesn't move. */
+  accountId?: string | null;
   onSuccess: () => void;
   onPendingChange?: (pending: boolean) => void;
 }
 
 export const SNIPPET_FORM_ID = 'voice-snippet-form';
 
-export function SnippetForm({ snippet, onSuccess, onPendingChange }: SnippetFormProps) {
+export function SnippetForm({ snippet, accountId, onSuccess, onPendingChange }: SnippetFormProps) {
   const { success, error } = useToast();
   const [type, setType] = useState(snippet?.snippet_type ?? 'opener');
   const [body, setBody] = useState(snippet?.body ?? '');
@@ -26,6 +28,7 @@ export function SnippetForm({ snippet, onSuccess, onPendingChange }: SnippetForm
   const handleSubmit = async () => {
     const fd = new FormData();
     if (snippet?.id) fd.set('id', snippet.id);
+    else fd.set('social_account_id', accountId ?? '');
     fd.set('snippet_type', type);
     fd.set('body', body);
     fd.set('curator_note', note);
