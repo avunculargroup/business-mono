@@ -39,7 +39,7 @@ export function ChipField({
 
   return (
     <div className={styles.field}>
-      <label className={styles.label}>{label}</label>
+      {label && <label className={styles.label}>{label}</label>}
       <div className={styles.chipArea}>
         {lockedValues.map((chip) => (
           <span key={`locked-${chip}`} className={`${styles.chip} ${styles.chipLocked}`} title="Enforced from company canon">

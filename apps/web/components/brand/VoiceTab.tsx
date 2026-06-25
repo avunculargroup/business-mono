@@ -10,13 +10,21 @@ import { useToast } from '@/providers/ToastProvider';
 import { Plus, Pencil, Star, Trash2, Lock, MessageSquareQuote } from 'lucide-react';
 import { VoiceForm, VOICE_FORM_ID } from './VoiceForm';
 import { SnippetForm, SNIPPET_FORM_ID } from './SnippetForm';
+import { AccountVoiceForm, ACCOUNT_VOICE_FORM_ID } from './AccountVoiceForm';
+import { overrideCount } from './accountVoice';
 import { toggleVoiceSnippetStar, deleteVoiceSnippet } from '@/app/actions/voice';
-import type { BrandVoiceRow, VoiceSnippetRow } from './voiceTypes';
+import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
+
+const PLATFORM_LABEL: Record<SocialAccountRow['platform'], string> = {
+  linkedin: 'LinkedIn',
+  twitter_x: 'X',
+};
 
 interface VoiceTabProps {
   voice: BrandVoiceRow | null;
   snippets: VoiceSnippetRow[];
+  accounts: SocialAccountRow[];
 }
 
 function ReadSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -28,11 +36,13 @@ function ReadSection({ label, children }: { label: string; children: React.React
   );
 }
 
-export function VoiceTab({ voice, snippets }: VoiceTabProps) {
+export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
   const router = useRouter();
   const { error } = useToast();
   const [editingVoice, setEditingVoice] = useState(false);
   const [voicePending, setVoicePending] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<SocialAccountRow | null>(null);
+  const [accountPending, setAccountPending] = useState(false);
   const [snippetEditing, setSnippetEditing] = useState<VoiceSnippetRow | null | 'new'>(null);
   const [snippetPending, setSnippetPending] = useState(false);
   const [deleting, setDeleting] = useState<VoiceSnippetRow | null>(null);
@@ -135,6 +145,35 @@ export function VoiceTab({ voice, snippets }: VoiceTabProps) {
         </>
       )}
 
+      {/* Account voices */}
+      <div className={styles.panelHeader}>
+        <span className={styles.panelTitle}>Account voices</span>
+      </div>
+      {accounts.length === 0 ? (
+        <EmptyState
+          icon={MessageSquareQuote}
+          title="No account voices"
+          description="Founder and company accounts inherit the company voice. They appear here once added."
+        />
+      ) : (
+        <div className={styles.accountList}>
+          {accounts.map((a) => {
+            const count = overrideCount(a.voice_profile, p);
+            return (
+              <button key={a.id} className={styles.accountRow} onClick={() => setEditingAccount(a)}>
+                <div className={styles.accountMain}>
+                  <span className={styles.accountName}>{a.display_name}</span>
+                  <span className={styles.accountPlatform}>{PLATFORM_LABEL[a.platform]}</span>
+                </div>
+                <span className={styles.overrideCount}>
+                  {count === 0 ? 'inherits all' : `${count} override${count === 1 ? '' : 's'}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Snippets panel */}
       <div className={styles.panelHeader}>
         <span className={styles.panelTitle}>Voice snippets</span>
@@ -198,6 +237,31 @@ export function VoiceTab({ voice, snippets }: VoiceTabProps) {
         }
       >
         <VoiceForm voice={voice} onSuccess={() => setEditingVoice(false)} onPendingChange={setVoicePending} />
+      </SlideOver>
+
+      {/* Edit account voice */}
+      <SlideOver
+        open={editingAccount !== null}
+        onClose={() => setEditingAccount(null)}
+        title={editingAccount ? `Edit ${editingAccount.display_name}` : 'Edit account voice'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditingAccount(null)}>Cancel</Button>
+            <Button variant="primary" type="submit" form={ACCOUNT_VOICE_FORM_ID} loading={accountPending}>
+              Save voice
+            </Button>
+          </>
+        }
+      >
+        {editingAccount && (
+          <AccountVoiceForm
+            account={editingAccount}
+            company={p}
+            bitcoinRule={voice?.bitcoin_capitalisation_rule ?? null}
+            onSuccess={() => setEditingAccount(null)}
+            onPendingChange={setAccountPending}
+          />
+        )}
       </SlideOver>
 
       {/* Add / edit snippet */}
