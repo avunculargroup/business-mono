@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { VoiceTab } from './VoiceTab';
 import { BrandView } from './BrandView';
-import type { BrandVoiceRow, VoiceSnippetRow } from './voiceTypes';
+import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 
 type BrandAsset = { id: string; name: string; type: string; content: string | null };
@@ -11,12 +11,13 @@ type BrandAsset = { id: string; name: string; type: string; content: string | nu
 interface BrandHubTabsProps {
   voice: BrandVoiceRow | null;
   snippets: VoiceSnippetRow[];
+  accounts: SocialAccountRow[];
   assets: BrandAsset[];
 }
 
 type Tab = 'voice' | 'assets';
 
-export function BrandHubTabs({ voice, snippets, assets }: BrandHubTabsProps) {
+export function BrandHubTabs({ voice, snippets, accounts, assets }: BrandHubTabsProps) {
   const [tab, setTab] = useState<Tab>('voice');
 
   return (
@@ -40,7 +41,11 @@ export function BrandHubTabs({ voice, snippets, assets }: BrandHubTabsProps) {
         </button>
       </div>
 
-      {tab === 'voice' ? <VoiceTab voice={voice} snippets={snippets} /> : <BrandView assets={assets} />}
+      {tab === 'voice' ? (
+        <VoiceTab voice={voice} snippets={snippets} accounts={accounts} />
+      ) : (
+        <BrandView assets={assets} />
+      )}
     </>
   );
 }

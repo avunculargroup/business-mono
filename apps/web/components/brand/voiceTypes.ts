@@ -19,6 +19,18 @@ export interface BrandVoiceRow {
   version: string;
 }
 
+export type Platform = 'linkedin' | 'twitter_x';
+
+export interface SocialAccountRow {
+  id: string;
+  platform: Platform;
+  account_type: 'company' | 'founder';
+  display_name: string;
+  handle: string | null;
+  profile_url: string | null;
+  voice_profile: VoiceProfile;
+}
+
 export type SnippetType =
   | 'phrase'
   | 'opener'

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { cleanAccountProfile } from '@/components/brand/accountVoice';
 
 // Brand Hub voice editing. Writes the brand_voice singleton and voice_snippets
 // via the cookie-authed SSR client (RLS: authenticated). brand_voice /
@@ -76,6 +77,61 @@ export async function updateBrandVoice(formData: FormData) {
 
   revalidatePath(REVALIDATE);
   return { success: true, version: row.version };
+}
+
+const accountVoiceSchema = z.object({
+  id: z.string().uuid(),
+  display_name: z.string().trim().min(1, 'Display name is required'),
+  handle: z.string().trim().optional().default(''),
+  profile_url: z.string().trim().optional().default(''),
+  profile: z.string(), // JSON-encoded VoiceProfile (overrides only)
+});
+
+const accountProfileSchema = profileSchema.partial();
+
+/**
+ * Update a founder/company account voice. Stores only the overridden fields on
+ * `social_accounts.voice_profile` (inherited fields stay empty so future canon
+ * edits keep flowing through) plus the editable account identity. The company
+ * canon is loaded to strip company-banned avoid words from the stored profile.
+ */
+export async function updateAccountVoice(formData: FormData) {
+  const parsed = accountVoiceSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  let rawProfile;
+  try {
+    rawProfile = accountProfileSchema.parse(JSON.parse(parsed.data.profile));
+  } catch {
+    return { error: 'Voice profile is malformed' };
+  }
+
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  const { data: brand } = await db
+    .from('brand_voice')
+    .select('profile')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  const voice_profile = cleanAccountProfile(rawProfile, brand?.profile ?? {});
+
+  const { error } = await db
+    .from('social_accounts')
+    .update({
+      display_name: parsed.data.display_name,
+      handle: parsed.data.handle || null,
+      profile_url: parsed.data.profile_url || null,
+      voice_profile,
+    })
+    .eq('id', parsed.data.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(REVALIDATE);
+  return { success: true };
 }
 
 const snippetSchema = z.object({
