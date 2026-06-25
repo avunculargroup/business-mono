@@ -19,8 +19,7 @@ export default async function BrandPage() {
       .maybeSingle(),
     db
       .from('voice_snippets')
-      .select('id, snippet_type, body, curator_note, platform, topic_tags, is_starred')
-      .is('social_account_id', null)
+      .select('id, snippet_type, body, curator_note, platform, topic_tags, is_starred, social_account_id')
       .order('is_starred', { ascending: false })
       .order('created_at', { ascending: true }),
     db

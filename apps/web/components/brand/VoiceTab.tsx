@@ -7,11 +7,13 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/providers/ToastProvider';
-import { Plus, Pencil, Star, Trash2, Lock, MessageSquareQuote } from 'lucide-react';
+import { Pencil, Lock, MessageSquareQuote } from 'lucide-react';
 import { VoiceForm, VOICE_FORM_ID } from './VoiceForm';
 import { SnippetForm, SNIPPET_FORM_ID } from './SnippetForm';
+import { SnippetsPanel } from './SnippetsPanel';
 import { AccountVoiceForm, ACCOUNT_VOICE_FORM_ID } from './AccountVoiceForm';
 import { overrideCount } from './accountVoice';
+import { canonSnippets, accountSnippets } from './snippetGroups';
 import { toggleVoiceSnippetStar, deleteVoiceSnippet } from '@/app/actions/voice';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
@@ -44,10 +46,21 @@ export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
   const [editingAccount, setEditingAccount] = useState<SocialAccountRow | null>(null);
   const [accountPending, setAccountPending] = useState(false);
   const [snippetEditing, setSnippetEditing] = useState<VoiceSnippetRow | null | 'new'>(null);
+  // Scope for a new snippet being added: null = company canon, otherwise the account id.
+  // Unused when editing an existing snippet — its scope doesn't move.
+  const [snippetScopeAccountId, setSnippetScopeAccountId] = useState<string | null>(null);
   const [snippetPending, setSnippetPending] = useState(false);
   const [deleting, setDeleting] = useState<VoiceSnippetRow | null>(null);
 
   const p = voice?.profile ?? {};
+  const ownCanonSnippets = canonSnippets(snippets);
+
+  const openAddSnippet = (accountId: string | null) => {
+    setSnippetScopeAccountId(accountId);
+    setSnippetEditing('new');
+  };
+
+  const editSnippet = (s: VoiceSnippetRow) => setSnippetEditing(s);
 
   const toggleStar = async (s: VoiceSnippetRow) => {
     const res = await toggleVoiceSnippetStar(s.id, !s.is_starred);
@@ -175,54 +188,14 @@ export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
       )}
 
       {/* Snippets panel */}
-      <div className={styles.panelHeader}>
-        <span className={styles.panelTitle}>Voice snippets</span>
-        <Button variant="secondary" size="sm" onClick={() => setSnippetEditing('new')}>
-          <Plus size={14} strokeWidth={1.5} />
-          Add snippet
-        </Button>
-      </div>
-
-      {snippets.length === 0 ? (
-        <EmptyState
-          icon={MessageSquareQuote}
-          title="No snippets yet"
-          description="Exemplars show the voice rather than describe it — the strongest input to on-voice writing. Add phrases, openers, or full posts with a note on why each works."
-          actionLabel="Add snippet"
-          onAction={() => setSnippetEditing('new')}
-        />
-      ) : (
-        <div className={styles.snippetList}>
-          {snippets.map((s) => (
-            <div key={s.id} className={styles.snippet}>
-              <div className={styles.snippetMeta}>
-                <span className={styles.metaChip}>
-                  {s.snippet_type.replace('_', ' ')} · {s.platform ?? 'any'}
-                  {s.topic_tags.length > 0 ? ` · ${s.topic_tags.join(', ')}` : ''}
-                </span>
-                <div className={styles.snippetActions}>
-                  <button
-                    className={`${styles.iconButton} ${s.is_starred ? styles.starActive : ''}`}
-                    onClick={() => toggleStar(s)}
-                    aria-label={s.is_starred ? 'Unstar' : 'Star'}
-                    title={s.is_starred ? 'Starred — agents weight these up' : 'Star this exemplar'}
-                  >
-                    <Star size={15} strokeWidth={1.5} fill={s.is_starred ? 'currentColor' : 'none'} />
-                  </button>
-                  <button className={styles.iconButton} onClick={() => setSnippetEditing(s)} aria-label="Edit snippet">
-                    <Pencil size={15} strokeWidth={1.5} />
-                  </button>
-                  <button className={styles.iconButton} onClick={() => setDeleting(s)} aria-label="Delete snippet">
-                    <Trash2 size={15} strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
-              <div className={styles.snippetBody}>{s.body}</div>
-              {s.curator_note && <div className={styles.curatorNote}>{s.curator_note}</div>}
-            </div>
-          ))}
-        </div>
-      )}
+      <SnippetsPanel
+        title="Voice snippets"
+        ownSnippets={ownCanonSnippets}
+        onAdd={() => openAddSnippet(null)}
+        onEdit={editSnippet}
+        onToggleStar={toggleStar}
+        onDelete={setDeleting}
+      />
 
       {/* Edit company voice */}
       <SlideOver
@@ -258,6 +231,12 @@ export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
             account={editingAccount}
             company={p}
             bitcoinRule={voice?.bitcoin_capitalisation_rule ?? null}
+            canonSnippets={ownCanonSnippets}
+            ownSnippets={accountSnippets(snippets, editingAccount.id)}
+            onAddSnippet={() => openAddSnippet(editingAccount.id)}
+            onEditSnippet={editSnippet}
+            onToggleStarSnippet={toggleStar}
+            onDeleteSnippet={setDeleting}
             onSuccess={() => setEditingAccount(null)}
             onPendingChange={setAccountPending}
           />
@@ -279,6 +258,7 @@ export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
         {snippetEditing !== null && (
           <SnippetForm
             snippet={snippetEditing === 'new' ? null : snippetEditing}
+            accountId={snippetScopeAccountId}
             onSuccess={() => setSnippetEditing(null)}
             onPendingChange={setSnippetPending}
           />
