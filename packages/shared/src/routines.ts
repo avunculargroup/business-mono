@@ -27,16 +27,21 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    (mempool/coinmetrics), upserts raw observations with revision handling, lets the
 //    views derive the rest, and proposes a (compliance-sensitive) content beat on a
 //    Hash-Ribbons signal change, an MVRV band cross, or a large hash-rate drop.
+//  - social_post_from_news: per-founder routine. The editor picks the day's news story
+//    that best fits the founder's voice and the post form (share-with-context vs teach),
+//    Charlie drafts a LinkedIn + an X post in the founder's voice, Lex classifies advice
+//    risk, both land in content_items as drafts, and the founder is emailed the drafts.
 export const RoutineActionType = {
-  RESEARCH_DIGEST:   'research_digest',
-  MONITOR_CHANGE:    'monitor_change',
-  NEWS_INGEST:       'news_ingest',
-  NEWS_SOURCE_SCAN:  'news_source_scan',
-  NEWSLETTER:        'newsletter',
-  PODCAST_INGEST:    'podcast_ingest',
-  NEWS_CURATION:     'news_curation',
-  INDICATOR_POLL:    'indicator_poll',
-  ONCHAIN_POLL:      'onchain_poll',
+  RESEARCH_DIGEST:       'research_digest',
+  MONITOR_CHANGE:        'monitor_change',
+  NEWS_INGEST:           'news_ingest',
+  NEWS_SOURCE_SCAN:      'news_source_scan',
+  NEWSLETTER:            'newsletter',
+  PODCAST_INGEST:        'podcast_ingest',
+  NEWS_CURATION:         'news_curation',
+  INDICATOR_POLL:        'indicator_poll',
+  ONCHAIN_POLL:          'onchain_poll',
+  SOCIAL_POST_FROM_NEWS: 'social_post_from_news',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -169,6 +174,40 @@ export interface OnchainPollResult {
   failed: string[];
 }
 
+// action_config shape for a 'social_post_from_news' routine. One routine per
+// founder (the seed creates one per founder social account owner); each run picks
+// a fresh news story that fits THIS founder's voice and drafts posts for them.
+export interface SocialPostFromNewsConfig {
+  // The team_member whose founder social_accounts (X + LinkedIn) the posts are for.
+  founder_team_member_id: string;
+  // Which platforms to draft for (default both).
+  platforms?: ('linkedin' | 'twitter_x')[];
+  // Only consider news_items fetched within this many hours (default 24).
+  lookback_hours?: number;
+}
+
+// The post form the editor chooses for a given story + founder.
+export type SocialPostForm = 'share_with_context' | 'teach';
+
+// One drafted post persisted to content_items this run.
+export interface SocialPostDraft {
+  contentItemId: string;
+  platform: 'linkedin' | 'twitter_x';
+  is_thread: boolean;
+}
+
+// Structured payload persisted under routines.last_result.metadata for social_post_from_news.
+export interface SocialPostFromNewsResult {
+  founder_team_member_id: string;
+  founder_name: string;
+  story_id: string;
+  story_url: string;
+  form: SocialPostForm;
+  posts: SocialPostDraft[];
+  // True when the founder draft email was sent successfully.
+  emailed: boolean;
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
@@ -176,7 +215,8 @@ export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.PODCAST_INGEST } & PodcastIngestConfig)
   | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig)
   | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig)
-  | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig);
+  | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig)
+  | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.
