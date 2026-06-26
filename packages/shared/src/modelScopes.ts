@@ -253,6 +253,32 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'margot',
   },
 
+  // ── Social-post-from-news routine steps ───────────────────────────────────
+  {
+    key: 'social_post.editor_select',
+    type: 'workflow_step',
+    label: 'Story & form selection',
+    description: 'The editor picks the news story that best fits a founder\'s voice and the post form',
+    workflow: 'social_post',
+    fallbackAgent: 'editor',
+  },
+  {
+    key: 'social_post.generate_copy',
+    type: 'workflow_step',
+    label: 'Generate copy',
+    description: 'Charlie drafts a LinkedIn/X post from a news story in the founder\'s voice',
+    workflow: 'social_post',
+    fallbackAgent: 'charlie',
+  },
+  {
+    key: 'social_post.compliance_check',
+    type: 'workflow_step',
+    label: 'Compliance check',
+    description: 'Lex classifies advice risk and decides on a disclaimer for the founder post',
+    workflow: 'social_post',
+    fallbackAgent: 'lex',
+  },
+
   // ── Content compliance review (Lex, on draft persistence) ──────────────────
   {
     key: 'content.compliance_review',
@@ -270,6 +296,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   newsletter: 'Newsletter',
   variant: 'Variant Generation',
   strategy: 'Campaign Strategy',
+  social_post: 'Social Posts from News',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

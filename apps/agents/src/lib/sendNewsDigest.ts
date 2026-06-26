@@ -24,8 +24,8 @@ import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js'
 // The Fastmail login whose stored token sends the digest, and the send-identity
 // (an alias on that account) the message is From. Both live on the same account
 // already managed in fastmail_accounts, so no extra credential is needed.
-const SENDER_ACCOUNT_USERNAME = 'avuncular@fastmail.com';
-const SENDER_FROM_EMAIL = 'hq@btreasury.com.au';
+export const SENDER_ACCOUNT_USERNAME = 'avuncular@fastmail.com';
+export const SENDER_FROM_EMAIL = 'hq@btreasury.com.au';
 
 export interface DigestDeliveryResult {
   /** False when no sender token is available in fastmail_accounts — nothing was attempted. */
@@ -118,7 +118,7 @@ export async function deliverNewsDigest(
 }
 
 /** The app-specific password for the sending account, from fastmail_accounts. */
-async function loadSenderToken(): Promise<string | null> {
+export async function loadSenderToken(): Promise<string | null> {
   const { data, error } = await supabase
     .from('fastmail_accounts')
     .select('token')
@@ -152,7 +152,7 @@ async function loadRecipients(): Promise<JmapAddress[]> {
 }
 
 /** Footer details, sourced from company_records (same keys the newsletter uses). */
-async function loadCompanyFooter(): Promise<CompanyFooter> {
+export async function loadCompanyFooter(): Promise<CompanyFooter> {
   const { data } = await supabase.from('company_records').select('type_key, value');
   const vars: Record<string, string> = {};
   for (const row of (data ?? []) as Array<{ type_key: string; value: string | null }>) {

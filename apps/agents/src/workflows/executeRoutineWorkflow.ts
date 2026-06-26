@@ -37,6 +37,7 @@ import type {
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
 import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
+import { runSocialPost } from './socialPost/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { editor } from '../agents/editorial/index.js';
@@ -209,6 +210,8 @@ const runRoutine = createStep({
           outcomes.push(await runIndicatorPoll(routine));
         } else if (routine.action_type === 'onchain_poll') {
           outcomes.push(await runOnchainPoll(routine));
+        } else if (routine.action_type === 'social_post_from_news') {
+          outcomes.push(await runSocialPost(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
