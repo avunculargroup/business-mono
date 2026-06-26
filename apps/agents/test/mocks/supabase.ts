@@ -24,6 +24,7 @@ export interface FakeQueryBuilder {
   eq: Mock;
   neq: Mock;
   not: Mock;
+  is: Mock;
   in: Mock;
   lte: Mock;
   gte: Mock;
@@ -79,6 +80,7 @@ function makeBuilder(table: string, response: SupabaseResponse): FakeQueryBuilde
   builder.eq = passthrough('eq');
   builder.neq = passthrough('neq');
   builder.not = passthrough('not');
+  builder.is = passthrough('is');
   builder.in = passthrough('in');
   builder.lte = passthrough('lte');
   builder.gte = passthrough('gte');

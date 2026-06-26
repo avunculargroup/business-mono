@@ -27,6 +27,7 @@ import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startResearchMailListener } from '../listeners/researchMailListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
+import { startVoiceEmbeddingListener } from '../listeners/voiceEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
 import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
@@ -160,6 +161,11 @@ startResearchMailListener();
 // Keep the content_embeddings RAG store in sync (embed-on-write + backfill).
 // Powers the newsletter workflow's retrieval step.
 startContentEmbeddingListener();
+
+// Backfill voice_snippets with NULL embeddings on every boot — catches rows
+// imported directly into the table (e.g. manual seeding) that skipped the
+// seed script's embed-on-save step.
+startVoiceEmbeddingListener();
 
 // Resume newsletter gates approved from the web /content page (the web app
 // can't reach this server over HTTP, so it writes to newsletter_runs and this
