@@ -18,6 +18,7 @@ import {
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
 import { buildGate1Message, buildGate2Message, buildNoStoriesMessage } from './messages.js';
+import { setWorkflowProgress, clearWorkflowProgress } from '../../lib/workflowProgress.js';
 import {
   newsletterInputSchema,
   retrievedItemSchema,
@@ -78,8 +79,9 @@ const retrieveStep = createStep({
     input: newsletterInputSchema,
     pool: z.array(retrievedItemSchema),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const input = inputData;
+    await setWorkflowProgress(runId, 'retrieve', 'Gathering source material…');
     const queryEmbedding = await embedText(NEWSLETTER_QUERY_SEED);
     const days = TIME_RANGE_DAYS[input.timeRange];
 
@@ -121,8 +123,9 @@ const selectStoriesStep = createStep({
     pool: z.array(retrievedItemSchema),
     shortlist: storyShortlistSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { input, pool } = inputData;
+    await setWorkflowProgress(runId, 'select_stories', 'Rex is selecting stories…');
     const tone = await fetchBrandTone();
 
     const prompt = `You are selecting stories for the BTS newsletter.
@@ -184,7 +187,7 @@ const gate1Step = createStep({
     input: newsletterInputSchema,
     approvedStories: z.array(storyCandidateSchema),
   }),
-  execute: async ({ inputData, resumeData, suspend, bail }) => {
+  execute: async ({ inputData, resumeData, suspend, bail, runId }) => {
     const { input, pool, shortlist } = inputData;
 
     if (!resumeData) {
@@ -192,6 +195,7 @@ const gate1Step = createStep({
       // approval prompt is useless); end the run with a diagnostic reason so the
       // director learns *why* it was empty instead of approving nothing.
       if (shortlist.candidates.length === 0) {
+        await clearWorkflowProgress(runId);
         const reason = buildNoStoriesMessage({ timeRange: input.timeRange, poolSize: pool.length });
         return bail({
           noStories: true as const,
@@ -206,6 +210,7 @@ const gate1Step = createStep({
         recommendedIds: shortlist.recommended,
         timeRange: input.timeRange,
       });
+      await clearWorkflowProgress(runId);
       await suspend({ gate: 'gate1' as const, message });
       // Unreachable after suspend resolves the run; the resumed pass re-enters
       // execute with resumeData populated.
@@ -220,6 +225,7 @@ const gate1Step = createStep({
     if (resumeData.decision === 'adjust' && resumeData.adjustment) {
       // Rex revises the shortlist applying the human's instruction — a single
       // agent invocation, not a full workflow re-run.
+      await setWorkflowProgress(runId, 'gate1', 'Rex is reworking the shortlist…');
       const prompt = `The human reviewed your newsletter shortlist and asked for changes.
 
 Original candidates:
@@ -262,11 +268,14 @@ const researchStep = createStep({
     approvedStories: z.array(storyCandidateSchema),
     researchNotes: z.array(researchNoteSchema),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { input, approvedStories } = inputData;
     const needsResearch = approvedStories.filter(
       (s) => s.needs_research && s.data_completeness < 8,
     );
+    if (needsResearch.length > 0) {
+      await setWorkflowProgress(runId, 'research_enrich', 'Rex is researching thin stories…');
+    }
 
     const researchNotes: ResearchNote[] = [];
     for (const story of needsResearch) {
@@ -361,8 +370,9 @@ const draftStep = createStep({
     drafts: z.array(storyDraftSchema),
     introOutro: introOutroSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { input, approvedStories, researchNotes } = inputData;
+    await setWorkflowProgress(runId, 'draft_generation', 'Charlie is drafting the newsletter…');
     const notesById = new Map(researchNotes.map((n) => [n.story_id, n]));
 
     // Stories drafted in parallel; intro/outro generated alongside.
@@ -463,8 +473,9 @@ const reviewStep = createStep({
     reviewed: z.array(reviewedStorySchema),
     introOutro: introOutroSchema,
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { input, approvedStories, researchNotes, drafts, introOutro } = inputData;
+    await setWorkflowProgress(runId, 'editorial_review', 'Editorial review in progress…');
     const reviewed = await Promise.all(drafts.map((d) => reviewDraft(d, input)));
     return { input, approvedStories, researchNotes, reviewed, introOutro };
   },
@@ -496,8 +507,9 @@ const assembleStep = createStep({
     totalWordCount: z.number(),
     overLengthIds: z.array(z.string()),
   }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { input, reviewed, introOutro } = inputData;
+    await setWorkflowProgress(runId, 'assemble', 'Assembling the draft…');
     const company = await fetchCompanyVars();
     const now = new Date();
     const title = newsletterTitle(now);
@@ -545,7 +557,7 @@ const gate2Step = createStep({
     markdown: z.string(),
     totalWordCount: z.number(),
   }),
-  execute: async ({ inputData, resumeData, suspend, state, setState }) => {
+  execute: async ({ inputData, resumeData, suspend, state, setState, runId }) => {
     const { input, approvedStories, researchNotes, introOutro, title } = inputData;
 
     // A resumed step re-runs from the top, so prior revisions live in workflow
@@ -567,6 +579,7 @@ const gate2Step = createStep({
         overLengthIds,
         held,
       });
+      await clearWorkflowProgress(runId);
       await suspend({ gate: 'gate2' as const, message, newsletterMarkdown: markdown, held });
     };
 
@@ -588,6 +601,7 @@ const gate2Step = createStep({
         const note = researchNotes.find((n) => n.story_id === target.story_id);
         if (story) {
           // Re-draft just this story with the human's instruction, then re-review.
+          await setWorkflowProgress(runId, 'gate2', `Revising story ${resumeData.storyNumber}…`);
           const revisedDraft = await draftStory(
             { ...story, key_points: [...story.key_points, `Human revision: ${resumeData.instruction}`] },
             note,
@@ -635,6 +649,7 @@ const persistStep = createStep({
   outputSchema: newsletterCompletedSchema,
   execute: async ({ inputData, runId }) => {
     const { input, approvedStories, reviewed, title, markdown, totalWordCount } = inputData;
+    await setWorkflowProgress(runId, 'persist', 'Saving to the content pipeline…');
 
     const { data: inserted, error } = await supabase
       .from('content_items')
@@ -671,6 +686,7 @@ const persistStep = createStep({
       approved_at: new Date().toISOString(),
     } as never);
 
+    await clearWorkflowProgress(runId);
     return { contentItemId, title, storyCount: reviewed.length, totalWordCount, editorialScores };
   },
 });

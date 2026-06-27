@@ -1,6 +1,7 @@
 import { SignalClient, type SendMessageParams } from '@platform/signal';
 import { supabase } from '@platform/db';
 import { isKeyLimitError } from '../lib/llmErrors.js';
+import { clearWorkflowProgress } from '../lib/workflowProgress.js';
 import { buildConfirmationMessage } from './newsletter/messages.js';
 import { newsletterInputSchema, type NewsletterInput } from './newsletter/schemas.js';
 
@@ -142,6 +143,7 @@ export async function handleRunResult(args: {
   // There's nothing to approve, so end the run and tell the director why.
   if (isNoStories(result.result)) {
     const { reason } = result.result;
+    await clearWorkflowProgress(runId);
     await db
       .from('newsletter_runs')
       .update({
@@ -240,6 +242,7 @@ export async function handleRunResult(args: {
     const message = keyLimit
       ? "I couldn't build the newsletter — the AI provider's usage limit has been reached. It'll need topping up before I can try again."
       : "I hit a problem putting the newsletter together and couldn't finish it. Try again when you're ready.";
+    await clearWorkflowProgress(runId);
     await db
       .from('newsletter_runs')
       .update({
