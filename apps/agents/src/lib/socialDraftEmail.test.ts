@@ -61,6 +61,9 @@ describe('renderSocialDraftEmail', () => {
     // CTA links to the content editor for each draft
     expect(html).toContain('https://hq.bts.example/content/ci-li');
     expect(html).toContain('https://hq.bts.example/content/ci-x');
+    // copy-to-clipboard link for each draft (the email itself can't run JS)
+    expect(html).toContain('https://hq.bts.example/content/ci-li/copy');
+    expect(html).toContain('https://hq.bts.example/content/ci-x/copy');
     // disclaimer note only on the general-advice post
     expect(html).toContain('Disclaimer to be attached by Lex.');
     // story line linked

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Check, ExternalLink } from 'lucide-react';
 import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
+import { CopyButton } from '@/components/ui/CopyButton';
 import { markVariantPosted } from '@/app/actions/campaigns';
 import styles from './ReadyToPostQueue.module.css';
 
@@ -29,27 +30,6 @@ function formatWhen(scheduledFor: string | null): string {
   if (!scheduledFor) return 'Unscheduled';
   const [date, time] = scheduledFor.split('T');
   return time ? `${date} · ${time.slice(0, 5)}` : (date ?? scheduledFor);
-}
-
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const { success, error } = useToast();
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      success('Copied to clipboard.');
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      error('Could not copy — select the text and copy manually.');
-    }
-  };
-  return (
-    <button type="button" className={styles.copyBtn} onClick={copy}>
-      {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
-      {label}
-    </button>
-  );
 }
 
 function QueueCard({

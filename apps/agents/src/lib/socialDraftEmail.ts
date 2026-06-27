@@ -97,6 +97,16 @@ function reviewUrl(contentItemId: string, webAppUrl?: string): string | null {
   return `${webAppUrl.replace(/\/$/, '')}/content/${contentItemId}`;
 }
 
+/**
+ * Resolve the copy-to-clipboard destination for a draft, or null if not linkable.
+ * Email clients strip <script>, so the email itself can't run a copy button —
+ * this links to a real page in the web app that does the clipboard write.
+ */
+function copyTextUrl(contentItemId: string, webAppUrl?: string): string | null {
+  if (!webAppUrl) return null;
+  return `${webAppUrl.replace(/\/$/, '')}/content/${contentItemId}/copy`;
+}
+
 /** The post body as preview lines: a single block, or numbered thread segments. */
 function bodyHtml(post: SocialDraftPost, dark: boolean): string {
   const color = dark ? C.xText : C.textPrimary;
@@ -131,10 +141,17 @@ function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
 
   const previewText = post.isThread ? post.segments.join('\n\n') : post.body;
   const href = reviewUrl(post.contentItemId, input.webAppUrl);
+  const copyHref = copyTextUrl(post.contentItemId, input.webAppUrl);
   const cta = href
     ? `<tr><td style="padding:16px 0 0 0;"><a href="${escapeHtml(
         href,
-      )}" style="display:inline-block;background:${C.accent};color:#1A1915;font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Review &amp; approve on the web</a></td></tr>`
+      )}" style="display:inline-block;background:${C.accent};color:#1A1915;font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Review &amp; approve on the web</a><a href="${escapeHtml(
+        copyHref!,
+      )}" style="display:inline-block;margin-left:8px;background:transparent;color:${
+        dark ? C.xMuted : C.textSecondary
+      };font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border:1px solid ${
+        dark ? C.xSurface : C.border
+      };border-radius:8px;">Copy text</a></td></tr>`
     : '';
 
   const disclaimer = post.needsDisclaimer
