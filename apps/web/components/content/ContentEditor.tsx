@@ -3,6 +3,7 @@
 import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
+import { CopyButton } from '@/components/ui/CopyButton';
 import { updateContentStatus } from '@/app/actions/content';
 import { useToast } from '@/providers/ToastProvider';
 import { formatDate } from '@/lib/utils';
@@ -48,6 +49,9 @@ export function ContentEditor({ item, threadSegments }: ContentEditorProps) {
   const fullText = item.is_thread ? threadSegments.map((s) => s.body).join(' ') : body;
   const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
   const charCount = fullText.length;
+  const copyText = item.is_thread
+    ? threadSegments.map((s, i) => `${i + 1}/ ${s.body}`).join('\n\n')
+    : body;
 
   const nextStep = statusFlow[optimisticStatus];
 
@@ -85,7 +89,10 @@ export function ContentEditor({ item, threadSegments }: ContentEditorProps) {
           />
         )}
         <div className={styles.counts}>
-          {wordCount} words / {charCount} characters{item.is_thread ? ` / ${threadSegments.length} posts` : ''}
+          <span>
+            {wordCount} words / {charCount} characters{item.is_thread ? ` / ${threadSegments.length} posts` : ''}
+          </span>
+          <CopyButton text={copyText} label="Copy text" />
         </div>
       </div>
 

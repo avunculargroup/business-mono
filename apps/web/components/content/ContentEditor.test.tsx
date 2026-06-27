@@ -52,4 +52,15 @@ describe('ContentEditor', () => {
 
     expect(screen.getByPlaceholderText('Start writing...')).toHaveValue('A single post body.');
   });
+
+  it('renders a copy button for the draft text', () => {
+    render(
+      <ContentEditor
+        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'A single post body.' }}
+        threadSegments={[]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Copy text' })).toBeInTheDocument();
+  });
 });
