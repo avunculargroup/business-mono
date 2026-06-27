@@ -4326,6 +4326,27 @@ export type Database = {
           },
         ]
       }
+      workflow_progress: {
+        Row: {
+          step_id: string
+          step_label: string
+          updated_at: string
+          workflow_run_id: string
+        }
+        Insert: {
+          step_id: string
+          step_label: string
+          updated_at?: string
+          workflow_run_id: string
+        }
+        Update: {
+          step_id?: string
+          step_label?: string
+          updated_at?: string
+          workflow_run_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_active_capabilities: {
