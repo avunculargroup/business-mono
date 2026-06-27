@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { stepRequestContext } from '../../config/model.js';
 import { resolveCompanyVoiceBlock } from '../../lib/voicePrompt.js';
+import { setWorkflowProgress, clearWorkflowProgress } from '../../lib/workflowProgress.js';
 import { margot } from '../../agents/margot/index.js';
 import { rex } from '../../agents/researcher/index.js';
 import { bruno } from '../../agents/ba/index.js';
@@ -151,8 +152,9 @@ const resolveContextStep = createStep({
   id: 'resolve_context',
   inputSchema: strategyInputSchema,
   outputSchema: z.object({ ctx: strategyContextSchema }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { campaignId } = inputData;
+    await setWorkflowProgress(runId, 'resolve_context', 'Loading campaign context…');
 
     const { data: campaign, error: campErr } = await db
       .from('campaigns')
@@ -254,9 +256,10 @@ const researchStep = createStep({
   id: 'research',
   inputSchema: z.object({ ctx: strategyContextSchema }),
   outputSchema: z.object({ ctx: strategyContextSchema }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { ctx } = inputData;
     if (!shouldRunResearch(ctx.objective)) return { ctx };
+    await setWorkflowProgress(runId, 'research', 'Rex is researching the campaign topic…');
     const researchBrief = await runResearch(ctx);
     return { ctx: { ...ctx, researchBrief } };
   },
@@ -268,9 +271,10 @@ const audienceStep = createStep({
   id: 'audience',
   inputSchema: z.object({ ctx: strategyContextSchema }),
   outputSchema: z.object({ ctx: strategyContextSchema }),
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const { ctx } = inputData;
     if (!shouldRunAudienceAnalysis(ctx.audienceFilter)) return { ctx };
+    await setWorkflowProgress(runId, 'audience', 'Bruno is analysing the audience…');
 
     // Light CRM lookup: representative companies in the filtered industries.
     let companyNames: string[] = [];
@@ -303,6 +307,7 @@ const synthesiseStep = createStep({
   outputSchema: z.object({ ctx: strategyContextSchema, strategy: strategyObjectSchema }),
   execute: async ({ inputData, runId }) => {
     const { ctx } = inputData;
+    await setWorkflowProgress(runId, 'synthesise_strategy', 'Margot is drafting the strategy…');
     const strategy = await synthesiseStrategy(ctx);
     await logStrategyActivity(ctx.campaignId, 'strategy_synthesised', runId, 'pending');
     return { ctx, strategy };
@@ -328,6 +333,7 @@ const gate1Step = createStep({
         .from('campaigns')
         .update({ workflow_run_id: runId ?? null, gate_state: payload, pending_decision: null } as never)
         .eq('id', ctx.campaignId);
+      await clearWorkflowProgress(runId);
       await suspend(payload);
     };
 
@@ -337,6 +343,7 @@ const gate1Step = createStep({
     }
 
     if (resumeData.decision === 'request_change') {
+      await setWorkflowProgress(runId, 'gate1', 'Margot is reworking the strategy…');
       strategy = await synthesiseStrategy(ctx, resumeData.instruction);
       await setState({ ...state, strategy });
       await suspendAtGate();
@@ -372,6 +379,7 @@ const planBeatsStep = createStep({
   }),
   execute: async ({ inputData, runId }) => {
     const { ctx, strategy } = inputData;
+    await setWorkflowProgress(runId, 'plan_beats', 'Margot is planning the beat sequence…');
     const beatPlan = await planBeats(ctx, strategy);
     await logStrategyActivity(ctx.campaignId, 'beat_plan_proposed', runId, 'pending');
     return { ctx, strategy, beatPlan };
@@ -413,6 +421,7 @@ const gate2Step = createStep({
         .from('campaigns')
         .update({ workflow_run_id: runId ?? null, gate_state: payload, pending_decision: null } as never)
         .eq('id', ctx.campaignId);
+      await clearWorkflowProgress(runId);
       await suspend(payload);
     };
 
@@ -422,6 +431,7 @@ const gate2Step = createStep({
     }
 
     if (resumeData.decision === 'request_change') {
+      await setWorkflowProgress(runId, 'gate2', 'Margot is reworking the beat sequence…');
       beatPlan = await planBeats(ctx, strategy, resumeData.instruction);
       await setState({ ...state, beatPlan });
       await suspendAtGate();
@@ -429,6 +439,7 @@ const gate2Step = createStep({
     }
 
     // approve — the founder may have edited/re-sequenced the beats in the UI.
+    await setWorkflowProgress(runId, 'gate2', 'Locking the plan and scheduling posts…');
     if (resumeData.beats) {
       beatPlan = beatPlanSchema.parse({ beats: resumeData.beats });
     }
@@ -469,6 +480,7 @@ const gate2Step = createStep({
       .eq('id', ctx.campaignId);
     if (campErr) throw new Error(`Failed to lock campaign at plan approval: ${campErr.message}`);
     await logStrategyActivity(ctx.campaignId, 'plan_approved', runId, 'approved');
+    await clearWorkflowProgress(runId);
     return result('plan_approved');
   },
 });

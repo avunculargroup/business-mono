@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, RefreshCw, Lock, Loader, MessageSquare, ListOrdered } from 'lucide-react';
+import { createClient } from '@/lib/supabase/browser';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import { AutoGrowTextarea } from '@/components/ui/AutoGrowTextarea';
@@ -113,6 +115,48 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
   const hasOpenGate = Boolean(campaign.workflow_run_id && gate?.gate);
   const isLocked = ['plan_approved', 'active', 'completed', 'archived'].includes(campaign.status);
 
+  // The campaign row is server-fetched props; on a Realtime change, re-pull the
+  // page's server component so gate_state/status/strategy stay current without
+  // a manual refresh.
+  useRealtimeSubscription(
+    'campaigns',
+    useCallback(() => {
+      router.refresh();
+    }, [router]),
+    `id=eq.${campaign.id}`,
+  );
+
+  const runId = campaign.workflow_run_id;
+  const [stepLabel, setStepLabel] = useState<string | null>(null);
+
+  const refreshProgress = useCallback(async () => {
+    if (!runId) {
+      setStepLabel(null);
+      return;
+    }
+    // workflow_progress isn't in the web Database types yet — cast at the boundary.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any;
+    const { data } = await supabase
+      .from('workflow_progress')
+      .select('step_label')
+      .eq('workflow_run_id', runId)
+      .maybeSingle();
+    setStepLabel((data?.step_label as string | undefined) ?? null);
+  }, [runId]);
+
+  useEffect(() => {
+    void refreshProgress();
+  }, [refreshProgress]);
+
+  useRealtimeSubscription(
+    'workflow_progress',
+    useCallback(() => {
+      void refreshProgress();
+    }, [refreshProgress]),
+    runId ? `workflow_run_id=eq.${runId}` : undefined,
+  );
+
   const submit = (decision: unknown, confirmation: string) => {
     startTransition(async () => {
       const result = await submitCampaignGateDecision(campaign.id, decision);
@@ -140,10 +184,7 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
       {!hasOpenGate && !isLocked && (
         <div className={styles.working} role="status">
           <Loader size={18} strokeWidth={1.5} className={styles.spin} />
-          <span>
-            Margot is working on the next step. This page updates once she has something to review —
-            refresh in a moment.
-          </span>
+          <span>{stepLabel ?? 'Margot is working on the next step. This page updates once she has something to review.'}</span>
         </div>
       )}
 
@@ -516,7 +557,7 @@ function GateActions({
     return (
       <div className={styles.working} role="status">
         <Loader size={18} strokeWidth={1.5} className={styles.spin} />
-        <span>Sent to Margot. Refresh in a moment to see the next step.</span>
+        <span>Sent to Margot. This page updates automatically once she has the next step ready.</span>
       </div>
     );
   }

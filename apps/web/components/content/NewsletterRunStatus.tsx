@@ -47,6 +47,7 @@ interface NewsletterRun {
 
 export function NewsletterRunStatus() {
   const [run, setRun] = useState<NewsletterRun | null>(null);
+  const [stepLabel, setStepLabel] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     // newsletter_runs isn't in the web Database types yet — cast at the boundary.
@@ -78,6 +79,36 @@ export function NewsletterRunStatus() {
     }, [refresh]),
   );
 
+  const runId = run?.workflow_run_id;
+
+  const refreshProgress = useCallback(async () => {
+    if (!runId) {
+      setStepLabel(null);
+      return;
+    }
+    // workflow_progress isn't in the web Database types yet — cast at the boundary.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createClient() as any;
+    const { data } = await supabase
+      .from('workflow_progress')
+      .select('step_label')
+      .eq('workflow_run_id', runId)
+      .maybeSingle();
+    setStepLabel((data?.step_label as string | undefined) ?? null);
+  }, [runId]);
+
+  useEffect(() => {
+    void refreshProgress();
+  }, [refreshProgress]);
+
+  useRealtimeSubscription(
+    'workflow_progress',
+    useCallback(() => {
+      void refreshProgress();
+    }, [refreshProgress]),
+    runId ? `workflow_run_id=eq.${runId}` : undefined,
+  );
+
   if (!run) return null;
 
   if (NOTICE_STATUSES.includes(run.status)) {
@@ -102,7 +133,7 @@ export function NewsletterRunStatus() {
     return (
       <div className={styles.banner} role="status">
         <StatusChip label="Newsletter" color="accent" />
-        <span className={styles.label}>{STATUS_LABEL[run.status] ?? run.status}</span>
+        <span className={styles.label}>{stepLabel ?? STATUS_LABEL[run.status] ?? run.status}</span>
         <span className={styles.meta}>{run.time_range} edition</span>
       </div>
     );
