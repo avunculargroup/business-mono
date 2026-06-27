@@ -14,10 +14,16 @@ type ContentItem = {
   type: string;
   status: string;
   body: string | null;
+  is_thread: boolean;
   scheduled_for: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type ThreadSegment = {
+  id: string;
+  body: string;
 };
 
 const statusFlow: Record<string, { next: string; label: string }> = {
@@ -30,16 +36,18 @@ const statusFlow: Record<string, { next: string; label: string }> = {
 
 interface ContentEditorProps {
   item: ContentItem;
+  threadSegments: ThreadSegment[];
 }
 
-export function ContentEditor({ item }: ContentEditorProps) {
+export function ContentEditor({ item, threadSegments }: ContentEditorProps) {
   const [body, setBody] = useState(item.body || '');
   const [isPending, startTransition] = useTransition();
   const [optimisticStatus, setOptimisticStatus] = useOptimistic(item.status);
   const { success, error } = useToast();
 
-  const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
-  const charCount = body.length;
+  const fullText = item.is_thread ? threadSegments.map((s) => s.body).join(' ') : body;
+  const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
+  const charCount = fullText.length;
 
   const nextStep = statusFlow[optimisticStatus];
 
@@ -59,14 +67,25 @@ export function ContentEditor({ item }: ContentEditorProps) {
   return (
     <div className={styles.layout}>
       <div className={styles.editor}>
-        <textarea
-          className={styles.textarea}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Start writing..."
-        />
+        {item.is_thread ? (
+          <ol className={styles.segments}>
+            {threadSegments.map((segment, i) => (
+              <li key={segment.id} className={styles.segment}>
+                <span className={styles.segmentNo}>{i + 1}/</span>
+                <p className={styles.segmentBody}>{segment.body}</p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <textarea
+            className={styles.textarea}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Start writing..."
+          />
+        )}
         <div className={styles.counts}>
-          {wordCount} words / {charCount} characters
+          {wordCount} words / {charCount} characters{item.is_thread ? ` / ${threadSegments.length} posts` : ''}
         </div>
       </div>
 

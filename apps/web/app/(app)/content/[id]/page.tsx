@@ -15,10 +15,18 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
 
   if (!item) notFound();
 
+  const { data: threadSegments } = item.is_thread
+    ? await supabase
+        .from('thread_segments')
+        .select('id, body')
+        .eq('content_item_id', id)
+        .order('sequence', { ascending: true })
+    : { data: null };
+
   return (
     <>
       <PageHeader title={item.title || 'Untitled'} />
-      <ContentEditor item={item} />
+      <ContentEditor item={item} threadSegments={threadSegments ?? []} />
     </>
   );
 }
