@@ -17,7 +17,7 @@ import {
 } from './retrieval.js';
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
-import { buildGate1Message, buildGate2Message, buildNoStoriesMessage } from './messages.js';
+import { buildGate1Message, buildGate2Message, buildNoStoriesMessage, editionLabel } from './messages.js';
 import { setWorkflowProgress, clearWorkflowProgress } from '../../lib/workflowProgress.js';
 import {
   newsletterInputSchema,
@@ -40,6 +40,7 @@ import {
   type ReviewedStory,
   type EditorialReview,
   type NewsletterInput,
+  type TimeRange,
 } from './schemas.js';
 
 const DEFAULT_AUDIENCE =
@@ -482,9 +483,15 @@ const reviewStep = createStep({
 });
 
 // ── Step 7: Assembly ──────────────────────────────────────────────────────────
-function newsletterTitle(date: Date): string {
-  const month = date.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
-  return `BTS Newsletter — ${month}`;
+// Title reflects both the edition cadence (week/fortnight/month) and the date
+// the run was assembled, e.g. "BTS Weekly Briefing — 27 June 2026".
+function newsletterTitle(date: Date, timeRange: TimeRange): string {
+  const runDate = date.toLocaleDateString('en-AU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  return `BTS ${editionLabel(timeRange)} Briefing — ${runDate}`;
 }
 
 const assembleStep = createStep({
@@ -512,7 +519,7 @@ const assembleStep = createStep({
     await setWorkflowProgress(runId, 'assemble', 'Assembling the draft…');
     const company = await fetchCompanyVars();
     const now = new Date();
-    const title = newsletterTitle(now);
+    const title = newsletterTitle(now, input.timeRange);
     const markdown = assembleNewsletter({
       title,
       date: now,

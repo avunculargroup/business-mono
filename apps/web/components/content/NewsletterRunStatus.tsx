@@ -35,6 +35,17 @@ const NOTICE_LABEL: Record<string, string> = {
   no_stories: 'No stories to run',
 };
 
+// Adjective form of the run's cadence for the "… edition" descriptor.
+const EDITION_LABEL: Record<string, string> = {
+  week: 'Weekly',
+  fortnight: 'Fortnightly',
+  month: 'Monthly',
+};
+
+function editionDescriptor(timeRange: string): string {
+  return `${EDITION_LABEL[timeRange] ?? timeRange} edition`;
+}
+
 interface NewsletterRun {
   workflow_run_id: string;
   status: string;
@@ -118,7 +129,7 @@ export function NewsletterRunStatus() {
       <div className={`${styles.banner} ${styles.notice}`} role="status">
         <StatusChip label="Newsletter" color={isFailure ? 'destructive' : 'warning'} />
         <span className={styles.label}>{NOTICE_LABEL[run.status] ?? run.status}</span>
-        <span className={styles.meta}>{run.time_range} edition</span>
+        <span className={styles.meta}>{editionDescriptor(run.time_range)}</span>
         {reason && <p className={styles.noticeReason}>{reason}</p>}
       </div>
     );
@@ -134,7 +145,7 @@ export function NewsletterRunStatus() {
       <div className={styles.banner} role="status">
         <StatusChip label="Newsletter" color="accent" />
         <span className={styles.label}>{stepLabel ?? STATUS_LABEL[run.status] ?? run.status}</span>
-        <span className={styles.meta}>{run.time_range} edition</span>
+        <span className={styles.meta}>{editionDescriptor(run.time_range)}</span>
       </div>
     );
   }
@@ -183,7 +194,7 @@ function GatePanel({ run }: { run: NewsletterRun }) {
               ? 'Newsletter on hold — ready when you are'
               : 'Draft ready — does this look right?'}
         </span>
-        <span className={styles.meta}>{run.time_range} edition</span>
+        <span className={styles.meta}>{editionDescriptor(run.time_range)}</span>
       </header>
 
       {run.gate_message && <pre className={styles.gateMessage}>{run.gate_message}</pre>}

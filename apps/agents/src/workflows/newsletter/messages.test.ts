@@ -4,6 +4,7 @@ import {
   buildGate2Message,
   buildConfirmationMessage,
   buildNoStoriesMessage,
+  editionLabel,
 } from './messages.js';
 import type { StoryCandidate, ReviewedStory } from './schemas.js';
 
@@ -72,6 +73,7 @@ describe('buildGate2Message', () => {
       overLengthIds: [],
     });
     expect(msg).toContain('~500 words');
+    expect(msg).toContain('Monthly edition');
     expect(msg).toContain('Story 1 "A" — 8/10');
     expect(msg).toContain('Story 2 "B" — 5/10 ⚠️');
     expect(msg).toContain('"publish"');
@@ -104,6 +106,14 @@ describe('buildNoStoriesMessage', () => {
     const msg = buildNoStoriesMessage({ timeRange: 'week', poolSize: 3 });
     expect(msg).toContain('3 candidate items');
     expect(msg).toContain('past week');
+  });
+});
+
+describe('editionLabel', () => {
+  it('maps each cadence to its adjective form', () => {
+    expect(editionLabel('week')).toBe('Weekly');
+    expect(editionLabel('fortnight')).toBe('Fortnightly');
+    expect(editionLabel('month')).toBe('Monthly');
   });
 });
 
