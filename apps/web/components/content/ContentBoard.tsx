@@ -8,7 +8,7 @@ import { ContentForm } from './ContentForm';
 import { RunNewsletterModal } from './RunNewsletterModal';
 import { NewsletterRunStatus } from './NewsletterRunStatus';
 import { updateContentStatus } from '@/app/actions/content';
-import { Plus, Newspaper } from 'lucide-react';
+import { Plus, Newspaper, Archive } from 'lucide-react';
 import Link from 'next/link';
 import styles from './ContentBoard.module.css';
 
@@ -82,6 +82,60 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
     e.dataTransfer.setData('text/plain', itemId);
   };
 
+  const handleArchive = (e: React.MouseEvent, itemId: string) => {
+    // The card is a Link — keep the archive click from navigating or dragging.
+    e.preventDefault();
+    e.stopPropagation();
+    setError(null);
+    startTransition(async () => {
+      setOptimisticStatus({ id: itemId, status: 'archived' });
+      const result = await updateContentStatus(itemId, 'archived');
+      if (result && 'error' in result && result.error) {
+        setError(result.error);
+      }
+    });
+  };
+
+  const renderCard = (item: ContentItem, archived: boolean) => (
+    <Link
+      key={item.id}
+      href={`/content/${item.id}`}
+      className={`${styles.card}${archived ? ` ${styles.archivedCard}` : ''}`}
+      draggable
+      onDragStart={(e) => handleDragStart(e, item.id)}
+    >
+      {item.campaign_name && (
+        <span className={styles.cardCampaign}>{item.campaign_name}</span>
+      )}
+      <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
+      <div className={styles.cardMeta}>
+        <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
+        {item.account_name && (
+          <span className={styles.cardAccount}>
+            {item.platform === 'twitter_x' ? 'X' : item.platform === 'linkedin' ? 'LinkedIn' : null}
+            {item.platform ? ' · ' : ''}{item.account_name}
+          </span>
+        )}
+        {!item.account_name && item.created_by && (
+          <span className={styles.assignee}>Assigned</span>
+        )}
+        {!archived && (
+          <button
+            type="button"
+            className={styles.archiveButton}
+            onClick={(e) => handleArchive(e, item.id)}
+            aria-label="Archive"
+            title="Archive"
+          >
+            <Archive size={14} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
+    </Link>
+  );
+
+  const archivedItems = optimisticItems.filter((i) => i.status === 'archived');
+
   return (
     <div>
       <div className={styles.toolbar}>
@@ -116,32 +170,7 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
                 <span className={styles.columnCount}>{colItems.length}</span>
               </div>
               <div className={styles.cards}>
-                {colItems.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/content/${item.id}`}
-                    className={styles.card}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, item.id)}
-                  >
-                    {item.campaign_name && (
-                      <span className={styles.cardCampaign}>{item.campaign_name}</span>
-                    )}
-                    <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
-                    <div className={styles.cardMeta}>
-                      <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
-                      {item.account_name && (
-                        <span className={styles.cardAccount}>
-                          {item.platform === 'twitter_x' ? 'X' : item.platform === 'linkedin' ? 'LinkedIn' : null}
-                          {item.platform ? ' · ' : ''}{item.account_name}
-                        </span>
-                      )}
-                      {!item.account_name && item.created_by && (
-                        <span className={styles.assignee}>Assigned</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                {colItems.map((item) => renderCard(item, false))}
                 {colItems.length === 0 && (
                   <p className={styles.emptyCol}>No items</p>
                 )}
@@ -150,6 +179,23 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
           );
         })}
       </div>
+
+      {archivedItems.length > 0 && (
+        <section
+          className={styles.archive}
+          onDrop={(e) => handleDrop(e, 'archived')}
+          onDragOver={handleDragOver}
+        >
+          <div className={styles.columnHeader}>
+            <span className={styles.columnLabel}>Archive</span>
+            <span className={styles.columnCount}>{archivedItems.length}</span>
+          </div>
+          <p className={styles.archiveHint}>Drag an item back onto a column to restore it.</p>
+          <div className={styles.archiveCards}>
+            {archivedItems.map((item) => renderCard(item, true))}
+          </div>
+        </section>
+      )}
 
       <SlideOver
         open={showCreate}

@@ -10,6 +10,18 @@ const TIME_RANGE_LABEL: Record<TimeRange, string> = {
   month: 'month',
 };
 
+// Adjective form for edition/title descriptors ("Weekly edition") as opposed to
+// the noun form above used in "the past week" phrasing.
+const EDITION_LABEL: Record<TimeRange, string> = {
+  week: 'Weekly',
+  fortnight: 'Fortnightly',
+  month: 'Monthly',
+};
+
+export function editionLabel(timeRange: TimeRange): string {
+  return EDITION_LABEL[timeRange];
+}
+
 const LETTERS = 'ABCDEFGHIJ';
 
 export function buildGate1Message(args: {
@@ -90,7 +102,7 @@ export function buildGate2Message(args: {
   const lines: string[] = [
     held ? 'Newsletter on hold — still ready when you are' : 'Newsletter ready for review',
     '',
-    `${stories.length} stories | ~${totalWordCount} words | ${TIME_RANGE_LABEL[timeRange]} edition`,
+    `${stories.length} stories | ~${totalWordCount} words | ${EDITION_LABEL[timeRange]} edition`,
     '',
     'Editorial scorecard:',
   ];

@@ -117,6 +117,48 @@
   color: var(--color-text-tertiary);
 }
 
+.archiveButton {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.archiveButton:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+}
+
+.archive {
+  margin: 0 var(--space-6) var(--space-6);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.archiveHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin: 0 0 var(--space-3);
+}
+
+.archiveCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.archivedCard {
+  width: 240px;
+  opacity: 0.85;
+}
+
 .emptyCol {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
@@ -137,5 +179,13 @@
 
   .error {
     margin: 0 var(--space-3) var(--space-3);
+  }
+
+  .archive {
+    margin: 0 var(--space-3) var(--space-3);
+  }
+
+  .archivedCard {
+    width: 100%;
   }
 }
