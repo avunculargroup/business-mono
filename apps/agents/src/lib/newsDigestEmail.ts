@@ -143,7 +143,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
     timeZone: 'Australia/Melbourne',
   }).format(input.date);
 
-  const subject = `${company.name} — Bitcoin & treasury news, ${dateStr}`;
+  const subject = `Bitcoin & treasury news, ${dateStr}`;
 
   // ── Plain-text part ─────────────────────────────────────────────────────────
   const textLines: string[] = [`${company.name}`, dateStr, ''];

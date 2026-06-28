@@ -26,6 +26,8 @@ import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js'
 // already managed in fastmail_accounts, so no extra credential is needed.
 export const SENDER_ACCOUNT_USERNAME = 'avuncular@fastmail.com';
 export const SENDER_FROM_EMAIL = 'hq@btreasury.com.au';
+// Display name on every outbound email from the agent server.
+export const SENDER_FROM_NAME = 'BTS HQ';
 
 export interface DigestDeliveryResult {
   /** False when no sender token is available in fastmail_accounts — nothing was attempted. */
@@ -79,7 +81,7 @@ export async function deliverNewsDigest(
     }
     const { draftsId, sentId } = await client.getDraftsAndSentMailboxIds(accountId, apiUrl);
 
-    const from: JmapAddress = { name: company.name, email: identity.email };
+    const from: JmapAddress = { name: SENDER_FROM_NAME, email: identity.email };
 
     let sent = 0;
     let failed = 0;
