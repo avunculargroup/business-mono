@@ -33,7 +33,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title="Episode" />
+      <PageHeader title="Episode" backHref="/news/podcasts" backLabel="Podcast ingestion" />
       <EpisodeDetail
         episode={ep}
         segments={(segments ?? []) as unknown as TranscriptSegment[]}

@@ -84,7 +84,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title={campaign.name}>
+      <PageHeader title={campaign.name} backHref="/campaigns">
         {matrix.length > 0 && (
           <Link href={`/campaigns/${id}/queue`} className={styles.queueLink}>
             <Send size={16} strokeWidth={1.5} />

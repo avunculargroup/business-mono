@@ -6,19 +6,6 @@
   gap: var(--space-5);
 }
 
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  width: fit-content;
-}
-
-.back:hover {
-  color: var(--color-accent-hover);
-}
-
 .header {
   display: flex;
   align-items: flex-start;

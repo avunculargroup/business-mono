@@ -18,7 +18,7 @@ export default async function PersonaDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={persona.name} />
+      <PageHeader title={persona.name} backHref="/crm/personas" />
       <PersonaDetail persona={persona as Persona} />
     </>
   );

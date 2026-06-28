@@ -1,10 +1,7 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { VariantEditor } from '@/components/campaigns/VariantEditor';
-import styles from '../../campaigns.module.css';
 
 // Variant review (Gate 3). Deep-linked per variant — the campaign matrix
 // (Step 8) links here, and the suspended variant carries its gate_state so the
@@ -32,11 +29,7 @@ export default async function VariantReviewPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title="Variant review" />
-      <Link href={backHref} className={styles.back}>
-        <ArrowLeft size={14} strokeWidth={1.5} />
-        {backLabel}
-      </Link>
+      <PageHeader title="Variant review" backHref={backHref} backLabel={backLabel} />
       <VariantEditor contentItemId={data.id} status={data.status} gateState={data.gate_state ?? null} />
     </>
   );

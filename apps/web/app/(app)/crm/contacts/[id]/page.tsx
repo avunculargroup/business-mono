@@ -40,7 +40,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={`${contact.first_name} ${contact.last_name}`} />
+      <PageHeader title={`${contact.first_name} ${contact.last_name}`} backHref="/crm/contacts" />
       <ContactDetail
         contact={{ ...contact, companies: company }}
         interactions={(interactions || []).map((i) => ({ ...i, team_members: null }))}

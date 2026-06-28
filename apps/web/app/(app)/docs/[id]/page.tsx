@@ -15,7 +15,7 @@ export default async function DocDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <>
-      <PageHeader title={document.title} />
+      <PageHeader title={document.title} backHref="/docs" />
       <DocVersionEditor document={document} />
     </>
   );

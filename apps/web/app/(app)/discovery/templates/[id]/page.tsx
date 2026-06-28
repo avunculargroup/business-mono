@@ -15,7 +15,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title={template.title} />
+      <PageHeader title={template.title} backHref="/discovery/templates" />
       <TemplateVersionEditor template={template} />
     </>
   );

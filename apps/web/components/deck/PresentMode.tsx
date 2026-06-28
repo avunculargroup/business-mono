@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { X } from 'lucide-react';
 import { SlideFrame } from '@/components/slides/primitives/SlideFrame';
 import { SlideView } from '@/components/slides/templates/SlideView';
 import { getTheme, SLIDE_WIDTH, SLIDE_HEIGHT } from '@/lib/decks/theme';
@@ -66,6 +68,16 @@ export function PresentMode({ deck, slides }: PresentModeProps) {
 
   return (
     <div className={styles.stage} onMouseMove={handleMouseMove} onClick={next}>
+      {/* Mobile-only exit — desktop relies on the Escape key. */}
+      <Link
+        href={`/decks/${deck.id}/edit`}
+        className={styles.exit}
+        aria-label="Exit presentation"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <X size={22} strokeWidth={1.5} />
+      </Link>
+
       {parsed && scale > 0 && (
         <div
           className={styles.slide}

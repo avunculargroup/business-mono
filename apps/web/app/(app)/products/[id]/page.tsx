@@ -56,7 +56,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={product.name} />
+      <PageHeader title={product.name} backHref="/products" />
       <ProductDetail
         product={product}
         keyContacts={keyContacts ?? []}

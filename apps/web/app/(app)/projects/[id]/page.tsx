@@ -36,7 +36,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={project.name}>
+      <PageHeader title={project.name} backHref="/projects">
         <StatusChip label={project.status.replace('_', ' ')} color={statusColors[project.status] || 'neutral'} />
       </PageHeader>
       <div className={styles.container}>
