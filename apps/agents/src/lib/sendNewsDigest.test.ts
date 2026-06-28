@@ -113,15 +113,16 @@ describe('deliverNewsDigest', () => {
     expect(h.sendHtmlEmail).toHaveBeenCalledTimes(2);
 
     const firstCall = h.sendHtmlEmail.mock.calls[0]![0] as {
-      from: { email: string };
+      from: { name: string; email: string };
       to: Array<{ email: string }>;
       subject: string;
       identityId: string;
     };
     expect(firstCall.from.email).toBe('hq@btreasury.com.au');
+    expect(firstCall.from.name).toBe('BTS HQ');
     expect(firstCall.identityId).toBe('id1');
     expect(firstCall.to[0]!.email).toBe('chris@btreasury.com.au');
-    expect(firstCall.subject).toContain('Bitcoin Treasury Solutions');
+    expect(firstCall.subject).not.toContain('Bitcoin Treasury Solutions');
   });
 
   it('counts per-recipient failures without throwing', async () => {

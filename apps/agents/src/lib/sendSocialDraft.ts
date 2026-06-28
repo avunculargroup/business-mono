@@ -18,6 +18,7 @@ import { renderSocialDraftEmail, type SocialDraftPost } from './socialDraftEmail
 import {
   SENDER_ACCOUNT_USERNAME,
   SENDER_FROM_EMAIL,
+  SENDER_FROM_NAME,
   loadSenderToken,
   loadCompanyFooter,
 } from './sendNewsDigest.js';
@@ -98,7 +99,7 @@ export async function sendSocialDraft(params: SendSocialDraftParams): Promise<bo
       identityId: identity.id,
       draftsId,
       sentId,
-      from: { name: company.name, email: identity.email },
+      from: { name: SENDER_FROM_NAME, email: identity.email },
       to: [recipient],
       subject,
       html,
