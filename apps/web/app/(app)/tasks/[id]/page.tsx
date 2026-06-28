@@ -6,7 +6,6 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { TaskDetailActions } from '@/components/tasks/TaskDetailActions';
 import { formatDate, formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import styles from './task-detail.module.css';
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,7 +49,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <PageHeader title={task.title}>
+      <PageHeader title={task.title} backHref="/tasks" backLabel="Back to tasks">
         <PriorityChip priority={task.priority} />
         <StatusChip label={task.status.replace('_', ' ')} color={statusColors[task.status] || 'neutral'} />
         <TaskDetailActions
@@ -61,11 +60,6 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         />
       </PageHeader>
       <div className={styles.container}>
-        <Link href="/tasks" className={styles.backLink}>
-          <ArrowLeft size={14} strokeWidth={1.5} />
-          Back to tasks
-        </Link>
-
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Description</h3>
           {task.description ? (

@@ -25,7 +25,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={company.name} />
+      <PageHeader title={company.name} backHref="/crm/companies" />
       <div className={styles.layout}>
         <aside className={styles.profile}>
           {company.industry && (

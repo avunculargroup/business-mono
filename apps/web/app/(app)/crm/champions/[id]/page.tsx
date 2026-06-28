@@ -25,7 +25,7 @@ export default async function ChampionDetailPage({ params }: Props) {
 
   return (
     <>
-      <PageHeader title={contactName} />
+      <PageHeader title={contactName} backHref="/crm/champions" />
       <ChampionDetail
         champion={champion}
         events={events}

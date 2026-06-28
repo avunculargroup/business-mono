@@ -1,10 +1,7 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ReadyToPostQueue, type QueueItem } from '@/components/campaigns/ReadyToPostQueue';
-import styles from '../../campaigns.module.css';
 
 // Phase 1's payoff — approved, scheduled variants ready to copy out and post by
 // hand (v_ready_to_post), with thread segments fetched per row. Copy-out,
@@ -43,11 +40,7 @@ export default async function CampaignQueuePage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={`${(campaign as { name: string }).name} — ready to post`} />
-      <Link href={`/campaigns/${id}`} className={styles.back}>
-        <ArrowLeft size={14} strokeWidth={1.5} />
-        Back to campaign
-      </Link>
+      <PageHeader title={`${(campaign as { name: string }).name} — ready to post`} backHref={`/campaigns/${id}`} backLabel="Back to campaign" />
       <ReadyToPostQueue campaignId={id} items={items} segmentsByItem={segmentsByItem} />
     </>
   );

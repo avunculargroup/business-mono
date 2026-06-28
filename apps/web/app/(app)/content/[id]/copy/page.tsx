@@ -1,10 +1,7 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { SocialDraftCopyView } from '@/components/content/SocialDraftCopyView';
-import styles from './copy.module.css';
 
 // Landing page for the "Copy text" link in the social-draft email. Pure
 // copy-to-clipboard surface — the email itself can't run the JS a copy button
@@ -37,11 +34,7 @@ export default async function ContentCopyPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={item.title || 'Copy draft'} />
-      <Link href={`/content/${id}`} className={styles.back}>
-        <ArrowLeft size={14} strokeWidth={1.5} />
-        Back to draft
-      </Link>
+      <PageHeader title={item.title || 'Copy draft'} backHref={`/content/${id}`} backLabel="Back to draft" />
       <SocialDraftCopyView
         platform={item.type as 'linkedin' | 'twitter_x'}
         accountName={account?.display_name ?? null}

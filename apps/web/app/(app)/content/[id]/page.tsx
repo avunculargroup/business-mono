@@ -25,7 +25,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <PageHeader title={item.title || 'Untitled'} />
+      <PageHeader title={item.title || 'Untitled'} backHref="/content" />
       <ContentEditor item={item} threadSegments={threadSegments ?? []} />
     </>
   );

@@ -1,9 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { YouTubeFacade } from '@/components/podcasts/YouTubeFacade';
@@ -57,11 +55,6 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
 
   return (
     <div className={styles.container}>
-      <Link href="/news/podcasts" className={styles.back}>
-        <ArrowLeft size={15} strokeWidth={1.5} />
-        Podcast ingestion
-      </Link>
-
       <div className={styles.header}>
         <div className={styles.headerMain}>
           <h1 className={styles.title}>{episode.title}</h1>
