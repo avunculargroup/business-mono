@@ -41,10 +41,10 @@ function sampleResult(): RoutineResult {
 const date = new Date('2026-06-18T00:00:00Z'); // 18 June 2026 in Australia/Melbourne
 
 describe('renderNewsDigestEmail', () => {
-  it('builds a subject with the Melbourne date and no company name', () => {
+  it('builds a "Daily Digest" subject with the Melbourne date and no company name', () => {
     const { subject } = renderNewsDigestEmail({ title: 'Daily news curation', result: sampleResult(), date, company });
+    expect(subject).toBe('Daily Digest - 18 June 2026');
     expect(subject).not.toContain('Bitcoin Treasury Solutions');
-    expect(subject).toContain('18 June 2026');
   });
 
   it('renders each story as a linked, source-suffix-cleaned headline', () => {
