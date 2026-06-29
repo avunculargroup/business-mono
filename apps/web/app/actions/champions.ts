@@ -1,14 +1,13 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => (supabase as any).from('champions');
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const che = (supabase: Awaited<ReturnType<typeof createClient>>) => (supabase as any).from('champion_events');
+const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champions');
+const che = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champion_events');
 
 const championSchema = z.object({
   contact_id:        z.string().uuid('Contact is required'),
@@ -33,15 +32,14 @@ async function dispatchSimonAlert(
   context: Record<string, unknown>,
 ) {
   // Dispatch to Simon via agent_activity — he will relay to directors on Signal
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).from('agent_activity').insert({
+  await supabase.from('agent_activity').insert({
     agent_name:       'simon',
     action,
     status:           'pending',
     trigger_type:     'system',
     entity_type:      'champion',
     entity_id:        entityId,
-    proposed_actions: { agent: 'simon', message, context },
+    proposed_actions: { agent: 'simon', message, context } as Json,
   });
 }
 

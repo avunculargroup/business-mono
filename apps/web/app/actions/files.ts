@@ -35,8 +35,7 @@ export type FileFilters = {
 export async function getFiles(filters?: FileFilters): Promise<{ files: PlatformFile[]; error?: string }> {
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
+  let query = supabase
     .from('platform_files')
     .select('*')
     .eq('org_id', ORG_ID)
@@ -62,7 +61,7 @@ export async function getFiles(filters?: FileFilters): Promise<{ files: Platform
   if (!data?.length) return { files: [] };
 
   // Batch-generate signed URLs for display (1 hour)
-  const paths: string[] = data.map((f: PlatformFile) => f.storage_path);
+  const paths: string[] = data.map((f) => f.storage_path);
   const { data: urlData } = await supabase.storage.from(FILES_BUCKET).createSignedUrls(paths, 3600);
 
   const urlMap = new Map<string, string>();
@@ -70,8 +69,9 @@ export async function getFiles(filters?: FileFilters): Promise<{ files: Platform
     if (item.path && item.signedUrl) urlMap.set(item.path, item.signedUrl);
   });
 
-  const files: PlatformFile[] = data.map((f: PlatformFile) => ({
+  const files: PlatformFile[] = data.map((f) => ({
     ...f,
+    tags: f.tags ?? [],
     signed_url: urlMap.get(f.storage_path),
   }));
 
@@ -110,8 +110,7 @@ export async function registerFile(params: {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('platform_files')
     .insert({
       id: params.fileId,
@@ -142,8 +141,7 @@ export async function renameFile(
 ): Promise<{ error?: string; success?: boolean }> {
   if (!name.trim()) return { error: 'Name is required' };
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from('platform_files').update({ name: name.trim() }).eq('id', id);
+  const { error } = await supabase.from('platform_files').update({ name: name.trim() }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
@@ -154,8 +152,7 @@ export async function updateFileTags(
   tags: string[],
 ): Promise<{ error?: string; success?: boolean }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from('platform_files').update({ tags }).eq('id', id);
+  const { error } = await supabase.from('platform_files').update({ tags }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
@@ -166,8 +163,7 @@ export async function updateFileVisibility(
   isPublic: boolean,
 ): Promise<{ error?: string; success?: boolean }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from('platform_files').update({ is_public: isPublic }).eq('id', id);
+  const { error } = await supabase.from('platform_files').update({ is_public: isPublic }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
@@ -178,8 +174,7 @@ export async function updateFileVisibility(
 export async function deleteFile(id: string): Promise<{ error?: string; success?: boolean }> {
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: file } = await (supabase as any)
+  const { data: file } = await supabase
     .from('platform_files')
     .select('storage_path')
     .eq('id', id)
@@ -189,8 +184,7 @@ export async function deleteFile(id: string): Promise<{ error?: string; success?
     await supabase.storage.from(FILES_BUCKET).remove([file.storage_path]);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from('platform_files').delete().eq('id', id);
+  const { error } = await supabase.from('platform_files').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
@@ -203,8 +197,7 @@ export async function getFileDownloadUrl(
 ): Promise<{ error: string } | { url: string }> {
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: file } = await (supabase as any)
+  const { data: file } = await supabase
     .from('platform_files')
     .select('storage_path, name, original_filename')
     .eq('id', id)

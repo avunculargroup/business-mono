@@ -5,9 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cw = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('community_watchlist');
+  supabase.from('community_watchlist');
 
 const communitySchema = z.object({
   type:              z.enum(['linkedin_group', 'association', 'conference']),

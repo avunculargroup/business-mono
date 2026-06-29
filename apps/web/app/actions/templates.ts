@@ -1,17 +1,16 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tmpl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('mvp_templates');
+  supabase.from('mvp_templates');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ver = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('mvp_template_versions');
+  supabase.from('mvp_template_versions');
 
 const templateSchema = z.object({
   type:        z.enum(['one_pager', 'briefing_deck']),
@@ -113,7 +112,7 @@ export async function createTemplateVersion(templateId: string, formData: FormDa
     template_id:    templateId,
     version_number: nextVersion,
     status:         'draft',
-    content,
+    content:        content as Json,
     created_by:     user?.id ?? null,
   });
 
@@ -131,7 +130,7 @@ export async function updateTemplateVersion(versionId: string, content: Record<s
   const supabase = await createClient();
 
   const { error } = await ver(supabase)
-    .update({ content })
+    .update({ content: content as Json })
     .eq('id', versionId)
     .eq('status', 'draft');
 
@@ -168,7 +167,16 @@ export async function getTemplates() {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // tags is a nullable text[] (normalise null → []); each version's content is a
+  // jsonb column typed loosely as Json — assert the object shape the view uses.
+  return (data ?? []).map((row) => ({
+    ...row,
+    tags: row.tags ?? [],
+    mvp_template_versions: row.mvp_template_versions.map((v) => ({
+      ...v,
+      content: (v.content ?? {}) as Record<string, unknown>,
+    })),
+  }));
 }
 
 export async function getTemplate(id: string) {
@@ -180,7 +188,14 @@ export async function getTemplate(id: string) {
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return {
+    ...data,
+    tags: data.tags ?? [],
+    mvp_template_versions: data.mvp_template_versions.map((v) => ({
+      ...v,
+      content: (v.content ?? {}) as Record<string, unknown>,
+    })),
+  };
 }
 
 function parseTags(raw: string | undefined): string[] {

@@ -5,9 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fb = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('feedback');
+  supabase.from('feedback');
 
 const feedbackSchema = z.object({
   contact_id:    z.string().uuid().optional().or(z.literal('')),
@@ -105,5 +104,11 @@ export async function getFeedback() {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // tags is a nullable text[]; normalise null → []. sentiment is a jsonb column
+  // typed loosely as Json — assert the structured shape the list view renders.
+  return (data ?? []).map((row) => ({
+    ...row,
+    tags: row.tags ?? [],
+    sentiment: row.sentiment as { score: number; magnitude: number; label: string } | null,
+  }));
 }

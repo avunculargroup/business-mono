@@ -5,9 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('corporate_lexicon');
+  supabase.from('corporate_lexicon');
 
 const lexiconSchema = z.object({
   term:              z.string().min(1, 'Term is required'),

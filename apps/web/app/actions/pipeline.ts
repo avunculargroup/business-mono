@@ -110,8 +110,7 @@ export async function movePipelineItem(id: string, status: string) {
 
 export async function getPipelineItems() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('content_items')
     .select('*, pain_points(id, content, interview_id)')
     .eq('type', 'linkedin')
@@ -119,7 +118,13 @@ export async function getPipelineItems() {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // Normalise for the board's row type: title null → ''; research_links is a
+  // jsonb column typed loosely as Json — assert the link-array shape.
+  return (data ?? []).map((row) => ({
+    ...row,
+    title: row.title ?? '',
+    research_links: row.research_links as Array<{ url: string; title: string; note?: string }> | null,
+  }));
 }
 
 export async function overrideValidation(id: string, validated: boolean, reason: string) {
@@ -128,15 +133,15 @@ export async function overrideValidation(id: string, validated: boolean, reason:
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('content_items')
-    .update({ validated } as never)
+    .update({ validated })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
 
   // Log override to agent_activity for audit trail
-  await (supabase as any).from('agent_activity').insert({
+  await supabase.from('agent_activity').insert({
     agent_name:   'simon',
     action:       `Pipeline validation override: ${validated ? 'validated' : 'invalidated'} — ${reason}`,
     status:       'auto',
@@ -152,8 +157,7 @@ export async function overrideValidation(id: string, validated: boolean, reason:
 
 export async function getPainPointsForPicker() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('pain_points')
     .select('id, content, interview_id, discovery_interviews(contact_id, contacts(first_name, last_name))')
     .order('created_at', { ascending: false });

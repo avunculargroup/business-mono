@@ -5,10 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// Table not in generated types until migration is applied — bypass with any cast
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ss = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('segment_scorecards');
+  supabase.from('segment_scorecards');
 
 const segmentSchema = z.object({
   segment_name:       z.string().min(1, 'Segment name is required'),

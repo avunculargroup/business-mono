@@ -19,13 +19,15 @@ const BUCKET = 'company-assets';
 
 export async function getCompanyRecordTypes(): Promise<CompanyRecordType[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_record_types')
     .select('*')
     .order('category')
     .order('sort_order');
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // content_type is a plain text column the app models as the CompanyContentType
+  // enum — assert the narrower shape at the read boundary.
+  return (data ?? []) as CompanyRecordType[];
 }
 
 export async function createCompanyRecordType(params: {
@@ -40,7 +42,7 @@ export async function createCompanyRecordType(params: {
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '');
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_record_types')
     .insert({
       key,
@@ -63,7 +65,7 @@ export async function deleteCompanyRecordType(
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
 
-  const { data: type } = await (supabase as any)
+  const { data: type } = await supabase
     .from('company_record_types')
     .select('is_builtin')
     .eq('key', key)
@@ -71,14 +73,14 @@ export async function deleteCompanyRecordType(
 
   if (type?.is_builtin) return { error: 'Built-in types cannot be deleted.' };
 
-  const { count } = await (supabase as any)
+  const { count } = await supabase
     .from('company_records')
     .select('*', { count: 'exact', head: true })
     .eq('type_key', key);
 
   if (count && count > 0) return { error: 'Remove all records of this type before deleting it.' };
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_record_types')
     .delete()
     .eq('key', key);
@@ -93,13 +95,15 @@ export async function deleteCompanyRecordType(
 
 export async function getCompanyRecords(): Promise<CompanyRecord[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_records')
     .select('*, type:company_record_types(*)')
     .order('display_order')
     .order('created_at');
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // The joined record type's content_type is a plain text column modelled as an
+  // enum — assert the narrower shape at the read boundary.
+  return (data ?? []) as CompanyRecord[];
 }
 
 export async function createCompanyRecord(params: {
@@ -115,14 +119,14 @@ export async function createCompanyRecord(params: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: type } = await (supabase as any)
+  const { data: type } = await supabase
     .from('company_record_types')
     .select('is_singleton, label')
     .eq('key', params.type_key)
     .single();
 
   if (type?.is_singleton) {
-    const { count } = await (supabase as any)
+    const { count } = await supabase
       .from('company_records')
       .select('*', { count: 'exact', head: true })
       .eq('type_key', params.type_key);
@@ -130,7 +134,7 @@ export async function createCompanyRecord(params: {
       return { error: `Only one "${type.label}" record is allowed.` };
   }
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_records')
     .insert({
       type_key:     params.type_key,
@@ -161,7 +165,7 @@ export async function updateCompanyRecord(
   },
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_records')
     .update({
       ...(params.value        !== undefined && { value:        params.value }),
@@ -182,7 +186,7 @@ export async function deleteCompanyRecord(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_records')
     .delete()
     .eq('id', id);
@@ -230,7 +234,7 @@ export async function getCompanyAssetUrl(path: string): Promise<string | null> {
 
 export async function getDomains(): Promise<CompanyDomain[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_domains')
     .select('*')
     .order('renewal_date', { nullsFirst: false })
@@ -246,7 +250,7 @@ export async function createDomain(params: {
   notes?: string;
 }): Promise<{ error: string } | { success: true; id: string }> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_domains')
     .insert({
       name:         params.name,
@@ -271,7 +275,7 @@ export async function updateDomain(
   },
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_domains')
     .update({
       ...(params.name         !== undefined && { name:         params.name }),
@@ -289,7 +293,7 @@ export async function deleteDomain(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_domains')
     .delete()
     .eq('id', id);
@@ -304,12 +308,14 @@ export async function deleteDomain(
 
 export async function getSubscriptions(): Promise<CompanySubscription[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_subscriptions')
     .select('*')
     .order('business');
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // payment_type is a plain text column the app models as SubscriptionPaymentType
+  // — assert the narrower shape at the read boundary.
+  return (data ?? []) as CompanySubscription[];
 }
 
 export async function createSubscription(params: {
@@ -322,7 +328,7 @@ export async function createSubscription(params: {
   notes?: string;
 }): Promise<{ error: string } | { success: true; id: string }> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_subscriptions')
     .insert({
       business:      params.business,
@@ -353,7 +359,7 @@ export async function updateSubscription(
   },
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_subscriptions')
     .update({
       ...(params.business      !== undefined && { business:      params.business }),
@@ -374,7 +380,7 @@ export async function deleteSubscription(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_subscriptions')
     .delete()
     .eq('id', id);
