@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { AssetRow } from '@/lib/decks/schema';
+import { humanizeError } from '@/lib/errors';
 
 const ORG_ID = 'bts';
 const BUCKET = 'slide-assets';
@@ -54,7 +55,7 @@ export async function createUploadSignedUrl(
     .from(BUCKET)
     .createSignedUploadUrl(path);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { success: true, signedUrl: data.signedUrl, path, assetId };
 }
 
@@ -91,7 +92,7 @@ export async function registerUploadedAsset(params: {
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { success: true, id: data.id };
 }
 

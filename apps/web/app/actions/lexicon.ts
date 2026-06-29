@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -34,7 +35,7 @@ export async function createLexiconEntry(formData: FormData) {
     created_by:    user?.id ?? null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/lexicon');
   return { success: true };
@@ -57,7 +58,7 @@ export async function updateLexiconEntry(id: string, formData: FormData) {
   }
 
   const { error } = await cl(supabase).update(updateData).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/lexicon');
   return { success: true };
@@ -71,7 +72,7 @@ export async function approveLexiconEntry(id: string) {
     .update({ status: 'approved', approved_by: user?.id ?? null })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/lexicon');
   return { success: true };
@@ -80,7 +81,7 @@ export async function approveLexiconEntry(id: string) {
 export async function deprecateLexiconEntry(id: string) {
   const supabase = await createClient();
   const { error } = await cl(supabase).update({ status: 'deprecated' }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/lexicon');
   return { success: true };

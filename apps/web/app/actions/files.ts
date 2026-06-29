@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { humanizeError } from '@/lib/errors';
 
 const ORG_ID = 'bts';
 const FILES_BUCKET = 'platform-files';
@@ -57,7 +58,7 @@ export async function getFiles(filters?: FileFilters): Promise<{ files: Platform
   }
 
   const { data, error } = await query;
-  if (error) return { files: [], error: error.message };
+  if (error) return { files: [], error: humanizeError(error) };
   if (!data?.length) return { files: [] };
 
   // Batch-generate signed URLs for display (1 hour)
@@ -91,7 +92,7 @@ export async function createFileUploadUrl(
   const path = `${ORG_ID}/${fileId}/original.${ext}`;
 
   const { data, error } = await supabase.storage.from(FILES_BUCKET).createSignedUploadUrl(path);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   return { success: true, signedUrl: data.signedUrl, token: data.token, path, fileId };
 }
@@ -128,7 +129,7 @@ export async function registerFile(params: {
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true, id: data.id };
 }
@@ -143,7 +144,7 @@ export async function renameFile(
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('platform_files').update({ name: name.trim() }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
 }
@@ -155,7 +156,7 @@ export async function updateFileTags(
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('platform_files').update({ tags }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
 }
@@ -167,7 +168,7 @@ export async function updateFileVisibility(
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('platform_files').update({ is_public: isPublic }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
 }
@@ -190,7 +191,7 @@ export async function deleteFile(id: string): Promise<{ error?: string; success?
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('platform_files').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
   return { success: true };
 }
@@ -217,6 +218,6 @@ export async function getFileDownloadUrl(
     { download: file.name || file.original_filename },
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { url: data.signedUrl };
 }

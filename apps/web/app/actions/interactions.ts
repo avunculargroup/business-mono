@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const interactionSchema = z.object({
   contact_id: z.string().uuid().optional().or(z.literal('')),
@@ -45,7 +46,7 @@ export async function createInteraction(formData: FormData) {
     external_id: null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   if (data.contact_id) revalidatePath(`/crm/contacts/${data.contact_id}`);
   revalidatePath('/crm');
@@ -56,7 +57,7 @@ export async function deleteInteraction(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('interactions').delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm');
   return { success: true };

@@ -9,6 +9,7 @@ import type {
   CompanySubscription,
   SubscriptionPaymentType,
 } from '@platform/shared';
+import { humanizeError } from '@/lib/errors';
 
 const BUCKET = 'company-assets';
 
@@ -53,7 +54,7 @@ export async function createCompanyRecordType(params: {
     .select('key')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { success: true, key: data.key };
 }
 
@@ -82,7 +83,7 @@ export async function deleteCompanyRecordType(
     .delete()
     .eq('key', key);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { success: true };
 }
 
@@ -143,7 +144,7 @@ export async function createCompanyRecord(params: {
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true, id: data.id };
 }
@@ -172,7 +173,7 @@ export async function updateCompanyRecord(
     })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }
@@ -186,7 +187,7 @@ export async function deleteCompanyRecord(
     .delete()
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }
@@ -213,7 +214,7 @@ export async function createCompanyUploadSignedUrl(
     .from(BUCKET)
     .createSignedUploadUrl(path);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   return { success: true, signedUrl: data.signedUrl, path };
 }
 
@@ -255,7 +256,7 @@ export async function createDomain(params: {
     })
     .select('id')
     .single();
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true, id: data.id };
 }
@@ -279,7 +280,7 @@ export async function updateDomain(
       ...(params.notes        !== undefined && { notes:        params.notes        || null }),
     })
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }
@@ -292,7 +293,7 @@ export async function deleteDomain(
     .from('company_domains')
     .delete()
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }
@@ -334,7 +335,7 @@ export async function createSubscription(params: {
     })
     .select('id')
     .single();
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true, id: data.id };
 }
@@ -364,7 +365,7 @@ export async function updateSubscription(
       ...(params.notes         !== undefined && { notes:         params.notes         || null }),
     })
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }
@@ -377,7 +378,7 @@ export async function deleteSubscription(
     .from('company_subscriptions')
     .delete()
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
 }

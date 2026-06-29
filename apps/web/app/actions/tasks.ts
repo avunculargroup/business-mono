@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -43,7 +44,7 @@ export async function createTask(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
   revalidatePath('/');
@@ -61,7 +62,7 @@ export async function updateTaskStatus(id: string, status: string) {
   }
 
   const { error } = await supabase.from('tasks').update(updateData as never).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
   revalidatePath('/');
@@ -99,7 +100,7 @@ export async function updateTask(id: string, formData: FormData) {
     .update(updateData as never)
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
   revalidatePath(`/tasks/${id}`);
@@ -110,7 +111,7 @@ export async function updateTask(id: string, formData: FormData) {
 export async function deleteTask(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('tasks').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
   return { success: true };

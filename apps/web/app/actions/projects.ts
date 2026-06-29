@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -34,7 +35,7 @@ export async function createProject(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/projects');
   return { success: true, project };
@@ -43,7 +44,7 @@ export async function createProject(formData: FormData) {
 export async function deleteProject(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('projects').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/projects');
   return { success: true };

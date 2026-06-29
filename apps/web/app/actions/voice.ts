@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { cleanAccountProfile } from '@/components/brand/accountVoice';
+import { humanizeError } from '@/lib/errors';
 
 // Brand Hub voice editing. Writes the brand_voice singleton and voice_snippets
 // via the cookie-authed SSR client (RLS: authenticated). brand_voice /
@@ -73,7 +74,7 @@ export async function updateBrandVoice(formData: FormData) {
   const { error } = existing?.id
     ? await db.from('brand_voice').update(row).eq('id', existing.id)
     : await db.from('brand_voice').insert(row);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(REVALIDATE);
   return { success: true, version: row.version };
@@ -128,7 +129,7 @@ export async function updateAccountVoice(formData: FormData) {
       voice_profile,
     })
     .eq('id', parsed.data.id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(REVALIDATE);
   return { success: true };
@@ -181,7 +182,7 @@ export async function saveVoiceSnippet(formData: FormData) {
 
   if (s.id) {
     const { error } = await db.from('voice_snippets').update(fields).eq('id', s.id);
-    if (error) return { error: error.message };
+    if (error) return { error: humanizeError(error) };
   } else {
     const { error } = await db.from('voice_snippets').insert({
       ...fields,
@@ -189,7 +190,7 @@ export async function saveVoiceSnippet(formData: FormData) {
       source: 'manual',
       created_by: user?.id ?? null,
     });
-    if (error) return { error: error.message };
+    if (error) return { error: humanizeError(error) };
   }
 
   revalidatePath(REVALIDATE);
@@ -201,7 +202,7 @@ export async function toggleVoiceSnippetStar(id: string, isStarred: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const { error } = await db.from('voice_snippets').update({ is_starred: isStarred }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -211,7 +212,7 @@ export async function deleteVoiceSnippet(id: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const { error } = await db.from('voice_snippets').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { humanizeError } from '@/lib/errors';
 
 export async function login(_prevState: { error: string } | null, formData: FormData) {
   const email = formData.get('email') as string;
@@ -15,7 +16,9 @@ export async function login(_prevState: { error: string } | null, formData: Form
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: 'Invalid email or password' };
+    // Most failures here are bad credentials, but a network blip or rate-limit
+    // deserves its own message rather than wrongly blaming the password.
+    return { error: humanizeError(error, "That email or password doesn't match our records.") };
   }
 
   const redirectTo = formData.get('redirect') as string;

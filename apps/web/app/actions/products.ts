@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const productSchema = z.object({
   name:                z.string().min(1, 'Name is required'),
@@ -52,7 +53,7 @@ export async function createProduct(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/products');
   return { success: true, product };
@@ -81,7 +82,7 @@ export async function updateProduct(id: string, formData: FormData) {
     })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/products');
   revalidatePath(`/products/${id}`);
@@ -91,7 +92,7 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('products_services').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/products');
   return { success: true };
@@ -121,7 +122,7 @@ export async function createReferralAgreement(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/products/${d.product_service_id}`);
   return { success: true, agreement };
@@ -130,7 +131,7 @@ export async function createReferralAgreement(formData: FormData) {
 export async function deleteReferralAgreement(id: string, productId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('product_referral_agreements').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/products/${productId}`);
   return { success: true };
@@ -144,7 +145,7 @@ export async function addProductKeyContact(productId: string, contactId: string,
     .select('id, role, contacts(id, first_name, last_name, email)')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/products/${productId}`);
   return { success: true, keyContact: data };
@@ -158,7 +159,7 @@ export async function removeProductKeyContact(productId: string, contactId: stri
     .eq('product_service_id', productId)
     .eq('contact_id', contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/products/${productId}`);
   return { success: true };

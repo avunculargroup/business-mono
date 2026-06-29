@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/news/podcasts';
 
@@ -24,7 +25,7 @@ export async function requestEpisodeAction(id: string, action: EpisodeAction) {
     .update({ pending_action: action, transcript_status: 'resolving', transcript_error: null } as never)
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   revalidatePath(`/news/podcasts/${id}`);
   return { success: true };
@@ -70,7 +71,7 @@ export async function ingestEpisodeBrief(formData: FormData) {
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true, id: (data as { id: string }).id };
 }

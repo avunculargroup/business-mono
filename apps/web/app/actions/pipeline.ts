@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // The insight pipeline reuses content_items filtered to type='linkedin'.
 // This action file handles the pipeline-specific fields (pain_point_id, score, research_links)
@@ -63,7 +64,7 @@ export async function createPipelineItem(formData: FormData) {
     research_links: parseResearchLinks(data.research_links),
   } as never);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/pipeline');
   revalidatePath('/content');
@@ -87,7 +88,7 @@ export async function updatePipelineItem(id: string, formData: FormData) {
   }
 
   const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/pipeline');
   revalidatePath('/content');
@@ -101,7 +102,7 @@ export async function movePipelineItem(id: string, status: string) {
     .update({ status } as never)
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/pipeline');
   return { success: true };
@@ -132,7 +133,7 @@ export async function overrideValidation(id: string, validated: boolean, reason:
     .update({ validated } as never)
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   // Log override to agent_activity for audit trail
   await (supabase as any).from('agent_activity').insert({

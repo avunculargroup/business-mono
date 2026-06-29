@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const personaSchema = z.object({
   name:                  z.string().min(1, 'Name is required').max(100),
@@ -74,7 +75,7 @@ export async function createPersona(formData: FormData) {
     notes:                d.notes || null,
   }).select().single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/personas');
   return { success: true, persona };
@@ -123,7 +124,7 @@ export async function updatePersona(id: string, formData: FormData) {
     notes:                d.notes || null,
   }).eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/personas');
   revalidatePath(`/crm/personas/${id}`);
@@ -134,7 +135,7 @@ export async function deletePersona(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('personas').delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/personas');
   return { success: true };

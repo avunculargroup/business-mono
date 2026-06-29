@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { humanizeError } from '@/lib/errors';
 
 export async function approveActivity(
   activityId: string,
@@ -21,7 +22,7 @@ export async function approveActivity(
     .eq('id', activityId);
 
   if (error) {
-    return { error: error.message };
+    return { error: humanizeError(error) };
   }
 
   revalidatePath('/simon');

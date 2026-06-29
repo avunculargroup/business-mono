@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // Table not in generated types until migration is applied — bypass with any cast
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,7 +40,7 @@ export async function createSegment(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/segments');
   return { success: true, segment };
@@ -68,7 +69,7 @@ export async function updateSegment(id: string, formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/segments');
   return { success: true, segment };
@@ -78,7 +79,7 @@ export async function deleteSegment(id: string) {
   const supabase = await createClient();
   const { error } = await ss(supabase).delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/segments');
   return { success: true };

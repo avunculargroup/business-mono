@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fb = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -52,7 +53,7 @@ export async function createFeedback(formData: FormData) {
     created_by:    user?.id ?? null,
   }).select().single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/feedback');
   return { success: true, entry };
@@ -78,7 +79,7 @@ export async function updateFeedback(id: string, formData: FormData) {
   }
 
   const { error } = await fb(supabase).update(updateData).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/feedback');
   return { success: true };
@@ -90,7 +91,7 @@ export async function deleteFeedback(id: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/feedback');
   return { success: true };

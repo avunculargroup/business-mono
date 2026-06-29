@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getDefaultSlideContent, type DeckRow, type DeckSlideRow } from '@/lib/decks/schema';
 import type { SlideType } from '@platform/shared';
+import { humanizeError } from '@/lib/errors';
 
 const ORG_ID = 'bts';
 
@@ -67,7 +68,7 @@ export async function createDeck(
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/decks');
   return { success: true, id: data.id };
 }
@@ -86,7 +87,7 @@ export async function updateDeckMeta(
     .update({ ...patch, updated_by: user?.id })
     .eq('id', deckId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
   revalidatePath('/decks');
   return { success: true };
@@ -97,7 +98,7 @@ export async function deleteDeck(
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
   const { error } = await (supabase as any).from('decks').delete().eq('id', deckId);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/decks');
   return { success: true };
 }
@@ -137,7 +138,7 @@ export async function addSlide(
     .select('*')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
   return { success: true, slide: data as DeckSlideRow };
 }
@@ -156,7 +157,7 @@ export async function updateSlide(
     .eq('id', slideId)
     .single();
 
-  if (fetchErr) return { error: fetchErr.message };
+  if (fetchErr) return { error: humanizeError(fetchErr) };
 
   const merged = { ...(current?.content_json ?? {}), ...contentPatch };
 
@@ -166,7 +167,7 @@ export async function updateSlide(
     .eq('id', slideId)
     .eq('deck_id', deckId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
   return { success: true };
 }
@@ -187,7 +188,7 @@ export async function reorderSlides(
 
   const results = await Promise.all(updates);
   const firstError = results.find((r) => r.error);
-  if (firstError?.error) return { error: firstError.error.message };
+  if (firstError?.error) return { error: humanizeError(firstError.error) };
 
   revalidatePath(`/decks/${deckId}/edit`);
   return { success: true };
@@ -219,7 +220,7 @@ export async function duplicateSlide(
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
   return { success: true, id: data.id };
 }
@@ -234,7 +235,7 @@ export async function deleteSlide(
     .delete()
     .eq('id', slideId)
     .eq('deck_id', deckId);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
   return { success: true };
 }

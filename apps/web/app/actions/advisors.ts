@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const advisorSchema = z.object({
   name:                z.string().min(1, 'Name is required'),
@@ -48,7 +49,7 @@ export async function createAdvisor(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/advisors');
   return { success: true, advisor };
@@ -80,7 +81,7 @@ export async function updateAdvisor(id: string, formData: FormData) {
     })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/advisors');
   revalidatePath(`/advisors/${id}`);
@@ -90,7 +91,7 @@ export async function updateAdvisor(id: string, formData: FormData) {
 export async function deleteAdvisor(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('advisors_partners').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/advisors');
   return { success: true };
@@ -104,7 +105,7 @@ export async function addAdvisorContact(advisorId: string, contactId: string, ro
     .select('id, role, contacts(id, first_name, last_name, email)')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/advisors/${advisorId}`);
   return { success: true, contact: data };
@@ -118,7 +119,7 @@ export async function removeAdvisorContact(advisorId: string, contactId: string)
     .eq('advisor_partner_id', advisorId)
     .eq('contact_id', contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/advisors/${advisorId}`);
   return { success: true };

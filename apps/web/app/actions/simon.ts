@@ -2,6 +2,7 @@
 
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { humanizeError } from '@/lib/errors';
 
 const WEB_THREAD_ID = 'web';
 
@@ -31,7 +32,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
       .from('agent_conversations')
       .update({ messages })
       .eq('id', conv.id);
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: humanizeError(error) };
   } else {
     const { error } = await supabase
       .from('agent_conversations')
@@ -40,7 +41,7 @@ export async function sendDirective(message: string): Promise<{ success: boolean
         thread_type: 'direct',
         messages: [directorMessage],
       });
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: humanizeError(error) };
   }
 
   // The agents server listens to agent_conversations via Supabase Realtime
