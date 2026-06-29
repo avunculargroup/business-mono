@@ -6,6 +6,25 @@
   height: 100%;
 }
 
+/* ── Shared placeholder block + gradient-sweep shimmer ── */
+.block {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-subtle) 0%,
+    var(--color-surface) 50%,
+    var(--color-surface-subtle) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Toolbar (table + cards) ── */
 .toolbar {
   display: flex;
   align-items: center;
@@ -13,25 +32,22 @@
 }
 
 .titleBlock {
+  composes: block;
   width: 180px;
   height: 24px;
-  background: var(--color-surface-subtle);
-  border-radius: var(--radius-sm);
-  animation: shimmer 1.5s infinite;
 }
 
 .buttonBlock {
+  composes: block;
   width: 100px;
   height: 32px;
-  background: var(--color-surface-subtle);
   border-radius: var(--radius-md);
-  animation: shimmer 1.5s infinite;
 }
 
+/* ── Table variant ── */
 .content {
   display: flex;
   flex-direction: column;
-  gap: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -51,28 +67,173 @@
 }
 
 .cell {
+  composes: block;
   height: 14px;
-  background: var(--color-surface-subtle);
-  border-radius: var(--radius-sm);
-  animation: shimmer 1.5s infinite;
-  flex-shrink: 0;
+  min-width: 0;
 }
 
-.row:nth-child(odd) .cell {
-  animation-delay: 0.15s;
+.cellPrimary { width: 38%; }
+.cellSecondary { width: 18%; }
+.cellMeta { width: 14%; margin-left: auto; }
+.cellMeta + .cellMeta { margin-left: 0; }
+
+/* Gentle width variety + staggered sweep so rows don't pulse in lockstep */
+.row:nth-child(3n) .cellPrimary { width: 30%; }
+.row:nth-child(3n + 1) .cellPrimary { width: 45%; }
+.row:nth-child(odd) .cell { animation-delay: 0.15s; }
+
+/* ── Detail variant ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 40px;
 }
 
-@keyframes shimmer {
-  0% { opacity: 0.5; }
-  50% { opacity: 0.9; }
-  100% { opacity: 0.5; }
+.headerBack {
+  composes: block;
+  width: 56px;
+  height: 16px;
 }
 
+.headerTitle {
+  composes: block;
+  width: 240px;
+  height: 28px;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: var(--space-6);
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  height: fit-content;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  composes: block;
+  width: 40%;
+  height: 11px;
+}
+
+.fieldValue {
+  composes: block;
+  width: 75%;
+  height: 15px;
+}
+
+.detailMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sectionTitle {
+  composes: block;
+  width: 160px;
+  height: 20px;
+}
+
+.card {
+  composes: block;
+  height: 88px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+/* ── Cards variant ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-6);
+}
+
+.cardTile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.cardTileTitle {
+  composes: block;
+  width: 60%;
+  height: 18px;
+}
+
+.cardTileLine {
+  composes: block;
+  width: 100%;
+  height: 12px;
+}
+
+.cardTileLineShort {
+  composes: block;
+  width: 70%;
+  height: 12px;
+}
+
+/* ── Mobile (matches AppShell / dashboard breakpoint) ── */
+@media (max-width: 767px) {
+  .page {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .row {
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  /* Two columns is all that fits cleanly on a phone — drop the meta cells
+     and let the primary cell flex instead of overflowing. */
+  .cellMeta { display: none; }
+  .cellPrimary,
+  .row:nth-child(3n) .cellPrimary,
+  .row:nth-child(3n + 1) .cellPrimary {
+    width: auto;
+    flex: 1;
+  }
+  .cellSecondary { width: 28%; }
+
+  .detail {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .headerTitle { width: 60%; }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}
+
+/* ── Reduced motion: flat fill, no sweep ── */
 @media (prefers-reduced-motion: reduce) {
-  .titleBlock,
-  .buttonBlock,
-  .cell {
+  .block {
     animation: none;
-    opacity: 0.7;
+    background: var(--color-surface-subtle);
   }
 }

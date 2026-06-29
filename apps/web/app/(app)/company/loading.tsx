@@ -1,5 +1,5 @@
 import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
-export default function CompanyLoading() {
-  return <PageSkeleton hasToolbar rows={8} />;
+export default function Loading() {
+  return <PageSkeleton variant="detail" />;
 }
