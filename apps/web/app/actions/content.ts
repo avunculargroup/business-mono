@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const contentSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -33,7 +34,7 @@ export async function createContent(formData: FormData) {
     iteration_count: 0,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/content');
   revalidatePath('/');
@@ -49,7 +50,7 @@ export async function updateContentStatus(id: string, status: string, extras?: {
   }
 
   const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/content');
   return { success: true };

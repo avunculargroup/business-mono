@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { computeNextRunAt, DEFAULT_TIMEZONE, NewsCategory } from '@platform/shared';
+import { humanizeError } from '@/lib/errors';
 
 const FREQUENCIES = ['daily', 'weekly', 'fortnightly'] as const;
 const AGENTS = ['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della'] as const;
@@ -181,7 +182,7 @@ export async function createRoutine(formData: FormData) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/routines');
   if (input.show_on_dashboard) revalidatePath('/');
@@ -221,7 +222,7 @@ export async function updateRoutine(id: string, formData: FormData) {
     })
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/routines');
   revalidatePath('/');
@@ -231,7 +232,7 @@ export async function updateRoutine(id: string, formData: FormData) {
 export async function deleteRoutine(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('routines').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/routines');
   revalidatePath('/');
   return { success: true };
@@ -243,7 +244,7 @@ export async function toggleRoutineActive(id: string, isActive: boolean) {
     .from('routines')
     .update({ is_active: isActive })
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/routines');
   revalidatePath('/');
   return { success: true };
@@ -255,7 +256,7 @@ export async function runRoutineNow(id: string) {
     .from('routines')
     .update({ next_run_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/routines');
   return { success: true };
 }

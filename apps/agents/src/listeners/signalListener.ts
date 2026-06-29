@@ -3,9 +3,16 @@ import type { IncomingMessage } from '@platform/signal';
 import { supabase } from '@platform/db';
 import { simon } from '../agents/simon/index.js';
 import { findSuspendedRun, resumeFromReply } from './newsletterGate.js';
+import { simonFailureMessage } from '../lib/simonFailureMessage.js';
 import type { ConvMessage } from './types.js';
 
 const client = new SignalClient();
+
+// Bound Simon's reply so a hung model or runaway tool chain can't leave a
+// director waiting forever with a typing indicator and no answer. Mirrors the
+// web path (webDirectives.ts). Mastra forwards abortSignal into subagent calls,
+// so this also cancels any in-flight specialist work.
+const SIMON_TIMEOUT_MS = 240_000;
 
 async function resolveSenderName(phoneNumber: string | null | undefined, signalId: string): Promise<string> {
   // Try phone number lookup in contacts
@@ -101,9 +108,14 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   });
 
   // Generate Simon's response via Mastra Memory (handles history retrieval, token limiting, etc.)
+  // On failure we still reply — with a humane apology — so the director never
+  // gets silence after their typing indicator clears.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SIMON_TIMEOUT_MS);
   let responseText: string;
   try {
     const result = await simon.generate(userMessage, {
+      abortSignal: controller.signal,
       memory: {
         resource: senderNumber,
         thread: `signal-${senderNumber}`,
@@ -116,7 +128,9 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
     );
   } catch (err) {
     console.error('[signal-listener] Simon error:', err);
-    return;
+    responseText = simonFailureMessage(err, controller.signal.aborted);
+  } finally {
+    clearTimeout(timer);
   }
 
   // Send reply via Signal

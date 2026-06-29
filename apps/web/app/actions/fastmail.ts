@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/settings/integrations/fastmail';
 
@@ -25,7 +26,7 @@ export async function addFastmailAccount(data: {
     watched_addresses: data.watched_addresses ?? [],
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   revalidatePath('/settings/integrations');
   return { success: true };
@@ -44,7 +45,7 @@ export async function toggleFastmailAccount(id: string, isActive: boolean) {
     .update(update)
     .eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   revalidatePath('/settings/integrations');
   return { success: true };
@@ -54,7 +55,7 @@ export async function removeFastmailAccount(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('fastmail_accounts').delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   revalidatePath('/settings/integrations');
   return { success: true };
@@ -78,7 +79,7 @@ export async function addFastmailExclusion(data: {
     notes: data.notes?.trim() || null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -87,7 +88,7 @@ export async function removeFastmailExclusion(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('fastmail_exclusions').delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -111,7 +112,7 @@ export async function approveContact(id: string) {
     .eq('id', id)
     .single();
 
-  if (fetchError) return { error: fetchError.message };
+  if (fetchError) return { error: humanizeError(fetchError) };
 
   const currentTags: string[] = Array.isArray((contact as { tags: unknown }).tags)
     ? (contact as { tags: string[] }).tags
@@ -123,7 +124,7 @@ export async function approveContact(id: string) {
     .update({ tags: updatedTags })
     .eq('id', id);
 
-  if (updateError) return { error: updateError.message };
+  if (updateError) return { error: humanizeError(updateError) };
   revalidatePath(REVALIDATE);
   revalidatePath('/crm/contacts');
   return { success: true };
@@ -138,10 +139,10 @@ export async function rejectContact(id: string, reason: 'marketing' | 'spam' | '
     .eq('id', id)
     .single();
 
-  if (fetchError) return { error: fetchError.message };
+  if (fetchError) return { error: humanizeError(fetchError) };
 
   const { error: deleteError } = await supabase.from('contacts').delete().eq('id', id);
-  if (deleteError) return { error: deleteError.message };
+  if (deleteError) return { error: humanizeError(deleteError) };
 
   if (reason === 'marketing' || reason === 'spam') {
     const email = (contact as { email: string | null }).email;

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
 import { validateFeedUrl } from '@/lib/news/validateFeed';
 import { slugify, computeInboundAddress, parseSenderAllowlist } from '@/lib/news/emailSource';
+import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/news/sources';
 
@@ -126,7 +127,7 @@ export async function createNewsSource(formData: FormData) {
   const supabase = await createClient();
   const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url) as never);
 
-  if (dbError) return { error: dbError.message };
+  if (dbError) return { error: humanizeError(dbError) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -150,7 +151,7 @@ export async function updateNewsSource(id: string, formData: FormData) {
     .update(buildRow(input, feed_url) as never)
     .eq('id', id);
 
-  if (dbError) return { error: dbError.message };
+  if (dbError) return { error: humanizeError(dbError) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -158,7 +159,7 @@ export async function updateNewsSource(id: string, formData: FormData) {
 export async function deleteNewsSource(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('news_sources').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -166,7 +167,7 @@ export async function deleteNewsSource(id: string) {
 export async function toggleNewsSourceActive(id: string, isActive: boolean) {
   const supabase = await createClient();
   const { error } = await supabase.from('news_sources').update({ is_active: isActive }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }

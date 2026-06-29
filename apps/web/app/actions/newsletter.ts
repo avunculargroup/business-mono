@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // Triggers an on-demand newsletter run from the /content "Run newsletter"
 // button. We reuse the routines mechanism rather than calling the agents server
@@ -41,7 +42,7 @@ export async function runNewsletter(formData: FormData) {
     .eq('name', ON_DEMAND_ROUTINE_NAME)
     .eq('action_type', 'newsletter')
     .maybeSingle();
-  if (findError) return { error: findError.message };
+  if (findError) return { error: humanizeError(findError) };
   if (!routine) {
     return { error: 'On-demand newsletter routine not found. Has the migration been applied?' };
   }
@@ -62,7 +63,7 @@ export async function runNewsletter(formData: FormData) {
       is_active: true,
     })
     .eq('id', routine.id);
-  if (updateError) return { error: updateError.message };
+  if (updateError) return { error: humanizeError(updateError) };
 
   revalidatePath('/content');
   return { success: true };
@@ -113,7 +114,7 @@ export async function submitNewsletterGateDecision(
     .select('status')
     .eq('workflow_run_id', workflowRunId)
     .maybeSingle();
-  if (findError) return { error: findError.message };
+  if (findError) return { error: humanizeError(findError) };
   if (!run) return { error: 'That newsletter run no longer exists.' };
 
   const status = run.status as string;
@@ -135,7 +136,7 @@ export async function submitNewsletterGateDecision(
     .from('newsletter_runs')
     .update({ pending_decision: parsed.data })
     .eq('workflow_run_id', workflowRunId);
-  if (updateError) return { error: updateError.message };
+  if (updateError) return { error: humanizeError(updateError) };
 
   revalidatePath('/content');
   return { success: true };

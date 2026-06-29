@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tmpl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -44,7 +45,7 @@ export async function createTemplate(formData: FormData) {
     .select()
     .single();
 
-  if (tmplErr) return { error: tmplErr.message };
+  if (tmplErr) return { error: humanizeError(tmplErr) };
 
   // Create initial draft version with empty content
   const initialContent = parsed.data.type === 'one_pager'
@@ -59,7 +60,7 @@ export async function createTemplate(formData: FormData) {
     created_by:     user?.id ?? null,
   });
 
-  if (verErr) return { error: verErr.message };
+  if (verErr) return { error: humanizeError(verErr) };
 
   revalidatePath('/discovery/templates');
   return { success: true, template };
@@ -78,7 +79,7 @@ export async function updateTemplate(id: string, formData: FormData) {
   if (parsed.data.tags        !== undefined) updateData.tags        = parseTags(parsed.data.tags);
 
   const { error } = await tmpl(supabase).update(updateData).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/templates');
   return { success: true };
@@ -116,7 +117,7 @@ export async function createTemplateVersion(templateId: string, formData: FormDa
     created_by:     user?.id ?? null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/templates');
   return { success: true, version_number: nextVersion };
@@ -134,7 +135,7 @@ export async function updateTemplateVersion(versionId: string, content: Record<s
     .eq('id', versionId)
     .eq('status', 'draft');
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/templates');
   return { success: true };
@@ -154,7 +155,7 @@ export async function approveTemplateVersion(templateId: string, versionId: stri
     .update({ status: 'approved', approved_by: user?.id ?? null })
     .eq('id', versionId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/templates');
   return { success: true };

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
@@ -34,7 +35,7 @@ export async function createCompany(formData: FormData) {
     source: 'web',
   }).select().single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/companies');
   return { success: true, company };
@@ -58,7 +59,7 @@ export async function updateCompany(id: string, formData: FormData) {
 
   const { error } = await supabase.from('companies').update(updateData as never).eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/companies');
   revalidatePath(`/crm/companies/${id}`);
@@ -69,7 +70,7 @@ export async function deleteCompany(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from('companies').delete().eq('id', id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/crm/companies');
   return { success: true };

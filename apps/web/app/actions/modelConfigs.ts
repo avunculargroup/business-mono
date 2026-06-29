@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { MODEL_SCOPES, type ModelScopeType } from '@platform/shared';
+import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/settings/models';
 
@@ -48,7 +49,7 @@ export async function upsertModelConfig(scopeKey: string, modelId: string) {
       { onConflict: 'scope_key' },
     );
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }
@@ -68,7 +69,7 @@ export async function resetModelConfig(scopeKey: string) {
     .delete()
     .eq('scope_key', scopeKey);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };
 }

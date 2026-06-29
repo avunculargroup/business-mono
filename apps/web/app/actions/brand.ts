@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 const brandAssetSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -28,7 +29,7 @@ export async function createBrandAsset(formData: FormData) {
     created_by: user?.id || null,
   } as never);
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/brand');
   return { success: true };

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // Server actions for the Social Campaigns feature.
 //
@@ -43,7 +44,7 @@ export async function submitVariantGateDecision(
     .from('content_items')
     .update({ pending_decision: parsed.data })
     .eq('id', contentItemId);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/campaigns/variants/${contentItemId}`);
   return { success: true };
@@ -84,7 +85,7 @@ export async function createCampaignDraft(
     })
     .select('id')
     .single();
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/campaigns');
   return { id: (data as { id: string }).id };
@@ -135,21 +136,21 @@ export async function launchCampaignStrategy(
       start_date: parsed.data.startDate,
     })
     .eq('id', campaignId);
-  if (updateErr) return { error: updateErr.message };
+  if (updateErr) return { error: humanizeError(updateErr) };
 
   // Replace the participating-accounts join wholesale.
   await supabase.from('campaign_accounts').delete().eq('campaign_id', campaignId);
   const { error: accErr } = await supabase
     .from('campaign_accounts')
     .insert(parsed.data.accountIds.map((id) => ({ campaign_id: campaignId, social_account_id: id })));
-  if (accErr) return { error: accErr.message };
+  if (accErr) return { error: humanizeError(accErr) };
 
   // Launch: the strategyGateWeb listener reacts to this pending_decision.
   const { error: startErr } = await supabase
     .from('campaigns')
     .update({ pending_decision: { decision: 'start' } })
     .eq('id', campaignId);
-  if (startErr) return { error: startErr.message };
+  if (startErr) return { error: humanizeError(startErr) };
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -221,7 +222,7 @@ export async function submitCampaignGateDecision(
     .from('campaigns')
     .update({ pending_decision: parsed.data })
     .eq('id', campaignId);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -255,7 +256,7 @@ export async function markVariantPosted(
     .eq('id', contentItemId)
     .eq('status', 'approved')
     .select('id');
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   if (!data || data.length === 0) {
     return { error: 'This variant is no longer ready to post — refresh the queue.' };
   }
@@ -332,7 +333,7 @@ export async function editVariantCopy(
       gate_state: patchedGate,
     })
     .eq('id', contentItemId);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   // Replace thread segments wholesale.
   await supabase.from('thread_segments').delete().eq('content_item_id', contentItemId);
@@ -344,7 +345,7 @@ export async function editVariantCopy(
       char_count: charCount(b),
     }));
     const { error: segErr } = await supabase.from('thread_segments').insert(rows);
-    if (segErr) return { error: segErr.message };
+    if (segErr) return { error: humanizeError(segErr) };
   }
 
   revalidatePath(`/campaigns/variants/${contentItemId}`);
@@ -390,7 +391,7 @@ export async function savePostMetrics(
     },
     { onConflict: 'content_item_id' },
   );
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -441,7 +442,7 @@ export async function promotePostToSnippet(
     source_content_item_id: contentItemId,
     created_by: user?.id ?? null,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };

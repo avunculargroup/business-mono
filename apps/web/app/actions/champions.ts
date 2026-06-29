@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => (supabase as any).from('champions');
@@ -104,7 +105,7 @@ export async function createChampion(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') return { error: 'This contact is already a champion.' };
-    return { error: error.message };
+    return { error: humanizeError(error) };
   }
 
   const contactName = data?.contacts
@@ -140,7 +141,7 @@ export async function updateChampion(id: string, formData: FormData) {
   if (d.company_id        !== undefined) updateData.company_id        = d.company_id || null;
 
   const { error } = await ch(supabase).update(updateData).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/champions');
   revalidatePath(`/crm/champions/${id}`);
   return { success: true };
@@ -149,7 +150,7 @@ export async function updateChampion(id: string, formData: FormData) {
 export async function deleteChampion(id: string) {
   const supabase = await createClient();
   const { error } = await ch(supabase).delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/champions');
   return { success: true };
 }
@@ -180,7 +181,7 @@ export async function logChampionEvent(championId: string, formData: FormData) {
     details:     d.details || null,
   });
 
-  if (insertError) return { error: insertError.message };
+  if (insertError) return { error: humanizeError(insertError) };
 
   // Auto-update champion status on departure/job_change
   let newStatus: string | null = null;

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { humanizeError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cw = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -82,7 +83,7 @@ export async function createCommunityEntry(formData: FormData) {
     notes:             d.notes             || null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/community');
   return { success: true };
 }
@@ -112,7 +113,7 @@ export async function updateCommunityEntry(id: string, formData: FormData) {
   if (d.notes             !== undefined) updateData.notes             = d.notes             || null;
 
   const { error } = await cw(supabase).update(updateData).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/community');
   return { success: true };
 }
@@ -120,7 +121,7 @@ export async function updateCommunityEntry(id: string, formData: FormData) {
 export async function deleteCommunityEntry(id: string) {
   const supabase = await createClient();
   const { error } = await cw(supabase).update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/community');
   return { success: true };
 }
