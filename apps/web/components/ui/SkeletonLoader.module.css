@@ -6,13 +6,35 @@
 }
 
 .line {
-  background: var(--color-surface-subtle);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-subtle) 0%,
+    var(--color-surface) 50%,
+    var(--color-surface-subtle) 100%
+  );
+  background-size: 200% 100%;
   border-radius: var(--radius-sm);
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.line:nth-child(odd) {
+  animation-delay: 0.15s;
 }
 
 @keyframes shimmer {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line {
+    animation: none;
+    background: var(--color-surface-subtle);
+  }
 }

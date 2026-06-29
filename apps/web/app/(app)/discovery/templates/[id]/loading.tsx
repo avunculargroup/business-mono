@@ -1,5 +1,5 @@
-import styles from './loading.module.css';
+import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
 export default function TemplateDetailLoading() {
-  return <div className={styles.skeleton} />;
+  return <PageSkeleton variant="detail" />;
 }

@@ -5,7 +5,7 @@ export default function FilesLoading() {
   return (
     <>
       <PageHeader title="Files" />
-      <PageSkeleton />
+      <PageSkeleton variant="cards" hasToolbar={false} />
     </>
   );
 }
