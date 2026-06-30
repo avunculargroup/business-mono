@@ -13,7 +13,7 @@ const BUCKET = 'slide-assets';
 
 export async function getAssets(): Promise<AssetRow[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('assets')
     .select('*')
     .eq('org_id', ORG_ID)
@@ -24,7 +24,7 @@ export async function getAssets(): Promise<AssetRow[]> {
 
 export async function getAsset(id: string): Promise<AssetRow | null> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('assets')
     .select('*')
     .eq('id', id)
@@ -74,7 +74,7 @@ export async function registerUploadedAsset(params: {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('assets')
     .insert({
       id: params.assetId,

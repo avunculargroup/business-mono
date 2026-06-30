@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { getDefaultSlideContent, type DeckRow, type DeckSlideRow } from '@/lib/decks/schema';
 import type { SlideType } from '@platform/shared';
@@ -14,7 +15,7 @@ const ORG_ID = 'bts';
 
 export async function getDecks(): Promise<DeckRow[]> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('decks')
     .select('*')
     .eq('org_id', ORG_ID)
@@ -25,7 +26,7 @@ export async function getDecks(): Promise<DeckRow[]> {
 
 export async function getDeck(id: string): Promise<DeckRow | null> {
   const supabase = await createClient();
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('decks')
     .select('*')
     .eq('id', id)
@@ -39,15 +40,21 @@ export async function getDeckWithSlides(
 ): Promise<{ deck: DeckRow; slides: DeckSlideRow[] } | null> {
   const supabase = await createClient();
   const [deckRes, slidesRes] = await Promise.all([
-    (supabase as any).from('decks').select('*').eq('id', id).single(),
-    (supabase as any)
+    supabase.from('decks').select('*').eq('id', id).single(),
+    supabase
       .from('deck_slides')
       .select('*')
       .eq('deck_id', id)
       .order('order_index', { ascending: true }),
   ]);
   if (deckRes.error || !deckRes.data) return null;
-  return { deck: deckRes.data, slides: slidesRes.data ?? [] };
+  // content_json is a jsonb column typed loosely as Json — assert the object
+  // shape DeckSlideRow uses.
+  const slides: DeckSlideRow[] = (slidesRes.data ?? []).map((s) => ({
+    ...s,
+    content_json: (s.content_json ?? {}) as Record<string, unknown>,
+  }));
+  return { deck: deckRes.data, slides };
 }
 
 // ──────────────────────────────────────────────────────────
@@ -62,7 +69,7 @@ export async function createDeck(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('decks')
     .insert({ org_id: ORG_ID, title: title.trim(), created_by: user?.id, updated_by: user?.id })
     .select('id')
@@ -82,7 +89,7 @@ export async function updateDeckMeta(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('decks')
     .update({ ...patch, updated_by: user?.id })
     .eq('id', deckId);
@@ -97,7 +104,7 @@ export async function deleteDeck(
   deckId: string,
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any).from('decks').delete().eq('id', deckId);
+  const { error } = await supabase.from('decks').delete().eq('id', deckId);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/decks');
   return { success: true };
@@ -115,7 +122,7 @@ export async function addSlide(
   const supabase = await createClient();
 
   // Determine order_index: append at end, or insert after given index
-  const { data: existing } = await (supabase as any)
+  const { data: existing } = await supabase
     .from('deck_slides')
     .select('order_index')
     .eq('deck_id', deckId)
@@ -127,20 +134,20 @@ export async function addSlide(
 
   const defaultSlide = getDefaultSlideContent(type);
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('deck_slides')
     .insert({
       deck_id: deckId,
       type,
       order_index: orderIndex,
-      content_json: defaultSlide.content,
+      content_json: defaultSlide.content as Json,
     })
     .select('*')
     .single();
 
   if (error) return { error: humanizeError(error) };
   revalidatePath(`/decks/${deckId}/edit`);
-  return { success: true, slide: data as DeckSlideRow };
+  return { success: true, slide: { ...data, content_json: (data.content_json ?? {}) as Record<string, unknown> } };
 }
 
 export async function updateSlide(
@@ -151,7 +158,7 @@ export async function updateSlide(
   const supabase = await createClient();
 
   // Fetch current content and merge patch
-  const { data: current, error: fetchErr } = await (supabase as any)
+  const { data: current, error: fetchErr } = await supabase
     .from('deck_slides')
     .select('content_json')
     .eq('id', slideId)
@@ -159,11 +166,11 @@ export async function updateSlide(
 
   if (fetchErr) return { error: humanizeError(fetchErr) };
 
-  const merged = { ...(current?.content_json ?? {}), ...contentPatch };
+  const merged = { ...((current?.content_json ?? {}) as Record<string, unknown>), ...contentPatch };
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('deck_slides')
-    .update({ content_json: merged })
+    .update({ content_json: merged as Json })
     .eq('id', slideId)
     .eq('deck_id', deckId);
 
@@ -179,7 +186,7 @@ export async function reorderSlides(
   const supabase = await createClient();
 
   const updates = orderedSlideIds.map((id, index) =>
-    (supabase as any)
+    supabase
       .from('deck_slides')
       .update({ order_index: index })
       .eq('id', id)
@@ -200,7 +207,7 @@ export async function duplicateSlide(
 ): Promise<{ error: string } | { success: true; id: string }> {
   const supabase = await createClient();
 
-  const { data: slide, error: fetchErr } = await (supabase as any)
+  const { data: slide, error: fetchErr } = await supabase
     .from('deck_slides')
     .select('*')
     .eq('id', slideId)
@@ -208,7 +215,7 @@ export async function duplicateSlide(
 
   if (fetchErr || !slide) return { error: fetchErr?.message ?? 'Slide not found' };
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('deck_slides')
     .insert({
       deck_id: deckId,
@@ -230,7 +237,7 @@ export async function deleteSlide(
   slideId: string,
 ): Promise<{ error: string } | { success: true }> {
   const supabase = await createClient();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('deck_slides')
     .delete()
     .eq('id', slideId)

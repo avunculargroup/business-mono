@@ -7,15 +7,21 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: contact } = await supabase
-    .from('contacts')
-    .select('*')
-    .eq('id', id)
-    .single();
+  // contact, interactions, and tasks all key off the route id, so fetch them
+  // together rather than in series.
+  const [{ data: contact }, { data: interactions }, { data: tasks }] = await Promise.all([
+    supabase.from('contacts').select('*').eq('id', id).single(),
+    supabase.from('interactions').select('*').eq('contact_id', id).order('occurred_at', { ascending: false }),
+    supabase
+      .from('tasks')
+      .select('id, title, status, priority, due_date')
+      .eq('contact_id', id)
+      .in('status', ['todo', 'in_progress', 'blocked']),
+  ]);
 
   if (!contact) notFound();
 
-  // Fetch company name if linked
+  // The linked company name needs contact.company_id, so it follows the batch.
   let company: { id: string; name: string } | null = null;
   if (contact.company_id) {
     const { data } = await supabase
@@ -25,18 +31,6 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       .single();
     company = data;
   }
-
-  const { data: interactions } = await supabase
-    .from('interactions')
-    .select('*')
-    .eq('contact_id', id)
-    .order('occurred_at', { ascending: false });
-
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('id, title, status, priority, due_date')
-    .eq('contact_id', id)
-    .in('status', ['todo', 'in_progress', 'blocked']);
 
   return (
     <>

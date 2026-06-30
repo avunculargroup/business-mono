@@ -106,10 +106,7 @@ export async function submitNewsletterGateDecision(
 ) {
   const supabase = await createClient();
 
-  // newsletter_runs isn't in the web Database types — cast at the boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-  const { data: run, error: findError } = await db
+  const { data: run, error: findError } = await supabase
     .from('newsletter_runs')
     .select('status')
     .eq('workflow_run_id', workflowRunId)
@@ -132,7 +129,7 @@ export async function submitNewsletterGateDecision(
     return { error: 'That decision doesn\'t match the current review step.' };
   }
 
-  const { error: updateError } = await db
+  const { error: updateError } = await supabase
     .from('newsletter_runs')
     .update({ pending_decision: parsed.data })
     .eq('workflow_run_id', workflowRunId);

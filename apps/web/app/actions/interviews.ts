@@ -5,10 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// Table not in generated types until migration is applied — bypass with any cast
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const di = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('discovery_interviews');
+  supabase.from('discovery_interviews');
 
 const interviewSchema = z.object({
   contact_id:      z.string().uuid().optional().or(z.literal('')),
@@ -116,7 +114,9 @@ export async function getInterviews() {
     .order('interview_date', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // pain_points is a nullable text[] column; normalise null → [] so the list
+  // view's row type stays non-null.
+  return (data ?? []).map((row) => ({ ...row, pain_points: row.pain_points ?? [] }));
 }
 
 export async function getInterview(id: string) {

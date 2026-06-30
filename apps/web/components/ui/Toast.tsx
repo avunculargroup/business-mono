@@ -10,7 +10,7 @@ export function Toast() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} role="status" aria-live="polite">
       {toasts.map((toast) => (
         <div key={toast.id} className={`${styles.toast} ${styles[toast.type]}`}>
           <span className={styles.message}>{toast.message}</span>
@@ -25,7 +25,7 @@ export function Toast() {
               {toast.action.label}
             </button>
           )}
-          <button className={styles.close} onClick={() => dismiss(toast.id)}>
+          <button className={styles.close} onClick={() => dismiss(toast.id)} aria-label="Dismiss" type="button">
             <X size={14} strokeWidth={1.5} />
           </button>
         </div>

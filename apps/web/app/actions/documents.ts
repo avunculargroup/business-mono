@@ -1,17 +1,16 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const docs = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('documents');
+  supabase.from('documents');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const vers = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  (supabase as any).from('document_versions');
+  supabase.from('document_versions');
 
 const documentSchema = z.object({
   type:        z.enum(['report', 'proposal', 'brief', 'memo', 'strategy']),
@@ -108,7 +107,7 @@ export async function createDocumentVersion(documentId: string, formData: FormDa
     document_id:    documentId,
     version_number: nextVersion,
     status:         'draft',
-    content,
+    content:        content as Json,
     created_by:     user?.id ?? null,
   });
 
@@ -126,7 +125,7 @@ export async function updateDocumentVersion(versionId: string, content: Record<s
   const supabase = await createClient();
 
   const { error } = await vers(supabase)
-    .update({ content })
+    .update({ content: content as Json })
     .eq('id', versionId)
     .eq('status', 'draft');
 
@@ -162,7 +161,15 @@ export async function getDocuments() {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  // Each version's content is a jsonb column typed loosely as Json — assert the
+  // object shape the view uses.
+  return (data ?? []).map((row) => ({
+    ...row,
+    document_versions: row.document_versions.map((v) => ({
+      ...v,
+      content: (v.content ?? {}) as Record<string, unknown>,
+    })),
+  }));
 }
 
 export async function getDocument(id: string) {
@@ -174,7 +181,13 @@ export async function getDocument(id: string) {
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return {
+    ...data,
+    document_versions: data.document_versions.map((v) => ({
+      ...v,
+      content: (v.content ?? {}) as Record<string, unknown>,
+    })),
+  };
 }
 
 export async function importDocxDocument(formData: FormData) {

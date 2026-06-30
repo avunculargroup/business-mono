@@ -1,8 +1,8 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 const companySchema = z.object({
@@ -22,7 +22,9 @@ export async function createCompany(formData: FormData) {
     return { error: parsed.error.errors[0].message };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: company, error } = await supabase.from('companies').insert({
@@ -49,7 +51,9 @@ export async function updateCompany(id: string, formData: FormData) {
     return { error: parsed.error.errors[0].message };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(parsed.data)) {
     if (value !== undefined && value !== '') {
@@ -67,7 +71,9 @@ export async function updateCompany(id: string, formData: FormData) {
 }
 
 export async function deleteCompany(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('companies').delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };

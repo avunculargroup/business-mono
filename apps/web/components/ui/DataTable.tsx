@@ -66,26 +66,45 @@ export function DataTable<T>({
       <table className={styles.table}>
         <thead>
           <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className={styles.th}
-                style={{ width: col.width, textAlign: col.align || 'left' }}
-                onClick={col.sortable && onSort ? () => {
-                  const newDir = sortKey === col.key && sortDir === 'asc' ? 'desc' : 'asc';
-                  onSort(col.key, newDir);
-                } : undefined}
-              >
-                <span className={col.sortable ? styles.sortable : ''}>
-                  {col.header}
-                  {col.sortable && sortKey === col.key && (
-                    sortDir === 'asc'
-                      ? <ChevronUp size={14} strokeWidth={1.5} />
-                      : <ChevronDown size={14} strokeWidth={1.5} />
+            {columns.map((col) => {
+              const isSortable = !!(col.sortable && onSort);
+              return (
+                <th
+                  key={col.key}
+                  className={styles.th}
+                  style={{ width: col.width, textAlign: col.align || 'left' }}
+                  aria-sort={
+                    col.sortable
+                      ? sortKey === col.key
+                        ? sortDir === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                      : undefined
+                  }
+                >
+                  {isSortable ? (
+                    <button
+                      type="button"
+                      className={styles.sortable}
+                      onClick={() => {
+                        const newDir = sortKey === col.key && sortDir === 'asc' ? 'desc' : 'asc';
+                        onSort!(col.key, newDir);
+                      }}
+                    >
+                      {col.header}
+                      {sortKey === col.key && (
+                        sortDir === 'asc'
+                          ? <ChevronUp size={14} strokeWidth={1.5} />
+                          : <ChevronDown size={14} strokeWidth={1.5} />
+                      )}
+                    </button>
+                  ) : (
+                    <span>{col.header}</span>
                   )}
-                </span>
-              </th>
-            ))}
+                </th>
+              );
+            })}
             {rowActions && <th className={styles.th} style={{ width: '48px' }} />}
           </tr>
         </thead>

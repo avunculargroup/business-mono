@@ -1,15 +1,17 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { cleanAccountProfile } from '@/components/brand/accountVoice';
+import type { VoiceProfile } from '@/components/brand/voiceTypes';
 import { humanizeError } from '@/lib/errors';
 
 // Brand Hub voice editing. Writes the brand_voice singleton and voice_snippets
-// via the cookie-authed SSR client (RLS: authenticated). brand_voice /
-// voice_snippets are not in the generated Database types yet, so we cast the
-// query builder at the boundary — same pattern as other not-yet-typed tables.
+// via the cookie-authed SSR client (RLS: authenticated). The structured voice
+// profile is stored in jsonb columns typed loosely as Json, so it is asserted
+// to/from VoiceProfile at the read/write boundary.
 
 const REVALIDATE = '/brand';
 
@@ -52,8 +54,7 @@ export async function updateBrandVoice(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = supabase;
 
   const { data: existing } = await db
     .from('brand_voice')
@@ -108,8 +109,7 @@ export async function updateAccountVoice(formData: FormData) {
   }
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = supabase;
 
   const { data: brand } = await db
     .from('brand_voice')
@@ -118,7 +118,7 @@ export async function updateAccountVoice(formData: FormData) {
     .limit(1)
     .maybeSingle();
 
-  const voice_profile = cleanAccountProfile(rawProfile, brand?.profile ?? {});
+  const voice_profile = cleanAccountProfile(rawProfile, (brand?.profile ?? {}) as VoiceProfile);
 
   const { error } = await db
     .from('social_accounts')
@@ -126,7 +126,7 @@ export async function updateAccountVoice(formData: FormData) {
       display_name: parsed.data.display_name,
       handle: parsed.data.handle || null,
       profile_url: parsed.data.profile_url || null,
-      voice_profile,
+      voice_profile: voice_profile as Json,
     })
     .eq('id', parsed.data.id);
   if (error) return { error: humanizeError(error) };
@@ -164,8 +164,7 @@ export async function saveVoiceSnippet(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = supabase;
 
   // Snippet scoped by social_account_id: NULL = company canon (applies to
   // every voice), a specific id = that account's own exemplar. Embedding is
@@ -199,8 +198,7 @@ export async function saveVoiceSnippet(formData: FormData) {
 
 export async function toggleVoiceSnippetStar(id: string, isStarred: boolean) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = supabase;
   const { error } = await db.from('voice_snippets').update({ is_starred: isStarred }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
@@ -209,8 +207,7 @@ export async function toggleVoiceSnippetStar(id: string, isStarred: boolean) {
 
 export async function deleteVoiceSnippet(id: string) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = supabase;
   const { error } = await db.from('voice_snippets').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);

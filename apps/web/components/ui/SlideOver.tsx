@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import styles from './SlideOver.module.css';
 
 interface SlideOverProps {
@@ -13,6 +14,9 @@ interface SlideOverProps {
 }
 
 export function SlideOver({ open, onClose, title, children, footer }: SlideOverProps) {
+  const titleId = useId();
+  const panelRef = useFocusTrap<HTMLDivElement>(open);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) onClose();
@@ -35,10 +39,17 @@ export function SlideOver({ open, onClose, title, children, footer }: SlideOverP
   return (
     <div className={styles.overlay}>
       <div className={styles.backdrop} onClick={onClose} />
-      <div className={styles.panel}>
+      <div
+        ref={panelRef}
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
-          <button className={styles.close} onClick={onClose}>
+          <h2 id={titleId} className={styles.title}>{title}</h2>
+          <button className={styles.close} onClick={onClose} aria-label="Close" type="button">
             <X size={18} strokeWidth={1.5} />
           </button>
         </div>

@@ -1,7 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 export async function approveActivity(
@@ -9,7 +9,9 @@ export async function approveActivity(
   action: 'approved' | 'rejected',
   response?: string
 ) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const updateData = {
     status: action,
@@ -18,7 +20,7 @@ export async function approveActivity(
   };
   const { error } = await supabase
     .from('agent_activity')
-    .update(updateData as never)
+    .update(updateData)
     .eq('id', activityId);
 
   if (error) {

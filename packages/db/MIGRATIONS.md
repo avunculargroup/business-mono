@@ -75,6 +75,14 @@ pnpm db:generate-types
 
 Commit the updated `packages/db/src/types/database.ts` as a follow-up commit.
 
+> **Don't paper over a lagging type with `as any`.** If a new table or column
+> isn't in the generated types yet, regenerate and commit instead of casting the
+> Supabase client (`(supabase as any).from(...)`). A blanket cast silently
+> disables type-checking for every column on that query and tends to outlive the
+> migration that prompted it. For genuinely loose `jsonb` columns, assert the
+> specific shape at the read/write boundary (`content as Json`,
+> `row.sentiment as { ... }`) rather than casting the whole client.
+
 ---
 
 ## Local development scripts
