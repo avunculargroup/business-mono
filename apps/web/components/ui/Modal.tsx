@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 import { cn } from '@/lib/utils';
@@ -28,12 +28,19 @@ export function Modal({ open, onClose, title, size = 'md', children, footer }: M
     }
   }, [open]);
 
+  const titleId = useId();
+
   return (
-    <dialog ref={dialogRef} className={cn(styles.dialog, styles[size])} onClose={onClose}>
+    <dialog
+      ref={dialogRef}
+      className={cn(styles.dialog, styles[size])}
+      onClose={onClose}
+      aria-labelledby={titleId}
+    >
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
-          <button className={styles.close} onClick={onClose}>
+          <h2 id={titleId} className={styles.title}>{title}</h2>
+          <button className={styles.close} onClick={onClose} aria-label="Close" type="button">
             <X size={18} strokeWidth={1.5} />
           </button>
         </div>
