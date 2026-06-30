@@ -4,6 +4,7 @@ import {
   isFieldOverridden,
   overrideCount,
   cleanAccountProfile,
+  hasFormatOverride,
 } from './accountVoice';
 import type { VoiceProfile } from './voiceTypes';
 
@@ -13,7 +14,7 @@ const company: VoiceProfile = {
   vocabulary_do: ['balance sheet', 'custody'],
   vocabulary_avoid: ['to the moon', 'HODL'],
   signature_devices: ['opens with a number'],
-  format_notes: 'No exclamation marks.',
+  format: { register: 'semi-formal', hashtag_use: 'platform-default' },
 };
 
 describe('lockedAvoidWords', () => {
@@ -65,18 +66,45 @@ describe('overrideCount', () => {
       persona: 'Chris on X — punchy.',
       tone_attributes: ['punchy', 'direct'],
       vocabulary_avoid: ['number go up'],
+      format: { word_count_max: 25 },
     };
-    expect(overrideCount(account, company)).toBe(3);
+    expect(overrideCount(account, company)).toBe(4);
+  });
+});
+
+describe('isFieldOverridden for format', () => {
+  it('is false when format is absent or empty', () => {
+    expect(isFieldOverridden('format', {}, company)).toBe(false);
+    expect(isFieldOverridden('format', { format: {} }, company)).toBe(false);
+  });
+
+  it('is true when any format field is set', () => {
+    expect(isFieldOverridden('format', { format: { word_count_max: 25 } }, company)).toBe(true);
+    expect(isFieldOverridden('format', { format: { register: 'conversational' } }, company)).toBe(true);
+  });
+});
+
+describe('hasFormatOverride', () => {
+  it('is false when format is null, undefined, or empty object', () => {
+    expect(hasFormatOverride(null)).toBe(false);
+    expect(hasFormatOverride(undefined)).toBe(false);
+    expect(hasFormatOverride({})).toBe(false);
+  });
+
+  it('is true when any field is set', () => {
+    expect(hasFormatOverride({ word_count_max: 25 })).toBe(true);
+    expect(hasFormatOverride({ register: 'conversational' })).toBe(true);
+    expect(hasFormatOverride({ hashtag_use: 'none' })).toBe(true);
   });
 });
 
 describe('cleanAccountProfile', () => {
   it('drops empty fields so they fall back to canon', () => {
     const cleaned = cleanAccountProfile(
-      { persona: '  ', tone_attributes: [], format_notes: 'Short.' },
+      { persona: '  ', tone_attributes: [], format: { word_count_max: 25 } },
       company,
     );
-    expect(cleaned).toEqual({ format_notes: 'Short.' });
+    expect(cleaned).toEqual({ format: { word_count_max: 25 } });
   });
 
   it('trims values and removes blank array entries', () => {
@@ -92,12 +120,24 @@ describe('cleanAccountProfile', () => {
       { vocabulary_avoid: ['HODL', 'number go up', 'to the moon'] },
       company,
     );
-    // Only the account-specific addition survives; locked words are enforced via union.
     expect(cleaned).toEqual({ vocabulary_avoid: ['number go up'] });
   });
 
   it('omits an avoid list that is only company bans', () => {
     const cleaned = cleanAccountProfile({ vocabulary_avoid: ['HODL'] }, company);
     expect(cleaned).toEqual({});
+  });
+
+  it('cleans format: drops undefined fields, omits when all empty', () => {
+    const cleaned = cleanAccountProfile({ format: {} }, company);
+    expect(cleaned.format).toBeUndefined();
+  });
+
+  it('keeps only set format fields', () => {
+    const cleaned = cleanAccountProfile(
+      { format: { word_count_min: 10, word_count_max: 25, register: 'conversational' } },
+      company,
+    );
+    expect(cleaned.format).toEqual({ word_count_min: 10, word_count_max: 25, register: 'conversational' });
   });
 });

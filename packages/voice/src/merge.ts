@@ -1,4 +1,4 @@
-import type { VoiceProfile } from './types.js';
+import type { FormatConfig, VoiceProfile } from './types.js';
 
 // Umbrella + override merge. The company canon is the baseline; the account
 // profile takes precedence on any overlapping key and the canon fills gaps.
@@ -70,6 +70,22 @@ export function mergeVoice(
   // Unioned field: company bans always survive.
   const vocabularyAvoid = unionDistinct(base.vocabulary_avoid, over.vocabulary_avoid);
   if (vocabularyAvoid.length > 0) merged.vocabulary_avoid = vocabularyAvoid;
+
+  // FormatConfig: field-by-field merge (account wins per field; company fills gaps).
+  const baseF = base.format ?? {};
+  const overF = over.format ?? {};
+  const format: FormatConfig = {};
+  if (overF.word_count_min != null) format.word_count_min = overF.word_count_min;
+  else if (baseF.word_count_min != null) format.word_count_min = baseF.word_count_min;
+  if (overF.word_count_max != null) format.word_count_max = overF.word_count_max;
+  else if (baseF.word_count_max != null) format.word_count_max = baseF.word_count_max;
+  if (overF.register != null) format.register = overF.register;
+  else if (baseF.register != null) format.register = baseF.register;
+  if (overF.paragraphing != null) format.paragraphing = overF.paragraphing;
+  else if (baseF.paragraphing != null) format.paragraphing = baseF.paragraphing;
+  if (overF.hashtag_use != null) format.hashtag_use = overF.hashtag_use;
+  else if (baseF.hashtag_use != null) format.hashtag_use = baseF.hashtag_use;
+  if (Object.keys(format).length > 0) merged.format = format;
 
   return merged;
 }

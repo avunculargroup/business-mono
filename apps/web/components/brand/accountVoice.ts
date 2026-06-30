@@ -5,7 +5,7 @@
 // merge rules in @platform/voice (account wins where set; vocabulary_avoid is
 // unioned with the company bans, which are locked on an account).
 
-import type { VoiceProfile } from './voiceTypes';
+import type { FormatConfig, VoiceProfile } from './voiceTypes';
 
 /** The profile fields an account can override, in display order. */
 export const VOICE_FIELDS = [
@@ -14,12 +14,12 @@ export const VOICE_FIELDS = [
   'vocabulary_do',
   'vocabulary_avoid',
   'signature_devices',
-  'format_notes',
+  'format',
 ] as const;
 
 export type VoiceField = (typeof VOICE_FIELDS)[number];
 
-const STRING_FIELDS: VoiceField[] = ['persona', 'format_notes'];
+const STRING_FIELDS: VoiceField[] = ['persona'];
 
 function presentString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -45,6 +45,18 @@ export function lockedAvoidWords(company: VoiceProfile | null | undefined): stri
   return (company?.vocabulary_avoid ?? []).filter((w) => presentString(w));
 }
 
+/** True when a FormatConfig has at least one non-null field set. */
+export function hasFormatOverride(fmt: FormatConfig | null | undefined): boolean {
+  if (!fmt) return false;
+  return (
+    fmt.word_count_min != null ||
+    fmt.word_count_max != null ||
+    fmt.register != null ||
+    fmt.paragraphing != null ||
+    fmt.hashtag_use != null
+  );
+}
+
 /**
  * Whether a single field is overridden on the account (i.e. the account sets its
  * own value, diverging from canon). For `vocabulary_avoid` only the account's
@@ -55,7 +67,8 @@ export function isFieldOverridden(
   account: VoiceProfile | null | undefined,
   company: VoiceProfile | null | undefined,
 ): boolean {
-  const value = account?.[field];
+  if (field === 'format') return hasFormatOverride(account?.format);
+  const value = account?.[field as keyof VoiceProfile];
   if (field === 'vocabulary_avoid') {
     const locked = lockedAvoidWords(company);
     const own = (Array.isArray(value) ? value : []).filter(
@@ -63,7 +76,7 @@ export function isFieldOverridden(
     );
     return own.length > 0;
   }
-  if (STRING_FIELDS.includes(field)) return presentString(value);
+  if (STRING_FIELDS.includes(field as typeof STRING_FIELDS[number])) return presentString(value);
   return presentArray(value);
 }
 
@@ -81,6 +94,8 @@ export function overrideCount(
  *   - drop empty/blank array entries and empty arrays,
  *   - strip company-banned words from `vocabulary_avoid` (they're enforced via
  *     the union, never stored on the account).
+ *   - for `format`, drop any undefined/null fields; omit the object entirely
+ *     when all fields are unset.
  * Omitted keys keep inheritance live — a later canon edit still reaches them.
  */
 export function cleanAccountProfile(
@@ -90,8 +105,7 @@ export function cleanAccountProfile(
   const out: VoiceProfile = {};
   const locked = lockedAvoidWords(company);
 
-  if (presentString(raw.persona)) out.persona = raw.persona.trim();
-  if (presentString(raw.format_notes)) out.format_notes = raw.format_notes.trim();
+  if (presentString(raw.persona)) out.persona = raw.persona!.trim();
 
   const cleanList = (list: string[] | undefined) =>
     (list ?? []).map((v) => v.trim()).filter((v) => v.length > 0);
@@ -107,6 +121,16 @@ export function cleanAccountProfile(
 
   const avoid = cleanList(raw.vocabulary_avoid).filter((w) => !includesCi(locked, w));
   if (avoid.length > 0) out.vocabulary_avoid = avoid;
+
+  if (raw.format) {
+    const fmt: FormatConfig = {};
+    if (raw.format.word_count_min != null) fmt.word_count_min = raw.format.word_count_min;
+    if (raw.format.word_count_max != null) fmt.word_count_max = raw.format.word_count_max;
+    if (raw.format.register != null) fmt.register = raw.format.register;
+    if (raw.format.paragraphing != null) fmt.paragraphing = raw.format.paragraphing;
+    if (raw.format.hashtag_use != null) fmt.hashtag_use = raw.format.hashtag_use;
+    if (Object.keys(fmt).length > 0) out.format = fmt;
+  }
 
   return out;
 }

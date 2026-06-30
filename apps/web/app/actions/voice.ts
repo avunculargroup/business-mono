@@ -15,6 +15,14 @@ import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/brand';
 
+const formatConfigSchema = z.object({
+  word_count_min: z.number().int().positive().optional(),
+  word_count_max: z.number().int().positive().optional(),
+  register: z.enum(['formal', 'semi-formal', 'conversational', 'casual']).optional(),
+  paragraphing: z.enum(['single-block', 'short-paragraphs', 'platform-default']).optional(),
+  hashtag_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+}).optional();
+
 const profileSchema = z.object({
   persona: z.string().trim().optional().default(''),
   tone_attributes: z.array(z.string()).default([]),
@@ -22,6 +30,7 @@ const profileSchema = z.object({
   vocabulary_avoid: z.array(z.string()).default([]),
   signature_devices: z.array(z.string()).default([]),
   format_notes: z.string().trim().optional().default(''),
+  format: formatConfigSchema,
 });
 
 const contentPolicySchema = z.object({

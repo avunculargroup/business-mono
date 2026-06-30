@@ -1,4 +1,4 @@
-import { resolveVoiceContext, type ResolvedVoiceContext } from '@platform/voice';
+import { resolveVoiceContext, type ResolvedVoiceContext, type FormatConfig } from '@platform/voice';
 
 // Renders a ResolvedVoiceContext (from packages/voice) into the <brand-voice>
 // prompt block content that content agents internalise. This is the bridge
@@ -18,6 +18,48 @@ export const FORMAT_NOTES_LABEL = 'Format notes';
  *  signal that platform length defaults should defer to them. */
 export function voiceBlockHasFormatNotes(voiceBlock: string): boolean {
   return voiceBlock.includes(`**${FORMAT_NOTES_LABEL}:**`);
+}
+
+/**
+ * Extract the structured FormatConfig from a merged VoiceProfile, or null when
+ * neither structured format nor legacy format_notes are set. The returned object
+ * also carries `legacy_notes` (the old free-text field) so callers can choose
+ * which rendering path to use.
+ */
+export function extractFormatConfig(
+  profile: { format?: FormatConfig; format_notes?: string },
+): (FormatConfig & { legacy_notes?: string }) | null {
+  if (profile.format && Object.keys(profile.format).length > 0) {
+    return { ...profile.format };
+  }
+  if (profile.format_notes && profile.format_notes.trim().length > 0) {
+    return { legacy_notes: profile.format_notes.trim() };
+  }
+  return null;
+}
+
+/**
+ * Render a FormatConfig as a human-readable summary for the voice block's
+ * `**Format notes:**` line. Used when structured format fields replace the old
+ * free-text `format_notes` string.
+ */
+export function renderFormatConfig(fmt: FormatConfig): string {
+  const parts: string[] = [];
+  if (fmt.word_count_min != null && fmt.word_count_max != null) {
+    parts.push(`${fmt.word_count_min}–${fmt.word_count_max} words`);
+  } else if (fmt.word_count_max != null) {
+    parts.push(`up to ${fmt.word_count_max} words`);
+  } else if (fmt.word_count_min != null) {
+    parts.push(`at least ${fmt.word_count_min} words`);
+  }
+  if (fmt.register) parts.push(`${fmt.register} register`);
+  if (fmt.paragraphing && fmt.paragraphing !== 'platform-default') {
+    parts.push(fmt.paragraphing === 'single-block' ? 'single block' : 'short paragraphs');
+  }
+  if (fmt.hashtag_use && fmt.hashtag_use !== 'platform-default') {
+    parts.push(fmt.hashtag_use === 'none' ? 'no hashtags' : 'hashtags sparingly (1–2)');
+  }
+  return parts.join(', ');
 }
 
 /** Format the merged profile (+ rule, mission, any retrieved snippets) as markdown. */
@@ -40,7 +82,12 @@ export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
   const devices = list('Signature devices', p.signature_devices);
   if (devices) parts.push(devices);
 
-  if (p.format_notes) parts.push(`**${FORMAT_NOTES_LABEL}:** ${p.format_notes}`);
+  if (p.format && Object.keys(p.format).length > 0) {
+    const rendered = renderFormatConfig(p.format);
+    if (rendered) parts.push(`**${FORMAT_NOTES_LABEL}:** ${rendered}`);
+  } else if (p.format_notes) {
+    parts.push(`**${FORMAT_NOTES_LABEL}:** ${p.format_notes}`);
+  }
 
   const policy = ctx.contentPolicy ?? {};
   const endorsed = list('Topics to comment on', policy.topics_endorsed);

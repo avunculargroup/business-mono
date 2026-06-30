@@ -3,13 +3,37 @@
 // (`social_accounts.voice_profile`) — that sameness is what lets one merge,
 // one editor, and one validator serve both. See docs/brand-voice-migration-spec.md.
 
+export const REGISTER_OPTIONS = ['formal', 'semi-formal', 'conversational', 'casual'] as const;
+export type Register = (typeof REGISTER_OPTIONS)[number];
+
+export const PARAGRAPHING_OPTIONS = ['single-block', 'short-paragraphs', 'platform-default'] as const;
+export type Paragraphing = (typeof PARAGRAPHING_OPTIONS)[number];
+
+export const HASHTAG_USE_OPTIONS = ['none', 'sparingly', 'platform-default'] as const;
+export type HashtagUse = (typeof HASHTAG_USE_OPTIONS)[number];
+
+/**
+ * Structured per-property format configuration. Stored under `VoiceProfile.format`.
+ * Each field is independently inherited (account wins per-field; company fills gaps).
+ * Preferred over the legacy free-text `format_notes` string when present.
+ */
+export interface FormatConfig {
+  word_count_min?: number;
+  word_count_max?: number;
+  register?: Register;
+  paragraphing?: Paragraphing;
+  hashtag_use?: HashtagUse;
+}
+
 export interface VoiceProfile {
   persona?: string;
   tone_attributes?: string[];
   vocabulary_do?: string[];
   vocabulary_avoid?: string[];
   signature_devices?: string[];
+  /** @deprecated Use `format` instead. Still rendered as a fallback when `format` is absent. */
   format_notes?: string;
+  format?: FormatConfig;
 }
 
 /**

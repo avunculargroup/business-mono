@@ -60,4 +60,52 @@ describe('mergeVoice', () => {
     const account: VoiceProfile = { persona: 'Solo voice.', vocabulary_avoid: ['hype'] };
     expect(mergeVoice(null, account)).toEqual(account);
   });
+
+  it('merges FormatConfig field-by-field (account wins per field)', () => {
+    const base: VoiceProfile = {
+      ...company,
+      format: { word_count_min: 100, word_count_max: 300, register: 'semi-formal' },
+    };
+    const account: VoiceProfile = { format: { word_count_max: 25, register: 'conversational' } };
+    const merged = mergeVoice(base, account);
+    // Account wins on word_count_max and register.
+    expect(merged.format?.word_count_max).toBe(25);
+    expect(merged.format?.register).toBe('conversational');
+    // Company fills the gap for word_count_min (account didn't set it).
+    expect(merged.format?.word_count_min).toBe(100);
+  });
+
+  it('fills all FormatConfig fields from company when account has no format', () => {
+    const base: VoiceProfile = {
+      ...company,
+      format: { word_count_max: 300, hashtag_use: 'none' },
+    };
+    const account: VoiceProfile = { persona: 'Chris on X.' };
+    const merged = mergeVoice(base, account);
+    expect(merged.format?.word_count_max).toBe(300);
+    expect(merged.format?.hashtag_use).toBe('none');
+  });
+
+  it('account format overrides company format completely when all fields set', () => {
+    const base: VoiceProfile = {
+      ...company,
+      format: { word_count_min: 100, word_count_max: 300, register: 'formal' },
+    };
+    const account: VoiceProfile = {
+      format: {
+        word_count_min: 10,
+        word_count_max: 25,
+        register: 'conversational',
+        paragraphing: 'single-block',
+        hashtag_use: 'none',
+      },
+    };
+    const merged = mergeVoice(base, account);
+    expect(merged.format).toEqual(account.format);
+  });
+
+  it('omits format from merged profile when neither side sets it', () => {
+    const merged = mergeVoice(company, { persona: 'Solo voice.' });
+    expect(merged.format).toBeUndefined();
+  });
 });

@@ -1,5 +1,4 @@
-import type { VariantContext, CharlieVariant } from './schemas.js';
-import { voiceBlockHasFormatNotes } from '../../lib/voicePrompt.js';
+import type { VariantContext, CharlieVariant, FormatConfigCtx } from './schemas.js';
 
 // Pure prompt builders + text helpers for the Variant Generation workflow.
 // Kept separate from index.ts so they can be unit-tested without invoking
@@ -36,38 +35,88 @@ const NO_TOOL_INSTRUCTION =
   'Return ONLY the structured object. Do not call any tool (no persist_content_draft, no supabase tools) — persistence happens later in the workflow.';
 
 /**
+ * Build the inline constraint lines from a structured FormatConfig or legacy
+ * format notes text. These are injected directly into the platform mechanics
+ * section so the LLM sees them as hard limits, not a soft deferral.
+ */
+function formatOverrideLines(fmt: FormatConfigCtx): string[] {
+  if (!fmt) return [];
+  const lines: string[] = [];
+
+  if (fmt.legacy_notes) {
+    lines.push(
+      `- FORMAT OVERRIDE (hard limit): "${fmt.legacy_notes}" — follow this exactly, it supersedes the platform default length.`,
+    );
+    return lines;
+  }
+
+  if (fmt.word_count_min != null && fmt.word_count_max != null) {
+    lines.push(
+      `- WORD COUNT: ${fmt.word_count_min}–${fmt.word_count_max} words — hard limit for this account, overrides platform default.`,
+    );
+  } else if (fmt.word_count_max != null) {
+    lines.push(
+      `- WORD COUNT: up to ${fmt.word_count_max} words — hard limit for this account, overrides platform default.`,
+    );
+  } else if (fmt.word_count_min != null) {
+    lines.push(
+      `- WORD COUNT: at least ${fmt.word_count_min} words — minimum for this account.`,
+    );
+  }
+  if (fmt.register) lines.push(`- REGISTER: ${fmt.register}`);
+  if (fmt.paragraphing && fmt.paragraphing !== 'platform-default') {
+    lines.push(
+      fmt.paragraphing === 'single-block'
+        ? `- PARAGRAPHING: single block (no blank lines between sentences)`
+        : `- PARAGRAPHING: short paragraphs (one or two sentences each, separated by a blank line)`,
+    );
+  }
+  if (fmt.hashtag_use && fmt.hashtag_use !== 'platform-default') {
+    lines.push(
+      fmt.hashtag_use === 'none'
+        ? `- HASHTAGS: none — do not include any hashtags`
+        : `- HASHTAGS: sparingly — 1–2 maximum, only where they earn their place`,
+    );
+  }
+  return lines;
+}
+
+/**
  * Platform *mechanics* Charlie must respect — the platform facts (char ceiling,
  * the LinkedIn fold point, thread segment behaviour) plus default styling
  * (length, register, paragraphing, hashtag use).
  *
- * Styling is brand voice's job, not the code's: when the resolved voice carries
- * account/canon `format_notes` (`hasFormatNotes`), the default styling lines are
- * replaced by a single deferral to those notes, so a per-account override (e.g.
- * "10–25 words", a different register, a hashtag rule) wins. The platform
- * mechanics — hard char ceiling, the ~140-char fold, the standalone first
- * segment — are real constraints and always stay.
+ * When `formatConfig` is set, the account's format constraints are injected
+ * inline as hard limits — not as a deferred pointer to the voice block — so
+ * the LLM treats them as real constraints rather than soft hints. For very short
+ * word-count limits (≤ 50 words) on LinkedIn, the fold/hook mechanic is replaced
+ * with a note that the post is shorter than the fold point (the hook framing
+ * would imply a longer format). Platform hard limits (char ceiling) always stay.
  */
 export function platformFormatRules(
   platform: VariantContext['platform'],
   platformSpec: VariantContext['platformSpec'],
   wantsThread: boolean,
-  hasFormatNotes = false,
+  formatConfig?: FormatConfigCtx,
 ): string {
   const max = platformSpec.max_chars;
-  const deferToNotes =
-    '- Length, register, paragraphing and hashtag use: follow the "Format notes" in the brand voice below — they govern for this account and override any platform default.';
+  const fmt = formatConfig ?? null;
+  const overrideLines = formatOverrideLines(fmt);
+  const hasOverride = overrideLines.length > 0;
 
   if (platform === 'linkedin') {
-    const mechanics = [
-      `- Open with a hook in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`,
-      `- Stay under the ${max}-character hard ceiling.`,
-    ];
+    const isVeryShort =
+      fmt && !fmt.legacy_notes && fmt.word_count_max != null && fmt.word_count_max <= 50;
+    const foldMechanic = isVeryShort
+      ? `- Keep the entire post under ${fmt!.word_count_max} words — shorter than LinkedIn's fold point, so the full post is visible without expanding.`
+      : `- Open with a hook in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`;
+    const mechanics = [foldMechanic, `- Stay under the ${max}-character hard ceiling.`];
     const styling = [
       `- Short paragraphs — one or two sentences each, separated by a blank line. No walls of text.`,
       `- Aim for 1,200–2,500 characters, semi-formal register.`,
       `- Group any hashtags together at the very end, never sprinkled through the body.`,
     ];
-    return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
+    return [...mechanics, ...(hasOverride ? overrideLines : styling)].join('\n');
   }
 
   // twitter_x
@@ -82,14 +131,14 @@ export function platformFormatRules(
       `- 5–10 segments (≈7 is the sweet spot).`,
       `- Keep every segment scannable and self-contained. Conversational register. Hashtags sparingly — 1–2 across the whole thread.`,
     ];
-    return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
+    return [...mechanics, ...(hasOverride ? overrideLines : styling)].join('\n');
   }
   const mechanics = [`- ${max} characters is the hard ceiling.`];
   const styling = [
     `- Aim for 100–250 characters — punchy, scannable, one clear idea.`,
     `- Conversational register. At most 1–2 hashtags, and only where they earn their place.`,
   ];
-  return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
+  return [...mechanics, ...(hasOverride ? overrideLines : styling)].join('\n');
 }
 
 /**
@@ -130,7 +179,7 @@ ${platformSpec.hashtag_guidance ? `Hashtag guidance: ${platformSpec.hashtag_guid
 ## ${formatBlock}
 
 ## ${platformLabel} formatting (platform mechanics)
-${platformFormatRules(platform, platformSpec, wantsThread, voiceBlockHasFormatNotes(ctx.voiceBlock))}
+${platformFormatRules(platform, platformSpec, wantsThread, ctx.formatConfig ?? null)}
 ${instruction ? `\n## Requested change (regenerate addressing this)\n${instruction}\n` : ''}
 ## Brand voice — authoritative for this post
 The brand voice below governs persona, tone, vocabulary (use and avoid), signature devices, format and length, topic policy, and the Bitcoin capitalisation rule. Follow it exactly. Where it conflicts with the platform notes above, the voice wins on style; the platform's hard limits (char ceiling, fold) still stand.

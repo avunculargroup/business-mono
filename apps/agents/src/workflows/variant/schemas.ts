@@ -37,6 +37,19 @@ export const beatSchema = z.object({
   prefer_thread: z.boolean(),
 });
 
+// Structured format override extracted from the resolved voice profile.
+// `legacy_notes` carries the old free-text format_notes when no structured
+// format is set. Null means no format override — use platform defaults.
+export const formatConfigSchema = z.object({
+  word_count_min: z.number().optional(),
+  word_count_max: z.number().optional(),
+  register: z.enum(['formal', 'semi-formal', 'conversational', 'casual']).optional(),
+  paragraphing: z.enum(['single-block', 'short-paragraphs', 'platform-default']).optional(),
+  hashtag_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+  legacy_notes: z.string().optional(),
+}).nullable();
+export type FormatConfigCtx = z.infer<typeof formatConfigSchema>;
+
 // The complete context one variant generation needs, assembled by the
 // resolve-context step and threaded through the rest of the run.
 export const variantContextSchema = z.object({
@@ -45,6 +58,8 @@ export const variantContextSchema = z.object({
   accountDisplayName: z.string(),
   // Pre-rendered <brand-voice> block (merged profile + retrieved exemplars).
   voiceBlock: z.string(),
+  // Structured format override (null = use platform defaults).
+  formatConfig: formatConfigSchema.optional(),
   platformSpec: platformSpecSchema,
   // campaigns.strategy JSONB — loose; the prompt builder reads known fields.
   strategy: z.record(z.string(), z.unknown()),

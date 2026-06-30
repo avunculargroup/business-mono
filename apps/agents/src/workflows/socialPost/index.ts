@@ -7,7 +7,7 @@ import type {
   SocialPostFromNewsResult,
   SocialPostDraft,
 } from '@platform/shared';
-import { formatResolvedVoice } from '../../lib/voicePrompt.js';
+import { formatResolvedVoice, extractFormatConfig } from '../../lib/voicePrompt.js';
 import { stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { editor } from '../../agents/editorial/index.js';
@@ -206,6 +206,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
           platform: account.platform,
           platformSpec: spec,
           voiceBlock: formatResolvedVoice(voice),
+          formatConfig: extractFormatConfig(voice.profile),
           founderName,
         }),
       );
