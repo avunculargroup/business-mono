@@ -36,15 +36,16 @@ const NO_TOOL_INSTRUCTION =
   'Return ONLY the structured object. Do not call any tool (no persist_content_draft, no supabase tools) — persistence happens later in the workflow.';
 
 /**
- * Platform-specific formatting conventions Charlie must follow rigorously, on top
- * of the structural format block (single vs thread) and the char ceiling. Kept
- * pure and separate so it can be unit-tested, and kept consistent with
- * docs/brand-voice.md (channel formality, content length, structure).
+ * Platform *mechanics* Charlie must respect — the platform facts (char ceiling,
+ * the LinkedIn fold point, thread segment behaviour) plus default styling
+ * (length, register, paragraphing, hashtag use).
  *
- * When the resolved voice carries account/canon `format_notes` (`hasFormatNotes`),
- * the default numeric length target is replaced by a deferral to those notes —
- * a per-account length override (e.g. "10–25 words") wins over the platform
- * default. The hard char ceiling is a real platform limit and always stays.
+ * Styling is brand voice's job, not the code's: when the resolved voice carries
+ * account/canon `format_notes` (`hasFormatNotes`), the default styling lines are
+ * replaced by a single deferral to those notes, so a per-account override (e.g.
+ * "10–25 words", a different register, a hashtag rule) wins. The platform
+ * mechanics — hard char ceiling, the ~140-char fold, the standalone first
+ * segment — are real constraints and always stay.
  */
 export function platformFormatRules(
   platform: VariantContext['platform'],
@@ -53,37 +54,42 @@ export function platformFormatRules(
   hasFormatNotes = false,
 ): string {
   const max = platformSpec.max_chars;
+  const deferToNotes =
+    '- Length, register, paragraphing and hashtag use: follow the "Format notes" in the brand voice below — they govern for this account and override any platform default.';
 
   if (platform === 'linkedin') {
-    const lengthRule = hasFormatNotes
-      ? `- Length: follow the "Format notes" in the Voice section below exactly — they set the length for this account and override any default length. Stay under the ${max}-character hard ceiling. Semi-formal register.`
-      : `- Aim for 1,200–2,500 characters: a deliberate, readable length well under the ${max}-character hard ceiling. Semi-formal register.`;
-    return [
-      `- Open with a hook that lands in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`,
+    const mechanics = [
+      `- Open with a hook in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`,
+      `- Stay under the ${max}-character hard ceiling.`,
+    ];
+    const styling = [
       `- Short paragraphs — one or two sentences each, separated by a blank line. No walls of text.`,
-      lengthRule,
+      `- Aim for 1,200–2,500 characters, semi-formal register.`,
       `- Group any hashtags together at the very end, never sprinkled through the body.`,
-    ].join('\n');
+    ];
+    return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
   }
 
   // twitter_x
   if (wantsThread) {
-    const countRule = hasFormatNotes
-      ? `- Length: follow the "Format notes" in the Voice section below where they specify segment count or length — they override the default. Otherwise 5–10 segments (≈7 is the sweet spot). One idea per segment, each at or under ${max} characters.`
-      : `- 5–10 segments (≈7 is the sweet spot), one idea per segment, each at or under ${max} characters.`;
-    return [
-      countRule,
+    const mechanics = [
       `- The FIRST segment must hook and stand on its own — in the feed it is the only part most people see.`,
+      `- One idea per segment, each at or under ${max} characters${
+        platformSpec.max_thread_segments ? ` (max ${platformSpec.max_thread_segments} segments)` : ''
+      }.`,
+    ];
+    const styling = [
+      `- 5–10 segments (≈7 is the sweet spot).`,
       `- Keep every segment scannable and self-contained. Conversational register. Hashtags sparingly — 1–2 across the whole thread.`,
-    ].join('\n');
+    ];
+    return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
   }
-  const lengthRule = hasFormatNotes
-    ? `- Length: follow the "Format notes" in the Voice section below exactly — they override any default length. ${max} characters is the hard ceiling, not the target.`
-    : `- Aim for 100–250 characters — punchy, scannable, one clear idea. ${max} is the hard ceiling, not the target.`;
-  return [
-    lengthRule,
+  const mechanics = [`- ${max} characters is the hard ceiling.`];
+  const styling = [
+    `- Aim for 100–250 characters — punchy, scannable, one clear idea.`,
     `- Conversational register. At most 1–2 hashtags, and only where they earn their place.`,
-  ].join('\n');
+  ];
+  return [...mechanics, ...(hasFormatNotes ? [deferToNotes] : styling)].join('\n');
 }
 
 /**
@@ -123,15 +129,12 @@ ${platformSpec.hashtag_guidance ? `Hashtag guidance: ${platformSpec.hashtag_guid
 
 ## ${formatBlock}
 
-## ${platformLabel} formatting — follow rigorously
+## ${platformLabel} formatting (platform mechanics)
 ${platformFormatRules(platform, platformSpec, wantsThread, voiceBlockHasFormatNotes(ctx.voiceBlock))}
-
-## Hard rules
-- "Bitcoin" (capital B) = the network/protocol; "bitcoin" (lowercase b) = the currency/unit. Get this right every time.
-- No exclamation marks. No crypto-native hype (no "HODL", "to the moon", "diamond hands", rocket framing).
-- Plain, confident advisor tone. Lead with the insight, not the throat-clearing. Explain jargon when you use it.
 ${instruction ? `\n## Requested change (regenerate addressing this)\n${instruction}\n` : ''}
-## Voice — write in this register
+## Brand voice — authoritative for this post
+The brand voice below governs persona, tone, vocabulary (use and avoid), signature devices, format and length, topic policy, and the Bitcoin capitalisation rule. Follow it exactly. Where it conflicts with the platform notes above, the voice wins on style; the platform's hard limits (char ceiling, fold) still stand.
+
 ${ctx.voiceBlock}
 
 ${NO_TOOL_INSTRUCTION}`;

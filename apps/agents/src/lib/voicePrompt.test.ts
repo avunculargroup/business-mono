@@ -19,6 +19,12 @@ const canon: ResolvedVoiceContext = {
   },
   bitcoinCapitalisationRule: 'Bitcoin = network; bitcoin = unit.',
   missionSummary: 'We make Bitcoin work for businesses.',
+  contentPolicy: {
+    topics_endorsed: ['treasury strategy', 'custody best practices'],
+    topics_avoided: ['price predictions', 'altcoins'],
+    aligned_voices: ['Lyn Alden'],
+    contrarian_views: ['Peter Schiff'],
+  },
   snippets: [],
 };
 
@@ -32,6 +38,18 @@ describe('formatResolvedVoice', () => {
     expect(block).toContain('HODL, to the moon');
     expect(block).toContain('Bitcoin = network');
     expect(block).toContain('We make Bitcoin work for businesses.');
+  });
+
+  it('renders the canon content policy — topics to comment on / avoid and aligned/contrarian voices', () => {
+    const block = formatResolvedVoice(canon);
+    expect(block).toContain('Topics to comment on');
+    expect(block).toContain('treasury strategy, custody best practices');
+    expect(block).toContain('Topics to avoid (never post about these)');
+    expect(block).toContain('price predictions, altcoins');
+    expect(block).toContain('Voices we align with');
+    expect(block).toContain('Lyn Alden');
+    expect(block).toContain('Voices we respectfully disagree with');
+    expect(block).toContain('Peter Schiff');
   });
 
   it('renders exemplars with their curator note when snippets are present', () => {

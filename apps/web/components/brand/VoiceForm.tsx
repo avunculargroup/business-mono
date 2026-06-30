@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { updateBrandVoice } from '@/app/actions/voice';
 import { useToast } from '@/providers/ToastProvider';
 import { ChipField } from './ChipField';
-import type { BrandVoiceRow, VoiceProfile } from './voiceTypes';
+import type { BrandVoiceRow, ContentPolicy, VoiceProfile } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 
 interface VoiceFormProps {
@@ -18,6 +18,7 @@ export const VOICE_FORM_ID = 'company-voice-form';
 export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps) {
   const { success, error } = useToast();
   const p: VoiceProfile = voice?.profile ?? {};
+  const cp: ContentPolicy = voice?.content_policy ?? {};
 
   const [persona, setPersona] = useState(p.persona ?? '');
   const [tone, setTone] = useState<string[]>(p.tone_attributes ?? []);
@@ -27,6 +28,10 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
   const [formatNotes, setFormatNotes] = useState(p.format_notes ?? '');
   const [mission, setMission] = useState(voice?.mission_summary ?? '');
   const [bitcoinRule, setBitcoinRule] = useState(voice?.bitcoin_capitalisation_rule ?? '');
+  const [topicsEndorsed, setTopicsEndorsed] = useState<string[]>(cp.topics_endorsed ?? []);
+  const [topicsAvoided, setTopicsAvoided] = useState<string[]>(cp.topics_avoided ?? []);
+  const [alignedVoices, setAlignedVoices] = useState<string[]>(cp.aligned_voices ?? []);
+  const [contrarianViews, setContrarianViews] = useState<string[]>(cp.contrarian_views ?? []);
 
   const handleSubmit = async () => {
     const fd = new FormData();
@@ -43,6 +48,15 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
     );
     fd.set('mission_summary', mission);
     fd.set('bitcoin_capitalisation_rule', bitcoinRule);
+    fd.set(
+      'content_policy',
+      JSON.stringify({
+        topics_endorsed: topicsEndorsed,
+        topics_avoided: topicsAvoided,
+        aligned_voices: alignedVoices,
+        contrarian_views: contrarianViews,
+      }),
+    );
 
     const result = await updateBrandVoice(fd);
     if (result.error) {
@@ -132,6 +146,37 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
           This rule is always applied and never overridable by an account voice.
         </span>
       </div>
+
+      <div className={styles.voiceDivider}>Topic & positioning policy</div>
+
+      <ChipField
+        label="Topics to comment on"
+        values={topicsEndorsed}
+        onChange={setTopicsEndorsed}
+        placeholder="Topics we'll post about publicly"
+        hint="Applied company-wide to every draft."
+      />
+
+      <ChipField
+        label="Topics to avoid (never post about these)"
+        values={topicsAvoided}
+        onChange={setTopicsAvoided}
+        placeholder="Off-limits topics"
+      />
+
+      <ChipField
+        label="Voices we align with"
+        values={alignedVoices}
+        onChange={setAlignedVoices}
+        placeholder="Thought leaders and companies"
+      />
+
+      <ChipField
+        label="Voices we respectfully disagree with"
+        values={contrarianViews}
+        onChange={setContrarianViews}
+        placeholder="Positions to push back on"
+      />
     </form>
   );
 }

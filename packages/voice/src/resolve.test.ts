@@ -10,6 +10,10 @@ const brand: BrandVoice = {
   },
   mission_summary: 'BTS sounds like a private wealth manager with the polish of Stripe.',
   bitcoin_capitalisation_rule: 'Bitcoin = network/protocol, bitcoin = the currency/unit.',
+  content_policy: {
+    topics_endorsed: ['treasury strategy'],
+    topics_avoided: ['price predictions'],
+  },
   version: '1.0',
 };
 
@@ -53,6 +57,7 @@ describe('resolveVoiceContext', () => {
     expect(ctx.profile.vocabulary_avoid).toEqual(['HODL', 'diamond hands']); // unioned
     expect(ctx.bitcoinCapitalisationRule).toBe(brand.bitcoin_capitalisation_rule);
     expect(ctx.missionSummary).toBe(brand.mission_summary);
+    expect(ctx.contentPolicy).toEqual(brand.content_policy); // canon-only, always surfaced
     expect(ctx.snippets).toEqual([snippet]);
   });
 

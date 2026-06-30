@@ -1,7 +1,13 @@
 import { supabase } from '@platform/db';
 import { embedVoiceText } from './embed.js';
 import { retrieveVoiceSnippets, type RetrieveSnippetsParams } from './retrieve.js';
-import type { BrandVoice, SocialAccountVoice, VoiceProfile, VoiceSnippet } from './types.js';
+import type {
+  BrandVoice,
+  ContentPolicy,
+  SocialAccountVoice,
+  VoiceProfile,
+  VoiceSnippet,
+} from './types.js';
 
 // The resolver's IO surface, injected so resolveVoiceContext is testable with
 // plain fakes — no module mocking. defaultDeps wires the real Supabase + OpenAI
@@ -23,7 +29,7 @@ const db = supabase as any;
 async function loadActiveBrandVoice(): Promise<BrandVoice | null> {
   const { data, error } = await db
     .from('brand_voice')
-    .select('profile, mission_summary, bitcoin_capitalisation_rule, version')
+    .select('profile, mission_summary, bitcoin_capitalisation_rule, content_policy, version')
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();
@@ -34,6 +40,7 @@ async function loadActiveBrandVoice(): Promise<BrandVoice | null> {
     profile: (data.profile ?? {}) as VoiceProfile,
     mission_summary: data.mission_summary ?? null,
     bitcoin_capitalisation_rule: data.bitcoin_capitalisation_rule ?? null,
+    content_policy: (data.content_policy ?? {}) as ContentPolicy,
     version: data.version ?? '1.0',
   };
 }

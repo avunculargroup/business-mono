@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-06-30 — `brand_voice.content_policy` — canon topic & positioning policy
+
+**Migration:** `20260630000000_add_brand_voice_content_policy.sql`
+
+Part of the move to make social/content generation voice-driven rather than hard-coded. The strategic-content lists that previously lived only as prose in `docs/brand-voice.md` (and as dangling references in Charlie's hard-coded system prompt) move into a structured, editable canon field:
+
+- **`content_policy`** (JSONB, `NOT NULL DEFAULT '{}'`) on `brand_voice`. Shape: `topics_endorsed` / `topics_avoided` / `aligned_voices` / `contrarian_views`, all optional `string[]`.
+
+Canon-only (not on `social_accounts.voice_profile`): topic policy is a company stance, not a per-account voice override. Surfaced through the voice resolver (`@platform/voice` → `ResolvedVoiceContext.contentPolicy`) and rendered into the `<brand-voice>` prompt block, so every generation gets topic guidance from data instead of hard-coded text. Editable in Brand Hub (Company Voice tab). Seeded from the doc lists via `seed:voice`. Default `'{}'` leaves existing rows valid.
+
+---
+
 ## 2026-06-22 — Variant Gate 3 web-approval columns on `content_items`
 
 **Migration:** `20260622020000_add_variant_gate_columns.sql`

@@ -12,6 +12,24 @@ export interface VoiceProfile {
   format_notes?: string;
 }
 
+/**
+ * Company-level topic & positioning policy. Lives on the canon (`brand_voice`)
+ * only — not on a per-account `voice_profile`, because what BTS will and won't
+ * comment on publicly is a company stance, not an account's voice. Always
+ * applied; surfaced into every generation so topic guidance is data, not
+ * hard-coded prompt text.
+ */
+export interface ContentPolicy {
+  /** Topics we comment on publicly. */
+  topics_endorsed?: string[];
+  /** Topics we never post about. */
+  topics_avoided?: string[];
+  /** Thought leaders / companies we align with. */
+  aligned_voices?: string[];
+  /** Voices we respectfully disagree with. */
+  contrarian_views?: string[];
+}
+
 export type Platform = 'linkedin' | 'twitter_x';
 
 export type SnippetType =
@@ -44,6 +62,8 @@ export interface BrandVoice {
   profile: VoiceProfile;
   mission_summary: string | null;
   bitcoin_capitalisation_rule: string | null;
+  /** Canon topic & positioning policy. Empty object when none set. */
+  content_policy: ContentPolicy;
   version: string;
 }
 
@@ -66,6 +86,8 @@ export interface ResolvedVoiceContext {
   bitcoinCapitalisationRule: string | null;
   /** One-paragraph statement of what BTS sounds like, from the company canon. */
   missionSummary: string | null;
+  /** Canon topic & positioning policy — company-level, always applied. */
+  contentPolicy: ContentPolicy;
   /** Top-N exemplars by similarity to the query (empty when no query given). */
   snippets: VoiceSnippet[];
 }

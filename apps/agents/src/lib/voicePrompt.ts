@@ -42,6 +42,16 @@ export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
 
   if (p.format_notes) parts.push(`**${FORMAT_NOTES_LABEL}:** ${p.format_notes}`);
 
+  const policy = ctx.contentPolicy ?? {};
+  const endorsed = list('Topics to comment on', policy.topics_endorsed);
+  if (endorsed) parts.push(endorsed);
+  const avoided = list('Topics to avoid (never post about these)', policy.topics_avoided);
+  if (avoided) parts.push(avoided);
+  const aligned = list('Voices we align with', policy.aligned_voices);
+  if (aligned) parts.push(aligned);
+  const contrarian = list('Voices we respectfully disagree with', policy.contrarian_views);
+  if (contrarian) parts.push(contrarian);
+
   if (ctx.bitcoinCapitalisationRule) {
     parts.push(`**Bitcoin capitalisation rule (always enforced):** ${ctx.bitcoinCapitalisationRule}`);
   }

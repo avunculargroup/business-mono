@@ -13,7 +13,7 @@ export default async function BrandPage() {
     supabase.from('brand_assets').select('*').order('name'),
     db
       .from('brand_voice')
-      .select('id, profile, mission_summary, bitcoin_capitalisation_rule, version')
+      .select('id, profile, mission_summary, bitcoin_capitalisation_rule, content_policy, version')
       .eq('is_active', true)
       .limit(1)
       .maybeSingle(),

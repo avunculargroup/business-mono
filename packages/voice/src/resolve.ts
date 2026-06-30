@@ -69,6 +69,7 @@ export async function resolveVoiceContext(
     profile,
     bitcoinCapitalisationRule: brand?.bitcoin_capitalisation_rule ?? null,
     missionSummary: brand?.mission_summary ?? null,
+    contentPolicy: brand?.content_policy ?? {},
     snippets,
   };
 }

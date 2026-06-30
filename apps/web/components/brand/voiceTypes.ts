@@ -11,11 +11,20 @@ export interface VoiceProfile {
   format_notes?: string;
 }
 
+/** Canon-only topic & positioning policy (lives on brand_voice, not accounts). */
+export interface ContentPolicy {
+  topics_endorsed?: string[];
+  topics_avoided?: string[];
+  aligned_voices?: string[];
+  contrarian_views?: string[];
+}
+
 export interface BrandVoiceRow {
   id: string;
   profile: VoiceProfile;
   mission_summary: string | null;
   bitcoin_capitalisation_rule: string | null;
+  content_policy: ContentPolicy | null;
   version: string;
 }
 
