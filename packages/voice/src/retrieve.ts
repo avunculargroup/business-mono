@@ -18,9 +18,11 @@ export interface RetrieveSnippetsParams {
 
 /**
  * Top-N voice_snippets by similarity to the query embedding, via the
- * `match_voice_snippets` RPC. Scoping (account + umbrella vs umbrella-only),
- * platform matching, and starred weighting all live in the RPC. Mirrors the
- * existing vector-search wrappers (contentVectorSearch / newsVectorSearch).
+ * `match_voice_snippets` RPC. Scoping, platform matching, and starred weighting
+ * all live in the RPC. Account snippets take precedence: when the account has
+ * any matching snippet of its own, the company-canon snippets are ignored (the
+ * canon is only a fallback for accounts with none). Mirrors the existing
+ * vector-search wrappers (contentVectorSearch / newsVectorSearch).
  */
 export async function retrieveVoiceSnippets(
   params: RetrieveSnippetsParams,

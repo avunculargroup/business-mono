@@ -146,7 +146,7 @@ Interaction detail that matters: **chips, not commas.** A `vocabulary_avoid` fie
 
 ## The Snippets Panel — exemplar library
 
-The exemplar library is where voice gets *shown* rather than described, and it’s the highest-leverage thing a founder can curate — concrete examples drive on-voice generation far harder than tone adjectives. It backs the `voice_snippets` table and follows the same **umbrella + override** model as everything else here: company-canon snippets (`social_account_id = NULL`) appear on every voice; account snippets are specific to one account.
+The exemplar library is where voice gets *shown* rather than described, and it’s the highest-leverage thing a founder can curate — concrete examples drive on-voice generation far harder than tone adjectives. It backs the `voice_snippets` table and follows the same **umbrella + override** model as everything else here: company-canon snippets (`social_account_id = NULL`) appear on every voice; account snippets are specific to one account. At retrieval, account snippets take precedence — once an account has snippets of its own, generation draws only on those and the inherited canon snippets are ignored (the canon is a fallback for accounts that have curated none).
 
 ### On a voice (read & edit)
 
