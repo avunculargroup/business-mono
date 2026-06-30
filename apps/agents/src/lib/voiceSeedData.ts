@@ -1,4 +1,4 @@
-import type { VoiceProfile } from '@platform/voice';
+import type { ContentPolicy, VoiceProfile } from '@platform/voice';
 
 // The company-voice canon, mapped from docs/brand-voice.md into the brand_voice
 // table shape. This is the explicit, reviewable migration of the doc's
@@ -15,6 +15,7 @@ export interface BrandVoiceSeed {
   profile: VoiceProfile;
   mission_summary: string;
   bitcoin_capitalisation_rule: string;
+  content_policy: ContentPolicy;
   version: string;
 }
 
@@ -30,6 +31,59 @@ export const BRAND_VOICE_SEED: BrandVoiceSeed = {
     '(lowercase b) for the currency or unit — e.g. “The Bitcoin network secures your ' +
     'bitcoin holdings.” Never use “crypto”, “cryptocurrency”, or “digital assets” ' +
     'except in a strict compliance context. Enforced across all output.',
+  content_policy: {
+    topics_endorsed: [
+      'Bitcoin treasury allocation strategies and governance frameworks',
+      'Regulatory developments (Australian and global — ATO, ASIC, evolving frameworks)',
+      'Corporate adoption trends and public company Bitcoin holdings',
+      'Bitcoin payment implementations (POS, B2B invoicing, cross-border, salaries)',
+      'Professional advisor education (accountants, lawyers, Big 4)',
+      'Superannuation fund integration and SMSF considerations',
+      'Custody best practices and security frameworks',
+      'Economic cycles, inflation hedging, monetary policy impacts',
+    ],
+    topics_avoided: [
+      'Price predictions or targets',
+      'Altcoins and other cryptocurrencies',
+      'DeFi (yield farming, liquidity pools, smart contracts)',
+      'Memecoins and novelty tokens',
+      'Political endorsements',
+      'Specific trading strategies (day trading, arbitrage, leverage)',
+      'NFTs and Web3 hype',
+      'Scam/fraud recovery',
+      'Personal investment advice (we focus on business/institutional)',
+    ],
+    aligned_voices: [
+      'Michael Saylor',
+      'Lyn Alden',
+      'Daniel Batten',
+      'Sam Roberts',
+      'Theresa Morrison',
+      'Lisa Hough',
+      'Caitlin Long',
+      'Steve Orenstein (Locate Technologies)',
+      'Bayani Mills',
+      'Sevan Tuna',
+      'Electra Frost',
+      'James Check (Checkmate)',
+      'Jeff Booth',
+      'Jason Pizzino',
+      'Michael Pizzino',
+      'Joe Nakamoto',
+      'MicroStrategy',
+      'Fidelity Digital Assets',
+      'River Financial',
+    ],
+    contrarian_views: [
+      'Warren Buffett',
+      'Gold maximalists (Peter Schiff, Jim Rickards, Marc Faber)',
+      'Jim Cramer',
+      'Nouriel Roubini',
+      'Paul Krugman',
+      'Economists dismissing Bitcoin as a bubble (Robert Shiller, Joseph Stiglitz, Kenneth Rogoff)',
+      'ESG critics (Alex de Vries/Digiconomist, Greenpeace, Christine Lagarde)',
+    ],
+  },
   profile: {
     persona:
       'The quietly confident dinner-party guest who really knows Bitcoin and business ' +

@@ -94,7 +94,7 @@ describe('buildCharliePrompt', () => {
     expect(prompt).toContain('A treasury horizon changes how volatility should be read.');
     expect(prompt).toContain('Do NOT say: price predictions; guaranteed returns');
     expect(prompt).toContain('plain, confident advisor'); // voice block injected
-    expect(prompt).toContain('No exclamation marks');
+    expect(prompt).toContain('Brand voice — authoritative for this post'); // voice governs, not hard-coded rules
   });
 
   it('asks for an X thread only on twitter_x when the beat prefers one', () => {
@@ -122,11 +122,22 @@ describe('buildCharliePrompt', () => {
 
   it('injects LinkedIn formatting rules — hook/fold, short paragraphs, hashtags at end', () => {
     const prompt = buildCharliePrompt(makeCtx());
-    expect(prompt).toContain('LinkedIn formatting — follow rigorously');
+    expect(prompt).toContain('LinkedIn formatting (platform mechanics)');
     expect(prompt).toContain('…more');
     expect(prompt).toContain('Short paragraphs');
     expect(prompt).toContain('1,200–2,500 characters');
     expect(prompt).toContain('hashtags together at the very end');
+  });
+
+  it('defers styling to format notes when the voice block carries them (account override wins)', () => {
+    const ctx = makeCtx({
+      voiceBlock: '**Persona:** plain, confident advisor\n\n**Format notes:** 10–25 words',
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).not.toContain('1,200–2,500 characters');
+    expect(prompt).toContain('follow the "Format notes" in the brand voice below');
+    // The hard ceiling is a real platform limit and must still be stated.
+    expect(prompt).toContain('3000-character hard ceiling');
   });
 
   it('injects X single-post formatting rules — punchy, scannable, sparing hashtags', () => {
@@ -135,7 +146,7 @@ describe('buildCharliePrompt', () => {
       platformSpec: { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25, premium_max_chars: 25000 },
     });
     const prompt = buildCharliePrompt(ctx);
-    expect(prompt).toContain('X (Twitter) formatting — follow rigorously');
+    expect(prompt).toContain('X (Twitter) formatting (platform mechanics)');
     expect(prompt).toContain('100–250 characters');
     expect(prompt).toContain('At most 1–2 hashtags');
   });
@@ -161,6 +172,13 @@ describe('platformFormatRules', () => {
     expect(rules).toContain('…more');
     expect(rules).toContain('3000-character hard ceiling');
     expect(rules).toContain('Short paragraphs');
+  });
+
+  it('drops the LinkedIn numeric target and defers to format notes when present', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, true);
+    expect(rules).not.toContain('1,200–2,500 characters');
+    expect(rules).toContain('Format notes');
+    expect(rules).toContain('3000-character hard ceiling');
   });
 
   it('gives X a single-post target distinct from the thread rules', () => {

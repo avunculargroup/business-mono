@@ -93,6 +93,7 @@ beforeEach(() => {
     },
     bitcoinCapitalisationRule: null,
     missionSummary: null,
+    contentPolicy: {},
     snippets: [],
   });
   editorGenerate.mockResolvedValue({ object: { story_index: 0, form: 'teach', rationale: 'fits Chris' } });

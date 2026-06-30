@@ -38,6 +38,7 @@ async function seedBrandVoice(): Promise<void> {
     profile: BRAND_VOICE_SEED.profile,
     mission_summary: BRAND_VOICE_SEED.mission_summary,
     bitcoin_capitalisation_rule: BRAND_VOICE_SEED.bitcoin_capitalisation_rule,
+    content_policy: BRAND_VOICE_SEED.content_policy,
     version: BRAND_VOICE_SEED.version,
     is_active: true,
   };

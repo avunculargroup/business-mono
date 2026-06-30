@@ -24,10 +24,18 @@ const profileSchema = z.object({
   format_notes: z.string().trim().optional().default(''),
 });
 
+const contentPolicySchema = z.object({
+  topics_endorsed: z.array(z.string()).default([]),
+  topics_avoided: z.array(z.string()).default([]),
+  aligned_voices: z.array(z.string()).default([]),
+  contrarian_views: z.array(z.string()).default([]),
+});
+
 const brandVoiceSchema = z.object({
   profile: z.string(), // JSON-encoded profile object
   mission_summary: z.string().trim().optional().default(''),
   bitcoin_capitalisation_rule: z.string().trim().optional().default(''),
+  content_policy: z.string().optional().default('{}'), // JSON-encoded content policy
 });
 
 /** Bump the minor component of a `major.minor` version string (1.2 -> 1.3). */
@@ -50,6 +58,13 @@ export async function updateBrandVoice(formData: FormData) {
   if (!profile.persona) return { error: 'Persona is required' };
   if (profile.tone_attributes.length === 0) return { error: 'Add at least one tone attribute' };
 
+  let contentPolicy;
+  try {
+    contentPolicy = contentPolicySchema.parse(JSON.parse(parsed.data.content_policy));
+  } catch {
+    return { error: 'Content policy is malformed' };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -67,6 +82,7 @@ export async function updateBrandVoice(formData: FormData) {
     profile,
     mission_summary: parsed.data.mission_summary || null,
     bitcoin_capitalisation_rule: parsed.data.bitcoin_capitalisation_rule || null,
+    content_policy: contentPolicy,
     version: bumpVersion(existing?.version),
     is_active: true,
     updated_by: user?.id ?? null,

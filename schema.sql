@@ -322,6 +322,7 @@ CREATE TABLE brand_voice (
   profile                     JSONB       NOT NULL DEFAULT '{}'::jsonb,
   mission_summary             TEXT,
   bitcoin_capitalisation_rule TEXT,
+  content_policy              JSONB       NOT NULL DEFAULT '{}'::jsonb,  -- topics_endorsed / topics_avoided / aligned_voices / contrarian_views
   version                     TEXT        NOT NULL DEFAULT '1.0',
   is_active                   BOOLEAN     NOT NULL DEFAULT TRUE,
   updated_by                  UUID        REFERENCES team_members(id),

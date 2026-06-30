@@ -1,5 +1,6 @@
 import type { Platform } from '../variant/schemas.js';
 import { platformFormatRules } from '../variant/prompts.js';
+import { voiceBlockHasFormatNotes } from '../../lib/voicePrompt.js';
 import type { StoryCandidate, SocialPostForm } from './select.js';
 
 // Pure prompt builders for the social_post_from_news routine. The platform format
@@ -102,16 +103,15 @@ Link: ${story.url}
 
 ## ${formatBlock}
 
-## ${label} formatting — follow rigorously
-${platformFormatRules(platform, platformSpec, allowThread && form === 'teach')}
+## ${label} formatting (platform mechanics)
+${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', voiceBlockHasFormatNotes(voiceBlock))}
 
-## Hard rules
-- "Bitcoin" (capital B) = the network/protocol; "bitcoin" (lowercase b) = the currency/unit. Get this right every time.
-- No exclamation marks. No crypto-native hype (no "HODL", "to the moon", "diamond hands", rocket framing).
-- Plain, confident advisor tone in ${founderName}'s register. Lead with the insight, not the throat-clearing. Explain jargon when you use it.
+## Sourcing
 - It is fine to reference or link the source story; write the post as ${founderName}'s own, not a news report.
 
-## Voice — write in this register
+## Brand voice — authoritative for this post
+The brand voice below is ${founderName}'s voice for this account and governs persona, tone, vocabulary (use and avoid), signature devices, format and length, topic policy, and the Bitcoin capitalisation rule. Follow it exactly. Where it conflicts with the platform notes above, the voice wins on style; the platform's hard limits (char ceiling, fold) still stand.
+
 ${voiceBlock}
 
 ${NO_TOOL_INSTRUCTION}`;
