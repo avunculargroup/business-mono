@@ -141,7 +141,6 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
       render: (r) => (
         <div className={styles.nameCell}>
           <span className={styles.nameText}>{r.name}</span>
-          {r.description && <span className={styles.nameSub}>{r.description}</span>}
         </div>
       ),
     },
