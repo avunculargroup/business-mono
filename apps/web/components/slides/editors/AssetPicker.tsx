@@ -19,8 +19,13 @@ export function AssetPicker({ selectedAssetId, onSelect }: AssetPickerProps) {
 
   useEffect(() => {
     if (isOpen) {
-      getAssets().then(setAssets).catch(() => {});
+      getAssets()
+        .then(setAssets)
+        .catch(() => toast.error("We couldn't load your assets just now. Try reopening the picker."));
     }
+    // `toast` is recreated each render (and on every toast), so it's deliberately
+    // not a dependency — including it would refetch on each toast and loop on failure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const selected = assets.find((a) => a.id === selectedAssetId);
