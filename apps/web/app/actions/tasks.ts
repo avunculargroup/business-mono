@@ -1,8 +1,8 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 const taskSchema = z.object({
@@ -22,7 +22,9 @@ export async function createTask(formData: FormData) {
 
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: task, error } = await supabase
@@ -52,7 +54,9 @@ export async function createTask(formData: FormData) {
 }
 
 export async function updateTaskStatus(id: string, status: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = { status };
 
   if (status === 'done') {
@@ -75,7 +79,9 @@ export async function updateTask(id: string, formData: FormData) {
 
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const updateData: Record<string, unknown> = {};
@@ -109,7 +115,9 @@ export async function updateTask(id: string, formData: FormData) {
 }
 
 export async function deleteTask(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
 

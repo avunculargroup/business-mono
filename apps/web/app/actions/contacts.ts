@@ -1,8 +1,8 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 const contactSchema = z.object({
@@ -27,7 +27,9 @@ export async function createContact(formData: FormData) {
     return { error: parsed.error.errors[0].message };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: contact, error } = await supabase.from('contacts').insert({
@@ -58,7 +60,9 @@ export async function updateContact(id: string, formData: FormData) {
     return { error: parsed.error.errors[0].message };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const updateData: Record<string, unknown> = {};
@@ -78,7 +82,9 @@ export async function updateContact(id: string, formData: FormData) {
 }
 
 export async function deleteContact(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('contacts').delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };
