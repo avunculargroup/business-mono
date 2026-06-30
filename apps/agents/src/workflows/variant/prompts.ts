@@ -1,4 +1,5 @@
 import type { VariantContext, CharlieVariant } from './schemas.js';
+import { voiceBlockHasFormatNotes } from '../../lib/voicePrompt.js';
 
 // Pure prompt builders + text helpers for the Variant Generation workflow.
 // Kept separate from index.ts so they can be unit-tested without invoking
@@ -39,33 +40,48 @@ const NO_TOOL_INSTRUCTION =
  * of the structural format block (single vs thread) and the char ceiling. Kept
  * pure and separate so it can be unit-tested, and kept consistent with
  * docs/brand-voice.md (channel formality, content length, structure).
+ *
+ * When the resolved voice carries account/canon `format_notes` (`hasFormatNotes`),
+ * the default numeric length target is replaced by a deferral to those notes —
+ * a per-account length override (e.g. "10–25 words") wins over the platform
+ * default. The hard char ceiling is a real platform limit and always stays.
  */
 export function platformFormatRules(
   platform: VariantContext['platform'],
   platformSpec: VariantContext['platformSpec'],
   wantsThread: boolean,
+  hasFormatNotes = false,
 ): string {
   const max = platformSpec.max_chars;
 
   if (platform === 'linkedin') {
+    const lengthRule = hasFormatNotes
+      ? `- Length: follow the "Format notes" in the Voice section below exactly — they set the length for this account and override any default length. Stay under the ${max}-character hard ceiling. Semi-formal register.`
+      : `- Aim for 1,200–2,500 characters: a deliberate, readable length well under the ${max}-character hard ceiling. Semi-formal register.`;
     return [
       `- Open with a hook that lands in the first 1–2 lines: LinkedIn folds everything past ~140 characters behind a "…more", so the first line has to earn the expand.`,
       `- Short paragraphs — one or two sentences each, separated by a blank line. No walls of text.`,
-      `- Aim for 1,200–2,500 characters: a deliberate, readable length well under the ${max}-character hard ceiling. Semi-formal register.`,
+      lengthRule,
       `- Group any hashtags together at the very end, never sprinkled through the body.`,
     ].join('\n');
   }
 
   // twitter_x
   if (wantsThread) {
+    const countRule = hasFormatNotes
+      ? `- Length: follow the "Format notes" in the Voice section below where they specify segment count or length — they override the default. Otherwise 5–10 segments (≈7 is the sweet spot). One idea per segment, each at or under ${max} characters.`
+      : `- 5–10 segments (≈7 is the sweet spot), one idea per segment, each at or under ${max} characters.`;
     return [
-      `- 5–10 segments (≈7 is the sweet spot), one idea per segment, each at or under ${max} characters.`,
+      countRule,
       `- The FIRST segment must hook and stand on its own — in the feed it is the only part most people see.`,
       `- Keep every segment scannable and self-contained. Conversational register. Hashtags sparingly — 1–2 across the whole thread.`,
     ].join('\n');
   }
+  const lengthRule = hasFormatNotes
+    ? `- Length: follow the "Format notes" in the Voice section below exactly — they override any default length. ${max} characters is the hard ceiling, not the target.`
+    : `- Aim for 100–250 characters — punchy, scannable, one clear idea. ${max} is the hard ceiling, not the target.`;
   return [
-    `- Aim for 100–250 characters — punchy, scannable, one clear idea. ${max} is the hard ceiling, not the target.`,
+    lengthRule,
     `- Conversational register. At most 1–2 hashtags, and only where they earn their place.`,
   ].join('\n');
 }
@@ -108,7 +124,7 @@ ${platformSpec.hashtag_guidance ? `Hashtag guidance: ${platformSpec.hashtag_guid
 ## ${formatBlock}
 
 ## ${platformLabel} formatting — follow rigorously
-${platformFormatRules(platform, platformSpec, wantsThread)}
+${platformFormatRules(platform, platformSpec, wantsThread, voiceBlockHasFormatNotes(ctx.voiceBlock))}
 
 ## Hard rules
 - "Bitcoin" (capital B) = the network/protocol; "bitcoin" (lowercase b) = the currency/unit. Get this right every time.

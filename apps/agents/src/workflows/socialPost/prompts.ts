@@ -1,5 +1,6 @@
 import type { Platform } from '../variant/schemas.js';
 import { platformFormatRules } from '../variant/prompts.js';
+import { voiceBlockHasFormatNotes } from '../../lib/voicePrompt.js';
 import type { StoryCandidate, SocialPostForm } from './select.js';
 
 // Pure prompt builders for the social_post_from_news routine. The platform format
@@ -103,7 +104,7 @@ Link: ${story.url}
 ## ${formatBlock}
 
 ## ${label} formatting — follow rigorously
-${platformFormatRules(platform, platformSpec, allowThread && form === 'teach')}
+${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', voiceBlockHasFormatNotes(voiceBlock))}
 
 ## Hard rules
 - "Bitcoin" (capital B) = the network/protocol; "bitcoin" (lowercase b) = the currency/unit. Get this right every time.

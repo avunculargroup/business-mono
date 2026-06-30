@@ -4,7 +4,9 @@ import type { ResolvedVoiceContext } from '@platform/voice';
 const { resolveVoiceContext } = vi.hoisted(() => ({ resolveVoiceContext: vi.fn() }));
 vi.mock('@platform/voice', () => ({ resolveVoiceContext }));
 
-const { formatResolvedVoice, resolveCompanyVoiceBlock } = await import('./voicePrompt.js');
+const { formatResolvedVoice, resolveCompanyVoiceBlock, voiceBlockHasFormatNotes } = await import(
+  './voicePrompt.js'
+);
 
 const canon: ResolvedVoiceContext = {
   profile: {
@@ -52,6 +54,18 @@ describe('formatResolvedVoice', () => {
     });
     expect(block).toContain('Open with a number.');
     expect(block).toContain('earns attention first');
+  });
+});
+
+describe('voiceBlockHasFormatNotes', () => {
+  it('detects a rendered format-notes line so length defaults can defer to it', () => {
+    const block = formatResolvedVoice({ ...canon, profile: { ...canon.profile, format_notes: '10–25 words' } });
+    expect(voiceBlockHasFormatNotes(block)).toBe(true);
+  });
+
+  it('is false when the profile carries no format notes', () => {
+    const block = formatResolvedVoice({ ...canon, profile: { ...canon.profile, format_notes: undefined } });
+    expect(voiceBlockHasFormatNotes(block)).toBe(false);
   });
 });
 

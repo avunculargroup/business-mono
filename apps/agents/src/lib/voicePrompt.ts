@@ -10,6 +10,16 @@ function list(label: string, items: string[] | undefined): string | null {
   return `**${label}:** ${items.join(', ')}`;
 }
 
+/** The label the format-notes line renders under — single source of truth so the
+ *  prompt builders can detect its presence and let it override default lengths. */
+export const FORMAT_NOTES_LABEL = 'Format notes';
+
+/** True when a rendered voice block carries account/canon format notes — the
+ *  signal that platform length defaults should defer to them. */
+export function voiceBlockHasFormatNotes(voiceBlock: string): boolean {
+  return voiceBlock.includes(`**${FORMAT_NOTES_LABEL}:**`);
+}
+
 /** Format the merged profile (+ rule, mission, any retrieved snippets) as markdown. */
 export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
   const p = ctx.profile;
@@ -30,7 +40,7 @@ export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
   const devices = list('Signature devices', p.signature_devices);
   if (devices) parts.push(devices);
 
-  if (p.format_notes) parts.push(`**Format notes:** ${p.format_notes}`);
+  if (p.format_notes) parts.push(`**${FORMAT_NOTES_LABEL}:** ${p.format_notes}`);
 
   if (ctx.bitcoinCapitalisationRule) {
     parts.push(`**Bitcoin capitalisation rule (always enforced):** ${ctx.bitcoinCapitalisationRule}`);

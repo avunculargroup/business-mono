@@ -129,6 +129,17 @@ describe('buildCharliePrompt', () => {
     expect(prompt).toContain('hashtags together at the very end');
   });
 
+  it('defers length to format notes when the voice block carries them (account override wins)', () => {
+    const ctx = makeCtx({
+      voiceBlock: '**Persona:** plain, confident advisor\n\n**Format notes:** 10–25 words',
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).not.toContain('1,200–2,500 characters');
+    expect(prompt).toContain('follow the "Format notes" in the Voice section below exactly');
+    // The hard ceiling is a real platform limit and must still be stated.
+    expect(prompt).toContain('3000-character hard ceiling');
+  });
+
   it('injects X single-post formatting rules — punchy, scannable, sparing hashtags', () => {
     const ctx = makeCtx({
       platform: 'twitter_x',
@@ -161,6 +172,13 @@ describe('platformFormatRules', () => {
     expect(rules).toContain('…more');
     expect(rules).toContain('3000-character hard ceiling');
     expect(rules).toContain('Short paragraphs');
+  });
+
+  it('drops the LinkedIn numeric target and defers to format notes when present', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, true);
+    expect(rules).not.toContain('1,200–2,500 characters');
+    expect(rules).toContain('Format notes');
+    expect(rules).toContain('3000-character hard ceiling');
   });
 
   it('gives X a single-post target distinct from the thread rules', () => {
