@@ -367,10 +367,13 @@ CREATE INDEX idx_voice_snippets_tags      ON voice_snippets USING GIN (topic_tag
 CREATE INDEX idx_voice_snippets_starred   ON voice_snippets(is_starred) WHERE is_starred;
 CREATE INDEX idx_voice_snippets_embedding ON voice_snippets USING hnsw (embedding vector_cosine_ops);
 
--- Semantic retrieval for packages/voice (migration 20260605130000). Top-N
--- snippets by cosine similarity to a query embedding, scoped account+umbrella
--- (or umbrella-only when p_account_id is NULL), platform-matched, starred-
--- weighted. Default PUBLIC execute, like the other vector_search_* functions.
+-- Semantic retrieval for packages/voice (migrations 20260605130000,
+-- 20260630010000). Top-N snippets by cosine similarity to a query embedding,
+-- scoped account+umbrella (or umbrella-only when p_account_id is NULL),
+-- platform-matched, starred-weighted. Account snippets take precedence: when the
+-- account has any matching snippet of its own, the company-canon snippets are
+-- ignored and the canon serves only as a fallback. Default PUBLIC execute, like
+-- the other vector_search_* functions.
 CREATE OR REPLACE FUNCTION match_voice_snippets(
   query_embedding  VECTOR(1536),
   p_account_id     UUID    DEFAULT NULL,
@@ -392,21 +395,31 @@ RETURNS TABLE (
   score             FLOAT
 )
 LANGUAGE sql STABLE AS $$
+  WITH candidates AS (
+    SELECT
+      vs.id, vs.social_account_id, vs.snippet_type, vs.body, vs.curator_note,
+      vs.platform, vs.topic_tags, vs.is_starred,
+      1 - (vs.embedding <=> query_embedding) AS similarity,
+      (1 - (vs.embedding <=> query_embedding))
+        + (CASE WHEN vs.is_starred THEN star_boost ELSE 0 END) AS score
+    FROM voice_snippets vs
+    WHERE vs.embedding IS NOT NULL
+      AND (
+        (p_account_id IS NOT NULL
+          AND (vs.social_account_id = p_account_id OR vs.social_account_id IS NULL))
+        OR (p_account_id IS NULL AND vs.social_account_id IS NULL)
+      )
+      AND (p_platform IS NULL OR vs.platform = p_platform OR vs.platform IS NULL)
+      AND 1 - (vs.embedding <=> query_embedding) >= match_threshold
+  )
   SELECT
-    vs.id, vs.social_account_id, vs.snippet_type, vs.body, vs.curator_note,
-    vs.platform, vs.topic_tags, vs.is_starred,
-    1 - (vs.embedding <=> query_embedding) AS similarity,
-    (1 - (vs.embedding <=> query_embedding))
-      + (CASE WHEN vs.is_starred THEN star_boost ELSE 0 END) AS score
-  FROM voice_snippets vs
-  WHERE vs.embedding IS NOT NULL
-    AND (
-      (p_account_id IS NOT NULL
-        AND (vs.social_account_id = p_account_id OR vs.social_account_id IS NULL))
-      OR (p_account_id IS NULL AND vs.social_account_id IS NULL)
-    )
-    AND (p_platform IS NULL OR vs.platform = p_platform OR vs.platform IS NULL)
-    AND 1 - (vs.embedding <=> query_embedding) >= match_threshold
+    c.id, c.social_account_id, c.snippet_type, c.body, c.curator_note,
+    c.platform, c.topic_tags, c.is_starred, c.similarity, c.score
+  FROM candidates c
+  WHERE
+    -- Account snippets win: if the account has any of its own, drop canon.
+    NOT EXISTS (SELECT 1 FROM candidates a WHERE a.social_account_id = p_account_id)
+    OR c.social_account_id = p_account_id
   ORDER BY score DESC
   LIMIT match_count;
 $$;

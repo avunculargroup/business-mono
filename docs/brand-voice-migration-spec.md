@@ -105,7 +105,7 @@ The `bitcoin_capitalisation_rule` is broken out as its own column rather than bu
 
 The exemplar library — phrases, openers, closers, and full posts that *demonstrate* a voice rather than describe it. This is the highest-leverage input to on-voice generation: concrete few-shot examples beat any number of tone adjectives. Embeddable so agents retrieve the snippets semantically closest to the beat they’re writing.
 
-Same **umbrella + override** logic as voice profiles: a snippet with `social_account_id = NULL` is company-canon (serves every voice); a snippet scoped to an account is specific to it. At retrieval an agent pulls *both* the account’s own snippets and the company-canon snippets.
+Same **umbrella + override** logic as voice profiles: a snippet with `social_account_id = NULL` is company-canon (serves every voice); a snippet scoped to an account is specific to it. At retrieval, account snippets take precedence — when an account has any matching snippets of its own, only those are returned and the company-canon snippets are ignored. The canon is a fallback: it surfaces only for accounts with no snippets of their own (and for non-account content, which has no override).
 
 |Column                  |Type        |Notes                                                                              |
 |------------------------|------------|-----------------------------------------------------------------------------------|
