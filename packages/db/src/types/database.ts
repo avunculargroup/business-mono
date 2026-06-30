@@ -348,6 +348,7 @@ export type Database = {
       brand_voice: {
         Row: {
           bitcoin_capitalisation_rule: string | null
+          content_policy: Json
           created_at: string
           id: string
           is_active: boolean
@@ -359,6 +360,7 @@ export type Database = {
         }
         Insert: {
           bitcoin_capitalisation_rule?: string | null
+          content_policy?: Json
           created_at?: string
           id?: string
           is_active?: boolean
@@ -370,6 +372,7 @@ export type Database = {
         }
         Update: {
           bitcoin_capitalisation_rule?: string | null
+          content_policy?: Json
           created_at?: string
           id?: string
           is_active?: boolean
