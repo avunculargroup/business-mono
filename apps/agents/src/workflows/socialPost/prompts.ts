@@ -1,6 +1,5 @@
-import type { Platform } from '../variant/schemas.js';
+import type { Platform, FormatConfigCtx } from '../variant/schemas.js';
 import { platformFormatRules } from '../variant/prompts.js';
-import { voiceBlockHasFormatNotes } from '../../lib/voicePrompt.js';
 import type { StoryCandidate, SocialPostForm } from './select.js';
 
 // Pure prompt builders for the social_post_from_news routine. The platform format
@@ -72,9 +71,10 @@ export function buildSocialPostPrompt(params: {
   platform: Platform;
   platformSpec: PlatformSpecLite;
   voiceBlock: string;
+  formatConfig?: FormatConfigCtx;
   founderName: string;
 }): string {
-  const { story, form, platform, platformSpec, voiceBlock, founderName } = params;
+  const { story, form, platform, platformSpec, voiceBlock, formatConfig, founderName } = params;
   const label = PLATFORM_LABEL[platform];
   const allowThread = platform === 'twitter_x';
 
@@ -104,7 +104,7 @@ Link: ${story.url}
 ## ${formatBlock}
 
 ## ${label} formatting (platform mechanics)
-${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', voiceBlockHasFormatNotes(voiceBlock))}
+${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', formatConfig ?? null)}
 
 ## Sourcing
 - It is fine to reference or link the source story; write the post as ${founderName}'s own, not a news report.

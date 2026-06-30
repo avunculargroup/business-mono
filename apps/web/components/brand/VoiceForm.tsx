@@ -4,7 +4,15 @@ import { useActionState, useEffect, useState } from 'react';
 import { updateBrandVoice } from '@/app/actions/voice';
 import { useToast } from '@/providers/ToastProvider';
 import { ChipField } from './ChipField';
-import type { BrandVoiceRow, ContentPolicy, VoiceProfile } from './voiceTypes';
+import {
+  REGISTER_OPTIONS,
+  PARAGRAPHING_OPTIONS,
+  HASHTAG_USE_OPTIONS,
+  type BrandVoiceRow,
+  type ContentPolicy,
+  type FormatConfig,
+  type VoiceProfile,
+} from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 
 interface VoiceFormProps {
@@ -25,7 +33,7 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
   const [vocabDo, setVocabDo] = useState<string[]>(p.vocabulary_do ?? []);
   const [vocabAvoid, setVocabAvoid] = useState<string[]>(p.vocabulary_avoid ?? []);
   const [devices, setDevices] = useState<string[]>(p.signature_devices ?? []);
-  const [formatNotes, setFormatNotes] = useState(p.format_notes ?? '');
+  const [format, setFormat] = useState<FormatConfig>(p.format ?? {});
   const [mission, setMission] = useState(voice?.mission_summary ?? '');
   const [bitcoinRule, setBitcoinRule] = useState(voice?.bitcoin_capitalisation_rule ?? '');
   const [topicsEndorsed, setTopicsEndorsed] = useState<string[]>(cp.topics_endorsed ?? []);
@@ -43,7 +51,7 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
         vocabulary_do: vocabDo,
         vocabulary_avoid: vocabAvoid,
         signature_devices: devices,
-        format_notes: formatNotes.trim(),
+        format,
       }),
     );
     fd.set('mission_summary', mission);
@@ -114,14 +122,99 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
         placeholder="e.g. opens with a number, no exclamation marks"
       />
 
+      {/* Format — structured per-property defaults for company voice */}
       <div className={styles.field}>
-        <label className={styles.label}>Format notes</label>
-        <textarea
-          className={styles.textarea}
-          value={formatNotes}
-          onChange={(e) => setFormatNotes(e.target.value)}
-          placeholder="Platform-shaping notes — formality, length, emoji rules."
-        />
+        <label className={styles.label}>Format</label>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Word count</label>
+          <div className={styles.fieldRow}>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Min"
+              value={format.word_count_min ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  word_count_min: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+            <span className={styles.fieldRowSep}>–</span>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Max"
+              value={format.word_count_max ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  word_count_max: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Register</label>
+          <select
+            className={styles.select}
+            value={format.register ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                register: (e.target.value as typeof REGISTER_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— not set</option>
+            {REGISTER_OPTIONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Paragraphing</label>
+          <select
+            className={styles.select}
+            value={format.paragraphing ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                paragraphing: (e.target.value as typeof PARAGRAPHING_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— not set</option>
+            <option value="single-block">Single block</option>
+            <option value="short-paragraphs">Short paragraphs</option>
+            <option value="platform-default">Platform default</option>
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Hashtag use</label>
+          <select
+            className={styles.select}
+            value={format.hashtag_use ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                hashtag_use: (e.target.value as typeof HASHTAG_USE_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— not set</option>
+            <option value="none">None</option>
+            <option value="sparingly">Sparingly (1–2)</option>
+            <option value="platform-default">Platform default</option>
+          </select>
+        </div>
       </div>
 
       <div className={styles.field}>

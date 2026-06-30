@@ -6,8 +6,16 @@ import { updateAccountVoice } from '@/app/actions/voice';
 import { useToast } from '@/providers/ToastProvider';
 import { ChipField } from './ChipField';
 import { SnippetsPanel } from './SnippetsPanel';
-import { lockedAvoidWords } from './accountVoice';
-import type { SocialAccountRow, VoiceProfile, VoiceSnippetRow } from './voiceTypes';
+import { lockedAvoidWords, hasFormatOverride } from './accountVoice';
+import {
+  REGISTER_OPTIONS,
+  PARAGRAPHING_OPTIONS,
+  HASHTAG_USE_OPTIONS,
+  type FormatConfig,
+  type SocialAccountRow,
+  type VoiceProfile,
+  type VoiceSnippetRow,
+} from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 
 interface AccountVoiceFormProps {
@@ -98,7 +106,7 @@ export function AccountVoiceForm({
     (p.vocabulary_avoid ?? []).filter((w) => !locked.some((l) => l.toLowerCase() === w.toLowerCase())),
   );
   const [devices, setDevices] = useState<string[]>(p.signature_devices ?? []);
-  const [formatNotes, setFormatNotes] = useState(p.format_notes ?? '');
+  const [format, setFormat] = useState<FormatConfig>(p.format ?? {});
 
   const handleSubmit = async () => {
     const fd = new FormData();
@@ -114,7 +122,7 @@ export function AccountVoiceForm({
         vocabulary_do: vocabDo,
         vocabulary_avoid: vocabAvoid,
         signature_devices: devices,
-        format_notes: formatNotes.trim(),
+        format,
       }),
     );
 
@@ -235,24 +243,114 @@ export function AccountVoiceForm({
         <ChipField label="" values={devices} onChange={setDevices} placeholder="Add to override" />
       </div>
 
-      {/* Format notes */}
+      {/* Format — structured per-property overrides */}
       <div className={styles.field}>
         <FieldHeader
-          label="Format notes"
-          overridden={formatNotes.trim().length > 0}
-          onReset={() => setFormatNotes('')}
+          label="Format"
+          overridden={hasFormatOverride(format)}
+          onReset={() => setFormat({})}
         />
-        {formatNotes.trim().length === 0 && (
+        {!hasFormatOverride(format) && !hasFormatOverride(company.format) && (
           <div className={styles.ghostPreview}>
-            <GhostText value={company.format_notes} />
+            <span className={styles.ghostEmpty}>
+              {company.format_notes ? company.format_notes : 'Not set on Company Voice'}
+            </span>
           </div>
         )}
-        <textarea
-          className={styles.textarea}
-          value={formatNotes}
-          onChange={(e) => setFormatNotes(e.target.value)}
-          placeholder="Override platform-shaping notes for this account…"
-        />
+
+        {/* Word count */}
+        <div className={styles.field}>
+          <label className={styles.label}>Word count</label>
+          <div className={styles.fieldRow}>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Min"
+              value={format.word_count_min ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  word_count_min: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+            <span className={styles.fieldRowSep}>–</span>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Max"
+              value={format.word_count_max ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  word_count_max: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+          </div>
+        </div>
+
+        {/* Register */}
+        <div className={styles.field}>
+          <label className={styles.label}>Register</label>
+          <select
+            className={styles.select}
+            value={format.register ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                register: (e.target.value as typeof REGISTER_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— inherit</option>
+            {REGISTER_OPTIONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Paragraphing */}
+        <div className={styles.field}>
+          <label className={styles.label}>Paragraphing</label>
+          <select
+            className={styles.select}
+            value={format.paragraphing ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                paragraphing: (e.target.value as typeof PARAGRAPHING_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— inherit</option>
+            <option value="single-block">Single block</option>
+            <option value="short-paragraphs">Short paragraphs</option>
+            <option value="platform-default">Platform default</option>
+          </select>
+        </div>
+
+        {/* Hashtag use */}
+        <div className={styles.field}>
+          <label className={styles.label}>Hashtag use</label>
+          <select
+            className={styles.select}
+            value={format.hashtag_use ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                hashtag_use: (e.target.value as typeof HASHTAG_USE_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— inherit</option>
+            <option value="none">None</option>
+            <option value="sparingly">Sparingly (1–2)</option>
+            <option value="platform-default">Platform default</option>
+          </select>
+        </div>
       </div>
 
       {/* Bitcoin rule — locked, company-level */}

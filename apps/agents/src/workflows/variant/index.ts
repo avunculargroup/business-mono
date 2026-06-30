@@ -2,7 +2,7 @@ import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { supabase } from '@platform/db';
 import { resolveVoiceContext } from '@platform/voice';
-import { formatResolvedVoice } from '../../lib/voicePrompt.js';
+import { formatResolvedVoice, extractFormatConfig } from '../../lib/voicePrompt.js';
 import { stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 // Lex is the shared compliance agent (added by the on-chain feature). The
@@ -257,6 +257,7 @@ const resolveContextStep = createStep({
       platform,
       accountDisplayName: acc.display_name ?? 'BTS',
       voiceBlock: formatResolvedVoice(voice),
+      formatConfig: extractFormatConfig(voice.profile),
       platformSpec: spec,
       strategy,
       beat: {

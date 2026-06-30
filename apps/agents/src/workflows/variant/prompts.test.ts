@@ -129,14 +129,36 @@ describe('buildCharliePrompt', () => {
     expect(prompt).toContain('hashtags together at the very end');
   });
 
-  it('defers styling to format notes when the voice block carries them (account override wins)', () => {
+  it('renders word-count constraint inline when formatConfig is set (account override wins)', () => {
     const ctx = makeCtx({
       voiceBlock: '**Persona:** plain, confident advisor\n\n**Format notes:** 10–25 words',
+      formatConfig: { word_count_min: 10, word_count_max: 25 },
     });
     const prompt = buildCharliePrompt(ctx);
     expect(prompt).not.toContain('1,200–2,500 characters');
-    expect(prompt).toContain('follow the "Format notes" in the brand voice below');
+    expect(prompt).toContain('WORD COUNT: 10–25 words');
+    expect(prompt).toContain('hard limit');
     // The hard ceiling is a real platform limit and must still be stated.
+    expect(prompt).toContain('3000-character hard ceiling');
+  });
+
+  it('renders legacy format notes inline as a hard override', () => {
+    const ctx = makeCtx({
+      voiceBlock: '**Persona:** plain, confident advisor\n\n**Format notes:** 10–25 words',
+      formatConfig: { legacy_notes: '10–25 words' },
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).not.toContain('1,200–2,500 characters');
+    expect(prompt).toContain('FORMAT OVERRIDE (hard limit)');
+    expect(prompt).toContain('10–25 words');
+    expect(prompt).toContain('3000-character hard ceiling');
+  });
+
+  it('omits the fold/hook mechanic for very short word-count limits on LinkedIn', () => {
+    const ctx = makeCtx({ formatConfig: { word_count_max: 25 } });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).not.toContain('…more');
+    expect(prompt).toContain('shorter than LinkedIn');
     expect(prompt).toContain('3000-character hard ceiling');
   });
 
@@ -174,11 +196,31 @@ describe('platformFormatRules', () => {
     expect(rules).toContain('Short paragraphs');
   });
 
-  it('drops the LinkedIn numeric target and defers to format notes when present', () => {
-    const rules = platformFormatRules('linkedin', liSpec, false, true);
+  it('drops the LinkedIn numeric target and renders legacy notes inline when present', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, { legacy_notes: '10–25 words' });
     expect(rules).not.toContain('1,200–2,500 characters');
-    expect(rules).toContain('Format notes');
+    expect(rules).toContain('FORMAT OVERRIDE (hard limit)');
     expect(rules).toContain('3000-character hard ceiling');
+  });
+
+  it('renders structured word-count as an inline hard limit', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, { word_count_min: 10, word_count_max: 25 });
+    expect(rules).not.toContain('1,200–2,500 characters');
+    expect(rules).toContain('WORD COUNT: 10–25 words');
+    expect(rules).toContain('hard limit');
+    expect(rules).toContain('3000-character hard ceiling');
+  });
+
+  it('omits the fold/hook on LinkedIn when word_count_max ≤ 50', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, { word_count_max: 20 });
+    expect(rules).not.toContain('…more');
+    expect(rules).toContain('shorter than LinkedIn');
+  });
+
+  it('keeps the fold/hook on LinkedIn when word_count_max > 50', () => {
+    const rules = platformFormatRules('linkedin', liSpec, false, { word_count_max: 100 });
+    expect(rules).toContain('…more');
+    expect(rules).not.toContain('1,200–2,500 characters');
   });
 
   it('gives X a single-post target distinct from the thread rules', () => {
