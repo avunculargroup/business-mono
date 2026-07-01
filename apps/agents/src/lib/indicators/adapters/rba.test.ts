@@ -95,4 +95,20 @@ describe('parseRbaCsv', () => {
     if (res.ok) return;
     expect(res.error.kind).toBe('not_found');
   });
+
+  it('errors (does not silently succeed) when the matched column is blank on every row', () => {
+    // Money Base header exists but every data row is blank — e.g. a discontinued
+    // series still listed in the preamble. This must not look like a genuine
+    // "nothing new" no-op the way an empty FRED window would.
+    const csv =
+      '"Title","M1","Money Base"\n' +
+      '"Series ID","DMAM1N","DMAMB"\n' +
+      '"31-Jan-2026","420.5",""\n' +
+      '"28-Feb-2026","422.1",""\n';
+    const res = parseRbaCsv(csv, 'DMAMB');
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.kind).toBe('parse');
+    expect(res.error.message).toMatch(/every data row was blank/);
+  });
 });

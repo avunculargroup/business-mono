@@ -124,6 +124,22 @@ export function parseRbaCsv(text: string, columnMatch: string | null): AdapterRe
     out.push({ periodDate, value, releasedAt: null, raw: { date: dateCell, value: cell, column: columnMatch } });
   }
 
+  // Unlike FRED (a windowed server-side fetch, where [] legitimately means "no
+  // new print"), this parses the FULL historical CSV every call. A matched
+  // column with zero non-blank rows across all of history is never a genuine
+  // no-op — it means the column match landed on the wrong place (header
+  // layout changed, series discontinued, etc). Surface it as a failure so it
+  // shows up in agent_activity instead of silently vanishing as a "success".
+  if (out.length === 0) {
+    return {
+      ok: false,
+      error: {
+        kind: 'parse',
+        message: `RBA CSV: column "${columnMatch}" matched a header but every data row was blank — column layout or series may have changed`,
+      },
+    };
+  }
+
   out.sort((a, b) => a.periodDate.localeCompare(b.periodDate));
   return { ok: true, observations: out };
 }
