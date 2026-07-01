@@ -4,17 +4,24 @@
  * GET https://www.rba.gov.au/statistics/tables/csv/{table}-data.csv
  * where {table} derives from providerTableRef (e.g. 'f1.1', 'd3').
  *
- * The CSV is a multi-row metadata preamble (Title, Description, Frequency, Units,
- * Source, Publication date, Series ID) THEN data rows. Row 0 is NOT the header.
- * The data section is wide (D3 carries M1, M3, Broad money, Money base side by
- * side), so the adapter selects the target column by matching the Series ID /
- * header LABEL, never a hard-coded index — RBA occasionally reorders columns
- * between revisions and label-matching survives that.
+ * The CSV opens with a table-title line (e.g. 'F1.1 INTEREST RATES AND YIELDS
+ * – MONEY MARKET'), then a multi-row metadata preamble (Title, Description,
+ * Frequency, Units, Source, Publication date, Series ID), THEN data rows. None
+ * of row 0..N is a conventional CSV header. The data section is wide (D3
+ * carries M1, M3, Broad money, Money base side by side), so the adapter
+ * selects the target column by matching the Series ID / header LABEL, never a
+ * hard-coded index — RBA occasionally reorders columns between revisions and
+ * label-matching survives that.
+ *
+ * Data-row dates are DD/MM/YYYY (e.g. '30/06/2026'), NOT the 'D-Mon-YYYY'
+ * format the metadata preamble's own 'Publication date' row uses — confirmed
+ * against a live fetch of f1.1 and d3. Confusing these two is exactly what
+ * silently zeroed out every RBA observation before this was checked against
+ * real data (see period.ts).
  *
  * providerTableRef may carry an explicit column matcher after a colon, e.g.
  * 'D3:Broad money' or 'F1.1:FIRMMCRTD'. Without one, a sensible default per table
- * is used (see DEFAULT_COLUMN). CONFIRM both the table file and the exact column
- * label/Series ID against the live CSV before trusting real output.
+ * is used (see DEFAULT_COLUMN) — FIRMMCRT / DMABMS, confirmed against a live fetch.
  *
  * See docs/features/economic-indicators/adapter-contract.md.
  */
@@ -75,7 +82,8 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-const DATE_CELL = /^\d{1,2}-[A-Za-z]{3}-\d{4}$/;
+// Data-row dates are DD/MM/YYYY (e.g. '30/06/2026') — see the file-header note above.
+const DATE_CELL = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
 
 /** Pure parse step — exported for fixture tests (no network). */
 export function parseRbaCsv(text: string, columnMatch: string | null): AdapterResult {

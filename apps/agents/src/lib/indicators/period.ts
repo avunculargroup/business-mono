@@ -28,21 +28,17 @@ export function toFirstOfQuarterISO(date: Date): string {
 }
 
 /**
- * Parse an RBA-style date cell ('31-Jan-2026', '30-Apr-2026') and normalise to
- * the first of that month. Returns null if it can't be parsed.
+ * Parse an RBA-style date cell ('30/06/2026', '31/12/2025' — DD/MM/YYYY, the
+ * format RBA's statistical-table CSVs actually use) and normalise to the
+ * first of that month. Returns null if it can't be parsed.
  */
 export function parseRbaDateToFirstOfMonth(cell: string): string | null {
-  const m = cell.trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  const m = cell.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
-  const month = MONTHS[m[2].toLowerCase()];
-  if (month === undefined) return null;
-  return isoDate(Number(m[3]), month, 1);
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+  return isoDate(Number(m[3]), month - 1, 1);
 }
-
-const MONTHS: Record<string, number> = {
-  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
-};
 
 function isoDate(year: number, monthZeroBased: number, day: number): string {
   const mm = String(monthZeroBased + 1).padStart(2, '0');
