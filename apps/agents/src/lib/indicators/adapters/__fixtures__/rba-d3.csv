@@ -1,3 +1,4 @@
+D3 MONETARY AGGREGATES
 "Title","M1","Broad money","Broad money: Seasonally adjusted","Money Base"
 "Description","M1 money supply","Broad money","Broad money, seasonally adjusted","Money base"
 "Frequency","Monthly","Monthly","Monthly","Monthly"
@@ -6,6 +7,6 @@
 "Source","RBA","RBA","RBA","RBA"
 "Publication date","30-Apr-2026","30-Apr-2026","30-Apr-2026","30-Apr-2026"
 "Series ID","DMAM1N","DMABMN","DMABMS","DMAMB"
-"31-Jan-2026","420.5","2885.0","2890.7","150.1"
-"28-Feb-2026","422.1","2900.0","","151.0"
-"31-Mar-2026","425.1","2908.0","2912.8","152.4"
+"31/01/2026","420.5","2885.0","2890.7","150.1"
+"28/02/2026","422.1","2900.0","","151.0"
+"31/03/2026","425.1","2908.0","2912.8","152.4"

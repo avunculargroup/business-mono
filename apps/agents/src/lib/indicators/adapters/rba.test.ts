@@ -95,4 +95,48 @@ describe('parseRbaCsv', () => {
     if (res.ok) return;
     expect(res.error.kind).toBe('not_found');
   });
+
+  it('tolerates the leading table-title line RBA prepends before the metadata preamble', () => {
+    // Confirmed against a live fetch: row 0 of the real CSV is a bare title
+    // line ('F1.1 INTEREST RATES AND YIELDS – MONEY MARKET'), not the "Title,"
+    // metadata row. Both fixtures already carry this line — this test pins it.
+    const res = parseRbaCsv(fixture('rba-f11.csv'), 'FIRMMCRT');
+    expect(res.ok).toBe(true);
+  });
+
+  it('regression: data rows use DD/MM/YYYY, not the D-Mon-YYYY format of the Publication date row', () => {
+    // Confirmed against a live fetch of f1.1 and d3 — every data row is
+    // '30/06/2026' style, never '30-Jun-2026'. Mistaking the metadata
+    // preamble's own date format for the data-row format silently produced
+    // zero observations for every RBA-sourced indicator in production,
+    // with no error (parseRbaCsv previously returned ok:true, observations: []).
+    const dashDated =
+      '"Title","Cash Rate Target"\n' +
+      '"Publication date","01-Jun-2026"\n' +
+      '"Series ID","FIRMMCRT"\n' +
+      '"31-Mar-2026","4.10"\n' + // wrong format — must NOT parse
+      '"31/03/2026","4.10"\n'; // right format — must parse
+    const res = parseRbaCsv(dashDated, 'FIRMMCRT');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations).toEqual([
+      { periodDate: '2026-03-01', value: 4.1, releasedAt: null, raw: { date: '31/03/2026', value: '4.10', column: 'FIRMMCRT' } },
+    ]);
+  });
+
+  it('errors (does not silently succeed) when the matched column is blank on every row', () => {
+    // Money Base header exists but every data row is blank — e.g. a discontinued
+    // series still listed in the preamble. This must not look like a genuine
+    // "nothing new" no-op the way an empty FRED window would.
+    const csv =
+      '"Title","M1","Money Base"\n' +
+      '"Series ID","DMAM1N","DMAMB"\n' +
+      '"31/01/2026","420.5",""\n' +
+      '"28/02/2026","422.1",""\n';
+    const res = parseRbaCsv(csv, 'DMAMB');
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.kind).toBe('parse');
+    expect(res.error.message).toMatch(/every data row was blank/);
+  });
 });

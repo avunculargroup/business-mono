@@ -1,3 +1,4 @@
+F1.1 INTEREST RATES AND YIELDS – MONEY MARKET
 "Title","Cash Rate Target","Interbank Overnight Cash Rate","Volume of Cash Market Transactions"
 "Description","Cash Rate Target; monthly average","Interbank Overnight Cash Rate; monthly average","Volume of Interbank Overnight Cash Market Transactions; monthly sum"
 "Frequency","Monthly","Monthly","Monthly"
@@ -6,6 +7,6 @@
 "Source","RBA","RBA","RBA"
 "Publication date","01-Jun-2026","01-Jun-2026","01-Jun-2026"
 "Series ID","FIRMMCRT","FIRMMCRI","FIRMMCRIVM"
-"31-Mar-2026","4.10","4.09","12345"
-"30-Apr-2026","3.85","3.84",""
-"31-May-2026","3.85","3.85","13010"
+"31/03/2026","4.10","4.09","12345"
+"30/04/2026","3.85","3.84",""
+"31/05/2026","3.85","3.85","13010"
