@@ -14,11 +14,18 @@
   text-decoration: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color var(--duration-fast) var(--ease-default);
+  transition: color var(--duration-fast) var(--ease-default),
+              background var(--duration-fast) var(--ease-default);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tab:hover {
   color: var(--color-text-primary);
+}
+
+.tab:active {
+  color: var(--color-text-primary);
+  background: var(--color-surface-active);
 }
 
 .tab.active {

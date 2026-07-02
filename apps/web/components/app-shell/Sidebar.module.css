@@ -81,6 +81,12 @@
   color: var(--color-text-primary);
 }
 
+.navItem:active {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
 .navItem.active {
   background: var(--color-accent-subtle);
   color: var(--color-accent-hover);
@@ -126,6 +132,12 @@
 
 .subNavItem:hover {
   color: var(--color-text-primary);
+}
+
+.subNavItem:active {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .subNavItem.active {
@@ -211,6 +223,14 @@
   font-weight: 500;
   padding: var(--space-1);
   position: relative;
+  transition: transform var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab:active {
+  transform: scale(var(--press-scale));
+  color: var(--color-accent);
 }
 
 .tabActive {
@@ -371,6 +391,12 @@
   color: var(--color-text-primary);
 }
 
+.moreSheetItem:active {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
 .moreSheetItemActive {
   color: var(--color-accent-hover);
 }
@@ -402,6 +428,12 @@
 .moreSheetAccordionTrigger:hover {
   background: var(--color-surface-hover);
   color: var(--color-text-primary);
+}
+
+.moreSheetAccordionTrigger:active {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .moreSheetAccordionTriggerActive {
@@ -451,6 +483,12 @@
 .moreSheetSubItem:hover {
   background: var(--color-surface-hover);
   color: var(--color-text-primary);
+}
+
+.moreSheetSubItem:active {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .moreSheetSubItemActive {

@@ -10,13 +10,20 @@
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-default),
               color var(--duration-fast) var(--ease-default),
-              border-color var(--duration-fast) var(--ease-default);
+              border-color var(--duration-fast) var(--ease-default),
+              transform var(--duration-fast) var(--ease-default);
   white-space: nowrap;
+  /* Bespoke press feedback below — opt out of the global amber flash. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(var(--press-scale));
 }
 
 /* Sizes */
