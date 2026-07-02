@@ -5,6 +5,7 @@ import {
   youtubeThumbnail,
   youtubeEmbedUrl,
   formatTimestamp,
+  htmlToText,
 } from './podcasts';
 
 describe('extractVideoId', () => {
@@ -71,6 +72,40 @@ describe('youtubeEmbedUrl', () => {
   it('omits start for zero / nullish offsets', () => {
     expect(youtubeEmbedUrl('dQw4w9WgXcQ', 0)).not.toContain('start');
     expect(youtubeEmbedUrl('dQw4w9WgXcQ', null)).not.toContain('start');
+  });
+});
+
+describe('htmlToText', () => {
+  it('strips inline tags and keeps the text', () => {
+    expect(htmlToText('An <strong>important</strong> episode about <em>Bitcoin</em>.')).toBe(
+      'An important episode about Bitcoin.',
+    );
+  });
+
+  it('drops anchor tags but keeps their text', () => {
+    expect(htmlToText('Read more at <a href="https://example.com">our site</a>.')).toBe(
+      'Read more at our site.',
+    );
+  });
+
+  it('turns paragraphs and <br> into line breaks', () => {
+    expect(htmlToText('<p>First para.</p><p>Second para.<br>Same para new line.</p>')).toBe(
+      'First para.\n\nSecond para.\nSame para new line.',
+    );
+  });
+
+  it('decodes named and numeric entities', () => {
+    expect(htmlToText('AT&amp;T &mdash; Q&#38;A &#x1F600;')).toBe('AT&T — Q&A 😀');
+  });
+
+  it('collapses excess whitespace and trims', () => {
+    expect(htmlToText('  <div>  lots   of   space  </div>  ')).toBe('lots of space');
+  });
+
+  it('returns an empty string for nullish input', () => {
+    expect(htmlToText(null)).toBe('');
+    expect(htmlToText(undefined)).toBe('');
+    expect(htmlToText('')).toBe('');
   });
 });
 

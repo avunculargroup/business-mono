@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { EpisodeDetail } from './EpisodeDetail';
-import type { PodcastEpisode } from '@platform/shared';
+import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -53,7 +53,38 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
   };
 }
 
+function makeSegment(overrides: Partial<TranscriptSegment> = {}): TranscriptSegment {
+  return {
+    id: 'seg-1',
+    episode_id: 'ep-1',
+    segment_index: 0,
+    start_seconds: 0,
+    end_seconds: 5,
+    speaker: null,
+    content: 'Welcome to the show.',
+    token_count: null,
+    created_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+// jsdom doesn't compute layout, so scrollHeight/clientHeight are 0 and the
+// clamp never triggers. These helpers force an overflow so the show-more
+// control appears.
+function forceTranscriptOverflow() {
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, value: 2000 });
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 480 });
+}
+function clearLayoutOverrides() {
+  // @ts-expect-error — remove the ad-hoc override so other tests see jsdom defaults
+  delete HTMLElement.prototype.scrollHeight;
+  // @ts-expect-error — same for clientHeight
+  delete HTMLElement.prototype.clientHeight;
+}
+
 describe('EpisodeDetail', () => {
+  afterEach(clearLayoutOverrides);
+
   it('renders the show artwork when the episode has an image_url', () => {
     const { container } = render(
       <EpisodeDetail
@@ -90,5 +121,56 @@ describe('EpisodeDetail', () => {
     );
 
     expect(screen.getByText('A calm look at treasury strategy.')).toBeInTheDocument();
+  });
+
+  it('strips HTML markup from feed-supplied descriptions', () => {
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({
+          description: '<p>A calm look at <strong>treasury</strong> strategy. <a href="https://x.co">More</a></p>',
+        })}
+        segments={[]}
+        sourceName={null}
+      />,
+    );
+
+    expect(screen.getByText('A calm look at treasury strategy. More')).toBeInTheDocument();
+    expect(screen.queryByText(/<p>|<strong>/)).not.toBeInTheDocument();
+  });
+
+  it('does not show a transcript toggle when the transcript fits', () => {
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available' })}
+        segments={[makeSegment()]}
+        sourceName={null}
+      />,
+    );
+
+    expect(screen.getByText('Welcome to the show.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show full transcript' })).not.toBeInTheDocument();
+  });
+
+  it('collapses an overflowing transcript and toggles on click', () => {
+    forceTranscriptOverflow();
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available' })}
+        segments={[makeSegment()]}
+        sourceName={null}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Show full transcript' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }));
+    expect(screen.getByRole('button', { name: 'Show full transcript' })).toBeInTheDocument();
   });
 });

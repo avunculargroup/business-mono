@@ -24,6 +24,52 @@ export function extractVideoId(input: string | null | undefined): string | null 
   return null;
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  mdash: '—',
+  ndash: '–',
+  hellip: '…',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+};
+
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, body: string) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : Number(body.slice(1));
+      return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+    }
+    return HTML_ENTITIES[body.toLowerCase()] ?? match;
+  });
+}
+
+/**
+ * Convert feed-supplied HTML (podcast show notes arrive as raw HTML via
+ * rss-parser's `content`) into plain text: block tags become line breaks, all
+ * other tags are dropped, and entities are decoded. Paired with `pre-wrap`
+ * styling so the preserved newlines render as paragraph breaks.
+ */
+export function htmlToText(input: string | null | undefined): string {
+  if (!input) return '';
+  return decodeEntities(
+    input
+      .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+      .replace(/<\s*\/\s*(p|div|li|ul|ol|h[1-6]|blockquote|tr)\s*>/gi, '\n\n')
+      .replace(/<[^>]+>/g, ''),
+  )
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /** Poster thumbnail for the click-to-play facade (no player loaded). */
 export function youtubeThumbnail(videoId: string): string {
   return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
