@@ -117,7 +117,14 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
             <img className={styles.artwork} src={episode.image_url} alt="" />
           ) : (
             <div className={styles.artworkPlaceholder}>
-              <BtsLogo size={64} />
+              <div className={styles.placeholderTop}>
+                <BtsLogo size={22} />
+                <span className={styles.placeholderKicker}>Podcasts</span>
+              </div>
+              <div className={styles.placeholderBody}>
+                <p className={styles.placeholderTitle}>{episode.title}</p>
+              </div>
+              {sourceName && <span className={styles.placeholderSource}>{sourceName}</span>}
             </div>
           )}
           {episode.audio_url && (
