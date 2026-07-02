@@ -37,6 +37,7 @@ export async function processPodcastTranscript(
   episodeId: string,
   results: DeepgramResults,
 ): Promise<void> {
+  let embedded: number;
   try {
     const segments = buildTimedSegments(results);
     if (segments.length === 0) {
@@ -52,30 +53,44 @@ export async function processPodcastTranscript(
       .join('\n')
       .trim();
 
-    const { segments: embedded } = await storeAvailableTranscript(episodeId, {
+    ({ segments: embedded } = await storeAvailableTranscript(episodeId, {
       source: 'deepgram',
       format: null,
       language: null,
       text,
       segments,
       hasTimestamps: true,
+    }));
+  } catch (err) {
+    await updateEpisode(episodeId, {
+      transcript_status: 'failed',
+      transcript_error: err instanceof Error ? err.message : String(err),
     });
+    return;
+  }
 
+  // The transcript is stored and embedded — the episode is already 'available'.
+  // Logging is a best-effort audit write; a failure here (e.g. a rejected
+  // trigger_type) must never demote a good transcript back to 'failed', which is
+  // exactly the bug that hid completed Deepgram transcripts behind a 'failed'
+  // status. Swallow logging errors instead. triggerType is 'scheduled' — the
+  // podcast batch is routine-driven and 'webhook' is not an allowed trigger_type.
+  try {
     await logActivity.execute!(
       {
         agentName: 'archie',
         action: `Podcast transcript ready (Deepgram): ${embedded} segments embedded`,
         status: 'auto',
-        triggerType: 'webhook',
+        triggerType: 'scheduled',
         entityType: 'podcast_episode',
         entityId: episodeId,
       } as never,
       {} as never,
     );
   } catch (err) {
-    await updateEpisode(episodeId, {
-      transcript_status: 'failed',
-      transcript_error: err instanceof Error ? err.message : String(err),
+    console.warn('[podcast-transcript] activity log failed (transcript is stored)', {
+      episodeId,
+      error: err instanceof Error ? err.message : String(err),
     });
   }
 }
