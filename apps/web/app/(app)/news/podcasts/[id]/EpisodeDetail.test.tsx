@@ -91,4 +91,19 @@ describe('EpisodeDetail', () => {
 
     expect(screen.getByText('A calm look at treasury strategy.')).toBeInTheDocument();
   });
+
+  it('strips HTML markup from feed-supplied descriptions', () => {
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({
+          description: '<p>A calm look at <strong>treasury</strong> strategy. <a href="https://x.co">More</a></p>',
+        })}
+        segments={[]}
+        sourceName={null}
+      />,
+    );
+
+    expect(screen.getByText('A calm look at treasury strategy. More')).toBeInTheDocument();
+    expect(screen.queryByText(/<p>|<strong>/)).not.toBeInTheDocument();
+  });
 });

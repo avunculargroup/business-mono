@@ -11,6 +11,7 @@ import { formatDate, formatDateTime } from '@/lib/utils';
 import {
   extractVideoId,
   formatTimestamp,
+  htmlToText,
   TRANSCRIPT_STATUS_LABELS,
   TRANSCRIPT_STATUS_COLORS,
   TRANSCRIPT_SOURCE_LABELS,
@@ -33,6 +34,7 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
   const [pending, setPending] = useState(false);
 
   const videoId = extractVideoId(episode.youtube_url);
+  const description = htmlToText(episode.description);
   const hasTimestamps = episode.has_timestamps && segments.some((s) => s.start_seconds != null);
 
   const seekTo = (seconds: number | null) => {
@@ -106,7 +108,7 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
         </div>
       )}
 
-      {episode.description && <p className={styles.description}>{episode.description}</p>}
+      {description && <p className={styles.description}>{description}</p>}
 
       <div className={styles.body}>
         {/* ── Transcript ── */}
