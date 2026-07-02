@@ -7,6 +7,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { BtsLogo } from '@/components/app-shell/BtsLogo';
 import { YouTubeFacade } from '@/components/podcasts/YouTubeFacade';
+import { AudioPlayer } from '@/components/podcasts/AudioPlayer';
 import { useToast } from '@/providers/ToastProvider';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import {
@@ -120,7 +121,11 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
             </div>
           )}
           {episode.audio_url && (
-            <audio ref={audioRef} className={styles.audio} controls preload="none" src={episode.audio_url} />
+            <AudioPlayer
+              src={episode.audio_url}
+              audioRef={audioRef}
+              durationFallback={episode.duration_seconds}
+            />
           )}
         </div>
       )}

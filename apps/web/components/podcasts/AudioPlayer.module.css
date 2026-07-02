@@ -1,0 +1,106 @@
+.player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 480px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.playButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.playButton:hover {
+  background: var(--color-accent-hover);
+}
+
+/* Optical centering — a triangle's visual mass sits left of its bounding box. */
+.playIcon {
+  margin-left: 2px;
+}
+
+.time {
+  flex-shrink: 0;
+  min-width: 40px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.time:last-of-type {
+  text-align: right;
+}
+
+/* ── Scrubber ─────────────────────────────────────────────────────────
+   Native range input, restyled. The filled portion is painted with a
+   gradient driven by the --progress custom property set inline. */
+.scrubber {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    to right,
+    var(--color-accent) var(--progress, 0%),
+    var(--color-surface-subtle) var(--progress, 0%)
+  );
+  cursor: pointer;
+}
+
+.scrubber:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.scrubber:disabled::-webkit-slider-thumb {
+  background: var(--color-text-tertiary);
+}
+
+.scrubber:disabled::-moz-range-thumb {
+  background: var(--color-text-tertiary);
+}
+
+.scrubber:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 4px;
+}
