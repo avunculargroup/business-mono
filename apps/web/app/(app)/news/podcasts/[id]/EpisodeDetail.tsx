@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
+import { BtsLogo } from '@/components/app-shell/BtsLogo';
 import { YouTubeFacade } from '@/components/podcasts/YouTubeFacade';
 import { useToast } from '@/providers/ToastProvider';
 import { formatDate, formatDateTime } from '@/lib/utils';
@@ -90,9 +91,22 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
       {/* ── Media ── */}
       {videoId ? (
         <YouTubeFacade videoId={videoId} title={episode.title} startSeconds={videoStart} />
-      ) : episode.audio_url ? (
-        <audio ref={audioRef} className={styles.audio} controls preload="none" src={episode.audio_url} />
-      ) : null}
+      ) : (
+        <div className={styles.audioMedia}>
+          {episode.image_url ? (
+            <img className={styles.artwork} src={episode.image_url} alt="" />
+          ) : (
+            <div className={styles.artworkPlaceholder}>
+              <BtsLogo size={64} />
+            </div>
+          )}
+          {episode.audio_url && (
+            <audio ref={audioRef} className={styles.audio} controls preload="none" src={episode.audio_url} />
+          )}
+        </div>
+      )}
+
+      {episode.description && <p className={styles.description}>{episode.description}</p>}
 
       <div className={styles.body}>
         {/* ── Transcript ── */}
