@@ -38,6 +38,11 @@
   /* ── Focus glow ── */
   --color-accent-glow: rgba(201, 168, 76, 0.12);
 
+  /* ── Press / tap feedback ── */
+  --color-surface-active: #E4E1D9;             /* one step darker than --color-border */
+  --tap-highlight: rgba(201, 168, 76, 0.24);   /* amber native tap flash */
+  --press-scale: 0.96;
+
   /* ── Typography ── */
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
@@ -109,6 +114,26 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* ── Instant tap feedback ── */
+
+/* Native tap flash on every tappable element — fires immediately on touch,
+   before any navigation or JS runs. */
+* {
+  -webkit-tap-highlight-color: var(--tap-highlight);
+}
+
+/* Remove the ~300ms tap delay so presses register instantly. */
+a,
+button,
+[role="button"],
+[role="tab"],
+label,
+summary,
+input[type="submit"],
+input[type="button"] {
+  touch-action: manipulation;
 }
 
 html {

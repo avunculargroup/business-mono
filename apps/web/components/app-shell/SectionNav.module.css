@@ -22,12 +22,19 @@
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   transition: color var(--duration-fast) var(--ease-default),
-              border-color var(--duration-fast) var(--ease-default);
+              border-color var(--duration-fast) var(--ease-default),
+              background var(--duration-fast) var(--ease-default);
   margin-bottom: -1px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tab:hover {
   color: var(--color-text-primary);
+}
+
+.tab:active {
+  color: var(--color-text-primary);
+  background: var(--color-surface-active);
 }
 
 .tabActive {

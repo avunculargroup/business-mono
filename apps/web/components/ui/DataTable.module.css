@@ -62,6 +62,10 @@
   background: var(--color-surface-subtle);
 }
 
+.clickable:active {
+  background: var(--color-surface-active);
+}
+
 .td {
   padding: var(--space-3) var(--space-4);
   font-size: 14px;
@@ -100,6 +104,11 @@
 
 .pageBtn:hover:not(:disabled) {
   background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+
+.pageBtn:active:not(:disabled) {
+  background: var(--color-surface-active);
   color: var(--color-text-primary);
 }
 
