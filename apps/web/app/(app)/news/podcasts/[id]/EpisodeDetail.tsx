@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { BtsLogo } from '@/components/app-shell/BtsLogo';
@@ -33,9 +34,25 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
   const [videoStart, setVideoStart] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
 
+  // Long transcripts make the page unwieldy, so clamp them to a fixed height
+  // and only surface the show-more control once the content actually overflows.
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [transcriptOverflows, setTranscriptOverflows] = useState(false);
+
   const videoId = extractVideoId(episode.youtube_url);
   const description = htmlToText(episode.description);
   const hasTimestamps = episode.has_timestamps && segments.some((s) => s.start_seconds != null);
+
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (!el) {
+      setTranscriptOverflows(false);
+      return;
+    }
+    // scrollHeight reflects the full content even while the clamp is applied.
+    setTranscriptOverflows(el.scrollHeight - el.clientHeight > 4);
+  }, [episode.transcript_status, segments, episode.transcript_text]);
 
   const seekTo = (seconds: number | null) => {
     if (seconds == null) return;
@@ -122,33 +139,63 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
                   ? 'No free transcript was available and Deepgram was not enabled.'
                   : 'Transcript is still being resolved.'}
             </p>
-          ) : segments.length > 0 ? (
-            <div className={styles.transcript}>
-              {segments.map((s) => (
-                <div key={s.id} className={styles.segment}>
-                  <div className={styles.segmentHead}>
-                    {s.start_seconds != null && (
-                      <button
-                        type="button"
-                        className={styles.timestamp}
-                        onClick={() => seekTo(s.start_seconds)}
-                        disabled={!videoId && !episode.audio_url}
-                      >
-                        {formatTimestamp(s.start_seconds)}
-                      </button>
-                    )}
-                    {s.speaker && <span className={styles.speaker}>{s.speaker}</span>}
+          ) : segments.length > 0 || episode.transcript_text ? (
+            <>
+              <div
+                ref={transcriptRef}
+                className={
+                  transcriptExpanded
+                    ? styles.transcriptContent
+                    : `${styles.transcriptContent} ${styles.transcriptClamped} ${
+                        transcriptOverflows ? styles.transcriptFaded : ''
+                      }`
+                }
+              >
+                {segments.length > 0 ? (
+                  <div className={styles.transcript}>
+                    {segments.map((s) => (
+                      <div key={s.id} className={styles.segment}>
+                        <div className={styles.segmentHead}>
+                          {s.start_seconds != null && (
+                            <button
+                              type="button"
+                              className={styles.timestamp}
+                              onClick={() => seekTo(s.start_seconds)}
+                              disabled={!videoId && !episode.audio_url}
+                            >
+                              {formatTimestamp(s.start_seconds)}
+                            </button>
+                          )}
+                          {s.speaker && <span className={styles.speaker}>{s.speaker}</span>}
+                        </div>
+                        <p className={styles.segmentText}>{s.content}</p>
+                      </div>
+                    ))}
                   </div>
-                  <p className={styles.segmentText}>{s.content}</p>
-                </div>
-              ))}
-            </div>
-          ) : episode.transcript_text ? (
-            <div className={styles.plainTranscript}>
-              {episode.transcript_text.split(/\n{2,}/).map((para, i) => (
-                <p key={i}>{para}</p>
-              ))}
-            </div>
+                ) : (
+                  <div className={styles.plainTranscript}>
+                    {episode.transcript_text!.split(/\n{2,}/).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {transcriptOverflows && (
+                <button
+                  type="button"
+                  className={styles.transcriptToggle}
+                  onClick={() => setTranscriptExpanded((v) => !v)}
+                  aria-expanded={transcriptExpanded}
+                >
+                  {transcriptExpanded ? 'Show less' : 'Show full transcript'}
+                  <ChevronDown
+                    size={16}
+                    strokeWidth={1.5}
+                    className={transcriptExpanded ? styles.chevOpen : undefined}
+                  />
+                </button>
+              )}
+            </>
           ) : (
             <p className={styles.stateNote}>Transcript text is not available.</p>
           )}
