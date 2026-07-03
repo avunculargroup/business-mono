@@ -29,6 +29,15 @@
   display: none;
 }
 
+.logoLockup {
+  display: none;
+}
+
+.logoWordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -55,5 +64,15 @@
     min-height: 44px;
     color: var(--color-text-secondary);
     font-size: var(--text-sm);
+  }
+
+  .logoLockup {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .titleTextDesktop {
+    display: none;
   }
 }

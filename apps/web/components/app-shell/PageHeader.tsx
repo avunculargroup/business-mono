@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
+import { BtsLogo } from './BtsLogo';
 import styles from './PageHeader.module.css';
 
 interface PageHeaderProps {
@@ -7,9 +8,10 @@ interface PageHeaderProps {
   backHref?: string;
   backLabel?: string;
   children?: React.ReactNode;
+  logoOnMobile?: boolean;
 }
 
-export function PageHeader({ title, backHref, backLabel = 'Back', children }: PageHeaderProps) {
+export function PageHeader({ title, backHref, backLabel = 'Back', children, logoOnMobile }: PageHeaderProps) {
   return (
     <header className={styles.header}>
       <div className={styles.left}>
@@ -19,7 +21,15 @@ export function PageHeader({ title, backHref, backLabel = 'Back', children }: Pa
             <span>{backLabel}</span>
           </Link>
         )}
-        <h1 className={styles.title}>{title}</h1>
+        <h1 className={styles.title}>
+          {logoOnMobile && (
+            <span className={styles.logoLockup}>
+              <BtsLogo size={22} />
+              <span className={styles.logoWordmark}>HQ</span>
+            </span>
+          )}
+          <span className={logoOnMobile ? styles.titleTextDesktop : undefined}>{title}</span>
+        </h1>
       </div>
       {children && <div className={styles.actions}>{children}</div>}
     </header>

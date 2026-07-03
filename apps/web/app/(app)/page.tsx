@@ -61,7 +61,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" />
+      <PageHeader title="Dashboard" logoOnMobile />
       <div className={styles.banner}>
         <FearGreedIndicator />
         <BitcoinPriceAUD />
