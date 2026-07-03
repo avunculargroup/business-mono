@@ -35,6 +35,7 @@ function indicator(overrides: Record<string, unknown> = {}) {
     unit: 'usd_billion',
     decimals: 1,
     poll_frequency: 'daily',
+    period_granularity: 'monthly',
     alert_on_new_print: true,
     alert_change_threshold: null,
     ...overrides,
@@ -137,6 +138,36 @@ describe('runIndicatorPoll', () => {
     expect(out.status).toBe('success');
     expect(out.indicator_poll_result?.failed).toHaveLength(1);
     expect(out.indicator_poll_result?.observations_inserted).toBe(0);
+  });
+
+  it('daily granularity: keeps distinct per-day periods and requests a ≥90-day first backfill', async () => {
+    setIndicators([
+      indicator({
+        short_label: 'S&P 500',
+        category: 'equity',
+        provider_series_code: 'SP500',
+        unit: 'index',
+        period_granularity: 'daily',
+        alert_on_new_print: false,
+      }),
+    ]);
+    setCurrentObs([]); // first ingest
+    adapterResult = {
+      ok: true,
+      observations: [obs('2026-06-17', 5000), obs('2026-06-18', 5010), obs('2026-06-19', 4990)],
+    };
+
+    const out = await runIndicatorPoll(ROUTINE, NOW);
+
+    expect(out.status).toBe('success');
+    expect(out.indicator_poll_result).toMatchObject({ observations_inserted: 3 });
+    // Distinct per-day rows survive — no false supersession collapsing them.
+    expect(obsInsertCount()).toBe(3);
+    // First-ingest backfill for a daily series is deepened to ≥90 days.
+    expect(fetchLatest).toHaveBeenCalledWith(
+      expect.objectContaining({ granularity: 'daily' }),
+      { limit: 90 },
+    );
   });
 
   it('does not propose a second beat within the dedupe window', async () => {

@@ -38,4 +38,34 @@ describe('parseFredResponse', () => {
     if (res.ok) return;
     expect(res.error.kind).toBe('parse');
   });
+
+  it('defaults monthly — collapses daily dates to first-of-month', () => {
+    const res = parseFredResponse({
+      observations: [
+        { date: '2026-06-15', value: '100.0' },
+        { date: '2026-06-16', value: '101.0' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // Both days collapse onto one period — exactly why daily series need granularity.
+    expect(res.observations.map((o) => o.periodDate)).toEqual(['2026-06-01', '2026-06-01']);
+  });
+
+  it('keeps the actual day for daily granularity', () => {
+    const res = parseFredResponse(
+      {
+        observations: [
+          { date: '2026-06-15', value: '100.0' },
+          { date: '2026-06-16', value: '101.0' },
+          { date: '2026-06-17', value: '.' }, // unpublished — still skipped
+        ],
+      },
+      'daily',
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations.map((o) => o.periodDate)).toEqual(['2026-06-15', '2026-06-16']);
+    expect(res.observations[1].value).toBe(101.0);
+  });
 });

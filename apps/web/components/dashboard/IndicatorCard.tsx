@@ -5,6 +5,7 @@ import {
   formatDay,
   formatPeriod,
   formatValue,
+  isDailyGranularity,
   isFresh,
   pickYoy,
   sparklinePath,
@@ -21,6 +22,9 @@ interface IndicatorCardProps {
 export function IndicatorCard({ row, series }: IndicatorCardProps) {
   const decimals = row.decimals ?? 2;
   const fresh = isFresh(row.days_since_release);
+  // Daily market tickers show a day-precise "as at" (and no month period or
+  // ~daily "next release" line, which would just be noise).
+  const daily = isDailyGranularity(row);
 
   return (
     <div className={styles.card}>
@@ -57,11 +61,17 @@ export function IndicatorCard({ row, series }: IndicatorCardProps) {
 
           {row.period_date && (
             <div className={styles.asat}>
-              {formatPeriod(row.period_date)}
-              {row.released_at && <> · released {formatDay(row.released_at)}</>}
+              {daily ? (
+                formatDay(row.period_date)
+              ) : (
+                <>
+                  {formatPeriod(row.period_date)}
+                  {row.released_at && <> · released {formatDay(row.released_at)}</>}
+                </>
+              )}
             </div>
           )}
-          {row.expected_next_release && (
+          {!daily && row.expected_next_release && (
             <div className={styles.next}>next release ~ {formatDay(row.expected_next_release)}</div>
           )}
         </>

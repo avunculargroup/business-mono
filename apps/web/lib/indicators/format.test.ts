@@ -5,6 +5,7 @@ import {
   formatDay,
   formatPeriod,
   formatValue,
+  isDailyGranularity,
   isFresh,
   pickYoy,
   sparklinePath,
@@ -44,9 +45,23 @@ describe('labels', () => {
   it('maps unit and category tokens to display labels', () => {
     expect(unitLabel('usd_billion')).toBe('USD bn');
     expect(unitLabel('percent')).toBe('%');
+    expect(unitLabel('usd')).toBe('USD');
     expect(categoryLabel('policy_rate')).toBe('Policy rate');
     expect(categoryLabel('activity')).toBe('Activity');
+    expect(categoryLabel('fx')).toBe('Currency');
+    expect(categoryLabel('commodity')).toBe('Commodity');
+    expect(categoryLabel('equity')).toBe('Equities');
+    expect(categoryLabel('bond_yield')).toBe('Bond yield');
     expect(unitLabel(null)).toBe('');
+  });
+});
+
+describe('isDailyGranularity', () => {
+  it('is true only when the row is a daily series', () => {
+    expect(isDailyGranularity(row({ period_granularity: 'daily' } as Partial<IndicatorLatest>))).toBe(true);
+    expect(isDailyGranularity(row({ period_granularity: 'monthly' } as Partial<IndicatorLatest>))).toBe(false);
+    // Absent (pre-migration view) falls back to false — monthly presentation.
+    expect(isDailyGranularity(row())).toBe(false);
   });
 });
 

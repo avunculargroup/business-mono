@@ -43,32 +43,41 @@ export interface DigestRoutineRef {
   title: string;
 }
 
-export async function deliverNewsDigest(
+/** A fully-rendered message, ready to send to every team member. */
+export interface TeamEmailMessage {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+/**
+ * Sends a pre-rendered message to every team member from the hq@ send identity,
+ * reusing the Fastmail token already stored in fastmail_accounts. Best-effort:
+ * returns configured:false when no token exists, counts and logs per-recipient
+ * failures, and never throws — so email delivery can never fail the calling
+ * routine. The transport shared by every team-wide email (news digest, market
+ * report, …); callers own the rendering.
+ */
+export async function deliverTeamEmail(
   routine: DigestRoutineRef,
-  result: RoutineResult,
+  message: TeamEmailMessage,
 ): Promise<DigestDeliveryResult> {
   const token = await loadSenderToken();
   if (!token) {
     console.warn(
-      `[news-digest] No Fastmail token for ${SENDER_ACCOUNT_USERNAME} in fastmail_accounts — skipping email delivery`,
+      `[team-email] No Fastmail token for ${SENDER_ACCOUNT_USERNAME} in fastmail_accounts — skipping email delivery`,
     );
     return { configured: false, attempted: 0, sent: 0, failed: 0 };
   }
 
   try {
-    const [recipients, company] = await Promise.all([loadRecipients(), loadCompanyFooter()]);
+    const recipients = await loadRecipients();
     if (recipients.length === 0) {
-      console.warn('[news-digest] No team_member recipients with an email — skipping');
+      console.warn('[team-email] No team_member recipients with an email — skipping');
       return { configured: true, attempted: 0, sent: 0, failed: 0 };
     }
 
-    const { subject, html, text } = renderNewsDigestEmail({
-      title: routine.title,
-      result,
-      date: new Date(),
-      webAppUrl: process.env['WEB_APP_URL'],
-      company,
-    });
+    const { subject, html, text } = message;
 
     const client = new FastmailJmapClient(SENDER_ACCOUNT_USERNAME, token);
     const { accountId, apiUrl } = await client.getSession();
@@ -102,21 +111,38 @@ export async function deliverNewsDigest(
         sent += 1;
       } catch (err) {
         failed += 1;
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[news-digest] Failed to send to ${to.email}:`, message);
-        await logSendFailure(routine, to.email, message);
+        const errMessage = err instanceof Error ? err.message : String(err);
+        console.error(`[team-email] Failed to send to ${to.email}:`, errMessage);
+        await logSendFailure(routine, to.email, errMessage);
       }
     }
 
-    console.log(`[news-digest] Sent "${subject}" — ${sent} delivered, ${failed} failed`);
+    console.log(`[team-email] Sent "${subject}" — ${sent} delivered, ${failed} failed`);
     return { configured: true, attempted: recipients.length, sent, failed };
   } catch (err) {
     // A setup failure (auth, session, recipient lookup) must not fail the routine.
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[news-digest] Delivery aborted:', message);
-    await logSendFailure(routine, null, message);
+    const errMessage = err instanceof Error ? err.message : String(err);
+    console.error('[team-email] Delivery aborted:', errMessage);
+    await logSendFailure(routine, null, errMessage);
     return { configured: true, attempted: 0, sent: 0, failed: 0 };
   }
+}
+
+/** Renders a news_curation result and delivers it to the team (thin wrapper over
+ *  the shared transport — the rendering is the only news-specific part). */
+export async function deliverNewsDigest(
+  routine: DigestRoutineRef,
+  result: RoutineResult,
+): Promise<DigestDeliveryResult> {
+  const company = await loadCompanyFooter();
+  const message = renderNewsDigestEmail({
+    title: routine.title,
+    result,
+    date: new Date(),
+    webAppUrl: process.env['WEB_APP_URL'],
+    company,
+  });
+  return deliverTeamEmail(routine, message);
 }
 
 /** The app-specific password for the sending account, from fastmail_accounts. */
@@ -175,7 +201,7 @@ async function logSendFailure(
   try {
     await supabase.from('agent_activity').insert({
       agent_name: 'rex',
-      action: `News digest email failed${recipient ? ` for ${recipient}` : ''}: ${routine.title}`,
+      action: `Team email failed${recipient ? ` for ${recipient}` : ''}: ${routine.title}`,
       status: 'error',
       trigger_type: 'scheduled',
       entity_type: 'routine',

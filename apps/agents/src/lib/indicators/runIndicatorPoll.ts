@@ -20,12 +20,13 @@ import {
   type RoutineFrequency,
 } from '@platform/shared';
 import { getAdapter } from './registry.js';
-import type { IndicatorConfig, Provider } from './types.js';
+import type { IndicatorConfig, PeriodGranularity, Provider } from './types.js';
 // Type-only import — erased at compile time, so no runtime import cycle with the
 // workflow (which imports this handler's value).
 import type { RoutineOutcome } from '../../workflows/executeRoutineWorkflow.js';
 
 const DEFAULT_BACKFILL_PERIODS = 18; // ~12–24; enough for YoY + a sparkline on day one
+const DAILY_BACKFILL_MIN = 90;       // daily series count in days — a thin 18-day start isn't enough
 const STEADY_LIMIT = 6;
 const BEAT_DEDUPE_DAYS = 7;
 const FETCH_TZ = 'Australia/Melbourne';
@@ -51,6 +52,7 @@ type IndicatorRow = {
   unit: string;
   decimals: number;
   poll_frequency: string;
+  period_granularity: PeriodGranularity;
   alert_on_new_print: boolean;
   alert_change_threshold: number | null;
 };
@@ -77,7 +79,7 @@ export async function runIndicatorPoll(
   const { data: indicators, error } = await supabase
     .from('economic_indicators')
     .select(
-      'id, name, short_label, category, provider, provider_series_code, provider_table_ref, unit, decimals, poll_frequency, alert_on_new_print, alert_change_threshold',
+      'id, name, short_label, category, provider, provider_series_code, provider_table_ref, unit, decimals, poll_frequency, period_granularity, alert_on_new_print, alert_change_threshold',
     )
     .eq('is_active', true);
 
@@ -85,7 +87,10 @@ export async function runIndicatorPoll(
     return outcome(routine, 'failed', null, `Failed to load indicators: ${error.message}`, result);
   }
 
-  for (const indicator of (indicators ?? []) as IndicatorRow[]) {
+  // Cast through unknown: the generated types lag the migration that adds
+  // period_granularity to the select, so the row type resolves as an error until
+  // `pnpm --filter @platform/db generate-types` runs post-migration.
+  for (const indicator of (indicators ?? []) as unknown as IndicatorRow[]) {
     const adapter = getAdapter(indicator.provider);
     if (!adapter) continue; // e.g. 'abs' — no adapter yet
     if (!isDue(indicator.poll_frequency, now, routine.timezone)) continue;
@@ -143,8 +148,13 @@ export async function runIndicatorPoll(
       provider,
       providerSeriesCode: indicator.provider_series_code,
       providerTableRef: indicator.provider_table_ref,
+      granularity: indicator.period_granularity,
     };
-    const res = await adapter.fetchLatest(config, { limit: firstIngest ? backfill : STEADY_LIMIT });
+    // Daily series count backfill in days, so a first ingest needs a deeper window
+    // than the ~18-period default sized for monthly data.
+    const firstLimit =
+      indicator.period_granularity === 'daily' ? Math.max(backfill, DAILY_BACKFILL_MIN) : backfill;
+    const res = await adapter.fetchLatest(config, { limit: firstIngest ? firstLimit : STEADY_LIMIT });
     if (!res.ok) {
       acc.failed.push(`${indicator.short_label} (${res.error.kind}: ${res.error.message})`);
       return;

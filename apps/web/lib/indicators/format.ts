@@ -11,6 +11,7 @@ const UNIT_LABELS: Record<string, string> = {
   usd_billion: 'USD bn',
   aud_billion: 'AUD bn',
   index: 'index',
+  usd: 'USD',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -18,6 +19,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   money_supply: 'Money supply',
   inflation: 'Inflation',
   activity: 'Activity',
+  fx: 'Currency',
+  commodity: 'Commodity',
+  equity: 'Equities',
+  bond_yield: 'Bond yield',
 };
 
 export function unitLabel(unit: string | null): string {
@@ -28,6 +33,13 @@ export function unitLabel(unit: string | null): string {
 export function categoryLabel(category: string | null): string {
   if (!category) return '';
   return CATEGORY_LABELS[category] ?? category;
+}
+
+/** True for daily-cadence series (market tickers). Cast because the generated
+ *  view type lags the migration that added period_granularity — the value is
+ *  absent (→ false) until the view ships, which is the correct fallback. */
+export function isDailyGranularity(row: IndicatorLatest): boolean {
+  return (row as { period_granularity?: string | null }).period_granularity === 'daily';
 }
 
 export function formatValue(value: number, decimals: number): string {
