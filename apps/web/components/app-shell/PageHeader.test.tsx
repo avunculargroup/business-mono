@@ -25,4 +25,10 @@ describe('PageHeader', () => {
     const link = screen.getByRole('link', { name: 'Back to tasks' });
     expect(link).toHaveAttribute('href', '/tasks');
   });
+
+  it('renders a logo + HQ lockup alongside the title when logoOnMobile is set', () => {
+    render(<PageHeader title="Dashboard" logoOnMobile />);
+    expect(screen.getByRole('heading')).toHaveTextContent('HQDashboard');
+    expect(screen.getByText('HQ')).toBeInTheDocument();
+  });
 });
