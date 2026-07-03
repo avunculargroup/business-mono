@@ -123,8 +123,8 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
               </div>
               <div className={styles.placeholderBody}>
                 <p className={styles.placeholderTitle}>{episode.title}</p>
+                {sourceName && <span className={styles.placeholderSource}>{sourceName}</span>}
               </div>
-              {sourceName && <span className={styles.placeholderSource}>{sourceName}</span>}
             </div>
           )}
           {episode.audio_url && (
