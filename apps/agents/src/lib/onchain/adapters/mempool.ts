@@ -6,6 +6,7 @@
  *   next_difficulty_adjustment      → /v1/difficulty-adjustment
  *   pool_concentration_top          → /v1/mining/hashrate/pools/1m
  *   miner_fees_total / _revenue     → /v1/mining/reward-stats/{blockCount}
+ *   block_height                    → /blocks/tip/height (plain-text integer, not JSON)
  *
  * THE CRITICAL NORMALISATION: raw hash rate is ~6e20 H/s, which exceeds
  * Number.MAX_SAFE_INTEGER (~9e15) and loses precision as a JS number. We divide
@@ -197,7 +198,38 @@ export function parseRewardStats(
   return { ok: true, observations: out };
 }
 
+/** block_height = mainnet tip height. Point-in-time; the endpoint returns a bare
+ *  integer as plain text, not JSON. */
+export function parseBlockHeight(text: string): AdapterResult {
+  const height = Number(text.trim());
+  if (!Number.isFinite(height) || height <= 0) {
+    return { ok: false, error: { kind: 'parse', message: 'mempool blocks/tip/height returned a non-numeric value' } };
+  }
+  return {
+    ok: true,
+    observations: [{ observedAt: utcDate(new Date()), key: 'block_height', value: height, raw: { height } }],
+  };
+}
+
 // ── Fetch orchestration ───────────────────────────────────────────────────────
+
+async function getText(url: string): Promise<{ ok: true; text: string } | { ok: false; error: AdapterError }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  } catch (err) {
+    return { ok: false, error: { kind: 'transport', message: err instanceof Error ? err.message : String(err) } };
+  }
+  if (!res.ok) {
+    const kind = res.status === 429 ? 'rate_limit' : res.status === 404 ? 'not_found' : 'transport';
+    return { ok: false, error: { kind, message: `mempool HTTP ${res.status}`, status: res.status } };
+  }
+  try {
+    return { ok: true, text: await res.text() };
+  } catch (err) {
+    return { ok: false, error: { kind: 'parse', message: err instanceof Error ? err.message : 'mempool text read failed' } };
+  }
+}
 
 async function getJson(url: string): Promise<{ ok: true; payload: unknown } | { ok: false; error: AdapterError }> {
   let res: Response;
@@ -264,6 +296,12 @@ export const mempoolAdapter: OnchainAdapter = {
           wantFees: want('miner_fees_total'),
         }));
       } else errors.push(r.error);
+    }
+
+    if (want('block_height')) {
+      const r = await getText(`${BASE}/blocks/tip/height`);
+      if (r.ok) absorb(parseBlockHeight(r.text));
+      else errors.push(r.error);
     }
 
     // Degrade gracefully: only fail the whole provider when nothing was gathered.

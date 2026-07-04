@@ -5,6 +5,7 @@ import {
   parseDifficultyAdjustment,
   parsePools,
   parseRewardStats,
+  parseBlockHeight,
 } from './mempool.js';
 
 function fixture(name: string): unknown {
@@ -128,5 +129,22 @@ describe('parseRewardStats', () => {
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.error.kind).toBe('parse');
+  });
+});
+
+describe('parseBlockHeight', () => {
+  it('parses the plain-text tip height', () => {
+    const res = parseBlockHeight('912345\n');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations).toHaveLength(1);
+    expect(res.observations[0]).toMatchObject({ key: 'block_height', value: 912345 });
+    expect(res.observations[0].observedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('parse error on a non-numeric or non-positive response', () => {
+    expect(parseBlockHeight('not a number').ok).toBe(false);
+    expect(parseBlockHeight('0').ok).toBe(false);
+    expect(parseBlockHeight('-5').ok).toBe(false);
   });
 });

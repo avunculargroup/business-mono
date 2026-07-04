@@ -24,9 +24,10 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    (FRED/RBA), upserts observations with revision handling, and proposes a content beat
 //    (Charlie draft) on a qualifying new print.
 //  - onchain_poll: Simon polls each active on-chain indicator via its provider adapter
-//    (mempool/coinmetrics), upserts raw observations with revision handling, lets the
-//    views derive the rest, and proposes a (compliance-sensitive) content beat on a
-//    Hash-Ribbons signal change, an MVRV band cross, or a large hash-rate drop.
+//    (mempool/coinmetrics/coingecko/alternative_me), upserts raw observations with
+//    revision handling, lets the views derive the rest, and proposes a
+//    (compliance-sensitive) content beat on a Hash-Ribbons signal change, an MVRV band
+//    cross, or a large hash-rate drop.
 //  - social_post_from_news: per-founder routine. The editor picks the day's news story
 //    that best fits the founder's voice and the post form (share-with-context vs teach),
 //    Charlie drafts a LinkedIn + an X post in the founder's voice, Lex classifies advice
@@ -34,7 +35,11 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //  - market_report: Simon reads the already-stored on-chain (v_onchain_dashboard) and
 //    macro (v_indicator_latest) views and emails the team a daily snapshot — current
 //    values, day-over-day/period change, and neutral signals (hash ribbons, MVRV band).
-//    Deterministic (no LLM); reads only, writes nothing beyond the audit trail.
+//    Block height, BTC/AUD price, and the Fear & Greed Index get their own "Bitcoin"
+//    section fetched LIVE at send time (not from the last onchain_poll run), with the
+//    delta computed against the most recently stored observation.
+//    Deterministic (no LLM); reads only (plus the three live fetches), writes nothing
+//    beyond the audit trail.
 export const RoutineActionType = {
   RESEARCH_DIGEST:       'research_digest',
   MONITOR_CHANGE:        'monitor_change',
@@ -244,6 +249,9 @@ export interface MarketReportResult {
   sections: MarketReportSection[];
   onchain_count: number;
   macro_count: number;
+  // Block height, BTC/AUD price, Fear & Greed — fetched live at send time, not
+  // read from the last onchain_poll run. See runMarketReport.ts.
+  bitcoin_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
 }

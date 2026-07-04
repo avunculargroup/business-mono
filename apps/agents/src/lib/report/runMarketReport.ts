@@ -1,11 +1,19 @@
 /**
  * market_report routine handler — the daily market snapshot email.
  *
- * Deterministic and read-only: it consumes the data the on-chain and macro polls
- * have ALREADY stored (v_onchain_dashboard + v_indicator_latest), assembles two
- * neutral sections (current value, day-over-day/period change, and any signal
- * chip), and emails them to the team via the shared deliverTeamEmail transport.
- * It calls no LLM and writes nothing beyond the routine's audit row.
+ * Deterministic and read-only (plus three live fetches — see below): it mostly
+ * consumes data the on-chain and macro polls have ALREADY stored
+ * (v_onchain_dashboard + v_indicator_latest), assembles neutral sections
+ * (current value, day-over-day/period change, and any signal chip), and emails
+ * them to the team via the shared deliverTeamEmail transport. It calls no LLM
+ * and writes nothing beyond the routine's audit row.
+ *
+ * The "Bitcoin" section (block height, BTC/AUD price, Fear & Greed) is the
+ * exception: those three are fetched LIVE at send time via the same adapters
+ * onchain_poll uses (see buildBitcoinSnapshotItems below), not read from last
+ * night's stored value — they move faster than the once-daily poll cadence.
+ * History still accumulates in onchain_observations via the normal poll, which
+ * is what the section's delta is computed against.
  *
  * On-chain valuation metrics (MVRV, Hash Ribbons) are compliance-sensitive, so
  * every line states the figure and its direction only — never a buy/sell framing.
@@ -21,6 +29,10 @@ import {
 } from '@platform/shared';
 import { deliverTeamEmail, loadCompanyFooter } from '../sendNewsDigest.js';
 import { renderMarketReportEmail } from '../marketReportEmail.js';
+import { mempoolAdapter } from '../onchain/adapters/mempool.js';
+import { coingeckoAdapter } from '../onchain/adapters/coingecko.js';
+import { alternativeMeAdapter } from '../onchain/adapters/alternativeMe.js';
+import { utcDate, type OnchainIndicatorConfig } from '../onchain/types.js';
 // Type-only import — erased at compile time, so no runtime import cycle with the
 // workflow (which imports this handler's value).
 import type { RoutineOutcome } from '../../workflows/executeRoutineWorkflow.js';
@@ -39,6 +51,7 @@ interface RoutineInput {
 // and can't import them). Empty string = a bare number reads best.
 const ONCHAIN_UNITS: Record<string, string> = {
   eh_s: 'EH/s', ratio: '', usd: 'USD', percent: '%', count: '', signal: '', btc: 'BTC',
+  aud: 'AUD', index: '',
 };
 const MACRO_UNITS: Record<string, string> = {
   percent: '%', usd_billion: 'USD bn', aud_billion: 'AUD bn', index: '', usd: 'USD',
@@ -75,12 +88,14 @@ export async function runMarketReport(
     sections: [],
     onchain_count: 0,
     macro_count: 0,
+    bitcoin_count: 0,
     emailed: false,
   };
 
-  const [onchainRes, macroRes] = await Promise.all([
+  const [onchainRes, macroRes, bitcoinItems] = await Promise.all([
     supabase.from('v_onchain_dashboard').select('*'),
     supabase.from('v_indicator_latest').select('*'),
+    buildBitcoinSnapshotItems(now),
   ]);
 
   if (onchainRes.error && macroRes.error) {
@@ -93,15 +108,22 @@ export async function runMarketReport(
     );
   }
 
-  const onchainRows = ((onchainRes.data ?? []) as unknown as OnchainRow[]);
+  // market_snapshot rows (block height, BTC/AUD price, Fear & Greed) get their own
+  // "Bitcoin" section built from a live fetch above — exclude them here so they
+  // don't also render as stale On-chain rows from last night's poll.
+  const onchainRows = ((onchainRes.data ?? []) as unknown as OnchainRow[]).filter(
+    (r) => r.metric_group !== 'market_snapshot',
+  );
   const macroRows = ((macroRes.data ?? []) as unknown as MacroRow[]);
 
   const onchainItems = buildOnchainItems(onchainRows);
   const macroItems = buildMacroItems(macroRows);
   result.onchain_count = onchainItems.length;
   result.macro_count = macroItems.length;
+  result.bitcoin_count = bitcoinItems.length;
 
   const sections: MarketReportSection[] = [];
+  if (bitcoinItems.length) sections.push({ heading: 'Bitcoin', items: bitcoinItems });
   if (onchainItems.length) sections.push({ heading: 'On-chain', items: onchainItems });
   if (macroItems.length) sections.push({ heading: 'Macro', items: macroItems });
   result.sections = sections;
@@ -124,7 +146,8 @@ export async function runMarketReport(
   result.emailed = delivery.sent > 0;
 
   const summary =
-    `Market report: ${result.onchain_count} on-chain + ${result.macro_count} macro indicators` +
+    `Market report: ${result.bitcoin_count} bitcoin + ${result.onchain_count} on-chain + ` +
+    `${result.macro_count} macro indicators` +
     (delivery.configured
       ? ` — emailed to ${delivery.sent}/${delivery.attempted} team members`
       : ' — email not configured');
@@ -163,6 +186,105 @@ function buildMacroItems(rows: MacroRow[]): MarketReportItem[] {
     signal: null,
     as_of: r.period_date ?? null,
   }));
+}
+
+// ── Bitcoin snapshot: live-fetched, not read from the last poll's stored value ──
+// Block height, BTC/AUD price, and Fear & Greed move (or, for Fear & Greed,
+// refresh) faster than the once-daily onchain_poll cadence, so the report calls
+// the SAME adapters the poll uses directly, at send time, rather than reading
+// yesterday's (or last night's) stored row. History still accumulates via the
+// normal onchain_poll routine — the delta below compares the live figure to the
+// most recently STORED observation, and falls back to the last two stored
+// observations if the live fetch fails, so the section degrades the same way the
+// web dashboard's equivalent cards do (never a hard failure, just a stale value).
+
+const BITCOIN_SNAPSHOT_KEYS = ['btc_price_aud', 'block_height', 'fear_greed'] as const;
+type BitcoinSnapshotKey = (typeof BITCOIN_SNAPSHOT_KEYS)[number];
+
+type BitcoinIndicatorRow = { id: string; key: string; short_label: string; unit: string; decimals: number };
+type StoredObs = { value: number; observed_at: string };
+
+async function fetchLiveValue(key: BitcoinSnapshotKey): Promise<{ value: number; signal: string | null } | null> {
+  const config = (provider: OnchainIndicatorConfig['provider']): OnchainIndicatorConfig => ({
+    key, provider, providerMetricCode: null, unit: '',
+  });
+  try {
+    if (key === 'block_height') {
+      const res = await mempoolAdapter.fetchLatest([config('mempool')]);
+      if (!res.ok) return null;
+      const obs = res.observations.find((o) => o.key === key);
+      return obs ? { value: obs.value, signal: null } : null;
+    }
+    if (key === 'btc_price_aud') {
+      const res = await coingeckoAdapter.fetchLatest([config('coingecko')]);
+      if (!res.ok) return null;
+      const obs = res.observations.find((o) => o.key === key);
+      return obs ? { value: obs.value, signal: null } : null;
+    }
+    const res = await alternativeMeAdapter.fetchLatest([config('alternative_me')]);
+    if (!res.ok) return null;
+    const obs = res.observations.find((o) => o.key === key);
+    if (!obs) return null;
+    const classification = (obs.raw as { classification?: string } | undefined)?.classification ?? null;
+    return { value: obs.value, signal: classification };
+  } catch {
+    return null; // one provider hiccup must not sink the report
+  }
+}
+
+async function buildBitcoinSnapshotItems(now: Date): Promise<MarketReportItem[]> {
+  const { data: indicatorRows } = await supabase
+    .from('onchain_indicators')
+    .select('id, key, short_label, unit, decimals')
+    .in('key', BITCOIN_SNAPSHOT_KEYS as unknown as string[])
+    .eq('is_active', true);
+  const indicators = (indicatorRows ?? []) as BitcoinIndicatorRow[];
+  if (indicators.length === 0) return [];
+  const byKey = new Map(indicators.map((i) => [i.key, i]));
+
+  const { data: obsRows } = await supabase
+    .from('onchain_observations')
+    .select('indicator_id, observed_at, value')
+    .in('indicator_id', indicators.map((i) => i.id))
+    .eq('is_current', true)
+    .order('observed_at', { ascending: false });
+  const latest = new Map<string, StoredObs>();
+  const prior = new Map<string, StoredObs>();
+  for (const row of (obsRows ?? []) as { indicator_id: string; observed_at: string; value: number }[]) {
+    const obs = { value: Number(row.value), observed_at: row.observed_at };
+    if (!latest.has(row.indicator_id)) latest.set(row.indicator_id, obs);
+    else if (!prior.has(row.indicator_id)) prior.set(row.indicator_id, obs);
+  }
+
+  const items = await Promise.all(
+    BITCOIN_SNAPSHOT_KEYS.map(async (key): Promise<MarketReportItem | null> => {
+      const indicator = byKey.get(key);
+      if (!indicator) return null;
+      const storedLatest = latest.get(indicator.id) ?? null;
+      const storedPrior = prior.get(indicator.id) ?? null;
+      const live = await fetchLiveValue(key);
+
+      const value = live ? live.value : storedLatest?.value ?? null;
+      const comparisonBase = live ? storedLatest?.value ?? null : storedPrior?.value ?? null;
+      const asOf = live ? utcDate(now) : storedLatest?.observed_at ?? null;
+      if (value == null) return null; // never polled yet AND the live fetch failed
+
+      const change = comparisonBase != null ? value - comparisonBase : null;
+      const pct =
+        comparisonBase != null && comparisonBase !== 0
+          ? Math.round(((value - comparisonBase) / Math.abs(comparisonBase)) * 10000) / 100
+          : null;
+
+      return {
+        label: indicator.short_label,
+        value: fmtValue(value, indicator.decimals ?? 2, ONCHAIN_UNITS[indicator.unit ?? ''] ?? ''),
+        delta: fmtDelta(change, pct, indicator.decimals ?? 2),
+        signal: live?.signal ?? null,
+        as_of: asOf,
+      };
+    }),
+  );
+  return items.filter((i): i is MarketReportItem => i !== null);
 }
 
 // ── formatting ──────────────────────────────────────────────────────────────

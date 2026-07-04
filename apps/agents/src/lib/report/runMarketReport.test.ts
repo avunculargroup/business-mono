@@ -1,14 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createFakeSupabase, type FakeSupabaseClient } from '../../../test/mocks/supabase.js';
+import type { AdapterResult } from '../onchain/types.js';
 
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const deliverTeamEmail = vi.fn(async () => ({ configured: true, attempted: 2, sent: 2, failed: 0 }));
 const loadCompanyFooter = vi.fn(async () => ({ name: 'Bitcoin Treasury Solutions' }));
+const notFound: AdapterResult = { ok: false, error: { kind: 'not_found', message: 'unmocked' } };
+const mempoolFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
+const coingeckoFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
+const alternativeMeFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../sendNewsDigest.js', () => ({
   deliverTeamEmail: (...args: unknown[]) => deliverTeamEmail(...(args as [])),
   loadCompanyFooter: () => loadCompanyFooter(),
+}));
+vi.mock('../onchain/adapters/mempool.js', () => ({
+  mempoolAdapter: { provider: 'mempool', fetchLatest: (...args: unknown[]) => mempoolFetchLatest(...(args as [])) },
+}));
+vi.mock('../onchain/adapters/coingecko.js', () => ({
+  coingeckoAdapter: { provider: 'coingecko', fetchLatest: (...args: unknown[]) => coingeckoFetchLatest(...(args as [])) },
+}));
+vi.mock('../onchain/adapters/alternativeMe.js', () => ({
+  alternativeMeAdapter: { provider: 'alternative_me', fetchLatest: (...args: unknown[]) => alternativeMeFetchLatest(...(args as [])) },
 }));
 
 const { runMarketReport } = await import('./runMarketReport.js');
@@ -29,12 +43,21 @@ function setOnchain(rows: unknown[]) {
 function setMacro(rows: unknown[]) {
   fakeSupabase.__setResponse('v_indicator_latest', { data: rows, error: null });
 }
+function setBitcoinIndicators(rows: unknown[]) {
+  fakeSupabase.__setResponse('onchain_indicators', { data: rows, error: null });
+}
+function setBitcoinObservations(rows: unknown[]) {
+  fakeSupabase.__setResponse('onchain_observations', { data: rows, error: null });
+}
 
 beforeEach(() => {
   fakeSupabase.__builders.length = 0;
   fakeSupabase.__responses.clear();
   deliverTeamEmail.mockClear();
   loadCompanyFooter.mockClear();
+  mempoolFetchLatest.mockClear();
+  coingeckoFetchLatest.mockClear();
+  alternativeMeFetchLatest.mockClear();
 });
 
 describe('runMarketReport', () => {
@@ -56,6 +79,8 @@ describe('runMarketReport', () => {
     const res = out.market_report_result!;
     expect(res.onchain_count).toBe(2);
     expect(res.macro_count).toBe(1);
+    expect(res.bitcoin_count).toBe(0);
+    expect(res.sections.find((s) => s.heading === 'Bitcoin')).toBeUndefined();
     expect(res.emailed).toBe(true);
     // Network security is ordered before holder-behaviour metrics.
     const onchain = res.sections.find((s) => s.heading === 'On-chain')!;
@@ -109,5 +134,88 @@ describe('runMarketReport', () => {
 
     expect(out.market_report_result?.emailed).toBe(false);
     expect(out.result?.summary).toContain('email not configured');
+  });
+
+  describe('Bitcoin snapshot (live fetch)', () => {
+    const BITCOIN_INDICATORS = [
+      { id: 'ind-price', key: 'btc_price_aud', short_label: 'BTC/AUD', unit: 'aud', decimals: 2 },
+      { id: 'ind-height', key: 'block_height', short_label: 'Block Height', unit: 'count', decimals: 0 },
+      { id: 'ind-fng', key: 'fear_greed', short_label: 'Fear & Greed', unit: 'index', decimals: 0 },
+    ];
+
+    it('renders the live value with a delta against the last stored observation', async () => {
+      setOnchain([]);
+      setMacro([]);
+      setBitcoinIndicators(BITCOIN_INDICATORS);
+      setBitcoinObservations([
+        { indicator_id: 'ind-price', observed_at: '2026-07-03', value: 140000 },
+        { indicator_id: 'ind-height', observed_at: '2026-07-03', value: 912000 },
+        { indicator_id: 'ind-fng', observed_at: '2026-07-03', value: 60 },
+      ]);
+      coingeckoFetchLatest.mockResolvedValueOnce({
+        ok: true, observations: [{ observedAt: '2026-07-04', key: 'btc_price_aud', value: 142350, raw: {} }],
+      });
+      mempoolFetchLatest.mockResolvedValueOnce({
+        ok: true, observations: [{ observedAt: '2026-07-04', key: 'block_height', value: 912144, raw: {} }],
+      });
+      alternativeMeFetchLatest.mockResolvedValueOnce({
+        ok: true,
+        observations: [{ observedAt: '2026-07-04', key: 'fear_greed', value: 72, raw: { classification: 'Greed' } }],
+      });
+
+      const out = await runMarketReport(ROUTINE, new Date('2026-07-04T11:00:00Z'));
+
+      expect(out.status).toBe('success');
+      const res = out.market_report_result!;
+      expect(res.bitcoin_count).toBe(3);
+      const bitcoin = res.sections.find((s) => s.heading === 'Bitcoin')!;
+      expect(bitcoin.items[0]).toMatchObject({ label: 'BTC/AUD', value: '142,350.00 AUD', as_of: '2026-07-04' });
+      expect(bitcoin.items[0].delta).toContain('▲');
+      const height = bitcoin.items.find((i) => i.label === 'Block Height')!;
+      expect(height.value).toBe('912,144');
+      expect(height.delta).toContain('▲');
+      const fng = bitcoin.items.find((i) => i.label === 'Fear & Greed')!;
+      expect(fng.value).toBe('72');
+      expect(fng.signal).toBe('Greed');
+      expect(fng.delta).toContain('▲');
+    });
+
+    it('shows the live value with no delta on day one (no stored history yet)', async () => {
+      setOnchain([]);
+      setMacro([]);
+      setBitcoinIndicators(BITCOIN_INDICATORS);
+      setBitcoinObservations([]);
+      coingeckoFetchLatest.mockResolvedValueOnce({
+        ok: true, observations: [{ observedAt: '2026-07-04', key: 'btc_price_aud', value: 142350, raw: {} }],
+      });
+      mempoolFetchLatest.mockResolvedValueOnce({ ok: false, error: { kind: 'transport', message: 'boom' } });
+      alternativeMeFetchLatest.mockResolvedValueOnce({ ok: false, error: { kind: 'transport', message: 'boom' } });
+
+      const out = await runMarketReport(ROUTINE, new Date('2026-07-04T11:00:00Z'));
+
+      const res = out.market_report_result!;
+      // Block height + Fear & Greed have no live value AND no stored fallback yet.
+      expect(res.bitcoin_count).toBe(1);
+      const bitcoin = res.sections.find((s) => s.heading === 'Bitcoin')!;
+      expect(bitcoin.items).toHaveLength(1);
+      expect(bitcoin.items[0]).toMatchObject({ label: 'BTC/AUD', delta: null });
+    });
+
+    it('falls back to the last two stored observations when the live fetch fails', async () => {
+      setOnchain([]);
+      setMacro([]);
+      setBitcoinIndicators([BITCOIN_INDICATORS[1]]); // block_height only
+      setBitcoinObservations([
+        { indicator_id: 'ind-height', observed_at: '2026-07-04', value: 912144 },
+        { indicator_id: 'ind-height', observed_at: '2026-07-03', value: 912000 },
+      ]);
+      mempoolFetchLatest.mockResolvedValueOnce({ ok: false, error: { kind: 'transport', message: 'mempool down' } });
+
+      const out = await runMarketReport(ROUTINE, new Date('2026-07-04T11:00:00Z'));
+
+      const bitcoin = out.market_report_result!.sections.find((s) => s.heading === 'Bitcoin')!;
+      expect(bitcoin.items[0]).toMatchObject({ value: '912,144', as_of: '2026-07-04' });
+      expect(bitcoin.items[0].delta).toContain('▲');
+    });
   });
 });
