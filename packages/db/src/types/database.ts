@@ -1741,6 +1741,7 @@ export type Database = {
           is_active: boolean
           name: string
           notes: string | null
+          period_granularity: string
           poll_frequency: string
           provider: string
           provider_series_code: string | null
@@ -1761,6 +1762,7 @@ export type Database = {
           is_active?: boolean
           name: string
           notes?: string | null
+          period_granularity?: string
           poll_frequency?: string
           provider: string
           provider_series_code?: string | null
@@ -1781,6 +1783,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           notes?: string | null
+          period_granularity?: string
           poll_frequency?: string
           provider?: string
           provider_series_code?: string | null
@@ -4488,6 +4491,7 @@ export type Database = {
           name: string | null
           pct_change_since_prior: number | null
           period_date: string | null
+          period_granularity: string | null
           prior_value: number | null
           region: string | null
           released_at: string | null
