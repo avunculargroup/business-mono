@@ -13,6 +13,12 @@
 
 export type Provider = 'fred' | 'rba' | 'abs' | 'oecd';
 
+/** The natural reference period of a series — how often it genuinely prints,
+ *  NOT the operational poll cadence. Governs how the adapter stamps periodDate:
+ *  daily series keep the actual day; monthly/quarterly collapse to first-of-period
+ *  (see period.ts). Defaults to 'monthly' when the registry row omits it. */
+export type PeriodGranularity = 'daily' | 'monthly' | 'quarterly';
+
 /** What every adapter returns, per observation. The DB columns
  *  period_date / value / released_at / raw map 1:1 onto this. */
 export interface RawObservation {
@@ -36,6 +42,8 @@ export interface IndicatorConfig {
   provider: Provider;
   providerSeriesCode: string | null; // FRED series_id
   providerTableRef: string | null;   // RBA table / ABS dataflow
+  /** Natural period of the series. Omit for the 'monthly' default. */
+  granularity?: PeriodGranularity;
 }
 
 /** Per-call options the workflow controls (e.g. backfill depth on first ingest). */

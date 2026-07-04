@@ -17,10 +17,11 @@ import type {
   AdapterResult,
   FetchOptions,
   IndicatorConfig,
+  PeriodGranularity,
   ProviderAdapter,
   RawObservation,
 } from '../types.js';
-import { toFirstOfMonthISO } from '../period.js';
+import { toFirstOfMonthISO, toISODateUTC } from '../period.js';
 
 const FRED_ENDPOINT = 'https://api.stlouisfed.org/fred/series/observations';
 
@@ -31,8 +32,12 @@ interface FredObservation {
   realtime_end?: string;
 }
 
-/** Pure parse step — exported for fixture tests (no network). */
-export function parseFredResponse(payload: unknown): AdapterResult {
+/** Pure parse step — exported for fixture tests (no network). Daily series keep
+ *  the actual observation date; monthly/quarterly collapse to first-of-period. */
+export function parseFredResponse(
+  payload: unknown,
+  granularity: PeriodGranularity = 'monthly',
+): AdapterResult {
   const observations = (payload as { observations?: unknown })?.observations;
   if (!Array.isArray(observations)) {
     return { ok: false, error: { kind: 'parse', message: 'FRED response missing observations array' } };
@@ -52,8 +57,9 @@ export function parseFredResponse(payload: unknown): AdapterResult {
     if (!obs.date) {
       return { ok: false, error: { kind: 'parse', message: 'FRED observation missing date' } };
     }
+    const asDate = new Date(`${obs.date}T00:00:00Z`);
     out.push({
-      periodDate: toFirstOfMonthISO(new Date(`${obs.date}T00:00:00Z`)),
+      periodDate: granularity === 'daily' ? toISODateUTC(asDate) : toFirstOfMonthISO(asDate),
       value,
       releasedAt: null,
       raw: obs,
@@ -112,6 +118,6 @@ export const fredAdapter: ProviderAdapter = {
       };
     }
 
-    return parseFredResponse(payload);
+    return parseFredResponse(payload, indicator.granularity ?? 'monthly');
   },
 };

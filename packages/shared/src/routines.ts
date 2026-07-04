@@ -31,6 +31,10 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    that best fits the founder's voice and the post form (share-with-context vs teach),
 //    Charlie drafts a LinkedIn + an X post in the founder's voice, Lex classifies advice
 //    risk, both land in content_items as drafts, and the founder is emailed the drafts.
+//  - market_report: Simon reads the already-stored on-chain (v_onchain_dashboard) and
+//    macro (v_indicator_latest) views and emails the team a daily snapshot — current
+//    values, day-over-day/period change, and neutral signals (hash ribbons, MVRV band).
+//    Deterministic (no LLM); reads only, writes nothing beyond the audit trail.
 export const RoutineActionType = {
   RESEARCH_DIGEST:       'research_digest',
   MONITOR_CHANGE:        'monitor_change',
@@ -42,6 +46,7 @@ export const RoutineActionType = {
   INDICATOR_POLL:        'indicator_poll',
   ONCHAIN_POLL:          'onchain_poll',
   SOCIAL_POST_FROM_NEWS: 'social_post_from_news',
+  MARKET_REPORT:         'market_report',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -208,6 +213,41 @@ export interface SocialPostFromNewsResult {
   emailed: boolean;
 }
 
+// action_config shape for a 'market_report' routine. No knobs in v1 — the report
+// always reads every displayed on-chain metric and every active macro indicator.
+export type MarketReportConfig = Record<string, never>;
+
+// One indicator line in the report. Delta is direction-only prose; never good/bad.
+export interface MarketReportItem {
+  // Short display label, e.g. 'Hash rate', 'MVRV', 'US 10Y'.
+  label: string;
+  // Formatted value including unit, e.g. '3.85%', '112.40 EH/s', '5,010.00'.
+  value: string;
+  // Direction-only change vs the prior observation, e.g. '▲ +0.12 (+0.4%) on prior'.
+  // Null when flat or when there is no prior value to compare.
+  delta?: string | null;
+  // A neutral state chip where the metric carries one — e.g. the Hash-Ribbons
+  // signal ('neutral'|'capitulation'|'recovery') or an MVRV band label. Null otherwise.
+  signal?: string | null;
+  // ISO date (YYYY-MM-DD) the figure is as at, for an "as at" caption.
+  as_of?: string | null;
+}
+
+export interface MarketReportSection {
+  // Section heading, e.g. 'On-chain' or 'Macro'.
+  heading: string;
+  items: MarketReportItem[];
+}
+
+// Structured payload persisted under routines.last_result.metadata for market_report.
+export interface MarketReportResult {
+  sections: MarketReportSection[];
+  onchain_count: number;
+  macro_count: number;
+  // True when the report email reached at least one recipient.
+  emailed: boolean;
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
@@ -216,7 +256,8 @@ export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.NEWS_CURATION } & NewsCurationConfig)
   | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig)
   | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig)
-  | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig);
+  | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig)
+  | ({ action_type: typeof RoutineActionType.MARKET_REPORT } & MarketReportConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

@@ -13,6 +13,12 @@
  * See docs/features/economic-indicators/adapter-contract.md.
  */
 
+/** ISO 'YYYY-MM-DD' for the exact day of `date` (UTC). For daily series, whose
+ *  reference period IS the day — no collapse to first-of-period. */
+export function toISODateUTC(date: Date): string {
+  return isoDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
 /** ISO 'YYYY-MM-DD' for the first day of the month containing `date` (UTC). */
 export function toFirstOfMonthISO(date: Date): string {
   const y = date.getUTCFullYear();
