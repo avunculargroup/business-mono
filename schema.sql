@@ -2288,9 +2288,9 @@ CREATE TABLE onchain_indicators (
   key                   TEXT NOT NULL UNIQUE,          -- stable slug, e.g. 'hash_rate'
   name                  TEXT NOT NULL,
   short_label           TEXT NOT NULL,
-  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation')),
+  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot')),
   derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
-  provider              TEXT CHECK (provider IN ('mempool','coinmetrics')),  -- NULL for derived
+  provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me')),  -- NULL for derived
   provider_metric_code  TEXT,                          -- e.g. CM 'CapRealUSD'; NULL for derived
   derivation_spec       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- documents derived formula; NOT executed
   unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc'
@@ -2321,7 +2321,7 @@ CREATE TABLE onchain_observations (
   is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage for this observed_at
   is_revision      BOOLEAN NOT NULL DEFAULT FALSE,
   superseded_value NUMERIC(24,6),
-  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics')),
+  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics','coingecko','alternative_me')),
   raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
   ingested_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -2339,6 +2339,13 @@ CREATE TABLE onchain_observations (
 --       fee_share[derived], hash_ribbons[derived], mvrv, realised_price[derived],
 --       active_addresses) + 5 raw inputs (miner_revenue_total, miner_fees_total,
 --       realised_cap, supply, difficulty).
+-- Migration 20260704160000_add_bitcoin_snapshot_indicators: widened provider/source
+--   CHECKs (+coingecko, +alternative_me) and metric_group CHECK (+market_snapshot);
+--   seeded block_height (mempool), btc_price_aud (coingecko), fear_greed
+--   (alternative_me). These three are displayed LIVE (fetched at send time) in the
+--   market_report email rather than read from the last poll — see
+--   apps/agents/src/lib/report/runMarketReport.ts — but still accumulate daily
+--   history here via the normal onchain_poll routine.
 
 -- Views:
 --   v_onchain_series — current observations per indicator, oldest→newest (sparklines + Rex).

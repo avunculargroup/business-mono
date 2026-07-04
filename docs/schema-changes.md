@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-04 — `onchain_indicators`/`onchain_observations` — Bitcoin snapshot (block height, BTC/AUD price, Fear & Greed)
+
+**Migration:** `20260704160000_add_bitcoin_snapshot_indicators.sql`
+
+Adds three indicators the founders wanted on the daily market report: block height, Bitcoin price in AUD, and the Crypto Fear & Greed Index. Reuses the existing `onchain_indicators`/`onchain_observations` registry (from `20260621170000`) rather than a new table, so they get daily-history storage and revision handling for free via the existing generic `onchain_poll` routine/adapter loop — no changes needed there.
+
+- Widens `onchain_indicators.provider` and `onchain_observations.source` CHECKs to add two new keyless providers: **`coingecko`** (Bitcoin/AUD spot price) and **`alternative_me`** (Fear & Greed Index) — the same endpoints `apps/web`'s dashboard widgets (`BitcoinPriceAUD.tsx`, `FearGreedIndicator.tsx`) already call for live display.
+- Widens `onchain_indicators.metric_group` CHECK to add **`market_snapshot`** — none of the three are network-security or holder-behaviour/valuation metrics.
+- Seeds `block_height` (mempool, new `/blocks/tip/height` branch on the existing adapter), `btc_price_aud` (new `coingecko` adapter), `fear_greed` (new `alternative_me` adapter).
+
+Unlike every other `market_report` line, these three render from a **live fetch at send time** (same adapters, called directly, no DB write) rather than the last `onchain_poll` run's stored value — see `apps/agents/src/lib/report/runMarketReport.ts`. The stored observations exist for history and to compute the report's day-over-day delta; if the live fetch fails, the report falls back to the last stored value like everything else.
+
+---
+
 ## 2026-06-30 — `brand_voice.content_policy` — canon topic & positioning policy
 
 **Migration:** `20260630000000_add_brand_voice_content_policy.sql`
