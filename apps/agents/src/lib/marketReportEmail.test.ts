@@ -59,4 +59,44 @@ describe('renderMarketReportEmail', () => {
     expect(text).toContain('US 10Y: 3.85 %');
     expect(text).toContain('[neutral]');
   });
+
+  it('omits the intro block when no commentary is supplied', () => {
+    // The intro's accent rule is the marker for its presence.
+    expect(html).not.toContain('border-left:3px solid');
+  });
+
+  describe('with commentary', () => {
+    const withIntro = renderMarketReportEmail({
+      title: 'Daily market report',
+      sections,
+      date: new Date('2026-07-03T22:00:00Z'),
+      company,
+      commentary: 'Hash rate keeps grinding higher while the 10-year eases — the network is tightening as macro loosens.',
+    });
+
+    it('renders the intro in both HTML and plain text', () => {
+      expect(withIntro.html).toContain('the network is tightening as macro loosens');
+      expect(withIntro.html).toContain('border-left:3px solid');
+      expect(withIntro.text).toContain('Hash rate keeps grinding higher');
+    });
+
+    it('escapes HTML in the commentary to prevent markup injection', () => {
+      const evil = renderMarketReportEmail({
+        title: 'x',
+        sections,
+        date: new Date('2026-07-03T22:00:00Z'),
+        company,
+        commentary: '<script>alert(1)</script>',
+      });
+      expect(evil.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(evil.html).not.toContain('<script>alert(1)</script>');
+    });
+
+    it('treats whitespace-only commentary as absent', () => {
+      const blank = renderMarketReportEmail({
+        title: 'x', sections, date: new Date('2026-07-03T22:00:00Z'), company, commentary: '   ',
+      });
+      expect(blank.html).not.toContain('border-left:3px solid');
+    });
+  });
 });

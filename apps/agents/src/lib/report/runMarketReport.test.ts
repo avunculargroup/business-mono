@@ -5,6 +5,9 @@ import type { AdapterResult } from '../onchain/types.js';
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const deliverTeamEmail = vi.fn(async () => ({ configured: true, attempted: 2, sent: 2, failed: 0 }));
 const loadCompanyFooter = vi.fn(async () => ({ name: 'Bitcoin Treasury Solutions' }));
+const generateMarketCommentary = vi.fn(
+  async (): Promise<string | null> => 'Momentum is building across the network.',
+);
 const notFound: AdapterResult = { ok: false, error: { kind: 'not_found', message: 'unmocked' } };
 const mempoolFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
 const coingeckoFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
@@ -23,6 +26,9 @@ vi.mock('../onchain/adapters/coingecko.js', () => ({
 }));
 vi.mock('../onchain/adapters/alternativeMe.js', () => ({
   alternativeMeAdapter: { provider: 'alternative_me', fetchLatest: (...args: unknown[]) => alternativeMeFetchLatest(...(args as [])) },
+}));
+vi.mock('./marketCommentary.js', () => ({
+  generateMarketCommentary: (...args: unknown[]) => generateMarketCommentary(...(args as [])),
 }));
 
 const { runMarketReport } = await import('./runMarketReport.js');
@@ -58,6 +64,8 @@ beforeEach(() => {
   mempoolFetchLatest.mockClear();
   coingeckoFetchLatest.mockClear();
   alternativeMeFetchLatest.mockClear();
+  generateMarketCommentary.mockClear();
+  generateMarketCommentary.mockResolvedValue('Momentum is building across the network.');
 });
 
 describe('runMarketReport', () => {
@@ -94,9 +102,29 @@ describe('runMarketReport', () => {
     expect(macro.items[0].delta).toContain('▼');
     // Delivered via the shared transport.
     expect(deliverTeamEmail).toHaveBeenCalledTimes(1);
-    const [ref, message] = deliverTeamEmail.mock.calls[0] as unknown as [unknown, { subject: string }];
+    const [ref, message] = deliverTeamEmail.mock.calls[0] as unknown as [unknown, { subject: string; text: string }];
     expect(ref).toMatchObject({ id: 'r1' });
     expect(message.subject).toMatch(/^Market Report — /);
+    // The analyst intro is generated from the assembled sections and threaded
+    // into both the result and the rendered email.
+    expect(generateMarketCommentary).toHaveBeenCalledWith(res.sections, expect.any(Date));
+    expect(res.commentary).toBe('Momentum is building across the network.');
+    expect(message.text).toContain('Momentum is building across the network.');
+  });
+
+  it('still sends (without an intro) when commentary generation yields null', async () => {
+    setOnchain([
+      { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,
+        value: 900, observed_at: '2026-07-03', change_since_prior: 10, pct_change_since_prior: 1.1, signal: null },
+    ]);
+    setMacro([]);
+    generateMarketCommentary.mockResolvedValueOnce(null);
+
+    const out = await runMarketReport(ROUTINE, new Date('2026-07-03T22:00:00Z'));
+
+    expect(out.status).toBe('success');
+    expect(out.market_report_result?.commentary).toBeNull();
+    expect(deliverTeamEmail).toHaveBeenCalledTimes(1);
   });
 
   it('skips the email when there is no indicator data yet', async () => {

@@ -1,12 +1,18 @@
 /**
  * market_report routine handler — the daily market snapshot email.
  *
- * Deterministic and read-only (plus three live fetches — see below): it mostly
- * consumes data the on-chain and macro polls have ALREADY stored
- * (v_onchain_dashboard + v_indicator_latest), assembles neutral sections
- * (current value, day-over-day/period change, and any signal chip), and emails
- * them to the team via the shared deliverTeamEmail transport. It calls no LLM
- * and writes nothing beyond the routine's audit row.
+ * Read-only (plus three live fetches — see below): it mostly consumes data the
+ * on-chain and macro polls have ALREADY stored (v_onchain_dashboard +
+ * v_indicator_latest), assembles neutral sections (current value,
+ * day-over-day/period change, and any signal chip), and emails them to the team
+ * via the shared deliverTeamEmail transport. It writes nothing beyond the
+ * routine's audit row.
+ *
+ * The one LLM touch is a short intro: once the sections are assembled, the
+ * internal marketAnalyst agent gets the snapshot plus several days of recent
+ * history and writes a ≤50-word commentary on what changed (see
+ * marketCommentary.ts). It is best-effort — a failure just drops the intro, the
+ * report still sends. Everything else stays deterministic.
  *
  * The "Bitcoin" section (block height, BTC/AUD price, Fear & Greed) is the
  * exception: those three are fetched LIVE at send time via the same adapters
@@ -29,6 +35,7 @@ import {
 } from '@platform/shared';
 import { deliverTeamEmail, loadCompanyFooter } from '../sendNewsDigest.js';
 import { renderMarketReportEmail } from '../marketReportEmail.js';
+import { generateMarketCommentary } from './marketCommentary.js';
 import { mempoolAdapter } from '../onchain/adapters/mempool.js';
 import { coingeckoAdapter } from '../onchain/adapters/coingecko.js';
 import { alternativeMeAdapter } from '../onchain/adapters/alternativeMe.js';
@@ -90,6 +97,7 @@ export async function runMarketReport(
     macro_count: 0,
     bitcoin_count: 0,
     emailed: false,
+    commentary: null,
   };
 
   const [onchainRes, macroRes, bitcoinItems] = await Promise.all([
@@ -140,8 +148,13 @@ export async function runMarketReport(
     );
   }
 
+  // Best-effort intro: the analyst reads the snapshot + recent history and writes
+  // a ≤50-word commentary. A null result (error/empty/over-length) just omits it.
+  const commentary = await generateMarketCommentary(sections, now);
+  result.commentary = commentary;
+
   const company = await loadCompanyFooter();
-  const message = renderMarketReportEmail({ title: routine.name, sections, date: now, company });
+  const message = renderMarketReportEmail({ title: routine.name, sections, date: now, company, commentary });
   const delivery = await deliverTeamEmail({ id: routine.id, title: routine.name }, message);
   result.emailed = delivery.sent > 0;
 
