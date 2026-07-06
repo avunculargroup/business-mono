@@ -56,6 +56,12 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Lex',
     description: 'Compliance reviewer — flags advice-framed content (AFSL/AR) on draft persistence',
   },
+  {
+    key: 'marketAnalyst',
+    type: 'agent',
+    label: 'Market analyst',
+    description: 'Writes the daily market report intro from on-chain + macro trends (internal to the market_report routine)',
+  },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
   {

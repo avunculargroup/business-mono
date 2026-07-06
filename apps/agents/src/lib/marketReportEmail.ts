@@ -39,6 +39,8 @@ export interface MarketReportEmailInput {
   /** When the report was produced; formatted in the recipient-facing date line. */
   date: Date;
   company: CompanyFooter;
+  /** Optional ≤50-word analyst intro rendered above the sections. */
+  commentary?: string | null;
 }
 
 export interface RenderedEmail {
@@ -62,6 +64,7 @@ function safeHref(url: string): string | null {
 
 export function renderMarketReportEmail(input: MarketReportEmailInput): RenderedEmail {
   const { sections, company } = input;
+  const commentary = input.commentary?.trim() || null;
 
   const dateStr = new Intl.DateTimeFormat('en-AU', {
     day: 'numeric',
@@ -74,6 +77,7 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
 
   // ── Plain-text part ─────────────────────────────────────────────────────────
   const textLines: string[] = [`${company.name}`, subject, ''];
+  if (commentary) textLines.push(commentary, '');
   for (const section of sections) {
     textLines.push(section.heading.toUpperCase(), '');
     for (const it of section.items) {
@@ -112,6 +116,14 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
         </td></tr>`;
     })
     .join('');
+
+  // Analyst intro — serif, sitting between the date line and the first section,
+  // set off by a subtle accent rule. Uses the inlined palette only.
+  const commentaryHtml = commentary
+    ? `<tr><td style="padding:16px 0 4px 0;">
+          <div style="font-family:${FONT_DISPLAY};font-size:15px;line-height:1.55;color:${C.textPrimary};border-left:3px solid ${C.accent};padding-left:14px;">${escapeHtml(commentary)}</div>
+        </td></tr>`
+    : '';
 
   const logoHref = safeHref(LOGO_URL);
   const logoHtml = logoHref
@@ -152,6 +164,7 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
               <tr>
                 <td style="font-family:${FONT_BODY};font-size:13px;color:${C.textSecondary};padding-bottom:4px;">${escapeHtml(dateStr)}</td>
               </tr>
+              ${commentaryHtml}
               ${sectionsHtml}
             </table>
           </td>

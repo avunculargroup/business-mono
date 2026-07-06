@@ -38,7 +38,9 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    Block height, BTC/AUD price, and the Fear & Greed Index get their own "Bitcoin"
 //    section fetched LIVE at send time (not from the last onchain_poll run), with the
 //    delta computed against the most recently stored observation.
-//    Deterministic (no LLM); reads only (plus the three live fetches), writes nothing
+//    A short (≤50-word) intro is written by the internal marketAnalyst agent from the
+//    snapshot + several days of recent history — best-effort, so a failure just drops
+//    the intro. Otherwise reads only (plus the three live fetches), writes nothing
 //    beyond the audit trail.
 export const RoutineActionType = {
   RESEARCH_DIGEST:       'research_digest',
@@ -254,6 +256,9 @@ export interface MarketReportResult {
   bitcoin_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
+  // The ≤50-word analyst intro, or null when it was skipped (no data, generation
+  // error, or an over-length response). Best-effort — never blocks the report.
+  commentary?: string | null;
 }
 
 export type RoutineActionConfig =
