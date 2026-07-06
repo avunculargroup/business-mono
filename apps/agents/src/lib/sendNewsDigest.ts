@@ -50,17 +50,21 @@ export interface TeamEmailMessage {
   text: string;
 }
 
+/** Renders the message for one recipient — lets a caller personalise per address (e.g. a greeting). */
+export type TeamEmailMessageFactory = (recipient: JmapAddress) => TeamEmailMessage;
+
 /**
  * Sends a pre-rendered message to every team member from the hq@ send identity,
  * reusing the Fastmail token already stored in fastmail_accounts. Best-effort:
  * returns configured:false when no token exists, counts and logs per-recipient
  * failures, and never throws — so email delivery can never fail the calling
  * routine. The transport shared by every team-wide email (news digest, market
- * report, …); callers own the rendering.
+ * report, …); callers own the rendering. Pass a factory instead of a static
+ * message to personalise per recipient (e.g. a first-name greeting).
  */
 export async function deliverTeamEmail(
   routine: DigestRoutineRef,
-  message: TeamEmailMessage,
+  message: TeamEmailMessage | TeamEmailMessageFactory,
 ): Promise<DigestDeliveryResult> {
   const token = await loadSenderToken();
   if (!token) {
@@ -76,8 +80,6 @@ export async function deliverTeamEmail(
       console.warn('[team-email] No team_member recipients with an email — skipping');
       return { configured: true, attempted: 0, sent: 0, failed: 0 };
     }
-
-    const { subject, html, text } = message;
 
     const client = new FastmailJmapClient(SENDER_ACCOUNT_USERNAME, token);
     const { accountId, apiUrl } = await client.getSession();
@@ -96,6 +98,7 @@ export async function deliverTeamEmail(
     let failed = 0;
     for (const to of recipients) {
       try {
+        const { subject, html, text } = typeof message === 'function' ? message(to) : message;
         await client.sendHtmlEmail({
           accountId,
           apiUrl,
@@ -117,7 +120,7 @@ export async function deliverTeamEmail(
       }
     }
 
-    console.log(`[team-email] Sent "${subject}" — ${sent} delivered, ${failed} failed`);
+    console.log(`[team-email] Sent "${routine.title}" — ${sent} delivered, ${failed} failed`);
     return { configured: true, attempted: recipients.length, sent, failed };
   } catch (err) {
     // A setup failure (auth, session, recipient lookup) must not fail the routine.
@@ -135,14 +138,25 @@ export async function deliverNewsDigest(
   result: RoutineResult,
 ): Promise<DigestDeliveryResult> {
   const company = await loadCompanyFooter();
-  const message = renderNewsDigestEmail({
-    title: routine.title,
-    result,
-    date: new Date(),
-    webAppUrl: process.env['WEB_APP_URL'],
-    company,
-  });
-  return deliverTeamEmail(routine, message);
+  const date = new Date();
+  const webAppUrl = process.env['WEB_APP_URL'];
+  // Render per recipient so each email opens with their own first-name greeting.
+  return deliverTeamEmail(routine, (recipient) =>
+    renderNewsDigestEmail({
+      title: routine.title,
+      greeting: digestGreeting(recipient),
+      result,
+      date,
+      webAppUrl,
+      company,
+    }),
+  );
+}
+
+/** "Morning Chris," from a recipient's name, or a plain "Morning," when no name is known. */
+export function digestGreeting(recipient: JmapAddress): string {
+  const first = recipient.name?.trim().split(/\s+/)[0] ?? '';
+  return first ? `Morning ${first},` : 'Morning,';
 }
 
 /** The app-specific password for the sending account, from fastmail_accounts. */
