@@ -104,8 +104,10 @@ const curationSelectSchema = z.object({
 });
 
 const curationMoodSchema = z.object({
-  mood_summary: z.string().min(1).max(240)
-    .describe('One catchy sentence (no exclamation marks) summarising the overall mood and topics.'),
+  mood_summary: z.string().min(1).max(420)
+    .describe(
+      'Two sentences (no exclamation marks) grounded in specifics from the stories — name the companies, figures, decisions, or events. No vague, sweeping generalities.',
+    ),
 });
 
 const fetchDueRoutines = createStep({
@@ -318,7 +320,7 @@ interface CurationCandidate extends NewsCurationStory {
 /**
  * Curates the day's best stories across BOTH the news_items feed and ingested
  * podcast_episodes into a dashboard tile. The editor selects and ranks ≤6 items;
- * Charlie writes a one-sentence mood summary; the headline item's image (podcast
+ * Charlie writes a two-sentence, fact-grounded summary; the headline item's image (podcast
  * feed artwork, or a best-effort og:image for news) is surfaced on the tile.
  */
 export async function runNewsCuration(
@@ -455,10 +457,10 @@ ${candidateLines}`;
     image_url: c.image_url,
   }));
 
-  // ── Charlie writes the one-sentence mood summary ─────────────────────────────
-  const moodPrompt = `Write ONE catchy sentence (max 200 characters, no exclamation marks, BTS brand voice) summarising the overall mood and the main topics across these stories. "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
+  // ── Charlie writes the two-sentence, fact-grounded intro summary ─────────────
+  const moodPrompt = `Write a TWO-sentence intro (max 400 characters, no exclamation marks, BTS brand voice) for today's news digest. Ground it in the specific facts of the stories below — name the companies, figures, decisions, jurisdictions, or events that actually appear. A reader should learn the concrete substance from your two sentences. Do NOT write vague, sweeping generalities like "treasury desks lean in" or "the market is buzzing". "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
 
-${stories.map((s, i) => `${i + 1}. ${s.title} (${s.source_name})`).join('\n')}
+${selected.map((c, i) => `${i + 1}. ${c.title} (${c.source_name})\n   ${c.summary.slice(0, 400)}`).join('\n\n')}
 
 ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
 

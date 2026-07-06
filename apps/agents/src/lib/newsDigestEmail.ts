@@ -39,6 +39,8 @@ export interface CompanyFooter {
 export interface NewsDigestEmailInput {
   /** Routine title used in the header eyebrow (e.g. dashboard_title or name). */
   title: string;
+  /** Recipient-facing greeting line, e.g. "Morning Chris,". Omitted when empty. */
+  greeting?: string;
   result: RoutineResult;
   /** When the digest was produced; formatted in the recipient-facing date line. */
   date: Date;
@@ -146,7 +148,9 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   const subject = `Daily Digest - ${dateStr}`;
 
   // ── Plain-text part ─────────────────────────────────────────────────────────
+  const greeting = input.greeting?.trim() || '';
   const textLines: string[] = [`${company.name}`, dateStr, ''];
+  if (greeting) textLines.push(greeting, '');
   if (mood) textLines.push(mood, '');
   items.forEach((it, i) => {
     textLines.push(`${i + 1}. ${it.title}${it.source ? ` (${it.source})` : ''}`);
@@ -187,6 +191,10 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   const headlineImageHtml = headlineImage && safeHref(headlineImage)
     ? `<tr><td style="padding:0 0 20px 0;"><img src="${escapeHtml(headlineImage)}" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border-radius:12px;" /></td></tr>`
     : fallbackBannerHtml;
+
+  const greetingHtml = greeting
+    ? `<tr><td style="padding:0 0 12px 0;font-family:${FONT_BODY};font-size:16px;line-height:1.5;color:${C.textPrimary};">${escapeHtml(greeting)}</td></tr>`
+    : '';
 
   const moodHtml = mood
     ? `<tr><td style="padding:0 0 20px 0;font-family:${FONT_DISPLAY};font-size:20px;line-height:1.4;color:${C.textPrimary};">${escapeHtml(mood)}</td></tr>`
@@ -232,6 +240,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
                 <td style="font-family:${FONT_BODY};font-size:13px;color:${C.textSecondary};padding-bottom:20px;">${escapeHtml(dateStr)}</td>
               </tr>
               ${headlineImageHtml}
+              ${greetingHtml}
               ${moodHtml}
               ${storyRows}
               ${moreNewsHtml}

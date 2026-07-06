@@ -125,6 +125,18 @@ describe('deliverNewsDigest', () => {
     expect(firstCall.subject).not.toContain('Bitcoin Treasury Solutions');
   });
 
+  it('greets each recipient by their first name', async () => {
+    await deliverNewsDigest(routine, result);
+
+    const [first, second] = h.sendHtmlEmail.mock.calls.map(
+      (c) => c![0] as { to: Array<{ name?: string }>; html: string; text: string },
+    );
+    expect(first!.to[0]!.name).toBe('Chris Pollard');
+    expect(first!.html).toContain('Morning Chris,');
+    expect(first!.text).toContain('Morning Chris,');
+    expect(second!.html).toContain('Morning Carolyn,');
+  });
+
   it('counts per-recipient failures without throwing', async () => {
     h.sendHtmlEmail.mockRejectedValueOnce(new Error('mailbox over quota'));
 

@@ -63,6 +63,21 @@ describe('renderNewsDigestEmail', () => {
     expect(html).toContain('src="https://img.example/og.png"');
   });
 
+  it('renders the greeting line in both parts when provided, and omits it otherwise', () => {
+    const withGreeting = renderNewsDigestEmail({
+      title: 'X',
+      greeting: 'Morning Chris,',
+      result: sampleResult(),
+      date,
+      company,
+    });
+    expect(withGreeting.html).toContain('Morning Chris,');
+    expect(withGreeting.text).toContain('Morning Chris,');
+
+    const noGreeting = renderNewsDigestEmail({ title: 'X', result: sampleResult(), date, company });
+    expect(noGreeting.html).not.toContain('Morning');
+  });
+
   it('falls back to a branded "Daily News" banner with the date when no headline image resolves', () => {
     const result = sampleResult();
     delete (result.metadata as { headline_image_url?: string }).headline_image_url;
