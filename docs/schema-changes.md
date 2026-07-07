@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-07 — `v_indicator_latest` — fix "next release" cadence (period-based, not release-based)
+
+**Migration:** `20260707000000_fix_indicator_cadence_period_based.sql`
+
+The economic-indicator cards showed a nonsensical "next release" — e.g. AU Broad Money "released 1 July · next release ~ 1 July", a next release on the day it was released and already in the past. Root cause: `v_indicator_latest` computed `expected_next_release` as `released_at + median(gap between successive released_at values)`, but v1 adapters supply no publication date, so `runIndicatorPoll` substitutes the **fetch date** for `released_at`. A first-ingest backfill therefore writes its whole history with one `released_at`, making every release gap 0, the median 0, and `expected_next_release = released_at`. The backfill's many 0-gaps also dominate the median in steady state, so it never self-corrects.
+
+Fix: derive the cadence from **`period_date`** spacing instead. Every adapter normalises each observation to the first day of its period (a hard convention), so period gaps are the series' true publication cadence — ~30/31d monthly, ~91d quarterly. `expected_next_release` becomes `released_at + median(period gap)` — roughly a month/quarter after the last print, as expected. View-only change (recreated with `DROP`/`CREATE`); no table or column changes, so generated types are unaffected.
+
+---
+
 ## 2026-07-04 — `onchain_indicators`/`onchain_observations` — Bitcoin snapshot (block height, BTC/AUD price, Fear & Greed)
 
 **Migration:** `20260704160000_add_bitcoin_snapshot_indicators.sql`

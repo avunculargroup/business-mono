@@ -2262,8 +2262,11 @@ CREATE TABLE indicator_observations (
 --     (sparklines + Rex). Columns: indicator_id, short_label, period_date, value, released_at.
 --   v_indicator_latest — one row per active indicator: current value, change-since-prior,
 --     YoY (via a calendar-year period_date join — frequency-agnostic, gap-tolerant),
---     and a computed cadence (median release gap → expected_next_release). Nothing stored.
---     Component picks the YoY column by category: yoy_change (policy_rate, pp) vs
+--     and a computed cadence (median gap between PERIODS → expected_next_release).
+--     Cadence is derived from period_date spacing, not released_at: v1 substitutes
+--     the fetch date for released_at, so a backfill shares one release date and its
+--     release gaps are all 0 (migration 20260707000000). Nothing stored. Component
+--     picks the YoY column by category: yoy_change (policy_rate, pp) vs
 --     yoy_pct_change (inflation = the rate; money_supply = the debasement rate).
 
 
