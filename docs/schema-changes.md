@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-08 — `onchain_indicators` — Trend & Valuation metrics (moving averages, Mayer Multiple, cross, RSI, volatility, drawdown)
+
+**Migration:** `20260708000000_add_btc_trend_valuation.sql`
+
+Adds the price-derived "chart metrics" the founders asked to surface on both the dashboard and the daily market report: 200-day / 50-day / 200-week moving averages, the Mayer Multiple, a 50d/200d cross, RSI(14), 30-day annualised realised volatility, and drawdown from the observed high. Reuses the existing `onchain_indicators`/`onchain_observations` registry (from `20260621170000`) and the derived-view pattern of `v_hash_ribbons` — the ONLY new stored input is a daily BTC/USD close; every metric is computed in a view, never stored.
+
+- Widens `onchain_indicators.metric_group` CHECK to add **`trend_valuation`**.
+- Seeds one raw input — **`btc_price_usd`** (Coin Metrics `PriceUSD`, `is_displayed=false`) — picked up automatically by the existing `coinmetrics` adapter (it batches every CM metric into one call). USD, not AUD: the 200-week MA and Mayer Multiple are conventionally USD and `PriceUSD` has the deep history the 200-week window needs. The existing `btc_price_aud` snapshot card is unaffected.
+- Seeds 8 derived display metrics (`ma_50d`, `ma_200d`, `ma_200w`, `mayer_multiple`, `ma_cross`, `rsi_14`, `realized_vol_30d`, `drawdown_from_high`), all `derivation='derived'`, `provider=NULL`, empty `alert_config` (display-only — they never propose a content beat).
+- New views **`v_btc_trend`** (per-day computed columns) and **`v_btc_trend_metrics`** (latest row unpivoted, shaped like `v_onchain_dashboard`), and rebuilds **`v_onchain_dashboard`** to union the trend rows in. The 200-week MA is implemented as a 1400-day SMA (the standard proxy); windows count ROWS not calendar days (same caveat as `v_hash_ribbons`).
+- Bumps the `onchain_poll` routine's `backfill_days` to **2600** so the 200-week window and the drawdown high (incl. the 2021 cycle high) populate on first ingest.
+
+**Adapter change (non-schema):** `coinmetrics.ts` now sends an explicit `start_time` window (a rolling `now − windowDays` anchor) with a matching `page_size`, instead of a bare `page_size`. Coin Metrics sorts time-ascending from the start of history, so a bare bounded page returns the OLDEST days — a deep backfill would have fetched 2010-era data. The window anchor makes both the steady poll (last few days) and a backfill (last N days) return the RECENT series regardless of default sort. This also affects the existing CM metrics (MVRV, realised cap, supply, active addresses) — they now poll a bounded recent window rather than `page_size=2` from the default page.
+
+Compliance: valuation/trend is the platform's highest advice-risk surface. Every metric renders factually (value + direction only); the 50d/200d cross is labelled neutrally (above / below / crossed above / crossed below) — it states what the relationship IS, never a buy/sell implication.
+
+The `v_onchain_dashboard` column shape is unchanged, so generated types are unaffected; the new `v_btc_trend*` views are not referenced from TypeScript.
+
+---
+
 ## 2026-07-07 — `v_indicator_latest` — fix "next release" cadence (period-based, not release-based)
 
 **Migration:** `20260707000000_fix_indicator_cadence_period_based.sql`

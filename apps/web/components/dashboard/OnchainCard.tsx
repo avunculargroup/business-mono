@@ -6,6 +6,7 @@ import {
   isFresh,
   rangePosition,
   signalState,
+  signalLabel,
   sparklinePath,
   unitLabel,
   POOL_CONCENTRATION_NOTE_THRESHOLD,
@@ -84,18 +85,21 @@ function Delta({ row }: { row: OnchainDashboardRow }) {
   );
 }
 
-/** Hash-Ribbons state — a neutral chip. States what the cross IS, never "BUY". */
+/** A neutral signal chip — Hash Ribbons (30/60-day) or the 50d/200d cross. States
+ *  what the relationship IS, never "BUY". */
 function SignalChip({ row }: { row: OnchainDashboardRow }) {
   const signal = signalState(row);
   if (!signal) return <p className={styles.empty}>No signal yet</p>;
+  // Which spread the meta figure describes, keyed by metric.
+  const spreadLabel = row.key === 'ma_cross' ? '50/200-day spread' : '30/60-day spread';
   return (
     <div className={styles.signalRow}>
       <span className={styles.signalChip} data-signal={signal}>
-        {signal}
+        {signalLabel(signal)}
       </span>
       {row.value != null && (
         <span className={styles.signalMeta}>
-          30/60-day spread {row.value >= 0 ? '+' : '−'}
+          {spreadLabel} {row.value >= 0 ? '+' : '−'}
           {Math.abs(row.value).toFixed(row.decimals ?? 2)}%
         </span>
       )}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseCoinMetricsResponse } from './coinmetrics.js';
+import { parseCoinMetricsResponse, buildAssetMetricsUrl } from './coinmetrics.js';
 
 function fixture(name: string): unknown {
   return JSON.parse(readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8'));
@@ -58,5 +58,25 @@ describe('parseCoinMetricsResponse', () => {
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.error.kind).toBe('parse');
+  });
+});
+
+describe('buildAssetMetricsUrl', () => {
+  const codes = new Map<string, string>([['PriceUSD', 'btc_price_usd']]);
+  const now = new Date('2026-07-08T09:00:00Z');
+
+  it('anchors a rolling window off now via start_time (not the oldest page)', () => {
+    // Steady poll: last STEADY_WINDOW_DAYS (3) days ending today.
+    const url = buildAssetMetricsUrl(codes, undefined, now);
+    expect(url.searchParams.get('sort')).toBe('time');
+    expect(url.searchParams.get('start_time')).toBe('2026-07-06'); // now − 2 days
+    expect(url.searchParams.get('page_size')).toBe('4');           // window + 1, one page
+    expect(url.searchParams.get('metrics')).toBe('PriceUSD');
+  });
+
+  it('backfill widens the window to backfillDays and keeps page_size ≥ window', () => {
+    const url = buildAssetMetricsUrl(codes, { backfillDays: 2600 }, now);
+    expect(url.searchParams.get('start_time')).toBe('2019-05-27'); // now − 2599 days
+    expect(url.searchParams.get('page_size')).toBe('2601');
   });
 });

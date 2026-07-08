@@ -10,6 +10,7 @@ import { BlockHeight } from '@/components/dashboard/BlockHeight';
 import { OpenRouterCredits } from '@/components/dashboard/OpenRouterCredits';
 import { MacroIndicators } from '@/components/dashboard/MacroIndicators';
 import { OnchainIndicators } from '@/components/dashboard/OnchainIndicators';
+import { TrendValuation } from '@/components/dashboard/TrendValuation';
 import { formatRelativeDate } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './dashboard.module.css';
@@ -68,6 +69,7 @@ export default async function DashboardPage() {
         <BlockHeight />
         <OpenRouterCredits />
       </div>
+      <TrendValuation latest={onchainLatest ?? []} />
       <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
       <OnchainIndicators latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <div className={styles.grid}>
