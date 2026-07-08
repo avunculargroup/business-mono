@@ -193,7 +193,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
     : fallbackBannerHtml;
 
   const greetingHtml = greeting
-    ? `<tr><td style="padding:0 0 12px 0;font-family:${FONT_BODY};font-size:16px;line-height:1.5;color:${C.textPrimary};">${escapeHtml(greeting)}</td></tr>`
+    ? `<tr><td style="padding:0 0 12px 0;font-family:${FONT_DISPLAY};font-size:20px;line-height:1.4;color:${C.textPrimary};">${escapeHtml(greeting)}</td></tr>`
     : '';
 
   const moodHtml = mood
