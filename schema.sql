@@ -2291,7 +2291,7 @@ CREATE TABLE onchain_indicators (
   key                   TEXT NOT NULL UNIQUE,          -- stable slug, e.g. 'hash_rate'
   name                  TEXT NOT NULL,
   short_label           TEXT NOT NULL,
-  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot')),
+  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot','trend_valuation')),
   derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
   provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me')),  -- NULL for derived
   provider_metric_code  TEXT,                          -- e.g. CM 'CapRealUSD'; NULL for derived
@@ -2349,6 +2349,13 @@ CREATE TABLE onchain_observations (
 --   market_report email rather than read from the last poll — see
 --   apps/agents/src/lib/report/runMarketReport.ts — but still accumulate daily
 --   history here via the normal onchain_poll routine.
+-- Migration 20260708000000_add_btc_trend_valuation: added metric_group 'trend_valuation'
+--   and seeded a BTC/USD close raw input (btc_price_usd, CM PriceUSD, is_displayed=false)
+--   plus 8 derived display metrics — ma_50d, ma_200d, ma_200w, mayer_multiple, ma_cross
+--   (signal), rsi_14, realized_vol_30d, drawdown_from_high — all computed in v_btc_trend.
+--   Bumped the onchain_poll routine's backfill_days to 2600 so the 200-week window and
+--   the drawdown high populate on first ingest. The coinmetrics adapter now sends an
+--   explicit start_time window (see adapter note) so a deep backfill returns RECENT days.
 
 -- Views:
 --   v_onchain_series — current observations per indicator, oldest→newest (sparklines + Rex).
@@ -2357,9 +2364,18 @@ CREATE TABLE onchain_observations (
 --     (capitulation/recovery/neutral). NB: ROWS BETWEEN N PRECEDING counts ROWS not
 --     calendar days — assumes daily-contiguous hash_rate rows (a polling gap shortens
 --     the window). Only emits once 60 days of history exist.
+--   v_btc_trend — per-day trend metrics from the btc_price_usd close series:
+--     ma_50d, ma_200d, ma_200w (1400-day SMA proxy), mayer_multiple, ma_cross_spread_pct
+--     + above_200d flag, realized_vol_30d (annualised), rsi_14 (Cutler SMA), drawdown_pct
+--     (from running high). Same ROWS-window caveat as v_hash_ribbons. Each metric is
+--     NULL until its window has enough contiguous days.
+--   v_btc_trend_metrics — latest v_btc_trend row unpivoted to one row per trend metric,
+--     shaped exactly like v_onchain_dashboard (with day-over-day deltas; the ma_cross
+--     signal is above/below/cross_up/cross_down from the latest-vs-prior transition).
 --   v_onchain_dashboard — one row per DISPLAY metric (fetched + derived), uniform shape:
 --     key, name, short_label, metric_group, unit, decimals, value, observed_at,
 --     change_since_prior, pct_change_since_prior, days_since_observed, signal. Fetched
 --     read their latest current observation (with day-over-day deltas); derived
---     (fee_share, realised_price, hash_ribbons) are computed inline. Derived metrics
---     carry NULL deltas in v1.
+--     (fee_share, realised_price, hash_ribbons) are computed inline; the trend_valuation
+--     rows are unioned in from v_btc_trend_metrics. Non-trend derived metrics carry NULL
+--     deltas; trend metrics carry deltas.

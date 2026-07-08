@@ -4467,6 +4467,39 @@ export type Database = {
         }
         Relationships: []
       }
+      v_btc_trend: {
+        Row: {
+          above_200d: number | null
+          close: number | null
+          drawdown_pct: number | null
+          ma_200d: number | null
+          ma_200w: number | null
+          ma_50d: number | null
+          ma_cross_spread_pct: number | null
+          mayer_multiple: number | null
+          observed_at: string | null
+          realized_vol_30d: number | null
+          rsi_14: number | null
+        }
+        Relationships: []
+      }
+      v_btc_trend_metrics: {
+        Row: {
+          change_since_prior: number | null
+          days_since_observed: number | null
+          decimals: number | null
+          key: string | null
+          metric_group: string | null
+          name: string | null
+          observed_at: string | null
+          pct_change_since_prior: number | null
+          short_label: string | null
+          signal: string | null
+          unit: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
       v_hash_ribbons: {
         Row: {
           hash_rate_eh_s: number | null

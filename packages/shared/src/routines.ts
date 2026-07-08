@@ -254,6 +254,9 @@ export interface MarketReportResult {
   // Block height, BTC/AUD price, Fear & Greed — fetched live at send time, not
   // read from the last onchain_poll run. See runMarketReport.ts.
   bitcoin_count: number;
+  // Price-derived trend/valuation metrics (moving averages, Mayer Multiple, 50d/200d
+  // cross, RSI, realised volatility, drawdown) — derived in v_btc_trend.
+  trend_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
   // The ≤50-word analyst intro, or null when it was skipped (no data, generation

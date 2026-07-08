@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCommentaryPrompt, type HistoryMap } from './marketCommentary.js';
+import { buildCommentaryPrompt, pivotTrendRows, type HistoryMap } from './marketCommentary.js';
 import type { MarketReportSection } from '@platform/shared';
 
 const sections: MarketReportSection[] = [
@@ -50,5 +50,33 @@ describe('buildCommentaryPrompt', () => {
     expect(prompt).toContain('changing conditions');
     expect(prompt).toContain('one or two');
     expect(prompt).toMatch(/50 words/);
+  });
+});
+
+describe('pivotTrendRows', () => {
+  it('pivots v_btc_trend columns into the report section labels, oldest→latest', () => {
+    const rows = [
+      { observed_at: '2026-07-01', ma_200d: 90000, mayer_multiple: 1.10, rsi_14: 48, ma_cross_spread_pct: 2.0, drawdown_pct: -20, ma_50d: null, ma_200w: null, realized_vol_30d: null },
+      { observed_at: '2026-07-02', ma_200d: 91000, mayer_multiple: 1.12, rsi_14: 52, ma_cross_spread_pct: 3.0, drawdown_pct: -18, ma_50d: null, ma_200w: null, realized_vol_30d: null },
+      { observed_at: '2026-07-03', ma_200d: 92000, mayer_multiple: 1.15, rsi_14: 55, ma_cross_spread_pct: 4.2, drawdown_pct: -17, ma_50d: null, ma_200w: null, realized_vol_30d: null },
+    ];
+    const map = pivotTrendRows(rows, 7);
+    expect(map['200-Day MA']).toEqual([90000, 91000, 92000]);
+    expect(map['Mayer Multiple']).toEqual([1.10, 1.12, 1.15]);
+    expect(map['RSI (14d)']).toEqual([48, 52, 55]);
+    expect(map['50d vs 200d']).toEqual([2.0, 3.0, 4.2]);
+    expect(map['Drawdown']).toEqual([-20, -18, -17]);
+    // Columns that were null across every row produce no label at all.
+    expect(map['50-Day MA']).toBeUndefined();
+    expect(map['Volatility (30d)']).toBeUndefined();
+  });
+
+  it('keeps only the last `keep` points per metric', () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      observed_at: `2026-07-${String(i + 1).padStart(2, '0')}`,
+      ma_200d: 90000 + i,
+    })) as Parameters<typeof pivotTrendRows>[0];
+    expect(pivotTrendRows(rows, 7)['200-Day MA']).toHaveLength(7);
+    expect(pivotTrendRows(rows, 7)['200-Day MA'].at(-1)).toBe(90009);
   });
 });

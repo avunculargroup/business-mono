@@ -22,11 +22,13 @@ const UNIT_LABELS: Record<string, string> = {
   count: '',
   signal: '',
   btc: 'BTC',
+  index: '',
 };
 
 const GROUP_LABELS: Record<string, string> = {
   network_security: 'Network security',
   behaviour_valuation: 'Holder behaviour & valuation',
+  trend_valuation: 'Trend & valuation',
 };
 
 export function unitLabel(unit: string | null): string {
@@ -88,14 +90,35 @@ export function displayValue(row: OnchainDashboardRow): string {
   return formatValue(row.value, decimals);
 }
 
-export type SignalState = 'recovery' | 'capitulation' | 'neutral';
+export type SignalState =
+  | 'recovery' | 'capitulation' | 'neutral'      // Hash Ribbons
+  | 'above' | 'below' | 'cross_up' | 'cross_down'; // 50d/200d cross
 
-/** Hash-Ribbons signal as a neutral state. NEVER mapped to buy/sell or a colour
- *  semantic — the chip states what the cross IS, not what to DO. */
+const SIGNAL_STATES = new Set<SignalState>([
+  'recovery', 'capitulation', 'neutral', 'above', 'below', 'cross_up', 'cross_down',
+]);
+
+/** A signal as a neutral state. NEVER mapped to buy/sell or a colour semantic —
+ *  the chip states what the relationship IS, not what to DO. */
 export function signalState(row: OnchainDashboardRow): SignalState | null {
   const s = row.signal;
-  if (s === 'recovery' || s === 'capitulation' || s === 'neutral') return s;
-  return null;
+  return s != null && SIGNAL_STATES.has(s as SignalState) ? (s as SignalState) : null;
+}
+
+/** Human-readable chip label for a signal state. The 50d/200d cross is phrased so
+ *  it states the relationship, never an implied action. */
+const SIGNAL_LABELS: Record<SignalState, string> = {
+  recovery: 'recovery',
+  capitulation: 'capitulation',
+  neutral: 'neutral',
+  above: '50d above 200d',
+  below: '50d below 200d',
+  cross_up: '50d crossed above 200d',
+  cross_down: '50d crossed below 200d',
+};
+
+export function signalLabel(state: SignalState): string {
+  return SIGNAL_LABELS[state];
 }
 
 /** Where the current value sits within its own observed history, as a 0–1

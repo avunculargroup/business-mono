@@ -112,6 +112,39 @@ describe('runMarketReport', () => {
     expect(message.text).toContain('Momentum is building across the network.');
   });
 
+  it('splits trend_valuation rows into their own ordered section with a neutral cross label', async () => {
+    setOnchain([
+      { key: 'mvrv', short_label: 'MVRV', metric_group: 'behaviour_valuation', unit: 'ratio', decimals: 2,
+        value: 2.1, observed_at: '2026-07-03', change_since_prior: null, pct_change_since_prior: null, signal: null },
+      // Deliberately out of display order — buildTrendItems re-sorts by TREND_ORDER.
+      { key: 'mayer_multiple', short_label: 'Mayer Multiple', metric_group: 'trend_valuation', unit: 'ratio', decimals: 2,
+        value: 1.15, observed_at: '2026-07-03', change_since_prior: 0.02, pct_change_since_prior: 1.77, signal: null },
+      { key: 'ma_200d', short_label: '200-Day MA', metric_group: 'trend_valuation', unit: 'usd', decimals: 0,
+        value: 92000, observed_at: '2026-07-03', change_since_prior: 300, pct_change_since_prior: 0.33, signal: null },
+      { key: 'ma_cross', short_label: '50d vs 200d', metric_group: 'trend_valuation', unit: 'signal', decimals: 2,
+        value: 4.2, observed_at: '2026-07-03', change_since_prior: null, pct_change_since_prior: null, signal: 'cross_up' },
+    ]);
+    setMacro([]);
+
+    const out = await runMarketReport(ROUTINE, new Date('2026-07-03T22:00:00Z'));
+
+    expect(out.status).toBe('success');
+    const res = out.market_report_result!;
+    expect(res.trend_count).toBe(3);
+    expect(res.onchain_count).toBe(1); // MVRV only — trend rows excluded from On-chain
+
+    // Trend section renders between Bitcoin and On-chain, in TREND_ORDER.
+    const headings = res.sections.map((s) => s.heading);
+    expect(headings).toEqual(['Trend & Valuation', 'On-chain']);
+    const trend = res.sections.find((s) => s.heading === 'Trend & Valuation')!;
+    expect(trend.items.map((i) => i.label)).toEqual(['200-Day MA', 'Mayer Multiple', '50d vs 200d']);
+    // The cross signal token is humanised to a neutral, action-free phrase.
+    expect(trend.items[2].signal).toBe('50d crossed above 200d');
+    // On-chain no longer carries the trend rows.
+    const onchain = res.sections.find((s) => s.heading === 'On-chain')!;
+    expect(onchain.items.map((i) => i.label)).toEqual(['MVRV']);
+  });
+
   it('still sends (without an intro) when commentary generation yields null', async () => {
     setOnchain([
       { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,

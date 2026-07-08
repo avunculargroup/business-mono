@@ -96,6 +96,7 @@ export async function runMarketReport(
     onchain_count: 0,
     macro_count: 0,
     bitcoin_count: 0,
+    trend_count: 0,
     emailed: false,
     commentary: null,
   };
@@ -118,20 +119,26 @@ export async function runMarketReport(
 
   // market_snapshot rows (block height, BTC/AUD price, Fear & Greed) get their own
   // "Bitcoin" section built from a live fetch above — exclude them here so they
-  // don't also render as stale On-chain rows from last night's poll.
-  const onchainRows = ((onchainRes.data ?? []) as unknown as OnchainRow[]).filter(
-    (r) => r.metric_group !== 'market_snapshot',
+  // don't also render as stale On-chain rows from last night's poll. trend_valuation
+  // rows (price MAs, Mayer, cross, RSI, vol, drawdown) get their own section too.
+  const allOnchain = (onchainRes.data ?? []) as unknown as OnchainRow[];
+  const onchainRows = allOnchain.filter(
+    (r) => r.metric_group !== 'market_snapshot' && r.metric_group !== 'trend_valuation',
   );
+  const trendRows = allOnchain.filter((r) => r.metric_group === 'trend_valuation');
   const macroRows = ((macroRes.data ?? []) as unknown as MacroRow[]);
 
   const onchainItems = buildOnchainItems(onchainRows);
+  const trendItems = buildTrendItems(trendRows);
   const macroItems = buildMacroItems(macroRows);
   result.onchain_count = onchainItems.length;
   result.macro_count = macroItems.length;
   result.bitcoin_count = bitcoinItems.length;
+  result.trend_count = trendItems.length;
 
   const sections: MarketReportSection[] = [];
   if (bitcoinItems.length) sections.push({ heading: 'Bitcoin', items: bitcoinItems });
+  if (trendItems.length) sections.push({ heading: 'Trend & Valuation', items: trendItems });
   if (onchainItems.length) sections.push({ heading: 'On-chain', items: onchainItems });
   if (macroItems.length) sections.push({ heading: 'Macro', items: macroItems });
   result.sections = sections;
@@ -159,8 +166,8 @@ export async function runMarketReport(
   result.emailed = delivery.sent > 0;
 
   const summary =
-    `Market report: ${result.bitcoin_count} bitcoin + ${result.onchain_count} on-chain + ` +
-    `${result.macro_count} macro indicators` +
+    `Market report: ${result.bitcoin_count} bitcoin + ${result.trend_count} trend + ` +
+    `${result.onchain_count} on-chain + ${result.macro_count} macro indicators` +
     (delivery.configured
       ? ` — emailed to ${delivery.sent}/${delivery.attempted} team members`
       : ' — email not configured');
@@ -186,6 +193,38 @@ function buildOnchainItems(rows: OnchainRow[]): MarketReportItem[] {
       value: fmtValue(r.value, r.decimals ?? 2, ONCHAIN_UNITS[r.unit ?? ''] ?? ''),
       delta: fmtDelta(r.change_since_prior, r.pct_change_since_prior, r.decimals ?? 2),
       signal: r.signal ?? null,
+      as_of: r.observed_at ?? null,
+    }));
+}
+
+// Display order within Trend & Valuation: the moving-average ladder, then the
+// derived ratios/oscillators. Keys not listed sort last, stably.
+const TREND_ORDER = [
+  'ma_50d', 'ma_200d', 'ma_200w', 'mayer_multiple', 'ma_cross',
+  'rsi_14', 'realized_vol_30d', 'drawdown_from_high',
+];
+
+// The 50d/200d cross state, framed neutrally — states what the relationship IS,
+// never a buy/sell implication. Mirrors the neutral chip on the web dashboard.
+const CROSS_SIGNAL_LABEL: Record<string, string> = {
+  above: '50d above 200d',
+  below: '50d below 200d',
+  cross_up: '50d crossed above 200d',
+  cross_down: '50d crossed below 200d',
+};
+
+function buildTrendItems(rows: OnchainRow[]): MarketReportItem[] {
+  const rank = (k: string | null) => {
+    const i = TREND_ORDER.indexOf(k ?? '');
+    return i === -1 ? TREND_ORDER.length : i;
+  };
+  return [...rows]
+    .sort((a, b) => rank(a.key) - rank(b.key))
+    .map((r) => ({
+      label: r.short_label ?? r.key ?? '',
+      value: fmtValue(r.value, r.decimals ?? 2, ONCHAIN_UNITS[r.unit ?? ''] ?? ''),
+      delta: fmtDelta(r.change_since_prior, r.pct_change_since_prior, r.decimals ?? 2),
+      signal: r.signal ? CROSS_SIGNAL_LABEL[r.signal] ?? r.signal : null,
       as_of: r.observed_at ?? null,
     }));
 }
