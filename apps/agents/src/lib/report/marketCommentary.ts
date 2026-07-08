@@ -58,13 +58,47 @@ function groupTail(
   return byLabel;
 }
 
+// The trend_valuation metrics are DERIVED (computed in v_btc_trend), so they have
+// no rows in v_onchain_series. Their history comes from v_btc_trend's per-day
+// columns instead, pivoted to the same short_label the report sections carry.
+// One v_btc_trend row: metric columns are number|null, observed_at is a string —
+// a permissive value type covers both (pivot only reads the metric columns).
+type TrendRow = Record<string, number | string | null>;
+const TREND_COLUMN_LABELS: Record<string, string> = {
+  ma_50d: '50-Day MA',
+  ma_200d: '200-Day MA',
+  ma_200w: '200-Week MA',
+  mayer_multiple: 'Mayer Multiple',
+  ma_cross_spread_pct: '50d vs 200d',
+  rsi_14: 'RSI (14d)',
+  realized_vol_30d: 'Volatility (30d)',
+  drawdown_pct: 'Drawdown',
+};
+
+/** Pivot v_btc_trend rows (oldest → latest) into a label-keyed history map,
+ *  keeping the last `keep` non-null points per metric. Pure/exported for tests. */
+export function pivotTrendRows(rows: TrendRow[], keep: number): HistoryMap {
+  const byLabel: HistoryMap = {};
+  for (const row of rows) {
+    for (const [column, label] of Object.entries(TREND_COLUMN_LABELS)) {
+      const v = row[column];
+      if (v == null) continue;
+      (byLabel[label] ??= []).push(Number(v));
+    }
+  }
+  for (const label of Object.keys(byLabel)) {
+    byLabel[label] = byLabel[label].slice(-keep);
+  }
+  return byLabel;
+}
+
 /**
  * Recent per-metric history for the on-chain/Bitcoin and macro indicators.
  * Reads the existing series views; returns {} on any error (best-effort).
  */
 export async function loadIndicatorHistory(now: Date = new Date()): Promise<HistoryMap> {
   try {
-    const [onchainRes, macroRes] = await Promise.all([
+    const [onchainRes, macroRes, trendRes] = await Promise.all([
       supabase
         .from('v_onchain_series')
         .select('short_label, value, observed_at')
@@ -75,6 +109,11 @@ export async function loadIndicatorHistory(now: Date = new Date()): Promise<Hist
         .select('short_label, value, period_date')
         .gte('period_date', daysAgoISO(now, MACRO_LOOKBACK_DAYS))
         .order('period_date', { ascending: true }),
+      supabase
+        .from('v_btc_trend')
+        .select('observed_at, ma_50d, ma_200d, ma_200w, mayer_multiple, ma_cross_spread_pct, rsi_14, realized_vol_30d, drawdown_pct')
+        .gte('observed_at', daysAgoISO(now, ONCHAIN_LOOKBACK_DAYS))
+        .order('observed_at', { ascending: true }),
     ]);
 
     const onchain = groupTail(
@@ -85,7 +124,8 @@ export async function loadIndicatorHistory(now: Date = new Date()): Promise<Hist
       (macroRes.data ?? []) as { short_label: string | null; value: number | null }[],
       MACRO_HISTORY_POINTS,
     );
-    return { ...onchain, ...macro };
+    const trend = pivotTrendRows((trendRes.data ?? []) as TrendRow[], ONCHAIN_HISTORY_POINTS);
+    return { ...onchain, ...trend, ...macro };
   } catch {
     return {};
   }
