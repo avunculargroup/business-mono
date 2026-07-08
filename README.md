@@ -1,6 +1,6 @@
 # business-mono
 
-Internal AI-powered operations platform for Bitcoin Treasury Solutions. Built on a hub-and-spoke agent architecture: a central coordinator (Simon) routes work to specialist agents, all sharing a Supabase database.
+Internal operations platform for Bitcoin Treasury Solutions (BTS) — a Bitcoin education, consulting, and treasury implementation company. Built on a hub-and-spoke agent architecture: a central coordinator (Simon) routes work to a roster of specialist agents, all sharing a Supabase database. A Next.js web app provides dashboards, approvals, and per-agent pages; a Mastra agent server runs the agents, workflows, and scheduled routines.
 
 ---
 
@@ -14,6 +14,8 @@ Internal AI-powered operations platform for Bitcoin Treasury Solutions. Built on
 - [Development](#development)
 - [Database](#database)
 - [Agents](#agents)
+- [Workflows and listeners](#workflows-and-listeners)
+- [Web app](#web-app)
 - [Webhooks](#webhooks)
 - [Deployment](#deployment)
 - [Key conventions](#key-conventions)
@@ -27,7 +29,8 @@ Directors (Signal / Web UI)
         ↕
      Simon (coordinator agent)
         ↕
-Specialist Agents: Recorder · Archivist · PM · BA · Content Creator · Researcher · Della (RM)
+Specialist Agents: Recorder · Archivist · PM · BA · Content Creator ·
+                   Researcher · Della (RM) · Margot (Marketer) · Lex (Compliance)
         ↕
   Supabase (shared Postgres + pgvector)
 ```
@@ -36,13 +39,15 @@ Simon is the only agent that talks to humans. Specialists never message director
 
 The one exception: any agent may query the Archivist's knowledge base directly for read-only lookups without going through Simon.
 
+A few agents are **internal** — invoked only inside a workflow, never on Simon's roster: the **editorial** agent (newsletter review) and **marketAnalyst** (market-report intro).
+
 ---
 
 ## Monorepo structure
 
 ```
 ├── apps/
-│   ├── agents/          # Mastra AI agent server — deployed to Railway
+│   ├── agents/          # Mastra agent server — deployed to Railway
 │   └── web/             # Next.js frontend — deployed to Vercel
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
@@ -59,7 +64,7 @@ The one exception: any agent may query the Archivist's knowledge base directly f
 ├── supabase/
 │   └── migrations/      # Database migrations — execution source of truth
 ├── schema.sql           # Consolidated database schema — human-readable reference only
-├── CLAUDE.md            # AI agent instructions
+├── CLAUDE.md            # Agent platform architecture, routing, conventions
 ├── tsconfig.base.json   # Base TypeScript config (extended by all packages)
 ├── turbo.json
 └── pnpm-workspace.yaml
@@ -136,7 +141,9 @@ cp apps/agents/.env.example apps/agents/.env
 | `SUPABASE_URL` | Yes | Your Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key (bypasses RLS — keep secret) |
 | `SUPABASE_PROJECT_ID` | Yes | Project ID for type generation |
-| `ANTHROPIC_API_KEY` | Yes* | Claude API key — all agents use `claude-sonnet-4-5` |
+| `MASTRA_DB_URL` | Yes | Postgres connection string for Mastra's internal thread/memory/semantic-recall storage and the native scheduler. **Not** the Supabase JS client. Railway Postgres recommended (always IPv4); Supabase direct works only with the IPv4 add-on. `SUPABASE_DB_URL` is accepted as a fallback. |
+| `ANTHROPIC_API_KEY` | Yes* | Claude API key — default model is `anthropic/claude-sonnet-4-5` |
+| `ANTHROPIC_MODEL` | No | Model override when using Anthropic direct |
 | `OPENROUTER_API_KEY` | Yes* | Alternative to Anthropic direct — takes priority if set |
 | `OPENROUTER_MODEL` | No | Model override when using OpenRouter (default: `anthropic/claude-sonnet-4-5`) |
 | `OPENAI_API_KEY` | Yes | Used for `text-embedding-3-small` (1536 dimensions) |
@@ -150,7 +157,18 @@ cp apps/agents/.env.example apps/agents/.env
 | `RAILWAY_PUBLIC_DOMAIN` | Yes | Public URL used when constructing webhook callback URLs |
 | `TAVILY_API_KEY` | No** | Tavily Search API key — Researcher agent web search (free tier: 1,000/month) |
 | `FIRECRAWL_API_KEY` | No** | Firecrawl API key — Researcher agent structured crawling (free tier: 500/month) |
-| `NEXT_PUBLIC_RESEARCH_INBOUND_DOMAIN` | No | Domain for email-newsletter inbound addresses (`research+{slug}@<domain>`), shown in the `/news/sources` form. Set in the web app's env (Vercel). Defaults to `btreasury.com.au`. |
+| `SIGNAL_LISTENER_ENABLED` | No | Kill switch for the Signal listener. Set to `false` to skip subscribing on boot (useful locally with no registered number). |
+| `WEB_APP_URL` | No | Web app base URL, used to make the news digest's "More news" link clickable. The button is omitted when unset. |
+| `MASTRA_CLOUD_ACCESS_TOKEN` | No | Ships traces to Mastra Cloud via `CloudExporter`. Self-disables when unset (local `DefaultExporter` is always on in dev). |
+
+**Web app** (`apps/web`, set in Vercel):
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
+| `OPENROUTER_API_KEY` | No | Read server-side only to show the credits balance on the dashboard. Use a dedicated, independently revocable key. |
+| `NEXT_PUBLIC_RESEARCH_INBOUND_DOMAIN` | No | Domain for email-newsletter inbound addresses (`research+{slug}@<domain>`), shown in the `/news/sources` form. Defaults to `btreasury.com.au`. |
 
 *Set either `ANTHROPIC_API_KEY` (direct) or `OPENROUTER_API_KEY` (OpenRouter). If both are set, `OPENROUTER_API_KEY` takes priority.
 
@@ -169,10 +187,24 @@ cp apps/agents/.env.example apps/agents/.env
 | `pnpm build` | Build all packages and apps |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
+| `pnpm test` | Run the Vitest suites for both apps |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
 | `pnpm --filter @platform/db seed:brand-voice` | Sync `docs/brand-voice.md` into `brand_assets` table |
 
 All commands are orchestrated through Turborepo, which handles build order and caching based on the dependency graph.
+
+### Testing
+
+Both apps carry a Vitest suite; `pnpm test` (root) runs both via Turborepo and is gated by the PR workflow (`.github/workflows/test.yml`).
+
+| Command | What it runs |
+|---------|--------------|
+| `pnpm --filter @platform/agents test` | Agent server suite — fully mocked, ~2s, no secrets |
+| `pnpm --filter @platform/agents typecheck` | Type-check the agent server |
+| `pnpm --filter @platform/agents test:eval` | LLM-touching routing/prompt evals — real LLM, on-demand, **not** in CI |
+| `pnpm --filter @platform/web test` | Web suite — `node` env for logic, `jsdom` + React Testing Library for components |
+
+Convention: put a `*.test.ts` (or `*.test.tsx`) next to the module. Reuse the shared helpers in `apps/agents/test/` (mocks, factories) rather than building one-off fixtures. Run the agent tests and typecheck before opening a PR — both are red-gates on CI.
 
 ### Adding a new agent
 
@@ -311,18 +343,20 @@ Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into 
 
 ## Agents
 
-Full specifications are in `docs/agents/`. Summary:
+Full specifications are in `docs/agents/`. Agent names in code use a persona (camelCase) — shown in parentheses. Summary:
 
 | Agent | Type | Role |
 |-------|------|------|
 | **Simon** | Agent | Central coordinator. Only agent that communicates with directors via Signal. Detects conflicts, tracks capacity gaps, dispatches to specialists. |
-| **Recorder** | Workflow + Agent | Ingests phone (Telnyx) and video (Zoom) recordings, transcribes via Deepgram, extracts entities, syncs to CRM, proposes tasks. |
-| **Archivist** | Agent | Manages the knowledge base. Processes URLs and YouTube videos, maps connections, answers knowledge queries via hybrid search. |
-| **PM** | Workflow + Agent | Triages tasks from `agent_activity`, manages projects, tracks risks, monitors blocked tasks. |
-| **BA** | Agent | Elicits and structures requirements with multi-round clarification loops (Mastra suspend/resume). |
-| **Content Creator** | Agent | Drafts and iterates content, enforces brand consistency, adapts across formats. All publishing is human-approved. |
-| **Researcher** | Workflow + Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds Archivist knowledge base. Scores ingested research (RSS/podcast/email newsletters) against the relevance rubric for the `/news` feed. |
-| **Della (RM)** | Agent | CRM management, customer understanding, relationship health, pipeline advice. Analyses Fastmail email via JMAP polling. |
+| **Recorder** (`roger`) | Workflow + Agent | Ingests phone (Telnyx) and video (Zoom) recordings, transcribes via Deepgram, extracts entities, syncs to CRM, proposes tasks. |
+| **Archivist** (`archie`) | Agent | Manages the knowledge base. Processes URLs and YouTube videos, maps connections, answers knowledge queries via hybrid search. |
+| **PM** (`petra`) | Workflow + Agent | Triages tasks from `agent_activity`, manages projects, tracks risks, monitors blocked tasks. |
+| **BA** (`bruno`) | Agent | Elicits and structures requirements with multi-round clarification loops (Mastra suspend/resume). |
+| **Content Creator** (`charlie`) | Agent | Drafts and iterates content, enforces brand consistency, adapts across formats. Feeds the newsletter and campaign workflows. All publishing is human-approved. |
+| **Researcher** (`rex`) | Workflow + Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds the Archivist knowledge base. Scores ingested research (RSS/podcast/YouTube/email newsletters) against the relevance rubric for the `/news` feed. |
+| **Della (RM)** (`della`) | Agent | CRM management, customer understanding, relationship health, pipeline advice. Analyses Fastmail email via JMAP polling. |
+| **Margot (Marketer)** (`margot`) | Agent | Campaign strategist above Content Creator. Turns an objective into a structured strategy and an ordered set of scheduled beats, powering the Campaign Strategy workflow. |
+| **Lex (Compliance)** (`lex`) | Agent | Reviews advice-framed content drafts for AFSL/AR compliance. Logs verdicts; never auto-approves. Re-runs when a campaign variant's copy is edited. |
 
 ### Approval philosophy
 
@@ -331,6 +365,44 @@ Operations graduate from human-confirmed → batch approval → autonomous based
 - Emails
 - Published content
 - CRM contact/company creation
+
+---
+
+## Workflows and listeners
+
+The agent server runs deterministic **workflows** and long-lived **listeners** alongside the agents (both registered in `apps/agents/src/mastra/index.ts`).
+
+**Workflows**
+
+| Workflow | Purpose |
+|----------|---------|
+| `recorder` | Transcription + entity extraction from call/video recordings |
+| `pm` | Task triage + risk scan |
+| `executeRoutine` | Cron-driven routines from the `routines` table (Mastra native scheduler) |
+| `newsletter` | Multi-stage newsletter generation (RAG → story selection → drafting → editorial review) with two human approval gates |
+| `strategy` | Campaign Strategy — Margot synthesises a strategy and beat plan behind two approval gates |
+| `variant` | Expands campaign beats into per-platform post variants (Lex compliance gate) |
+
+**Listeners** (`apps/agents/src/listeners/`) — Signal polling, web-directive and gate-resume realtime listeners, Fastmail CRM + research-newsletter polling, content-embedding sync, and compliance re-checks. The news pipeline (`ingestNewsItem` → Rex relevance rubric) feeds the `/news` feed from RSS, podcast, YouTube, and email-newsletter sources.
+
+---
+
+## Web app
+
+`apps/web` is a Next.js 15 App Router frontend (deployed to Vercel) with an authenticated shell at `app/(app)/`. Server actions live in `app/actions/`. Main areas:
+
+| Area | Purpose |
+|------|---------|
+| `dashboard` (`/`) | Overview — activity, approvals queue, credits |
+| `activity` | The `agent_activity` audit trail and approval actions |
+| `simon` | Conversational interface to Simon |
+| `crm` / `company` | Contacts, companies, interactions |
+| `projects` / `tasks` | Project and task tracking (PM) |
+| `content` / `campaigns` | Content drafts, newsletter gates, and marketing campaigns |
+| `news` | Curated research feed and source management (incl. email sources) |
+| `routines` | Scheduled agent routines |
+| `advisors` / `discovery` / `decks` / `products` / `brand` / `files` / `docs` | Supporting workspace pages |
+| `settings` | Integrations (Fastmail), per-agent/per-step model selection (`/settings/models`) |
 
 ---
 
@@ -383,5 +455,5 @@ Connect the `apps/web` directory to a Vercel project and set the same Supabase v
 | DB tables | snake_case, plural | `knowledge_items` |
 | TS files | camelCase modules, PascalCase components | `vectorSearch.ts` |
 | Env vars | `SCREAMING_SNAKE_CASE` with service prefix | `TELNYX_API_KEY` |
-| AI model | `anthropic/claude-sonnet-4-5` | all agents |
+| Default model | `anthropic/claude-sonnet-4-5` | all agents (overridable per agent/step via `/settings/models`) |
 | Embedding model | `text-embedding-3-small`, 1536 dims | Archivist, Recorder |
