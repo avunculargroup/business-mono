@@ -172,7 +172,7 @@ SELECT
        THEN ((ma_50d / NULLIF(ma_200d, 0)) - 1) * 100 END           AS ma_cross_spread_pct,
   CASE WHEN n50 >= 50 AND n200 >= 200
        THEN CASE WHEN ma_50d >= ma_200d THEN 1 ELSE 0 END END        AS above_200d,
-  CASE WHEN nret30 >= 30 THEN sd30 * SQRT(365) * 100 END             AS realized_vol_30d,
+  CASE WHEN nret30 >= 30 THEN (sd30 * SQRT(365) * 100)::numeric END  AS realized_vol_30d,
   CASE
     WHEN nchg >= 14 AND avg_loss > 0 THEN 100 - (100 / (1 + (avg_gain / avg_loss)))
     WHEN nchg >= 14 AND avg_loss = 0 AND avg_gain > 0 THEN 100
