@@ -117,7 +117,7 @@ generous but be polite — one daily poll is nothing.
 
 ### Coin Metrics community — `apps/agents/.../adapters/coinmetrics.ts`
 
-Free, keyless, JSON REST. Base `https://api.coinmetrics.io/v4`. **Batch everything in one request:**
+Free, keyless, JSON REST. Base `https://community-api.coinmetrics.io/v4` — the keyless community endpoint (the bare `api.coinmetrics.io` host is the authenticated Pro API and answers 401 to keyless requests). **Batch everything in one request:**
 
 ```
 GET /timeseries/asset-metrics
