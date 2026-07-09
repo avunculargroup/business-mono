@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-09 — Repoint the Gold indicator off the discontinued FRED LBMA series
+
+**Migration:** `20260709000000_repoint_gold_indicator_series.sql`
+
+The `economic_indicators` row `Gold (USD/oz)` was seeded (`20260703000000`) with FRED series `GOLDAMGBD228NLBM` (LBMA Gold Price, AM fixing), which FRED **discontinued** after ICE Benchmark Administration withdrew the LBMA licence. The indicator poll fails the fetch on every run, so Gold has printed **zero** observations since 2026-07-04 while its daily siblings (DXY / S&P 500 / US 10Y) print normally — the dashboard gold tile never gets a first print.
+
+- Data-only `UPDATE` to `economic_indicators.provider_series_code` (+ `notes`); no DDL, so `schema.sql` is unchanged (it carries no seed rows).
+- Once the code is corrected the poll self-heals: Gold has 0 rows, so `firstIngest` is still true and the next poll backfills ~90 days automatically. No data cleanup needed.
+- **⚠️ The replacement code is a placeholder.** FRED's API was unreachable from the build environment, so no live series could be confirmed. The migration includes a guard that **fails on purpose** until `new_code` is set to a verified, currently-active FRED daily gold series — it must not be merged un-edited.
+
+---
+
 ## 2026-07-08 — `onchain_indicators` — Trend & Valuation metrics (moving averages, Mayer Multiple, cross, RSI, volatility, drawdown)
 
 **Migration:** `20260708000000_add_btc_trend_valuation.sql`
