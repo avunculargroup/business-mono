@@ -65,6 +65,11 @@ describe('buildAssetMetricsUrl', () => {
   const codes = new Map<string, string>([['PriceUSD', 'btc_price_usd']]);
   const now = new Date('2026-07-08T09:00:00Z');
 
+  it('targets the keyless community host (the Pro host answers 401 keyless)', () => {
+    const url = buildAssetMetricsUrl(codes, undefined, now);
+    expect(url.origin).toBe('https://community-api.coinmetrics.io');
+  });
+
   it('anchors a rolling window off now via start_time (not the oldest page)', () => {
     // Steady poll: last STEADY_WINDOW_DAYS (3) days ending today.
     const url = buildAssetMetricsUrl(codes, undefined, now);

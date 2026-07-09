@@ -1,6 +1,8 @@
 /**
  * Coin Metrics community adapter — free, keyless, JSON REST.
- * Base https://api.coinmetrics.io/v4. BATCHES every metric into one request:
+ * Base https://community-api.coinmetrics.io/v4 — the keyless community endpoint.
+ * (The bare api.coinmetrics.io host is the authenticated Pro API and answers 401
+ * to keyless requests.) BATCHES every metric into one request:
  *
  *   GET /timeseries/asset-metrics
  *       ?assets=btc&metrics=CapMVRVCur,CapRealUSD,SplyCur,AdrActCnt
@@ -36,7 +38,7 @@ import type {
 } from '../types.js';
 import { utcDate } from '../types.js';
 
-const BASE = 'https://api.coinmetrics.io/v4';
+const BASE = 'https://community-api.coinmetrics.io/v4';
 
 // Steady poll window: enough recent days to catch the latest close plus a late
 // revision, without a backfill. Backfill overrides this via opts.backfillDays.
