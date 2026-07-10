@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseCoinMetricsResponse, buildAssetMetricsUrl } from './coinmetrics.js';
+import { parseCoinMetricsResponse, buildAssetMetricsUrl, coinmetricsAdapter } from './coinmetrics.js';
+import type { OnchainIndicatorConfig } from '../types.js';
 
 function fixture(name: string): unknown {
   return JSON.parse(readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8'));
@@ -65,7 +66,7 @@ describe('buildAssetMetricsUrl', () => {
   const codes = new Map<string, string>([['PriceUSD', 'btc_price_usd']]);
   const now = new Date('2026-07-08T09:00:00Z');
 
-  it('targets the keyless community host (the Pro host answers 401 keyless)', () => {
+  it('targets the keyless community host (the bare api host answers 401 keyless)', () => {
     const url = buildAssetMetricsUrl(codes, undefined, now);
     expect(url.origin).toBe('https://community-api.coinmetrics.io');
   });
@@ -83,5 +84,50 @@ describe('buildAssetMetricsUrl', () => {
     const url = buildAssetMetricsUrl(codes, { backfillDays: 2600 }, now);
     expect(url.searchParams.get('start_time')).toBe('2019-05-27'); // now − 2599 days
     expect(url.searchParams.get('page_size')).toBe('2601');
+  });
+});
+
+describe('coinmetricsAdapter.fetchLatest — community-tier 403 fallback', () => {
+  const indicators: OnchainIndicatorConfig[] = [
+    { key: 'mvrv', provider: 'coinmetrics', providerMetricCode: 'CapMVRVCur', unit: 'ratio' },
+    { key: 'btc_price_usd', provider: 'coinmetrics', providerMetricCode: 'PriceUSD', unit: 'usd' },
+  ];
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  // CM answers 403 to the batched request (a Pro-gated metric is in the set), then
+  // 403 for CapMVRVCur alone and 200 for PriceUSD alone.
+  function stubFetch() {
+    return vi.fn(async (input: URL | string) => {
+      const metrics = new URL(input).searchParams.get('metrics') ?? '';
+      const isSingle = !metrics.includes(',');
+      if (!isSingle) return new Response('forbidden', { status: 403 });
+      if (metrics === 'PriceUSD') {
+        return new Response(
+          JSON.stringify({ data: [{ asset: 'btc', time: '2026-07-08T00:00:00Z', PriceUSD: '64000' }] }),
+          { status: 200 },
+        );
+      }
+      return new Response('forbidden', { status: 403 }); // CapMVRVCur — not community
+    });
+  }
+
+  it('drops the forbidden metric but still ingests the entitled one', async () => {
+    vi.stubGlobal('fetch', stubFetch());
+    const res = await coinmetricsAdapter.fetchLatest(indicators);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const keys = res.observations.map((o) => o.key);
+    expect(keys).toContain('btc_price_usd'); // entitled → ingested
+    expect(keys).not.toContain('mvrv');       // forbidden → dropped, not fatal
+    expect(res.observations.find((o) => o.key === 'btc_price_usd')?.value).toBe(64000);
+  });
+
+  it('surfaces the 403 only when no metric is entitled', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('forbidden', { status: 403 })));
+    const res = await coinmetricsAdapter.fetchLatest(indicators);
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.status).toBe(403);
   });
 });
