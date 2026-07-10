@@ -193,4 +193,54 @@ describe('runOnchainPoll — alerts', () => {
     expect(out.onchain_poll_result?.beats_proposed).toBe(0);
     expect(beatInserts()).toHaveLength(0);
   });
+
+  // mvrv is DERIVED — its band alert reads latest+prior from v_btc_mvrv, not from
+  // onchain_observations (which a derived metric never has).
+  const mvrv = () =>
+    hashRate({
+      id: 'i-mvrv',
+      key: 'mvrv',
+      name: 'MVRV Ratio',
+      short_label: 'MVRV',
+      metric_group: 'behaviour_valuation',
+      derivation: 'derived',
+      provider: null,
+      provider_metric_code: null,
+      unit: 'ratio',
+      decimals: 2,
+      alert_config: { bands: [{ below: 1.0 }, { above: 3.5 }] },
+    });
+  const setMvrvSeries = (rows: unknown[]) =>
+    fakeSupabase.__setResponse('v_btc_mvrv', { data: rows, error: null });
+
+  it('proposes an mvrv beat on a fresh band cross, sourced from v_btc_mvrv', async () => {
+    setIndicators([mvrv()]);
+    setObservations([]); // derived row is not polled and has no observations
+    setMvrvSeries([
+      { observed_at: '2026-06-20', mvrv: 3.6 }, // above 3.5 today
+      { observed_at: '2026-06-19', mvrv: 3.4 }, // was in-band yesterday → fresh cross
+    ]);
+
+    const out = await runOnchainPoll(ROUTINE, NOW);
+
+    expect(out.onchain_poll_result?.beats_proposed).toBe(1);
+    const beats = beatInserts();
+    expect(beats).toHaveLength(1);
+    expect(beats[0]).toMatchObject({ entity_type: 'onchain_indicator', entity_id: 'i-mvrv' });
+    const proposed = beats[0].proposed_actions as Array<{ context: Record<string, unknown> }>;
+    expect(proposed[0].context).toMatchObject({ band: 'above 3.5', compliance_sensitive: true });
+  });
+
+  it('does not propose an mvrv beat when already in-band the prior day', async () => {
+    setIndicators([mvrv()]);
+    setObservations([]);
+    setMvrvSeries([
+      { observed_at: '2026-06-20', mvrv: 3.7 },
+      { observed_at: '2026-06-19', mvrv: 3.6 }, // already above 3.5 → no fresh cross
+    ]);
+
+    const out = await runOnchainPoll(ROUTINE, NOW);
+    expect(out.onchain_poll_result?.beats_proposed).toBe(0);
+    expect(beatInserts()).toHaveLength(0);
+  });
 });

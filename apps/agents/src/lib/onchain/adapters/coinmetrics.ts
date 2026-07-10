@@ -17,6 +17,13 @@
  * MVRV is fetched directly here (CapMVRVCur) — it is NOT derived. realised_cap
  * and supply are raw inputs the view divides into realised_price.
  *
+ * ENTITLEMENT (403): the keyless community host serves a SUBSET of Pro metrics. A
+ * metric outside that subset (CapMVRVCur is not community-entitled) makes CM answer
+ * HTTP 403 for the WHOLE batched request — so one Pro-gated metric would sink every
+ * community metric alongside it. On a batch 403 we therefore retry each metric on
+ * its own and keep the ones that succeed; the forbidden metric is dropped (and
+ * logged), never allowed to starve price/supply/addresses/realised-cap.
+ *
  * DATE WINDOW: the request always carries an explicit start_time (= today minus
  * the window length) with page_size wide enough to return the whole window in one
  * page. CM sorts time-ASCENDING from the start of history, so without a start_time
@@ -102,6 +109,37 @@ export function parseCoinMetricsResponse(
   return { ok: true, observations: out };
 }
 
+/** One asset-metrics request + parse. `byCode` may hold one metric or the full
+ *  batch — the fallback below reuses it per metric. Never throws across the seam. */
+async function fetchAssetMetrics(
+  byCode: Map<string, string>,
+  opts: FetchOptions | undefined,
+  now: Date,
+): Promise<AdapterResult> {
+  const url = buildAssetMetricsUrl(byCode, opts, now);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  } catch (err) {
+    const error: AdapterError = { kind: 'transport', message: err instanceof Error ? err.message : String(err) };
+    return { ok: false, error };
+  }
+  if (!res.ok) {
+    const kind = res.status === 429 ? 'rate_limit' : res.status === 404 ? 'not_found' : 'transport';
+    return { ok: false, error: { kind, message: `Coin Metrics HTTP ${res.status}`, status: res.status } };
+  }
+
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch (err) {
+    return { ok: false, error: { kind: 'parse', message: err instanceof Error ? err.message : 'Coin Metrics JSON parse failed' } };
+  }
+
+  return parseCoinMetricsResponse(payload, byCode);
+}
+
 export const coinmetricsAdapter: OnchainAdapter = {
   provider: 'coinmetrics',
 
@@ -114,27 +152,31 @@ export const coinmetricsAdapter: OnchainAdapter = {
       return { ok: false, error: { kind: 'not_found', message: 'No Coin Metrics metric codes to fetch' } };
     }
 
-    const url = buildAssetMetricsUrl(byCode, opts, new Date());
+    const now = new Date();
+    const batched = await fetchAssetMetrics(byCode, opts, now);
+    // Fast path, or a genuine failure with a single metric (nothing to isolate).
+    if (batched.ok || batched.error.status !== 403 || byCode.size === 1) return batched;
 
-    let res: Response;
-    try {
-      res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-    } catch (err) {
-      const error: AdapterError = { kind: 'transport', message: err instanceof Error ? err.message : String(err) };
-      return { ok: false, error };
-    }
-    if (!res.ok) {
-      const kind = res.status === 429 ? 'rate_limit' : res.status === 404 ? 'not_found' : 'transport';
-      return { ok: false, error: { kind, message: `Coin Metrics HTTP ${res.status}`, status: res.status } };
-    }
-
-    let payload: unknown;
-    try {
-      payload = await res.json();
-    } catch (err) {
-      return { ok: false, error: { kind: 'parse', message: err instanceof Error ? err.message : 'Coin Metrics JSON parse failed' } };
+    // Batch 403 = a Pro-gated metric is in the set. Retry each metric alone so the
+    // community-entitled ones still ingest; drop (and log) the forbidden metric(s).
+    const observations: RawObservation[] = [];
+    const forbidden: string[] = [];
+    let anyOk = false;
+    for (const [code, key] of byCode) {
+      const one = await fetchAssetMetrics(new Map([[code, key]]), opts, now);
+      if (one.ok) {
+        anyOk = true;
+        observations.push(...one.observations);
+      } else {
+        forbidden.push(`${code} (HTTP ${one.error.status ?? '?'})`);
+      }
     }
 
-    return parseCoinMetricsResponse(payload, byCode);
+    if (!anyOk) return batched; // none entitled — surface the original 403
+    if (forbidden.length) {
+      console.warn(`[onchain] Coin Metrics dropped ${forbidden.join(', ')} — not on the community tier; other metrics ingested.`);
+    }
+    observations.sort((a, b) => a.observedAt.localeCompare(b.observedAt));
+    return { ok: true, observations };
   },
 };
