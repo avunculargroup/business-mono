@@ -6,6 +6,41 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-10 — `onchain_indicators` — derive MVRV locally instead of fetching CapMVRVCur
+
+**Migration:** `20260710000000_derive_mvrv.sql`
+
+Coin Metrics' `CapMVRVCur` (MVRV) is **not** on the free community tier. Because the
+`coinmetrics` adapter batches every metric into one request, the keyless community
+host answered **HTTP 403** to the whole batch (confirmed in `agent_activity`: the
+`onchain_poll` failed daily, first with 401 on the old Pro host, then 403 on the
+community host after the host was corrected). That sank `btc_price_usd`, `supply`,
+`active_addresses` and `realised_cap` alongside MVRV — the entire coinmetrics leg
+ingested nothing, so the market report's Trend & Valuation section (derived from the
+`btc_price_usd` close series) never appeared.
+
+MVRV is not independent data: `MVRV = market value / realised value =
+(btc_price_usd × supply) / realised_cap`, and all three inputs are community-entitled
+and already polled. So the `mvrv` registry row flips `fetched` → `derived` (provider
+`NULL`, no polling, no `CapMVRVCur` in the batch → no more 403), mirroring how
+`realised_price` is already derived.
+
+- **`onchain_indicators`** — `mvrv` row updated to `derivation='derived'`,
+  `provider=NULL`, with a `derivation_spec` documenting the formula. Any stray
+  observations deleted (a derived metric stores none; there were none).
+- **`v_btc_mvrv`** (new) — per-day MVRV series joining the three current input series
+  on `observed_at`. Feeds the dashboard card **and** the MVRV band alert in
+  `runOnchainPoll` (`evalBands` reads latest + prior from here, since a derived metric
+  has no `onchain_observations`).
+- **`v_onchain_dashboard`** — rebuilt; the `mvrv` card is now sourced from `v_btc_mvrv`
+  (latest value + prior-day delta) instead of a fetched observation row.
+
+Belt-and-braces: the adapter also gained a per-metric 403 fallback (see
+`apps/agents/.../adapters/coinmetrics.ts`) so a future Pro-gated metric can never again
+sink the whole community batch.
+
+---
+
 ## 2026-07-08 — `onchain_indicators` — Trend & Valuation metrics (moving averages, Mayer Multiple, cross, RSI, volatility, drawdown)
 
 **Migration:** `20260708000000_add_btc_trend_valuation.sql`

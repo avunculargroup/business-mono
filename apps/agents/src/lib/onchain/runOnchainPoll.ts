@@ -264,13 +264,20 @@ async function evalHashRibbons(ind: IndicatorRow, acc: OnchainPollResult, now: D
   await proposeBeat(ind, msg, { signal: latest.signal, observed_at: latest.observed_at }, now, acc);
 }
 
-/** Fire on a fresh band cross: latest value is in a band the prior day was not. */
-async function evalBands(
-  ind: IndicatorRow,
-  bands: Array<{ below?: number; above?: number }>,
-  acc: OnchainPollResult,
-  now: Date,
-): Promise<void> {
+/** Latest + prior day for a banded indicator. Fetched rows read their stored
+ *  observations; mvrv is DERIVED (no observations) so it reads the per-day series
+ *  view v_btc_mvrv = (btc_price_usd × supply) / realised_cap. */
+async function bandSeries(ind: IndicatorRow): Promise<{ observed_at: string; value: number }[]> {
+  if (ind.key === 'mvrv') {
+    const { data } = await supabase
+      .from('v_btc_mvrv')
+      .select('observed_at, mvrv')
+      .order('observed_at', { ascending: false })
+      .limit(2);
+    return ((data ?? []) as { observed_at: string | null; mvrv: number | null }[])
+      .filter((r): r is { observed_at: string; mvrv: number } => r.observed_at != null && r.mvrv != null)
+      .map((r) => ({ observed_at: r.observed_at, value: Number(r.mvrv) }));
+  }
   const { data } = await supabase
     .from('onchain_observations')
     .select('observed_at, value')
@@ -278,7 +285,18 @@ async function evalBands(
     .eq('is_current', true)
     .order('observed_at', { ascending: false })
     .limit(2);
-  const rows = (data ?? []) as { observed_at: string; value: number }[];
+  return ((data ?? []) as { observed_at: string; value: number }[])
+    .map((r) => ({ observed_at: r.observed_at, value: Number(r.value) }));
+}
+
+/** Fire on a fresh band cross: latest value is in a band the prior day was not. */
+async function evalBands(
+  ind: IndicatorRow,
+  bands: Array<{ below?: number; above?: number }>,
+  acc: OnchainPollResult,
+  now: Date,
+): Promise<void> {
+  const rows = await bandSeries(ind);
   if (rows.length === 0) return;
   const latest = { observed_at: rows[0].observed_at, value: Number(rows[0].value) };
   const prior = rows[1] ? Number(rows[1].value) : null;
