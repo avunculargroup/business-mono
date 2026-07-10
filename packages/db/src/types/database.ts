@@ -4379,6 +4379,13 @@ export type Database = {
         }
         Relationships: []
       }
+      v_btc_mvrv: {
+        Row: {
+          mvrv: number | null
+          observed_at: string | null
+        }
+        Relationships: []
+      }
       v_btc_trend: {
         Row: {
           above_200d: number | null
@@ -4392,13 +4399,6 @@ export type Database = {
           observed_at: string | null
           realized_vol_30d: number | null
           rsi_14: number | null
-        }
-        Relationships: []
-      }
-      v_btc_mvrv: {
-        Row: {
-          mvrv: number | null
-          observed_at: string | null
         }
         Relationships: []
       }
