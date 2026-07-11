@@ -4,9 +4,8 @@ import type { ResolvedVoiceContext } from '@platform/voice';
 const { resolveVoiceContext } = vi.hoisted(() => ({ resolveVoiceContext: vi.fn() }));
 vi.mock('@platform/voice', () => ({ resolveVoiceContext }));
 
-const { formatResolvedVoice, resolveCompanyVoiceBlock, voiceBlockHasFormatNotes } = await import(
-  './voicePrompt.js'
-);
+const { formatResolvedVoice, resolveCompanyVoiceBlock, voiceBlockHasFormatNotes, renderFormatConfig } =
+  await import('./voicePrompt.js');
 
 const canon: ResolvedVoiceContext = {
   profile: {
@@ -72,6 +71,26 @@ describe('formatResolvedVoice', () => {
     });
     expect(block).toContain('Open with a number.');
     expect(block).toContain('earns attention first');
+  });
+});
+
+describe('renderFormatConfig', () => {
+  it('summarises char count, emoji use, and a single-only thread note', () => {
+    const summary = renderFormatConfig({
+      char_count_min: 100,
+      char_count_max: 250,
+      emoji_use: 'none',
+      thread_style: 'single-only',
+    });
+    expect(summary).toContain('100–250 characters');
+    expect(summary).toContain('no emojis');
+    expect(summary).toContain('single posts only (no threads)');
+  });
+
+  it('omits emoji and thread notes at their platform-default / passthrough values', () => {
+    const summary = renderFormatConfig({ emoji_use: 'platform-default', thread_style: 'platform-default' });
+    expect(summary).not.toContain('emoji');
+    expect(summary).not.toContain('threads');
   });
 });
 

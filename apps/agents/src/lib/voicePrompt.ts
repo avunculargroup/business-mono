@@ -52,12 +52,25 @@ export function renderFormatConfig(fmt: FormatConfig): string {
   } else if (fmt.word_count_min != null) {
     parts.push(`at least ${fmt.word_count_min} words`);
   }
+  if (fmt.char_count_min != null && fmt.char_count_max != null) {
+    parts.push(`${fmt.char_count_min}–${fmt.char_count_max} characters`);
+  } else if (fmt.char_count_max != null) {
+    parts.push(`up to ${fmt.char_count_max} characters`);
+  } else if (fmt.char_count_min != null) {
+    parts.push(`at least ${fmt.char_count_min} characters`);
+  }
   if (fmt.register) parts.push(`${fmt.register} register`);
   if (fmt.paragraphing && fmt.paragraphing !== 'platform-default') {
     parts.push(fmt.paragraphing === 'single-block' ? 'single block' : 'short paragraphs');
   }
   if (fmt.hashtag_use && fmt.hashtag_use !== 'platform-default') {
     parts.push(fmt.hashtag_use === 'none' ? 'no hashtags' : 'hashtags sparingly (1–2)');
+  }
+  if (fmt.emoji_use && fmt.emoji_use !== 'platform-default') {
+    parts.push(fmt.emoji_use === 'none' ? 'no emojis' : 'emojis sparingly');
+  }
+  if (fmt.thread_style === 'single-only') {
+    parts.push('single posts only (no threads)');
   }
   return parts.join(', ');
 }

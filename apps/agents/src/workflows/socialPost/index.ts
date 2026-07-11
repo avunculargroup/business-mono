@@ -12,7 +12,7 @@ import { stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { editor } from '../../agents/editorial/index.js';
 import { lex } from '../../agents/compliance/index.js';
-import { buildLexPrompt } from '../variant/prompts.js';
+import { applyThreadStyle, buildLexPrompt } from '../variant/prompts.js';
 import { charlieVariantSchema, lexVerdictSchema, type Platform, type CharlieVariant, type LexVerdict } from '../variant/schemas.js';
 import { buildSocialPostRow, buildThreadSegmentRows, type DisclaimerRef } from './persist.js';
 import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite } from './prompts.js';
@@ -199,16 +199,20 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
         platform: account.platform,
         query: `${story.title}\n${story.summary}`,
       });
-      const draft = await generateDraft(
-        buildSocialPostPrompt({
-          story,
-          form,
-          platform: account.platform,
-          platformSpec: spec,
-          voiceBlock: formatResolvedVoice(voice),
-          formatConfig: extractFormatConfig(voice.profile),
-          founderName,
-        }),
+      const formatConfig = extractFormatConfig(voice.profile);
+      const draft = applyThreadStyle(
+        await generateDraft(
+          buildSocialPostPrompt({
+            story,
+            form,
+            platform: account.platform,
+            platformSpec: spec,
+            voiceBlock: formatResolvedVoice(voice),
+            formatConfig,
+            founderName,
+          }),
+        ),
+        formatConfig,
       );
       const verdict = await classifyDraft(draft, disclaimers);
 

@@ -9,7 +9,7 @@ import { charlie } from '../../agents/contentCreator/index.js';
 // variant workflow drives it with its own campaign-specific prompt + schema
 // (classification + disclaimer) — the persona is the same compliance officer.
 import { lex } from '../../agents/compliance/index.js';
-import { buildCharliePrompt, buildLexPrompt, charCountOf, isThreadVariant, variantCopyText } from './prompts.js';
+import { applyThreadStyle, buildCharliePrompt, buildLexPrompt, charCountOf, isThreadVariant, variantCopyText } from './prompts.js';
 import { buildContentItemRow, buildThreadSegmentRows } from './persist.js';
 import {
   variantInputSchema,
@@ -60,7 +60,9 @@ async function generateVariant(ctx: VariantContext, instruction?: string): Promi
       fallbackValue: fallback,
     },
   });
-  return charlieVariantSchema.parse(response.object ?? fallback);
+  const draft = charlieVariantSchema.parse(response.object ?? fallback);
+  // Enforce the account's thread_style before the draft drives persist/preview.
+  return applyThreadStyle(draft, ctx.formatConfig);
 }
 
 async function classifyVariant(ctx: VariantContext, draft: CharlieVariant): Promise<LexVerdict> {

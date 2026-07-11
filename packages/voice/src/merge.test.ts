@@ -104,6 +104,21 @@ describe('mergeVoice', () => {
     expect(merged.format).toEqual(account.format);
   });
 
+  it('merges the char-count, emoji, and thread-style fields field-by-field', () => {
+    const base: VoiceProfile = {
+      ...company,
+      format: { char_count_min: 100, char_count_max: 250, emoji_use: 'sparingly', thread_style: 'platform-default' },
+    };
+    const account: VoiceProfile = { format: { char_count_max: 200, thread_style: 'single-only' } };
+    const merged = mergeVoice(base, account);
+    // Account wins where set.
+    expect(merged.format?.char_count_max).toBe(200);
+    expect(merged.format?.thread_style).toBe('single-only');
+    // Company fills the gaps.
+    expect(merged.format?.char_count_min).toBe(100);
+    expect(merged.format?.emoji_use).toBe('sparingly');
+  });
+
   it('omits format from merged profile when neither side sets it', () => {
     const merged = mergeVoice(company, { persona: 'Solo voice.' });
     expect(merged.format).toBeUndefined();

@@ -51,9 +51,13 @@ export function hasFormatOverride(fmt: FormatConfig | null | undefined): boolean
   return (
     fmt.word_count_min != null ||
     fmt.word_count_max != null ||
+    fmt.char_count_min != null ||
+    fmt.char_count_max != null ||
     fmt.register != null ||
     fmt.paragraphing != null ||
-    fmt.hashtag_use != null
+    fmt.hashtag_use != null ||
+    fmt.emoji_use != null ||
+    fmt.thread_style != null
   );
 }
 
@@ -126,9 +130,13 @@ export function cleanAccountProfile(
     const fmt: FormatConfig = {};
     if (raw.format.word_count_min != null) fmt.word_count_min = raw.format.word_count_min;
     if (raw.format.word_count_max != null) fmt.word_count_max = raw.format.word_count_max;
+    if (raw.format.char_count_min != null) fmt.char_count_min = raw.format.char_count_min;
+    if (raw.format.char_count_max != null) fmt.char_count_max = raw.format.char_count_max;
     if (raw.format.register != null) fmt.register = raw.format.register;
     if (raw.format.paragraphing != null) fmt.paragraphing = raw.format.paragraphing;
     if (raw.format.hashtag_use != null) fmt.hashtag_use = raw.format.hashtag_use;
+    if (raw.format.emoji_use != null) fmt.emoji_use = raw.format.emoji_use;
+    if (raw.format.thread_style != null) fmt.thread_style = raw.format.thread_style;
     if (Object.keys(fmt).length > 0) out.format = fmt;
   }
 

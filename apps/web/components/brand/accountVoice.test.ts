@@ -95,6 +95,9 @@ describe('hasFormatOverride', () => {
     expect(hasFormatOverride({ word_count_max: 25 })).toBe(true);
     expect(hasFormatOverride({ register: 'conversational' })).toBe(true);
     expect(hasFormatOverride({ hashtag_use: 'none' })).toBe(true);
+    expect(hasFormatOverride({ char_count_max: 200 })).toBe(true);
+    expect(hasFormatOverride({ emoji_use: 'none' })).toBe(true);
+    expect(hasFormatOverride({ thread_style: 'single-only' })).toBe(true);
   });
 });
 
@@ -139,5 +142,18 @@ describe('cleanAccountProfile', () => {
       company,
     );
     expect(cleaned.format).toEqual({ word_count_min: 10, word_count_max: 25, register: 'conversational' });
+  });
+
+  it('carries the char-count, emoji, and thread-style fields through cleaning', () => {
+    const cleaned = cleanAccountProfile(
+      { format: { char_count_min: 100, char_count_max: 200, emoji_use: 'none', thread_style: 'single-only' } },
+      company,
+    );
+    expect(cleaned.format).toEqual({
+      char_count_min: 100,
+      char_count_max: 200,
+      emoji_use: 'none',
+      thread_style: 'single-only',
+    });
   });
 });
