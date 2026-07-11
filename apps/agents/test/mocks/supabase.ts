@@ -44,6 +44,13 @@ export interface FakeSupabaseClient {
   __responses: Map<string, SupabaseResponse>;
   /** Set the response returned for queries against a given table. */
   __setResponse: (table: string, response: SupabaseResponse) => void;
+  /**
+   * Queue responses for successive `from(table)` calls, dispensed in order.
+   * Once the queue is exhausted, falls back to `__setResponse`/the default.
+   * Use when one table is queried several times in a row with distinct results
+   * (e.g. a SELECT followed by per-row claim UPDATEs).
+   */
+  __setResponses: (table: string, responses: SupabaseResponse[]) => void;
   /** Get all builders created for a given table. */
   __buildersFor: (table: string) => FakeQueryBuilder[];
 }
@@ -100,10 +107,13 @@ function makeBuilder(table: string, response: SupabaseResponse): FakeQueryBuilde
 export function createFakeSupabase(): FakeSupabaseClient {
   const builders: FakeQueryBuilder[] = [];
   const responses = new Map<string, SupabaseResponse>();
+  const responseQueues = new Map<string, SupabaseResponse[]>();
 
   const client: FakeSupabaseClient = {
     from: vi.fn((table: string) => {
-      const response = responses.get(table) ?? { data: null, error: null };
+      const queue = responseQueues.get(table);
+      const response = (queue && queue.length > 0 ? queue.shift()! : responses.get(table))
+        ?? { data: null, error: null };
       const builder = makeBuilder(table, response);
       builders.push(builder);
       return builder;
@@ -113,6 +123,9 @@ export function createFakeSupabase(): FakeSupabaseClient {
     __responses: responses,
     __setResponse: (table, response) => {
       responses.set(table, response);
+    },
+    __setResponses: (table, queued) => {
+      responseQueues.set(table, [...queued]);
     },
     __buildersFor: (table) => builders.filter((b) => b.table === table),
   };

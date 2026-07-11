@@ -110,6 +110,80 @@ const curationMoodSchema = z.object({
     ),
 });
 
+/**
+ * Selects every due routine and atomically claims each before returning it.
+ *
+ * The claim is essential: this workflow's schedule fires every 5 minutes and,
+ * because it declares a `schedule`, runs on Mastra's evented engine where ticks
+ * can overlap. A routine stays selectable (`next_run_at <= now`) for the whole
+ * duration of the batch — `next_run_at` isn't advanced until the final
+ * persist step, after every routine in the batch has run. So a batch that takes
+ * longer than 5 minutes lets the next tick re-select the same routine and run
+ * it again (for `news_curation` that means emailing the team the digest a
+ * second and third time). To prevent this, we advance `next_run_at` to the
+ * routine's next slot up front, gated on the row still being due. Two concurrent
+ * ticks serialise on the row: the first commits the future `next_run_at`, the
+ * second's `next_run_at <= now` predicate no longer matches, so it claims
+ * nothing and skips the routine. Each due routine therefore runs at most once
+ * per slot regardless of overlap.
+ */
+export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof routineSchema>>> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('routines')
+    .select('id, name, agent_name, action_type, action_config, frequency, time_of_day, timezone')
+    .eq('is_active', true)
+    .lte('next_run_at', nowIso)
+    .order('next_run_at', { ascending: true })
+    .limit(10);
+
+  if (error) {
+    const msg = (error as { message: string }).message;
+    if (msg.includes('routines')) {
+      console.warn('[routine-workflow] routines table not found — migration pending, skipping');
+      return [];
+    }
+    throw new Error(`Failed to fetch routines: ${msg}`);
+  }
+
+  const claimed: Array<z.infer<typeof routineSchema>> = [];
+  for (const r of data ?? []) {
+    const nextRunAt = computeNextRunAt({
+      frequency: r.frequency as RoutineFrequency,
+      timeOfDay: r.time_of_day as string,
+      timezone: r.timezone as string,
+    });
+    // Atomic claim: advance next_run_at only while the row is still due. An empty
+    // result means a concurrent tick already claimed it — skip so we don't re-run.
+    const { data: won, error: claimError } = await supabase
+      .from('routines')
+      .update({ next_run_at: nextRunAt.toISOString() })
+      .eq('id', r.id as string)
+      .lte('next_run_at', nowIso)
+      .select('id');
+    if (claimError) {
+      console.warn('[routine-workflow] claim failed — skipping routine this tick', {
+        id: r.id,
+        error: claimError.message,
+      });
+      continue;
+    }
+    if (!won || won.length === 0) continue;
+    claimed.push({
+      id: r.id as string,
+      name: r.name as string,
+      agent_name: r.agent_name as string,
+      action_type: r.action_type as string,
+      action_config: (r.action_config as Record<string, unknown>) ?? {},
+      frequency: r.frequency as string,
+      time_of_day: r.time_of_day as string,
+      timezone: r.timezone as string,
+    });
+  }
+
+  return claimed;
+}
+
 const fetchDueRoutines = createStep({
   id: 'fetch_due_routines',
   inputSchema: z.object({
@@ -119,35 +193,7 @@ const fetchDueRoutines = createStep({
     routines: z.array(routineSchema),
   }),
   execute: async () => {
-    const { data, error } = await supabase
-      .from('routines')
-      .select('id, name, agent_name, action_type, action_config, frequency, time_of_day, timezone')
-      .eq('is_active', true)
-      .lte('next_run_at', new Date().toISOString())
-      .order('next_run_at', { ascending: true })
-      .limit(10);
-
-    if (error) {
-      const msg = (error as { message: string }).message;
-      if (msg.includes('routines')) {
-        console.warn('[routine-workflow] routines table not found — migration pending, skipping');
-        return { routines: [] };
-      }
-      throw new Error(`Failed to fetch routines: ${msg}`);
-    }
-
-    return {
-      routines: (data ?? []).map((r) => ({
-        id: r.id as string,
-        name: r.name as string,
-        agent_name: r.agent_name as string,
-        action_type: r.action_type as string,
-        action_config: (r.action_config as Record<string, unknown>) ?? {},
-        frequency: r.frequency as string,
-        time_of_day: r.time_of_day as string,
-        timezone: r.timezone as string,
-      })),
-    };
+    return { routines: await selectAndClaimDueRoutines() };
   },
 });
 
