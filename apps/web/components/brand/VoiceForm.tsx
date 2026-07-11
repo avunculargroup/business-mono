@@ -8,6 +8,7 @@ import {
   REGISTER_OPTIONS,
   PARAGRAPHING_OPTIONS,
   HASHTAG_USE_OPTIONS,
+  EMOJI_USE_OPTIONS,
   type BrandVoiceRow,
   type ContentPolicy,
   type FormatConfig,
@@ -160,6 +161,39 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
         </div>
 
         <div className={styles.field}>
+          <label className={styles.label}>Character count</label>
+          <div className={styles.fieldRow}>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Min"
+              value={format.char_count_min ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  char_count_min: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+            <span className={styles.fieldRowSep}>–</span>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              placeholder="Max"
+              value={format.char_count_max ?? ''}
+              onChange={(e) =>
+                setFormat((f) => ({
+                  ...f,
+                  char_count_max: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+            />
+          </div>
+        </div>
+
+        <div className={styles.field}>
           <label className={styles.label}>Register</label>
           <select
             className={styles.select}
@@ -213,6 +247,43 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
             <option value="none">None</option>
             <option value="sparingly">Sparingly (1–2)</option>
             <option value="platform-default">Platform default</option>
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Emoji use</label>
+          <select
+            className={styles.select}
+            value={format.emoji_use ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                emoji_use: (e.target.value as typeof EMOJI_USE_OPTIONS[number]) || undefined,
+              }))
+            }
+          >
+            <option value="">— not set</option>
+            <option value="none">None</option>
+            <option value="sparingly">Sparingly</option>
+            <option value="platform-default">Platform default</option>
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Thread style</label>
+          <select
+            className={styles.select}
+            value={format.thread_style ?? ''}
+            onChange={(e) =>
+              setFormat((f) => ({
+                ...f,
+                thread_style: (e.target.value as 'platform-default' | 'single-only') || undefined,
+              }))
+            }
+          >
+            <option value="">— not set</option>
+            <option value="platform-default">Platform default</option>
+            <option value="single-only">Single posts only (no threads)</option>
           </select>
         </div>
       </div>

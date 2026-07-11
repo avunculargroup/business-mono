@@ -79,12 +79,20 @@ export function mergeVoice(
   else if (baseF.word_count_min != null) format.word_count_min = baseF.word_count_min;
   if (overF.word_count_max != null) format.word_count_max = overF.word_count_max;
   else if (baseF.word_count_max != null) format.word_count_max = baseF.word_count_max;
+  if (overF.char_count_min != null) format.char_count_min = overF.char_count_min;
+  else if (baseF.char_count_min != null) format.char_count_min = baseF.char_count_min;
+  if (overF.char_count_max != null) format.char_count_max = overF.char_count_max;
+  else if (baseF.char_count_max != null) format.char_count_max = baseF.char_count_max;
   if (overF.register != null) format.register = overF.register;
   else if (baseF.register != null) format.register = baseF.register;
   if (overF.paragraphing != null) format.paragraphing = overF.paragraphing;
   else if (baseF.paragraphing != null) format.paragraphing = baseF.paragraphing;
   if (overF.hashtag_use != null) format.hashtag_use = overF.hashtag_use;
   else if (baseF.hashtag_use != null) format.hashtag_use = baseF.hashtag_use;
+  if (overF.emoji_use != null) format.emoji_use = overF.emoji_use;
+  else if (baseF.emoji_use != null) format.emoji_use = baseF.emoji_use;
+  if (overF.thread_style != null) format.thread_style = overF.thread_style;
+  else if (baseF.thread_style != null) format.thread_style = baseF.thread_style;
   if (Object.keys(format).length > 0) merged.format = format;
 
   return merged;

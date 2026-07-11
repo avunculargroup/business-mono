@@ -14,6 +14,25 @@ export function isThreadVariant(draft: CharlieVariant): boolean {
   return draft.is_thread && draft.segments.length > 0;
 }
 
+/**
+ * Enforce an account's `thread_style` on Charlie's output. When `single-only`,
+ * a thread draft is collapsed to a single post — `is_thread` cleared, `segments`
+ * emptied, and (if `body` is empty) the segments folded into `body` so no copy is
+ * lost. This is the deterministic guarantee behind the "no threads" setting: the
+ * prompt asks for a single post, and this clamp holds even if Charlie ignores it.
+ * A no-op for any other `thread_style` or a non-thread draft.
+ */
+export function applyThreadStyle(
+  draft: CharlieVariant,
+  formatConfig?: FormatConfigCtx,
+): CharlieVariant {
+  if (formatConfig?.thread_style !== 'single-only' || !isThreadVariant(draft)) return draft;
+  const body = draft.body.trim().length > 0
+    ? draft.body
+    : draft.segments.map((s) => s.body).join('\n\n');
+  return { ...draft, is_thread: false, segments: [], body };
+}
+
 /** The copy a reader sees — the body for a single post, the joined numbered
  *  segments for a thread. Used for compliance review and char accounting. */
 export function variantCopyText(draft: CharlieVariant): string {
@@ -63,6 +82,19 @@ function formatOverrideLines(fmt: FormatConfigCtx): string[] {
       `- WORD COUNT: at least ${fmt.word_count_min} words — minimum for this account.`,
     );
   }
+  if (fmt.char_count_min != null && fmt.char_count_max != null) {
+    lines.push(
+      `- CHAR COUNT: ${fmt.char_count_min}–${fmt.char_count_max} characters — hard limit for this account, overrides platform default.`,
+    );
+  } else if (fmt.char_count_max != null) {
+    lines.push(
+      `- CHAR COUNT: up to ${fmt.char_count_max} characters — hard limit for this account, overrides platform default.`,
+    );
+  } else if (fmt.char_count_min != null) {
+    lines.push(
+      `- CHAR COUNT: at least ${fmt.char_count_min} characters — minimum for this account.`,
+    );
+  }
   if (fmt.register) lines.push(`- REGISTER: ${fmt.register}`);
   if (fmt.paragraphing && fmt.paragraphing !== 'platform-default') {
     lines.push(
@@ -76,6 +108,13 @@ function formatOverrideLines(fmt: FormatConfigCtx): string[] {
       fmt.hashtag_use === 'none'
         ? `- HASHTAGS: none — do not include any hashtags`
         : `- HASHTAGS: sparingly — 1–2 maximum, only where they earn their place`,
+    );
+  }
+  if (fmt.emoji_use && fmt.emoji_use !== 'platform-default') {
+    lines.push(
+      fmt.emoji_use === 'none'
+        ? `- EMOJIS: none — do not include any emojis`
+        : `- EMOJIS: sparingly — a light touch only, where it genuinely adds`,
     );
   }
   return lines;
@@ -147,7 +186,10 @@ export function platformFormatRules(
  */
 export function buildCharliePrompt(ctx: VariantContext, instruction?: string): string {
   const { platform, platformSpec, strategy, beat } = ctx;
-  const wantsThread = beat.prefer_thread && platform === 'twitter_x';
+  const wantsThread =
+    beat.prefer_thread &&
+    platform === 'twitter_x' &&
+    ctx.formatConfig?.thread_style !== 'single-only';
   const platformLabel = platform === 'twitter_x' ? 'X (Twitter)' : 'LinkedIn';
 
   const toneGuidance = strategyField(strategy, 'tone_guidance');

@@ -12,6 +12,12 @@ export type Paragraphing = (typeof PARAGRAPHING_OPTIONS)[number];
 export const HASHTAG_USE_OPTIONS = ['none', 'sparingly', 'platform-default'] as const;
 export type HashtagUse = (typeof HASHTAG_USE_OPTIONS)[number];
 
+export const EMOJI_USE_OPTIONS = ['none', 'sparingly', 'platform-default'] as const;
+export type EmojiUse = (typeof EMOJI_USE_OPTIONS)[number];
+
+export const THREAD_STYLE_OPTIONS = ['platform-default', 'single-only'] as const;
+export type ThreadStyle = (typeof THREAD_STYLE_OPTIONS)[number];
+
 /**
  * Structured per-property format configuration. Stored under `VoiceProfile.format`.
  * Each field is independently inherited (account wins per-field; company fills gaps).
@@ -20,9 +26,16 @@ export type HashtagUse = (typeof HASHTAG_USE_OPTIONS)[number];
 export interface FormatConfig {
   word_count_min?: number;
   word_count_max?: number;
+  /** Character-based length floor — mainly for X, which counts characters. */
+  char_count_min?: number;
+  /** Character-based length ceiling. A soft account limit below the platform hard ceiling. */
+  char_count_max?: number;
   register?: Register;
   paragraphing?: Paragraphing;
   hashtag_use?: HashtagUse;
+  emoji_use?: EmojiUse;
+  /** `single-only` forces single posts on X (never threads). Only bites on twitter_x. */
+  thread_style?: ThreadStyle;
 }
 
 export interface VoiceProfile {

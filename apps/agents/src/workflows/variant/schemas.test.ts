@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   charlieVariantSchema,
+  formatConfigSchema,
   lexVerdictSchema,
   variantGateResumeSchema,
   variantResultSchema,
@@ -16,6 +17,27 @@ describe('charlieVariantSchema', () => {
       segments: [],
       charlie_note: '',
     });
+  });
+});
+
+describe('formatConfigSchema', () => {
+  it('accepts the char-count, emoji, and thread-style fields so they survive into the context', () => {
+    const parsed = formatConfigSchema.parse({
+      char_count_min: 100,
+      char_count_max: 250,
+      emoji_use: 'none',
+      thread_style: 'single-only',
+    });
+    expect(parsed).toEqual({
+      char_count_min: 100,
+      char_count_max: 250,
+      emoji_use: 'none',
+      thread_style: 'single-only',
+    });
+  });
+
+  it('rejects an unknown thread_style value', () => {
+    expect(() => formatConfigSchema.parse({ thread_style: 'prefer-threads' })).toThrow();
   });
 });
 

@@ -6,6 +6,7 @@ import {
   buildCharliePrompt,
   buildLexPrompt,
   platformFormatRules,
+  applyThreadStyle,
 } from './prompts.js';
 import type { VariantContext, CharlieVariant } from './schemas.js';
 
@@ -112,6 +113,30 @@ describe('buildCharliePrompt', () => {
   it('keeps a single post on LinkedIn even when the beat prefers a thread', () => {
     const ctx = makeCtx({ beat: { ...makeCtx().beat, prefer_thread: true } });
     expect(buildCharliePrompt(ctx)).toContain('SINGLE LinkedIn post');
+  });
+
+  it('forces a single post on X when thread_style is single-only, even if the beat prefers a thread', () => {
+    const ctx = makeCtx({
+      platform: 'twitter_x',
+      platformSpec: { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25, premium_max_chars: 25000 },
+      beat: { ...makeCtx().beat, prefer_thread: true },
+      formatConfig: { thread_style: 'single-only' },
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).toContain('SINGLE X (Twitter) post');
+    expect(prompt).not.toContain('X THREAD');
+    expect(prompt).not.toContain('5–10 segments');
+  });
+
+  it('renders char-count and emoji constraints inline when formatConfig sets them', () => {
+    const ctx = makeCtx({
+      platform: 'twitter_x',
+      platformSpec: { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25, premium_max_chars: 25000 },
+      formatConfig: { char_count_min: 100, char_count_max: 200, emoji_use: 'none' },
+    });
+    const prompt = buildCharliePrompt(ctx);
+    expect(prompt).toContain('CHAR COUNT: 100–200 characters');
+    expect(prompt).toContain('EMOJIS: none');
   });
 
   it('includes the requested change when regenerating', () => {
@@ -231,6 +256,31 @@ describe('platformFormatRules', () => {
     const thread = platformFormatRules('twitter_x', xSpec, true);
     expect(thread).toContain('5–10 segments');
     expect(thread).toContain('280 characters');
+  });
+});
+
+describe('applyThreadStyle', () => {
+  it('collapses a thread to a single post under single-only, folding segments into an empty body', () => {
+    const draft: CharlieVariant = { ...thread, body: '' };
+    const out = applyThreadStyle(draft, { thread_style: 'single-only' });
+    expect(out.is_thread).toBe(false);
+    expect(out.segments).toEqual([]);
+    expect(out.body).toBe('First, define the horizon.\n\nThen read volatility against it.');
+    expect(isThreadVariant(out)).toBe(false);
+  });
+
+  it('keeps an existing lead body when collapsing under single-only', () => {
+    const out = applyThreadStyle(thread, { thread_style: 'single-only' });
+    expect(out.is_thread).toBe(false);
+    expect(out.segments).toEqual([]);
+    expect(out.body).toBe(thread.body);
+  });
+
+  it('is a no-op for platform-default, no config, or a non-thread draft', () => {
+    expect(applyThreadStyle(thread, { thread_style: 'platform-default' })).toBe(thread);
+    expect(applyThreadStyle(thread, null)).toBe(thread);
+    expect(applyThreadStyle(thread, undefined)).toBe(thread);
+    expect(applyThreadStyle(singlePost, { thread_style: 'single-only' })).toBe(singlePost);
   });
 });
 

@@ -18,9 +18,13 @@ const REVALIDATE = '/brand';
 const formatConfigSchema = z.object({
   word_count_min: z.number().int().positive().optional(),
   word_count_max: z.number().int().positive().optional(),
+  char_count_min: z.number().int().positive().optional(),
+  char_count_max: z.number().int().positive().optional(),
   register: z.enum(['formal', 'semi-formal', 'conversational', 'casual']).optional(),
   paragraphing: z.enum(['single-block', 'short-paragraphs', 'platform-default']).optional(),
   hashtag_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+  emoji_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+  thread_style: z.enum(['platform-default', 'single-only']).optional(),
 }).optional();
 
 const profileSchema = z.object({

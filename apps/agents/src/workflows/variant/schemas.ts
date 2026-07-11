@@ -43,9 +43,13 @@ export const beatSchema = z.object({
 export const formatConfigSchema = z.object({
   word_count_min: z.number().optional(),
   word_count_max: z.number().optional(),
+  char_count_min: z.number().optional(),
+  char_count_max: z.number().optional(),
   register: z.enum(['formal', 'semi-formal', 'conversational', 'casual']).optional(),
   paragraphing: z.enum(['single-block', 'short-paragraphs', 'platform-default']).optional(),
   hashtag_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+  emoji_use: z.enum(['none', 'sparingly', 'platform-default']).optional(),
+  thread_style: z.enum(['platform-default', 'single-only']).optional(),
   legacy_notes: z.string().optional(),
 }).nullable();
 export type FormatConfigCtx = z.infer<typeof formatConfigSchema>;

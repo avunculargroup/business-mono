@@ -66,6 +66,20 @@ describe('buildSocialPostPrompt', () => {
     expect(p).toContain('max 25 segments');
   });
 
+  it('forces a single X post when the account voice sets thread_style single-only', () => {
+    const p = buildSocialPostPrompt({
+      story: STORY,
+      form: 'teach',
+      platform: 'twitter_x',
+      platformSpec: X_SPEC,
+      voiceBlock: 'CARRI-VOICE',
+      formatConfig: { thread_style: 'single-only' },
+      founderName: 'Carri Crawford',
+    });
+    expect(p).toContain('SINGLE X (Twitter) post');
+    expect(p).not.toContain('X THREAD');
+  });
+
   it('includes the story key points when present', () => {
     const p = buildSocialPostPrompt({
       story: STORY,

@@ -76,7 +76,7 @@ export function buildSocialPostPrompt(params: {
 }): string {
   const { story, form, platform, platformSpec, voiceBlock, formatConfig, founderName } = params;
   const label = PLATFORM_LABEL[platform];
-  const allowThread = platform === 'twitter_x';
+  const allowThread = platform === 'twitter_x' && formatConfig?.thread_style !== 'single-only';
 
   const formBlock =
     form === 'teach'
