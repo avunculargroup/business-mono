@@ -1,6 +1,20 @@
 import type { Platform, FormatConfigCtx } from '../variant/schemas.js';
 import { platformFormatRules } from '../variant/prompts.js';
-import type { StoryCandidate, SocialPostForm } from './select.js';
+import type { StoryCandidate } from './select.js';
+import { SOCIAL_POST_FORMS, type SocialPostForm } from './forms.js';
+import { buildRepetitionBlock } from './history.js';
+
+/** How hard to lean on brevity today — a soft nudge, varied per run. Platform
+ *  hard limits (char ceiling) always win regardless. */
+export type LengthTarget = 'short' | 'standard' | 'punchy';
+
+const LENGTH_NUDGE: Record<LengthTarget, string> = {
+  short:
+    'Length today: lean SHORT. A couple of tight, confident lines beats a fully-developed post — an unhedged short post reads human. Do not pad to fill space, and do not force a takeaway.',
+  punchy:
+    'Length today: keep it PUNCHY and economical. Cut every sentence that is not earning its place; no windup, no summary line.',
+  standard: '',
+};
 
 // Pure prompt builders for the social_post_from_news routine. The platform format
 // rules, char helpers and Lex prompt are reused verbatim from the campaign variant
@@ -37,18 +51,28 @@ function candidateLine(c: StoryCandidate, index: number): string {
  * The editor picks the single best-fit story for THIS founder and the post form.
  * The founder's resolved voice block is the fit signal — the editor weighs which
  * story this particular founder is best placed to post about, in their voice.
+ * `recentForms` (most-recent first) biases the pick toward variety so the feed
+ * does not settle into one repeated shape.
  */
 export function buildEditorSelectionPrompt(
   candidates: StoryCandidate[],
   voiceBlock: string,
   founderName: string,
+  recentForms: SocialPostForm[] = [],
 ): string {
   const lines = candidates.map((c, i) => candidateLine(c, i)).join('\n\n');
+  const formOptions = Object.entries(SOCIAL_POST_FORMS)
+    .map(([key, def]) => `- **${key}** — ${def.editorDesc}`)
+    .join('\n');
+  const rotation = recentForms.length
+    ? `\n\nRecently used forms on this account (most recent first): ${recentForms.join(
+        ', ',
+      )}. Prefer variety — bias away from these unless a different form would clearly serve this story worse. Humans post shapes, not templates.`
+    : '';
   return `You are choosing one Bitcoin/treasury news story for ${founderName} to post about today, and the form their post should take.
 
 Pick the SINGLE story from the candidates below that best fits ${founderName}'s individual voice and the topics they are credible on — not simply the highest-ranked story. Then choose the post form:
-- **share_with_context** — share the story with ${founderName}'s perspective and what it means for Australian businesses. Best when the news itself is the point.
-- **teach** — use the story as a hook to teach the underlying concept a sceptical CFO needs to understand. Best when the story surfaces a principle worth explaining.
+${formOptions}${rotation}
 
 Return the verbatim candidate index, the form, and a one-line rationale.
 
@@ -73,15 +97,28 @@ export function buildSocialPostPrompt(params: {
   voiceBlock: string;
   formatConfig?: FormatConfigCtx;
   founderName: string;
+  /** Openers used on recent drafts for this account — Charlie must not reuse them. */
+  recentOpenings?: string[];
+  /** Soft brevity nudge for the day; platform hard limits still win. */
+  lengthTarget?: LengthTarget;
 }): string {
-  const { story, form, platform, platformSpec, voiceBlock, formatConfig, founderName } = params;
+  const {
+    story,
+    form,
+    platform,
+    platformSpec,
+    voiceBlock,
+    formatConfig,
+    founderName,
+    recentOpenings = [],
+    lengthTarget = 'standard',
+  } = params;
   const label = PLATFORM_LABEL[platform];
   const allowThread = platform === 'twitter_x' && formatConfig?.thread_style !== 'single-only';
 
-  const formBlock =
-    form === 'teach'
-      ? 'Form: TEACH. Use the story as a hook, then teach the underlying concept a sceptical CFO needs to understand. Lead with the principle, ground it in the news.'
-      : 'Form: SHARE WITH CONTEXT. Share the story with your perspective on what it means for Australian businesses. Add the insight a reader would miss skimming the headline.';
+  const formBlock = SOCIAL_POST_FORMS[form].generateInstruction;
+  const repetitionBlock = buildRepetitionBlock(recentOpenings);
+  const lengthNudge = LENGTH_NUDGE[lengthTarget];
 
   const formatBlock = allowThread
     ? `Format: a SINGLE post OR an X THREAD — choose what the form needs (teaching often suits a short thread). For a thread, set is_thread = true, put ordered segments in \`segments\` (each at or under ${platformSpec.max_chars} characters${
@@ -100,12 +137,12 @@ Summary: ${story.summary}${points}
 Link: ${story.url}
 
 ## ${formBlock}
-
+${lengthNudge ? `\n${lengthNudge}\n` : ''}
 ## ${formatBlock}
 
 ## ${label} formatting (platform mechanics)
 ${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', formatConfig ?? null)}
-
+${repetitionBlock ? `\n${repetitionBlock}\n` : ''}
 ## Sourcing
 - It is fine to reference or link the source story; write the post as ${founderName}'s own, not a news report.
 

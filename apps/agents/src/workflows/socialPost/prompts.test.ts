@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite } from './prompts.js';
 import type { StoryCandidate } from './select.js';
+import { SOCIAL_POST_FORMS, SOCIAL_POST_FORM_VALUES } from './forms.js';
 
 const STORY: StoryCandidate = {
   id: 'n1',
@@ -19,15 +20,27 @@ const LINKEDIN_SPEC: PlatformSpecLite = { platform: 'linkedin', max_chars: 3000 
 const X_SPEC: PlatformSpecLite = { platform: 'twitter_x', max_chars: 280, max_thread_segments: 25 };
 
 describe('buildEditorSelectionPrompt', () => {
-  it('asks the editor to pick by founder voice and includes candidates + forms', () => {
+  it('asks the editor to pick by founder voice and includes candidates + all forms', () => {
     const p = buildEditorSelectionPrompt([STORY], 'VOICE-BLOCK', 'Carri Crawford');
     expect(p).toContain('Carri Crawford');
     expect(p).toContain('VOICE-BLOCK');
-    expect(p).toContain('share_with_context');
-    expect(p).toContain('teach');
+    // every form in the vocabulary is offered
+    for (const form of SOCIAL_POST_FORM_VALUES) expect(p).toContain(`**${form}**`);
     // candidate index + title rendered
     expect(p).toContain('0. RBA holds the cash rate');
     expect(p).toContain('AFR');
+  });
+
+  it('adds a rotation-bias line when recent forms are supplied', () => {
+    const p = buildEditorSelectionPrompt([STORY], 'V', 'Chris', ['teach', 'share_with_context']);
+    expect(p).toContain('Recently used forms');
+    expect(p).toContain('teach, share_with_context');
+    expect(p).toMatch(/bias away from these/i);
+  });
+
+  it('omits the rotation-bias line when there is no history', () => {
+    const p = buildEditorSelectionPrompt([STORY], 'V', 'Chris');
+    expect(p).not.toContain('Recently used forms');
   });
 });
 
@@ -90,5 +103,70 @@ describe('buildSocialPostPrompt', () => {
       founderName: 'Chris',
     });
     expect(p).toContain('Rate held at 4.35%');
+  });
+
+  it('renders the generate instruction for every form in the vocabulary', () => {
+    for (const form of SOCIAL_POST_FORM_VALUES) {
+      const p = buildSocialPostPrompt({
+        story: STORY,
+        form,
+        platform: 'linkedin',
+        platformSpec: LINKEDIN_SPEC,
+        voiceBlock: 'V',
+        founderName: 'Chris',
+      });
+      expect(p).toContain(SOCIAL_POST_FORMS[form].generateInstruction);
+    }
+  });
+
+  it('injects the anti-repetition block when recent openings are supplied', () => {
+    const p = buildSocialPostPrompt({
+      story: STORY,
+      form: 'flat_observation',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+      recentOpenings: ['The RBA held rates again.'],
+    });
+    expect(p).toContain('Do not repeat yourself');
+    expect(p).toContain('- The RBA held rates again.');
+  });
+
+  it('omits the anti-repetition block when there are no recent openings', () => {
+    const p = buildSocialPostPrompt({
+      story: STORY,
+      form: 'flat_observation',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+    });
+    expect(p).not.toContain('Do not repeat yourself');
+  });
+
+  it('adds a brevity nudge for a short length target and none for standard', () => {
+    const short = buildSocialPostPrompt({
+      story: STORY,
+      form: 'contrarian_take',
+      platform: 'twitter_x',
+      platformSpec: X_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+      lengthTarget: 'short',
+    });
+    expect(short).toContain('lean SHORT');
+
+    const standard = buildSocialPostPrompt({
+      story: STORY,
+      form: 'contrarian_take',
+      platform: 'twitter_x',
+      platformSpec: X_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+      lengthTarget: 'standard',
+    });
+    expect(standard).not.toContain('lean SHORT');
+    expect(standard).not.toContain('Length today');
   });
 });

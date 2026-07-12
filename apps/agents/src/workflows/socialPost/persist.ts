@@ -1,6 +1,7 @@
 import type { Platform, CharlieVariant, LexVerdict } from '../variant/schemas.js';
 import { charCountOf, isThreadVariant } from '../variant/prompts.js';
 import { complianceStatusFor, resolveDisclaimerSnippetId } from '../variant/persist.js';
+import type { SocialPostForm } from './forms.js';
 
 // Pure row mappers for the social-post persist step. Like the campaign variant
 // persist, but the idea is a news story, not a campaign beat — so campaign_id and
@@ -22,6 +23,9 @@ export interface SocialPostRow {
   campaign_id: null;
   beat_id: null;
   social_account_id: string;
+  // The editor-chosen form this post took — persisted so future runs can rotate
+  // away from recently-used forms (see socialPost/history.ts).
+  post_form: SocialPostForm;
   is_thread: boolean;
   char_count: number | null;
   compliance_status: 'cleared' | 'flagged';
@@ -36,12 +40,13 @@ export interface SocialPostRow {
 export function buildSocialPostRow(params: {
   platform: Platform;
   socialAccountId: string;
+  form: SocialPostForm;
   draft: CharlieVariant;
   verdict: LexVerdict;
   disclaimerSnippets: DisclaimerRef[];
   checkedAt: string;
 }): SocialPostRow {
-  const { platform, socialAccountId, draft, verdict, disclaimerSnippets, checkedAt } = params;
+  const { platform, socialAccountId, form, draft, verdict, disclaimerSnippets, checkedAt } = params;
   const thread = isThreadVariant(draft);
   return {
     title: draft.title || null,
@@ -52,6 +57,7 @@ export function buildSocialPostRow(params: {
     campaign_id: null,
     beat_id: null,
     social_account_id: socialAccountId,
+    post_form: form,
     is_thread: thread,
     char_count: thread ? null : charCountOf(draft.body),
     compliance_status: complianceStatusFor(verdict),

@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-12 — `content_items.post_form` — persist the daily social post's editor-chosen form
+
+**Migration:** `20260712000000_add_content_item_post_form.sql`
+
+The `social_post_from_news` routine (`docs/daily-social-posts.md`) has the internal
+`editor` agent pick a post *form* (share_with_context, teach, and now four skeleton-less
+shapes: flat_observation, contrarian_take, small_note, numbers_first). Until now the
+chosen form was only recorded in `agent_activity.proposed_actions` and
+`routines.last_result` — neither a practical query surface.
+
+To make the feed feel less automated, each morning's run now reads an account's recent
+drafts and biases the editor toward a form it has not used lately. That needs the form on
+the row we already write, so:
+
+- **`content_items.post_form`** (new, nullable `TEXT`) — the editor-chosen form of a daily
+  social post. Plain TEXT, not an enum: the form vocabulary is application code
+  (`apps/agents/src/workflows/socialPost/forms.ts`) and is expected to grow; the reader
+  (`socialPost/history.ts`) tolerates unknown/null values. Existing non-social
+  content_items are unaffected (stays NULL).
+
 ## 2026-07-10 — `onchain_indicators` — derive MVRV locally instead of fetching CapMVRVCur
 
 **Migration:** `20260710000000_derive_mvrv.sql`
