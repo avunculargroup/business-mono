@@ -380,7 +380,8 @@ CREATE OR REPLACE FUNCTION match_voice_snippets(
   p_platform       TEXT    DEFAULT NULL,
   match_count      INT     DEFAULT 5,
   star_boost       FLOAT   DEFAULT 0.05,
-  match_threshold  FLOAT   DEFAULT 0.0
+  match_threshold  FLOAT   DEFAULT 0.0,
+  p_snippet_types  TEXT[]  DEFAULT NULL
 )
 RETURNS TABLE (
   id                UUID,
@@ -410,6 +411,7 @@ LANGUAGE sql STABLE AS $$
         OR (p_account_id IS NULL AND vs.social_account_id IS NULL)
       )
       AND (p_platform IS NULL OR vs.platform = p_platform OR vs.platform IS NULL)
+      AND (p_snippet_types IS NULL OR vs.snippet_type = ANY(p_snippet_types))
       AND 1 - (vs.embedding <=> query_embedding) >= match_threshold
   )
   SELECT

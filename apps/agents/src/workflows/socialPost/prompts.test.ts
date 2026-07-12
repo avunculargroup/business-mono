@@ -145,6 +145,57 @@ describe('buildSocialPostPrompt', () => {
     expect(p).not.toContain('Do not repeat yourself');
   });
 
+  it('always includes the grounding requirement', () => {
+    const p = buildSocialPostPrompt({
+      story: STORY,
+      form: 'share_with_context',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+    });
+    expect(p).toContain('Grounding (make it concrete)');
+    expect(p).toMatch(/number, name, date, or figure/i);
+  });
+
+  it('renders a rewrite section only when a rewrite instruction is passed', () => {
+    const withRewrite = buildSocialPostPrompt({
+      story: STORY,
+      form: 'teach',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+      rewriteInstruction: '- Cut the em-dashes — restructure into plain sentences.',
+    });
+    expect(withRewrite).toContain('Rewrite — fix these AI-tells');
+    expect(withRewrite).toContain('Cut the em-dashes');
+
+    const without = buildSocialPostPrompt({
+      story: STORY,
+      form: 'teach',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+    });
+    expect(without).not.toContain('Rewrite — fix these AI-tells');
+  });
+
+  it('appends the cadence block after the voice block when supplied', () => {
+    const p = buildSocialPostPrompt({
+      story: STORY,
+      form: 'numbers_first',
+      platform: 'twitter_x',
+      platformSpec: X_SPEC,
+      voiceBlock: 'VOICE',
+      founderName: 'Chris',
+      cadenceBlock: '**How you tend to open and close — borrow the cadence, not the words:**\n- opener',
+    });
+    expect(p).toContain('borrow the cadence, not the words');
+    expect(p.indexOf('VOICE')).toBeLessThan(p.indexOf('borrow the cadence'));
+  });
+
   it('adds a brevity nudge for a short length target and none for standard', () => {
     const short = buildSocialPostPrompt({
       story: STORY,

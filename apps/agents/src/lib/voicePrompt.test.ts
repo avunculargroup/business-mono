@@ -4,8 +4,13 @@ import type { ResolvedVoiceContext } from '@platform/voice';
 const { resolveVoiceContext } = vi.hoisted(() => ({ resolveVoiceContext: vi.fn() }));
 vi.mock('@platform/voice', () => ({ resolveVoiceContext }));
 
-const { formatResolvedVoice, resolveCompanyVoiceBlock, voiceBlockHasFormatNotes, renderFormatConfig } =
-  await import('./voicePrompt.js');
+const {
+  formatResolvedVoice,
+  formatCadenceExemplars,
+  resolveCompanyVoiceBlock,
+  voiceBlockHasFormatNotes,
+  renderFormatConfig,
+} = await import('./voicePrompt.js');
 
 const canon: ResolvedVoiceContext = {
   profile: {
@@ -71,6 +76,32 @@ describe('formatResolvedVoice', () => {
     });
     expect(block).toContain('Open with a number.');
     expect(block).toContain('earns attention first');
+  });
+});
+
+describe('formatCadenceExemplars', () => {
+  it('is empty when there are no cadence snippets', () => {
+    expect(formatCadenceExemplars([])).toBe('');
+  });
+
+  it('renders opener/closer exemplars under a cadence heading', () => {
+    const block = formatCadenceExemplars([
+      {
+        id: '1',
+        social_account_id: null,
+        snippet_type: 'opener',
+        body: 'Start with the number that matters.',
+        curator_note: 'hooks on the figure',
+        platform: 'linkedin',
+        topic_tags: ['etf'],
+        is_starred: false,
+        similarity: 0.8,
+        score: 0.8,
+      },
+    ]);
+    expect(block).toContain('borrow the cadence, not the words');
+    expect(block).toContain('Start with the number that matters.');
+    expect(block).toContain('hooks on the figure');
   });
 });
 
