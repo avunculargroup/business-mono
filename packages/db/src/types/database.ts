@@ -1253,6 +1253,7 @@ export type Database = {
           needs_disclaimer: boolean
           pain_point_id: string | null
           pending_decision: Json | null
+          post_form: string | null
           published_at: string | null
           published_url: string | null
           question_count: number
@@ -1292,6 +1293,7 @@ export type Database = {
           needs_disclaimer?: boolean
           pain_point_id?: string | null
           pending_decision?: Json | null
+          post_form?: string | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
@@ -1331,6 +1333,7 @@ export type Database = {
           needs_disclaimer?: boolean
           pain_point_id?: string | null
           pending_decision?: Json | null
+          post_form?: string | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
