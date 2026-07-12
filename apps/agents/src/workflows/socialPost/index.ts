@@ -15,8 +15,9 @@ import { lex } from '../../agents/compliance/index.js';
 import { applyThreadStyle, buildLexPrompt } from '../variant/prompts.js';
 import { charlieVariantSchema, lexVerdictSchema, type Platform, type CharlieVariant, type LexVerdict } from '../variant/schemas.js';
 import { buildSocialPostRow, buildThreadSegmentRows, type DisclaimerRef } from './persist.js';
-import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite } from './prompts.js';
+import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite, type LengthTarget } from './prompts.js';
 import { editorSelectionSchema, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
+import { toRecentPosts, extractOpeningLines, recentForms, type RecentPost } from './history.js';
 import { sendSocialDraft, type SocialDraftPost } from '../../lib/sendSocialDraft.js';
 // Type-only — erased at compile time, so no runtime import cycle with the
 // workflow file (which imports this handler's value). Mirrors runIndicatorPoll.
@@ -52,6 +53,19 @@ interface FounderAccount {
 
 const DEFAULT_PLATFORMS: Platform[] = ['linkedin', 'twitter_x'];
 const CANDIDATE_LIMIT = 30;
+const RECENT_POST_LIMIT = 10;
+
+/**
+ * A deterministic per-day, per-founder brevity target, so length varies across
+ * days without a config knob. Same for both platforms in a single run — length is
+ * a "how the founder feels today" decision, not a per-platform one.
+ */
+function pickLengthTarget(founderId: string): LengthTarget {
+  const key = `${new Date().toISOString().slice(0, 10)}:${founderId}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return (['standard', 'short', 'punchy'] as const)[h % 3];
+}
 
 async function generateDraft(prompt: string): Promise<CharlieVariant> {
   const fallback: CharlieVariant = { is_thread: false, title: '', body: '', segments: [], charlie_note: 'Generation failed.' };
@@ -164,15 +178,37 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     };
   }
 
+  // ── Recent drafts per account: openers to avoid + forms to rotate away from ─
+  // One cheap read per account, only reached once there is news to draft.
+  const recentByAccount = new Map<string, RecentPost[]>();
+  await Promise.all(
+    [...accounts.values()].map(async (account) => {
+      const { data: recentRows, error: recentErr } = await db
+        .from('content_items')
+        .select('title, body, is_thread, post_form, created_at')
+        .eq('social_account_id', account.id)
+        .eq('source', 'charlie')
+        .order('created_at', { ascending: false })
+        .limit(RECENT_POST_LIMIT);
+      if (recentErr) {
+        console.warn(`[social-post] recent content_items read failed for ${account.platform}:`, recentErr.message);
+      }
+      recentByAccount.set(account.id, toRecentPosts(recentRows));
+    }),
+  );
+
+  const lengthTarget = pickLengthTarget(founderId);
+
   // ── Editor picks the best-fit story + form for this founder ─────────────────
   const selectionAccount = accounts.get('linkedin') ?? [...accounts.values()][0]!;
   const selectionVoice = await resolveVoiceContext({ accountId: selectionAccount.id, platform: selectionAccount.platform });
   const selectionVoiceBlock = formatResolvedVoice(selectionVoice);
+  const selectionRecentForms = recentForms(recentByAccount.get(selectionAccount.id) ?? []);
 
   let pick = null;
   try {
     const resp = await editor.generate(
-      [{ role: 'user', content: buildEditorSelectionPrompt(candidates, selectionVoiceBlock, founderName) }],
+      [{ role: 'user', content: buildEditorSelectionPrompt(candidates, selectionVoiceBlock, founderName, selectionRecentForms) }],
       {
         requestContext: stepRequestContext('social_post.editor_select'),
         structuredOutput: { schema: editorSelectionSchema, errorStrategy: 'fallback', fallbackValue: null },
@@ -200,6 +236,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
         query: `${story.title}\n${story.summary}`,
       });
       const formatConfig = extractFormatConfig(voice.profile);
+      const recentOpenings = extractOpeningLines(recentByAccount.get(account.id) ?? []);
       const draft = applyThreadStyle(
         await generateDraft(
           buildSocialPostPrompt({
@@ -210,6 +247,8 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
             voiceBlock: formatResolvedVoice(voice),
             formatConfig,
             founderName,
+            recentOpenings,
+            lengthTarget,
           }),
         ),
         formatConfig,
@@ -219,6 +258,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
       const row = buildSocialPostRow({
         platform: account.platform,
         socialAccountId: account.id,
+        form,
         draft,
         verdict,
         disclaimerSnippets: disclaimers,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SOCIAL_POST_FORM_VALUES, type SocialPostForm } from './forms.js';
 
 // Pure story-selection helpers for the social_post_from_news routine. A founder's
 // routine pulls the day's news_items, the editor picks the single story that best
@@ -20,17 +21,16 @@ export interface StoryCandidate {
   published_at: string | null;
 }
 
-/** The two post forms the editor chooses between for a given story + founder. */
-export const socialPostFormEnum = z.enum(['share_with_context', 'teach']);
-export type SocialPostForm = z.infer<typeof socialPostFormEnum>;
+/** The post forms the editor chooses between for a given story + founder. The
+ *  vocabulary (and its prompt text) lives in forms.ts — the single source of truth. */
+export const socialPostFormEnum = z.enum(SOCIAL_POST_FORM_VALUES);
+export type { SocialPostForm };
 
 // The editor's pick: which candidate (by verbatim index) and which form, plus a
 // one-line rationale for the audit trail.
 export const editorSelectionSchema = z.object({
   story_index: z.number().int().nonnegative().describe('The verbatim candidate index from the input list.'),
-  form: socialPostFormEnum.describe(
-    'share_with_context = share the story with the founder\'s perspective; teach = teach the concept the story surfaces.',
-  ),
+  form: socialPostFormEnum.describe('The post form — one of the forms defined and described in the prompt.'),
   rationale: z.string().default('').describe('One line: why this story and form suit this founder.'),
 });
 export type EditorSelection = z.infer<typeof editorSelectionSchema>;

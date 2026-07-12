@@ -2010,6 +2010,12 @@ ALTER TABLE content_items
   ADD COLUMN IF NOT EXISTS gate_state       JSONB,
   ADD COLUMN IF NOT EXISTS pending_decision JSONB;
 
+-- The editor-chosen form of a daily social post (migration: 20260712000000).
+-- Plain TEXT (not an enum) — the form vocabulary lives in application code and is
+-- expected to grow; the next day's run reads recent forms to bias toward variety.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS post_form TEXT;
+
 -- Ordered child rows of a threaded content_item.
 CREATE TABLE thread_segments (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

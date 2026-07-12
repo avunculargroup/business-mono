@@ -199,7 +199,15 @@ export interface SocialPostFromNewsConfig {
 }
 
 // The post form the editor chooses for a given story + founder.
-export type SocialPostForm = 'share_with_context' | 'teach';
+// KEEP IN SYNC with SOCIAL_POST_FORMS in apps/agents/src/workflows/socialPost/forms.ts
+// (shared cannot import from apps/agents, so this union is duplicated deliberately).
+export type SocialPostForm =
+  | 'share_with_context'
+  | 'teach'
+  | 'flat_observation'
+  | 'contrarian_take'
+  | 'small_note'
+  | 'numbers_first';
 
 // One drafted post persisted to content_items this run.
 export interface SocialPostDraft {

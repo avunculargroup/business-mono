@@ -36,6 +36,7 @@ describe('buildSocialPostRow', () => {
     const row = buildSocialPostRow({
       platform: 'linkedin',
       socialAccountId: 'acc-1',
+      form: 'flat_observation',
       draft: SINGLE,
       verdict: CLEARED,
       disclaimerSnippets: DISCLAIMERS,
@@ -44,6 +45,7 @@ describe('buildSocialPostRow', () => {
     expect(row.campaign_id).toBeNull();
     expect(row.beat_id).toBeNull();
     expect(row.social_account_id).toBe('acc-1');
+    expect(row.post_form).toBe('flat_observation');
     expect(row.type).toBe('linkedin');
     expect(row.status).toBe('draft');
     expect(row.source).toBe('charlie');
@@ -58,11 +60,13 @@ describe('buildSocialPostRow', () => {
     const row = buildSocialPostRow({
       platform: 'twitter_x',
       socialAccountId: 'acc-2',
+      form: 'teach',
       draft: THREAD,
       verdict: ADVICE,
       disclaimerSnippets: DISCLAIMERS,
       checkedAt: '2026-06-26T09:00:00Z',
     });
+    expect(row.post_form).toBe('teach');
     expect(row.is_thread).toBe(true);
     expect(row.char_count).toBeNull(); // each segment carries its own count
     expect(row.compliance_status).toBe('cleared');

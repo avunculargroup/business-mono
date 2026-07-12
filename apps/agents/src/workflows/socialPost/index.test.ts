@@ -121,8 +121,10 @@ describe('runSocialPost', () => {
     expect(posts.map((p) => p.platform).sort()).toEqual(['linkedin', 'twitter_x']);
     expect(meta['emailed']).toBe(true);
 
-    // Two content_items inserts (one per platform).
-    expect(fakeSupabase.__buildersFor('content_items').length).toBe(2);
+    // Two content_items inserts (one per platform) — the recent-drafts reads use
+    // the same table key, so filter to the builders whose insert() actually ran.
+    const inserts = fakeSupabase.__buildersFor('content_items').filter((b) => b.insert.mock.calls.length > 0);
+    expect(inserts.length).toBe(2);
     expect(sendSocialDraft).toHaveBeenCalledTimes(1);
     // Editor selection ran once; Charlie + Lex ran once per platform.
     expect(editorGenerate).toHaveBeenCalledTimes(1);
@@ -151,6 +153,35 @@ describe('runSocialPost', () => {
     expect(outcome.result?.summary).toMatch(/no fresh news/i);
     expect(charlieGenerate).not.toHaveBeenCalled();
     expect(sendSocialDraft).not.toHaveBeenCalled();
+  });
+
+  it('feeds recent openers and forms into the editor + Charlie prompts', async () => {
+    wireHappyPath();
+    // from('content_items') order: read(linkedin), read(twitter_x), insert(li), insert(x).
+    fakeSupabase.__setResponses('content_items', [
+      {
+        data: [
+          { title: 'Old', body: 'We keep saying the same thing.', is_thread: false, post_form: 'teach', created_at: '2026-07-11T00:00:00Z' },
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+      { data: { id: 'ci-li' }, error: null },
+      { data: { id: 'ci-x' }, error: null },
+    ]);
+
+    await runSocialPost(ROUTINE);
+
+    // The editor prompt (keyed on the LinkedIn selection account) carries the
+    // rotation bias derived from that account's recent forms.
+    const editorPrompt = editorGenerate.mock.calls[0][0][0].content as string;
+    expect(editorPrompt).toContain('Recently used forms');
+    expect(editorPrompt).toContain('teach');
+
+    // The first Charlie draft (LinkedIn) carries the anti-repetition block.
+    const liPrompt = charlieGenerate.mock.calls[0][0][0].content as string;
+    expect(liPrompt).toContain('Do not repeat yourself');
+    expect(liPrompt).toContain('We keep saying the same thing.');
   });
 
   it('still emails the founder when only one platform drafts successfully', async () => {
