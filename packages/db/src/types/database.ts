@@ -4748,6 +4748,7 @@ export type Database = {
           match_threshold?: number
           p_account_id?: string
           p_platform?: string
+          p_snippet_types?: string[]
           query_embedding: string
           star_boost?: number
         }
