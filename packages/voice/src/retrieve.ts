@@ -14,6 +14,8 @@ export interface RetrieveSnippetsParams {
   starBoost?: number;
   /** Minimum cosine similarity (0..1) a snippet must clear. */
   threshold?: number;
+  /** Restrict to these snippet_type values (e.g. opener/closer). NULL = no filter. */
+  snippetTypes?: string[] | null;
 }
 
 /**
@@ -27,8 +29,15 @@ export interface RetrieveSnippetsParams {
 export async function retrieveVoiceSnippets(
   params: RetrieveSnippetsParams,
 ): Promise<VoiceSnippet[]> {
-  const { queryEmbedding, accountId = null, platform = null, count = 5, starBoost = 0.05, threshold = 0 } =
-    params;
+  const {
+    queryEmbedding,
+    accountId = null,
+    platform = null,
+    count = 5,
+    starBoost = 0.05,
+    threshold = 0,
+    snippetTypes = null,
+  } = params;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)('match_voice_snippets', {
@@ -38,6 +47,7 @@ export async function retrieveVoiceSnippets(
     match_count: count,
     star_boost: starBoost,
     match_threshold: threshold,
+    p_snippet_types: snippetTypes,
   });
 
   if (error) throw new Error(`Voice snippet retrieval failed: ${error.message}`);

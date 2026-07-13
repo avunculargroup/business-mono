@@ -101,6 +101,10 @@ export function buildSocialPostPrompt(params: {
   recentOpenings?: string[];
   /** Soft brevity nudge for the day; platform hard limits still win. */
   lengthTarget?: LengthTarget;
+  /** Retrieved opener/closer exemplars — how this founder tends to open and close. */
+  cadenceBlock?: string;
+  /** When set, a rewrite pass: fix the named AI-tells while keeping story/form/voice. */
+  rewriteInstruction?: string;
 }): string {
   const {
     story,
@@ -112,6 +116,8 @@ export function buildSocialPostPrompt(params: {
     founderName,
     recentOpenings = [],
     lengthTarget = 'standard',
+    cadenceBlock = '',
+    rewriteInstruction,
   } = params;
   const label = PLATFORM_LABEL[platform];
   const allowThread = platform === 'twitter_x' && formatConfig?.thread_style !== 'single-only';
@@ -128,6 +134,17 @@ export function buildSocialPostPrompt(params: {
 
   const points = story.key_points.length ? `\nKey points:\n- ${story.key_points.join('\n- ')}` : '';
 
+  const groundingBlock = `## Grounding (make it concrete)
+Anchor the post in at least one hard specific from the story — a number, name, date, or figure from the key points above. Concrete beats general: avoid vague filler like "many Australian businesses are exploring…".`;
+
+  const rewriteBlock = rewriteInstruction
+    ? `## Rewrite — fix these AI-tells
+The previous draft read as machine-written. Rewrite it addressing each point below, keeping the same story, form, and voice:
+${rewriteInstruction}
+
+`
+    : '';
+
   return `You are writing one ${label} post for ${founderName}, a co-founder of BTS, in their personal voice.
 
 ## The story
@@ -143,13 +160,15 @@ ${lengthNudge ? `\n${lengthNudge}\n` : ''}
 ## ${label} formatting (platform mechanics)
 ${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', formatConfig ?? null)}
 ${repetitionBlock ? `\n${repetitionBlock}\n` : ''}
+${groundingBlock}
+
 ## Sourcing
 - It is fine to reference or link the source story; write the post as ${founderName}'s own, not a news report.
 
-## Brand voice — authoritative for this post
+${rewriteBlock}## Brand voice — authoritative for this post
 The brand voice below is ${founderName}'s voice for this account and governs persona, tone, vocabulary (use and avoid), signature devices, format and length, topic policy, and the Bitcoin capitalisation rule. Follow it exactly. Where it conflicts with the platform notes above, the voice wins on style; the platform's hard limits (char ceiling, fold) still stand.
 
 ${voiceBlock}
-
+${cadenceBlock ? `\n${cadenceBlock}\n` : ''}
 ${NO_TOOL_INSTRUCTION}`;
 }

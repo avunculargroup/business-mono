@@ -1,4 +1,4 @@
-import { resolveVoiceContext, type ResolvedVoiceContext, type FormatConfig } from '@platform/voice';
+import { resolveVoiceContext, type ResolvedVoiceContext, type FormatConfig, type VoiceSnippet } from '@platform/voice';
 
 // Renders a ResolvedVoiceContext (from packages/voice) into the <brand-voice>
 // prompt block content that content agents internalise. This is the bridge
@@ -75,6 +75,25 @@ export function renderFormatConfig(fmt: FormatConfig): string {
   return parts.join(', ');
 }
 
+/** One retrieved exemplar rendered as a prompt line: its meta tags, the body, and
+ *  (when present) the curator's note. Shared by the exemplars and cadence blocks. */
+function renderSnippetLine(s: VoiceSnippet): string {
+  const tags = [s.snippet_type, s.platform ?? 'any', ...s.topic_tags].join(' · ');
+  const note = s.curator_note ? `\n  why it works: ${s.curator_note}` : '';
+  return `- (${tags})\n  "${s.body}"${note}`;
+}
+
+/**
+ * Render opener/closer exemplars as a compact "cadence" block — how this founder
+ * tends to open and close, so Charlie borrows the rhythm, not the words. Empty
+ * string when there are no cadence snippets (so the caller can omit the section).
+ */
+export function formatCadenceExemplars(snippets: VoiceSnippet[]): string {
+  if (snippets.length === 0) return '';
+  const lines = snippets.map(renderSnippetLine).join('\n');
+  return `**How you tend to open and close — borrow the cadence, not the words:**\n${lines}`;
+}
+
 /** Format the merged profile (+ rule, mission, any retrieved snippets) as markdown. */
 export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
   const p = ctx.profile;
@@ -117,13 +136,7 @@ export function formatResolvedVoice(ctx: ResolvedVoiceContext): string {
   }
 
   if (ctx.snippets.length > 0) {
-    const examples = ctx.snippets
-      .map((s) => {
-        const tags = [s.snippet_type, s.platform ?? 'any', ...s.topic_tags].join(' · ');
-        const note = s.curator_note ? `\n  why it works: ${s.curator_note}` : '';
-        return `- (${tags})\n  "${s.body}"${note}`;
-      })
-      .join('\n');
+    const examples = ctx.snippets.map(renderSnippetLine).join('\n');
     parts.push(`**Exemplars — write in this register (do not copy):**\n${examples}`);
   }
 

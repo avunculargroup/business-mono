@@ -22,6 +22,11 @@ export interface ResolveVoiceParams {
   snippetCount?: number;
   /** Starred-snippet ranking bonus, forwarded to retrieval. */
   starBoost?: number;
+  /**
+   * Restrict retrieval to these snippet_type values (e.g. opener/closer, for a
+   * cadence pass). Omit for no type filter. Only meaningful with a `query`.
+   */
+  snippetTypes?: string[] | null;
 }
 
 /**
@@ -42,7 +47,7 @@ export async function resolveVoiceContext(
   params: ResolveVoiceParams,
   deps: VoiceResolverDeps = defaultDeps,
 ): Promise<ResolvedVoiceContext> {
-  const { accountId = null, query = null, snippetCount = 5, starBoost = 0.05 } = params;
+  const { accountId = null, query = null, snippetCount = 5, starBoost = 0.05, snippetTypes = null } = params;
 
   const brand = await deps.loadActiveBrandVoice();
 
@@ -64,6 +69,7 @@ export async function resolveVoiceContext(
           platform,
           count: snippetCount,
           starBoost,
+          snippetTypes,
         })
       : [];
 

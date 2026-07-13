@@ -70,6 +70,23 @@ describe('resolveVoiceContext', () => {
     );
   });
 
+  it('forwards a snippetTypes filter to retrieval (cadence pass)', async () => {
+    const deps = makeDeps();
+    await resolveVoiceContext(
+      { accountId: 'acc-1', query: 'reframe', snippetCount: 4, snippetTypes: ['opener', 'closer'] },
+      deps,
+    );
+    expect(deps.retrieve).toHaveBeenCalledWith(
+      expect.objectContaining({ count: 4, snippetTypes: ['opener', 'closer'] }),
+    );
+  });
+
+  it('defaults snippetTypes to null so unfiltered retrieval is unchanged', async () => {
+    const deps = makeDeps();
+    await resolveVoiceContext({ accountId: 'acc-1', query: 'reframe' }, deps);
+    expect(deps.retrieve).toHaveBeenCalledWith(expect.objectContaining({ snippetTypes: null }));
+  });
+
   it('skips retrieval entirely when no query is given (merge-only)', async () => {
     const deps = makeDeps();
     const ctx = await resolveVoiceContext({ accountId: 'acc-1' }, deps);

@@ -97,8 +97,10 @@ beforeEach(() => {
     snippets: [],
   });
   editorGenerate.mockResolvedValue({ object: { story_index: 0, form: 'teach', rationale: 'fits Chris' } });
+  // Grounded body (carries a figure) so the AI-tell linter does not trigger a
+  // rewrite in the default happy path — the story's key point has "4.35%".
   charlieGenerate.mockResolvedValue({
-    object: { is_thread: false, title: 'Holding the line', body: 'The RBA held rates.', segments: [], charlie_note: '' },
+    object: { is_thread: false, title: 'Holding the line', body: 'The RBA held rates at 4.35%.', segments: [], charlie_note: '' },
   });
   lexGenerate.mockResolvedValue({
     object: { classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'edu' },
@@ -182,6 +184,41 @@ describe('runSocialPost', () => {
     const liPrompt = charlieGenerate.mock.calls[0][0][0].content as string;
     expect(liPrompt).toContain('Do not repeat yourself');
     expect(liPrompt).toContain('We keep saying the same thing.');
+  });
+
+  it('runs one rewrite pass when the first draft trips the AI-tell linter', async () => {
+    wireHappyPath();
+    // Single account to keep call-counting unambiguous.
+    fakeSupabase.__setResponse('social_accounts', {
+      data: [{ id: 'acc-li', platform: 'linkedin', display_name: 'Chris' }],
+      error: null,
+    });
+    // First draft is ungrounded (no figure though the story has one) → rewrite; the
+    // rewrite is clean.
+    charlieGenerate
+      .mockResolvedValueOnce({ object: { is_thread: false, title: 'T', body: 'Vague post, nothing concrete here.', segments: [], charlie_note: '' } })
+      .mockResolvedValueOnce({ object: { is_thread: false, title: 'T', body: 'The RBA held at 4.35%.', segments: [], charlie_note: '' } });
+
+    await runSocialPost(ROUTINE);
+
+    expect(charlieGenerate).toHaveBeenCalledTimes(2); // first draft + one rewrite
+    const rewritePrompt = charlieGenerate.mock.calls[1][0][0].content as string;
+    expect(rewritePrompt).toContain('Rewrite — fix these AI-tells');
+  });
+
+  it('does not rewrite a clean, grounded draft', async () => {
+    wireHappyPath();
+    fakeSupabase.__setResponse('social_accounts', {
+      data: [{ id: 'acc-li', platform: 'linkedin', display_name: 'Chris' }],
+      error: null,
+    });
+    charlieGenerate.mockResolvedValue({
+      object: { is_thread: false, title: 'T', body: 'The RBA held at 4.35% today.', segments: [], charlie_note: '' },
+    });
+
+    await runSocialPost(ROUTINE);
+
+    expect(charlieGenerate).toHaveBeenCalledTimes(1); // no rewrite
   });
 
   it('still emails the founder when only one platform drafts successfully', async () => {

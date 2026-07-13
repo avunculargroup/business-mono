@@ -6,6 +6,23 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-12 — `match_voice_snippets` — optional `p_snippet_types` filter
+
+**Migration:** `20260712010000_voice_snippet_type_filter.sql`
+
+The daily social-post routine's cadence pass (proposal 4) needs to retrieve a founder's
+characteristic *openers* and *closers* specifically, so Charlie borrows their rhythm — not just
+on-topic phrasing. The `match_voice_snippets` RPC ranked purely by topical similarity with no way
+to restrict by `snippet_type`.
+
+- **`match_voice_snippets`** — gains a trailing `p_snippet_types TEXT[] DEFAULT NULL` argument and
+  an `AND (p_snippet_types IS NULL OR vs.snippet_type = ANY(p_snippet_types))` clause. NULL (the
+  default) imposes no filter, so every existing caller is unchanged. The parameter is added last
+  with a DEFAULT; PostgREST resolves arguments by name, so the JS caller is order-independent.
+  Adding a parameter changes the function identity, so the migration DROPs the prior six-argument
+  signature first (RPC-only — nothing depends on it) then recreates on the precedence-aware body.
+  `@platform/voice` (`retrieve.ts`, `resolve.ts`) threads a `snippetTypes` option through to it.
+
 ## 2026-07-12 — `content_items.post_form` — persist the daily social post's editor-chosen form
 
 **Migration:** `20260712000000_add_content_item_post_form.sql`

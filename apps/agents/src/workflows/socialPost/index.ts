@@ -7,17 +7,18 @@ import type {
   SocialPostFromNewsResult,
   SocialPostDraft,
 } from '@platform/shared';
-import { formatResolvedVoice, extractFormatConfig } from '../../lib/voicePrompt.js';
+import { formatResolvedVoice, formatCadenceExemplars, extractFormatConfig } from '../../lib/voicePrompt.js';
 import { stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { editor } from '../../agents/editorial/index.js';
 import { lex } from '../../agents/compliance/index.js';
-import { applyThreadStyle, buildLexPrompt } from '../variant/prompts.js';
+import { applyThreadStyle, buildLexPrompt, variantCopyText } from '../variant/prompts.js';
 import { charlieVariantSchema, lexVerdictSchema, type Platform, type CharlieVariant, type LexVerdict } from '../variant/schemas.js';
 import { buildSocialPostRow, buildThreadSegmentRows, type DisclaimerRef } from './persist.js';
 import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite, type LengthTarget } from './prompts.js';
 import { editorSelectionSchema, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
 import { toRecentPosts, extractOpeningLines, recentForms, type RecentPost } from './history.js';
+import { scoreAiTells, aiTellRewriteInstruction } from './aiTell.js';
 import { sendSocialDraft, type SocialDraftPost } from '../../lib/sendSocialDraft.js';
 // Type-only — erased at compile time, so no runtime import cycle with the
 // workflow file (which imports this handler's value). Mirrors runIndicatorPoll.
@@ -219,6 +220,9 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     console.warn('[social-post] editor selection failed:', err);
   }
   const { story, form, rationale } = resolveSelection(candidates, pick);
+  const storyQuery = `${story.title}\n${story.summary}`;
+  // Did the source story carry figures? Feeds the linter's grounding check.
+  const storyHasNumbers = /\d/.test(story.summary) || story.key_points.some((k) => /\d/.test(k));
 
   // ── Draft each platform: Charlie → Lex → persist ────────────────────────────
   const posts: SocialPostDraft[] = [];
@@ -233,26 +237,49 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
       const voice = await resolveVoiceContext({
         accountId: account.id,
         platform: account.platform,
-        query: `${story.title}\n${story.summary}`,
+        query: storyQuery,
       });
+      // A second, type-filtered pass for the founder's opener/closer exemplars, so
+      // Charlie borrows their cadence — not just on-topic phrasing. Empty for
+      // accounts with no such snippets (no block, no extra prompt weight).
+      const cadence = await resolveVoiceContext({
+        accountId: account.id,
+        platform: account.platform,
+        query: storyQuery,
+        snippetCount: 4,
+        snippetTypes: ['opener', 'closer'],
+      });
+      const cadenceBlock = formatCadenceExemplars(cadence.snippets);
       const formatConfig = extractFormatConfig(voice.profile);
       const recentOpenings = extractOpeningLines(recentByAccount.get(account.id) ?? []);
-      const draft = applyThreadStyle(
-        await generateDraft(
-          buildSocialPostPrompt({
-            story,
-            form,
-            platform: account.platform,
-            platformSpec: spec,
-            voiceBlock: formatResolvedVoice(voice),
-            formatConfig,
-            founderName,
-            recentOpenings,
-            lengthTarget,
-          }),
-        ),
+
+      const promptParams = {
+        story,
+        form,
+        platform: account.platform,
+        platformSpec: spec,
+        voiceBlock: formatResolvedVoice(voice),
         formatConfig,
+        founderName,
+        recentOpenings,
+        lengthTarget,
+        cadenceBlock,
+      };
+
+      let draft = applyThreadStyle(await generateDraft(buildSocialPostPrompt(promptParams)), formatConfig);
+
+      // Deterministic AI-tell gate: on offenders only, one rewrite pass carrying
+      // the specific flags (reuses the generate_copy scope). Never loops.
+      const rewriteInstruction = aiTellRewriteInstruction(
+        scoreAiTells(variantCopyText(draft), { storyHasNumbers }),
       );
+      if (rewriteInstruction) {
+        draft = applyThreadStyle(
+          await generateDraft(buildSocialPostPrompt({ ...promptParams, rewriteInstruction })),
+          formatConfig,
+        );
+      }
+
       const verdict = await classifyDraft(draft, disclaimers);
 
       const row = buildSocialPostRow({
