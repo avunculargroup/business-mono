@@ -48,6 +48,7 @@ import { coerceToSchema } from './newsletter/coerce.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
 import { extractNewsMetadata } from './newsExtract.js';
+import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
 import { fetchOgImage } from '../lib/fetchOgImage.js';
 import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
@@ -1037,32 +1038,39 @@ async function runNewsIngest(
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
 
-      const { error: insertError } = await supabase.from('news_items').insert({
+      // Persist through the shared pipeline so search-derived items get Rex
+      // rubric scoring (relevance_score + rex_metadata). The ranking judge and
+      // shouldDropForRelevance above still decide *which* items reach this point;
+      // the rubric composite replaces the raw Tavily search score. These items
+      // have no news_sources row, so source.id is null.
+      const ingest = await ingestNewsItem({
+        source: { id: null, name: item.source, tier: null },
         title: item.title,
-        url: item.url,
-        source_name: item.source,
-        published_at: item.published_at,
-        body_markdown: bodyMarkdown,
-        summary: finalSummary,
-        key_points: extracted?.key_points ?? [],
-        topic_tags: extracted?.topic_tags ?? [],
-        australian_relevance: extracted?.australian_relevance ?? true,
+        body: bodyMarkdown ?? finalSummary,
+        fallbackSummary: finalSummary,
         category: category as NewsCategory,
-        relevance_score: Math.min(1, item.score),
-        embedding: finalEmbedding as unknown as string,
+        keyPoints: extracted?.key_points ?? [],
+        topicTags: extracted?.topic_tags ?? [],
+        australianRelevance: extracted?.australian_relevance ?? true,
+        publishedAt: item.published_at,
+        url: item.url,
+        routineId: routine.id,
+        ingestedBy: 'rex',
+        precomputedEmbedding: finalEmbedding,
         status: extractionOk ? 'new' : 'extraction_failed',
-        routine_id: routine.id,
-        ingested_by: 'rex',
       });
-      // A failed insert (e.g. a UNIQUE(url) collision from a late-detected
-      // duplicate) must not be counted as stored or surfaced in the dashboard
-      // sources — otherwise the same article appears twice in the tile.
-      if (insertError) {
-        if (insertError.code === '23505') itemsSkippedDuplicate += 1;
+      // A duplicate or failed insert (e.g. a UNIQUE(url) collision from a
+      // late-detected duplicate) must not be counted as stored or surfaced in the
+      // dashboard sources — otherwise the same article appears twice in the tile.
+      if (ingest.status === 'duplicate') {
+        itemsSkippedDuplicate += 1;
+        continue;
+      }
+      if (ingest.status === 'failed') {
         console.warn('[news-ingest] insert skipped', {
           url: item.url,
           title: item.title,
-          error: insertError.message,
+          error: ingest.reason,
         });
         continue;
       }
@@ -1147,7 +1155,7 @@ async function runNewsSourceScan(
   // generated types until post-migration regen, hence the boundary cast.)
   const { data: sources, error: sourcesError } = await (supabase
     .from('news_sources')
-    .select('id, name, feed_url')
+    .select('id, name, feed_url, tier')
     .eq('is_active', true)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .eq('source_type' as any, 'rss') as any);
@@ -1179,6 +1187,8 @@ async function runNewsSourceScan(
     title: string;
     summary: string;
     source: string;
+    sourceId: string;
+    sourceTier: string | null;
     published_at: string | null;
   }> = [];
   const failedSources: string[] = [];
@@ -1186,6 +1196,7 @@ async function runNewsSourceScan(
   for (const src of activeSources) {
     const sourceId = src.id as string;
     const sourceName = src.name as string;
+    const sourceTier = (src.tier as string | null) ?? null;
     const feedUrl = src.feed_url as string;
     try {
       const feed = await fetchFeed(feedUrl);
@@ -1197,7 +1208,7 @@ async function runNewsSourceScan(
       for (const cand of normalized) {
         if (seen.has(cand.url)) continue;
         seen.add(cand.url);
-        candidates.push(cand);
+        candidates.push({ ...cand, sourceId, sourceTier });
       }
 
       await supabase
@@ -1317,23 +1328,33 @@ async function runNewsSourceScan(
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
 
-      await supabase.from('news_items').insert({
+      // Persist through the shared pipeline so RSS items get Rex rubric scoring
+      // (relevance_score + rex_metadata), just like email newsletters.
+      const ingest = await ingestNewsItem({
+        source: { id: item.sourceId, name: item.source, tier: item.sourceTier },
         title: item.title,
-        url: item.url,
-        source_name: item.source,
-        published_at: item.published_at,
-        body_markdown: bodyMarkdown,
-        summary: finalSummary,
-        key_points: extracted?.key_points ?? [],
-        topic_tags: extracted?.topic_tags ?? [],
-        australian_relevance: extracted?.australian_relevance ?? false,
+        body: bodyMarkdown ?? finalSummary,
+        fallbackSummary: finalSummary,
         category: (extracted?.category ?? 'international') as NewsCategory,
-        relevance_score: null,
-        embedding: finalEmbedding as unknown as string,
+        keyPoints: extracted?.key_points ?? [],
+        topicTags: extracted?.topic_tags ?? [],
+        australianRelevance: extracted?.australian_relevance ?? false,
+        publishedAt: item.published_at,
+        url: item.url,
+        routineId: routine.id,
+        ingestedBy: 'rex',
+        precomputedEmbedding: finalEmbedding,
         status: extractionOk ? 'new' : 'extraction_failed',
-        routine_id: routine.id,
-        ingested_by: 'rex',
       });
+
+      if (ingest.status === 'duplicate') {
+        itemsSkippedDuplicate += 1;
+        continue;
+      }
+      if (ingest.status === 'failed') {
+        console.warn('[news-source-scan] insert skipped', { url: item.url, error: ingest.reason });
+        continue;
+      }
       itemsStored += 1;
       if (extractionOk) {
         storedSources.push({

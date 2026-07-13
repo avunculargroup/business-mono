@@ -23,7 +23,8 @@ const SEMANTIC_DEDUP_THRESHOLD = 0.88;
 const SIMILAR_LOOKBACK_DAYS = 60;
 
 export interface IngestNewsItemInput {
-  source: { id: string; name: string; tier: string | null };
+  /** id is null for search-derived items (web/Tavily) that have no news_sources row. */
+  source: { id: string | null; name: string; tier: string | null };
   title: string;
   /** Cleaned markdown body. */
   body: string;
@@ -45,6 +46,14 @@ export interface IngestNewsItemInput {
   attachmentCount?: number;
   ingestedBy?: string;
   routineId?: string | null;
+  /**
+   * Embedding of `title\nsummary`, when the caller already computed one (RSS/web
+   * paths embed during their own dedup phase). Skips the internal embed call and
+   * is reused for the semantic-dedup search and persistence.
+   */
+  precomputedEmbedding?: number[] | null;
+  /** Persisted news_items.status. Defaults to 'new'; callers pass 'extraction_failed' when metadata extraction failed. */
+  status?: 'new' | 'extraction_failed';
 }
 
 export type IngestStatus = 'inserted' | 'duplicate' | 'failed';
@@ -75,7 +84,8 @@ export function mergeTopics(...lists: ReadonlyArray<readonly string[]>): string[
 
 export async function ingestNewsItem(input: IngestNewsItemInput): Promise<IngestNewsItemResult> {
   // 1. ingestion_ref dedup (cheap; avoids embedding a re-delivered email).
-  if (input.ingestionRef) {
+  //    Scoped by source_id, so only meaningful when the item has one.
+  if (input.ingestionRef && input.source.id) {
     const { data: existingRef } = await supabase
       .from('news_items')
       .select('id')
@@ -98,8 +108,11 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
   }
 
   // 3. embed (title + summary, matching the rest of the news pipeline so
-  //    vector_search_news comparisons are like-for-like).
-  const embedding = await embedText(`${input.title}\n${input.fallbackSummary}`.trim());
+  //    vector_search_news comparisons are like-for-like). Reuse the caller's
+  //    embedding when supplied (RSS/web paths already embed the same string).
+  const embedding =
+    input.precomputedEmbedding ??
+    (await embedText(`${input.title}\n${input.fallbackSummary}`.trim()));
 
   // 4. semantic dedup + novelty neighbours in one vector search.
   let similar: SimilarItem[] = [];
@@ -165,7 +178,7 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     has_pdf_attachment: input.hasPdfAttachment ?? false,
     attachment_count: input.attachmentCount ?? 0,
     embedding: embedding as unknown as string,
-    status: 'new',
+    status: input.status ?? 'new',
     ingested_by: input.ingestedBy ?? 'rex',
     routine_id: input.routineId ?? null,
   };
