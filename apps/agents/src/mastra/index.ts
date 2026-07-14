@@ -3,7 +3,7 @@ import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
 import { Observability, SamplingStrategyType, DefaultExporter, CloudExporter } from '@mastra/observability';
 import { PinoLogger } from '@mastra/loggers';
-import type { Context } from 'hono';
+import type { ApiRouteHandler } from '@mastra/core/server';
 import { getResolvedMastraDbUrl } from '../lib/resolveDbUrl.js';
 import { createLogger } from '../lib/logger.js';
 import { simon } from '../agents/simon/index.js';
@@ -16,6 +16,7 @@ import { margot } from '../agents/margot/index.js';
 import { recorderWorkflow } from '../agents/recorder/workflow.js';
 import { pmWorkflow } from '../agents/pm/workflow.js';
 import { executeRoutineWorkflow } from '../workflows/executeRoutineWorkflow.js';
+import { pruneStorageWorkflow } from '../workflows/pruneStorageWorkflow.js';
 import { newsletterWorkflow } from '../workflows/newsletter/index.js';
 import { variantWorkflow } from '../workflows/variant/index.js';
 import { strategyWorkflow } from '../workflows/strategy/index.js';
@@ -42,9 +43,13 @@ import { AgentActivitySpanProcessor } from '../observability/agentActivityProces
 // db.[ref].supabase.co can return both). Must be called before any TCP connect.
 setDefaultResultOrder('ipv4first');
 
-// Adapt Web API handlers (Request → Response) to Hono handlers
-const honoHandler = (fn: (req: Request) => Promise<Response>) =>
-  (c: Context) => fn(c.req.raw);
+// Adapt Web API handlers (Request → Response) to Mastra API-route handlers.
+// Typed against Mastra's own ApiRouteHandler (its context param is `any`)
+// rather than hono's Context: @mastra/core vendors its own copy of hono's
+// types, so the app's `hono` Context is a distinct nominal type and won't
+// assign here. The adapter only needs `c.req.raw`, which `any` covers.
+const honoHandler = (fn: (req: Request) => Promise<Response>): ApiRouteHandler =>
+  (c) => fn(c.req.raw);
 
 // MASTRA_DB_URL is the Postgres connection string used exclusively for Mastra's
 // internal thread/memory storage (PostgresStore) and PgVector. It is NOT the
@@ -56,6 +61,20 @@ const resolvedDbUrl = await getResolvedMastraDbUrl();
 const storage = new PostgresStore({
   id: 'default',
   connectionString: resolvedDbUrl,
+  // Opt-in, age-based retention bounding the growth tables in the Mastra
+  // Postgres (MASTRA_DB_URL) — thread memory, observability spans, workflow
+  // run snapshots, and schedule fire history all accumulate rows unbounded as
+  // a side effect of normal operation. Unset tables are kept forever. Mastra
+  // never runs prune() itself; the pruneStorage workflow drives it on a daily
+  // cron (see ../workflows/pruneStorageWorkflow.ts). Values are conservative —
+  // safe to tune. Does NOT touch the Supabase agent_activity audit table
+  // (different database, populated by AgentActivitySpanProcessor).
+  retention: {
+    memory: { messages: { maxAge: '90d' }, threads: { maxAge: '180d' } },
+    observability: { spans: { maxAge: '14d' } },
+    workflows: { workflowSnapshot: { maxAge: '30d' } },
+    schedules: { triggers: { maxAge: '30d' } },
+  },
 });
 
 // Observability mirrors agent/tool/workflow spans into agent_activity via a
@@ -107,6 +126,23 @@ export const mastra = new Mastra({
   },
   storage,
   observability,
+  // Bundler config required by @mastra/core 1.50's stricter deployer (`mastra
+  // build`). Two problems it surfaced that the older deployer handled silently:
+  //   1. Without `transpilePackages`, the deployer emits a self-referencing
+  //      re-export stub for each pnpm-workspace barrel
+  //      (`export * from '@platform/shared'` resolving to itself), which rollup
+  //      rejects ("MODEL_SCOPES ... reexport that references itself"). Listing
+  //      the workspace packages makes it resolve them to their built dist.
+  //   2. `xmlbuilder` (CJS, pulled in transitively via rss-parser → xml2js)
+  //      can't be bundled, so it's externalized — installed into
+  //      `.mastra/output/node_modules` at build time, exactly like `pg`. It's
+  //      also declared as a direct dependency in package.json so the deployer
+  //      can resolve it out of pnpm's nested layout (otherwise: "couldn't load
+  //      xmlbuilder from rss").
+  bundler: {
+    transpilePackages: ['@platform/shared', '@platform/db', '@platform/signal', '@platform/voice'],
+    externals: ['xmlbuilder'],
+  },
   // Route Mastra's framework-internal logs through pino too, so they emit the
   // same single-line JSON as the app logger. prettyPrint is off in production
   // (and non-TTY), which is the Railway path — see ../lib/logger.ts.
@@ -119,6 +155,7 @@ export const mastra = new Mastra({
     recorder: recorderWorkflow,
     pm: pmWorkflow,
     executeRoutine: executeRoutineWorkflow,
+    pruneStorage: pruneStorageWorkflow,
     newsletter: newsletterWorkflow,
     variant: variantWorkflow,
     strategy: strategyWorkflow,
