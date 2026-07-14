@@ -1,0 +1,412 @@
+# Review — Podcast Dashboard & Episode Pages
+
+**Platform:** Bitcoin Treasury Solutions Internal Platform
+**Surfaces reviewed:** `/news/podcasts` (dashboard), `/news/podcasts/[id]` (episode)
+**Reviewer brief:** State-of-play + prioritised improvements, serving two audiences —
+the **director** (you, monitoring ingestion) and a **future client** (CFO / finance
+manager / CEO, accessing and sifting content).
+**Read against:** `podcast-ingestion-spec.md`, `DESIGN_BRIEF.md`, the live components in
+`apps/web/app/(app)/news/podcasts/`, and `packages/shared/src/podcasts.ts`.
+
+---
+
+## TL;DR
+
+The pages are genuinely well built for **one** of their two jobs. As a **director's
+ingestion console** they're clear, honest, and tastefully restrained — the spend gauge,
+feed-health grid and optimistic row actions are the work of someone who has actually run
+a pipeline and been surprised by an invoice.
+
+As a **client-facing knowledge product** they are, today, close to 0% built. That isn't a
+criticism of the code — the spec explicitly scoped podcasts as *"not a client-facing
+feature"*. But your brief now asks the surface to grow a second head, and the gap is
+stark and specific:
+
+> **The single most important finding:** transcripts are chunked and embedded into
+> `transcript_segments` (pgvector, 1536-dim) for exactly one reason — semantic retrieval.
+> `transcript_segments` is read in **exactly one place** in the entire web app: the
+> episode detail page, to render one episode's own transcript. **There is no search
+> surface.** The whole payoff of the embedding pipeline — "search episode transcripts the
+> same way I search articles", a literal user story in the spec — has no UI. A CFO cannot
+> ask the library a single question. That is the headline opportunity.
+
+The second theme: the current page shows **status** ("is a transcript available?") but not
+**value** ("what's in it, why does it matter to a treasury audience, and is it actually
+searchable yet?"). Those are the two axes a client cares about, and neither is surfaced.
+
+The rest of this doc is the detail, prioritised, with effort tags (S / M / L) and a
+recommended build sequence at the end.
+
+---
+
+## What's working well (keep, don't touch)
+
+Worth naming, because these are the load-bearing decisions the rest should build *around*,
+not over:
+
+- **The cost story is told honestly and everywhere.** Amber = Deepgram = money, gold/green
+  = free, the spend-gauge hint spells out the intent in plain words. For a company whose
+  whole pitch is treasury discipline, a dashboard that visibly respects its own costs is
+  on-brand in a way that's easy to underrate.
+- **Optimistic row actions + the Realtime hand-off.** `useOptimisticList` flips the row to
+  `resolving`, the action writes `pending_action` to the row, the agents server picks it up
+  over Supabase Realtime. The web app never pretends it can run the pipeline. That's the
+  correct seam and it's respected consistently.
+- **Provenance is first-class on the episode page.** Source, format, language, timestamps,
+  origin, fetched/embedded times, curator note. This is the compliance-and-trust
+  substrate a client product will *need*, already present.
+- **Restraint.** Hand-rolled SVG charts instead of a charting dep, native `<select>`s,
+  design tokens only, no raw hex. The YouTube facade (nocookie, click-to-load) and the
+  branded audio placeholder are thoughtful. Nothing here is over-engineered.
+
+Credit noted. Now the gaps.
+
+---
+
+## The core tension: one page, two audiences
+
+The dashboard is titled **"Podcast ingestion"** and is, correctly, an *operations console*.
+A CFO does not care about Deepgram spend, feed `last_scanned_at`, or the 30-day uptime
+sparkline — those are your concerns, and surfacing them to a client would actively erode
+the "serious, credible, not-a-crypto-hype-product" positioning in the design brief.
+
+So the right model is **not** "make the ingestion dashboard prettier for clients." It's
+**two experiences over one data spine**:
+
+| | **Director console** (exists) | **Client library** (to build) |
+|---|---|---|
+| Question it answers | "Is ingestion healthy, what's it costing, what needs me?" | "What's been said about *X*, and what should I take from it?" |
+| Primary object | the *feed* and the *pipeline* | the *idea* and the *episode* |
+| Surfaces | KPIs, spend gauge, feed health, triage | search, briefs, takeaways, collections |
+| Tone | operational, honest about cost | editorial, curated, compliance-safe |
+| Who authors the words | nobody (raw show-notes) | an agent, Lex-gated |
+
+Keep `/news/podcasts` as the console. The client experience wants its own route (see P0-1).
+The episode page is the **shared spine** — both audiences land on it — so it has to carry
+both a provenance sidebar (you) and a synthesised brief (them).
+
+Everything below is sorted into: **A. Director console**, **B. Client library** (the big
+build), **C. Episode page**, **D. Cross-cutting** (agents, data model, compliance).
+
+---
+
+## A. Director / ops console — findings
+
+The console is 80% there. These are mostly high-value, low-effort fills.
+
+### A1. Show dollars, not just source counts — `S` 🎯
+
+The spend gauge counts *episodes by transcript source*. But Deepgram is billed **per minute
+of audio**, and you already store `duration_seconds` per episode and `deepgram_request_id`
+on the ones you paid for. Counting episodes hides the truth that one 3-hour Deepgram
+episode costs more than ten 12-minute feed-tag ones.
+
+**Do:** add an estimated-spend readout — `Σ(duration_seconds where transcript_source =
+'deepgram') × your per-minute rate`, shown as an AUD figure (JetBrains Mono, naturally),
+with a "this billing period" and "all time" split. Keep the existing gauge; add the number
+beneath it. This is the most on-brand possible dashboard element for *this* company and
+it's an afternoon's work.
+
+### A2. A real triage lane, not just a KPI number — `S`
+
+`v_episodes_awaiting_action` exists in the spec precisely for this, but the dashboard
+doesn't use it. "Needs attention" is a number in a KPI card; the failed/skipped episodes
+themselves are buried behind a table filter. Simon surfaces them over Signal, but the
+dashboard — the thing you open when Simon pings you — has no worklist to *act* on.
+
+**Do:** a compact "Needs a decision" section (only rendered when non-empty) listing
+`failed` + `skipped` episodes with the failure reason (`transcript_error`) inline and the
+one relevant action per row. This is the "close the loop from the Signal message" surface.
+`skipped` and `failed` want different default actions (skipped → "turn Deepgram on for this
+feed / transcribe once"; failed → "retry / view error").
+
+### A3. Make the one lever that controls spend actionable where you see it — `M`
+
+Feed health surfaces the per-feed Deepgram toggle **read-only**. The dashboard shows you
+the consequence of the toggle (coverage %, skipped counts) but makes you leave for
+`/news/sources` to pull the lever. That's the wrong place to make the cost decision — you
+decide it while looking at the evidence.
+
+**Do:** make the Deepgram pill a real toggle (writes `transcribe_with_deepgram` on
+`news_sources`, optimistic, with a confirm because it's a money switch). Bonus: a per-feed
+"backfill catalogue" affordance that respects `max_backfill_episodes` / `max_episode_age_days`
+so turning a feed on doesn't transcribe a decade overnight — the exact failure the spec
+warns about.
+
+### A4. "Available" ≠ "searchable" — surface the embed state — `S` 🎯
+
+`embedded_at` is fetched into `DashboardEpisode` and then... never shown. But an episode
+can be `available` (transcript stored) yet not embedded (not in the research index, so Rex
+can't retrieve it, so it doesn't exist to a client search). Right now the gap between
+"transcribed" and "usable knowledge" is invisible.
+
+**Do:** add "In research index" as a first-class state — a fifth KPI (`count where
+embedded_at is not null`) and a subtle indicator on rows/detail. This matters *doubly* once
+B (client search) ships, because an un-embedded episode is a silent hole in the library.
+
+### A5. Bulk actions — `M`
+
+Every action is per-row. For a 600-episode back-catalogue (the spec's own example), you
+can't select ten `skipped` episodes and transcribe them together, or re-embed a batch after
+a chunking change. `DataTable` would need row selection.
+
+**Do (later):** multi-select + a bulk-action bar (fetch / deepgram / retry / re-embed). Not
+urgent while volumes are small; will bite the moment you onboard a real catalogue.
+
+### A6. Latency / freshness, not just throughput — `S`
+
+The 30-day area chart answers "did the cron run?" It doesn't answer "how long from ingest
+to available?" — the metric that predicts whether a client sees an episode the morning it
+drops or three days later. `created_at → transcript_fetched_at → embedded_at` gives you the
+pipeline latency for free.
+
+**Do (later):** a small "median time to searchable" stat. Nice-to-have; genuinely useful
+once Deepgram (minutes-to-hours) is doing more of the work.
+
+---
+
+## B. Client library & briefing — the big build
+
+This is the half that doesn't exist. It's also where the differentiated product lives, so
+it gets the most space. Two pillars: **make episodes worth reading** (intelligence) and
+**make the library answerable** (search).
+
+### B1. Episode intelligence — summary, takeaways, chapters, entities — `L` 🎯🎯
+
+**The problem:** a CFO will not read a 90-minute raw transcript. The episode page currently
+offers exactly that (plus raw HTML show-notes as the "description"). There is no synthesis
+layer. The transcript is *evidence*; nobody has done the *reading*.
+
+**The build — an intelligence pass, produced by an agent, stored on the episode:**
+
+- `episode_summary` (TEXT) — 3–5 sentences, BTS house voice, compliance-safe.
+- `key_takeaways` (JSONB) — 4–7 bullets, **each anchored to a `start_seconds`** so every
+  claim deep-links into the audio/video. This is the treasury-relevant distillation.
+- `chapters` (JSONB) — `[{ title, start_seconds }]`. Transforms the transcript from a wall
+  into a navigable document, and gives the media player a chapter rail.
+- `mentioned_entities` (JSONB) — companies, people, tickers, regulators, dollar figures,
+  dates. Deterministic extraction, not vibes (see D1).
+- `relevance` — episodes should carry the same **relevance score + category** that
+  `news_items` already do (regulatory / corporate / macro / international). Rex already
+  scores news; extend the same lens to episodes so a client can sort "most relevant to
+  treasury first," not "most recently published."
+
+**How it's built (this is an agents problem, not a UI problem):**
+
+Follow the house **"deterministic before LLM"** rule and the **two-stage extract-then-
+narrate** pattern already in play for the daily social pipeline:
+
+1. **Deterministic extract** (a Mastra *tool*, pure, testable): pull entities, numbers,
+   tickers, dates, and candidate chapter boundaries from `transcript_segments` — you have
+   timestamps, use them. No model needed to find "$21M" or "MicroStrategy."
+2. **Narrate** (the agent layer): Roger (or Charlie in a research register) turns the
+   structured extract into summary + takeaways in BTS voice, each takeaway carrying the
+   `start_seconds` from stage 1 so citations are real, not hallucinated.
+3. **Lex gate** (non-negotiable — see D3): a third-party podcast host saying "buy Bitcoin"
+   must surface in a BTS client product as *descriptive* ("the host argued X"), never as
+   BTS advice. Route the narration through Lex classification before it's ever client-
+   visible. This is a natural **Mastra suspend/resume approval gate**, logged to
+   `agent_activity` with `proposed → approved`, exactly like the campaigns feature.
+4. **Publish-wall:** per your own principle, the client-visible summary only "goes live"
+   on approval. Draft summaries stay director-only. The episode page renders the approved
+   brief to clients and the raw provenance to you.
+
+This is a big item but it's the one that turns a monitoring page into a knowledge product.
+It's also phaseable: `episode_summary` alone (Phase 1) already changes the experience;
+takeaways-with-timestamps (Phase 2) and chapters (Phase 3) layer on.
+
+### B2. "Ask the library" — semantic search across transcripts — `M` → `L` 🎯🎯
+
+The embeddings exist and nothing queries them from the web. This is the feature that makes
+the back-catalogue an *asset* instead of an archive.
+
+**Minimum (M):** a search route (`/news/podcasts/search` or a client-facing `/library`)
+with a query box that runs a `match_transcript_segments` RPC (pgvector cosine similarity)
+and returns ranked segments, each showing episode title, the matched passage, a mono
+timestamp, and a deep-link into the media at that moment (`{youtube_url}&t={start}s` or an
+audio seek — the plumbing for this *already exists* on the episode page). This is Rex's
+retrieval, given a UI.
+
+**Elevated (L) — "answer, with receipts":** wrap retrieval in a RAG answer. A CFO types
+*"how are companies accounting for bitcoin on the balance sheet?"* and gets a synthesised
+2–3 sentence answer **with inline citations** — "Ep. 142 at 23:14", "Ep. 88 at 41:02" —
+each a play link. Answer-with-citations is the shape that reads as *trustworthy advisory*
+rather than *crypto search engine*, which is precisely the design-brief personality. Lex
+sits in front of the answer for the same reason as B1.
+
+> Design note: this is where the "curator note" pays a dividend you can't get elsewhere.
+> Because briefs ride a *why*-note into retrieval, the answer can prefer segments a human
+> thought were worth saving — contextually intelligent recall, not generic vector match.
+> It's the differentiator you already designed for; nothing currently exercises it.
+
+### B3. A browse experience that isn't "Recent (max 4)" — `M`
+
+Today the only "library" gesture is a 4-card recent grid, capped and buried below the
+charts, filtered to episodes with playable media. A client arriving to *browse* has nowhere
+to go.
+
+**Do:** a proper library view — card grid of episodes (artwork, title, source, duration,
+relevance, topic tags), with the *client-relevant* filters (topic, category, source,
+"has takeaways") rather than the *ops* filters (transcript status, Deepgram source). Sort
+by relevance by default. This is the same data, re-lensed for the reader; it should feel
+like a curated shelf, not a job queue.
+
+### B4. Collections / "briefing packs" — `M`
+
+A CFO's real job-to-be-done is often thematic: "get me up to speed on custody" or "what's
+the state of the accounting debate." Loose episodes don't serve that; curated sets do.
+
+**Do:** lightweight collections — a named set of episodes (or even individual takeaways/
+segments) with a short intro. Manually curated to start (you/Carri assemble them); later,
+Charlie can *propose* a collection from a theme and you approve it. A collection is also the
+natural unit to eventually hand a client, or to seed a piece of content from — which quietly
+connects this to the content pipeline.
+
+### B5. Shareable, exportable artifacts — `S` → `M`
+
+Nothing here leaves the app. A client-facing product needs to produce something a CFO can
+forward: "email me this episode's brief," a one-page PDF of a collection, a copy-quote-with-
+citation button (`"…quote…" — Guest, Ep. 142 @ 23:14`) on any transcript segment. The
+copy-with-citation button is `S` and disproportionately useful; the PDF/email is `M` and
+can lean on the existing doc-generation direction elsewhere in the platform.
+
+---
+
+## C. Episode page — the shared spine
+
+Both audiences land here, so it has to serve both without becoming a mess. Concrete fixes:
+
+### C1. Lead with the brief, keep provenance for you — `M`
+Restructure the page around audience. **Above** the transcript: the synthesised brief from
+B1 (summary, takeaways-with-timestamps, chapters) — that's what a client reads. **Beside/
+below**: the provenance sidebar you already have — that's what you read. Right now the page
+opens with raw HTML show-notes (`htmlToText(description)`), which is neither party's ideal
+first impression. The transcript becomes the *primary source you can expand into*, not the
+main event.
+
+### C2. The transcript itself is under-tooled for a 90-minute document — `S` each
+The clamp-to-480px + show-more is fine, but for real long-form:
+- **In-transcript search** (find within) — obvious once transcripts are chapter-length.
+- **Chapter rail** (from B1's `chapters`) — jump to "Custody", "Accounting", "Q&A".
+- **Speaker filter** when diarised — "just show me the guest."
+- **Copy-with-citation** per segment (C/B5) — turns reading into sourcing.
+- **Search-term highlight + auto-scroll** when you arrive from B2 search (deep-link to the
+  matched segment, not just the top of the page). This closes the loop between search and
+  transcript and is high-delight for low effort once B2 exists.
+
+### C3. Cross-links — the episode doesn't know it lives in a graph — `M`
+An episode that discusses a company in your CRM, or that corroborates a `news_item`, shows
+none of it. `mentioned_entities` (B1) unlocks: "Companies mentioned → [link to CRM]",
+"Related news", "Other episodes on this topic." This is what makes the library feel
+*intelligent* rather than a pile of pages, and it's mostly join-work once entities exist.
+
+### C4. Empty/interstitial states for the client register — `S`
+The current not-available states are ops-phrased ("No free transcript was available and
+Deepgram was not enabled."). A client should never see Deepgram mentioned. When the client
+library renders an episode without a brief yet, it wants a graceful "summary in progress"
+state, not the pipeline's internal vocabulary. Keep the ops phrasing for the console; give
+the client view its own copy.
+
+---
+
+## D. Cross-cutting — agents, data model, compliance
+
+### D1. Where the intelligence work belongs (agent architecture)
+- **Deterministic tools, not agent guesswork**, for entities/numbers/chapters/timestamps —
+  pure modules with tests, matching the linter/extraction pattern you've used elsewhere.
+  A model should *narrate* the extract, not *be* the extractor.
+- **Roger** is the natural owner of episode intelligence (he's the podcast/recorder agent);
+  **Charlie** consumes takeaways for content angles; **Rex** owns retrieval behind B2.
+  Keep the hub-and-spoke discipline — none of these talk to the human directly, Simon does.
+- **Workflow vs Agent:** the intelligence pass is a *Workflow* (deterministic extract →
+  narrate → Lex gate → persist), not an open-ended Agent. The only fuzzy step is narration,
+  bounded inside one step. Same reasoning the ingestion spec already applies.
+- Verify Mastra suspend/resume + step signatures against the installed
+  `node_modules/@mastra/core` before building the Lex gate — the approval-gate APIs are
+  exactly the ones that drift between versions.
+
+### D2. Data-model additions implied by the above
+Additive, no migrations to existing columns:
+- `podcast_episodes`: `episode_summary TEXT`, `key_takeaways JSONB`, `chapters JSONB`,
+  `mentioned_entities JSONB`, `relevance_score INT`, `category TEXT`,
+  `summary_status TEXT` (`none|proposed|approved`), `summary_approved_at TIMESTAMPTZ`.
+- `podcast_collections` + `podcast_collection_items` (for B4).
+- RPC `match_transcript_segments(query_embedding, k, filter…)` for B2 — mirror whatever the
+  news/RAG retrieval already does so there's one retrieval idiom, not two.
+- A client-facing view (e.g. `v_episode_library`) that exposes *only* approved,
+  client-safe fields — so the client surface physically cannot render raw
+  `transcript_error`, Deepgram internals, or an unapproved summary. Enforce the
+  ops/client boundary in the data layer, not just the components.
+
+### D3. Compliance is not optional the moment words are generated
+Today the pages generate **no** prose, so there's no AFSL exposure — the page just renders
+what feeds supplied. The instant B1/B2 ship, BTS is publishing *synthesised commentary about
+financial matters* to clients. That crosses a line the rest of your platform already takes
+seriously:
+- Every client-visible summary, takeaway, and RAG answer routes through **Lex** and is
+  framed **descriptively** ("the host argued…", "the guest claimed…"), never as BTS's own
+  view or advice.
+- **Publish-wall**: nothing client-visible without `summary_status = 'approved'`.
+- Log the proposal/approval to `agent_activity` so there's an audit trail of who approved
+  what a client saw — the same trust substrate the compliance feature is built on.
+
+Treat this as a **gating requirement on B**, not a follow-up. It's cheaper to build the gate
+first than to retrofit it after a summary has already gone out.
+
+---
+
+## Prioritised roadmap
+
+Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = high impact-to-effort.
+
+### P0 — Do first (unblocks the client half + cheap ops wins)
+1. **Episode intelligence pass, Phase 1** — `episode_summary` + Lex gate + publish-wall
+   (B1 core, D3). `L`, but it's the keystone; everything client-facing leans on it. Ship
+   summary-only first.
+2. **"Ask the library" search, minimum version** — `match_transcript_segments` RPC + a
+   results surface with timestamp deep-links (B2 min). `M`. The embeddings are *right there*.
+3. **Dollars on the dashboard** (A1) + **"In research index" state** (A4). `S` each. High
+   signal, trivial cost, both purely additive.
+4. **Triage lane** from `v_episodes_awaiting_action` (A2). `S`. Closes the Simon→dashboard
+   loop you use daily.
+
+### P1 — Next (depth on both heads)
+5. **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and **restructured episode page**
+   leading with the brief (C1). `M`–`L`.
+6. **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`.
+7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
+   boundary** (D2). `M`.
+8. **Actionable Deepgram toggle** in feed health (A3). `M`.
+9. **Copy-with-citation** + in-transcript search + chapter rail (C2, B5 core). `S` each.
+
+### P2 — Then (compounding value once the above lands)
+10. **Collections / briefing packs** (B4). `M`.
+11. **Cross-links** — mentioned entities → CRM / news / related episodes (C3). `M`.
+12. **Export** — one-page PDF / email brief (B5). `M`.
+13. **Bulk actions** (A5) + **pipeline-latency stat** (A6). `M` / `S`. When volume justifies.
+
+### Recommended first slice
+If you want one coherent, demoable increment: **P0-1 (summary) + P0-2 (search) + the
+timestamp deep-link that already exists on the episode page.** That trio is the smallest
+thing that lets a CFO *type a treasury question and get a cited, readable answer that plays
+the exact moment in the source* — which is the whole product thesis in one interaction, and
+it reuses plumbing you've already built.
+
+---
+
+## Open questions
+
+- **One route or two?** Recommendation: keep `/news/podcasts` as the console; give the
+  client experience its own home (a `/library` or client-portal route) reading the
+  `v_episode_library` safe view. A per-user "mode toggle" on one page is tempting but risks
+  leaking ops vocabulary to clients — the D2 view boundary is the safer seam.
+- **Who curates collections, and when does Charlie propose vs. you assemble?** Affects
+  whether B4 needs an approval gate from day one.
+- **Relevance scoring for episodes — reuse Rex's news scorer, or a podcast-tuned variant?**
+  A 90-minute episode isn't a headline; the scoring prompt probably wants adjusting.
+- **Per-minute Deepgram rate for A1** — hardcode, config, or read from the
+  `domains_and_subscriptions` cost fields you already model in the Company feature? The
+  latter keeps a single source of truth for what things cost.
+- **What does a client actually *do* with a takeaway?** Save it, share it, book a call about
+  it? The answer shapes whether the library is a reading surface or a lead-gen surface — and
+  that's a design-thinking conversation worth having before B is fully built, not after.
