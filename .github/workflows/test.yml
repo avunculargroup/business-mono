@@ -38,3 +38,30 @@ jobs:
       # them on-demand locally.
       - name: Test
         run: pnpm test
+
+  build:
+    name: Build agents deploy bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Runs `mastra build` (the Railway deploy path) so bundler/deployer
+      # breaks are caught pre-merge — typecheck and tests don't exercise it.
+      # Mirrors apps/agents/Dockerfile: turbo builds workspace deps first,
+      # then the Mastra deployer bundles + installs externals. No secrets
+      # required (index.ts's runtime env is not evaluated at build time).
+      - name: Build agents
+        run: pnpm exec turbo run build --filter=@platform/agents...
