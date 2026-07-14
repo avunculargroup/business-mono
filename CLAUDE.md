@@ -23,6 +23,11 @@ This is the internal business platform for Bitcoin Treasury Solutions (BTS) — 
 - Remove only imports/variables/functions that YOUR changes made unused.
 - Mention pre-existing dead code — don't delete it.
 
+### Logging (apps/agents)
+- Never use `console.*` in `apps/agents/src`. It writes multi-line stack traces to stderr, which Railway shreds into one "error" entry per line. Use the shared pino logger instead: `import { createLogger } from '<rel>/lib/logger.js'; const log = createLogger('<component>')`.
+- Log errors as `log.error({ err }, 'message')` — the `{ err }` field carries the whole stack on one JSON line. Structured fields go in the object; the message is a short static string (`log.info({ rowId }, 'dispatch received')`), not an interpolated sentence. The `<component>` replaces the old `[tag]` message prefixes.
+- Sensitive keys (`authorization`/`apikey`/`token`) are auto-redacted; for message-only logging that must not dump a raw object (e.g. Realtime errors), use `describeError(err)` from the same module.
+
 ### Goal-Driven Execution
 Transform tasks into verifiable goals before implementing:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
@@ -281,6 +286,7 @@ Read the relevant docs BEFORE writing code.
 |Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing.eval.ts` + `apps/agents/evals/simon-routing/fixtures.json`|Add a fixture row, then run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy (real LLM) before merging|
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 |New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|
+|Logging / console output in `apps/agents`                |`apps/agents/src/lib/logger.ts`                              |Use `createLogger('<component>')` + `log.error({ err }, 'msg')` — never `console.*`. Single-line JSON to stdout so Railway parses each event as one entry (see Coding Behavior → Logging)|
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
 
