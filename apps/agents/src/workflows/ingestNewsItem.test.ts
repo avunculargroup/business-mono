@@ -218,4 +218,45 @@ describe('ingestNewsItem', () => {
     const row = insertedRows[0];
     expect(row['ingestion_ref']).toBeNull();
   });
+
+  it('reuses a precomputed embedding instead of calling embedText', async () => {
+    responseQueue = [
+      { data: [], error: null },                 // ingestion_ref miss
+      { data: [], error: null },                 // url miss
+      { data: { id: 'news-5' }, error: null },   // insert
+    ];
+    const input = { ...baseInput(), precomputedEmbedding: [0.7, 0.8, 0.9] };
+    const res = await ingestNewsItem(input);
+    expect(res.status).toBe('inserted');
+    expect(embedMock).not.toHaveBeenCalled();
+    // the caller's vector is what gets searched and persisted
+    expect(rpcMock).toHaveBeenCalledWith(
+      'vector_search_news',
+      expect.objectContaining({ query_embedding: [0.7, 0.8, 0.9] }),
+    );
+    expect(insertedRows[0]['embedding']).toEqual([0.7, 0.8, 0.9]);
+  });
+
+  it('persists a caller-supplied status override', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-6' }, error: null },
+    ];
+    const input = { ...baseInput(), status: 'extraction_failed' as const };
+    await ingestNewsItem(input);
+    expect(insertedRows[0]['status']).toBe('extraction_failed');
+  });
+
+  it('skips the ingestion_ref check for a source-less item and inserts a null source_id', async () => {
+    responseQueue = [
+      { data: [], error: null },               // url miss (ingestion_ref check skipped — no source id)
+      { data: { id: 'news-7' }, error: null }, // insert
+    ];
+    // A web/Tavily item: has a Message-ID-less ref carried over but no news_sources row.
+    const input = { ...baseInput(), source: { id: null, name: 'Some Site', tier: null } };
+    const res = await ingestNewsItem(input);
+    expect(res.status).toBe('inserted');
+    expect(insertedRows[0]['source_id']).toBeNull();
+  });
 });
