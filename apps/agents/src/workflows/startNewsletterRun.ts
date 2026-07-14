@@ -4,6 +4,9 @@ import { isKeyLimitError } from '../lib/llmErrors.js';
 import { clearWorkflowProgress } from '../lib/workflowProgress.js';
 import { buildConfirmationMessage } from './newsletter/messages.js';
 import { newsletterInputSchema, type NewsletterInput } from './newsletter/schemas.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('newsletter');
 
 // mastra/index has top-level side effects (it boots the agent server and starts
 // the realtime/polling listeners). Importing it eagerly here would drag those
@@ -33,7 +36,7 @@ export async function notifySignal(params: SendMessageParams): Promise<void> {
   try {
     await client.sendMessage(params);
   } catch (err) {
-    console.warn('[newsletter] Signal notification failed (continuing):', err);
+    log.warn({ err }, 'Signal notification failed (continuing)');
   }
 }
 
@@ -164,7 +167,7 @@ export async function handleRunResult(args: {
   if (result.status === 'suspended') {
     const payload = extractSuspendPayload(result);
     if (!payload) {
-      console.error('[newsletter] Suspended run has no gate payload', runId);
+      log.error({ runId }, 'suspended run has no gate payload');
       return;
     }
     const status = statusForGatePayload(payload);
@@ -371,12 +374,13 @@ export async function resumeNewsletterRun(args: {
   // can't accept; the director then re-decides against the correct gate.
   const actualStep = await inspectSuspendedGate(runId);
   if (!actualStep) {
-    console.warn('[newsletter] Resume requested but run is not suspended at a gate:', runId);
+    log.warn({ runId }, 'resume requested but run is not suspended at a gate');
     return { status: 'not_suspended' };
   }
   if (actualStep !== step) {
-    console.warn(
-      `[newsletter] Gate drift on ${runId}: row expected ${step}, snapshot is at ${actualStep}. Reconciling the row and discarding the ${step} decision.`,
+    log.warn(
+      { runId, expectedStep: step, snapshotStep: actualStep },
+      'gate drift: reconciling the row and discarding the decision',
     );
     await reconcileRowToGate(runId, actualStep);
     return { status: `reconciled_${actualStep}` };

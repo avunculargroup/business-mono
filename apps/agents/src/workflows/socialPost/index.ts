@@ -23,6 +23,9 @@ import { sendSocialDraft, type SocialDraftPost } from '../../lib/sendSocialDraft
 // Type-only — erased at compile time, so no runtime import cycle with the
 // workflow file (which imports this handler's value). Mirrors runIndicatorPoll.
 import type { RoutineOutcome } from '../executeRoutineWorkflow.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('social-post');
 
 // social_post_from_news routine handler. One routine per founder: pick the day's
 // news story that best fits the founder's voice (editor), draft a LinkedIn + an X
@@ -192,7 +195,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
         .order('created_at', { ascending: false })
         .limit(RECENT_POST_LIMIT);
       if (recentErr) {
-        console.warn(`[social-post] recent content_items read failed for ${account.platform}:`, recentErr.message);
+        log.warn({ platform: account.platform, error: recentErr.message }, 'recent content_items read failed');
       }
       recentByAccount.set(account.id, toRecentPosts(recentRows));
     }),
@@ -217,7 +220,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     );
     pick = resp.object ? editorSelectionSchema.parse(resp.object) : null;
   } catch (err) {
-    console.warn('[social-post] editor selection failed:', err);
+    log.warn({ err }, 'editor selection failed');
   }
   const { story, form, rationale } = resolveSelection(candidates, pick);
   const storyQuery = `${story.title}\n${story.summary}`;
@@ -230,7 +233,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
   for (const account of accounts.values()) {
     const spec = specs.get(account.platform);
     if (!spec) {
-      console.warn(`[social-post] no platform_specs row for ${account.platform} — skipping.`);
+      log.warn({ platform: account.platform }, 'no platform_specs row — skipping');
       continue;
     }
     try {
@@ -335,7 +338,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
         needsDisclaimer: verdict.needs_disclaimer,
       });
     } catch (err) {
-      console.error(`[social-post] ${account.platform} draft failed for ${founderName}:`, err);
+      log.error({ err, platform: account.platform, founderName }, 'draft failed');
     }
   }
 
@@ -348,7 +351,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
   try {
     emailed = await sendSocialDraft({ founderTeamMemberId: founderId, founderName, story, posts: emailPosts });
   } catch (err) {
-    console.error('[social-post] founder draft email failed:', err);
+    log.error({ err }, 'founder draft email failed');
   }
 
   const metadata: SocialPostFromNewsResult = {

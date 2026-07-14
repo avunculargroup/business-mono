@@ -15,6 +15,9 @@ import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 import type { NewsCategory } from '@platform/shared';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('news-ingest');
 
 export const newsExtractionSchema = z.object({
   category: z.enum(['regulatory', 'corporate', 'macro', 'international'])
@@ -103,9 +106,6 @@ export async function extractNewsMetadata(input: {
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
-  console.warn('[news-ingest] extraction failed after retry', {
-    title: input.title,
-    reason: lastError,
-  });
+  log.warn({ title: input.title, reason: lastError }, 'extraction failed after retry');
   return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
 }

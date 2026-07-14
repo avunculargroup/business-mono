@@ -38,7 +38,9 @@ import {
 } from '../lib/newsletterExtract.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('research-mail');
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface EmailSource {
@@ -59,7 +61,7 @@ type ResearchAccount = {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function startResearchMailListener(): void {
-  console.log('[research-mail] Starting research newsletter polling (5-minute interval)');
+  log.info('starting research newsletter polling (5-minute interval)');
   void pollAllResearchAccounts();
   setInterval(() => void pollAllResearchAccounts(), POLL_INTERVAL_MS);
 }
@@ -94,13 +96,13 @@ async function pollAllResearchAccounts(): Promise<void> {
       if (s.slug) sourcesBySlug.set(s.slug.toLowerCase(), s);
     }
   } catch (err) {
-    console.error('[research-mail] Failed to load config from DB:', err);
+    log.error({ err }, 'failed to load config from DB');
     return;
   }
 
   if (accounts.length === 0) return;
   if (sourcesBySlug.size === 0) {
-    console.log('[research-mail] No active email sources configured — skipping poll cycle');
+    log.info('no active email sources configured — skipping poll cycle');
     return;
   }
 
@@ -108,7 +110,7 @@ async function pollAllResearchAccounts(): Promise<void> {
     try {
       await pollResearchAccount(account, sourcesBySlug);
     } catch (err) {
-      console.error(`[research-mail] Error polling ${account.username}:`, err);
+      log.error({ err, account: account.username }, 'error polling account');
     }
   }
 }
@@ -124,8 +126,9 @@ async function pollResearchAccount(
 
   const folderId = await client.getMailboxIdByName(accountId, apiUrl, account.research_folder);
   if (!folderId) {
-    console.warn(
-      `[research-mail] Folder "${account.research_folder}" not found for ${account.username} — skipping`,
+    log.warn(
+      { folder: account.research_folder, account: account.username },
+      'research folder not found — skipping',
     );
     return;
   }
@@ -145,14 +148,15 @@ async function pollResearchAccount(
       try {
         const outcome = await processResearchEmail(email, sourcesBySlug);
         if (outcome.status === 'skipped') {
-          console.log(`[research-mail] skipped ${email.id}: ${outcome.reason}`);
+          log.info({ emailId: email.id, reason: outcome.reason }, 'skipped');
         } else if (outcome.status === 'ingested') {
-          console.log(
-            `[research-mail] ingested ${email.id} → news_item ${outcome.newsItemId} (score ${outcome.relevanceScore ?? 'n/a'})`,
+          log.info(
+            { emailId: email.id, newsItemId: outcome.newsItemId, score: outcome.relevanceScore ?? 'n/a' },
+            'ingested → news_item',
           );
         }
       } catch (err) {
-        console.error(`[research-mail] Error processing ${email.id} for ${account.username}:`, err);
+        log.error({ err, emailId: email.id, account: account.username }, 'error processing email');
       }
     }
   }
@@ -168,7 +172,10 @@ async function pollResearchAccount(
     { onConflict: 'account_id' },
   );
 
-  console.log(`[research-mail] Polled ${account.username}/${account.research_folder}: ${result.emailIds.length} message(s) checked`);
+  log.info(
+    { account: account.username, folder: account.research_folder, checked: result.emailIds.length },
+    'polled research folder',
+  );
 }
 
 // ── Process a single research email ─────────────────────────────────────────────

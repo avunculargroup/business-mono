@@ -6,6 +6,9 @@ import {
   storeAvailableTranscript,
 } from './store.js';
 import type { TranscriptTagCandidate } from './selectTranscriptTag.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('podcast-action');
 
 // Web-requested per-episode re-run actions. Written to
 // podcast_episodes.pending_action by the web app; claimed by
@@ -85,7 +88,7 @@ export async function reResolveEpisode(
     .eq('id', episodeId)
     .single();
   if (epErr || !episode) {
-    console.error('[podcast-action] episode not found', episodeId, epErr?.message);
+    log.error({ episodeId, error: epErr?.message }, 'episode not found');
     return;
   }
   const ep = episode as EpisodeRow;

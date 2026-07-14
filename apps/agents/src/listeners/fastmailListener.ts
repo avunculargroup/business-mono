@@ -16,7 +16,9 @@ import {
   shouldSkipEmail,
   extractBody,
 } from '../lib/fastmailJmap.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('fastmail-listener');
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const AUTH_FAILURE_DISABLE_THRESHOLD = 3;
 const ERROR_MESSAGE_MAX_LEN = 500;
@@ -33,7 +35,7 @@ type FastmailAccount = {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function startFastmailListener(): void {
-  console.log('[fastmail-listener] Starting Fastmail polling (5-minute interval)');
+  log.info('starting Fastmail polling (5-minute interval)');
   void pollAllAccounts();
   setInterval(() => void pollAllAccounts(), POLL_INTERVAL_MS);
 }
@@ -73,12 +75,12 @@ async function pollAllAccounts(): Promise<void> {
       ]),
     );
   } catch (err) {
-    console.error('[fastmail-listener] Failed to load config from DB:', err);
+    log.error({ err }, 'failed to load config from DB');
     return;
   }
 
   if (accounts.length === 0) {
-    console.log('[fastmail-listener] No active Fastmail accounts — skipping poll cycle');
+    log.info('no active Fastmail accounts — skipping poll cycle');
     return;
   }
 
@@ -88,7 +90,7 @@ async function pollAllAccounts(): Promise<void> {
       await pollAccount(account, exclusions, teamEmails);
       await markAccountSuccess(account);
     } catch (err) {
-      console.error(`[fastmail-listener] Error polling account ${account.username}:`, err);
+      log.error({ err, account: account.username }, 'error polling account');
       await markAccountFailure(account, err);
     }
   }
@@ -120,8 +122,9 @@ async function markAccountFailure(account: FastmailAccount, err: unknown): Promi
 
   if (err instanceof JmapAuthError && nextFailures >= AUTH_FAILURE_DISABLE_THRESHOLD) {
     update.is_active = false;
-    console.error(
-      `[fastmail-listener] Auto-disabled ${account.username} after ${nextFailures} consecutive auth failures`,
+    log.error(
+      { account: account.username, consecutiveFailures: nextFailures },
+      'auto-disabled account after consecutive auth failures',
     );
   }
 
@@ -163,10 +166,7 @@ async function pollAccount(
       try {
         await processEmail(email, 'inbox', account.username, exclusions, teamEmails, watchedAddresses);
       } catch (err) {
-        console.error(
-          `[fastmail-listener] Error processing inbox email ${email.id} for ${account.username}:`,
-          err,
-        );
+        log.error({ err, emailId: email.id, account: account.username }, 'error processing inbox email');
       }
     }
   }
@@ -191,10 +191,7 @@ async function pollAccount(
       try {
         await processEmail(email, 'sent', account.username, exclusions, teamEmails, watchedAddresses);
       } catch (err) {
-        console.error(
-          `[fastmail-listener] Error processing sent email ${email.id} for ${account.username}:`,
-          err,
-        );
+        log.error({ err, emailId: email.id, account: account.username }, 'error processing sent email');
       }
     }
   }
@@ -212,9 +209,9 @@ async function pollAccount(
     { onConflict: 'account_id' },
   );
 
-  console.log(
-    `[fastmail-listener] Polled ${account.username}: ` +
-    `${inboxResult.emailIds.length} inbox, ${sentResult.emailIds.length} sent emails checked`,
+  log.info(
+    { account: account.username, inbox: inboxResult.emailIds.length, sent: sentResult.emailIds.length },
+    'polled account',
   );
 }
 
@@ -384,7 +381,7 @@ async function findOrCreateContact(
 
   if (error) throw new Error(`Failed to create contact for ${normalised}: ${error.message}`);
 
-  console.log(`[fastmail-listener] Created new contact ${normalised} (${firstName} ${lastName})`);
+  log.info({ email: normalised, firstName, lastName }, 'created new contact');
   return { contactId: (created as { id: string }).id, isNew: true };
 }
 

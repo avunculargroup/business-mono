@@ -1,9 +1,10 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { SignalClient } from '@platform/signal';
+import { createLogger } from '../lib/logger.js';
 
 const client = new SignalClient();
-const LOG_TAG = '[get-simon-profile]';
+const log = createLogger('get-simon-profile');
 
 export const getSimonProfile = createTool({
   id: 'get_simon_profile',
@@ -11,14 +12,14 @@ export const getSimonProfile = createTool({
   inputSchema: z.object({}),
   execute: async () => {
     const signalNumber = process.env['SIGNAL_CLI_NUMBER'] ?? '';
-    console.log(`${LOG_TAG} Fetching profile for ${signalNumber}`);
+    log.info({ signalNumber }, 'fetching profile');
 
     try {
       const contacts = await client.getContacts();
       const self = contacts.find(c => c.number === signalNumber);
 
       if (!self) {
-        console.warn(`${LOG_TAG} Self-contact not found in contacts list`);
+        log.warn('self-contact not found in contacts list');
         return {
           success: true,
           found: false,
@@ -26,11 +27,10 @@ export const getSimonProfile = createTool({
         };
       }
 
-      console.log(`${LOG_TAG} Self-contact found:`, JSON.stringify({
-        profile_name: self.profile_name,
-        profile: self.profile,
-        name: self.name,
-      }));
+      log.info(
+        { profile_name: self.profile_name, profile: self.profile, name: self.name },
+        'self-contact found',
+      );
 
       return {
         success: true,
@@ -46,7 +46,7 @@ export const getSimonProfile = createTool({
         lastUpdated: self.profile?.last_updated_timestamp,
       };
     } catch (err) {
-      console.error(`${LOG_TAG} Failed to fetch contacts:`, err);
+      log.error({ err }, 'failed to fetch contacts');
       return {
         success: false,
         error: `Failed to read profile: ${err instanceof Error ? err.message : String(err)}`,

@@ -4,9 +4,13 @@
 // step in the agent loop with a full LLMStepResult payload. We capture a
 // compact summary per step and log one aggregate line at end-of-run.
 //
-// Output goes to console.log (Railway logs) — no DB writes. The label
+// Output goes to the structured logger (Railway logs) — no DB writes. The label
 // should include the agent name and a correlator (traceId or runId) so
 // the log line joins to existing agent_activity rows.
+
+import { createLogger } from './logger.js';
+
+const log = createLogger('step-telemetry');
 
 type StepSummary = {
   idx: number;
@@ -57,7 +61,7 @@ export function makeStepLogger(label: string): StepLogger {
 
   const summarise = (): void => {
     if (steps.length === 0) {
-      console.log(`[step-telemetry ${label}] 0 steps (generate aborted before first step)`);
+      log.info({ label }, '0 steps (generate aborted before first step)');
       return;
     }
     const totalMs = steps.reduce((a, s) => a + (s.dtMs ?? 0), 0);
@@ -70,12 +74,19 @@ export function makeStepLogger(label: string): StepLogger {
     const inSum = steps.reduce((a, s) => a + (s.inputTokens ?? 0), 0);
     const outSum = steps.reduce((a, s) => a + (s.outputTokens ?? 0), 0);
     const finish = steps.at(-1)?.finishReason ?? 'unknown';
-    console.log(
-      `[step-telemetry ${label}] ${steps.length} steps, ${(totalMs / 1000).toFixed(1)}s, ` +
-        `tools=${JSON.stringify(toolCounts)}, finish=${finish}, ` +
-        `tokens in/out=${inSum}/${outSum}`,
+    log.info(
+      {
+        label,
+        steps: steps.length,
+        seconds: Number((totalMs / 1000).toFixed(1)),
+        tools: toolCounts,
+        finish,
+        tokensIn: inSum,
+        tokensOut: outSum,
+      },
+      'step telemetry summary',
     );
-    console.log(`[step-telemetry ${label}] per-step:`, steps);
+    log.info({ label, perStep: steps }, 'step telemetry per-step');
   };
 
   return { onStepFinish, summarise };

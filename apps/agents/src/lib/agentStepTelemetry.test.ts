@@ -1,20 +1,23 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { MockInstance } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Capture the structured logger the module binds at import time. vi.hoisted runs
+// before the hoisted vi.mock factory, so the spy exists when createLogger fires.
+const { infoSpy } = vi.hoisted(() => ({ infoSpy: vi.fn() }));
+vi.mock('./logger.js', () => ({
+  createLogger: () => ({ info: infoSpy, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+}));
+
 import { makeStepLogger } from './agentStepTelemetry.js';
 
 describe('makeStepLogger', () => {
-  let logSpy: MockInstance<(...args: unknown[]) => void>;
-
-  beforeEach(() => {
-    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-  });
-  afterEach(() => logSpy.mockRestore());
+  beforeEach(() => infoSpy.mockClear());
 
   it('summarise logs zero-step message when no events fired', () => {
     const logger = makeStepLogger('agent/run-1');
     logger.summarise();
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('0 steps (generate aborted before first step)'),
+    expect(infoSpy).toHaveBeenCalledWith(
+      { label: 'agent/run-1' },
+      '0 steps (generate aborted before first step)',
     );
   });
 
@@ -36,15 +39,17 @@ describe('makeStepLogger', () => {
 
     logger.summarise();
 
-    const summaryCall = logSpy.mock.calls.find((c) =>
-      typeof c[0] === 'string' && c[0].includes('2 steps'),
-    );
+    const summaryCall = infoSpy.mock.calls.find((c) => c[1] === 'step telemetry summary');
     expect(summaryCall).toBeDefined();
-    const line = summaryCall![0] as string;
-    expect(line).toContain('"agent-rex":2');
-    expect(line).toContain('"supabase_query":1');
-    expect(line).toContain('tokens in/out=180/70');
-    expect(line).toContain('finish=stop');
+    const payload = summaryCall![0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      label: 'charlie/abc',
+      steps: 2,
+      tools: { 'agent-rex': 2, supabase_query: 1 },
+      tokensIn: 180,
+      tokensOut: 70,
+      finish: 'stop',
+    });
   });
 
   it('reads toolName from payload when present at top level is missing', () => {
@@ -54,7 +59,9 @@ describe('makeStepLogger', () => {
       response: { timestamp: new Date() },
     });
     logger.summarise();
-    const line = logSpy.mock.calls.find((c) => typeof c[0] === 'string' && (c[0] as string).includes('1 steps'))?.[0];
-    expect(line).toContain('"nested-tool":1');
+    const summaryCall = infoSpy.mock.calls.find((c) => c[1] === 'step telemetry summary');
+    expect((summaryCall![0] as { tools: Record<string, number> }).tools).toMatchObject({
+      'nested-tool': 1,
+    });
   });
 });

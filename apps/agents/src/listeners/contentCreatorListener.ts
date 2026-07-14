@@ -4,7 +4,9 @@ import { makeStepLogger } from '../lib/agentStepTelemetry.js';
 import { charlie } from '../agents/contentCreator/index.js';
 import { recordComplianceReview } from '../agents/compliance/index.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('content-creator-listener');
 const supabase = createRealtimeClient();
 
 type ProposedAction = {
@@ -51,7 +53,7 @@ export function startContentCreatorListener(): void {
     channelName: 'content-creator-dispatches',
     logPrefix: '[content-creator-listener]',
     onSubscribed: () => {
-      console.log('[content-creator-listener] Listening for Content Creator dispatches via Supabase Realtime');
+      log.info('listening for Content Creator dispatches via Supabase Realtime');
     },
     attachHandlers: (channel) => channel.on(
       'postgres_changes' as never,
@@ -65,7 +67,7 @@ export function startContentCreatorListener(): void {
         const dispatch = proposed.find((a) => a.agent === 'charlie');
         if (!dispatch) return;
 
-        console.log(`[content-creator-listener] Dispatch received from activity ${row.id}`);
+        log.info({ activityId: row.id }, 'dispatch received');
 
         const existingContentItemId = dispatch.context?.['content_item_id'] as string | undefined;
 
@@ -121,7 +123,7 @@ export function startContentCreatorListener(): void {
                 .single();
 
               if (insertError) {
-                console.error('[content-creator-listener] Failed to insert content_items:', insertError);
+                log.error({ error: insertError }, 'failed to insert content_items');
                 throw new Error(`Failed to persist content_items: ${insertError.message}`);
               }
               contentItemId = data?.id ?? null;
@@ -131,7 +133,7 @@ export function startContentCreatorListener(): void {
               throw new Error('Failed to persist content_items — insert returned no id');
             }
 
-            console.log(`[content-creator-listener] Saved draft to content_items ${contentItemId}`);
+            log.info({ contentItemId }, 'saved draft to content_items');
 
             // Compliance gate: beats flagged compliance-sensitive (e.g. on-chain
             // valuation framing) get a Lex review logged against the draft before
@@ -144,11 +146,12 @@ export function startContentCreatorListener(): void {
                   body: parsed.body,
                   parentActivityId: row.id,
                 });
-                console.log(
-                  `[content-creator-listener] Lex compliance review for ${contentItemId}: ${verdict.passes ? 'passed' : 'flagged'}`,
+                log.info(
+                  { contentItemId, verdict: verdict.passes ? 'passed' : 'flagged' },
+                  'Lex compliance review',
                 );
               } catch (err) {
-                console.error('[content-creator-listener] Compliance review failed:', err);
+                log.error({ err }, 'compliance review failed');
               }
             }
 
@@ -161,7 +164,7 @@ export function startContentCreatorListener(): void {
           },
         });
 
-        console.log(`[content-creator-listener] Completed dispatch from activity ${row.id}`);
+        log.info({ activityId: row.id }, 'completed dispatch');
       }
     ),
   });

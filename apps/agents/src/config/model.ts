@@ -5,7 +5,9 @@ import { RequestContext } from '@mastra/core/request-context';
 import { DEFAULT_MODEL, MODEL_SCOPES } from '@platform/shared';
 import { supabase } from '@platform/db';
 import { isKeyLimitError } from '../lib/llmErrors.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('model');
 const STEP_SCOPE_KEY = 'stepScope';
 
 const fallbackAgentByStepKey = new Map<string, string>(
@@ -42,7 +44,7 @@ function createFallbackModel(
         return await primary.doGenerate(options);
       } catch (err) {
         if (!shouldFallback(err)) throw err;
-        console.warn('[model] OpenRouter key limit hit — falling back to Anthropic');
+        log.warn('OpenRouter key limit hit — falling back to Anthropic');
         return fallback.doGenerate(options);
       }
     },
@@ -51,7 +53,7 @@ function createFallbackModel(
         return await primary.doStream(options);
       } catch (err) {
         if (!shouldFallback(err)) throw err;
-        console.warn('[model] OpenRouter key limit hit — falling back to Anthropic');
+        log.warn('OpenRouter key limit hit — falling back to Anthropic');
         return fallback.doStream(options);
       }
     },
@@ -145,14 +147,14 @@ async function loadConfigs(): Promise<Map<string, string>> {
       .from('model_configs')
       .select('scope_key, model_id');
     if (error) {
-      console.warn('[model.ts] model_configs select failed, using defaults:', error.message);
+      log.warn({ error: error.message }, 'model_configs select failed, using defaults');
     } else if (data) {
       for (const row of data) {
         byKey.set(row.scope_key, row.model_id);
       }
     }
   } catch (err) {
-    console.warn('[model.ts] model_configs load threw, using defaults:', err);
+    log.warn({ err }, 'model_configs load threw, using defaults');
   }
   return byKey;
 }

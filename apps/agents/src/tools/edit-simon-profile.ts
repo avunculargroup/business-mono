@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
 import { extname } from 'path';
 import { SignalClient } from '@platform/signal';
+import { createLogger } from '../lib/logger.js';
 
 const client = new SignalClient();
 const SUPPORTED_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg']);
-const LOG_TAG = '[edit-simon-profile]';
+const log = createLogger('edit-simon-profile');
 
 export const editSimonProfile = createTool({
   id: 'edit_simon_profile',
@@ -19,11 +20,10 @@ export const editSimonProfile = createTool({
   execute: async (context) => {
     const { name, about, avatarPath } = context;
 
-    console.log(`${LOG_TAG} Starting profile update — fields requested:`, {
-      name,
-      about: about ?? '(not set)',
-      avatarPath: avatarPath ?? '(not set)',
-    });
+    log.info(
+      { name, about: about ?? '(not set)', avatarPath: avatarPath ?? '(not set)' },
+      'starting profile update — fields requested',
+    );
 
     // Avatar processing
     let base64Avatar: string | undefined;
@@ -51,11 +51,11 @@ export const editSimonProfile = createTool({
         const height = imageBuffer.readUInt32BE(20);
         if (width !== height || width !== 512) {
           warnings.push(`Avatar is ${width}×${height}px — recommended 512×512px square for best display.`);
-          console.warn(`${LOG_TAG} Avatar dimensions: ${width}x${height}px (recommended 512x512)`);
+          log.warn({ width, height }, 'avatar dimensions off recommended 512x512');
         }
       }
       base64Avatar = imageBuffer.toString('base64');
-      console.log(`${LOG_TAG} Avatar encoded: ${imageBuffer.length} bytes from ${avatarPath}`);
+      log.info({ bytes: imageBuffer.length, avatarPath }, 'avatar encoded');
     }
 
     // Verify account is registered in signal-cli before attempting update
@@ -63,13 +63,13 @@ export const editSimonProfile = createTool({
     let registeredAccounts: string[] = [];
     try {
       registeredAccounts = await client.getAccounts();
-      console.log(`${LOG_TAG} Registered accounts in signal-cli:`, registeredAccounts);
+      log.info({ registeredAccounts }, 'registered accounts in signal-cli');
     } catch (err) {
-      console.warn(`${LOG_TAG} Could not fetch accounts list (non-fatal):`, err);
+      log.warn({ err }, 'could not fetch accounts list (non-fatal)');
     }
 
     if (registeredAccounts.length > 0 && !registeredAccounts.includes(signalNumber)) {
-      console.error(`${LOG_TAG} Account mismatch! SIGNAL_CLI_NUMBER=${signalNumber} not in registered accounts:`, registeredAccounts);
+      log.error({ signalNumber, registeredAccounts }, 'account mismatch — SIGNAL_CLI_NUMBER not in registered accounts');
       return {
         success: false,
         updatedFields: [] as string[],
@@ -78,11 +78,14 @@ export const editSimonProfile = createTool({
     }
 
     // Perform the update
-    console.log(`${LOG_TAG} Calling updateProfile:`, JSON.stringify({
-      name,
-      ...(about !== undefined ? { about } : {}),
-      ...(base64Avatar !== undefined ? { avatar: '(base64 omitted)' } : {}),
-    }));
+    log.info(
+      {
+        name,
+        ...(about !== undefined ? { about } : {}),
+        ...(base64Avatar !== undefined ? { avatar: '(base64 omitted)' } : {}),
+      },
+      'calling updateProfile',
+    );
 
     let httpStatus: number;
     try {
@@ -92,9 +95,9 @@ export const editSimonProfile = createTool({
         ...(base64Avatar !== undefined ? { base64Avatar } : {}),
       });
       httpStatus = result.httpStatus;
-      console.log(`${LOG_TAG} updateProfile returned HTTP ${httpStatus}`);
+      log.info({ httpStatus }, 'updateProfile returned');
     } catch (err) {
-      console.error(`${LOG_TAG} updateProfile API call failed:`, err);
+      log.error({ err }, 'updateProfile API call failed');
       return {
         success: false,
         updatedFields: [] as string[],
@@ -110,20 +113,20 @@ export const editSimonProfile = createTool({
       const self = contacts.find(c => c.number === signalNumber);
       if (!self) {
         verificationWarning = 'Self-contact not found in contacts list — cannot verify profile state';
-        console.warn(`${LOG_TAG} ${verificationWarning}`);
+        log.warn(verificationWarning);
       } else {
         const profileName = self.profile?.given_name ?? self.profile_name ?? self.name;
         if (profileName === name) {
           verified = true;
-          console.log(`${LOG_TAG} Verification passed: profile name matches "${name}"`);
+          log.info({ name }, 'verification passed: profile name matches');
         } else {
           verificationWarning = `Profile read-back mismatch: expected "${name}", got "${profileName}"`;
-          console.warn(`${LOG_TAG} ${verificationWarning}`);
+          log.warn(verificationWarning);
         }
       }
     } catch (err) {
       verificationWarning = `Could not verify profile update: ${err instanceof Error ? err.message : String(err)}`;
-      console.warn(`${LOG_TAG} ${verificationWarning}`);
+      log.warn({ err }, 'could not verify profile update');
     }
 
     const updatedFields = [
@@ -132,7 +135,7 @@ export const editSimonProfile = createTool({
       ...(avatarPath ? ['avatar'] : []),
     ];
 
-    console.log(`${LOG_TAG} Profile update complete. Fields: [${updatedFields.join(', ')}], verified: ${verified}`);
+    log.info({ fields: updatedFields, verified }, 'profile update complete');
 
     return {
       success: true,

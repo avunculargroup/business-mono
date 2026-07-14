@@ -9,6 +9,10 @@
  * Session discovery: GET https://api.fastmail.com/.well-known/jmap
  */
 
+import { createLogger } from './logger.js';
+
+const log = createLogger('fastmail-jmap');
+
 const JMAP_WELL_KNOWN = 'https://api.fastmail.com/.well-known/jmap';
 
 // Read paths use core + mail; sending additionally needs the submission spec.
@@ -423,9 +427,9 @@ export class FastmailJmapClient {
         lastErr = err;
         if (!(err instanceof TypeError) || attempt === maxAttempts) break;
         const backoffMs = 1000 * 2 ** (attempt - 1);
-        console.warn(
-          `[fastmail-jmap] fetch ${url} failed (attempt ${attempt}/${maxAttempts}), ` +
-          `retrying in ${backoffMs}ms: ${err.message}`,
+        log.warn(
+          { url, attempt, maxAttempts, backoffMs, error: err.message },
+          'fetch failed, retrying',
         );
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }

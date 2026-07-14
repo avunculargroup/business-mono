@@ -6,6 +6,9 @@ import { buildLexPrompt, charCountOf, isThreadVariant, variantCopyText } from '.
 import { complianceStatusFor, resolveDisclaimerSnippetId } from '../workflows/variant/persist.js';
 import { lexVerdictSchema, type LexVerdict, type CharlieVariant } from '../workflows/variant/schemas.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('compliance-recheck');
 
 // Compliance re-run on edit (Step 9, application layer — not the workflow). When
 // a human edits a campaign variant's copy, the web action sets
@@ -157,7 +160,7 @@ export async function handleRecheckRow(row: RecheckRow): Promise<void> {
     .from('content_items')
     .update({ ...fields, ...(gatePatch ? { gate_state: gatePatch } : {}) })
     .eq('id', row.id);
-  if (error) console.error('[compliance-recheck] update failed:', error.message);
+  if (error) log.error({ error: error.message }, 'update failed');
 }
 
 /** Subscribe to content_items and re-run Lex on any variant edit that reset
@@ -168,7 +171,7 @@ export function startComplianceRecheckListener(): void {
     channelName: 'compliance-recheck',
     logPrefix: '[compliance-recheck]',
     onSubscribed: () => {
-      console.log('[compliance-recheck] Listening for edited variants via Supabase Realtime');
+      log.info('listening for edited variants via Supabase Realtime');
     },
     attachHandlers: (channel) =>
       channel.on(
@@ -178,7 +181,7 @@ export function startComplianceRecheckListener(): void {
           try {
             await handleRecheckRow(payload.new);
           } catch (err) {
-            console.error('[compliance-recheck] Error handling recheck:', err);
+            log.error({ err }, 'error handling recheck');
           }
         },
       ),

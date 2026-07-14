@@ -44,6 +44,9 @@ import type {
   RawObservation,
 } from '../types.js';
 import { utcDate } from '../types.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('onchain');
 
 const BASE = 'https://community-api.coinmetrics.io/v4';
 
@@ -174,7 +177,7 @@ export const coinmetricsAdapter: OnchainAdapter = {
 
     if (!anyOk) return batched; // none entitled — surface the original 403
     if (forbidden.length) {
-      console.warn(`[onchain] Coin Metrics dropped ${forbidden.join(', ')} — not on the community tier; other metrics ingested.`);
+      log.warn({ dropped: forbidden }, 'Coin Metrics dropped metrics not on the community tier; other metrics ingested');
     }
     observations.sort((a, b) => a.observedAt.localeCompare(b.observedAt));
     return { ok: true, observations };

@@ -36,6 +36,9 @@ import {
   type SchedulePlan,
   type StrategyResult,
 } from './schemas.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('strategy');
 
 // ── Campaign Strategy workflow (Step 7) ───────────────────────────────────────
 // One run per campaign: resolve context → Margot synthesises a strategy → GATE 1
@@ -97,7 +100,7 @@ async function runResearch(ctx: StrategyContext): Promise<string> {
     });
     return response.text?.trim() ?? '';
   } catch (err) {
-    console.warn('[strategy] research branch failed (continuing):', err);
+    log.warn({ err }, 'research branch failed (continuing)');
     return '';
   }
 }
@@ -111,7 +114,7 @@ async function runAudienceAnalysis(ctx: StrategyContext, companyNames: string[])
     );
     return response.text?.trim() ?? '';
   } catch (err) {
-    console.warn('[strategy] audience branch failed (continuing):', err);
+    log.warn({ err }, 'audience branch failed (continuing)');
     return '';
   }
 }
@@ -143,7 +146,7 @@ async function logStrategyActivity(
     entity_type: 'campaign',
     entity_id: campaignId,
   } as never);
-  if (error) console.error('[strategy] agent_activity insert failed:', error.message);
+  if (error) log.error({ error: error.message }, 'agent_activity insert failed');
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
@@ -292,7 +295,7 @@ const audienceStep = createStep({
           .map((c) => c.name)
           .filter((n): n is string => Boolean(n));
       } catch (err) {
-        console.warn('[strategy] audience CRM lookup failed (continuing):', err);
+        log.warn({ err }, 'audience CRM lookup failed (continuing)');
       }
     }
 

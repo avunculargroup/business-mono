@@ -3,7 +3,9 @@ import { createRealtimeClient } from '@platform/db';
 import { petra } from '../agents/pm/agent.js';
 import type { ActivityNotes } from '../lib/dispatchRunner.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('pm-listener');
 const supabase = createRealtimeClient();
 
 type ProposedAction = {
@@ -54,7 +56,7 @@ Return ONLY a JSON object with these fields:
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
   } catch (jsonParseErr) {
-    console.warn('[pm-listener] JSON parse failed on petra output, using title-only fallback:', jsonParseErr);
+    log.warn({ err: jsonParseErr }, 'JSON parse failed on petra output, using title-only fallback');
   }
 
   return {
@@ -74,7 +76,7 @@ export function startPMListener(mastra: Mastra): void {
     channelName: 'pm-dispatches',
     logPrefix: '[pm-listener]',
     onSubscribed: () => {
-      console.log('[pm-listener] Listening for PM dispatches via Supabase Realtime');
+      log.info('listening for PM dispatches via Supabase Realtime');
     },
     attachHandlers: (channel) => channel.on(
       'postgres_changes' as never,
@@ -88,7 +90,7 @@ export function startPMListener(mastra: Mastra): void {
         const dispatch = proposed.find((a) => a.agent === 'petra');
         if (!dispatch) return;
 
-        console.log(`[pm-listener] Dispatch received from activity ${row.id}`);
+        log.info({ activityId: row.id }, 'dispatch received');
 
         // Log that petra has started work so the UI shows activity immediately
         const startedAt = Date.now();
@@ -113,9 +115,9 @@ export function startPMListener(mastra: Mastra): void {
             clarifications: null,
             notes: JSON.stringify(startNotes),
           } as never);
-          if (error) console.error('[pm-listener] Failed to insert in_progress log:', error);
+          if (error) log.error({ error }, 'failed to insert in_progress log');
         } catch (err) {
-          console.error('[pm-listener] Failed to insert in_progress log:', err);
+          log.error({ err }, 'failed to insert in_progress log');
         }
 
         let workflowInput: WorkflowInput;
@@ -127,7 +129,7 @@ export function startPMListener(mastra: Mastra): void {
           );
         } catch (err) {
           const durationMs = Date.now() - startedAt;
-          console.error('[pm-listener] Failed to parse dispatch:', err);
+          log.error({ err }, 'failed to parse dispatch');
           const errorNotes: ActivityNotes = {
             phase: 'error',
             durationMs,
@@ -150,9 +152,9 @@ export function startPMListener(mastra: Mastra): void {
               clarifications: null,
               notes: JSON.stringify(errorNotes),
             } as never);
-            if (error) console.error('[pm-listener] Failed to insert parse-error log:', error);
+            if (error) log.error({ error }, 'failed to insert parse-error log');
           } catch (insertErr) {
-            console.error('[pm-listener] Failed to insert parse-error log:', insertErr);
+            log.error({ err: insertErr }, 'failed to insert parse-error log');
           }
           return;
         }
@@ -161,7 +163,7 @@ export function startPMListener(mastra: Mastra): void {
           const run = await mastra.getWorkflow('pm').createRun();
           const result = await run.start({ inputData: workflowInput });
           const durationMs = Date.now() - startedAt;
-          console.log(`[pm-listener] Workflow run completed for activity ${row.id}:`, result);
+          log.info({ activityId: row.id, result }, 'workflow run completed');
 
           const completedNotes: ActivityNotes = {
             phase: 'completed',
@@ -183,13 +185,13 @@ export function startPMListener(mastra: Mastra): void {
               clarifications: null,
               notes: JSON.stringify(completedNotes),
             } as never);
-            if (error) console.error('[pm-listener] Failed to insert completion log:', error);
+            if (error) log.error({ error }, 'failed to insert completion log');
           } catch (insertErr) {
-            console.error('[pm-listener] Failed to insert completion log:', insertErr);
+            log.error({ err: insertErr }, 'failed to insert completion log');
           }
         } catch (err) {
           const durationMs = Date.now() - startedAt;
-          console.error('[pm-listener] PM workflow error:', err);
+          log.error({ err }, 'PM workflow error');
           const errorNotes: ActivityNotes = {
             phase: 'error',
             durationMs,
@@ -212,9 +214,9 @@ export function startPMListener(mastra: Mastra): void {
               clarifications: null,
               notes: JSON.stringify(errorNotes),
             } as never);
-            if (error) console.error('[pm-listener] Failed to insert workflow-error log:', error);
+            if (error) log.error({ error }, 'failed to insert workflow-error log');
           } catch (insertErr) {
-            console.error('[pm-listener] Failed to insert workflow-error log:', insertErr);
+            log.error({ err: insertErr }, 'failed to insert workflow-error log');
           }
         }
       }

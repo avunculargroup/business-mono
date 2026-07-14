@@ -5,6 +5,9 @@ import type { Json, Database } from '@platform/db';
 
 type AgentActivityInsert = Database['public']['Tables']['agent_activity']['Insert'];
 import { dynamicModelFor, stepRequestContext } from '../../config/model.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('compliance');
 
 // Lex — BTS's compliance reviewer. Unlike the internal newsletter `editor`, Lex
 // is a first-class roster persona: its verdicts are logged to agent_activity
@@ -133,7 +136,7 @@ export async function recordComplianceReview(
   const verdict = await review({ title: input.title, body: input.body });
   const { error } = await supabase.from('agent_activity').insert(verdictToActivity(verdict, input));
   if (error) {
-    console.error('[compliance] Failed to log Lex verdict:', error.message);
+    log.error({ error: error.message }, 'failed to log Lex verdict');
   }
   return verdict;
 }

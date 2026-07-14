@@ -11,6 +11,9 @@ import { charlie } from '../../agents/contentCreator/index.js';
 import { lex } from '../../agents/compliance/index.js';
 import { applyThreadStyle, buildCharliePrompt, buildLexPrompt, charCountOf, isThreadVariant, variantCopyText } from './prompts.js';
 import { buildContentItemRow, buildThreadSegmentRows } from './persist.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('variant');
 import {
   variantInputSchema,
   variantContextSchema,
@@ -127,7 +130,7 @@ async function logVariantActivity(
   ];
   const { error } = await db.from('agent_activity').insert(rows as never);
   // Audit failures shouldn't sink the run — log and continue.
-  if (error) console.error('[variant] agent_activity insert failed:', error.message);
+  if (error) log.error({ error: error.message }, 'agent_activity insert failed');
 }
 
 async function insertVariant(

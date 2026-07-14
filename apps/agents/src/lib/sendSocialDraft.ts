@@ -22,6 +22,9 @@ import {
   loadSenderToken,
   loadCompanyFooter,
 } from './sendNewsDigest.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('social-draft');
 
 export type { SocialDraftPost } from './socialDraftEmail.js';
 
@@ -63,7 +66,7 @@ export async function sendSocialDraft(params: SendSocialDraftParams): Promise<bo
 
   const token = await loadSenderToken();
   if (!token) {
-    console.warn(`[social-draft] No Fastmail token for ${SENDER_ACCOUNT_USERNAME} — skipping email`);
+    log.warn({ account: SENDER_ACCOUNT_USERNAME }, 'no Fastmail token — skipping email');
     return false;
   }
 
@@ -73,7 +76,7 @@ export async function sendSocialDraft(params: SendSocialDraftParams): Promise<bo
       loadCompanyFooter(),
     ]);
     if (!recipient) {
-      console.warn(`[social-draft] No account email for founder ${founderName} — skipping email`);
+      log.warn({ founderName }, 'no account email for founder — skipping email');
       return false;
     }
 
@@ -105,11 +108,11 @@ export async function sendSocialDraft(params: SendSocialDraftParams): Promise<bo
       html,
       text,
     });
-    console.log(`[social-draft] Sent "${subject}" to ${recipient.email}`);
+    log.info({ subject, recipient: recipient.email }, 'sent');
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[social-draft] Delivery aborted:', message);
+    log.error({ error: message }, 'delivery aborted');
     await logFailure(founderTeamMemberId, message);
     return false;
   }

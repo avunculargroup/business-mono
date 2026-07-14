@@ -1,6 +1,9 @@
 import { logActivity } from '../../tools/activity.js';
 import { storeAvailableTranscript, updateEpisode } from './store.js';
 import type { TimedSegment } from './parsers.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('podcast-transcript');
 
 // Subset of the Deepgram callback payload we consume — utterances carry per-line
 // timing and a speaker index (single-channel diarisation).
@@ -88,9 +91,6 @@ export async function processPodcastTranscript(
       {} as never,
     );
   } catch (err) {
-    console.warn('[podcast-transcript] activity log failed (transcript is stored)', {
-      episodeId,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    log.warn({ err, episodeId }, 'activity log failed (transcript is stored)');
   }
 }

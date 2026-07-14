@@ -2,6 +2,9 @@ import type { AnySpan, SpanOutputProcessor } from '@mastra/core/observability';
 import { SpanType } from '@mastra/core/observability';
 import { supabase } from '@platform/db';
 import { AgentActivityStatus } from '@platform/shared';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('agent-activity-processor');
 
 // Span types we mirror into agent_activity. Model/memory/RAG spans are
 // excluded — they would dominate the table without adding audit value.
@@ -137,8 +140,9 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
 
   private recordSuccess(): void {
     if (this.consecutiveFailures > 0) {
-      console.warn(
-        `[agent-activity-processor] recovered after ${this.consecutiveFailures} failed insert(s) — audit trail resumed`,
+      log.warn(
+        { consecutiveFailures: this.consecutiveFailures },
+        'recovered after failed insert(s) — audit trail resumed',
       );
       this.consecutiveFailures = 0;
     }
@@ -152,18 +156,21 @@ export class AgentActivitySpanProcessor implements SpanOutputProcessor {
     error: unknown;
   }): void {
     this.consecutiveFailures += 1;
-    console.error('[agent-activity-processor] insert failed', {
-      agent: ctx.agentName,
-      action: ctx.action,
-      status: ctx.status,
-      spanType: ctx.spanType,
-      consecutiveFailures: this.consecutiveFailures,
-      error: serialiseError(ctx.error),
-    });
+    log.error(
+      {
+        agent: ctx.agentName,
+        action: ctx.action,
+        status: ctx.status,
+        spanType: ctx.spanType,
+        consecutiveFailures: this.consecutiveFailures,
+        error: serialiseError(ctx.error),
+      },
+      'insert failed',
+    );
     if (this.consecutiveFailures % FAILURE_ESCALATION_THRESHOLD === 0) {
-      console.error(
-        `[agent-activity-processor] CRITICAL: ${this.consecutiveFailures} consecutive audit-trail inserts have failed. ` +
-          `agent_activity is no longer recording spans — check DB connectivity or the agent_activity CHECK constraints.`,
+      log.error(
+        { consecutiveFailures: this.consecutiveFailures },
+        'CRITICAL: consecutive audit-trail inserts have failed — agent_activity is no longer recording spans; check DB connectivity or the agent_activity CHECK constraints',
       );
     }
   }

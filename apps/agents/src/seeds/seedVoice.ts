@@ -1,6 +1,9 @@
 import { supabase } from '@platform/db';
 import { embedVoiceText } from '@platform/voice';
 import { BRAND_VOICE_SEED, VOICE_SNIPPET_SEEDS } from '../lib/voiceSeedData.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('seed:voice');
 
 /**
  * Seed the brand_voice singleton and the company-canon voice_snippets from the
@@ -46,11 +49,11 @@ async function seedBrandVoice(): Promise<void> {
   if (existing?.id) {
     const { error } = await db.from('brand_voice').update(row).eq('id', existing.id);
     if (error) throw new Error(`Updating brand_voice failed: ${error.message}`);
-    console.log(`[seed:voice] Updated brand_voice ${existing.id} (v${row.version}).`);
+    log.info({ id: existing.id, version: row.version }, 'updated brand_voice');
   } else {
     const { error } = await db.from('brand_voice').insert(row);
     if (error) throw new Error(`Inserting brand_voice failed: ${error.message}`);
-    console.log(`[seed:voice] Inserted brand_voice singleton (v${row.version}).`);
+    log.info({ version: row.version }, 'inserted brand_voice singleton');
   }
 }
 
@@ -82,18 +85,19 @@ async function seedSnippets(): Promise<void> {
     if (error) throw new Error(`Inserting voice_snippet failed: ${error.message}`);
     inserted += 1;
   }
-  console.log(
-    `[seed:voice] Snippets: ${inserted} inserted, ${VOICE_SNIPPET_SEEDS.length - inserted} already present.`,
+  log.info(
+    { inserted, alreadyPresent: VOICE_SNIPPET_SEEDS.length - inserted },
+    'snippets seeded',
   );
 }
 
 async function main(): Promise<void> {
   await seedBrandVoice();
   await seedSnippets();
-  console.log('[seed:voice] Done.');
+  log.info('done');
 }
 
 main().catch((err) => {
-  console.error('[seed:voice] Failed:', err);
+  log.error({ err }, 'failed');
   process.exit(1);
 });

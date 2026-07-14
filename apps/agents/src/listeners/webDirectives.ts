@@ -1,8 +1,10 @@
 import { createRealtimeClient } from '@platform/db';
 import { simon } from '../agents/simon/index.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
 import type { ConvMessage, ConvRow } from './types.js';
 
+const log = createLogger('web-directives');
 const supabase = createRealtimeClient();
 
 // Bound the top-level simon.generate() call so a hung model or runaway tool
@@ -133,9 +135,9 @@ export function needsDelegationRetry(analysis: DelegationAnalysis): boolean {
  */
 export function buildFlaggedReply(result: SimonGenerateResult, analysis: DelegationAnalysis): string {
   if (analysis.claimsDelegation && !analysis.delegated) {
-    console.warn(
-      '[web-directives] Simon claimed delegation but made no agent-* subagent call:',
-      result.text.slice(0, 200),
+    log.warn(
+      { replyPrefix: result.text.slice(0, 200) },
+      'Simon claimed delegation but made no agent-* subagent call',
     );
     return `${result.text}\n\n[system: I named a specialist but didn't actually invoke one — please retry, or rephrase the directive.]`;
   }
@@ -153,17 +155,16 @@ export function buildFlaggedReply(result: SimonGenerateResult, analysis: Delegat
       }
       return `${failedDelegate.toolName} failed`;
     })();
-    console.warn('[web-directives] Simon claimed success but delegate tool errored:', {
-      toolName: failedDelegate.toolName,
-      error: errStr,
-      replyPrefix: result.text.slice(0, 200),
-    });
+    log.warn(
+      { toolName: failedDelegate.toolName, error: errStr, replyPrefix: result.text.slice(0, 200) },
+      'Simon claimed success but delegate tool errored',
+    );
     return `${result.text}\n\n[system: ${failedDelegate.toolName} actually returned an error: ${errStr}. Please resend the directive — a shorter prompt sometimes helps.]`;
   }
   if (analysis.emptyRetryPromise) {
-    console.warn(
-      '[web-directives] Simon promised a retry but made no follow-up agent-* subagent call:',
-      result.text.slice(0, 200),
+    log.warn(
+      { replyPrefix: result.text.slice(0, 200) },
+      'Simon promised a retry but made no follow-up agent-* subagent call',
     );
     return `${result.text}\n\n[system: Simon promised a retry but didn't actually run one. Please resend the directive — a shorter prompt sometimes helps.]`;
   }
@@ -197,9 +198,7 @@ export async function runDirectiveWithRetry(
 
   const retried = needsDelegationRetry(analysis);
   if (retried) {
-    console.warn(
-      '[web-directives] Simon narrated delegation without invoking a subagent — auto-retrying once',
-    );
+    log.warn('Simon narrated delegation without invoking a subagent — auto-retrying once');
     result = await generate(directive, {
       memory,
       abortSignal: ctx.signal,
@@ -227,7 +226,7 @@ export async function startWebDirectivesListener(): Promise<void> {
     .eq('signal_chat_id', 'web')
     .eq('is_processing', true as never);
   if (cleanupError) {
-    console.error('[web-directives] Failed to clear stuck is_processing flag:', cleanupError);
+    log.error({ error: cleanupError }, 'failed to clear stuck is_processing flag');
   }
 
   subscribeWithReconnect({
@@ -235,20 +234,20 @@ export async function startWebDirectivesListener(): Promise<void> {
     channelName: 'web-directives',
     logPrefix: '[web-directives]',
     onSubscribed: () => {
-      console.log('[web-directives] Listening for web directives via Supabase Realtime');
+      log.info('listening for web directives via Supabase Realtime');
     },
     attachHandlers: (channel) => channel.on(
       'postgres_changes' as never,
       { event: '*', schema: 'public', table: 'agent_conversations' },
       async (payload: { eventType: string; new: ConvRow }) => {
         try {
-          console.log('[web-directives] Received event:', payload.eventType);
+          log.info({ eventType: payload.eventType }, 'received event');
           if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
           const conv = payload.new;
           if (conv.signal_chat_id !== 'web') return;
           if (conv.is_processing) return; // Prevents re-triggering from our own is_processing=true write
-          console.log('[web-directives] Processing web conversation:', conv.id);
+          log.info({ convId: conv.id }, 'processing web conversation');
 
           const messages: ConvMessage[] = Array.isArray(conv.messages) ? conv.messages : [];
           const lastMessage = messages[messages.length - 1];
@@ -305,7 +304,7 @@ export async function startWebDirectivesListener(): Promise<void> {
               notes: null,
             });
           } catch (err) {
-            console.error('[web-directives] Simon processing error:', err);
+            log.error({ err }, 'Simon processing error');
             // Surface the failure to the director — clearing the typing indicator
             // without a message just looks like Simon ignored them.
             const isTimeout = controller.signal.aborted;
@@ -338,7 +337,7 @@ export async function startWebDirectivesListener(): Promise<void> {
             clearTimeout(timer);
           }
         } catch (err) {
-          console.error('[web-directives] Unhandled error in event handler:', err);
+          log.error({ err }, 'unhandled error in event handler');
         }
       }
     ),

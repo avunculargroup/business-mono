@@ -1,6 +1,9 @@
 import { createRealtimeClient, supabase } from '@platform/db';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 import { embedSource } from '../lib/contentEmbeddings.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('content-embeddings');
 
 // Keeps the content_embeddings RAG store in sync with its source rows. Embeds:
 //   - content_items when they reach status 'approved' or 'published'
@@ -81,15 +84,15 @@ async function backfillMissing(): Promise<void> {
       await embedSource('interactions', row.id, row.summary);
     }
 
-    console.log('[content-embeddings] Backfill complete');
+    log.info('backfill complete');
   } catch (err) {
-    console.error('[content-embeddings] Backfill failed (non-fatal):', err);
+    log.error({ err }, 'backfill failed (non-fatal)');
   }
 }
 
 export function startContentEmbeddingListener(): void {
   if (process.env['CONTENT_EMBEDDING_LISTENER_ENABLED'] === 'false') {
-    console.log('[content-embeddings] Disabled via CONTENT_EMBEDDING_LISTENER_ENABLED=false');
+    log.info('disabled via CONTENT_EMBEDDING_LISTENER_ENABLED=false');
     return;
   }
 
@@ -100,7 +103,7 @@ export function startContentEmbeddingListener(): void {
     channelName: 'content-embeddings',
     logPrefix: '[content-embeddings]',
     onSubscribed: () => {
-      console.log('[content-embeddings] Listening for content_items + interactions changes');
+      log.info('listening for content_items + interactions changes');
     },
     attachHandlers: (channel) =>
       channel
@@ -115,9 +118,9 @@ export function startContentEmbeddingListener(): void {
               const text = contentEmbedText(row);
               if (!text) return;
               await embedSource('content_items', row.id, text);
-              console.log(`[content-embeddings] Embedded content_item ${row.id}`);
+              log.info({ rowId: row.id }, 'embedded content_item');
             } catch (err) {
-              console.error('[content-embeddings] content_items embed failed:', err);
+              log.error({ err }, 'content_items embed failed');
             }
           },
         )
@@ -130,9 +133,9 @@ export function startContentEmbeddingListener(): void {
               const row = payload.new;
               if (!row?.summary) return;
               await embedSource('interactions', row.id, row.summary);
-              console.log(`[content-embeddings] Embedded interaction ${row.id}`);
+              log.info({ rowId: row.id }, 'embedded interaction');
             } catch (err) {
-              console.error('[content-embeddings] interactions embed failed:', err);
+              log.error({ err }, 'interactions embed failed');
             }
           },
         ),

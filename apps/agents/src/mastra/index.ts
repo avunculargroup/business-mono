@@ -2,8 +2,10 @@ import { setDefaultResultOrder } from 'node:dns';
 import { Mastra } from '@mastra/core/mastra';
 import { PostgresStore } from '@mastra/pg';
 import { Observability, SamplingStrategyType, DefaultExporter, CloudExporter } from '@mastra/observability';
+import { PinoLogger } from '@mastra/loggers';
 import type { Context } from 'hono';
 import { getResolvedMastraDbUrl } from '../lib/resolveDbUrl.js';
+import { createLogger } from '../lib/logger.js';
 import { simon } from '../agents/simon/index.js';
 import { archie } from '../agents/archivist/index.js';
 import { bruno } from '../agents/ba/index.js';
@@ -105,6 +107,14 @@ export const mastra = new Mastra({
   },
   storage,
   observability,
+  // Route Mastra's framework-internal logs through pino too, so they emit the
+  // same single-line JSON as the app logger. prettyPrint is off in production
+  // (and non-TTY), which is the Railway path — see ../lib/logger.ts.
+  logger: new PinoLogger({
+    name: 'Mastra',
+    level: (process.env['LOG_LEVEL'] as 'debug' | 'info' | 'warn' | 'error') ?? 'info',
+    prettyPrint: process.env['NODE_ENV'] !== 'production' && process.stdout.isTTY === true,
+  }),
   workflows: {
     recorder: recorderWorkflow,
     pm: pmWorkflow,
@@ -124,11 +134,12 @@ export const mastra = new Mastra({
 
 // Last-resort guard: log rather than crash on any error that slips through
 // module-level handlers (e.g. a delayed ECONNRESET on a closed socket).
+const log = createLogger('process');
 process.on('uncaughtException', (err) => {
-  console.error('[process] Uncaught exception (process continuing):', err);
+  log.error({ err }, 'Uncaught exception (process continuing)');
 });
 process.on('unhandledRejection', (reason) => {
-  console.error('[process] Unhandled rejection (process continuing):', reason);
+  log.error({ err: reason }, 'Unhandled rejection (process continuing)');
 });
 
 // Start Supabase Realtime listener for web directives
