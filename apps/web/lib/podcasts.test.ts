@@ -6,6 +6,10 @@ import {
   youtubeEmbedUrl,
   formatTimestamp,
   htmlToText,
+  estimateDeepgramCost,
+  formatAud,
+  highlightText,
+  DEEPGRAM_COST_PER_MINUTE_AUD,
 } from './podcasts';
 
 describe('extractVideoId', () => {
@@ -128,5 +132,84 @@ describe('formatTimestamp', () => {
     expect(formatTimestamp(null)).toBe('');
     expect(formatTimestamp(undefined)).toBe('');
     expect(formatTimestamp(Number.NaN)).toBe('');
+  });
+});
+
+describe('estimateDeepgramCost', () => {
+  const now = new Date('2026-07-14T00:00:00Z');
+  const ep = (over: Partial<Parameters<typeof estimateDeepgramCost>[0][number]>) => ({
+    transcript_source: 'deepgram' as const,
+    duration_seconds: 600,
+    created_at: '2026-07-01T00:00:00Z',
+    ...over,
+  });
+
+  it('only counts episodes transcribed by Deepgram', () => {
+    const { allTime } = estimateDeepgramCost(
+      [
+        ep({}),
+        ep({ transcript_source: 'youtube' }),
+        ep({ transcript_source: 'feed_tag' }),
+        ep({ transcript_source: null }),
+      ],
+      now,
+    );
+    // One 600s (10 min) deepgram episode.
+    expect(allTime).toBeCloseTo(10 * DEEPGRAM_COST_PER_MINUTE_AUD, 6);
+  });
+
+  it('buckets this-month spend on created_at', () => {
+    const { thisMonth, allTime } = estimateDeepgramCost(
+      [
+        ep({ duration_seconds: 600, created_at: '2026-07-10T00:00:00Z' }), // this month
+        ep({ duration_seconds: 1200, created_at: '2026-06-10T00:00:00Z' }), // last month
+      ],
+      now,
+    );
+    expect(thisMonth).toBeCloseTo(10 * DEEPGRAM_COST_PER_MINUTE_AUD, 6);
+    expect(allTime).toBeCloseTo(30 * DEEPGRAM_COST_PER_MINUTE_AUD, 6);
+  });
+
+  it('treats null / non-positive durations as zero', () => {
+    const { allTime } = estimateDeepgramCost(
+      [ep({ duration_seconds: null }), ep({ duration_seconds: 0 })],
+      now,
+    );
+    expect(allTime).toBe(0);
+  });
+});
+
+describe('formatAud', () => {
+  it('formats to two decimals with an A$ prefix', () => {
+    expect(formatAud(0)).toBe('A$0.00');
+    expect(formatAud(12.3)).toBe('A$12.30');
+    expect(formatAud(12.345)).toBe('A$12.35');
+  });
+});
+
+describe('highlightText', () => {
+  it('returns a single non-match part for an empty query', () => {
+    expect(highlightText('hello world', '')).toEqual([{ text: 'hello world', match: false }]);
+    expect(highlightText('hello world', '   ')).toEqual([{ text: 'hello world', match: false }]);
+  });
+
+  it('splits and flags case-insensitive matches', () => {
+    expect(highlightText('Bitcoin and bitcoin', 'bitcoin')).toEqual([
+      { text: 'Bitcoin', match: true },
+      { text: ' and ', match: false },
+      { text: 'bitcoin', match: true },
+    ]);
+  });
+
+  it('escapes regex special characters in the query', () => {
+    expect(highlightText('a (b) c', '(b)')).toEqual([
+      { text: 'a ', match: false },
+      { text: '(b)', match: true },
+      { text: ' c', match: false },
+    ]);
+  });
+
+  it('returns the whole string unflagged when there is no match', () => {
+    expect(highlightText('nothing here', 'zzz')).toEqual([{ text: 'nothing here', match: false }]);
   });
 });

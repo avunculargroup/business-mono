@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { EpisodeDetail } from './EpisodeDetail';
@@ -13,6 +13,15 @@ vi.mock('@/providers/ToastProvider', () => ({
 vi.mock('@/app/actions/podcasts', () => ({
   requestEpisodeAction: vi.fn(async () => ({})),
 }));
+
+// jsdom implements neither of these; the in-transcript find effect calls
+// scrollIntoView, and copy-with-citation writes to the clipboard.
+const writeText = vi.fn().mockResolvedValue(undefined);
+beforeEach(() => {
+  writeText.mockClear();
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+});
 
 // Minimal audio-only episode (no youtube_url) with sensible defaults; each test
 // overrides the fields it exercises.
@@ -172,5 +181,53 @@ describe('EpisodeDetail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Show less' }));
     expect(screen.getByRole('button', { name: 'Show full transcript' })).toBeInTheDocument();
+  });
+
+  it('highlights in-transcript matches and reports a count', () => {
+    const { container } = render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available' })}
+        segments={[makeSegment({ content: 'Bitcoin treasury and bitcoin custody.' })]}
+        sourceName={null}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find in transcript' }), {
+      target: { value: 'bitcoin' },
+    });
+
+    expect(container.querySelectorAll('mark')).toHaveLength(2);
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('force-expands an overflowing transcript while searching', () => {
+    forceTranscriptOverflow();
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available' })}
+        segments={[makeSegment({ content: 'Bitcoin treasury.' })]}
+        sourceName={null}
+      />,
+    );
+
+    // The show-more control is present until a query is active.
+    expect(screen.getByRole('button', { name: 'Show full transcript' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find in transcript' }), {
+      target: { value: 'bitcoin' },
+    });
+    expect(screen.queryByRole('button', { name: 'Show full transcript' })).not.toBeInTheDocument();
+  });
+
+  it('copies a segment quote with citation', () => {
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available', title: 'Sound money weekly' })}
+        segments={[makeSegment({ content: 'Custody matters.', speaker: 'Guest', start_seconds: 75 })]}
+        sourceName={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy quote with citation' }));
+    expect(writeText).toHaveBeenCalledWith('"Custody matters." — Guest, Sound money weekly @ 1:15');
   });
 });

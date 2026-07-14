@@ -13,13 +13,15 @@ import { useToast } from '@/providers/ToastProvider';
 import { formatRelativeDate, formatDate } from '@/lib/utils';
 import {
   formatTimestamp,
+  estimateDeepgramCost,
+  formatAud,
   TRANSCRIPT_STATUS_LABELS,
   TRANSCRIPT_STATUS_COLORS,
   TRANSCRIPT_SOURCE_LABELS,
 } from '@/lib/podcasts';
 import { requestEpisodeAction, ingestEpisodeBrief } from '@/app/actions/podcasts';
 import type { TranscriptStatus, TranscriptSource } from '@platform/shared';
-import { Library, FileCheck2, Loader, AlertTriangle, Plus } from 'lucide-react';
+import { Library, FileCheck2, Loader, AlertTriangle, Plus, Database } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
 import styles from './podcasts.module.css';
 
@@ -74,13 +76,26 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
     let available = 0;
     let inProgress = 0;
     let needsAttention = 0;
+    let indexed = 0;
     for (const e of episodes) {
       if (e.transcript_status === 'available') available += 1;
       if (IN_PROGRESS.includes(e.transcript_status)) inProgress += 1;
       if (NEEDS_ATTENTION.includes(e.transcript_status)) needsAttention += 1;
+      if (e.embedded_at) indexed += 1;
     }
-    return { total: episodes.length, available, inProgress, needsAttention };
+    return { total: episodes.length, available, inProgress, needsAttention, indexed };
   }, [episodes]);
+
+  // Estimated realized Deepgram spend (paid transcriptions only) — the money the
+  // source-count gauge hides. See estimateDeepgramCost for the rate/assumptions.
+  const spend = useMemo(() => estimateDeepgramCost(episodes), [episodes]);
+
+  // "Needs a decision" worklist: failed + skipped episodes, acted on in place.
+  // Reuses the in-memory list so a resolved row leaves the lane optimistically.
+  const triage = useMemo(
+    () => episodes.filter((e) => NEEDS_ATTENTION.includes(e.transcript_status)),
+    [episodes],
+  );
 
   const sourceBreakdown = useMemo(() => {
     let feedTag = 0;
@@ -192,11 +207,18 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
       header: 'Transcript',
       render: (e) =>
         e.transcript_source ? (
-          <span className={styles.muted}>{TRANSCRIPT_SOURCE_LABELS[e.transcript_source]}</span>
+          <span className={styles.muted}>
+            {TRANSCRIPT_SOURCE_LABELS[e.transcript_source]}
+            {e.transcript_status === 'available' && !e.embedded_at && (
+              <span className={styles.notIndexed} title="Transcript stored but not yet in the research index">
+                {' '}· not indexed
+              </span>
+            )}
+          </span>
         ) : (
           <span className={styles.muted}>—</span>
         ),
-      width: '130px',
+      width: '150px',
     },
     {
       key: 'duration',
@@ -223,6 +245,7 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
       <div className={styles.kpiRow}>
         <KpiCard icon={<Library size={18} strokeWidth={1.5} />} label="Episodes" value={kpis.total} headline />
         <KpiCard icon={<FileCheck2 size={18} strokeWidth={1.5} />} label="Transcripts available" value={kpis.available} />
+        <KpiCard icon={<Database size={18} strokeWidth={1.5} />} label="In research index" value={kpis.indexed} />
         <KpiCard icon={<Loader size={18} strokeWidth={1.5} />} label="In progress" value={kpis.inProgress} />
         <KpiCard
           icon={<AlertTriangle size={18} strokeWidth={1.5} />}
@@ -230,6 +253,50 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
           value={kpis.needsAttention}
         />
       </div>
+
+      {/* ── Triage: failed / skipped episodes to act on ── */}
+      {triage.length > 0 && (
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Needs a decision</h2>
+          <p className={styles.panelHint}>Episodes that stalled without a transcript. Resolve them here.</p>
+          <div className={styles.triageList}>
+            {triage.map((e) => (
+              <div key={e.id} className={styles.triageRow}>
+                <div className={styles.triageMain}>
+                  <Link href={`/news/podcasts/${e.id}`} className={styles.triageTitle}>
+                    {e.title}
+                  </Link>
+                  <div className={styles.triageSub}>
+                    {e.source_name && <span className={styles.sourceChip}>{e.source_name}</span>}
+                    <StatusChip
+                      label={TRANSCRIPT_STATUS_LABELS[e.transcript_status]}
+                      color={TRANSCRIPT_STATUS_COLORS[e.transcript_status]}
+                    />
+                    <span className={styles.triageReason}>
+                      {e.transcript_status === 'failed'
+                        ? e.transcript_error ?? 'Every transcript source errored.'
+                        : 'No free transcript; Deepgram was off for this feed.'}
+                    </span>
+                  </div>
+                </div>
+                {e.transcript_status === 'failed' ? (
+                  <Button variant="secondary" size="sm" onClick={() => runAction(e.id, 'retry', 'Retrying')}>
+                    Retry
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => runAction(e.id, 'deepgram', 'Submitting to Deepgram')}
+                  >
+                    Transcribe with Deepgram
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className={styles.chartsRow}>
         {/* ── Transcript-source breakdown / spend gauge ── */}
@@ -239,6 +306,14 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
             More warning-coloured means more Deepgram spend. Free sources keep the bar gold and green.
           </p>
           <StackedBar breakdown={sourceBreakdown} />
+          <div className={styles.spendReadout}>
+            <span className={styles.spendLabel}>Est. Deepgram spend</span>
+            <span className={styles.spendFigures}>
+              <span className={styles.mono}>{formatAud(spend.thisMonth)}</span> this month
+              <span className={styles.feedDivider}>·</span>
+              <span className={styles.mono}>{formatAud(spend.allTime)}</span> all time
+            </span>
+          </div>
         </section>
 
         {/* ── Ingestion over time ── */}

@@ -96,6 +96,77 @@ export function formatTimestamp(seconds: number | null | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// ── Deepgram spend estimate ───────────────────────────────────────────────────
+
+/**
+ * Rough per-minute Deepgram rate used only for the dashboard's *estimated* spend
+ * readout. Nova-3 pre-recorded is billed per minute of audio; adjust this to your
+ * actual contracted rate (in AUD) — it is a display estimate, not a billing figure.
+ */
+export const DEEPGRAM_COST_PER_MINUTE_AUD = 0.0065;
+
+/**
+ * Estimated realized Deepgram spend from episodes whose transcript actually came
+ * from Deepgram (`transcript_source === 'deepgram'`), summing their audio minutes ×
+ * the rate above. "This month" buckets on `created_at` (ingest time) as a proxy for
+ * when the transcription ran — close enough for a spend estimate. Episodes with no
+ * known duration contribute 0.
+ */
+export function estimateDeepgramCost(
+  episodes: { transcript_source: TranscriptSource | null; duration_seconds: number | null; created_at: string | null }[],
+  now: Date = new Date(),
+): { thisMonth: number; allTime: number } {
+  let allTimeSeconds = 0;
+  let thisMonthSeconds = 0;
+  for (const e of episodes) {
+    if (e.transcript_source !== 'deepgram') continue;
+    const seconds = e.duration_seconds ?? 0;
+    if (seconds <= 0) continue;
+    allTimeSeconds += seconds;
+    if (e.created_at) {
+      const d = new Date(e.created_at);
+      if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
+        thisMonthSeconds += seconds;
+      }
+    }
+  }
+  const cost = (seconds: number) => (seconds / 60) * DEEPGRAM_COST_PER_MINUTE_AUD;
+  return { thisMonth: cost(thisMonthSeconds), allTime: cost(allTimeSeconds) };
+}
+
+/** Format an AUD amount as `A$X.XX` for the mono spend readout. */
+export function formatAud(amount: number): string {
+  return `A$${amount.toFixed(2)}`;
+}
+
+// ── In-transcript search highlighting ─────────────────────────────────────────
+
+/** Escape a user query so it can be used literally inside a RegExp. */
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Split `text` into ordered parts, flagging the case-insensitive matches of
+ * `query` so the caller can wrap them in `<mark>`. An empty/whitespace query
+ * returns the whole string as a single non-match part.
+ */
+export function highlightText(text: string, query: string): { text: string; match: boolean }[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [{ text, match: false }];
+  const re = new RegExp(escapeRegExp(trimmed), 'ig');
+  const parts: { text: string; match: boolean }[] = [];
+  let lastIndex = 0;
+  for (const m of text.matchAll(re)) {
+    const start = m.index;
+    if (start > lastIndex) parts.push({ text: text.slice(lastIndex, start), match: false });
+    parts.push({ text: m[0], match: true });
+    lastIndex = start + m[0].length;
+  }
+  if (lastIndex < text.length) parts.push({ text: text.slice(lastIndex), match: false });
+  return parts.length > 0 ? parts : [{ text, match: false }];
+}
+
 // ── Status + provenance presentation (spec §"Web App" token mapping) ──────────
 
 type ChipColor = 'neutral' | 'accent' | 'success' | 'warning' | 'destructive';
