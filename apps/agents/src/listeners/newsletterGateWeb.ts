@@ -3,6 +3,9 @@ import { resumeNewsletterRun, gateStepForStatus } from '../workflows/startNewsle
 import { gate1ResumeSchema, gate2ResumeSchema } from '../workflows/newsletter/schemas.js';
 import type { Gate1Resume, Gate2Resume } from '../workflows/newsletter/schemas.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('newsletter-gate-web');
 
 // Web approval path for the newsletter gates. The /content page can't reach the
 // agents server over HTTP, so it writes the director's decision into
@@ -70,16 +73,14 @@ export async function handleGateRow(row: NewsletterRunRow): Promise<void> {
   if (!claimed || claimed.length === 0) return;
 
   if (!resumeData) {
-    console.error(
-      '[newsletter-gate-web] Invalid decision for',
-      row.status,
-      row.workflow_run_id,
-      row.pending_decision,
+    log.error(
+      { status: row.status, runId: row.workflow_run_id, decision: row.pending_decision },
+      'invalid decision',
     );
     return;
   }
 
-  console.log('[newsletter-gate-web] Resuming', row.workflow_run_id, 'with', resumeData);
+  log.info({ runId: row.workflow_run_id, resumeData }, 'resuming');
   await resumeNewsletterRun({
     runId: row.workflow_run_id,
     resumeData,
@@ -97,7 +98,7 @@ export function startNewsletterGateWebListener(): void {
     channelName: 'newsletter-gate-web',
     logPrefix: '[newsletter-gate-web]',
     onSubscribed: () => {
-      console.log('[newsletter-gate-web] Listening for web gate decisions via Supabase Realtime');
+      log.info('listening for web gate decisions via Supabase Realtime');
     },
     attachHandlers: (channel) =>
       channel.on(
@@ -108,7 +109,7 @@ export function startNewsletterGateWebListener(): void {
             if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
             await handleGateRow(payload.new);
           } catch (err) {
-            console.error('[newsletter-gate-web] Error handling gate decision:', err);
+            log.error({ err }, 'error handling gate decision');
           }
         },
       ),

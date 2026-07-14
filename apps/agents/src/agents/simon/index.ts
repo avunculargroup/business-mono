@@ -28,6 +28,9 @@ import { della } from '../relationshipManager/index.js';
 import { roger } from '../recorder/agent.js';
 import { petra } from '../pm/agent.js';
 import { margot } from '../margot/index.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('simon.onDelegationComplete');
 
 const SYSTEM_PROMPT = `You are Simon, the EA and central coordinator for Bitcoin Treasury Solutions.
 
@@ -240,7 +243,7 @@ export const simon = new Agent({
             } as never)
             .then(({ error }) => {
               if (error) {
-                console.error('[simon.onDelegationComplete] capacity_gaps insert failed:', error);
+                log.error({ error }, 'capacity_gaps insert failed');
               }
             });
         }

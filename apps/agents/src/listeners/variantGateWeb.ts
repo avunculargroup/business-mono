@@ -1,6 +1,9 @@
 import { createRealtimeClient } from '@platform/db';
 import { resumeVariantRun, validateVariantDecision } from '../workflows/variant/run.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('variant-gate-web');
 
 // Web approval path for the variant Gate 3. The /campaigns variant editor can't
 // reach the agents server over HTTP, so it writes the director's decision into
@@ -42,11 +45,11 @@ export async function handleVariantGateRow(row: VariantGateRow): Promise<void> {
   if (!claimed || claimed.length === 0) return;
 
   if (!resumeData) {
-    console.error('[variant-gate-web] Invalid decision for', row.id, row.pending_decision);
+    log.error({ rowId: row.id, decision: row.pending_decision }, 'invalid decision');
     return;
   }
 
-  console.log('[variant-gate-web] Resuming', row.workflow_run_id, 'with', resumeData.decision);
+  log.info({ runId: row.workflow_run_id, decision: resumeData.decision }, 'resuming');
   await resumeVariantRun({ runId: row.workflow_run_id, resumeData });
 }
 
@@ -60,7 +63,7 @@ export function startVariantGateWebListener(): void {
     channelName: 'variant-gate-web',
     logPrefix: '[variant-gate-web]',
     onSubscribed: () => {
-      console.log('[variant-gate-web] Listening for web gate decisions via Supabase Realtime');
+      log.info('listening for web gate decisions via Supabase Realtime');
     },
     attachHandlers: (channel) =>
       channel.on(
@@ -71,7 +74,7 @@ export function startVariantGateWebListener(): void {
             if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
             await handleVariantGateRow(payload.new);
           } catch (err) {
-            console.error('[variant-gate-web] Error handling gate decision:', err);
+            log.error({ err }, 'error handling gate decision');
           }
         },
       ),

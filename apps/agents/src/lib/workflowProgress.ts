@@ -1,4 +1,7 @@
 import { supabase } from '@platform/db';
+import { createLogger } from './logger.js';
+
+const log = createLogger('workflow-progress');
 
 // workflow_progress isn't in the generated Database types until
 // `pnpm --filter @platform/db generate-types` runs post-migration. Cast at the
@@ -22,12 +25,12 @@ export async function setWorkflowProgress(
     .upsert({ workflow_run_id: runId, step_id: stepId, step_label: stepLabel } as never, {
       onConflict: 'workflow_run_id',
     });
-  if (error) console.error('[workflowProgress] upsert failed:', error.message);
+  if (error) log.error({ error: error.message }, 'upsert failed');
 }
 
 /** Clears the progress row once a run suspends at a gate or reaches a terminal state. */
 export async function clearWorkflowProgress(runId: string | undefined): Promise<void> {
   if (!runId) return;
   const { error } = await db.from('workflow_progress').delete().eq('workflow_run_id', runId);
-  if (error) console.error('[workflowProgress] delete failed:', error.message);
+  if (error) log.error({ error: error.message }, 'delete failed');
 }

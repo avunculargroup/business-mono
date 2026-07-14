@@ -1,6 +1,8 @@
 import { createVerify } from 'crypto';
 import { mastra } from '../mastra/index.js';
+import { createLogger } from '../lib/logger.js';
 
+const log = createLogger('telnyx');
 const TELNYX_PUBLIC_KEY = process.env['TELNYX_PUBLIC_KEY'];
 
 function verifyTelnyxSignature(
@@ -9,7 +11,7 @@ function verifyTelnyxSignature(
   signature: string
 ): boolean {
   if (!TELNYX_PUBLIC_KEY) {
-    console.warn('TELNYX_PUBLIC_KEY not set — skipping signature verification');
+    log.warn('TELNYX_PUBLIC_KEY not set — skipping signature verification');
     return true;
   }
 

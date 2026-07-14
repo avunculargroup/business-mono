@@ -1,6 +1,9 @@
 import { createRealtimeClient } from '@platform/db';
 import { parseEpisodeAction, reResolveEpisode } from '../lib/transcripts/reResolve.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('podcast-action');
 
 // Web path for per-episode re-run actions. The /news/podcasts pages can't reach
 // the agents server over HTTP, so they write the requested action to
@@ -40,11 +43,11 @@ export async function handleEpisodeActionRow(row: EpisodeActionRow): Promise<voi
   if (!claimed || claimed.length === 0) return;
 
   if (!parsed) {
-    console.error('[podcast-action] unknown action', row.id, row.pending_action);
+    log.error({ rowId: row.id, action: row.pending_action }, 'unknown action');
     return;
   }
 
-  console.log('[podcast-action] Re-resolving', row.id, 'action', row.pending_action);
+  log.info({ rowId: row.id, action: row.pending_action }, 're-resolving');
   await reResolveEpisode(row.id, parsed);
 }
 
@@ -69,7 +72,7 @@ export async function reconcilePendingActions(): Promise<void> {
     try {
       await handleEpisodeActionRow(row);
     } catch (err) {
-      console.error('[podcast-action] Error reconciling episode action:', row.id, err);
+      log.error({ err, rowId: row.id }, 'error reconciling episode action');
     }
   }
 }
@@ -84,7 +87,7 @@ export function startPodcastActionListener(): void {
     channelName: 'podcast-action',
     logPrefix: '[podcast-action]',
     onSubscribed: () => {
-      console.log('[podcast-action] Listening for episode re-run actions via Supabase Realtime');
+      log.info('listening for episode re-run actions via Supabase Realtime');
       // Catch up on any actions missed while the subscription was down.
       void reconcilePendingActions();
     },
@@ -97,7 +100,7 @@ export function startPodcastActionListener(): void {
             if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
             await handleEpisodeActionRow(payload.new);
           } catch (err) {
-            console.error('[podcast-action] Error handling episode action:', err);
+            log.error({ err }, 'error handling episode action');
           }
         },
       ),

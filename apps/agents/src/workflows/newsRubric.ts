@@ -15,6 +15,9 @@
 import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('news-rubric');
 
 export const RUBRIC_VERSION = 'v1';
 
@@ -230,6 +233,6 @@ export async function scoreNewsItem(input: ScoreNewsItemInput): Promise<ScoredNe
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
-  console.warn('[news-rubric] scoring failed after retry', { title: input.title, reason: lastError });
+  log.warn({ title: input.title, reason: lastError }, 'scoring failed after retry');
   return null;
 }

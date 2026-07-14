@@ -1,4 +1,5 @@
 import type { createRealtimeClient } from '@platform/db';
+import { createLogger, describeError } from '../../lib/logger.js';
 
 type SupabaseClient = ReturnType<typeof createRealtimeClient>;
 type RealtimeChannel = ReturnType<SupabaseClient['channel']>;
@@ -22,20 +23,11 @@ interface ChannelState {
 // Keyed by channelName so multiple listeners share no state.
 const states = new Map<string, ChannelState>();
 
-/**
- * Concise, single-line description of a subscription error.
- *
- * Realtime hands us a normalized Error whose `cause` is the raw `CloseEvent`
- * (with the whole `SafeWebSocket` — including the apikey/JWT in its URL).
- * Logging the object directly dumps all of that to stdout on every transient
- * 1006 close, which is both noisy and a credential leak. The Error's `message`
- * (e.g. "socket closed: 1006") already carries everything actionable.
- */
-function describeError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
-  return String(err);
-}
+// Realtime hands us a normalized Error whose `cause` is the raw `CloseEvent`
+// (with the whole `SafeWebSocket` — including the apikey/JWT in its URL). We
+// therefore log describeError(err) (the message only, e.g. "socket closed:
+// 1006") rather than the raw object, to avoid leaking credentials on every
+// transient 1006 close. See describeError in ../../lib/logger.ts.
 
 function getState(channelName: string): ChannelState {
   let s = states.get(channelName);
@@ -65,6 +57,7 @@ function getState(channelName: string): ChannelState {
  */
 export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): void {
   const { client, channelName, logPrefix, attachHandlers, onSubscribed } = opts;
+  const log = createLogger(logPrefix.replace(/^\[|\]$/g, ''));
   const state = getState(channelName);
 
   if (state.reconnectTimer !== null) {
@@ -83,9 +76,9 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
     state.reconnectAttempt += 1;
     const delay = Math.min(5000 * Math.pow(2, state.reconnectAttempt - 1), 60000);
     const scenario = state.hasEverSubscribed ? 'connection lost' : 'never connected';
-    console.log(
-      `${logPrefix} ${scenario} — reconnect attempt ${state.reconnectAttempt} in ${delay / 1000}s` +
-      (reason ? ` (${reason})` : ''),
+    log.info(
+      { scenario, attempt: state.reconnectAttempt, delaySeconds: delay / 1000, reason },
+      'scheduling reconnect',
     );
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;
@@ -98,8 +91,8 @@ export function subscribeWithReconnect(opts: SubscribeWithReconnectOptions): voi
   const channel = channelWithHandlers.subscribe((status: SubscribeStatus, err?: unknown) => {
     if (channel !== state.currentChannel) return;
 
-    console.log(`${logPrefix} Subscription status:`, status);
-    if (err) console.error(`${logPrefix} Subscription error: ${describeError(err)}`);
+    log.info({ status }, 'subscription status');
+    if (err) log.error({ err: describeError(err) }, 'subscription error');
     if (status === 'SUBSCRIBED') {
       // Cancel any pending reconnect timer. Supabase's internal Phoenix socket
       // reconnect re-joins channels automatically, so the channel can recover

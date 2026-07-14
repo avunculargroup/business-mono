@@ -2,6 +2,9 @@ import { supabase } from '@platform/db';
 import { startVariantRun } from '../variant/run.js';
 import { schedulePlanSchema, type SchedulePlan } from './schemas.js';
 import type { VariantInput } from '../variant/schemas.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('fan-out');
 
 // Step 8 — fan-out. On plan approval the Campaign Strategy workflow persists the
 // beats and the (beat × account) schedule, then locks (status = plan_approved).
@@ -53,7 +56,7 @@ async function logFanOutActivity(campaignId: string, spawned: number): Promise<v
     entity_id: campaignId,
     proposed_actions: [{ type: 'fan_out', variants: spawned }],
   } as never);
-  if (error) console.error('[fan-out] agent_activity insert failed:', error.message);
+  if (error) log.error({ error: error.message }, 'agent_activity insert failed');
 }
 
 /**
@@ -79,7 +82,7 @@ export async function fanOutCampaign(args: {
 
   const parsedPlan = schedulePlanSchema.safeParse((campaign as { schedule_plan: unknown }).schedule_plan);
   if (!parsedPlan.success) {
-    console.error('[fan-out] campaign', campaignId, 'has no usable schedule_plan');
+    log.error({ campaignId }, 'campaign has no usable schedule_plan');
     return { claimed: false, spawned: 0 };
   }
 
@@ -117,7 +120,7 @@ export async function fanOutCampaign(args: {
       spawned += 1;
     } catch (err) {
       // One variant failing must not abort the rest — each is its own run.
-      console.error('[fan-out] variant start failed for', input.beatId, input.socialAccountId, err);
+      log.error({ err, beatId: input.beatId, socialAccountId: input.socialAccountId }, 'variant start failed');
     }
   }
 

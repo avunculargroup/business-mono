@@ -64,6 +64,13 @@ import {
   storeAvailableTranscript,
 } from '../lib/transcripts/store.js';
 import { dynamicModelFor, stepRequestContext } from '../config/model.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('routine-workflow');
+const curationLog = createLogger('news-curation');
+const ingestLog = createLogger('news-ingest');
+const scanLog = createLogger('news-source-scan');
+const podcastLog = createLogger('podcast-ingest');
 
 // ── Step 1: Fetch due routines ───────────────────────────────────────────────
 
@@ -140,7 +147,7 @@ export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof 
   if (error) {
     const msg = (error as { message: string }).message;
     if (msg.includes('routines')) {
-      console.warn('[routine-workflow] routines table not found — migration pending, skipping');
+      log.warn('routines table not found — migration pending, skipping');
       return [];
     }
     throw new Error(`Failed to fetch routines: ${msg}`);
@@ -162,10 +169,7 @@ export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof 
       .lte('next_run_at', nowIso)
       .select('id');
     if (claimError) {
-      console.warn('[routine-workflow] claim failed — skipping routine this tick', {
-        id: r.id,
-        error: claimError.message,
-      });
+      log.warn({ id: r.id, error: claimError.message }, 'claim failed — skipping routine this tick');
       continue;
     }
     if (!won || won.length === 0) continue;
@@ -280,7 +284,7 @@ const runRoutine = createStep({
           });
         }
       } catch (err) {
-        console.error(`[routine-workflow] Error running routine ${routine.id}:`, err);
+        log.error({ err, routineId: routine.id }, 'error running routine');
         outcomes.push({
           routine_id: routine.id,
           name: routine.name,
@@ -487,7 +491,7 @@ ${candidateLines}`;
       .map((i) => candidates[i])
       .slice(0, maxStories);
   } catch (err) {
-    console.warn('[news-curation] editor selection failed:', err);
+    curationLog.warn({ err }, 'editor selection failed');
   }
 
   // Fallback: if the editor produced nothing usable, take the top ranked candidates.
@@ -522,7 +526,7 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
     });
     moodSummary = coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
   } catch (err) {
-    console.warn('[news-curation] Charlie mood summary failed:', err);
+    curationLog.warn({ err }, 'Charlie mood summary failed');
   }
 
   // ── Headline image: walk the ranked stories and use the first that resolves ──
@@ -788,11 +792,10 @@ async function rankNewsCandidates(input: {
       lastError = err instanceof Error ? err.message : String(err);
     }
   }
-  console.warn('[news-ingest] judge failed after retry', {
-    category: input.category,
-    candidate_count: input.candidates.length,
-    reason: lastError,
-  });
+  ingestLog.warn(
+    { category: input.category, candidate_count: input.candidates.length, reason: lastError },
+    'judge failed after retry',
+  );
   return { data: null, reason: lastError?.slice(0, 200) ?? 'unknown' };
 }
 
@@ -862,7 +865,7 @@ async function runNewsIngest(
     }
   }
 
-  console.log('[news-ingest] tavily returned', tavilyCandidates.length, 'unique candidates for', category);
+  ingestLog.info({ count: tavilyCandidates.length, category }, 'tavily returned unique candidates');
 
   if (tavilyCandidates.length === 0) {
     const result: RoutineResult = { summary: 'No new articles found.', sources: [] };
@@ -926,15 +929,11 @@ async function runNewsIngest(
       }
       fresh.push({ ...item, dedupEmbedding });
     } catch (err) {
-      console.warn('[news-ingest] dedup failed — skipping candidate', {
-        url: item.url,
-        title: item.title,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      ingestLog.warn({ err, url: item.url, title: item.title }, 'dedup failed — skipping candidate');
     }
   }
 
-  console.log('[news-ingest]', fresh.length, 'fresh after dedup');
+  ingestLog.info({ count: fresh.length }, 'fresh after dedup');
 
   // ── Phase 2: rank with the LLM judge ──────────────────────────────────────
   // If the pool already fits the cap, skip the judge call.
@@ -965,15 +964,15 @@ async function runNewsIngest(
         .slice(0, maxCurated)
         .map((s) => fresh[s.index])
         .filter((c): c is FreshCandidate => Boolean(c));
-      console.log('[news-ingest] judge selected', shortlist.length, 'of', fresh.length);
+      ingestLog.info({ selected: shortlist.length, of: fresh.length }, 'judge selected');
     } else {
       shortlist = [];
       judgeFailed = true;
       judgeFailureReason = rankReason ?? 'unknown';
-      console.warn('[news-ingest] judge returned nothing usable — skipping run, no stories curated', {
-        fresh_pool: fresh.length,
-        reason: judgeFailureReason,
-      });
+      ingestLog.warn(
+        { fresh_pool: fresh.length, reason: judgeFailureReason },
+        'judge returned nothing usable — skipping run, no stories curated',
+      );
     }
   }
 
@@ -1012,11 +1011,10 @@ async function runNewsIngest(
       if (!extractionOk) {
         extractionFailures += 1;
         failedUrls.push(item.url);
-        console.warn('[news-ingest] extraction failed — inserting with extraction_failed status', {
-          title: item.title,
-          url: item.url,
-          reason: extractionReason,
-        });
+        ingestLog.warn(
+          { title: item.title, url: item.url, reason: extractionReason },
+          'extraction failed — inserting with extraction_failed status',
+        );
       }
 
       // Drop stories that fail the routine's relevance filter. Default keeps a
@@ -1024,7 +1022,7 @@ async function runNewsIngest(
       // keeps everything the judge curated.
       if (extracted && shouldDropForRelevance(relevanceFilter, extracted)) {
         itemsFilteredIrrelevant += 1;
-        console.warn('[news-ingest] filtered as irrelevant', { url: item.url, title: item.title });
+        ingestLog.warn({ url: item.url, title: item.title }, 'filtered as irrelevant');
         continue;
       }
 
@@ -1059,11 +1057,7 @@ async function runNewsIngest(
       // sources — otherwise the same article appears twice in the tile.
       if (insertError) {
         if (insertError.code === '23505') itemsSkippedDuplicate += 1;
-        console.warn('[news-ingest] insert skipped', {
-          url: item.url,
-          title: item.title,
-          error: insertError.message,
-        });
+        ingestLog.warn({ url: item.url, title: item.title, error: insertError.message }, 'insert skipped');
         continue;
       }
       itemsStored += 1;
@@ -1077,16 +1071,13 @@ async function runNewsIngest(
         });
       }
     } catch (err) {
-      console.warn('[news-ingest] item failed — skipping', {
-        url: item.url,
-        title: item.title,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      ingestLog.warn({ err, url: item.url, title: item.title }, 'item failed — skipping');
     }
   }
 
-  console.log(
-    `[news-ingest] category=${category} stored=${itemsStored}/${shortlist.length} extraction_failures=${extractionFailures} filtered=${itemsFilteredIrrelevant}`,
+  ingestLog.info(
+    { category, stored: itemsStored, shortlist: shortlist.length, extraction_failures: extractionFailures, filtered: itemsFilteredIrrelevant },
+    'ingest complete',
   );
 
   const ingestResult: NewsIngestResult = {
@@ -1207,7 +1198,7 @@ async function runNewsSourceScan(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       failedSources.push(sourceName);
-      console.warn('[news-source-scan] feed failed', { source: sourceName, feed_url: feedUrl, error: message });
+      scanLog.warn({ source: sourceName, feed_url: feedUrl, error: message }, 'feed failed');
       await supabase
         .from('news_sources')
         .update({ last_scanned_at: new Date().toISOString(), last_status: 'failed', last_error: message.slice(0, 500) })
@@ -1215,7 +1206,7 @@ async function runNewsSourceScan(
     }
   }
 
-  console.log('[news-source-scan] gathered', candidates.length, 'candidates from', activeSources.length, 'sources');
+  scanLog.info({ candidates: candidates.length, sources: activeSources.length }, 'gathered candidates from sources');
 
   // ── Dedup (URL + semantic), mirroring runNewsIngest phase 1 ─────────────────
   let itemsSkippedDuplicate = 0;
@@ -1264,15 +1255,12 @@ async function runNewsSourceScan(
         }
         fresh.push({ ...item, dedupEmbedding });
       } catch (err) {
-        console.warn('[news-source-scan] dedup failed — skipping candidate', {
-          url: item.url,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        scanLog.warn({ err, url: item.url }, 'dedup failed — skipping candidate');
       }
     }
   }
 
-  console.log('[news-source-scan]', fresh.length, 'fresh after dedup');
+  scanLog.info({ count: fresh.length }, 'fresh after dedup');
 
   // ── Enrich + insert (no LLM judge, no relevance drop — trust the source) ────
   let itemsStored = 0;
@@ -1302,11 +1290,10 @@ async function runNewsSourceScan(
       const extractionOk = extracted !== null;
       if (!extractionOk) {
         extractionFailures += 1;
-        console.warn('[news-source-scan] extraction failed — inserting with extraction_failed status', {
-          title: item.title,
-          url: item.url,
-          reason: extractionReason,
-        });
+        scanLog.warn(
+          { title: item.title, url: item.url, reason: extractionReason },
+          'extraction failed — inserting with extraction_failed status',
+        );
       }
 
       const finalSummary = extracted?.summary ?? item.summary;
@@ -1345,15 +1332,13 @@ async function runNewsSourceScan(
         });
       }
     } catch (err) {
-      console.warn('[news-source-scan] item failed — skipping', {
-        url: item.url,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      scanLog.warn({ err, url: item.url }, 'item failed — skipping');
     }
   }
 
-  console.log(
-    `[news-source-scan] stored=${itemsStored}/${fresh.length} extraction_failures=${extractionFailures} failed_sources=${failedSources.length}`,
+  scanLog.info(
+    { stored: itemsStored, fresh: fresh.length, extraction_failures: extractionFailures, failed_sources: failedSources.length },
+    'source scan complete',
   );
 
   const scanResult: NewsSourceScanResult = {
@@ -1547,7 +1532,7 @@ async function runPodcastIngest(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       result.failed_sources!.push(src.name);
-      console.warn('[podcast-ingest] feed failed', { source: src.name, error: message });
+      podcastLog.warn({ source: src.name, error: message }, 'feed failed');
       await supabase
         .from('news_sources')
         .update({ last_scanned_at: new Date().toISOString(), last_status: 'failed', last_error: message.slice(0, 500) })
@@ -1755,7 +1740,7 @@ async function archiveSources(outcome: RoutineOutcome): Promise<number> {
       });
       archived += 1;
     } catch (err) {
-      console.warn(`[routine-workflow] archive failed for ${url}:`, err);
+      log.warn({ err, url }, 'archive failed');
     }
   }
   return archived;

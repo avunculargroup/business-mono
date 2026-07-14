@@ -20,6 +20,10 @@ import { supabase } from '@platform/db';
 import type { RoutineResult } from '@platform/shared';
 import { FastmailJmapClient, type JmapAddress } from './fastmailJmap.js';
 import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js';
+import { createLogger } from './logger.js';
+
+const teamEmailLog = createLogger('team-email');
+const digestLog = createLogger('news-digest');
 
 // The Fastmail login whose stored token sends the digest, and the send-identity
 // (an alias on that account) the message is From. Both live on the same account
@@ -68,8 +72,9 @@ export async function deliverTeamEmail(
 ): Promise<DigestDeliveryResult> {
   const token = await loadSenderToken();
   if (!token) {
-    console.warn(
-      `[team-email] No Fastmail token for ${SENDER_ACCOUNT_USERNAME} in fastmail_accounts — skipping email delivery`,
+    teamEmailLog.warn(
+      { account: SENDER_ACCOUNT_USERNAME },
+      'no Fastmail token in fastmail_accounts — skipping email delivery',
     );
     return { configured: false, attempted: 0, sent: 0, failed: 0 };
   }
@@ -77,7 +82,7 @@ export async function deliverTeamEmail(
   try {
     const recipients = await loadRecipients();
     if (recipients.length === 0) {
-      console.warn('[team-email] No team_member recipients with an email — skipping');
+      teamEmailLog.warn('no team_member recipients with an email — skipping');
       return { configured: true, attempted: 0, sent: 0, failed: 0 };
     }
 
@@ -115,17 +120,17 @@ export async function deliverTeamEmail(
       } catch (err) {
         failed += 1;
         const errMessage = err instanceof Error ? err.message : String(err);
-        console.error(`[team-email] Failed to send to ${to.email}:`, errMessage);
+        teamEmailLog.error({ recipient: to.email, error: errMessage }, 'failed to send');
         await logSendFailure(routine, to.email, errMessage);
       }
     }
 
-    console.log(`[team-email] Sent "${routine.title}" — ${sent} delivered, ${failed} failed`);
+    teamEmailLog.info({ title: routine.title, sent, failed }, 'digest sent');
     return { configured: true, attempted: recipients.length, sent, failed };
   } catch (err) {
     // A setup failure (auth, session, recipient lookup) must not fail the routine.
     const errMessage = err instanceof Error ? err.message : String(err);
-    console.error('[team-email] Delivery aborted:', errMessage);
+    teamEmailLog.error({ error: errMessage }, 'delivery aborted');
     await logSendFailure(routine, null, errMessage);
     return { configured: true, attempted: 0, sent: 0, failed: 0 };
   }
@@ -167,7 +172,7 @@ export async function loadSenderToken(): Promise<string | null> {
     .eq('username', SENDER_ACCOUNT_USERNAME)
     .maybeSingle();
   if (error) {
-    console.error('[news-digest] Failed to load sender token:', error.message);
+    digestLog.error({ error: error.message }, 'failed to load sender token');
     return null;
   }
   const token = (data as { token?: string } | null)?.token;
@@ -223,6 +228,6 @@ async function logSendFailure(
       notes: message.slice(0, 500),
     });
   } catch (err) {
-    console.error('[news-digest] Failed to log send failure:', err);
+    digestLog.error({ err }, 'failed to log send failure');
   }
 }

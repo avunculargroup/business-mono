@@ -1,5 +1,8 @@
 import { supabase } from '@platform/db';
 import { embedVoiceText } from '@platform/voice';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('voice-embeddings');
 
 // Backfills voice_snippets.embedding for rows that have none — e.g. snippets
 // imported directly into the table, bypassing the seed script's embed-on-save
@@ -29,21 +32,21 @@ export async function backfillMissingVoiceEmbeddings(): Promise<void> {
           .update({ embedding: embedding as unknown as string })
           .eq('id', row.id);
         if (updError) throw new Error(`voice_snippets update failed: ${updError.message}`);
-        console.log(`[voice-embeddings] Backfilled voice_snippet ${row.id}`);
+        log.info({ rowId: row.id }, 'backfilled voice_snippet');
       } catch (err) {
-        console.error(`[voice-embeddings] Backfill failed for voice_snippet ${row.id}:`, err);
+        log.error({ err, rowId: row.id }, 'backfill failed for voice_snippet');
       }
     }
 
-    console.log(`[voice-embeddings] Backfill complete (${(rows ?? []).length} candidate rows)`);
+    log.info({ candidateRows: (rows ?? []).length }, 'backfill complete');
   } catch (err) {
-    console.error('[voice-embeddings] Backfill failed (non-fatal):', err);
+    log.error({ err }, 'backfill failed (non-fatal)');
   }
 }
 
 export function startVoiceEmbeddingListener(): void {
   if (process.env['VOICE_EMBEDDING_LISTENER_ENABLED'] === 'false') {
-    console.log('[voice-embeddings] Disabled via VOICE_EMBEDDING_LISTENER_ENABLED=false');
+    log.info('disabled via VOICE_EMBEDDING_LISTENER_ENABLED=false');
     return;
   }
   void backfillMissingVoiceEmbeddings();

@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+// Capture the component logger the module binds, but keep the real describeError
+// (the helper that flattens an Error to its message so the raw socket object —
+// apikey/JWT in its URL — is never logged).
+const errorSpy = vi.fn();
+const infoSpy = vi.fn();
+vi.mock('../../lib/logger.js', async (importActual) => {
+  const actual = await importActual<typeof import('../../lib/logger.js')>();
+  return {
+    ...actual,
+    createLogger: () => ({ info: infoSpy, warn: vi.fn(), error: errorSpy, debug: vi.fn() }),
+  };
+});
+
 import { subscribeWithReconnect } from './realtimeChannel.js';
 
 /**
@@ -27,13 +41,11 @@ function createFakeClient() {
 
 describe('subscribeWithReconnect', () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.useRealTimers();
   });
 
   it('logs a concise message instead of dumping the raw socket error', () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { client, callbacks } = createFakeClient();
 
     subscribeWithReconnect({
@@ -48,17 +60,14 @@ describe('subscribeWithReconnect', () => {
     (err as Error & { cause?: unknown }).cause = { hugeWebSocketObject: 'with apikey in url' };
     callbacks.at(-1)!('CHANNEL_ERROR', err);
 
-    expect(errSpy).toHaveBeenCalledTimes(1);
-    expect(errSpy).toHaveBeenCalledWith('[test-concise] Subscription error: socket closed: 1006');
-    // A single string argument — the raw error object is never passed through.
-    const [, ...rest] = errSpy.mock.calls[0];
-    expect(rest).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    // The err field is the flattened message string — never the raw Error object,
+    // so the credential-bearing cause can't leak into the log stream.
+    expect(errorSpy).toHaveBeenCalledWith({ err: 'socket closed: 1006' }, 'subscription error');
   });
 
   it('schedules an exponential-backoff reconnect on CHANNEL_ERROR', () => {
     vi.useFakeTimers();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { client, channel, callbacks } = createFakeClient();
 
     subscribeWithReconnect({
@@ -80,8 +89,6 @@ describe('subscribeWithReconnect', () => {
 
   it('cancels a pending reconnect when the channel recovers on its own', () => {
     vi.useFakeTimers();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { client, channel, callbacks } = createFakeClient();
 
     subscribeWithReconnect({

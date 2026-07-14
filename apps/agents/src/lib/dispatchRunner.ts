@@ -1,4 +1,5 @@
 import { createRealtimeClient } from '@platform/db';
+import { createLogger } from './logger.js';
 
 // Notes JSON shape written to agent_activity.notes (TEXT column, JSON-serialised)
 export type ActivityNotes =
@@ -40,7 +41,7 @@ export type DispatchRunnerOptions<TResult> = {
 
 export async function runDispatch<TResult>(opts: DispatchRunnerOptions<TResult>): Promise<void> {
   const { supabase, agentName, dispatchActivityId, dispatchMessage, run, onSuccess } = opts;
-  const prefix = `[dispatch-runner:${agentName}]`;
+  const log = createLogger(`dispatch-runner:${agentName}`);
   const startedAt = Date.now();
 
   // Log that the agent has picked up the task so the UI shows activity immediately
@@ -65,9 +66,9 @@ export async function runDispatch<TResult>(opts: DispatchRunnerOptions<TResult>)
       clarifications: null,
       notes: JSON.stringify(startNotes),
     } as never);
-    if (error) console.error(`${prefix} Failed to insert in_progress log:`, error);
+    if (error) log.error({ error }, 'failed to insert in_progress log');
   } catch (err) {
-    console.error(`${prefix} Failed to insert in_progress log:`, err);
+    log.error({ err }, 'failed to insert in_progress log');
   }
 
   let result: TResult;
@@ -97,9 +98,9 @@ export async function runDispatch<TResult>(opts: DispatchRunnerOptions<TResult>)
         clarifications: null,
         notes: JSON.stringify(errorNotes),
       } as never);
-      if (error) console.error(`${prefix} Failed to insert error log:`, error);
+      if (error) log.error({ error }, 'failed to insert error log');
     } catch (insertErr) {
-      console.error(`${prefix} Failed to insert error log:`, insertErr);
+      log.error({ err: insertErr }, 'failed to insert error log');
     }
     return;
   }
@@ -133,9 +134,9 @@ export async function runDispatch<TResult>(opts: DispatchRunnerOptions<TResult>)
         clarifications: null,
         notes: JSON.stringify(errorNotes),
       } as never);
-      if (error) console.error(`${prefix} Failed to insert persistence-error log:`, error);
+      if (error) log.error({ error }, 'failed to insert persistence-error log');
     } catch (insertErr) {
-      console.error(`${prefix} Failed to insert persistence-error log:`, insertErr);
+      log.error({ err: insertErr }, 'failed to insert persistence-error log');
     }
     return;
   }
@@ -162,8 +163,8 @@ export async function runDispatch<TResult>(opts: DispatchRunnerOptions<TResult>)
       clarifications: null,
       notes: JSON.stringify(completedNotes),
     } as never);
-    if (error) console.error(`${prefix} Failed to insert completion log:`, error);
+    if (error) log.error({ error }, 'failed to insert completion log');
   } catch (insertErr) {
-    console.error(`${prefix} Failed to insert completion log:`, insertErr);
+    log.error({ err: insertErr }, 'failed to insert completion log');
   }
 }

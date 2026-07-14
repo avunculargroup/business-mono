@@ -5,6 +5,9 @@ import {
   type Gate1Resume,
   type Gate2Resume,
 } from './schemas.js';
+import { createLogger } from '../../lib/logger.js';
+
+const log = createLogger('strategy');
 
 // Launch + resume orchestration for the Campaign Strategy workflow. The workflow
 // steps stay pure; this module owns the side effects: creating the Mastra run and
@@ -94,12 +97,13 @@ export async function resumeStrategyRun(args: {
   // throws "step X was not suspended" and wedges the run. Reconcile instead.
   const actualStep = await inspectSuspendedGate(runId);
   if (!actualStep) {
-    console.warn('[strategy] Resume requested but run is not suspended at a gate:', runId);
+    log.warn({ runId }, 'resume requested but run is not suspended at a gate');
     return { status: 'not_suspended' };
   }
   if (actualStep !== step) {
-    console.warn(
-      `[strategy] Gate drift on ${runId}: row expected ${step}, snapshot is at ${actualStep}. Discarding the ${step} decision.`,
+    log.warn(
+      { runId, expectedStep: step, snapshotStep: actualStep },
+      'gate drift: discarding the decision',
     );
     // Clear the stale pending_decision; the founder re-decides against the real gate.
     await db.from('campaigns').update({ pending_decision: null } as never).eq('workflow_run_id', runId);
@@ -135,7 +139,7 @@ export async function resumeStrategyRun(args: {
       const { fanOutCampaign } = await import('./fanOut.js');
       await fanOutCampaign({ campaignId });
     } catch (err) {
-      console.error('[strategy] fan-out trigger failed:', err);
+      log.error({ err }, 'fan-out trigger failed');
     }
   })();
 

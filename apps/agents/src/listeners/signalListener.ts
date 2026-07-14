@@ -4,8 +4,10 @@ import { supabase } from '@platform/db';
 import { simon } from '../agents/simon/index.js';
 import { findSuspendedRun, resumeFromReply } from './newsletterGate.js';
 import { simonFailureMessage } from '../lib/simonFailureMessage.js';
+import { createLogger } from '../lib/logger.js';
 import type { ConvMessage } from './types.js';
 
+const log = createLogger('signal-listener');
 const client = new SignalClient();
 
 // Bound Simon's reply so a hung model or runaway tool chain can't leave a
@@ -59,7 +61,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 
   const senderName = await resolveSenderName(sourceNumber, senderNumber);
 
-  console.log(`[signal-listener] Message from ${senderName} (${senderNumber}): ${userMessage.slice(0, 80)}`);
+  log.info({ senderName, senderNumber, preview: userMessage.slice(0, 80) }, 'message received');
 
   // Newsletter gate intercept: if this sender has a newsletter run suspended at
   // a human gate, treat the reply as the gate response and resume that run
@@ -67,14 +69,14 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   try {
     const suspendedRun = await findSuspendedRun(senderNumber);
     if (suspendedRun) {
-      console.log(`[signal-listener] Routing reply to suspended newsletter run ${suspendedRun.runId}`);
+      log.info({ runId: suspendedRun.runId }, 'routing reply to suspended newsletter run');
       void client.sendTypingIndicator(senderNumber).catch(() => {});
       const ack = await resumeFromReply(suspendedRun, userMessage);
       await client.sendMessage({ recipients: [senderNumber], message: ack });
       return;
     }
   } catch (err) {
-    console.error('[signal-listener] Newsletter gate handling failed, falling through to Simon:', err);
+    log.error({ err }, 'newsletter gate handling failed, falling through to Simon');
   }
 
   // Ensure agent_conversations row exists for dual-write
@@ -96,7 +98,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
       .single();
 
     if (error || !created) {
-      console.error('[signal-listener] Failed to create conversation:', error);
+      log.error({ error }, 'failed to create conversation');
       return;
     }
     conv = created;
@@ -104,7 +106,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
 
   // Fire-and-forget typing indicator — failure must not block message processing
   void client.sendTypingIndicator(senderNumber).catch((err) => {
-    console.warn('[signal-listener] Typing indicator failed (non-fatal):', err);
+    log.warn({ err }, 'typing indicator failed (non-fatal)');
   });
 
   // Generate Simon's response via Mastra Memory (handles history retrieval, token limiting, etc.)
@@ -122,12 +124,9 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
       },
     });
     responseText = result.text;
-    console.log(
-      `[signal-listener] Simon response (${responseText.length} chars):`,
-      responseText.slice(0, 300),
-    );
+    log.info({ length: responseText.length, preview: responseText.slice(0, 300) }, 'Simon response');
   } catch (err) {
-    console.error('[signal-listener] Simon error:', err);
+    log.error({ err }, 'Simon error');
     responseText = simonFailureMessage(err, controller.signal.aborted);
   } finally {
     clearTimeout(timer);
@@ -137,7 +136,7 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
   try {
     await client.sendMessage({ recipients: [senderNumber], message: responseText });
   } catch (err) {
-    console.error('[signal-listener] Send error:', err);
+    log.error({ err }, 'send error');
   }
 
   // Dual-write: keep agent_conversations populated for web UI
@@ -179,19 +178,19 @@ async function handleMessage(envelope: IncomingMessage): Promise<void> {
       clarifications: null,
       notes: null,
     });
-    if (auditError) console.error('[signal-listener] Failed to insert audit log:', auditError);
+    if (auditError) log.error({ error: auditError }, 'failed to insert audit log');
   } catch (err) {
-    console.error('[signal-listener] Failed to insert audit log:', err);
+    log.error({ err }, 'failed to insert audit log');
   }
 }
 
 export function startSignalListener(): void {
   if (process.env['SIGNAL_LISTENER_ENABLED'] === 'false') {
-    console.log('[signal-listener] Disabled via SIGNAL_LISTENER_ENABLED=false');
+    log.info('disabled via SIGNAL_LISTENER_ENABLED=false');
     return;
   }
-  console.log('[signal-listener] Connecting to Signal via WebSocket');
+  log.info('connecting to Signal via WebSocket');
   client.subscribe(handleMessage, (err) => {
-    console.error('[signal-listener] WebSocket error:', err);
+    log.error({ err }, 'WebSocket error');
   });
 }

@@ -6,6 +6,9 @@ import {
   type GateStepId,
 } from '../workflows/strategy/run.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('strategy-gate-web');
 
 // Web launch + approval path for the Campaign Strategy workflow's two gates. The
 // /campaigns wizard can't reach the agents server over HTTP, so it writes the
@@ -59,7 +62,7 @@ export async function handleStrategyGateRow(row: StrategyGateRow): Promise<void>
   // Launch: a 'start' decision on a campaign with no run yet.
   if (!row.workflow_run_id && isStartDecision(row.pending_decision)) {
     if (!(await claim())) return;
-    console.log('[strategy-gate-web] Starting strategy run for campaign', row.id);
+    log.info({ campaignId: row.id }, 'starting strategy run for campaign');
     await startStrategyRun({ campaignId: row.id });
     return;
   }
@@ -74,11 +77,11 @@ export async function handleStrategyGateRow(row: StrategyGateRow): Promise<void>
 
   if (!(await claim())) return;
   if (!resumeData) {
-    console.error('[strategy-gate-web] Invalid decision for', row.id, row.pending_decision);
+    log.error({ campaignId: row.id, decision: row.pending_decision }, 'invalid decision');
     return;
   }
 
-  console.log('[strategy-gate-web] Resuming', row.workflow_run_id, 'at', step);
+  log.info({ runId: row.workflow_run_id, step }, 'resuming');
   await resumeStrategyRun({ runId: row.workflow_run_id, step: step as GateStepId, resumeData });
 }
 
@@ -99,17 +102,17 @@ export async function backfillPendingDecisions(): Promise<void> {
     .select('id, status, workflow_run_id, gate_state, pending_decision')
     .not('pending_decision', 'is', null);
   if (error) {
-    console.error('[strategy-gate-web] Backfill scan failed:', error.message);
+    log.error({ error: error.message }, 'backfill scan failed');
     return;
   }
   const rows = (data ?? []) as StrategyGateRow[];
   if (rows.length === 0) return;
-  console.log(`[strategy-gate-web] Backfill: processing ${rows.length} pending decision(s)`);
+  log.info({ count: rows.length }, 'backfill: processing pending decision(s)');
   for (const row of rows) {
     try {
       await handleStrategyGateRow(row);
     } catch (err) {
-      console.error('[strategy-gate-web] Backfill error for campaign', row.id, err);
+      log.error({ err, campaignId: row.id }, 'backfill error for campaign');
     }
   }
 }
@@ -125,7 +128,7 @@ export function startStrategyGateWebListener(): void {
     channelName: 'strategy-gate-web',
     logPrefix: '[strategy-gate-web]',
     onSubscribed: () => {
-      console.log('[strategy-gate-web] Listening for web gate decisions via Supabase Realtime');
+      log.info('listening for web gate decisions via Supabase Realtime');
       // Once per process, after the subscription is live (so the scan can't race
       // a write that lands during boot): recover any decision missed while down.
       if (!didBackfill) {
@@ -142,7 +145,7 @@ export function startStrategyGateWebListener(): void {
             if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
             await handleStrategyGateRow(payload.new);
           } catch (err) {
-            console.error('[strategy-gate-web] Error handling gate decision:', err);
+            log.error({ err }, 'error handling gate decision');
           }
         },
       ),
