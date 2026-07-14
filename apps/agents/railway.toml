@@ -7,8 +7,13 @@ dockerfilePath = "apps/agents/Dockerfile"
 # assumes the Railway service has at least ~1 GB RAM — set it below the
 # container's memory limit, or the OS OOM-killer will SIGKILL the process
 # (a harder failure than a V8 heap error). Lower this if the instance is smaller.
+#
+# --disable-warning=DEP0040 silences the punycode DeprecationWarning emitted by
+# transitive deps that `require` the deprecated built-in `punycode` module
+# (uri-js via ajv; tr46 via node-fetch's whatwg-url@5). It targets only that one
+# warning, so genuine deprecation warnings from our own code still surface.
 [deploy]
-startCommand = "node --max-old-space-size=512 .mastra/output/index.mjs"
+startCommand = "node --max-old-space-size=512 --disable-warning=DEP0040 .mastra/output/index.mjs"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"

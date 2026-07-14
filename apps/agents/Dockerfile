@@ -41,4 +41,6 @@ EXPOSE 3000
 # startCommand in railway.toml, which overrides this CMD on Railway. 512 MB
 # assumes the container has at least ~1 GB RAM — keep it below the memory limit
 # or the OS OOM-killer will SIGKILL the process instead.
-CMD ["node", "--max-old-space-size=512", ".mastra/output/index.mjs"]
+# --disable-warning=DEP0040 silences the punycode DeprecationWarning from
+# transitive deps that require the deprecated built-in `punycode` module.
+CMD ["node", "--max-old-space-size=512", "--disable-warning=DEP0040", ".mastra/output/index.mjs"]
