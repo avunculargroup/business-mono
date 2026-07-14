@@ -1,5 +1,5 @@
 # ── Stage 1: Install dependencies ────────────────────────────────────────────
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
@@ -25,7 +25,7 @@ COPY . .
 RUN pnpm exec turbo run build --filter=@platform/agents...
 
 # ── Stage 3: Runtime ──────────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 WORKDIR /app
 
