@@ -14,6 +14,17 @@ export type SearchTranscriptsResult =
 const MIN_QUERY_LENGTH = 3;
 const RESULT_COUNT = 20;
 
+// Cosine-similarity floor for a hit. The RPC's own default is 0.5, which is far
+// too high for this corpus: transcript_segments are long (~2.3k chars), so a
+// short query embeds to a point that lands well below 0.5 even against segments
+// that are squarely on topic — within-topic segment-to-segment pairs top out
+// around 0.70, and a keyword query scores lower still. At 0.5 a search for a
+// single common term like "Bitcoin" returns nothing despite ~40% of segments
+// mentioning it. Results are ranked and capped at RESULT_COUNT, so a low floor
+// surfaces the best moments while still letting a genuinely off-topic query
+// come back empty.
+const MATCH_THRESHOLD = 0.2;
+
 // "Ask the library" — semantic search across ingested transcript_segments.
 // Embeds the query with the ingestion pipeline's model and runs the pgvector
 // RPC (the same retrieval Rex uses), returning one row per matching segment so
@@ -35,6 +46,7 @@ export async function searchTranscripts(query: string): Promise<SearchTranscript
     const { data, error } = await supabase.rpc('vector_search_transcripts', {
       // pgvector serialises the float array to its text form on the wire.
       query_embedding: embedding as unknown as string,
+      match_threshold: MATCH_THRESHOLD,
       match_count: RESULT_COUNT,
     });
     if (error) throw new Error(`Transcript vector search failed: ${error.message}`);
