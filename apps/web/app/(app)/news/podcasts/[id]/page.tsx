@@ -6,8 +6,17 @@ import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EpisodeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EpisodeDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string }>;
+}) {
   const { id } = await params;
+  // Deep-link from transcript search: ?t=<seconds> seeks the media on arrival.
+  const { t } = await searchParams;
+  const initialSeek = t != null && /^\d+$/.test(t) ? Number(t) : null;
   const supabase = await createClient();
 
   const { data: episode } = await supabase.from('podcast_episodes').select('*').eq('id', id).single();
@@ -38,6 +47,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
         episode={ep}
         segments={(segments ?? []) as unknown as TranscriptSegment[]}
         sourceName={sourceName}
+        initialSeek={initialSeek}
       />
     </>
   );

@@ -1,9 +1,10 @@
 # Podcast & Episode pages
 
-Reference for the web UI at `/news/podcasts` (the ingestion dashboard) and
-`/news/podcasts/[id]` (a single episode). This document describes the **current
-state** of the UX and UI only — the ingestion pipeline itself lives in
-`apps/agents` and is specced in `docs/podcast-ingestion-spec.md`.
+Reference for the web UI at `/news/podcasts` (the ingestion dashboard),
+`/news/podcasts/[id]` (a single episode), and `/news/podcasts/search` (semantic
+transcript search). This document describes the **current state** of the UX and
+UI only — the ingestion pipeline itself lives in `apps/agents` and is specced in
+`docs/podcast-ingestion-spec.md`.
 
 Both pages are server components that read from Supabase and hand data to a
 client component. They live under the authenticated `app/(app)/` shell, in the
@@ -17,13 +18,20 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 | `page.tsx` | Server component for the dashboard. Fetches the three data sets, aggregates per-feed health, renders `PodcastDashboard`. |
 | `PodcastDashboard.tsx` | Client component. All dashboard UI: KPIs, charts, feed health, recent grid, filterable table, ingest modal. |
 | `podcasts.module.css` | Dashboard styles. |
-| `[id]/page.tsx` | Server component for one episode. Fetches the episode, its transcript segments, and its source name. |
-| `[id]/EpisodeDetail.tsx` | Client component. Header + actions, media, description, transcript, provenance sidebar. |
+| `[id]/page.tsx` | Server component for one episode. Fetches the episode, its transcript segments, and its source name; reads `?t=<seconds>` and passes it as `initialSeek`. |
+| `[id]/EpisodeDetail.tsx` | Client component. Header + actions, media, description, transcript (with in-transcript find + copy-with-citation), provenance sidebar. |
 | `[id]/detail.module.css` | Episode styles. |
 | `[id]/EpisodeDetail.test.tsx` | Component tests for the episode view. |
+| `search/page.tsx` | Server component for the transcript search page. Renders `PageHeader` + `TranscriptSearch`. |
+| `search/TranscriptSearch.tsx` | Client component. Query box + ranked segment results with timestamped deep-links. |
+| `search/search.module.css` | Search page styles. |
+| `search/TranscriptSearch.test.tsx` | Component tests for the search UI. |
 | `../../../components/podcasts/` | Shared media components: `MediaEmbed`, `YouTubeFacade`, `AudioPlayer`. |
-| `../../../lib/podcasts.ts` | Client-safe helpers: video-ID parsing, HTML→text, timestamp formatting, status/source label + colour maps. |
+| `../../../lib/podcasts.ts` | Client-safe helpers: video-ID parsing, HTML→text, timestamp formatting, status/source label + colour maps, Deepgram spend estimate (`estimateDeepgramCost`, `formatAud`), and in-transcript highlight (`highlightText`). |
+| `../../../lib/openaiEmbedding.ts` | Server-only query embedding (`embedQuery`) via the OpenAI REST endpoint — used by transcript search. |
 | `../../../app/actions/podcasts.ts` | Server actions: `requestEpisodeAction`, `ingestEpisodeBrief`. |
+| `../../../app/actions/podcastSearch.ts` | Server action: `searchTranscripts` (embed query → `transcriptVectorSearch` RPC). |
+| `packages/db/src/rpc/transcriptSearch.ts` | `transcriptVectorSearch` wrapper over the `vector_search_transcripts` pgvector RPC. |
 | `packages/shared/src/podcasts.ts` | `TranscriptStatus`, `TranscriptSource`, `IngestionOrigin`, `PodcastEpisode`, `TranscriptSegment` types. |
 
 ## Data model (as the UI sees it)
@@ -54,9 +62,11 @@ form), and `manual`.
 
 ## Dashboard page — `/news/podcasts`
 
-Titled **"Podcast ingestion"**. This is a monitoring surface, not a media
-library: it answers "is ingestion healthy, what's it costing, and what needs my
-attention?" The server component (`page.tsx`) issues three parallel queries:
+Titled **"Podcast ingestion"**, with a **"Search transcripts"** link in the
+`PageHeader` → the transcript search page. This is a monitoring surface, not a
+media library: it answers "is ingestion healthy, what's it costing, and what
+needs my attention?" The server component (`page.tsx`) issues three parallel
+queries:
 
 1. `v_podcast_ingestion_status` — one row per episode with source + status
    (the monitoring view).
@@ -71,19 +81,34 @@ to bottom inside a single centred column (`max-width: var(--content-max-width)`,
 
 ### 1. KPI row
 
-Four cards across the top (`grid`, 4 columns, collapsing to 2 columns under
-880px). Each card is icon + big mono number + uppercase label:
+Five cards across the top (`grid`, collapsing to 2 columns under 880px). Each
+card is icon + big mono number + uppercase label:
 
 - **Episodes** — total count. This is the *headline* card: its icon and value
   use the gold accent (`--color-accent-dark`) while the others stay neutral.
 - **Transcripts available** — count of `available`.
+- **In research index** — count of episodes with `embedded_at` set. "Available"
+  means a transcript is stored; "in research index" means it is embedded and so
+  actually retrievable by search and by Rex. The gap between the two is a silent
+  hole in the searchable library, so it gets its own card.
 - **In progress** — count of `resolving` + `transcribing`.
 - **Needs attention** — count of `failed` + `skipped`.
 
 Counts are computed client-side with `useMemo` over the (optimistic) episode
 list, so they update instantly when a row action fires.
 
-### 2. Charts row
+### 2. Needs a decision (triage lane)
+
+Rendered **only when non-empty**: a compact worklist of `failed` + `skipped`
+episodes — the ones that stalled without a transcript. Each row shows the linked
+title, a source chip, the status chip, and the reason inline (the stored
+`transcript_error` for `failed`; "No free transcript; Deepgram was off for this
+feed." for `skipped`), with the one relevant action per row: **Retry** for
+`failed`, **Transcribe with Deepgram** for `skipped`. Actions are optimistic,
+like the table rows. This is the "close the loop from the Signal ping" surface —
+act on the stalled episodes without hunting for them behind a table filter.
+
+### 3. Charts row
 
 Two side-by-side panels (collapse to stacked under 880px).
 
@@ -96,13 +121,21 @@ gold and green."* Each segment has a hover `title` with its exact count, and a
 legend below lists all four with counts. Zero-width segments are dropped from
 the bar but kept in the legend. Empty state: "No episodes ingested yet."
 
+Beneath the gauge, an **estimated Deepgram spend** readout: `A$X.XX this month ·
+A$X.XX all time` (mono figures). Deepgram is billed *per minute of audio*, so
+counting episodes hides that one 3-hour episode costs more than ten short ones;
+this sums `duration_seconds` of `deepgram`-sourced episodes × a per-minute rate
+(`DEEPGRAM_COST_PER_MINUTE_AUD` in `lib/podcasts.ts` — a display estimate, not a
+billing figure). "This month" buckets on `created_at` as a proxy for when the
+transcription ran.
+
 **"Ingested over 30 days"** — a hand-rolled SVG area chart of episodes ingested
 per day (bucketed by `created_at` over the trailing 30 days). Gold line over a
 faint gold fill (`--color-accent-glow`), with the first and last date labels on
 a mono axis. The hint — *"A gap means the daily routine did not run"* — frames
 it as an uptime check. Empty state: "No ingestion history yet."
 
-### 3. Feed health
+### 4. Feed health
 
 Only rendered when there are `podcast`/`youtube` sources. A responsive grid of
 cards (`auto-fill`, min 220px), one per feed:
@@ -114,7 +147,7 @@ cards (`auto-fill`, min 220px), one per feed:
 - Stats line: `N episodes · N% transcribed` (mono numerals).
 - `Last run <relative time>` from the source's `last_scanned_at`, or "never".
 
-### 4. Recent episodes
+### 5. Recent episodes
 
 Rendered when at least one episode has playable media. A grid (`auto-fill`, min
 240px) of up to **4** cards, sorted by recency (`published_at`, falling back to
@@ -124,7 +157,7 @@ Each card is an inline `MediaEmbed` (click-to-play video facade, or a native
 is the one spot on the dashboard that leans "media library"; the title links to
 the episode detail page.
 
-### 5. All episodes (filterable table)
+### 6. All episodes (filterable table)
 
 The main working surface.
 
@@ -136,7 +169,9 @@ The main working surface.
   `topic_tags`). Filters compose and are applied client-side via `useMemo`.
 - **`DataTable`** with columns: **Episode** (title + a source chip beneath),
   **Published** (date or em-dash), **Status** (`StatusChip`), **Transcript**
-  (source label or em-dash), **Duration** (right-aligned mono `M:SS`/`H:MM:SS`).
+  (source label or em-dash — with a subtle `· not indexed` marker when the
+  transcript is `available` but has no `embedded_at`), **Duration**
+  (right-aligned mono `M:SS`/`H:MM:SS`).
 - **Row click** navigates to `/news/podcasts/[id]`.
 - **Row actions menu** (`RowActionsMenu`), conditional per row:
   - *Fetch transcript* — re-runs the whole waterfall (always present).
@@ -153,7 +188,7 @@ surfaces an error. The action writes `pending_action` + `transcript_status =
 Supabase Realtime and actually re-runs the pipeline (the web app can't reach the
 agent server over HTTP).
 
-### 6. "Ingest an episode" modal
+### 7. "Ingest an episode" modal
 
 A `Modal` (size `md`) holding the brief form for ad-hoc ingestion:
 
@@ -211,7 +246,10 @@ One of two treatments, chosen by whether a YouTube video ID can be parsed from
   feed-supplied value until the element reports its own metadata.
 
 The `audioRef`/video start state is owned by `EpisodeDetail` so transcript
-timestamps can seek the same element.
+timestamps can seek the same element. Arriving with a `?t=<seconds>` query param
+(the deep-link the search page emits) seeks that same element **once on mount**
+via the `initialSeek` prop — opening the video facade at the moment, or seeking
+and playing the audio.
 
 ### Description
 
@@ -233,10 +271,19 @@ column under 800px (where the sidebar stops being sticky).
   **timestamp button** and an optional uppercase **speaker** label above the
   text. Clicking a timestamp seeks the audio player or deep-links the video
   (revealing the facade's real iframe and jumping to that moment). Timestamp
-  buttons are disabled when there's no playable media.
+  buttons are disabled when there's no playable media. Each segment also has a
+  hover-revealed **copy-with-citation** button that writes
+  `"…quote…" — Speaker, Episode title @ MM:SS` to the clipboard.
 - `available` with only **plain text** (no segments) → the text split on blank
   lines into paragraphs.
 - `available` but nothing stored → "Transcript text is not available."
+
+When a transcript is available, a **find-in-transcript** bar sits above it: a
+literal (case-insensitive) substring search that highlights matches (`<mark>`),
+shows an `N / M` count, and steps through them with prev/next (each scrolls the
+active match into view). While a find is active the clamp is dropped so matches
+below the fold are reachable. A **"Copy transcript"** action in the transcript
+header copies the whole body with a title citation.
 
 Long transcripts are **clamped to 480px** with a fade-out gradient at the
 bottom; a **"Show full transcript" / "Show less"** toggle (chevron rotates)
@@ -249,6 +296,46 @@ came from and its processing state: **Source** (transcript source label),
 origin), **Fetched** (datetime), **Embedded** (datetime), and **Duration** (mono,
 when known). Below the list, when present: a **Curator note** block (the "why"
 from a brief) and a wrap of **topic tags**.
+
+---
+
+## Transcript search — `/news/podcasts/search`
+
+Titled **"Search transcripts"**, back link → the dashboard. Semantic ("ask the
+library") search across every ingested transcript, giving the embedding pipeline
+a UI: `transcript_segments` are embedded on ingest, but until this page nothing
+in the web app queried them.
+
+- **`search/page.tsx`** is a thin server component; **`TranscriptSearch.tsx`** is
+  the client component holding the query box and results. Submitting calls the
+  `searchTranscripts` server action inside a `useTransition` (the Search button
+  shows a loading state; the button is disabled until the query is ≥ 3 chars).
+- **`searchTranscripts`** (`app/actions/podcastSearch.ts`) embeds the query with
+  `embedQuery` (`lib/openaiEmbedding.ts` → OpenAI `text-embedding-3-small`, 1536
+  dims, the same model the ingestion pipeline used so the vectors are
+  comparable), then runs `transcriptVectorSearch` (the `vector_search_transcripts`
+  pgvector RPC, joined back to the episode + source). It returns one row per
+  matching **segment** — not best-per-episode — so each result can deep-link to
+  its exact moment. This is the same retrieval Rex uses via his
+  `query_transcripts` tool.
+- **Results** are cards: linked episode title, a `NN% match` (cosine similarity,
+  mono), source + published date, the matched passage (with the speaker prefixed
+  when known), and a **"Play at MM:SS"** link → `/news/podcasts/{id}?t={start}`
+  (the episode page seeks the media to that second on arrival). Segments with no
+  timestamp show "Open episode" instead.
+- **States:** an initial prompt (`EmptyState`) before any search; a humane error
+  note if the action fails (e.g. the key is unset or OpenAI errors); and a
+  "No matching passages" empty state when nothing clears the similarity
+  threshold.
+
+> **Scope.** This is the minimum (retrieval + deep-links) version — the "P0-2"
+> item from `docs/reviews/podcast-pages-review`. The elevated RAG
+> *answer-with-citations* and the Lex compliance gate for client-facing prose are
+> deliberately **not** built here; see that review for the roadmap.
+
+**Environment.** The search action needs `OPENAI_API_KEY` in the web app's
+server environment (Vercel). Without it, `searchTranscripts` returns a humane
+error rather than throwing; the rest of the podcast pages are unaffected.
 
 ---
 
@@ -267,6 +354,10 @@ from a brief) and a wrap of **topic tags**.
 - **Responsive breakpoints:** dashboard reflows at 880px (KPIs → 2-up, charts →
   stacked); episode reflows at 800px (single column, sidebar unstuck) and 767px
   (tighter padding, stacked header, full-width artwork).
-- **Tests:** `[id]/EpisodeDetail.test.tsx` and
-  `components/podcasts/AudioPlayer.test.tsx` cover the interactive pieces
-  (`pnpm --filter @platform/web test`).
+- **Search needs a key:** transcript search calls OpenAI to embed the query, so
+  the web app's server environment needs `OPENAI_API_KEY`. It degrades to a
+  humane error when absent; nothing else on these pages depends on it.
+- **Tests:** `[id]/EpisodeDetail.test.tsx`,
+  `search/TranscriptSearch.test.tsx`, `lib/openaiEmbedding.test.ts`,
+  `lib/podcasts.test.ts`, and `components/podcasts/AudioPlayer.test.tsx` cover the
+  interactive and pure pieces (`pnpm --filter @platform/web test`).

@@ -1,6 +1,9 @@
+import Link from 'next/link';
+import { Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PodcastDashboard, type DashboardEpisode, type FeedHealth } from './PodcastDashboard';
+import styles from './podcasts.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +83,12 @@ export default async function PodcastsPage() {
 
   return (
     <>
-      <PageHeader title="Podcast ingestion" />
+      <PageHeader title="Podcast ingestion">
+        <Link href="/news/podcasts/search" className={styles.headerLink}>
+          <Search size={16} strokeWidth={1.5} />
+          Search transcripts
+        </Link>
+      </PageHeader>
       <PodcastDashboard episodes={episodes} feeds={feeds} />
     </>
   );
