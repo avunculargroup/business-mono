@@ -10,8 +10,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/providers/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
+const generateEpisodeBrief = vi.fn(async () => ({ success: true }));
+const decideEpisodeBrief = vi.fn(async () => ({ success: true }));
 vi.mock('@/app/actions/podcasts', () => ({
   requestEpisodeAction: vi.fn(async () => ({})),
+  generateEpisodeBrief: (...args: unknown[]) => generateEpisodeBrief(...(args as [])),
+  decideEpisodeBrief: (...args: unknown[]) => decideEpisodeBrief(...(args as [])),
 }));
 
 // jsdom implements neither of these; the in-transcript find effect calls
@@ -55,6 +59,12 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
     topic_tags: [],
     transcript_fetched_at: null,
     embedded_at: null,
+    episode_summary: null,
+    summary_status: 'none',
+    summary_lex_verdict: null,
+    summary_generated_at: null,
+    summary_approved_at: null,
+    summary_approved_by: null,
     created_by: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -229,5 +239,78 @@ describe('EpisodeDetail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy quote with citation' }));
     expect(writeText).toHaveBeenCalledWith('"Custody matters." — Guest, Sound money weekly @ 1:15');
+  });
+
+  describe('episode brief', () => {
+    beforeEach(() => {
+      generateEpisodeBrief.mockClear();
+      decideEpisodeBrief.mockClear();
+    });
+
+    it('offers a Generate brief action once a transcript is available', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available' })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Generate brief' }));
+      expect(generateEpisodeBrief).toHaveBeenCalledWith('ep-1');
+    });
+
+    it('does not offer a brief action when there is no transcript yet', () => {
+      render(<EpisodeDetail episode={makeEpisode({ transcript_status: 'skipped' })} segments={[]} sourceName={null} />);
+
+      expect(screen.queryByRole('button', { name: 'Generate brief' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Episode brief')).not.toBeInTheDocument();
+    });
+
+    it('shows a proposed draft with its compliance verdict and approve/reject controls', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'proposed',
+            episode_summary: 'The host discussed board-level custody decisions.',
+            summary_lex_verdict: {
+              passes: false,
+              flags: [{ quote: 'a buying opportunity', issue: 'reads as a buy signal' }],
+              rationale: 'One phrase frames the market as advice.',
+              suggested_rewrite: null,
+            },
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('The host discussed board-level custody decisions.')).toBeInTheDocument();
+      expect(screen.getByText('Draft · team only')).toBeInTheDocument();
+      expect(screen.getByText('Compliance needs review')).toBeInTheDocument();
+      expect(screen.getByText(/reads as a buy signal/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Approve and publish' }));
+      expect(decideEpisodeBrief).toHaveBeenCalledWith('ep-1', 'approve');
+    });
+
+    it('renders an approved brief without draft controls', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('A concise, published brief.')).toBeInTheDocument();
+      expect(screen.queryByText('Draft · team only')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve and publish' })).not.toBeInTheDocument();
+    });
   });
 });

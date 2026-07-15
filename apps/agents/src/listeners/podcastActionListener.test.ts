@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createFakeSupabase, type FakeSupabaseClient } from '../../test/mocks/supabase.js';
 
-// Shared fake client + reResolve spy, wired through the module mocks below.
+// Shared fake client + reResolve/runEpisodeIntel spies, wired through the module
+// mocks below.
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const reResolveSpy = vi.fn(async () => undefined);
+const runEpisodeIntelSpy = vi.fn(async () => undefined);
 
 vi.mock('@platform/db', () => ({
   createRealtimeClient: () => fakeSupabase,
@@ -17,6 +19,9 @@ vi.mock('../lib/transcripts/reResolve.js', () => ({
         : null,
   reResolveEpisode: reResolveSpy,
 }));
+vi.mock('../workflows/podcastIntel/index.js', () => ({
+  runEpisodeIntel: runEpisodeIntelSpy,
+}));
 
 const { handleEpisodeActionRow, reconcilePendingActions } = await import(
   './podcastActionListener.js'
@@ -25,6 +30,7 @@ const { handleEpisodeActionRow, reconcilePendingActions } = await import(
 describe('handleEpisodeActionRow', () => {
   beforeEach(() => {
     reResolveSpy.mockClear();
+    runEpisodeIntelSpy.mockClear();
     fakeSupabase.from.mockClear();
     fakeSupabase.__responses.clear();
     fakeSupabase.__builders.length = 0;
@@ -39,6 +45,17 @@ describe('handleEpisodeActionRow', () => {
     expect(builder?.update).toHaveBeenCalledWith({ pending_action: null });
     expect(builder?.not).toHaveBeenCalledWith('pending_action', 'is', null);
     expect(reResolveSpy).toHaveBeenCalledWith('ep-1', { forceDeepgram: true });
+  });
+
+  it('claims a summarize action and runs the intelligence pass', async () => {
+    fakeSupabase.__setResponse('podcast_episodes', { data: [{ id: 'ep-1' }], error: null });
+
+    await handleEpisodeActionRow({ id: 'ep-1', pending_action: 'summarize' });
+
+    const builder = fakeSupabase.__buildersFor('podcast_episodes')[0];
+    expect(builder?.update).toHaveBeenCalledWith({ pending_action: null });
+    expect(runEpisodeIntelSpy).toHaveBeenCalledWith('ep-1');
+    expect(reResolveSpy).not.toHaveBeenCalled();
   });
 
   it('does not re-resolve when the claim affects no row (already taken)', async () => {

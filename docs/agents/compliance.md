@@ -70,3 +70,23 @@ decides `needs_disclaimer`, and selects a keyed `compliance_snippets` disclaimer
 - Its verdict is persisted on the `content_item` (the variant) and logged to
   `agent_activity` under `lex` by the workflow's persist step — advisory only;
   the human decides at Gate 3.
+
+## Third use: podcast episode summaries (episode intelligence)
+
+Lex is also the gate for the **podcast episode intelligence** pass
+(`apps/agents/src/workflows/podcastIntel/`, review P0-1). The moment BTS
+generates a summary of a third-party podcast for a client surface, it is
+publishing synthesised commentary about financial matters — so every summary
+routes through Lex before it can be published.
+
+- Same persona, and the **content-review verdict shape** (`complianceVerdictSchema`
+  = passes / flags / rationale / suggested_rewrite) — a summary is prose, like a
+  content draft. Prompt: `workflows/podcastIntel/prompts.ts → buildSummaryLexPrompt`.
+- Lex checks the summary reads as **neutral description** of what the speakers
+  said ("the host argued…"), never as a BTS buy/sell/price call.
+- Model resolves via the `podcast_intel.compliance_check` step scope first, then
+  `lex`. Fail-safe: on error the verdict is `passes:false` (route to a human).
+- The verdict is stored on `podcast_episodes.summary_lex_verdict` (shown to the
+  director at the approval wall) and logged to `agent_activity` under `lex`.
+  Advisory only — the summary stays behind the publish-wall
+  (`summary_status = 'proposed'`) until a human approves it.

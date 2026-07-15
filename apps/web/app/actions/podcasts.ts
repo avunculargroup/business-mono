@@ -75,3 +75,69 @@ export async function ingestEpisodeBrief(formData: FormData) {
   revalidatePath(REVALIDATE);
   return { success: true, id: (data as { id: string }).id };
 }
+
+// ── Episode intelligence (Phase 1: summary) ──────────────────────────────────
+
+// Request the episode-intelligence pass. Writes pending_action = 'summarize';
+// the agents server's podcastActionListener claims it and runs roger → Lex →
+// persist a `proposed` summary (the web app can't reach the agent server over
+// HTTP). Also (re)generates when a proposed draft is rejected or revised.
+export async function generateEpisodeBrief(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('podcast_episodes')
+    .update({ pending_action: 'summarize' } as never)
+    .eq('id', id);
+
+  if (error) return { error: humanizeError(error) };
+  revalidatePath(`/news/podcasts/${id}`);
+  return { success: true };
+}
+
+// Approve or reject a proposed summary (the publish-wall). Approval is a plain
+// DB flip — no agent round-trip — since nothing runs after approval. Guarded to
+// only act on a `proposed` draft so an empty summary can't be published.
+export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reject') {
+  if (decision !== 'approve' && decision !== 'reject') return { error: 'Unknown decision.' };
+
+  const supabase = await createClient();
+  const { data: current, error: readErr } = await supabase
+    .from('podcast_episodes')
+    .select('summary_status')
+    .eq('id', id)
+    .single();
+  if (readErr) return { error: humanizeError(readErr) };
+  if ((current as { summary_status?: string } | null)?.summary_status !== 'proposed') {
+    return { error: 'This episode has no summary awaiting a decision.' };
+  }
+
+  const patch =
+    decision === 'approve'
+      ? await (async () => {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          return {
+            summary_status: 'approved',
+            summary_approved_at: new Date().toISOString(),
+            summary_approved_by: user?.id ?? null,
+          };
+        })()
+      : {
+          summary_status: 'none',
+          episode_summary: null,
+          summary_lex_verdict: null,
+          summary_generated_at: null,
+          summary_approved_at: null,
+          summary_approved_by: null,
+        };
+
+  const { error } = await supabase
+    .from('podcast_episodes')
+    .update(patch as never)
+    .eq('id', id);
+
+  if (error) return { error: humanizeError(error) };
+  revalidatePath(`/news/podcasts/${id}`);
+  return { success: true };
+}

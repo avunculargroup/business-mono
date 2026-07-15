@@ -2170,6 +2170,17 @@ CREATE TABLE podcast_episodes (
   topic_tags            TEXT[] NOT NULL DEFAULT '{}',
   transcript_fetched_at TIMESTAMPTZ,
   embedded_at           TIMESTAMPTZ,
+  -- Web-requested re-run / intelligence action; claimed atomically by
+  -- podcastActionListener (see 20260607000000 + 20260716010000).
+  pending_action        TEXT CHECK (pending_action IN ('refetch','deepgram','retry','summarize')),
+  -- Episode intelligence (Phase 1: summary). The draft lives in episode_summary;
+  -- summary_status gates client visibility (publish-wall). See 20260716010000.
+  episode_summary       TEXT,
+  summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','proposed','approved')),
+  summary_lex_verdict   JSONB,
+  summary_generated_at  TIMESTAMPTZ,
+  summary_approved_at   TIMESTAMPTZ,
+  summary_approved_by   UUID REFERENCES team_members(id),
   fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
   created_by            UUID REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),

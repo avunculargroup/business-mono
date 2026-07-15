@@ -45,6 +45,29 @@ export const IngestionOrigin = {
 } as const;
 export type IngestionOrigin = (typeof IngestionOrigin)[keyof typeof IngestionOrigin];
 
+// Lifecycle of an episode's synthesised brief (episode intelligence, Phase 1).
+// The draft text lives in episode_summary throughout; this status is the
+// publish-wall: only 'approved' is client-visible.
+//   none → proposed        (roger drafts, lex reviews — director-only)
+//   proposed → approved     (a human approves at the wall)
+//   proposed → none         (a human rejects; draft is cleared)
+export const SummaryStatus = {
+  NONE:     'none',
+  PROPOSED: 'proposed',
+  APPROVED: 'approved',
+} as const;
+export type SummaryStatus = (typeof SummaryStatus)[keyof typeof SummaryStatus];
+
+// Lex's structured verdict on a proposed summary, stored on the episode row so
+// the director sees the compliance signal at the approval wall. Mirrors the
+// content-review ComplianceVerdict shape in apps/agents compliance.
+export interface SummaryComplianceVerdict {
+  passes: boolean;
+  flags: { quote: string; issue: string }[];
+  rationale: string;
+  suggested_rewrite: string | null;
+}
+
 // One ingested episode. Mirrors the podcast_episodes table (embedding columns
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
@@ -76,6 +99,14 @@ export interface PodcastEpisode {
   topic_tags: string[];
   transcript_fetched_at: string | null;
   embedded_at: string | null;
+  // Episode intelligence (Phase 1: summary). The draft lives in episode_summary
+  // the whole time; summary_status gates whether it is client-visible.
+  episode_summary: string | null;
+  summary_status: SummaryStatus;
+  summary_lex_verdict: SummaryComplianceVerdict | null;
+  summary_generated_at: string | null;
+  summary_approved_at: string | null;
+  summary_approved_by: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
