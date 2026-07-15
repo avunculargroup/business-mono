@@ -437,6 +437,15 @@ export const queryNewsItems = createTool({
 // query_transcripts — podcast/episode transcript segments (RAG)
 // ============================================================
 
+// Cosine-similarity floor for a transcript hit. transcriptVectorSearch defaults
+// to 0.5, which is far too high for this corpus: transcript_segments are long
+// (~2.3k chars), so a query embeds well below 0.5 cosine even against on-topic
+// segments (within-topic segment pairs top out ~0.70, keyword queries lower
+// still). At 0.5 a search for a common term like "Bitcoin" returns nothing.
+// Results are ranked and capped by `limit`, so a low floor surfaces the best
+// moments while an off-topic query still comes back empty.
+const TRANSCRIPT_MATCH_THRESHOLD = 0.2;
+
 // Build a deep-link to the moment a segment occurs: YouTube uses a &t= seek,
 // audio uses a #t= media fragment. Null when neither URL is known.
 function transcriptDeepLink(
@@ -470,6 +479,7 @@ export const queryTranscripts = createTool({
     const embedding = embRes.data[0]?.embedding ?? [];
 
     const rows = await transcriptVectorSearch(embedding, {
+      threshold: TRANSCRIPT_MATCH_THRESHOLD,
       count: context.limit ?? 10,
       days: context.days,
     });
