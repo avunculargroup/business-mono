@@ -27,9 +27,11 @@ interface Props {
   episode: PodcastEpisode;
   segments: TranscriptSegment[];
   sourceName: string | null;
+  // Deep-link arrival second (from transcript search ?t=): seek the media once.
+  initialSeek?: number | null;
 }
 
-export function EpisodeDetail({ episode, segments, sourceName }: Props) {
+export function EpisodeDetail({ episode, segments, sourceName, initialSeek = null }: Props) {
   const router = useRouter();
   const { success, error } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -125,6 +127,15 @@ export function EpisodeDetail({ episode, segments, sourceName }: Props) {
       void audioRef.current.play();
     }
   };
+
+  // Arriving from transcript search (?t=): seek the media to that moment once.
+  const seekedRef = useRef(false);
+  useEffect(() => {
+    if (seekedRef.current || initialSeek == null) return;
+    seekedRef.current = true;
+    seekTo(initialSeek);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSeek]);
 
   const runAction = async (action: 'refetch' | 'deepgram' | 'retry', label: string) => {
     setPending(true);

@@ -365,6 +365,19 @@
   white-space: nowrap;
 }
 
+.headerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.headerLink:hover {
+  color: var(--color-accent-hover);
+}
+
 /* ── Episode list ── */
 
 .listHead {
