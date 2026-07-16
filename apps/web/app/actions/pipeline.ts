@@ -117,7 +117,7 @@ export async function getPipelineItems() {
     .neq('status', 'archived')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // Normalise for the board's row type: title null → ''; research_links is a
   // jsonb column typed loosely as Json — assert the link-array shape.
   return (data ?? []).map((row) => ({
@@ -162,6 +162,6 @@ export async function getPainPointsForPicker() {
     .select('id, content, interview_id, discovery_interviews(contact_id, contacts(first_name, last_name))')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }

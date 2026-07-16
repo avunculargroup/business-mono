@@ -167,7 +167,7 @@ export async function getTemplates() {
     .select('*, mvp_template_versions(*)')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // tags is a nullable text[] (normalise null → []); each version's content is a
   // jsonb column typed loosely as Json — assert the object shape the view uses.
   return (data ?? []).map((row) => ({
@@ -188,7 +188,7 @@ export async function getTemplate(id: string) {
     .order('version_number', { referencedTable: 'mvp_template_versions', ascending: false })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return {
     ...data,
     tags: data.tags ?? [],

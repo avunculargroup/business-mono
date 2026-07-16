@@ -63,7 +63,7 @@ export async function getChampions(filters?: {
   if (filters?.company_id) query = query.eq('company_id', filters.company_id);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
@@ -78,7 +78,7 @@ export async function getChampion(id: string) {
     .eq(idColumn(id), id)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data;
 }
 
@@ -161,7 +161,7 @@ export async function getChampionEvents(championId: string) {
     .eq('champion_id', championId)
     .order('event_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 

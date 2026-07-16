@@ -103,7 +103,7 @@ export async function getFeedback() {
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // tags is a nullable text[]; normalise null → []. sentiment is a jsonb column
   // typed loosely as Json — assert the structured shape the list view renders.
   return (data ?? []).map((row) => ({

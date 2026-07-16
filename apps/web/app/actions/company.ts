@@ -24,7 +24,7 @@ export async function getCompanyRecordTypes(): Promise<CompanyRecordType[]> {
     .select('*')
     .order('category')
     .order('sort_order');
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // content_type is a plain text column the app models as the CompanyContentType
   // enum — assert the narrower shape at the read boundary.
   return (data ?? []) as CompanyRecordType[];
@@ -100,7 +100,7 @@ export async function getCompanyRecords(): Promise<CompanyRecord[]> {
     .select('*, type:company_record_types(*)')
     .order('display_order')
     .order('created_at');
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // The joined record type's content_type is a plain text column modelled as an
   // enum — assert the narrower shape at the read boundary.
   return (data ?? []) as CompanyRecord[];
@@ -239,7 +239,7 @@ export async function getDomains(): Promise<CompanyDomain[]> {
     .select('*')
     .order('renewal_date', { nullsFirst: false })
     .order('name');
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
@@ -312,7 +312,7 @@ export async function getSubscriptions(): Promise<CompanySubscription[]> {
     .from('company_subscriptions')
     .select('*')
     .order('business');
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // payment_type is a plain text column the app models as SubscriptionPaymentType
   // — assert the narrower shape at the read boundary.
   return (data ?? []) as CompanySubscription[];

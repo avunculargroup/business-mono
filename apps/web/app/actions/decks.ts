@@ -21,7 +21,7 @@ export async function getDecks(): Promise<DeckRow[]> {
     .select('*')
     .eq('org_id', ORG_ID)
     .order('updated_at', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 

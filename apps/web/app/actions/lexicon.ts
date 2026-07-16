@@ -92,6 +92,6 @@ export async function getLexiconEntries() {
     .select('*, created_by_member:team_members!corporate_lexicon_created_by_fkey(full_name), approved_by_member:team_members!corporate_lexicon_approved_by_fkey(full_name)')
     .order('term', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }

@@ -1,6 +1,25 @@
 # Review: Web App (`apps/web`) — Refactoring Opportunities
 
-**Date:** 2026-07-16 · **Status:** review only — nothing here is implemented yet.
+**Date:** 2026-07-16 · **Status:** in progress — implementation underway (see Progress log).
+
+## Progress log
+
+Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work lands.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| 1. Finish `getAuthedClient()` migration | ☐ todo | |
+| 2. One error contract for server actions | ☑ done | 2026-07-16 — 21 raw `throw new Error(error.message)` across 12 read helpers now throw `humanizeError(error)`; `podcastSearch.ts` re-throws the original error so its existing catch humanizes with the Postgres `code` intact. Typecheck + 271 web tests green. |
+| 3. Delete stale type-cast escape hatches | ◐ in progress | |
+| 4. Shared form hook + field components | ☐ todo | |
+| 5. Promote shared form stylesheet | ☐ todo | |
+| 6. Shared CRUD list-page scaffold | ☐ todo | |
+| 7. Shared parse/map helpers for CRUD actions | ☐ todo | |
+| 8. One set of Supabase client factories | ☐ todo | |
+| 9. Centralise status→label/color maps | ☐ todo | |
+| 10. Decompose the three giant client views | ☐ todo | |
+| 11. Shared reference-data fetchers + revalidation | ☐ todo | |
+| 12. Board abstraction | ☐ todo | deferred until a 4th board appears |
 
 ## Context
 

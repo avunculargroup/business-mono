@@ -161,7 +161,7 @@ export async function getDocuments() {
     .select('*, document_versions(*)')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // Each version's content is a jsonb column typed loosely as Json — assert the
   // object shape the view uses.
   return (data ?? []).map((row) => ({
@@ -181,7 +181,7 @@ export async function getDocument(id: string) {
     .order('version_number', { referencedTable: 'document_versions', ascending: false })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return {
     ...data,
     document_versions: data.document_versions.map((v) => ({

@@ -113,7 +113,7 @@ export async function getInterviews() {
     .select('*, contacts(id, first_name, last_name, job_title, role), companies(id, name)')
     .order('interview_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // pain_points is a nullable text[] column; normalise null → [] so the list
   // view's row type stays non-null.
   return (data ?? []).map((row) => ({ ...row, pain_points: row.pain_points ?? [] }));
@@ -127,6 +127,6 @@ export async function getInterview(id: string) {
     .order('changed_at', { referencedTable: 'pain_point_log', ascending: true })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data;
 }

@@ -49,7 +49,8 @@ export async function searchTranscripts(query: string): Promise<SearchTranscript
       match_threshold: MATCH_THRESHOLD,
       match_count: RESULT_COUNT,
     });
-    if (error) throw new Error(`Transcript vector search failed: ${error.message}`);
+    // Let the shared catch humanize the PostgREST error with its code intact.
+    if (error) throw error;
     return { results: (data ?? []) as TranscriptSearchHit[] };
   } catch (err) {
     return { error: humanizeError(err) };

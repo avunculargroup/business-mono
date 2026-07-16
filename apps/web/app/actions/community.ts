@@ -53,7 +53,7 @@ export async function getCommunityEntries(filters?: {
   if (filters?.industry_tag)      query = query.contains('industry_tags', [filters.industry_tag]);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
