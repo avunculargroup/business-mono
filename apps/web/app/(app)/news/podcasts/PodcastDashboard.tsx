@@ -90,13 +90,6 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
   // source-count gauge hides. See estimateDeepgramCost for the rate/assumptions.
   const spend = useMemo(() => estimateDeepgramCost(episodes), [episodes]);
 
-  // "Needs a decision" worklist: failed + skipped episodes, acted on in place.
-  // Reuses the in-memory list so a resolved row leaves the lane optimistically.
-  const triage = useMemo(
-    () => episodes.filter((e) => NEEDS_ATTENTION.includes(e.transcript_status)),
-    [episodes],
-  );
-
   const sourceBreakdown = useMemo(() => {
     let feedTag = 0;
     let youtube = 0;
@@ -253,50 +246,6 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
           value={kpis.needsAttention}
         />
       </div>
-
-      {/* ── Triage: failed / skipped episodes to act on ── */}
-      {triage.length > 0 && (
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Needs a decision</h2>
-          <p className={styles.panelHint}>Episodes that stalled without a transcript. Resolve them here.</p>
-          <div className={styles.triageList}>
-            {triage.map((e) => (
-              <div key={e.id} className={styles.triageRow}>
-                <div className={styles.triageMain}>
-                  <Link href={`/news/podcasts/${e.id}`} className={styles.triageTitle}>
-                    {e.title}
-                  </Link>
-                  <div className={styles.triageSub}>
-                    {e.source_name && <span className={styles.sourceChip}>{e.source_name}</span>}
-                    <StatusChip
-                      label={TRANSCRIPT_STATUS_LABELS[e.transcript_status]}
-                      color={TRANSCRIPT_STATUS_COLORS[e.transcript_status]}
-                    />
-                    <span className={styles.triageReason}>
-                      {e.transcript_status === 'failed'
-                        ? e.transcript_error ?? 'Every transcript source errored.'
-                        : 'No free transcript; Deepgram was off for this feed.'}
-                    </span>
-                  </div>
-                </div>
-                {e.transcript_status === 'failed' ? (
-                  <Button variant="secondary" size="sm" onClick={() => runAction(e.id, 'retry', 'Retrying')}>
-                    Retry
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => runAction(e.id, 'deepgram', 'Submitting to Deepgram')}
-                  >
-                    Transcribe with Deepgram
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       <div className={styles.chartsRow}>
         {/* ── Transcript-source breakdown / spend gauge ── */}

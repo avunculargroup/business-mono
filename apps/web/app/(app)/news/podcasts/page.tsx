@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Search, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PodcastDashboard, type DashboardEpisode, type FeedHealth } from './PodcastDashboard';
@@ -81,9 +81,18 @@ export default async function PodcastsPage() {
     };
   });
 
+  const needsDecision = episodes.filter(
+    (e) => e.transcript_status === 'failed' || e.transcript_status === 'skipped',
+  ).length;
+
   return (
     <>
       <PageHeader title="Podcast ingestion">
+        <Link href="/news/podcasts/decisions" className={styles.headerLink}>
+          <AlertTriangle size={16} strokeWidth={1.5} />
+          Needs a decision
+          {needsDecision > 0 && <span className={styles.headerBadge}>{needsDecision}</span>}
+        </Link>
         <Link href="/news/podcasts/search" className={styles.headerLink}>
           <Search size={16} strokeWidth={1.5} />
           Search transcripts
