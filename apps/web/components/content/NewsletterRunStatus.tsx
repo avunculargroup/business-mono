@@ -61,9 +61,7 @@ export function NewsletterRunStatus() {
   const [stepLabel, setStepLabel] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    // newsletter_runs isn't in the web Database types yet — cast at the boundary.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = createClient() as any;
+    const supabase = createClient();
     // Active runs always show; terminal notices only if recent so old failures
     // don't haunt the page forever.
     const cutoff = new Date(Date.now() - NOTICE_WINDOW_MS).toISOString();
@@ -97,9 +95,7 @@ export function NewsletterRunStatus() {
       setStepLabel(null);
       return;
     }
-    // workflow_progress isn't in the web Database types yet — cast at the boundary.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = createClient() as any;
+    const supabase = createClient();
     const { data } = await supabase
       .from('workflow_progress')
       .select('step_label')

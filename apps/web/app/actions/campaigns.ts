@@ -1,5 +1,6 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -13,11 +14,6 @@ import { humanizeError } from '@/lib/errors';
 //   * Campaign Strategy gates 1 & 2 — campaigns.pending_decision
 //     (strategyGateWeb listener): a { decision: 'start' } launches the run, a
 //     gate resume payload advances it.
-//
-// The campaign tables + gate columns aren't in the generated web Database types
-// until db:generate-types runs post-migration — cast at the boundary.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyDb = { from: (t: string) => any };
 
 // ── Variant Gate 3 (Step 6) ───────────────────────────────────────────────────
 
@@ -39,7 +35,7 @@ export async function submitVariantGateDecision(
     return { error: 'Tell Charlie what to change before requesting a revision.' };
   }
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
   const { error } = await supabase
     .from('content_items')
     .update({ pending_decision: parsed.data })
@@ -73,7 +69,7 @@ export async function createCampaignDraft(
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid campaign' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('campaigns')
     .insert({
@@ -115,7 +111,7 @@ export async function launchCampaignStrategy(
   const parsed = cadenceSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid cadence' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
 
   const { data: campaign } = await supabase
     .from('campaigns')
@@ -200,7 +196,7 @@ export async function submitCampaignGateDecision(
   const parsed = gateDecisionSchema.safeParse(decision);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid decision' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
   const { data: campaign } = await supabase
     .from('campaigns')
     .select('status, gate_state, workflow_run_id')
@@ -245,7 +241,7 @@ export async function markVariantPosted(
   const parsed = markPostedSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid URL' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('content_items')
     .update({
@@ -295,7 +291,7 @@ export async function editVariantCopy(
   if (isThread && segments.length === 0) return { error: 'A thread needs at least one segment.' };
   if (!isThread && !body) return { error: 'The post body cannot be empty.' };
 
-  const supabase = (await createClient()) as unknown as AnyDb;
+  const supabase = await createClient();
 
   const { data: existing } = await supabase
     .from('content_items')
@@ -305,7 +301,7 @@ export async function editVariantCopy(
   if (!existing) return { error: 'Variant not found.' };
 
   // Patch the suspended preview's copy so the editor reflects the edit at once.
-  const gateState = (existing as { gate_state: { preview?: Record<string, unknown> } | null }).gate_state;
+  const gateState = (existing as { gate_state: { preview?: Record<string, Json> } | null }).gate_state;
   const patchedGate =
     gateState?.preview != null
       ? {
@@ -375,7 +371,7 @@ export async function savePostMetrics(
   const {
     data: { user },
   } = await client.auth.getUser();
-  const supabase = client as unknown as AnyDb;
+  const supabase = client;
 
   const { error } = await supabase.from('post_metrics').upsert(
     {
@@ -421,7 +417,7 @@ export async function promotePostToSnippet(
   const {
     data: { user },
   } = await client.auth.getUser();
-  const supabase = client as unknown as AnyDb;
+  const supabase = client;
 
   // The post's account + platform anchor the snippet to that voice.
   const { data: item } = await supabase

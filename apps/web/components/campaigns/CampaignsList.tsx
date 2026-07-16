@@ -53,9 +53,7 @@ export function CampaignsList({ initialCampaigns }: { initialCampaigns: Overview
   const [campaigns, setCampaigns] = useState(initialCampaigns);
 
   const refresh = useCallback(async () => {
-    // v_campaign_overview isn't in the web Database types yet — cast at the boundary.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = createClient() as any;
+    const supabase = createClient();
     const { data } = await supabase.from('v_campaign_overview').select('*');
     setCampaigns((data as OverviewRow[] | null) ?? []);
   }, []);

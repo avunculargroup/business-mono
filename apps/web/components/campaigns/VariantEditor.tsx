@@ -33,7 +33,7 @@ interface GatePreview {
   rationale: string;
 }
 
-interface GateState {
+export interface GateState {
   gate: string;
   contentItemId: string;
   preview: GatePreview;

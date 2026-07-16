@@ -134,9 +134,7 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
       setStepLabel(null);
       return;
     }
-    // workflow_progress isn't in the web Database types yet — cast at the boundary.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = createClient() as any;
+    const supabase = createClient();
     const { data } = await supabase
       .from('workflow_progress')
       .select('step_label')

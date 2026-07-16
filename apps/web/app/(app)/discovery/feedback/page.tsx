@@ -10,8 +10,7 @@ export default async function FeedbackPage() {
     getFeedback(),
     supabase.from('contacts').select('id, first_name, last_name').order('last_name'),
     supabase.from('companies').select('id, name').order('name'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('pain_points').select('id, content, interview_id').order('created_at', { ascending: false }),
+    supabase.from('pain_points').select('id, content, interview_id').order('created_at', { ascending: false }),
   ]);
 
   return (

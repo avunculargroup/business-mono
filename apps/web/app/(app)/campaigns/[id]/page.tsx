@@ -17,12 +17,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const supabase = await createClient();
 
-  // campaign gate columns aren't in the generated web types until db:generate-types
-  // runs post-migration — cast at the boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
-  const { data } = await db
+  const { data } = await supabase
     .from('campaigns')
     .select(
       'id, slug, name, objective, status, strategy, schedule_plan, gate_state, pending_decision, workflow_run_id',
@@ -45,13 +40,13 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   let published: PublishedItem[] = [];
   if (planLocked) {
     const [{ data: beatData }, { data: matrixData }, { data: publishedData }] = await Promise.all([
-      db
+      supabase
         .from('campaign_beats')
         .select('id, sequence, title, core_message, rationale, prefer_thread')
         .eq('campaign_id', campaignId)
         .order('sequence', { ascending: true }),
-      db.from('v_campaign_matrix').select('*').eq('campaign_id', id),
-      db
+      supabase.from('v_campaign_matrix').select('*').eq('campaign_id', id),
+      supabase
         .from('content_items')
         .select(
           'id, title, body, type, is_thread, published_url, social_accounts(display_name), post_metrics(impressions, reactions, comments, reposts, clicks)',
@@ -61,7 +56,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         .order('published_at', { ascending: false }),
     ]);
     beats = (beatData ?? []) as BeatRow[];
-    matrix = (matrixData ?? []) as MatrixRow[];
+    // v_campaign_matrix.slug (added by the human-friendly-slugs migration) isn't
+    // in the generated Database types yet, so the view row lacks it — assert the
+    // component shape at the boundary.
+    matrix = (matrixData ?? []) as unknown as MatrixRow[];
     // Flatten the nested account + metrics relations into the component shape.
     published = (
       (publishedData ?? []) as Array<{
