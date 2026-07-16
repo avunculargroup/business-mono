@@ -8,6 +8,7 @@ import styles from './ContactForm.module.css';
 
 type CompanyRow = {
   id: string;
+  slug: string;
   name: string;
   industry: string | null;
   size: string | null;

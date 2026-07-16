@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ContentEditor } from '@/components/content/ContentEditor';
+import { idColumn } from '@/lib/utils';
 
 export default async function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -10,7 +11,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
   const { data: item } = await supabase
     .from('content_items')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!item) notFound();
@@ -19,7 +20,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
     ? await supabase
         .from('thread_segments')
         .select('id, body')
-        .eq('content_item_id', id)
+        .eq('content_item_id', item.id)
         .order('sequence', { ascending: true })
     : { data: null };
 

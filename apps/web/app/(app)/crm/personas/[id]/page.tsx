@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PersonaDetail } from '@/components/crm/PersonaDetail';
+import { idColumn } from '@/lib/utils';
 import type { Persona } from '@platform/shared';
 
 export default async function PersonaDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -11,7 +12,7 @@ export default async function PersonaDetailPage({ params }: { params: Promise<{ 
   const { data: persona } = await supabase
     .from('personas')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!persona) notFound();

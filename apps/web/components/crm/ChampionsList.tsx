@@ -25,6 +25,7 @@ type CompanyJoin  = { id: string; name: string } | null;
 
 export type ChampionRow = {
   id: string;
+  slug: string;
   contact_id: string;
   company_id: string | null;
   role_type: string;
@@ -189,12 +190,12 @@ export function ChampionsList({ initialChampions, contacts, companies }: Champio
         columns={columns}
         data={filtered}
         rowKey={(row) => row.id}
-        onRowClick={(row) => router.push(`/crm/champions/${row.id}`)}
+        onRowClick={(row) => router.push(`/crm/champions/${row.slug}`)}
         rowActions={(row) => [
           {
             label: 'View',
             icon: <Eye size={14} strokeWidth={1.5} />,
-            onClick: () => router.push(`/crm/champions/${row.id}`),
+            onClick: () => router.push(`/crm/champions/${row.slug}`),
           },
           {
             label: 'Remove designation',

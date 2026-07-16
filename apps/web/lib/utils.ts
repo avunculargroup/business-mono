@@ -68,3 +68,16 @@ export function formatTimeInTz(dateStr: string, tz: string = DEFAULT_TIMEZONE): 
 export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+// Detail-page route params now carry a human-friendly slug, but old bookmarked
+// UUID links must keep working. Picks the column to filter a lookup on: the raw
+// UUID resolves by `id`, anything else by `slug`.
+export function idColumn(value: string): 'id' | 'slug' {
+  return isUuid(value) ? 'id' : 'slug';
+}

@@ -27,6 +27,7 @@ import styles from './podcasts.module.css';
 
 export interface DashboardEpisode {
   id: string;
+  slug: string;
   title: string;
   published_at: string | null;
   transcript_status: TranscriptStatus;
@@ -312,7 +313,7 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
               <div key={e.id} className={styles.recentCard}>
                 <MediaEmbed youtubeUrl={e.youtube_url} audioUrl={e.audio_url} title={e.title} />
                 <div className={styles.recentMeta}>
-                  <Link href={`/news/podcasts/${e.id}`} className={styles.recentTitle}>
+                  <Link href={`/news/podcasts/${e.slug}`} className={styles.recentTitle}>
                     {e.title}
                   </Link>
                   <div className={styles.recentSub}>
@@ -356,7 +357,7 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
           columns={columns}
           data={filtered}
           rowKey={(e) => e.id}
-          onRowClick={(e) => router.push(`/news/podcasts/${e.id}`)}
+          onRowClick={(e) => router.push(`/news/podcasts/${e.slug}`)}
           rowActions={rowActions}
           emptyState={<span>No episodes match these filters.</span>}
         />

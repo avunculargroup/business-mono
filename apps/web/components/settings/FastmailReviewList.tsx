@@ -10,6 +10,7 @@ import styles from './FastmailReviewList.module.css';
 
 export type ReviewContact = {
   id: string;
+  slug: string;
   first_name: string | null;
   last_name: string | null;
   email: string | null;
@@ -72,7 +73,7 @@ export function FastmailReviewList({ contacts }: { contacts: ReviewContact[] }) 
               >
                 Approve as lead
               </Button>
-              <Link href={`/crm/contacts/${contact.id}`}>
+              <Link href={`/crm/contacts/${contact.slug}`}>
                 <Button variant="secondary" size="sm">View in CRM</Button>
               </Link>
               <div className={styles.rejectGroup}>

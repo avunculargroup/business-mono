@@ -62,6 +62,7 @@ export type Database = {
       }
       advisors_partners: {
         Row: {
+          slug: string
           active: boolean
           bio: string | null
           company_id: string | null
@@ -80,6 +81,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          slug?: string | null
           active?: boolean
           bio?: string | null
           company_id?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          slug?: string | null
           active?: boolean
           bio?: string | null
           company_id?: string | null
@@ -492,6 +495,7 @@ export type Database = {
       }
       campaigns: {
         Row: {
+          slug: string
           audience_filter: Json
           audience_persona: string | null
           created_at: string
@@ -517,6 +521,7 @@ export type Database = {
           workflow_run_id: string | null
         }
         Insert: {
+          slug?: string | null
           audience_filter?: Json
           audience_persona?: string | null
           created_at?: string
@@ -542,6 +547,7 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Update: {
+          slug?: string | null
           audience_filter?: Json
           audience_persona?: string | null
           created_at?: string
@@ -663,6 +669,7 @@ export type Database = {
       }
       champions: {
         Row: {
+          slug: string
           champion_score: number
           company_id: string | null
           contact_id: string
@@ -675,6 +682,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           champion_score?: number
           company_id?: string | null
           contact_id: string
@@ -687,6 +695,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           champion_score?: number
           company_id?: string | null
           contact_id?: string
@@ -787,6 +796,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          slug: string
           country: string | null
           created_at: string
           created_by: string | null
@@ -801,6 +811,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          slug?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -815,6 +826,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          slug?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -1039,6 +1051,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          slug: string
           bitcoin_literacy: string | null
           company_id: string | null
           created_at: string
@@ -1060,6 +1073,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           bitcoin_literacy?: string | null
           company_id?: string | null
           created_at?: string
@@ -1081,6 +1095,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           bitcoin_literacy?: string | null
           company_id?: string | null
           created_at?: string
@@ -1232,6 +1247,7 @@ export type Database = {
       }
       content_items: {
         Row: {
+          slug: string
           approved_at: string | null
           approved_by: string | null
           assigned_to: string | null
@@ -1272,6 +1288,7 @@ export type Database = {
           workflow_run_id: string | null
         }
         Insert: {
+          slug?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
@@ -1312,6 +1329,7 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Update: {
+          slug?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
@@ -1548,6 +1566,7 @@ export type Database = {
       }
       decks: {
         Row: {
+          slug: string
           aspect_ratio: string
           created_at: string
           created_by: string | null
@@ -1560,6 +1579,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          slug?: string | null
           aspect_ratio?: string
           created_at?: string
           created_by?: string | null
@@ -1572,6 +1592,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          slug?: string | null
           aspect_ratio?: string
           created_at?: string
           created_by?: string | null
@@ -1701,6 +1722,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          slug: string
           created_at: string
           created_by: string | null
           description: string | null
@@ -1711,6 +1733,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1721,6 +1744,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2442,6 +2466,7 @@ export type Database = {
       }
       mvp_templates: {
         Row: {
+          slug: string
           created_at: string
           created_by: string | null
           description: string | null
@@ -2452,6 +2477,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2462,6 +2488,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2979,6 +3006,7 @@ export type Database = {
       }
       personas: {
         Row: {
+          slug: string
           created_at: string
           created_by: string | null
           estimated_aum: string | null
@@ -2994,6 +3022,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           estimated_aum?: string | null
@@ -3009,6 +3038,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           estimated_aum?: string | null
@@ -3158,6 +3188,7 @@ export type Database = {
       }
       podcast_episodes: {
         Row: {
+          slug: string
           audio_mime_type: string | null
           audio_url: string | null
           created_at: string
@@ -3199,6 +3230,7 @@ export type Database = {
           youtube_url: string | null
         }
         Insert: {
+          slug?: string | null
           audio_mime_type?: string | null
           audio_url?: string | null
           created_at?: string
@@ -3240,6 +3272,7 @@ export type Database = {
           youtube_url?: string | null
         }
         Update: {
+          slug?: string | null
           audio_mime_type?: string | null
           audio_url?: string | null
           created_at?: string
@@ -3470,6 +3503,7 @@ export type Database = {
       }
       products_services: {
         Row: {
+          slug: string
           australian_owned: boolean
           business_name: string | null
           category: string | null
@@ -3485,6 +3519,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
@@ -3500,6 +3535,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
@@ -3540,6 +3576,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          slug: string
           created_at: string
           created_by: string | null
           description: string | null
@@ -3552,6 +3589,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3564,6 +3602,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3994,6 +4033,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          slug: string
           assigned_to: string | null
           completed_at: string | null
           created_at: string
@@ -4015,6 +4055,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          slug?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
@@ -4036,6 +4077,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          slug?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           created_at?: string

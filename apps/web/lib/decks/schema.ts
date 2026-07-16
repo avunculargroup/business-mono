@@ -121,6 +121,7 @@ export interface DeckSlideRow {
 
 export interface DeckRow {
   id: string;
+  slug: string;
   org_id: string;
   title: string;
   theme_id: string;

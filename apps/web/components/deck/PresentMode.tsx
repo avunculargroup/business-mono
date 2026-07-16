@@ -70,7 +70,7 @@ export function PresentMode({ deck, slides }: PresentModeProps) {
     <div className={styles.stage} onMouseMove={handleMouseMove} onClick={next}>
       {/* Mobile-only exit — desktop relies on the Escape key. */}
       <Link
-        href={`/decks/${deck.id}/edit`}
+        href={`/decks/${deck.slug}/edit`}
         className={styles.exit}
         aria-label="Exit presentation"
         onClick={(e) => e.stopPropagation()}

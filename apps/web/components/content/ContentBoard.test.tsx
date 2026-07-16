@@ -24,6 +24,7 @@ type Card = Parameters<typeof ContentBoard>[0]['items'][number];
 
 const baseCard: Card = {
   id: '1',
+  slug: 'why-treasuries-hold-bitcoin',
   title: 'Why treasuries hold Bitcoin',
   type: 'linkedin',
   status: 'draft',

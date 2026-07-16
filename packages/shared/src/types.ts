@@ -1032,6 +1032,7 @@ export interface PersonaSuccessSignals {
 
 export interface Persona {
   id: string;
+  slug: string;
   name: string;
   market_segment: PersonaMarketSegment;
   sophistication_level: PersonaSophisticationLevel;

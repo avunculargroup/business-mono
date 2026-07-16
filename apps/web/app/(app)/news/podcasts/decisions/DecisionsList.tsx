@@ -13,6 +13,7 @@ import styles from '../podcasts.module.css';
 
 export interface DecisionEpisode {
   id: string;
+  slug: string;
   title: string;
   transcript_status: TranscriptStatus;
   transcript_error: string | null;
@@ -62,7 +63,7 @@ export function DecisionsList({ episodes: initial }: { episodes: DecisionEpisode
           {triage.map((e) => (
             <div key={e.id} className={styles.triageRow}>
               <div className={styles.triageMain}>
-                <Link href={`/news/podcasts/${e.id}`} className={styles.triageTitle}>
+                <Link href={`/news/podcasts/${e.slug}`} className={styles.triageTitle}>
                   {e.title}
                 </Link>
                 <div className={styles.triageSub}>

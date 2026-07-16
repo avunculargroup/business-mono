@@ -9,17 +9,22 @@ export default async function PodcastDecisionsPage() {
   const supabase = await createClient();
 
   // Only the stalled episodes — failed or skipped — that need a human decision.
+  // `select('*')` (not an explicit column list) so `slug` — present on the view
+  // at runtime but absent from the generated view type — is readable via the
+  // Record cast below, matching the dashboard page's pattern.
   const { data: rows } = await supabase
     .from('v_podcast_ingestion_status')
-    .select('id, title, transcript_status, transcript_error, source_name')
+    .select('*')
     .in('transcript_status', ['failed', 'skipped']);
 
   const episodes: DecisionEpisode[] = (rows ?? [])
     .filter((r) => (r as { id: string | null }).id)
     .map((r) => {
       const row = r as Record<string, unknown>;
+      const id = row['id'] as string;
       return {
-        id: row['id'] as string,
+        id,
+        slug: (row['slug'] as string) ?? id,
         title: (row['title'] as string) ?? 'Untitled episode',
         transcript_status: (row['transcript_status'] as TranscriptStatus) ?? 'pending',
         transcript_error: (row['transcript_error'] as string | null) ?? null,

@@ -34,7 +34,7 @@ export default async function DecksPage() {
         ) : (
           <div className={styles.grid}>
             {decks.map((deck) => (
-              <Link key={deck.id} href={`/decks/${deck.id}/edit`} className={styles.card}>
+              <Link key={deck.id} href={`/decks/${deck.slug}/edit`} className={styles.card}>
                 <div className={styles.cardPreview}>
                   <span className={styles.cardIcon}>🎞</span>
                 </div>

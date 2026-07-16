@@ -57,6 +57,7 @@ CREATE TABLE team_members (
 
 CREATE TABLE companies (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name          TEXT NOT NULL,
   industry      TEXT,
   size          TEXT,
@@ -78,6 +79,7 @@ CREATE TRIGGER companies_updated_at
 
 CREATE TABLE contacts (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   company_id      UUID REFERENCES companies(id) ON DELETE SET NULL,
   first_name      TEXT NOT NULL,
   last_name       TEXT NOT NULL,
@@ -154,6 +156,7 @@ CREATE INDEX idx_interactions_type ON interactions(type);
 
 CREATE TABLE projects (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name              TEXT NOT NULL,
   description       TEXT,
   status            TEXT NOT NULL DEFAULT 'active'
@@ -174,6 +177,7 @@ CREATE TRIGGER projects_updated_at
 
 CREATE TABLE tasks (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   project_id            UUID REFERENCES projects(id) ON DELETE SET NULL,
   parent_task_id        UUID REFERENCES tasks(id) ON DELETE SET NULL,
 
@@ -221,6 +225,7 @@ CREATE INDEX idx_tasks_parent ON tasks(parent_task_id);
 
 CREATE TABLE content_items (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   title           TEXT,
   body            TEXT,
 
@@ -1211,6 +1216,7 @@ CREATE POLICY "corporate_lexicon_all" ON corporate_lexicon
 
 CREATE TABLE IF NOT EXISTS mvp_templates (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   type        TEXT        NOT NULL CHECK (type IN ('one_pager', 'briefing_deck')),
   title       TEXT        NOT NULL,
   description TEXT,
@@ -1328,6 +1334,7 @@ CREATE TABLE assets (
 
 CREATE TABLE decks (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   org_id       TEXT NOT NULL,
   title        TEXT NOT NULL,
   theme_id     TEXT NOT NULL DEFAULT 'company-default',
@@ -1434,6 +1441,7 @@ CREATE TYPE persona_decision_style AS ENUM (
 
 CREATE TABLE personas (
   id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name                   TEXT         NOT NULL UNIQUE,
   market_segment         persona_market_segment NOT NULL,
   sophistication_level   persona_sophistication_level NOT NULL DEFAULT 'intermediate',
@@ -1581,6 +1589,7 @@ $$;
 
 CREATE TABLE IF NOT EXISTS products_services (
   id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name                 TEXT        NOT NULL,
   company_id           UUID        REFERENCES companies(id) ON DELETE SET NULL,
   business_name        TEXT,
@@ -1632,6 +1641,7 @@ CREATE TABLE IF NOT EXISTS product_key_contacts (
 
 CREATE TABLE IF NOT EXISTS advisors_partners (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name                TEXT        NOT NULL,
   type                TEXT        NOT NULL CHECK (type IN ('advisor', 'partner')),
   company_id          UUID        REFERENCES companies(id) ON DELETE SET NULL,
@@ -1755,6 +1765,7 @@ CREATE POLICY "platform_files_objects_public_select" ON storage.objects
 
 CREATE TABLE IF NOT EXISTS documents (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   type        text NOT NULL CHECK (type IN ('report','proposal','brief','memo','strategy')),
   title       text NOT NULL,
   description text,
@@ -1861,6 +1872,7 @@ CREATE TABLE newsletter_runs (
 
 CREATE TABLE campaigns (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   name                 TEXT NOT NULL,
   objective            TEXT,
   status               TEXT NOT NULL DEFAULT 'draft'
@@ -2081,7 +2093,8 @@ CREATE VIEW v_campaign_overview AS
     COUNT(ci.id) FILTER (WHERE ci.status = 'published')     AS published_count,
     COUNT(ci.id) FILTER (WHERE ci.status = 'approved')      AS approved_count,
     COUNT(ci.id) FILTER (WHERE ci.status IN ('draft', 'review')) AS pending_count,
-    COUNT(ci.id) FILTER (WHERE ci.compliance_status = 'flagged') AS flagged_count
+    COUNT(ci.id) FILTER (WHERE ci.compliance_status = 'flagged') AS flagged_count,
+    c.slug
   FROM campaigns c
   LEFT JOIN content_items ci ON ci.campaign_id = c.id
   GROUP BY c.id
@@ -2093,7 +2106,8 @@ CREATE VIEW v_campaign_matrix AS
     cb.sequence AS beat_sequence, cb.title AS beat_title,
     sa.id AS account_id, sa.display_name AS account_name, sa.platform,
     ci.type, ci.is_thread, ci.status, ci.scheduled_for,
-    ci.compliance_status, ci.compliance_classification, ci.needs_disclaimer, ci.char_count
+    ci.compliance_status, ci.compliance_classification, ci.needs_disclaimer, ci.char_count,
+    ci.slug
   FROM content_items ci
   JOIN campaign_beats cb  ON cb.id = ci.beat_id
   JOIN social_accounts sa ON sa.id = ci.social_account_id
@@ -2142,6 +2156,7 @@ CREATE POLICY "post_metrics_all"        ON post_metrics        FOR ALL USING (au
 -- embeddings live in transcript_segments.
 CREATE TABLE podcast_episodes (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          TEXT NOT NULL UNIQUE,  -- human-friendly URL handle (auto-generated on insert; see 20260716020000 migration)
   source_id             UUID REFERENCES news_sources(id) ON DELETE SET NULL,
   guid                  TEXT NOT NULL,
   title                 TEXT NOT NULL,

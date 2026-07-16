@@ -26,6 +26,7 @@ type EventRow    = { id: string; champion_id: string; event_type: string; event_
 
 export type ChampionDetailData = {
   id: string;
+  slug: string;
   contact_id: string;
   company_id: string | null;
   role_type: string;

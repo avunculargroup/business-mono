@@ -32,6 +32,7 @@ beforeEach(() => {
 function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
   return {
     id: 'ep-1',
+    slug: 'sound-money-weekly',
     source_id: null,
     guid: 'guid-1',
     title: 'Sound money weekly',

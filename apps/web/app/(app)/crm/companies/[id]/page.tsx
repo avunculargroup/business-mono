@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import Link from 'next/link';
 import { PipelineChip } from '@/components/ui/PipelineChip';
+import { idColumn } from '@/lib/utils';
 import styles from './company-detail.module.css';
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,15 +13,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { data: company } = await supabase
     .from('companies')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!company) notFound();
 
   const { data: contacts } = await supabase
     .from('contacts')
-    .select('id, first_name, last_name, pipeline_stage, email')
-    .eq('company_id', id)
+    .select('id, slug, first_name, last_name, pipeline_stage, email')
+    .eq('company_id', company.id)
     .order('first_name');
 
   return (
@@ -61,7 +62,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           {contacts && contacts.length > 0 ? (
             <div className={styles.contactList}>
               {contacts.map((c) => (
-                <Link key={c.id} href={`/crm/contacts/${c.id}`} className={styles.contactRow}>
+                <Link key={c.id} href={`/crm/contacts/${c.slug}`} className={styles.contactRow}>
                   <span className={styles.contactName}>{c.first_name} {c.last_name}</span>
                   <PipelineChip stage={c.pipeline_stage} />
                   <span className={styles.contactEmail}>{c.email || ''}</span>

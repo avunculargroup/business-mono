@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CampaignWorkspace, type CampaignRow, type BeatRow } from '@/components/campaigns/CampaignWorkspace';
 import { CampaignMatrix, type MatrixRow } from '@/components/campaigns/CampaignMatrix';
 import { PublishedPosts, type PublishedItem } from '@/components/campaigns/PublishedPosts';
+import { idColumn } from '@/lib/utils';
 import styles from '../campaigns.module.css';
 
 // Campaign detail / canvas. Renders the strategy summary and drives the two
@@ -24,12 +25,15 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const { data } = await db
     .from('campaigns')
     .select(
-      'id, name, objective, status, strategy, schedule_plan, gate_state, pending_decision, workflow_run_id',
+      'id, slug, name, objective, status, strategy, schedule_plan, gate_state, pending_decision, workflow_run_id',
     )
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .maybeSingle();
   if (!data) notFound();
   const campaign = data as CampaignRow;
+  // Downstream data filters key off the UUID; URLs use the human-friendly slug.
+  const campaignId = campaign.id;
+  const campaignSlug = data.slug as string;
 
   // Once the plan is approved the beats live in campaign_beats — load them for
   // the locked canvas, plus the variant matrix (v_campaign_matrix). Before then
@@ -44,7 +48,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       db
         .from('campaign_beats')
         .select('id, sequence, title, core_message, rationale, prefer_thread')
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaignId)
         .order('sequence', { ascending: true }),
       db.from('v_campaign_matrix').select('*').eq('campaign_id', id),
       db
@@ -52,7 +56,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         .select(
           'id, title, body, type, is_thread, published_url, social_accounts(display_name), post_metrics(impressions, reactions, comments, reposts, clicks)',
         )
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaignId)
         .eq('status', 'published')
         .order('published_at', { ascending: false }),
     ]);
@@ -86,7 +90,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     <>
       <PageHeader title={campaign.name} backHref="/campaigns">
         {matrix.length > 0 && (
-          <Link href={`/campaigns/${id}/queue`} className={styles.queueLink}>
+          <Link href={`/campaigns/${campaignSlug}/queue`} className={styles.queueLink}>
             <Send size={16} strokeWidth={1.5} />
             Ready to post
           </Link>
@@ -95,7 +99,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       <div className={styles.detailStack}>
         <CampaignWorkspace campaign={campaign} beats={beats} />
         <CampaignMatrix rows={matrix} />
-        <PublishedPosts items={published} campaignId={id} />
+        <PublishedPosts items={published} campaignId={campaignId} />
       </div>
     </>
   );
