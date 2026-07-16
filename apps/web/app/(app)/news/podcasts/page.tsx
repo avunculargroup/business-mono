@@ -88,14 +88,18 @@ export default async function PodcastsPage() {
   return (
     <>
       <PageHeader title="Podcast ingestion">
-        <Link href="/news/podcasts/decisions" className={styles.headerLink}>
+        <Link
+          href="/news/podcasts/decisions"
+          className={styles.headerLink}
+          aria-label={`Needs a decision${needsDecision > 0 ? ` (${needsDecision})` : ''}`}
+        >
           <AlertTriangle size={16} strokeWidth={1.5} />
-          Needs a decision
+          <span className={styles.headerLinkLabel}>Needs a decision</span>
           {needsDecision > 0 && <span className={styles.headerBadge}>{needsDecision}</span>}
         </Link>
-        <Link href="/news/podcasts/search" className={styles.headerLink}>
+        <Link href="/news/podcasts/search" className={styles.headerLink} aria-label="Search transcripts">
           <Search size={16} strokeWidth={1.5} />
-          Search transcripts
+          <span className={styles.headerLinkLabel}>Search transcripts</span>
         </Link>
       </PageHeader>
       <PodcastDashboard episodes={episodes} feeds={feeds} />

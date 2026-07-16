@@ -378,6 +378,10 @@
   color: var(--color-accent-hover);
 }
 
+.headerLinkLabel {
+  display: inline;
+}
+
 .headerBadge {
   display: inline-flex;
   align-items: center;
@@ -529,6 +533,19 @@
 @media (max-width: 880px) {
   .kpiRow { grid-template-columns: repeat(2, 1fr); }
   .chartsRow { grid-template-columns: 1fr; }
+}
+
+/* Collapse the header action links to icon-only on mobile so the title +
+   two actions stop crowding the header row. The count badge stays visible. */
+@media (max-width: 767px) {
+  .headerLinkLabel {
+    display: none;
+  }
+
+  .headerLink {
+    min-height: 44px;
+    padding: 0 var(--space-1);
+  }
 }
 
 @media (max-width: 560px) {
