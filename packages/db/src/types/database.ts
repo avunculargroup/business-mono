@@ -3168,6 +3168,7 @@ export type Database = {
           duration_seconds: number | null
           embedded_at: string | null
           episode_number: number | null
+          episode_summary: string | null
           episode_url: string | null
           fts: unknown
           guid: string
@@ -3179,6 +3180,11 @@ export type Database = {
           published_at: string | null
           season: number | null
           source_id: string | null
+          summary_approved_at: string | null
+          summary_approved_by: string | null
+          summary_generated_at: string | null
+          summary_lex_verdict: Json | null
+          summary_status: string
           title: string
           topic_tags: string[]
           transcript_error: string | null
@@ -3203,6 +3209,7 @@ export type Database = {
           duration_seconds?: number | null
           embedded_at?: string | null
           episode_number?: number | null
+          episode_summary?: string | null
           episode_url?: string | null
           fts?: unknown
           guid: string
@@ -3214,6 +3221,11 @@ export type Database = {
           published_at?: string | null
           season?: number | null
           source_id?: string | null
+          summary_approved_at?: string | null
+          summary_approved_by?: string | null
+          summary_generated_at?: string | null
+          summary_lex_verdict?: Json | null
+          summary_status?: string
           title: string
           topic_tags?: string[]
           transcript_error?: string | null
@@ -3238,6 +3250,7 @@ export type Database = {
           duration_seconds?: number | null
           embedded_at?: string | null
           episode_number?: number | null
+          episode_summary?: string | null
           episode_url?: string | null
           fts?: unknown
           guid?: string
@@ -3249,6 +3262,11 @@ export type Database = {
           published_at?: string | null
           season?: number | null
           source_id?: string | null
+          summary_approved_at?: string | null
+          summary_approved_by?: string | null
+          summary_generated_at?: string | null
+          summary_lex_verdict?: Json | null
+          summary_status?: string
           title?: string
           topic_tags?: string[]
           transcript_error?: string | null
@@ -3275,6 +3293,13 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_episodes_summary_approved_by_fkey"
+            columns: ["summary_approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
