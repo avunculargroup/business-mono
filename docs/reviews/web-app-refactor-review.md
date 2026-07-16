@@ -10,7 +10,7 @@ Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work land
 |------|--------|-------|
 | 1. Finish `getAuthedClient()` migration | ☐ todo | |
 | 2. One error contract for server actions | ☑ done | 2026-07-16 — 21 raw `throw new Error(error.message)` across 12 read helpers now throw `humanizeError(error)`; `podcastSearch.ts` re-throws the original error so its existing catch humanizes with the Postgres `code` intact. Typecheck + 271 web tests green. |
-| 3. Delete stale type-cast escape hatches | ◐ in progress | |
+| 3. Delete stale type-cast escape hatches | ☑ done | 2026-07-16 — removed all Database-related `any` casts (read pages/components + `campaigns.ts` `AnyDb`) and every `as never` write-cast in the action files, restoring column/type checking on inserts & updates. Typed `routines.buildActionConfig` → `Json`; asserted three genuine boundaries honestly (see notes below). Standardised the 9 `Database` imports on `@platform/db` and deleted the dead `lib/database.ts`. Left deferred: the `useRealtimeSubscription` channel `as never` casts (hygiene item) and test fixtures. **Surfaced:** `v_campaign_matrix.slug` (human-friendly-slugs migration) is missing from the generated view type — the types lag that migration for this view column; a `pnpm --filter @platform/db generate-types` run would let the `as unknown as MatrixRow[]` narrow revert to a plain assertion. Typecheck + 271 web tests green. |
 | 4. Shared form hook + field components | ☐ todo | |
 | 5. Promote shared form stylesheet | ☐ todo | |
 | 6. Shared CRUD list-page scaffold | ☐ todo | |
