@@ -8,6 +8,7 @@ import styles from './ContactForm.module.css';
 
 type ContactRow = {
   id: string;
+  slug: string;
   first_name: string;
   last_name: string;
   email: string | null;

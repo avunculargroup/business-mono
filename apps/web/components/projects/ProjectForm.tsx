@@ -8,6 +8,7 @@ import styles from '@/components/crm/ContactForm.module.css';
 
 interface CreatedProject {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   status: string;

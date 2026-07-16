@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { TaskDetailActions } from '@/components/tasks/TaskDetailActions';
-import { formatDate, formatRelativeDate } from '@/lib/utils';
+import { formatDate, formatRelativeDate, idColumn } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './task-detail.module.css';
 
@@ -15,7 +15,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const { data: task } = await supabase
     .from('tasks')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!task) notFound();
@@ -29,10 +29,10 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     { data: allContacts },
   ] = await Promise.all([
     task.project_id
-      ? supabase.from('projects').select('id, name').eq('id', task.project_id).single()
+      ? supabase.from('projects').select('id, slug, name').eq('id', task.project_id).single()
       : Promise.resolve({ data: null }),
     task.related_contact_id
-      ? supabase.from('contacts').select('id, first_name, last_name').eq('id', task.related_contact_id).single()
+      ? supabase.from('contacts').select('id, slug, first_name, last_name').eq('id', task.related_contact_id).single()
       : Promise.resolve({ data: null }),
     supabase.from('team_members').select('id, full_name'),
     supabase.from('projects').select('id, name').eq('status', 'active'),
@@ -75,7 +75,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <div className={styles.field}>
               <span className={styles.label}>Project</span>
               {project ? (
-                <Link href={`/projects/${project.id}`}>{project.name}</Link>
+                <Link href={`/projects/${project.slug}`}>{project.name}</Link>
               ) : (
                 <span className={styles.emptyValue}>&mdash;</span>
               )}
@@ -84,7 +84,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <div className={styles.field}>
               <span className={styles.label}>Contact</span>
               {contact ? (
-                <Link href={`/crm/contacts/${contact.id}`}>{contact.first_name} {contact.last_name}</Link>
+                <Link href={`/crm/contacts/${contact.slug}`}>{contact.first_name} {contact.last_name}</Link>
               ) : (
                 <span className={styles.emptyValue}>&mdash;</span>
               )}

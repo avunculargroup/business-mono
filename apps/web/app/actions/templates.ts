@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { idColumn } from '@/lib/utils';
 
 const tmpl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('mvp_templates');
@@ -183,7 +184,7 @@ export async function getTemplate(id: string) {
   const supabase = await createClient();
   const { data, error } = await tmpl(supabase)
     .select('*, mvp_template_versions(*)')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .order('version_number', { referencedTable: 'mvp_template_versions', ascending: false })
     .single();
 

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getDefaultSlideContent, type DeckRow, type DeckSlideRow } from '@/lib/decks/schema';
 import type { SlideType } from '@platform/shared';
 import { humanizeError } from '@/lib/errors';
+import { idColumn } from '@/lib/utils';
 
 const ORG_ID = 'bts';
 
@@ -29,7 +30,7 @@ export async function getDeck(id: string): Promise<DeckRow | null> {
   const { data, error } = await supabase
     .from('decks')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
   if (error) return null;
   return data;
@@ -39,22 +40,25 @@ export async function getDeckWithSlides(
   id: string,
 ): Promise<{ deck: DeckRow; slides: DeckSlideRow[] } | null> {
   const supabase = await createClient();
-  const [deckRes, slidesRes] = await Promise.all([
-    supabase.from('decks').select('*').eq('id', id).single(),
-    supabase
-      .from('deck_slides')
-      .select('*')
-      .eq('deck_id', id)
-      .order('order_index', { ascending: true }),
-  ]);
-  if (deckRes.error || !deckRes.data) return null;
+  const { data: deck, error } = await supabase
+    .from('decks')
+    .select('*')
+    .eq(idColumn(id), id)
+    .single();
+  if (error || !deck) return null;
+  // Slides key off the resolved deck UUID (the route param may be a slug).
+  const slidesRes = await supabase
+    .from('deck_slides')
+    .select('*')
+    .eq('deck_id', deck.id)
+    .order('order_index', { ascending: true });
   // content_json is a jsonb column typed loosely as Json — assert the object
   // shape DeckSlideRow uses.
   const slides: DeckSlideRow[] = (slidesRes.data ?? []).map((s) => ({
     ...s,
     content_json: (s.content_json ?? {}) as Record<string, unknown>,
   }));
-  return { deck: deckRes.data, slides };
+  return { deck, slides };
 }
 
 // ──────────────────────────────────────────────────────────

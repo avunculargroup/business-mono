@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
-import { cn, getInitials, formatDate, formatRelativeDate } from './utils';
+import { cn, getInitials, formatDate, formatRelativeDate, isUuid, idColumn } from './utils';
 
 describe('getInitials', () => {
   it('takes the first letter of the first two words, uppercased', () => {
@@ -35,6 +35,24 @@ describe('cn', () => {
 
   it('returns an empty string when everything is falsy', () => {
     expect(cn(false, null, undefined)).toBe('');
+  });
+});
+
+describe('isUuid / idColumn', () => {
+  const uuid = '9b2e4c1a-5d3f-4a7b-8c9d-0e1f2a3b4c5d';
+
+  it('recognises a canonical UUID', () => {
+    expect(isUuid(uuid)).toBe(true);
+  });
+
+  it('treats a human-friendly slug as not a UUID', () => {
+    expect(isUuid('acme-corp')).toBe(false);
+    expect(isUuid('chris-pollard-1')).toBe(false);
+  });
+
+  it('routes a UUID param to the id column and a slug to the slug column', () => {
+    expect(idColumn(uuid)).toBe('id');
+    expect(idColumn('acme-corp')).toBe('slug');
   });
 });
 

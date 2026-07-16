@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { EpisodeDetail } from './EpisodeDetail';
+import { idColumn } from '@/lib/utils';
 import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export default async function EpisodeDetailPage({
   const initialSeek = t != null && /^\d+$/.test(t) ? Number(t) : null;
   const supabase = await createClient();
 
-  const { data: episode } = await supabase.from('podcast_episodes').select('*').eq('id', id).single();
+  const { data: episode } = await supabase.from('podcast_episodes').select('*').eq(idColumn(id), id).single();
   if (!episode) notFound();
 
   const ep = episode as unknown as PodcastEpisode;
@@ -28,7 +29,7 @@ export default async function EpisodeDetailPage({
     supabase
       .from('transcript_segments')
       .select('id, episode_id, segment_index, start_seconds, end_seconds, speaker, content, token_count, created_at')
-      .eq('episode_id', id)
+      .eq('episode_id', ep.id)
       .order('segment_index', { ascending: true }),
     ep.source_id
       ? supabase

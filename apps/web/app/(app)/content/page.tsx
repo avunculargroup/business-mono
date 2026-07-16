@@ -8,7 +8,7 @@ export default async function ContentPage() {
   const { data: items } = await supabase
     .from('content_items')
     .select(
-      'id, title, type, status, scheduled_for, created_by, campaign_id, social_account_id, campaigns(name), social_accounts(display_name, platform)'
+      'id, slug, title, type, status, scheduled_for, created_by, campaign_id, social_account_id, campaigns(name), social_accounts(display_name, platform)'
     )
     .order('created_at', { ascending: false });
 
@@ -18,6 +18,7 @@ export default async function ContentPage() {
 
   const cards = (items || []).map((item) => ({
     id: item.id,
+    slug: item.slug,
     title: item.title,
     type: item.type,
     status: item.status,

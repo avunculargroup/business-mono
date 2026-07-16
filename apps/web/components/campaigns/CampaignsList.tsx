@@ -14,6 +14,7 @@ import styles from '../../app/(app)/campaigns/campaigns.module.css';
 
 export interface OverviewRow {
   id: string;
+  slug: string;
   name: string;
   objective: string | null;
   status: string;
@@ -91,7 +92,7 @@ export function CampaignsList({ initialCampaigns }: { initialCampaigns: Overview
     <ul className={styles.list}>
       {campaigns.map((c) => (
         <li key={c.id}>
-          <Link href={`/campaigns/${c.id}`} className={styles.card}>
+          <Link href={`/campaigns/${c.slug}`} className={styles.card}>
             <div className={styles.cardHead}>
               <span className={styles.cardName}>{c.name}</span>
               <StatusChip label={STATUS_LABEL[c.status] ?? c.status} color={STATUS_COLOR[c.status] ?? 'neutral'} />

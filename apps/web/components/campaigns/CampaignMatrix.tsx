@@ -13,6 +13,7 @@ import styles from './CampaignMatrix.module.css';
 
 export interface MatrixRow {
   id: string;
+  slug: string;
   beat_id: string | null;
   beat_sequence: number | null;
   beat_title: string | null;
@@ -44,7 +45,7 @@ function formatWhen(scheduledFor: string | null): string {
 
 function StatusCell({ row }: { row: MatrixRow }) {
   return (
-    <Link href={`/campaigns/variants/${row.id}`} className={styles.cellLink}>
+    <Link href={`/campaigns/variants/${row.slug}`} className={styles.cellLink}>
       <StatusChip label={row.status} color={STATUS_COLOR[row.status] ?? 'neutral'} />
       {row.compliance_status === 'flagged' && (
         <Flag size={12} strokeWidth={1.5} className={styles.flag} aria-label="Compliance flagged" />

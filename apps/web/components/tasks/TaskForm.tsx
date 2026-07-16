@@ -20,6 +20,7 @@ interface TaskDefaultValues {
 
 interface CreatedTask {
   id: string;
+  slug: string;
   title: string;
   status: string;
   priority: string;

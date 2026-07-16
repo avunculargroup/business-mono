@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import Link from 'next/link';
-import { formatDate, formatRelativeDate } from '@/lib/utils';
+import { formatDate, formatRelativeDate, idColumn } from '@/lib/utils';
 import styles from '../projects.module.css';
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,15 +14,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { data: project } = await supabase
     .from('projects')
     .select('*')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!project) notFound();
 
   const { data: tasks } = await supabase
     .from('tasks')
-    .select('id, title, status, priority, due_date')
-    .eq('project_id', id)
+    .select('id, slug, title, status, priority, due_date')
+    .eq('project_id', project.id)
     .order('status')
     .order('priority');
 
@@ -54,7 +54,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {tasks.map((task) => (
               <Link
                 key={task.id}
-                href={`/tasks/${task.id}`}
+                href={`/tasks/${task.slug}`}
                 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-border)', textDecoration: 'none', color: 'inherit' }}
               >
                 <span style={{ flex: 1, fontWeight: 500 }}>{task.title}</span>

@@ -21,6 +21,7 @@ import styles from './TasksView.module.css';
 
 type TaskRow = {
   id: string;
+  slug: string;
   title: string;
   status: string;
   priority: string;
@@ -85,7 +86,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
       header: 'Title',
       width: '30%',
       render: (row) => (
-        <Link href={`/tasks/${row.id}`} className={styles.taskLink}>
+        <Link href={`/tasks/${row.slug}`} className={styles.taskLink}>
           {row.title}
         </Link>
       ),

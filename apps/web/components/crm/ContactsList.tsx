@@ -19,6 +19,7 @@ import styles from './ContactsList.module.css';
 
 type ContactRow = {
   id: string;
+  slug: string;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -157,13 +158,13 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
       <DataTable
         columns={columns}
         data={contacts}
-        onRowClick={(row) => router.push(`/crm/contacts/${row.id}`)}
+        onRowClick={(row) => router.push(`/crm/contacts/${row.slug}`)}
         rowKey={(row) => row.id}
         rowActions={(row) => [
           {
             label: 'View',
             icon: <Eye size={14} strokeWidth={1.5} />,
-            onClick: () => router.push(`/crm/contacts/${row.id}`),
+            onClick: () => router.push(`/crm/contacts/${row.slug}`),
           },
           {
             label: 'Edit',

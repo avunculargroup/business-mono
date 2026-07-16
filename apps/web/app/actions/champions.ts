@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { idColumn } from '@/lib/utils';
 
 const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champions');
 const che = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champion_events');
@@ -71,10 +72,10 @@ export async function getChampion(id: string) {
   const { data, error } = await ch(supabase)
     .select(`
       *,
-      contacts(id, first_name, last_name, job_title, email, pipeline_stage),
-      companies(id, name)
+      contacts(id, slug, first_name, last_name, job_title, email, pipeline_stage),
+      companies(id, slug, name)
     `)
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (error) throw new Error(error.message);

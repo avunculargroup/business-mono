@@ -38,6 +38,7 @@ export default async function PodcastsPage() {
       const m = metaById.get(id);
       return {
         id,
+        slug: (row['slug'] as string) ?? id,
         title: (row['title'] as string) ?? 'Untitled episode',
         published_at: (row['published_at'] as string | null) ?? null,
         transcript_status: (row['transcript_status'] as DashboardEpisode['transcript_status']) ?? 'pending',
