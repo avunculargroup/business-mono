@@ -71,7 +71,7 @@ export default async function DashboardPage() {
         <BlockHeight />
         <OpenRouterCredits />
       </div>
-      <TrendValuation latest={onchainLatest ?? []} />
+      <TrendValuation latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
       <OnchainIndicators latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <div className={styles.grid}>

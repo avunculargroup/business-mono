@@ -262,6 +262,38 @@ describe('runMarketReport', () => {
       expect(bitcoin.items[0]).toMatchObject({ label: 'BTC/AUD', delta: null });
     });
 
+    it('renders BTC/USD live, directly below BTC/AUD, from the same adapter', async () => {
+      setOnchain([]);
+      setMacro([]);
+      setBitcoinIndicators([
+        { id: 'ind-aud', key: 'btc_price_aud', short_label: 'BTC/AUD', unit: 'aud', decimals: 2 },
+        { id: 'ind-usd', key: 'btc_price_usd', short_label: 'BTC/USD', unit: 'usd', decimals: 0 },
+      ]);
+      setBitcoinObservations([
+        { indicator_id: 'ind-aud', observed_at: '2026-07-03', value: 140000 },
+        { indicator_id: 'ind-usd', observed_at: '2026-07-03', value: 92000 },
+      ]);
+      // The snapshot keys are mapped in array order (AUD then USD), so the two
+      // coingecko calls resolve in that order.
+      coingeckoFetchLatest
+        .mockResolvedValueOnce({
+          ok: true, observations: [{ observedAt: '2026-07-04', key: 'btc_price_aud', value: 142350, raw: {} }],
+        })
+        .mockResolvedValueOnce({
+          ok: true, observations: [{ observedAt: '2026-07-04', key: 'btc_price_usd', value: 94000, raw: {} }],
+        });
+
+      const out = await runMarketReport(ROUTINE, new Date('2026-07-04T11:00:00Z'));
+
+      expect(out.status).toBe('success');
+      const res = out.market_report_result!;
+      expect(res.bitcoin_count).toBe(2);
+      const bitcoin = res.sections.find((s) => s.heading === 'Bitcoin')!;
+      expect(bitcoin.items.map((i) => i.label)).toEqual(['BTC/AUD', 'BTC/USD']);
+      expect(bitcoin.items[1]).toMatchObject({ label: 'BTC/USD', value: '94,000 USD', as_of: '2026-07-04' });
+      expect(bitcoin.items[1].delta).toContain('▲'); // 94,000 vs stored 92,000
+    });
+
     it('falls back to the last two stored observations when the live fetch fails', async () => {
       setOnchain([]);
       setMacro([]);
