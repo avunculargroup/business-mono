@@ -1,6 +1,7 @@
 # Podcast & Episode pages
 
 Reference for the web UI at `/news/podcasts` (the ingestion dashboard),
+`/news/podcasts/feeds` (the per-show podcasts list with feed health),
 `/news/podcasts/[id]` (a single episode), `/news/podcasts/decisions` (the
 stalled-episode triage worklist), and `/news/podcasts/search` (semantic
 transcript search). This document describes the **current state** of the UX and
@@ -16,9 +17,12 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 
 | File | Role |
 |------|------|
-| `page.tsx` | Server component for the dashboard. Fetches the three data sets, aggregates per-feed health, renders `PodcastDashboard`. |
-| `PodcastDashboard.tsx` | Client component. All dashboard UI: KPIs, charts, feed health, recent grid, filterable table, ingest modal. |
+| `page.tsx` | Server component for the dashboard. Fetches the two data sets and renders `PodcastDashboard`. |
+| `PodcastDashboard.tsx` | Client component. All dashboard UI: KPIs, charts, recent grid, filterable table, ingest modal. |
 | `podcasts.module.css` | Dashboard styles (shared by the decisions page). |
+| `feeds/page.tsx` | Server component for the podcasts list. Aggregates per-feed health + artwork and renders the card grid directly (no client child). |
+| `feeds/feeds.module.css` | Podcasts list styles. |
+| `feeds/page.test.tsx` | Page tests for the podcasts list (query wiring, aggregation, artwork pick, empty state). |
 | `decisions/page.tsx` | Server component for the triage worklist. Fetches only `failed`/`skipped` episodes and renders `DecisionsList`. |
 | `decisions/DecisionsList.tsx` | Client component. The "Needs a decision" lane with optimistic Retry / Deepgram actions. |
 | `[id]/page.tsx` | Server component for one episode. Fetches the episode, its transcript segments, and its source name; reads `?t=<seconds>` and passes it as `initialSeek`. |
@@ -65,23 +69,21 @@ form), and `manual`.
 
 ## Dashboard page — `/news/podcasts`
 
-Titled **"Podcast ingestion"**, with two `PageHeader` links: **"Needs a
-decision"** → the triage worklist (showing a warning-coloured count badge when
-any episode is stalled) and **"Search transcripts"** → the transcript search
-page. This is a monitoring surface, not a media library: it answers "is
-ingestion healthy, what's it costing, and what needs my attention?" The server
-component (`page.tsx`) issues three parallel queries:
+Titled **"Podcast ingestion"**, with three `PageHeader` links: **"Podcasts"** →
+the per-show list with feed health, **"Needs a decision"** → the triage
+worklist (showing a warning-coloured count badge when any episode is stalled),
+and **"Search transcripts"** → the transcript search page. This is a monitoring
+surface, not a media library: it answers "is ingestion healthy, what's it
+costing, and what needs my attention?" The server component (`page.tsx`) issues
+two parallel queries:
 
 1. `v_podcast_ingestion_status` — one row per episode with source + status
    (the monitoring view).
 2. `podcast_episodes` — the extra fields the view omits (`created_at`,
    `duration_seconds`, `topic_tags`), joined back by id.
-3. `news_sources` filtered to `podcast`/`youtube` types — for per-feed health.
 
-It then aggregates episode counts per source (total + how many are `available`)
-into `coverage` percentages before rendering. Everything below is laid out top
-to bottom inside a single centred column (`max-width: var(--content-max-width)`,
-`--space-5` gaps).
+Everything below is laid out top to bottom inside a single centred column
+(`max-width: var(--content-max-width)`, `--space-5` gaps).
 
 ### 1. KPI row
 
@@ -128,19 +130,7 @@ faint gold fill (`--color-accent-glow`), with the first and last date labels on
 a mono axis. The hint — *"A gap means the daily routine did not run"* — frames
 it as an uptime check. Empty state: "No ingestion history yet."
 
-### 3. Feed health
-
-Only rendered when there are `podcast`/`youtube` sources. A responsive grid of
-cards (`auto-fill`, min 220px), one per feed:
-
-- Feed name, and — for `podcast` sources only — a **Deepgram on/off** pill with
-  a status dot (gold with a glow ring when on, grey when off). This is the
-  per-feed toggle that governs whether paid transcription is allowed for that
-  feed; the page surfaces it read-only.
-- Stats line: `N episodes · N% transcribed` (mono numerals).
-- `Last run <relative time>` from the source's `last_scanned_at`, or "never".
-
-### 4. Recent episodes
+### 3. Recent episodes
 
 Rendered when at least one episode has playable media. A grid (`auto-fill`, min
 240px) of up to **4** cards, sorted by recency (`published_at`, falling back to
@@ -150,7 +140,7 @@ Each card is an inline `MediaEmbed` (click-to-play video facade, or a native
 is the one spot on the dashboard that leans "media library"; the title links to
 the episode detail page.
 
-### 5. All episodes (filterable table)
+### 4. All episodes (filterable table)
 
 The main working surface.
 
@@ -181,7 +171,7 @@ surfaces an error. The action writes `pending_action` + `transcript_status =
 Supabase Realtime and actually re-runs the pipeline (the web app can't reach the
 agent server over HTTP).
 
-### 6. "Ingest an episode" modal
+### 5. "Ingest an episode" modal
 
 A `Modal` (size `md`) holding the brief form for ad-hoc ingestion:
 
@@ -199,6 +189,32 @@ required — audio or YouTube — and the "why" note is mandatory), inserts a
 `brief`-origin episode with `pending_action` set to `deepgram` or `refetch`
 depending on the checkbox, then closes the modal and refreshes. Server errors
 are humanised into a toast.
+
+---
+
+## Podcasts — `/news/podcasts/feeds`
+
+Titled **"Podcasts"**, with a back link → the dashboard. One card per subscribed
+`podcast`/`youtube` source, replacing the "Feed health" panel that used to sit
+inline on the dashboard. Reached from the dashboard's **"Podcasts"** header
+link.
+
+The server component (`feeds/page.tsx`) renders the whole page — there is no
+client child. It queries `news_sources` (podcast/youtube types, ordered by
+name) and `podcast_episodes` (`source_id`, `transcript_status`, `image_url`,
+`published_at`), then aggregates per source: episode count, `coverage` (percent
+of episodes with an `available` transcript), and the show artwork.
+`news_sources` has no image column, so the artwork is borrowed from the most
+recently published episode with an `image_url` (feed items commonly fall back
+to channel art); sources with no episode image get a placeholder tile with a
+Lucide `Podcast`/`Youtube` icon.
+
+Each card in the responsive grid (`auto-fill`, min 220px): square artwork on
+top, then the feed name, a **Deepgram on/off** pill (for `podcast` sources
+only — the read-only per-feed paid-transcription toggle, gold dot with a glow
+ring when on), a `N episodes · N% transcribed` stats line (mono numerals), and
+`Last run <relative time>` from `last_scanned_at`, or "never". Empty state
+links to the news sources page.
 
 ---
 
@@ -401,7 +417,7 @@ error rather than throwing; the rest of the podcast pages are unaffected.
 - **Search needs a key:** transcript search calls OpenAI to embed the query, so
   the web app's server environment needs `OPENAI_API_KEY`. It degrades to a
   humane error when absent; nothing else on these pages depends on it.
-- **Tests:** `[id]/EpisodeDetail.test.tsx`,
+- **Tests:** `feeds/page.test.tsx`, `[id]/EpisodeDetail.test.tsx`,
   `search/TranscriptSearch.test.tsx`, `lib/openaiEmbedding.test.ts`,
   `lib/podcasts.test.ts`, and `components/podcasts/AudioPlayer.test.tsx` cover the
   interactive and pure pieces (`pnpm --filter @platform/web test`).
