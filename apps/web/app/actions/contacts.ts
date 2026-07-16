@@ -72,7 +72,7 @@ export async function updateContact(id: string, formData: FormData) {
     }
   }
 
-  const { error } = await supabase.from('contacts').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('contacts').update(updateData).eq('id', id);
 
   if (error) return { error: humanizeError(error) };
 

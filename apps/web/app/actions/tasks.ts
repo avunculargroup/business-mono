@@ -65,7 +65,7 @@ export async function updateTaskStatus(id: string, status: string) {
     updateData.completed_at = null;
   }
 
-  const { error } = await supabase.from('tasks').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('tasks').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
@@ -103,7 +103,7 @@ export async function updateTask(id: string, formData: FormData) {
 
   const { error } = await supabase
     .from('tasks')
-    .update(updateData as never)
+    .update(updateData)
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };

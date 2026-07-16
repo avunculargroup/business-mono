@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { AgentActivityCard } from './AgentActivityCard';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 import styles from './ActivityFeed.module.css';
 
 type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];

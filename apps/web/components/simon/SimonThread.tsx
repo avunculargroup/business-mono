@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ThreadItem } from '@/app/(app)/simon/page';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 import { DirectorMessage } from './DirectorMessage';
 import { SimonResponse } from './SimonResponse';
 import { TypingIndicator } from './TypingIndicator';

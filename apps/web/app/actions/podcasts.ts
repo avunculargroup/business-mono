@@ -22,7 +22,7 @@ export async function requestEpisodeAction(id: string, action: EpisodeAction) {
     // pending_action is picked up by the listener; resolving reflects the
     // in-flight state immediately in the UI. (pending_action is post-migration,
     // so cast at the boundary like the agents code does.)
-    .update({ pending_action: action, transcript_status: 'resolving', transcript_error: null } as never)
+    .update({ pending_action: action, transcript_status: 'resolving', transcript_error: null })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -67,7 +67,7 @@ export async function ingestEpisodeBrief(formData: FormData) {
       curator_note: input.why,
       transcript_status: 'pending',
       pending_action: input.allow_deepgram ? 'deepgram' : 'refetch',
-    } as never)
+    })
     .select('id')
     .single();
 
@@ -86,7 +86,7 @@ export async function generateEpisodeBrief(id: string) {
   const supabase = await createClient();
   const { error } = await supabase
     .from('podcast_episodes')
-    .update({ pending_action: 'summarize' } as never)
+    .update({ pending_action: 'summarize' })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -134,7 +134,7 @@ export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reje
 
   const { error } = await supabase
     .from('podcast_episodes')
-    .update(patch as never)
+    .update(patch)
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };

@@ -58,7 +58,7 @@ export async function runNewsletter(formData: FormData) {
   const { error: updateError } = await supabase
     .from('routines')
     .update({
-      action_config: actionConfig as never,
+      action_config: actionConfig,
       next_run_at: new Date().toISOString(),
       is_active: true,
     })

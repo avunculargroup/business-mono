@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 
 type TeamMember = Database['public']['Tables']['team_members']['Row'];
 

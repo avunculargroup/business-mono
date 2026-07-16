@@ -125,7 +125,7 @@ export async function createNewsSource(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url) as never);
+  const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url));
 
   if (dbError) return { error: humanizeError(dbError) };
   revalidatePath(REVALIDATE);
@@ -148,7 +148,7 @@ export async function updateNewsSource(id: string, formData: FormData) {
   const supabase = await createClient();
   const { error: dbError } = await supabase
     .from('news_sources')
-    .update(buildRow(input, feed_url) as never)
+    .update(buildRow(input, feed_url))
     .eq('id', id);
 
   if (dbError) return { error: humanizeError(dbError) };

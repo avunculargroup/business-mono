@@ -1,5 +1,6 @@
 'use server';
 
+import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -107,7 +108,7 @@ function normalizeTime(t: string): string {
   return /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t;
 }
 
-function buildActionConfig(input: z.infer<typeof createSchema>): Record<string, unknown> {
+function buildActionConfig(input: z.infer<typeof createSchema>): Json {
   if (input.action_type === 'research_digest') {
     return {
       subject: input.subject,
@@ -170,7 +171,7 @@ export async function createRoutine(formData: FormData) {
       description: input.description || null,
       agent_name: input.agent_name,
       action_type: input.action_type,
-      action_config: buildActionConfig(input) as never,
+      action_config: buildActionConfig(input),
       frequency: input.frequency,
       time_of_day: timeOfDay,
       timezone: input.timezone,
@@ -211,7 +212,7 @@ export async function updateRoutine(id: string, formData: FormData) {
       description: input.description || null,
       agent_name: input.agent_name,
       action_type: input.action_type,
-      action_config: buildActionConfig(input) as never,
+      action_config: buildActionConfig(input),
       frequency: input.frequency,
       time_of_day: timeOfDay,
       timezone: input.timezone,

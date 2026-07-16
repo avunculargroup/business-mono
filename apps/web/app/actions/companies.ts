@@ -61,7 +61,7 @@ export async function updateCompany(id: string, formData: FormData) {
     }
   }
 
-  const { error } = await supabase.from('companies').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('companies').update(updateData).eq('id', id);
 
   if (error) return { error: humanizeError(error) };
 

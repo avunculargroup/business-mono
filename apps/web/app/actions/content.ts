@@ -49,7 +49,7 @@ export async function updateContentStatus(id: string, status: string, extras?: {
     if (extras.published_at) updateData.published_at = extras.published_at;
   }
 
-  const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('content_items').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/content');

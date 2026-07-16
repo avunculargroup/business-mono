@@ -62,7 +62,7 @@ export async function createPipelineItem(formData: FormData) {
     pain_point_id:  data.pain_point_id || null,
     score:          data.score === '' || data.score === undefined ? null : Number(data.score),
     research_links: parseResearchLinks(data.research_links),
-  } as never);
+  });
 
   if (error) return { error: humanizeError(error) };
 
@@ -87,7 +87,7 @@ export async function updatePipelineItem(id: string, formData: FormData) {
     updateData[key] = value === '' ? null : value;
   }
 
-  const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('content_items').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/pipeline');
@@ -99,7 +99,7 @@ export async function movePipelineItem(id: string, status: string) {
   const supabase = await createClient();
   const { error } = await supabase
     .from('content_items')
-    .update({ status } as never)
+    .update({ status })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
