@@ -16,7 +16,7 @@ interface ContactDetailProps {
     pipeline_stage: string;
     bitcoin_literacy: string | null;
     notes: string | null;
-    companies: { id: string; name: string } | null;
+    companies: { id: string; slug: string; name: string } | null;
   };
   interactions: Array<{
     id: string;
@@ -45,7 +45,7 @@ export function ContactDetail({ contact, interactions, openTaskCount }: ContactD
         {contact.companies && (
           <div className={styles.section}>
             <span className={styles.label}>Company</span>
-            <Link href={`/crm/companies/${contact.companies.id}`} className={styles.link}>
+            <Link href={`/crm/companies/${contact.companies.slug}`} className={styles.link}>
               {contact.companies.name}
             </Link>
           </div>

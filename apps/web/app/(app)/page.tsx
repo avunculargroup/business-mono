@@ -88,7 +88,7 @@ export default async function DashboardPage() {
                 {openTasks.map((task) => (
                   <div key={task.id} className={styles.taskRow}>
                     <div className={styles.taskInfo}>
-                      <Link href={`/tasks/${task.id}`} className={styles.taskTitle}>{task.title}</Link>
+                      <Link href={`/tasks/${task.slug}`} className={styles.taskTitle}>{task.title}</Link>
                       {task.related_contact_id && (
                         <span className={styles.taskContact}>Contact linked</span>
                       )}

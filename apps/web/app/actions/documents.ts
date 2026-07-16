@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { idColumn } from '@/lib/utils';
 
 const docs = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('documents');
@@ -176,7 +177,7 @@ export async function getDocument(id: string) {
   const supabase = await createClient();
   const { data, error } = await docs(supabase)
     .select('*, document_versions(*)')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .order('version_number', { referencedTable: 'document_versions', ascending: false })
     .single();
 

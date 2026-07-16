@@ -15,6 +15,7 @@ import styles from './ContactsList.module.css';
 
 type CompanyRow = {
   id: string;
+  slug: string;
   name: string;
   industry: string | null;
   size: string | null;
@@ -103,13 +104,13 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
       <DataTable
         columns={columns}
         data={companies}
-        onRowClick={(row) => router.push(`/crm/companies/${row.id}`)}
+        onRowClick={(row) => router.push(`/crm/companies/${row.slug}`)}
         rowKey={(row) => row.id}
         rowActions={(row) => [
           {
             label: 'View',
             icon: <Eye size={14} strokeWidth={1.5} />,
-            onClick: () => router.push(`/crm/companies/${row.id}`),
+            onClick: () => router.push(`/crm/companies/${row.slug}`),
           },
           {
             label: 'Edit',

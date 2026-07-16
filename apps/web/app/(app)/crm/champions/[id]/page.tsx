@@ -12,14 +12,15 @@ export default async function ChampionDetailPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [champion, events, contactsResult, companiesResult] = await Promise.all([
-    getChampion(id).catch(() => null),
-    getChampionEvents(id),
+  const champion = await getChampion(id).catch(() => null);
+  if (!champion) notFound();
+
+  // Events key off the resolved champion UUID (the route param may be a slug).
+  const [events, contactsResult, companiesResult] = await Promise.all([
+    getChampionEvents(champion.id),
     supabase.from('contacts').select('id, first_name, last_name, company_id').order('last_name'),
     supabase.from('companies').select('id, name').order('name'),
   ]);
-
-  if (!champion) notFound();
 
   const contactName = `${champion.contacts.first_name} ${champion.contacts.last_name}`;
 

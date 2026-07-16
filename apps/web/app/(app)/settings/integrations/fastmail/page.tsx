@@ -25,7 +25,7 @@ export default async function FastmailSettingsPage() {
 
     supabase
       .from('contacts')
-      .select('id, first_name, last_name, email, pipeline_stage, created_at')
+      .select('id, slug, first_name, last_name, email, pipeline_stage, created_at')
       .eq('source', 'fastmail_sync')
       .contains('tags', ['needs-review'])
       .order('created_at', { ascending: false }),

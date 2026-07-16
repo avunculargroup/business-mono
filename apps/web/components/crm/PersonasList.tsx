@@ -113,13 +113,13 @@ export function PersonasList({ initialPersonas, totalCount: _totalCount }: Perso
       <DataTable
         columns={columns}
         data={personas}
-        onRowClick={(row) => router.push(`/crm/personas/${row.id}`)}
+        onRowClick={(row) => router.push(`/crm/personas/${row.slug}`)}
         rowKey={(row) => row.id}
         rowActions={(row) => [
           {
             label: 'View',
             icon: <Eye size={14} strokeWidth={1.5} />,
-            onClick: () => router.push(`/crm/personas/${row.id}`),
+            onClick: () => router.push(`/crm/personas/${row.slug}`),
           },
           {
             label: 'Edit',

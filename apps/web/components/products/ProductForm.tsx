@@ -8,6 +8,7 @@ import styles from '@/components/crm/ContactForm.module.css';
 
 type ProductRow = {
   id: string;
+  slug: string;
   name: string;
   business_name: string | null;
   category: string | null;

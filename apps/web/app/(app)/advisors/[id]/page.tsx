@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { AdvisorDetail } from '@/components/advisors/AdvisorDetail';
+import { idColumn } from '@/lib/utils';
 
 export default async function AdvisorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,7 +16,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
       key_relationship:team_members!advisors_partners_key_relationship_id_fkey(id, full_name),
       created_by_member:team_members!advisors_partners_created_by_fkey(id, full_name)
     `)
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!advisor) notFound();
@@ -29,7 +30,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
     supabase
       .from('advisor_partner_contacts')
       .select('id, role, contacts(id, first_name, last_name, email)')
-      .eq('advisor_partner_id', id),
+      .eq('advisor_partner_id', advisor.id),
     supabase.from('companies').select('id, name').order('name'),
     supabase.from('team_members').select('id, full_name'),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),

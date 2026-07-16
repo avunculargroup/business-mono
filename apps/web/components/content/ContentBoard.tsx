@@ -14,6 +14,7 @@ import styles from './ContentBoard.module.css';
 
 type ContentItem = {
   id: string;
+  slug: string;
   title: string | null;
   type: string;
   status: string;
@@ -99,7 +100,7 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   const renderCard = (item: ContentItem, archived: boolean) => (
     <Link
       key={item.id}
-      href={`/content/${item.id}`}
+      href={`/content/${item.slug}`}
       className={`${styles.card}${archived ? ` ${styles.archivedCard}` : ''}`}
       draggable
       onDragStart={(e) => handleDragStart(e, item.id)}

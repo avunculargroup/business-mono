@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ProductDetail } from '@/components/products/ProductDetail';
+import { idColumn } from '@/lib/utils';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,7 +16,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       key_relationship:team_members!products_services_key_relationship_id_fkey(id, full_name),
       created_by_member:team_members!products_services_created_by_fkey(id, full_name)
     `)
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .single();
 
   if (!product) notFound();
@@ -30,11 +31,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     supabase
       .from('product_key_contacts')
       .select('id, role, contacts(id, first_name, last_name, email)')
-      .eq('product_service_id', id),
+      .eq('product_service_id', product.id),
     supabase
       .from('product_referral_agreements')
       .select('*')
-      .eq('product_service_id', id)
+      .eq('product_service_id', product.id)
       .order('created_at', { ascending: false }),
     supabase.from('companies').select('id, name').order('name'),
     supabase.from('team_members').select('id, full_name'),

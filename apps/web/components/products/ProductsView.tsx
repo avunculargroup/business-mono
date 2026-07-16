@@ -12,6 +12,7 @@ import styles from '@/app/(app)/products/products.module.css';
 
 type ProductRow = {
   id: string;
+  slug: string;
   name: string;
   business_name: string | null;
   category: string | null;
@@ -66,7 +67,7 @@ export function ProductsView({ products: initialProducts, companies, teamMembers
         {products.length > 0 ? (
           <div className={styles.grid}>
             {products.map((product) => (
-              <Link key={product.id} href={`/products/${product.id}`} className={styles.cardLink}>
+              <Link key={product.id} href={`/products/${product.slug}`} className={styles.cardLink}>
                 <Card hoverable padding="md">
                   <div className={styles.cardTopRow}>
                     <div className={styles.logoWrap}>

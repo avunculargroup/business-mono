@@ -13,6 +13,7 @@ import styles from '@/app/(app)/advisors/advisors.module.css';
 
 export type AdvisorRow = {
   id: string;
+  slug: string;
   name: string;
   type: 'advisor' | 'partner';
   specialization: string | null;
@@ -53,7 +54,7 @@ export function AdvisorsView({ advisors: initialAdvisors, companies, teamMembers
         {advisors.length > 0 ? (
           <div className={styles.grid}>
             {advisors.map((advisor) => (
-              <Link key={advisor.id} href={`/advisors/${advisor.id}`} className={styles.cardLink}>
+              <Link key={advisor.id} href={`/advisors/${advisor.slug}`} className={styles.cardLink}>
                 <Card hoverable padding="md">
                   <div className={styles.cardTopRow}>
                     <div className={styles.avatar}>

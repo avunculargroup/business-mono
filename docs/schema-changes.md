@@ -6,6 +6,34 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-16 — human-friendly slugs on detail-page tables
+
+**Migration:** `20260716020000_add_human_friendly_slugs.sql`
+
+Detail-page URLs used raw UUIDs (`/crm/companies/9b2e4c1a-…`). This adds a readable
+`slug` handle (`/crm/companies/acme-corp`) to every table that backs a detail page,
+without touching primary keys — all foreign keys and `agent_activity.entity_id`
+references still point at `id`. `slug` is a secondary, human-facing handle only.
+
+- **`slug TEXT NOT NULL UNIQUE`** added to: `projects`, `companies`, `personas`,
+  `contacts`, `champions`, `tasks`, `mvp_templates`, `content_items`,
+  `podcast_episodes`, `advisors_partners`, `products_services`, `documents`,
+  `campaigns`, `decks`.
+- **Generation is centralised in the DB**, not per-insert-site (inserts come from both
+  the web app and the agents server). A `BEFORE INSERT` trigger (`set_slug`) fills the
+  slug from the row's name/title column(s) via shared helpers `slugify(text)` and
+  `compute_unique_slug(table, base, id)`. Slugs are generated **once on insert** and are
+  **not** regenerated on rename, so URLs stay stable. Collisions get a numeric suffix
+  (`acme-corp`, `acme-corp-1`); rows with no usable source text fall back to a short
+  slice of their id.
+- **Existing rows were backfilled** (oldest first, so the unsuffixed slug goes to the
+  earliest row).
+- **Views `v_campaign_overview` and `v_campaign_matrix`** gained a trailing `slug`
+  column (appended last, since `CREATE OR REPLACE VIEW` can only add columns at the end)
+  so the campaign UI can build slug URLs.
+- **Web routing** resolves a detail param by `slug` or, when it looks like a UUID, by
+  `id` (`apps/web/lib/utils.ts` → `idColumn`), so old bookmarked UUID links keep working.
+
 ## 2026-07-16 — `podcast_episodes` — episode intelligence (Phase 1: summary)
 
 **Migration:** `20260716010000_add_podcast_episode_summary.sql`

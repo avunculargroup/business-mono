@@ -8,6 +8,7 @@ import styles from '@/components/crm/ContactForm.module.css';
 
 type AdvisorRow = {
   id: string;
+  slug: string;
   name: string;
   type: 'advisor' | 'partner';
   specialization: string | null;

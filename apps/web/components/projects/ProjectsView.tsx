@@ -13,6 +13,7 @@ import styles from '@/app/(app)/projects/projects.module.css';
 
 type ProjectRow = {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   status: string;
@@ -53,7 +54,7 @@ export function ProjectsView({ projects: initialProjects, teamMembers }: Project
         {projects.length > 0 ? (
           <div className={styles.grid}>
             {projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`} className={styles.cardLink}>
+              <Link key={project.id} href={`/projects/${project.slug}`} className={styles.cardLink}>
                 <Card hoverable padding="md">
                   <div className={styles.cardHeader}>
                     <h3 className={styles.cardTitle}>{project.name}</h3>

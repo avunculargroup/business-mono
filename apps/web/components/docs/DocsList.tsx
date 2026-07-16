@@ -26,6 +26,7 @@ export type DocumentVersionRow = {
 
 export type DocumentRow = {
   id: string;
+  slug: string;
   type: string;
   title: string;
   description: string | null;
@@ -163,7 +164,7 @@ export function DocsList({ initialDocuments }: DocsListProps) {
                   </span>
                   <div className={styles.cardActions}>
                     <Link
-                      href={`/docs/${doc.id}`}
+                      href={`/docs/${doc.slug}`}
                       className={styles.viewLink}
                     >
                       <Eye size={14} strokeWidth={1.5} />

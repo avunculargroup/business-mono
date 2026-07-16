@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { VariantEditor } from '@/components/campaigns/VariantEditor';
+import { idColumn } from '@/lib/utils';
 
 // Variant review (Gate 3). Deep-linked per variant — the campaign matrix
 // (Step 8) links here, and the suspended variant carries its gate_state so the
@@ -17,15 +18,24 @@ export default async function VariantReviewPage({ params }: { params: Promise<{ 
   const { data } = await (supabase as any)
     .from('content_items')
     .select('id, status, workflow_run_id, gate_state, campaign_id')
-    .eq('id', id)
+    .eq(idColumn(id), id)
     .maybeSingle();
 
   if (!data) notFound();
 
-  // Link back to the parent campaign when this variant belongs to one; otherwise
-  // up to the campaigns list.
-  const backHref = data.campaign_id ? `/campaigns/${data.campaign_id}` : '/campaigns';
-  const backLabel = data.campaign_id ? 'Back to campaign' : 'Back to campaigns';
+  // Link back to the parent campaign (by slug) when this variant belongs to one;
+  // otherwise up to the campaigns list.
+  let campaignSlug: string | null = null;
+  if (data.campaign_id) {
+    const { data: campaign } = await supabase
+      .from('campaigns')
+      .select('slug')
+      .eq('id', data.campaign_id)
+      .single();
+    campaignSlug = campaign?.slug ?? null;
+  }
+  const backHref = campaignSlug ? `/campaigns/${campaignSlug}` : '/campaigns';
+  const backLabel = campaignSlug ? 'Back to campaign' : 'Back to campaigns';
 
   return (
     <>

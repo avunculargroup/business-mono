@@ -72,6 +72,7 @@ export interface SummaryComplianceVerdict {
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
   id: string;
+  slug: string;
   source_id: string | null;
   guid: string;
   title: string;

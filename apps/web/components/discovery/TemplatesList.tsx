@@ -25,6 +25,7 @@ export type TemplateVersionRow = {
 
 export type TemplateRow = {
   id: string;
+  slug: string;
   type: string;
   title: string;
   description: string | null;
@@ -122,7 +123,7 @@ export function TemplatesList({ initialTemplates }: TemplatesListProps) {
                   </span>
                   <div className={styles.cardActions}>
                     <Link
-                      href={`/discovery/templates/${template.id}`}
+                      href={`/discovery/templates/${template.slug}`}
                       className={styles.viewLink}
                     >
                       <Eye size={14} strokeWidth={1.5} />
