@@ -6,6 +6,7 @@ import { QuickAdd } from '@/components/dashboard/QuickAdd';
 import { RoutineTile } from '@/components/dashboard/RoutineTile';
 import { FearGreedIndicator } from '@/components/dashboard/FearGreedIndicator';
 import { BitcoinPriceAUD } from '@/components/dashboard/BitcoinPriceAUD';
+import { BitcoinPriceUSD } from '@/components/dashboard/BitcoinPriceUSD';
 import { BlockHeight } from '@/components/dashboard/BlockHeight';
 import { OpenRouterCredits } from '@/components/dashboard/OpenRouterCredits';
 import { MacroIndicators } from '@/components/dashboard/MacroIndicators';
@@ -66,10 +67,11 @@ export default async function DashboardPage() {
       <div className={styles.banner}>
         <FearGreedIndicator />
         <BitcoinPriceAUD />
+        <BitcoinPriceUSD />
         <BlockHeight />
         <OpenRouterCredits />
       </div>
-      <TrendValuation latest={onchainLatest ?? []} />
+      <TrendValuation latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
       <OnchainIndicators latest={onchainLatest ?? []} series={onchainSeries ?? []} />
       <div className={styles.grid}>

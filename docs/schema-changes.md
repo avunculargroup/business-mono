@@ -78,6 +78,17 @@ sink the whole community batch.
 
 ---
 
+## 2026-07-16 — `onchain_indicators` — surface `btc_price_usd`
+
+**Migration:** `20260716000000_surface_btc_price_usd.sql`
+
+Flips **`btc_price_usd`** from `is_displayed=false` to `true`. Seeded as a hidden raw input in `20260708000000`, it now renders on the dashboard's Trend & Valuation panel (first, above the moving averages derived from it, with a sparkline of its stored series). No schema change — a single-row data flip; `metric_group` stays `trend_valuation`.
+
+- **Web:** `TrendValuation` now receives `v_onchain_series` and draws the price sparkline; `btc_price_usd` leads its `ORDER`.
+- **Market report (non-schema):** `runMarketReport` adds `btc_price_usd` to the live-fetched **Bitcoin** snapshot section, directly below `btc_price_aud`, and excludes it from the report's **Trend & Valuation** section so it renders once. The `coingecko` adapter now fetches AUD and/or USD driven by the requested indicator keys; the poll still asks it only for `btc_price_aud`, so the CM-sourced USD series is never double-written.
+
+---
+
 ## 2026-07-08 — `onchain_indicators` — Trend & Valuation metrics (moving averages, Mayer Multiple, cross, RSI, volatility, drawdown)
 
 **Migration:** `20260708000000_add_btc_trend_valuation.sql`

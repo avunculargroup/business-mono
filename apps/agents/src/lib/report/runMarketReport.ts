@@ -121,11 +121,15 @@ export async function runMarketReport(
   // "Bitcoin" section built from a live fetch above — exclude them here so they
   // don't also render as stale On-chain rows from last night's poll. trend_valuation
   // rows (price MAs, Mayer, cross, RSI, vol, drawdown) get their own section too.
+  // btc_price_usd is a trend_valuation row but is surfaced in the Bitcoin snapshot
+  // section (below BTC/AUD, live-fetched) instead — drop it here so it renders once.
   const allOnchain = (onchainRes.data ?? []) as unknown as OnchainRow[];
   const onchainRows = allOnchain.filter(
     (r) => r.metric_group !== 'market_snapshot' && r.metric_group !== 'trend_valuation',
   );
-  const trendRows = allOnchain.filter((r) => r.metric_group === 'trend_valuation');
+  const trendRows = allOnchain.filter(
+    (r) => r.metric_group === 'trend_valuation' && r.key !== 'btc_price_usd',
+  );
   const macroRows = ((macroRes.data ?? []) as unknown as MacroRow[]);
 
   const onchainItems = buildOnchainItems(onchainRows);
@@ -250,7 +254,7 @@ function buildMacroItems(rows: MacroRow[]): MarketReportItem[] {
 // observations if the live fetch fails, so the section degrades the same way the
 // web dashboard's equivalent cards do (never a hard failure, just a stale value).
 
-const BITCOIN_SNAPSHOT_KEYS = ['btc_price_aud', 'block_height', 'fear_greed'] as const;
+const BITCOIN_SNAPSHOT_KEYS = ['btc_price_aud', 'btc_price_usd', 'block_height', 'fear_greed'] as const;
 type BitcoinSnapshotKey = (typeof BITCOIN_SNAPSHOT_KEYS)[number];
 
 type BitcoinIndicatorRow = { id: string; key: string; short_label: string; unit: string; decimals: number };
@@ -267,7 +271,8 @@ async function fetchLiveValue(key: BitcoinSnapshotKey): Promise<{ value: number;
       const obs = res.observations.find((o) => o.key === key);
       return obs ? { value: obs.value, signal: null } : null;
     }
-    if (key === 'btc_price_aud') {
+    if (key === 'btc_price_aud' || key === 'btc_price_usd') {
+      // The adapter reads the currency off the config key (aud vs usd).
       const res = await coingeckoAdapter.fetchLatest([config('coingecko')]);
       if (!res.ok) return null;
       const obs = res.observations.find((o) => o.key === key);

@@ -57,6 +57,30 @@ describe('TrendValuation', () => {
     expect(screen.getByText(/50\/200-day spread \+4\.20%/)).toBeInTheDocument();
   });
 
+  it('renders the BTC/USD price first, with a sparkline from its stored series', () => {
+    const { container } = render(
+      <TrendValuation
+        latest={[
+          row({ key: 'ma_50d', short_label: '50-Day MA', value: 95000 }),
+          row({ key: 'btc_price_usd', short_label: 'BTC/USD', value: 94000 }),
+        ]}
+        series={[
+          { key: 'btc_price_usd', value: 90000 } as never,
+          { key: 'btc_price_usd', value: 92000 } as never,
+          { key: 'btc_price_usd', value: 94000 } as never,
+        ]}
+      />,
+    );
+
+    const panel = screen.getByRole('region', { name: /trend & valuation/i });
+    const labels = within(panel)
+      .getAllByText(/BTC\/USD|50-Day MA/)
+      .map((el) => el.textContent);
+    expect(labels).toEqual(['BTC/USD', '50-Day MA']);
+    // The price row's stored series renders as a sparkline; the derived MA has none.
+    expect(container.querySelectorAll('svg')).toHaveLength(1);
+  });
+
   it('renders nothing when there are no trend rows', () => {
     const { container } = render(
       <TrendValuation latest={[row({ key: 'hash_rate', metric_group: 'network_security' })]} />,
