@@ -1,7 +1,8 @@
 # Podcast & Episode pages
 
 Reference for the web UI at `/news/podcasts` (the ingestion dashboard),
-`/news/podcasts/[id]` (a single episode), and `/news/podcasts/search` (semantic
+`/news/podcasts/[id]` (a single episode), `/news/podcasts/decisions` (the
+stalled-episode triage worklist), and `/news/podcasts/search` (semantic
 transcript search). This document describes the **current state** of the UX and
 UI only — the ingestion pipeline itself lives in `apps/agents` and is specced in
 `docs/podcast-ingestion-spec.md`.
@@ -17,7 +18,9 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 |------|------|
 | `page.tsx` | Server component for the dashboard. Fetches the three data sets, aggregates per-feed health, renders `PodcastDashboard`. |
 | `PodcastDashboard.tsx` | Client component. All dashboard UI: KPIs, charts, feed health, recent grid, filterable table, ingest modal. |
-| `podcasts.module.css` | Dashboard styles. |
+| `podcasts.module.css` | Dashboard styles (shared by the decisions page). |
+| `decisions/page.tsx` | Server component for the triage worklist. Fetches only `failed`/`skipped` episodes and renders `DecisionsList`. |
+| `decisions/DecisionsList.tsx` | Client component. The "Needs a decision" lane with optimistic Retry / Deepgram actions. |
 | `[id]/page.tsx` | Server component for one episode. Fetches the episode, its transcript segments, and its source name; reads `?t=<seconds>` and passes it as `initialSeek`. |
 | `[id]/EpisodeDetail.tsx` | Client component. Header + actions, media, description, transcript (with in-transcript find + copy-with-citation), provenance sidebar. |
 | `[id]/detail.module.css` | Episode styles. |
@@ -62,11 +65,12 @@ form), and `manual`.
 
 ## Dashboard page — `/news/podcasts`
 
-Titled **"Podcast ingestion"**, with a **"Search transcripts"** link in the
-`PageHeader` → the transcript search page. This is a monitoring surface, not a
-media library: it answers "is ingestion healthy, what's it costing, and what
-needs my attention?" The server component (`page.tsx`) issues three parallel
-queries:
+Titled **"Podcast ingestion"**, with two `PageHeader` links: **"Needs a
+decision"** → the triage worklist (showing a warning-coloured count badge when
+any episode is stalled) and **"Search transcripts"** → the transcript search
+page. This is a monitoring surface, not a media library: it answers "is
+ingestion healthy, what's it costing, and what needs my attention?" The server
+component (`page.tsx`) issues three parallel queries:
 
 1. `v_podcast_ingestion_status` — one row per episode with source + status
    (the monitoring view).
@@ -97,18 +101,7 @@ card is icon + big mono number + uppercase label:
 Counts are computed client-side with `useMemo` over the (optimistic) episode
 list, so they update instantly when a row action fires.
 
-### 2. Needs a decision (triage lane)
-
-Rendered **only when non-empty**: a compact worklist of `failed` + `skipped`
-episodes — the ones that stalled without a transcript. Each row shows the linked
-title, a source chip, the status chip, and the reason inline (the stored
-`transcript_error` for `failed`; "No free transcript; Deepgram was off for this
-feed." for `skipped`), with the one relevant action per row: **Retry** for
-`failed`, **Transcribe with Deepgram** for `skipped`. Actions are optimistic,
-like the table rows. This is the "close the loop from the Signal ping" surface —
-act on the stalled episodes without hunting for them behind a table filter.
-
-### 3. Charts row
+### 2. Charts row
 
 Two side-by-side panels (collapse to stacked under 880px).
 
@@ -135,7 +128,7 @@ faint gold fill (`--color-accent-glow`), with the first and last date labels on
 a mono axis. The hint — *"A gap means the daily routine did not run"* — frames
 it as an uptime check. Empty state: "No ingestion history yet."
 
-### 4. Feed health
+### 3. Feed health
 
 Only rendered when there are `podcast`/`youtube` sources. A responsive grid of
 cards (`auto-fill`, min 220px), one per feed:
@@ -147,7 +140,7 @@ cards (`auto-fill`, min 220px), one per feed:
 - Stats line: `N episodes · N% transcribed` (mono numerals).
 - `Last run <relative time>` from the source's `last_scanned_at`, or "never".
 
-### 5. Recent episodes
+### 4. Recent episodes
 
 Rendered when at least one episode has playable media. A grid (`auto-fill`, min
 240px) of up to **4** cards, sorted by recency (`published_at`, falling back to
@@ -157,7 +150,7 @@ Each card is an inline `MediaEmbed` (click-to-play video facade, or a native
 is the one spot on the dashboard that leans "media library"; the title links to
 the episode detail page.
 
-### 6. All episodes (filterable table)
+### 5. All episodes (filterable table)
 
 The main working surface.
 
@@ -188,7 +181,7 @@ surfaces an error. The action writes `pending_action` + `transcript_status =
 Supabase Realtime and actually re-runs the pipeline (the web app can't reach the
 agent server over HTTP).
 
-### 7. "Ingest an episode" modal
+### 6. "Ingest an episode" modal
 
 A `Modal` (size `md`) holding the brief form for ad-hoc ingestion:
 
@@ -206,6 +199,30 @@ required — audio or YouTube — and the "why" note is mandatory), inserts a
 `brief`-origin episode with `pending_action` set to `deepgram` or `refetch`
 depending on the checkbox, then closes the modal and refreshes. Server errors
 are humanised into a toast.
+
+---
+
+## Needs a decision — `/news/podcasts/decisions`
+
+Titled **"Needs a decision"**, with a back link → the dashboard. The triage
+worklist that used to sit inline on the dashboard, split out to its own page so
+the monitoring surface stays compact. Reached from the dashboard's **"Needs a
+decision"** header link (which carries the stalled count as a badge).
+
+The server component (`decisions/page.tsx`) queries `v_podcast_ingestion_status`
+filtered to `failed` + `skipped` episodes only — the ones that stalled without a
+transcript — and hands them to `DecisionsList`.
+
+`DecisionsList` renders one row per episode: the linked title, a source chip,
+the status chip, and the reason inline (the stored `transcript_error` for
+`failed`; "No free transcript; Deepgram was off for this feed." for `skipped`),
+with the one relevant action per row — **Retry** for `failed`, **Transcribe with
+Deepgram** for `skipped`. Actions are **optimistic** (`useOptimisticList`): the
+row flips to `resolving` and leaves the lane immediately, and a toast confirms or
+surfaces an error. Like the dashboard's row actions, this only writes intent
+(`pending_action`) to `podcast_episodes`; the agents server reacts over Supabase
+Realtime. When nothing is stalled the page shows a **"Nothing needs a decision"**
+empty state. Styles are shared from `podcasts.module.css` (the `triage*` classes).
 
 ---
 
