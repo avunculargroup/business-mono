@@ -293,6 +293,24 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     description: 'Lex reviews a persisted draft for advice risk (buy/sell framing, price prediction)',
     fallbackAgent: 'lex',
   },
+
+  // ── Podcast episode intelligence (summary) ─────────────────────────────────
+  {
+    key: 'podcast_intel.narrate',
+    type: 'workflow_step',
+    label: 'Episode summary',
+    description: 'Roger writes a short, descriptive brief of an episode from its transcript',
+    workflow: 'podcast_intel',
+    fallbackAgent: 'roger',
+  },
+  {
+    key: 'podcast_intel.compliance_check',
+    type: 'workflow_step',
+    label: 'Compliance check',
+    description: 'Lex reviews an episode summary for advice risk before it can be published',
+    workflow: 'podcast_intel',
+    fallbackAgent: 'lex',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
@@ -303,6 +321,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   variant: 'Variant Generation',
   strategy: 'Campaign Strategy',
   social_post: 'Social Posts from News',
+  podcast_intel: 'Podcast Intelligence',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

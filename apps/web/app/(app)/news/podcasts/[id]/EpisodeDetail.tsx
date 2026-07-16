@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, Copy, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Search, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { BtsLogo } from '@/components/app-shell/BtsLogo';
@@ -19,7 +19,7 @@ import {
   TRANSCRIPT_STATUS_COLORS,
   TRANSCRIPT_SOURCE_LABELS,
 } from '@/lib/podcasts';
-import { requestEpisodeAction } from '@/app/actions/podcasts';
+import { requestEpisodeAction, generateEpisodeBrief, decideEpisodeBrief } from '@/app/actions/podcasts';
 import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
 import styles from './detail.module.css';
 
@@ -37,6 +37,12 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
   const audioRef = useRef<HTMLAudioElement>(null);
   const [videoStart, setVideoStart] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+
+  // Episode brief (intelligence pass). `requested` is the optimistic "generating"
+  // state after a request — the agent server writes the proposed summary async,
+  // so the page shows it on the next load.
+  const [briefPending, setBriefPending] = useState(false);
+  const [requested, setRequested] = useState(false);
 
   // Long transcripts make the page unwieldy, so clamp them to a fixed height
   // and only surface the show-more control once the content actually overflows.
@@ -146,6 +152,27 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
     router.refresh();
   };
 
+  const generateBrief = async () => {
+    setBriefPending(true);
+    const result = await generateEpisodeBrief(episode.id);
+    setBriefPending(false);
+    if (result.error) return error(result.error);
+    setRequested(true);
+    success('Generating the brief — it appears here when it is ready');
+    router.refresh();
+  };
+
+  const decideBrief = async (decision: 'approve' | 'reject') => {
+    setBriefPending(true);
+    const result = await decideEpisodeBrief(episode.id, decision);
+    setBriefPending(false);
+    if (result.error) return error(result.error);
+    success(decision === 'approve' ? 'Brief published' : 'Draft rejected');
+    router.refresh();
+  };
+
+  const verdict = episode.summary_lex_verdict;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -210,6 +237,76 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
       )}
 
       {description && <p className={styles.description}>{description}</p>}
+
+      {/* ── Episode brief (intelligence pass) ── */}
+      {episode.summary_status === 'approved' ? (
+        <section className={styles.brief}>
+          <div className={styles.briefHead}>
+            <h2 className={styles.sectionTitle}>Episode brief</h2>
+          </div>
+          <p className={styles.briefText}>{episode.episode_summary}</p>
+        </section>
+      ) : episode.summary_status === 'proposed' ? (
+        <section className={`${styles.brief} ${styles.briefDraft}`}>
+          <div className={styles.briefHead}>
+            <h2 className={styles.sectionTitle}>Episode brief</h2>
+            <span className={styles.briefBadge}>Draft · team only</span>
+          </div>
+          <p className={styles.briefText}>{episode.episode_summary}</p>
+          {verdict && (
+            <div className={`${styles.verdict} ${verdict.passes ? styles.verdictPass : styles.verdictFlag}`}>
+              <span className={styles.verdictLabel}>
+                {verdict.passes ? (
+                  <ShieldCheck size={15} strokeWidth={1.5} />
+                ) : (
+                  <ShieldAlert size={15} strokeWidth={1.5} />
+                )}
+                {verdict.passes ? 'Compliance cleared' : 'Compliance needs review'}
+              </span>
+              {verdict.rationale && <p className={styles.verdictRationale}>{verdict.rationale}</p>}
+              {verdict.flags.length > 0 && (
+                <ul className={styles.flagList}>
+                  {verdict.flags.map((f, i) => (
+                    <li key={i}>
+                      <q>{f.quote}</q> — {f.issue}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <div className={styles.briefActions}>
+            <Button size="sm" loading={briefPending} onClick={() => decideBrief('approve')}>
+              Approve and publish
+            </Button>
+            <Button variant="secondary" size="sm" loading={briefPending} onClick={() => decideBrief('reject')}>
+              Reject
+            </Button>
+            <Button variant="ghost" size="sm" loading={briefPending} onClick={generateBrief}>
+              Regenerate
+            </Button>
+          </div>
+        </section>
+      ) : requested ? (
+        <section className={styles.brief}>
+          <p className={styles.stateNote}>Generating the brief — it appears here once it is ready.</p>
+        </section>
+      ) : episode.transcript_status === 'available' ? (
+        <section className={styles.brief}>
+          <div className={styles.briefHead}>
+            <h2 className={styles.sectionTitle}>Episode brief</h2>
+          </div>
+          <p className={styles.stateNote}>
+            No brief yet. Generate a short, compliance-reviewed summary a reader can skim instead of
+            the full transcript.
+          </p>
+          <div className={styles.briefActions}>
+            <Button size="sm" loading={briefPending} onClick={generateBrief}>
+              Generate brief
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       <div className={styles.body}>
         {/* ── Transcript ── */}

@@ -29,7 +29,7 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 | `../../../components/podcasts/` | Shared media components: `MediaEmbed`, `YouTubeFacade`, `AudioPlayer`. |
 | `../../../lib/podcasts.ts` | Client-safe helpers: video-ID parsing, HTML→text, timestamp formatting, status/source label + colour maps, Deepgram spend estimate (`estimateDeepgramCost`, `formatAud`), and in-transcript highlight (`highlightText`). |
 | `../../../lib/openaiEmbedding.ts` | Server-only query embedding (`embedQuery`) via the OpenAI REST endpoint — used by transcript search. |
-| `../../../app/actions/podcasts.ts` | Server actions: `requestEpisodeAction`, `ingestEpisodeBrief`. |
+| `../../../app/actions/podcasts.ts` | Server actions: `requestEpisodeAction`, `ingestEpisodeBrief`, `generateEpisodeBrief`, `decideEpisodeBrief`. |
 | `../../../app/actions/podcastSearch.ts` | Server action: `searchTranscripts` (embed query → `transcriptVectorSearch` RPC). |
 | `packages/db/src/rpc/transcriptSearch.ts` | `transcriptVectorSearch` wrapper over the `vector_search_transcripts` pgvector RPC. |
 | `packages/shared/src/podcasts.ts` | `TranscriptStatus`, `TranscriptSource`, `IngestionOrigin`, `PodcastEpisode`, `TranscriptSegment` types. |
@@ -256,6 +256,33 @@ and playing the audio.
 Feed show-notes arrive as raw HTML; `htmlToText` converts block tags to line
 breaks, strips the rest, and decodes entities. Rendered with `pre-wrap` so the
 preserved newlines read as paragraph breaks. Muted, relaxed line height.
+
+### Episode brief (intelligence pass)
+
+Between the description and the transcript sits the **episode brief** — a short,
+agent-written summary a reader can skim instead of the full transcript. This is
+Phase 1 of the "episode intelligence" build (`docs/reviews/podcast-pages-review`
+P0-1): summary only, behind a **publish-wall**. It renders by `summary_status`:
+
+- **`none`** (transcript `available`) → a **"Generate brief"** button.
+  `generateEpisodeBrief` writes `pending_action = 'summarize'`; the agents
+  server's `podcastActionListener` claims it and runs the pass (roger narrates →
+  Lex reviews → persist a `proposed` summary). The web app can't reach the agent
+  server, so it only writes intent — same seam as the row actions. After a
+  request the UI shows an optimistic "generating" note until the next load.
+- **`proposed`** → the draft, badged **"Draft · team only"**, with Lex's
+  compliance verdict inline (cleared/needs-review + rationale + any flagged
+  phrases) and **Approve and publish / Reject / Regenerate** controls.
+  `decideEpisodeBrief(id, 'approve'|'reject')` flips `summary_status`
+  (approve → `approved` + `summary_approved_at`/`summary_approved_by`; reject →
+  back to `none`, clearing the draft). Approval is a plain DB write — nothing
+  runs after it — so there is no suspend/resume workflow here.
+- **`approved`** → the published brief, rendered plainly (no draft controls).
+  This is the only state a client-facing surface would ever show.
+
+`summary_status = 'none'` with no transcript renders nothing. The agent pass
+(roger + Lex, model-configurable via the `podcast_intel.*` scopes) lives in
+`apps/agents/src/workflows/podcastIntel/`.
 
 ### Body — two columns
 

@@ -6,6 +6,30 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-16 — `podcast_episodes` — episode intelligence (Phase 1: summary)
+
+**Migration:** `20260716010000_add_podcast_episode_summary.sql`
+
+The podcast-pages review (`docs/reviews/podcast-pages-review`, P0-1) calls for a synthesis
+layer over raw transcripts: an agent-written summary a client can read instead of a
+90-minute transcript. Phase 1 is summary-only and ships behind a publish-wall — the summary
+is generated as `proposed` and only becomes client-visible once a human approves it.
+
+- **`podcast_episodes.episode_summary`** (`TEXT`) — the synthesised brief. The draft lives
+  here the whole time; visibility is gated by `summary_status`.
+- **`podcast_episodes.summary_status`** (`TEXT NOT NULL DEFAULT 'none'`, CHECK
+  `none|proposed|approved`) — the publish-wall. `roger` narrates a `proposed` summary;
+  approval (a plain web action) flips it to `approved`; a reject returns it to `none`.
+- **`podcast_episodes.summary_lex_verdict`** (`JSONB`) — Lex's structured verdict
+  (passes / flags / rationale / suggested_rewrite) so the director sees the AFSL/AR
+  compliance signal at the approval wall.
+- **`podcast_episodes.summary_generated_at` / `summary_approved_at`** (`TIMESTAMPTZ`) and
+  **`summary_approved_by`** (`UUID REFERENCES team_members(id)`) — provenance for the brief.
+- **`podcast_episodes.pending_action`** CHECK widened to accept **`'summarize'`** (was
+  `refetch|deepgram|retry`) — the episode page's "Generate brief" button writes it and
+  `podcastActionListener` claims it to run the intelligence pass. No new agent_activity
+  CHECK is needed: `roger` and `lex` are already permitted names.
+
 ## 2026-07-12 — `match_voice_snippets` — optional `p_snippet_types` filter
 
 **Migration:** `20260712010000_voice_snippet_type_filter.sql`

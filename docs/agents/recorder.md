@@ -68,10 +68,29 @@ Steps marked `[Agent]` use LLM reasoning. All others are deterministic.
 - `create_reminder` — create time-triggered reminders
 - `log_activity` — write to agent_activity
 
+## Second use: podcast episode intelligence (summary)
+
+Beyond call/meeting recordings, roger is the narrator for the **podcast episode
+intelligence** pass (`apps/agents/src/workflows/podcastIntel/`, review P0-1). Given
+an ingested episode's stored transcript, roger writes a short, descriptive,
+compliance-safe **summary** (3–5 sentences, BTS voice) that a reader can skim
+instead of the full transcript. It is a plain orchestrator (deterministic load →
+roger narrates → Lex reviews → persist), not a suspendable workflow:
+
+- Model scope: `podcast_intel.narrate` (fallback: `roger`), configurable at
+  `/settings/models`.
+- The summary is persisted to `podcast_episodes.episode_summary` as
+  `summary_status = 'proposed'` and logged to `agent_activity` under `roger`.
+- **Publish-wall**: it only becomes client-visible on human approval
+  (`summary_status = 'approved'`). Lex reviews it first — see `compliance.md`.
+- Triggered on demand from the episode page (`pending_action = 'summarize'`,
+  claimed by `podcastActionListener`). Phase 1 is summary-only; takeaways,
+  chapters and entities are later phases.
+
 ## Schema Dependencies
 
-**Reads**: `companies`, `contacts`, `team_members`
-**Writes**: `interactions`, `agent_activity`
+**Reads**: `companies`, `contacts`, `team_members`, `podcast_episodes`
+**Writes**: `interactions`, `agent_activity`, `podcast_episodes.episode_summary` (proposed)
 **Proposes writes to**: `companies`, `contacts` (via approval), `tasks` (via PM), `reminders`
 
 ## Voice Profiles (Phase 2 Exploration)

@@ -1,5 +1,6 @@
 import { createRealtimeClient } from '@platform/db';
 import { parseEpisodeAction, reResolveEpisode } from '../lib/transcripts/reResolve.js';
+import { runEpisodeIntel } from '../workflows/podcastIntel/index.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 import { createLogger } from '../lib/logger.js';
 
@@ -27,7 +28,11 @@ export interface EpisodeActionRow {
 export async function handleEpisodeActionRow(row: EpisodeActionRow): Promise<void> {
   if (row.pending_action == null) return;
 
-  const parsed = parseEpisodeAction(row.pending_action);
+  // 'summarize' runs the episode-intelligence pass; the rest re-run the
+  // transcript waterfall. Classify before the claim so an unknown action is
+  // still claimed (cleared) but not dispatched.
+  const action = row.pending_action;
+  const parsed = action === 'summarize' ? null : parseEpisodeAction(action);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as unknown as { from: (t: string) => any };
@@ -42,12 +47,18 @@ export async function handleEpisodeActionRow(row: EpisodeActionRow): Promise<voi
     .select('id');
   if (!claimed || claimed.length === 0) return;
 
-  if (!parsed) {
-    log.error({ rowId: row.id, action: row.pending_action }, 'unknown action');
+  if (action === 'summarize') {
+    log.info({ rowId: row.id }, 'summarizing');
+    await runEpisodeIntel(row.id);
     return;
   }
 
-  log.info({ rowId: row.id, action: row.pending_action }, 're-resolving');
+  if (!parsed) {
+    log.error({ rowId: row.id, action }, 'unknown action');
+    return;
+  }
+
+  log.info({ rowId: row.id, action }, 're-resolving');
   await reResolveEpisode(row.id, parsed);
 }
 
