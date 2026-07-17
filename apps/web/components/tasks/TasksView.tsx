@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PriorityChip } from '@/components/ui/PriorityChip';
@@ -10,12 +9,11 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { formatRelativeDate } from '@/lib/utils';
 import { Plus, List, LayoutGrid, CheckSquare, Pencil, Trash2 } from 'lucide-react';
 import { updateTaskStatus, deleteTask } from '@/app/actions/tasks';
-import { useToast } from '@/providers/ToastProvider';
 import Link from 'next/link';
 import styles from './TasksView.module.css';
 
@@ -48,37 +46,25 @@ const statusColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' 
 
 export function TasksView({ initialTasks, projects, teamMembers, contacts }: TasksViewProps) {
   const [view, setView] = useLocalStorage<'list' | 'board'>('tasks-view', 'list');
-  const [showCreate, setShowCreate] = useState(false);
-  const [editTask, setEditTask] = useState<TaskRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TaskRow | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const { success, error } = useToast();
-  const { items: tasks, optimisticAdd } = useOptimisticList(initialTasks);
-
-  const handleTaskCreated = useCallback((task?: TaskRow) => {
-    if (task) {
-      optimisticAdd(task, async () => {
-        // Server action already called by the form — optimistic add only
-      });
-    }
-    setShowCreate(false);
-  }, [optimisticAdd]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteTask(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Task deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
+  const {
+    items: tasks,
+    showCreate,
+    setShowCreate,
+    editing: editTask,
+    setEditing: setEditTask,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<TaskRow>({
+    initialItems: initialTasks,
+    entityLabel: 'Task',
+    remove: deleteTask,
+  });
 
   const columns: Column<TaskRow>[] = [
     {
@@ -218,7 +204,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
           projects={projects}
           teamMembers={teamMembers}
           contacts={contacts}
-          onSuccess={handleTaskCreated}
+          onSuccess={handleCreated}
           onPendingChange={setIsSubmitting}
         />
       </SlideOver>
@@ -256,7 +242,7 @@ export function TasksView({ initialTasks, projects, teamMembers, contacts }: Tas
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete task"
         description={`Permanently delete "${deleteTarget?.title}"? This cannot be undone.`}
         confirmLabel="Delete task"
