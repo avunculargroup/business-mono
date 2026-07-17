@@ -59,6 +59,7 @@ export function buildEditorSelectionPrompt(
   voiceBlock: string,
   founderName: string,
   recentForms: SocialPostForm[] = [],
+  guidelines: string[] = [],
 ): string {
   const lines = candidates.map((c, i) => candidateLine(c, i)).join('\n\n');
   const formOptions = Object.entries(SOCIAL_POST_FORMS)
@@ -69,6 +70,11 @@ export function buildEditorSelectionPrompt(
         ', ',
       )}. Prefer variety — bias away from these unless a different form would clearly serve this story worse. Humans post shapes, not templates.`
     : '';
+  const standingFeedback = guidelines.length
+    ? `\n\n## Standing feedback from ${founderName}
+${founderName} has given this standing feedback on past drafts — weigh it when picking the story and form:
+${guidelines.map((g) => `- ${g}`).join('\n')}`
+    : '';
   return `You are choosing one Bitcoin/treasury news story for ${founderName} to post about today, and the form their post should take.
 
 Pick the SINGLE story from the candidates below that best fits ${founderName}'s individual voice and the topics they are credible on — not simply the highest-ranked story. Then choose the post form:
@@ -77,7 +83,7 @@ ${formOptions}${rotation}
 Return the verbatim candidate index, the form, and a one-line rationale.
 
 ## ${founderName}'s voice (the fit signal)
-${voiceBlock}
+${voiceBlock}${standingFeedback}
 
 ## Candidates
 ${lines}`;
@@ -103,6 +109,8 @@ export function buildSocialPostPrompt(params: {
   lengthTarget?: LengthTarget;
   /** Retrieved opener/closer exemplars — how this founder tends to open and close. */
   cadenceBlock?: string;
+  /** Rendered standing-feedback guidelines block (buildGuidelinesBlock). */
+  guidelinesBlock?: string;
   /** When set, a rewrite pass: fix the named AI-tells while keeping story/form/voice. */
   rewriteInstruction?: string;
 }): string {
@@ -117,6 +125,7 @@ export function buildSocialPostPrompt(params: {
     recentOpenings = [],
     lengthTarget = 'standard',
     cadenceBlock = '',
+    guidelinesBlock = '',
     rewriteInstruction,
   } = params;
   const label = PLATFORM_LABEL[platform];
@@ -159,7 +168,7 @@ ${lengthNudge ? `\n${lengthNudge}\n` : ''}
 
 ## ${label} formatting (platform mechanics)
 ${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', formatConfig ?? null)}
-${repetitionBlock ? `\n${repetitionBlock}\n` : ''}
+${repetitionBlock ? `\n${repetitionBlock}\n` : ''}${guidelinesBlock ? `\n${guidelinesBlock}\n` : ''}
 ${groundingBlock}
 
 ## Sourcing

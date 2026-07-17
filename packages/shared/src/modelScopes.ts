@@ -284,6 +284,14 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'social_post',
     fallbackAgent: 'lex',
   },
+  {
+    key: 'social_post.distill_feedback',
+    type: 'workflow_step',
+    label: 'Distill feedback guidelines',
+    description: 'The editor folds founder review feedback into the account\'s standing guideline list',
+    workflow: 'social_post',
+    fallbackAgent: 'editor',
+  },
 
   // ── Content compliance review (Lex, on draft persistence) ──────────────────
   {

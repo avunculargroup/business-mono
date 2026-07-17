@@ -18,6 +18,7 @@ import { buildSocialPostRow, buildThreadSegmentRows, type DisclaimerRef } from '
 import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite, type LengthTarget } from './prompts.js';
 import { editorSelectionSchema, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
 import { toRecentPosts, extractOpeningLines, recentForms, type RecentPost } from './history.js';
+import { toGuidelines, buildGuidelinesBlock } from './guidelines.js';
 import { scoreAiTells, aiTellRewriteInstruction } from './aiTell.js';
 import { sendSocialDraft, type SocialDraftPost } from '../../lib/sendSocialDraft.js';
 // Type-only — erased at compile time, so no runtime import cycle with the
@@ -203,16 +204,34 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
 
   const lengthTarget = pickLengthTarget(founderId);
 
+  // ── Standing feedback guidelines per account (distilled from past reviews) ──
+  // One read for all accounts; a failure degrades to "no guidelines", not a
+  // failed run.
+  const guidelinesByAccount = new Map<string, string[]>();
+  {
+    const { data: guidelineRows, error: glErr } = await db
+      .from('account_feedback_guidelines')
+      .select('social_account_id, guidelines')
+      .in('social_account_id', [...accounts.values()].map((a) => a.id));
+    if (glErr) {
+      log.warn({ error: glErr.message }, 'account_feedback_guidelines read failed');
+    }
+    for (const r of (guidelineRows ?? []) as Array<{ social_account_id: string; guidelines: unknown }>) {
+      guidelinesByAccount.set(r.social_account_id, toGuidelines(r.guidelines));
+    }
+  }
+
   // ── Editor picks the best-fit story + form for this founder ─────────────────
   const selectionAccount = accounts.get('linkedin') ?? [...accounts.values()][0]!;
   const selectionVoice = await resolveVoiceContext({ accountId: selectionAccount.id, platform: selectionAccount.platform });
   const selectionVoiceBlock = formatResolvedVoice(selectionVoice);
   const selectionRecentForms = recentForms(recentByAccount.get(selectionAccount.id) ?? []);
+  const selectionGuidelines = guidelinesByAccount.get(selectionAccount.id) ?? [];
 
   let pick = null;
   try {
     const resp = await editor.generate(
-      [{ role: 'user', content: buildEditorSelectionPrompt(candidates, selectionVoiceBlock, founderName, selectionRecentForms) }],
+      [{ role: 'user', content: buildEditorSelectionPrompt(candidates, selectionVoiceBlock, founderName, selectionRecentForms, selectionGuidelines) }],
       {
         requestContext: stepRequestContext('social_post.editor_select'),
         structuredOutput: { schema: editorSelectionSchema, errorStrategy: 'fallback', fallbackValue: null },
@@ -267,6 +286,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
         recentOpenings,
         lengthTarget,
         cadenceBlock,
+        guidelinesBlock: buildGuidelinesBlock(guidelinesByAccount.get(account.id) ?? []),
       };
 
       let draft = applyThreadStyle(await generateDraft(buildSocialPostPrompt(promptParams)), formatConfig);

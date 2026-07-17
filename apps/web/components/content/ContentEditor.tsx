@@ -4,6 +4,7 @@ import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { CopyButton } from '@/components/ui/CopyButton';
+import { DraftFeedback, type DraftFeedbackEntry } from './DraftFeedback';
 import { updateContentStatus } from '@/app/actions/content';
 import { useToast } from '@/providers/ToastProvider';
 import { formatDate } from '@/lib/utils';
@@ -16,6 +17,7 @@ type ContentItem = {
   status: string;
   body: string | null;
   is_thread: boolean;
+  social_account_id?: string | null;
   scheduled_for: string | null;
   published_at: string | null;
   created_at: string;
@@ -38,9 +40,10 @@ const statusFlow: Record<string, { next: string; label: string }> = {
 interface ContentEditorProps {
   item: ContentItem;
   threadSegments: ThreadSegment[];
+  priorFeedback?: DraftFeedbackEntry[];
 }
 
-export function ContentEditor({ item, threadSegments }: ContentEditorProps) {
+export function ContentEditor({ item, threadSegments, priorFeedback = [] }: ContentEditorProps) {
   const [body, setBody] = useState(item.body || '');
   const [isPending, startTransition] = useTransition();
   const [optimisticStatus, setOptimisticStatus] = useOptimistic(item.status);
@@ -128,6 +131,10 @@ export function ContentEditor({ item, threadSegments }: ContentEditorProps) {
           <Button variant="primary" size="md" onClick={handleAdvance} loading={isPending}>
             {nextStep.label}
           </Button>
+        )}
+
+        {item.social_account_id && (
+          <DraftFeedback contentItemId={item.id} priorFeedback={priorFeedback} />
         )}
       </aside>
     </div>

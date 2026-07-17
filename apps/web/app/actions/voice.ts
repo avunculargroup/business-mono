@@ -242,3 +242,39 @@ export async function deleteVoiceSnippet(id: string) {
   revalidatePath(REVALIDATE);
   return { success: true };
 }
+
+const MAX_GUIDELINES = 15;
+
+/**
+ * Save an account's distilled feedback guidelines from the Brand Hub textarea
+ * (one guideline per line). updated_by records the human editor — the distiller
+ * writes NULL — so human and machine writes stay distinguishable.
+ */
+export async function updateAccountGuidelines(accountId: string, guidelinesText: string) {
+  if (!z.string().uuid().safeParse(accountId).success) return { error: 'Invalid account' };
+
+  const guidelines = guidelinesText
+    .split('\n')
+    .map((line) => line.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_GUIDELINES);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // account_feedback_guidelines is not in the generated Database types yet.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  const { error } = await db.from('account_feedback_guidelines').upsert({
+    social_account_id: accountId,
+    guidelines,
+    updated_at: new Date().toISOString(),
+    updated_by: user?.id ?? null,
+  });
+  if (error) return { error: humanizeError(error) };
+
+  revalidatePath(REVALIDATE);
+  return { success: true };
+}

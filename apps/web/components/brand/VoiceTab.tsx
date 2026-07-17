@@ -12,6 +12,7 @@ import { VoiceForm, VOICE_FORM_ID } from './VoiceForm';
 import { SnippetForm, SNIPPET_FORM_ID } from './SnippetForm';
 import { SnippetsPanel } from './SnippetsPanel';
 import { AccountVoiceForm, ACCOUNT_VOICE_FORM_ID } from './AccountVoiceForm';
+import { FeedbackGuidelinesPanel, type AccountGuidelinesRow, type ContentFeedbackRow } from './FeedbackGuidelinesPanel';
 import { overrideCount } from './accountVoice';
 import { canonSnippets, accountSnippets } from './snippetGroups';
 import { toggleVoiceSnippetStar, deleteVoiceSnippet } from '@/app/actions/voice';
@@ -27,6 +28,8 @@ interface VoiceTabProps {
   voice: BrandVoiceRow | null;
   snippets: VoiceSnippetRow[];
   accounts: SocialAccountRow[];
+  guidelines: AccountGuidelinesRow[];
+  feedback: ContentFeedbackRow[];
 }
 
 function ReadSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -38,7 +41,7 @@ function ReadSection({ label, children }: { label: string; children: React.React
   );
 }
 
-export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
+export function VoiceTab({ voice, snippets, accounts, guidelines, feedback }: VoiceTabProps) {
   const router = useRouter();
   const { error } = useToast();
   const [editingVoice, setEditingVoice] = useState(false);
@@ -185,6 +188,11 @@ export function VoiceTab({ voice, snippets, accounts }: VoiceTabProps) {
             );
           })}
         </div>
+      )}
+
+      {/* Distilled feedback guidelines per account */}
+      {accounts.length > 0 && (
+        <FeedbackGuidelinesPanel accounts={accounts} guidelines={guidelines} feedback={feedback} />
       )}
 
       {/* Snippets panel */}

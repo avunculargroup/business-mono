@@ -36,6 +36,7 @@ import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
 import { startComplianceRecheckListener } from '../listeners/complianceRecheck.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
+import { startFeedbackDistillListener } from '../listeners/feedbackDistillListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -237,3 +238,8 @@ startComplianceRecheckListener();
 // pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same
 // DB-driven pattern as the newsletter gate above.
 startPodcastActionListener();
+
+// Distill founder feedback on social drafts (written by /content/[id]) into
+// durable per-account guidelines that every future generation injects. Same
+// web→DB→agents pattern; includes a startup sweep for feedback missed while down.
+startFeedbackDistillListener();
