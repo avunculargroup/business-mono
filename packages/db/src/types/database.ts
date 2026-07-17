@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_feedback_guidelines: {
+        Row: {
+          guidelines: Json
+          social_account_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          guidelines?: Json
+          social_account_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          guidelines?: Json
+          social_account_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_feedback_guidelines_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_feedback_guidelines_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
       advisor_partner_contacts: {
         Row: {
           advisor_partner_id: string
@@ -1169,6 +1205,84 @@ export type Database = {
           source_table?: string
         }
         Relationships: []
+      }
+      content_feedback: {
+        Row: {
+          content_item_id: string | null
+          created_at: string
+          created_by: string | null
+          distilled_at: string | null
+          draft_excerpt: string | null
+          feedback: string
+          id: string
+          platform: string
+          post_form: string | null
+          social_account_id: string
+          verdict: string | null
+        }
+        Insert: {
+          content_item_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          distilled_at?: string | null
+          draft_excerpt?: string | null
+          feedback: string
+          id?: string
+          platform: string
+          post_form?: string | null
+          social_account_id: string
+          verdict?: string | null
+        }
+        Update: {
+          content_item_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          distilled_at?: string | null
+          draft_excerpt?: string | null
+          feedback?: string
+          id?: string
+          platform?: string
+          post_form?: string | null
+          social_account_id?: string
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_feedback_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_feedback_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_feedback_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_feedback_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_feedback_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
+        ]
       }
       content_images: {
         Row: {
