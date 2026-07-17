@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { humanizeError } from '@/lib/errors';
 
@@ -18,7 +18,9 @@ export async function addFastmailAccount(data: {
     return { error: 'Username and token are required' };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('fastmail_accounts').insert({
     username:          data.username.trim().toLowerCase(),
     token:             data.token,
@@ -33,7 +35,9 @@ export async function addFastmailAccount(data: {
 }
 
 export async function toggleFastmailAccount(id: string, isActive: boolean) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   // When re-activating, also clear any failure state so the listener gets a
   // fresh start. Pausing leaves the error history intact for diagnostics.
   const update = isActive
@@ -52,7 +56,9 @@ export async function toggleFastmailAccount(id: string, isActive: boolean) {
 }
 
 export async function removeFastmailAccount(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('fastmail_accounts').delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -72,7 +78,9 @@ export async function addFastmailExclusion(data: {
     return { error: 'Value is required' };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('fastmail_exclusions').insert({
     type:  data.type,
     value: data.value.trim().toLowerCase(),
@@ -85,7 +93,9 @@ export async function addFastmailExclusion(data: {
 }
 
 export async function removeFastmailExclusion(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('fastmail_exclusions').delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -101,7 +111,9 @@ export async function removeFastmailExclusion(id: string) {
  * without overwriting the full tags array.
  */
 export async function approveContact(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   // Fetch current tags first, then remove 'needs-review' client-side.
   // Supabase JS v2 does not expose array_remove directly; fetching + updating
@@ -131,7 +143,9 @@ export async function approveContact(id: string) {
 }
 
 export async function rejectContact(id: string, reason: 'marketing' | 'spam' | 'other') {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: contact, error: fetchError } = await supabase
     .from('contacts')

@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -33,7 +33,9 @@ export async function createProduct(formData: FormData) {
   const parsed = productSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { data: product, error } = await supabase
@@ -64,7 +66,9 @@ export async function updateProduct(id: string, formData: FormData) {
   const parsed = productSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { error } = await supabase
@@ -90,7 +94,9 @@ export async function updateProduct(id: string, formData: FormData) {
 }
 
 export async function deleteProduct(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('products_services').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
 
@@ -103,7 +109,9 @@ export async function createReferralAgreement(formData: FormData) {
   const parsed = referralAgreementSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const pct = d.percentage ? parseFloat(d.percentage) : null;
@@ -129,7 +137,9 @@ export async function createReferralAgreement(formData: FormData) {
 }
 
 export async function deleteReferralAgreement(id: string, productId: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('product_referral_agreements').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
 
@@ -138,7 +148,9 @@ export async function deleteReferralAgreement(id: string, productId: string) {
 }
 
 export async function addProductKeyContact(productId: string, contactId: string, role: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data, error } = await supabase
     .from('product_key_contacts')
     .insert({ product_service_id: productId, contact_id: contactId, role: role || null })
@@ -152,7 +164,9 @@ export async function addProductKeyContact(productId: string, contactId: string,
 }
 
 export async function removeProductKeyContact(productId: string, contactId: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('product_key_contacts')
     .delete()

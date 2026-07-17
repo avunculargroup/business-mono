@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -35,8 +36,9 @@ export async function createFeedback(formData: FormData) {
   const parsed = feedbackSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const data = parsed.data;
 
   const { data: entry, error } = await fb(supabase).insert({
@@ -49,7 +51,7 @@ export async function createFeedback(formData: FormData) {
     rating:        data.rating === '' || data.rating === undefined ? null : Number(data.rating),
     description:   data.description,
     tags:          parseTags(data.tags),
-    created_by:    user?.id ?? null,
+    created_by:    user.id,
   }).select().single();
 
   if (error) return { error: humanizeError(error) };
@@ -63,7 +65,9 @@ export async function updateFeedback(id: string, formData: FormData) {
   const parsed = feedbackSchema.partial().safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(parsed.data)) {
@@ -85,7 +89,9 @@ export async function updateFeedback(id: string, formData: FormData) {
 }
 
 export async function deleteFeedback(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await fb(supabase)
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

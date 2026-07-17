@@ -1,7 +1,7 @@
 'use server';
 
 import type { Json } from '@platform/db';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 const WEB_THREAD_ID = 'web';
@@ -10,7 +10,9 @@ export async function sendDirective(message: string): Promise<{ success: boolean
   const trimmed = message.trim();
   if (!trimmed) return { success: false, error: 'Empty message' };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { success: false, error: auth.error };
+  const { supabase } = auth;
 
   // Get or create the web conversation thread
   const { data: conv } = await supabase

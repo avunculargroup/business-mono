@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -17,8 +17,9 @@ export async function createBrandAsset(formData: FormData) {
   const parsed = brandAssetSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const data = parsed.data;
 
   const { error } = await supabase.from('brand_assets').insert({
@@ -26,7 +27,7 @@ export async function createBrandAsset(formData: FormData) {
     type: data.type,
     description: data.description || null,
     content: data.content || null,
-    created_by: user?.id || null,
+    created_by: user.id,
   });
 
   if (error) return { error: humanizeError(error) };

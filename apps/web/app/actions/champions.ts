@@ -2,6 +2,7 @@
 
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -87,7 +88,9 @@ export async function createChampion(formData: FormData) {
   const parsed = championSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { data, error } = await ch(supabase)
@@ -129,7 +132,9 @@ export async function updateChampion(id: string, formData: FormData) {
   const parsed = championSchema.partial().safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
   const d = parsed.data;
 
@@ -147,7 +152,9 @@ export async function updateChampion(id: string, formData: FormData) {
 }
 
 export async function deleteChampion(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await ch(supabase).delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/champions');
@@ -170,7 +177,9 @@ export async function logChampionEvent(championId: string, formData: FormData) {
   const parsed = eventSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { error: insertError } = await che(supabase).insert({

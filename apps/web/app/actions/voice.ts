@@ -1,7 +1,7 @@
 'use server';
 
 import type { Json } from '@platform/db';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { cleanAccountProfile } from '@/components/brand/accountVoice';
@@ -78,10 +78,9 @@ export async function updateBrandVoice(formData: FormData) {
     return { error: 'Content policy is malformed' };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const db = supabase;
 
   const { data: existing } = await db
@@ -98,7 +97,7 @@ export async function updateBrandVoice(formData: FormData) {
     content_policy: contentPolicy,
     version: bumpVersion(existing?.version),
     is_active: true,
-    updated_by: user?.id ?? null,
+    updated_by: user.id,
   };
 
   const { error } = existing?.id
@@ -137,7 +136,9 @@ export async function updateAccountVoice(formData: FormData) {
     return { error: 'Voice profile is malformed' };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const db = supabase;
 
   const { data: brand } = await db
@@ -189,10 +190,9 @@ export async function saveVoiceSnippet(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.errors[0].message };
   const s = parsed.data;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const db = supabase;
 
   // Snippet scoped by social_account_id: NULL = company canon (applies to
@@ -216,7 +216,7 @@ export async function saveVoiceSnippet(formData: FormData) {
       ...fields,
       social_account_id: s.social_account_id ?? null,
       source: 'manual',
-      created_by: user?.id ?? null,
+      created_by: user.id,
     });
     if (error) return { error: humanizeError(error) };
   }
@@ -226,7 +226,9 @@ export async function saveVoiceSnippet(formData: FormData) {
 }
 
 export async function toggleVoiceSnippetStar(id: string, isStarred: boolean) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const db = supabase;
   const { error } = await db.from('voice_snippets').update({ is_starred: isStarred }).eq('id', id);
   if (error) return { error: humanizeError(error) };
@@ -235,7 +237,9 @@ export async function toggleVoiceSnippetStar(id: string, isStarred: boolean) {
 }
 
 export async function deleteVoiceSnippet(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const db = supabase;
   const { error } = await db.from('voice_snippets').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
