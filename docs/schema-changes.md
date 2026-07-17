@@ -8,7 +8,7 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ## 2026-07-17 — social draft feedback → distilled per-account guidelines
 
-**Migration:** `20260717000000_add_content_feedback.sql`
+**Migration:** `20260717010000_add_content_feedback.sql`
 
 The daily `social_post_from_news` routine emails founders their drafts but captured no
 feedback, so nothing improved future generations. This adds the feedback loop:
@@ -27,6 +27,21 @@ feedback, so nothing improved future generations. This adds the feedback loop:
 - **Realtime** — `content_feedback` gets `REPLICA IDENTITY FULL` and joins the
   `supabase_realtime` publication so an INSERT wakes the agents-side
   `feedbackDistillListener` (web→agents handoff, same pattern as the campaign gates).
+
+## 2026-07-17 — `news_sources.image_url` — show-level artwork
+
+**Migration:** `20260717000000_add_news_source_image.sql`
+
+The podcasts page (`/news/podcasts/feeds`) shows one card per podcast/YouTube
+source with artwork. Until now the artwork was borrowed from the most recently
+published episode's `image_url`, which is unreliable (per-episode art, or none
+at all). This adds a nullable **`image_url TEXT`** to `news_sources`, populated
+for podcast sources by the `podcast_ingest` routine from the feed's
+channel-level `<itunes:image>` (falling back to the standard RSS
+`<image><url>`) on each successful scan. Only overwritten when the feed carries
+artwork — a scan that finds none leaves the stored value alone. YouTube sources
+have no scan path, so they stay null and the UI keeps its episode-image
+fallback.
 
 ## 2026-07-16 — human-friendly slugs on detail-page tables
 

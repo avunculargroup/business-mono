@@ -1488,6 +1488,7 @@ CREATE TABLE news_sources (
                               CHECK (source_type IN ('rss','podcast','youtube','email')),
   -- podcast / youtube config
   youtube_channel_url       TEXT,
+  image_url                 TEXT,                              -- show artwork; set by podcast_ingest from channel-level feed art
   transcribe_with_deepgram  BOOLEAN     NOT NULL DEFAULT false,
   preferred_transcript_lang TEXT        NOT NULL DEFAULT 'en',
   max_backfill_episodes     INT         NOT NULL DEFAULT 25,
@@ -2415,7 +2416,7 @@ CREATE TABLE onchain_observations (
 --     deltas; trend metrics carry deltas.
 
 -- ============================================================
--- SOCIAL DRAFT FEEDBACK (migration: 20260717000000_add_content_feedback)
+-- SOCIAL DRAFT FEEDBACK (migration: 20260717010000_add_content_feedback)
 -- ============================================================
 -- Founder feedback on generated social drafts, distilled into durable
 -- per-account guidelines injected into every future generation. The /content/[id]

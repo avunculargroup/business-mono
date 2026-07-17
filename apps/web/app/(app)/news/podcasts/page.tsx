@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { Search, AlertTriangle } from 'lucide-react';
+import { Search, AlertTriangle, Podcast } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { PodcastDashboard, type DashboardEpisode, type FeedHealth } from './PodcastDashboard';
+import { PodcastDashboard, type DashboardEpisode } from './PodcastDashboard';
 import styles from './podcasts.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -10,17 +10,11 @@ export const dynamic = 'force-dynamic';
 export default async function PodcastsPage() {
   const supabase = await createClient();
 
-  const [{ data: statusRows }, { data: meta }, { data: sources }] = await Promise.all([
+  const [{ data: statusRows }, { data: meta }] = await Promise.all([
     // The spec's monitoring surface: one row per episode with source + status.
     supabase.from('v_podcast_ingestion_status').select('*'),
     // Ingest time + the fields the view omits (duration, topic tags), joined by id.
     supabase.from('podcast_episodes').select('id, created_at, duration_seconds, topic_tags'),
-    // Per-feed health: podcast/youtube sources only.
-    supabase
-      .from('news_sources')
-      .select('name, source_type, transcribe_with_deepgram, last_scanned_at')
-      .in('source_type', ['podcast', 'youtube'])
-      .order('name', { ascending: true }),
   ]);
 
   const metaById = new Map(
@@ -55,33 +49,6 @@ export default async function PodcastsPage() {
       };
     });
 
-  // Per-feed health, aggregated from the view by source name.
-  const bySource = new Map<string, { total: number; available: number }>();
-  for (const ep of episodes) {
-    if (!ep.source_name) continue;
-    const row = bySource.get(ep.source_name) ?? { total: 0, available: 0 };
-    row.total += 1;
-    if (ep.transcript_status === 'available') row.available += 1;
-    bySource.set(ep.source_name, row);
-  }
-  const feeds: FeedHealth[] = (sources ?? []).map((s) => {
-    const src = s as {
-      name: string;
-      source_type: string;
-      transcribe_with_deepgram: boolean | null;
-      last_scanned_at: string | null;
-    };
-    const counts = bySource.get(src.name) ?? { total: 0, available: 0 };
-    return {
-      name: src.name,
-      source_type: src.source_type,
-      transcribe_with_deepgram: Boolean(src.transcribe_with_deepgram),
-      last_scanned_at: src.last_scanned_at,
-      episodes: counts.total,
-      coverage: counts.total > 0 ? Math.round((counts.available / counts.total) * 100) : 0,
-    };
-  });
-
   const needsDecision = episodes.filter(
     (e) => e.transcript_status === 'failed' || e.transcript_status === 'skipped',
   ).length;
@@ -89,6 +56,10 @@ export default async function PodcastsPage() {
   return (
     <>
       <PageHeader title="Podcast ingestion">
+        <Link href="/news/podcasts/feeds" className={styles.headerLink} aria-label="Podcasts">
+          <Podcast size={16} strokeWidth={1.5} />
+          <span className={styles.headerLinkLabel}>Podcasts</span>
+        </Link>
         <Link
           href="/news/podcasts/decisions"
           className={styles.headerLink}
@@ -103,7 +74,7 @@ export default async function PodcastsPage() {
           <span className={styles.headerLinkLabel}>Search transcripts</span>
         </Link>
       </PageHeader>
-      <PodcastDashboard episodes={episodes} feeds={feeds} />
+      <PodcastDashboard episodes={episodes} />
     </>
   );
 }

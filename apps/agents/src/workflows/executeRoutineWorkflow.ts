@@ -56,7 +56,7 @@ import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
 import { fetchFeed, fetchPodcastFeed } from '../lib/fetchFeed.js';
-import { normalizePodcastItems } from '../lib/podcastFeed.js';
+import { normalizePodcastItems, feedImageUrl } from '../lib/podcastFeed.js';
 import { resolveTranscript } from '../lib/transcripts/resolveTranscript.js';
 import {
   insertEpisodeIfNew,
@@ -1464,6 +1464,7 @@ async function runPodcastIngest(
     result.sources_scanned += 1;
     try {
       const feed = await fetchPodcastFeed(src.feed_url);
+      const artwork = feedImageUrl(feed as { itunesImage?: unknown; image?: { url?: unknown } });
       const items = normalizePodcastItems(
         (feed.items ?? []) as Parameters<typeof normalizePodcastItems>[0],
         { cutoffMs: cutoff, maxItems: maxPerSource },
@@ -1546,9 +1547,16 @@ async function runPodcastIngest(
         }
       }
 
+      // Only overwrite stored artwork when the feed carries some — a scan that
+      // finds none leaves the previous value alone.
       await supabase
         .from('news_sources')
-        .update({ last_scanned_at: new Date().toISOString(), last_status: 'success', last_error: null })
+        .update({
+          last_scanned_at: new Date().toISOString(),
+          last_status: 'success',
+          last_error: null,
+          ...(artwork ? { image_url: artwork } : {}),
+        })
         .eq('id', src.id);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
