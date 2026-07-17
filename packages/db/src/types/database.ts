@@ -62,7 +62,6 @@ export type Database = {
       }
       advisors_partners: {
         Row: {
-          slug: string
           active: boolean
           bio: string | null
           company_id: string | null
@@ -75,13 +74,13 @@ export type Database = {
           logo_url: string | null
           name: string
           rate_notes: string | null
+          slug: string
           specialization: string | null
           type: string
           updated_at: string
           website: string | null
         }
         Insert: {
-          slug?: string | null
           active?: boolean
           bio?: string | null
           company_id?: string | null
@@ -94,13 +93,13 @@ export type Database = {
           logo_url?: string | null
           name: string
           rate_notes?: string | null
+          slug: string
           specialization?: string | null
           type: string
           updated_at?: string
           website?: string | null
         }
         Update: {
-          slug?: string | null
           active?: boolean
           bio?: string | null
           company_id?: string | null
@@ -113,6 +112,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           rate_notes?: string | null
+          slug?: string
           specialization?: string | null
           type?: string
           updated_at?: string
@@ -495,7 +495,6 @@ export type Database = {
       }
       campaigns: {
         Row: {
-          slug: string
           audience_filter: Json
           audience_persona: string | null
           created_at: string
@@ -511,6 +510,7 @@ export type Database = {
           post_slots: Json
           posts_per_week: number | null
           schedule_plan: Json | null
+          slug: string
           start_date: string | null
           status: string
           strategy: Json
@@ -521,7 +521,6 @@ export type Database = {
           workflow_run_id: string | null
         }
         Insert: {
-          slug?: string | null
           audience_filter?: Json
           audience_persona?: string | null
           created_at?: string
@@ -537,6 +536,7 @@ export type Database = {
           post_slots?: Json
           posts_per_week?: number | null
           schedule_plan?: Json | null
+          slug: string
           start_date?: string | null
           status?: string
           strategy?: Json
@@ -547,7 +547,6 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Update: {
-          slug?: string | null
           audience_filter?: Json
           audience_persona?: string | null
           created_at?: string
@@ -563,6 +562,7 @@ export type Database = {
           post_slots?: Json
           posts_per_week?: number | null
           schedule_plan?: Json | null
+          slug?: string
           start_date?: string | null
           status?: string
           strategy?: Json
@@ -669,7 +669,6 @@ export type Database = {
       }
       champions: {
         Row: {
-          slug: string
           champion_score: number
           company_id: string | null
           contact_id: string
@@ -678,11 +677,11 @@ export type Database = {
           last_contacted_at: string | null
           notes: string | null
           role_type: string
+          slug: string
           status: string
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           champion_score?: number
           company_id?: string | null
           contact_id: string
@@ -691,11 +690,11 @@ export type Database = {
           last_contacted_at?: string | null
           notes?: string | null
           role_type: string
+          slug: string
           status?: string
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           champion_score?: number
           company_id?: string | null
           contact_id?: string
@@ -704,6 +703,7 @@ export type Database = {
           last_contacted_at?: string | null
           notes?: string | null
           role_type?: string
+          slug?: string
           status?: string
           updated_at?: string
         }
@@ -796,7 +796,6 @@ export type Database = {
       }
       companies: {
         Row: {
-          slug: string
           country: string | null
           created_at: string
           created_by: string | null
@@ -806,12 +805,12 @@ export type Database = {
           name: string
           notes: string | null
           size: string | null
+          slug: string
           source: string | null
           updated_at: string
           website: string | null
         }
         Insert: {
-          slug?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -821,12 +820,12 @@ export type Database = {
           name: string
           notes?: string | null
           size?: string | null
+          slug: string
           source?: string | null
           updated_at?: string
           website?: string | null
         }
         Update: {
-          slug?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -836,6 +835,7 @@ export type Database = {
           name?: string
           notes?: string | null
           size?: string | null
+          slug?: string
           source?: string | null
           updated_at?: string
           website?: string | null
@@ -1051,7 +1051,6 @@ export type Database = {
       }
       contacts: {
         Row: {
-          slug: string
           bitcoin_literacy: string | null
           company_id: string | null
           created_at: string
@@ -1068,12 +1067,12 @@ export type Database = {
           pipeline_stage: string
           role: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid: string | null
+          slug: string
           source: string | null
           tags: string[] | null
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           bitcoin_literacy?: string | null
           company_id?: string | null
           created_at?: string
@@ -1090,12 +1089,12 @@ export type Database = {
           pipeline_stage?: string
           role?: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid?: string | null
+          slug: string
           source?: string | null
           tags?: string[] | null
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           bitcoin_literacy?: string | null
           company_id?: string | null
           created_at?: string
@@ -1112,6 +1111,7 @@ export type Database = {
           pipeline_stage?: string
           role?: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid?: string | null
+          slug?: string
           source?: string | null
           tags?: string[] | null
           updated_at?: string
@@ -1247,7 +1247,6 @@ export type Database = {
       }
       content_items: {
         Row: {
-          slug: string
           approved_at: string | null
           approved_by: string | null
           assigned_to: string | null
@@ -1276,6 +1275,7 @@ export type Database = {
           research_links: Json
           scheduled_for: string | null
           score: number | null
+          slug: string
           social_account_id: string | null
           source: string | null
           source_interaction_id: string | null
@@ -1288,7 +1288,6 @@ export type Database = {
           workflow_run_id: string | null
         }
         Insert: {
-          slug?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
@@ -1317,6 +1316,7 @@ export type Database = {
           research_links?: Json
           scheduled_for?: string | null
           score?: number | null
+          slug: string
           social_account_id?: string | null
           source?: string | null
           source_interaction_id?: string | null
@@ -1329,7 +1329,6 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Update: {
-          slug?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
@@ -1358,6 +1357,7 @@ export type Database = {
           research_links?: Json
           scheduled_for?: string | null
           score?: number | null
+          slug?: string
           social_account_id?: string | null
           source?: string | null
           source_interaction_id?: string | null
@@ -1566,12 +1566,12 @@ export type Database = {
       }
       decks: {
         Row: {
-          slug: string
           aspect_ratio: string
           created_at: string
           created_by: string | null
           id: string
           org_id: string
+          slug: string
           status: string
           theme_id: string
           title: string
@@ -1579,12 +1579,12 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
-          slug?: string | null
           aspect_ratio?: string
           created_at?: string
           created_by?: string | null
           id?: string
           org_id: string
+          slug: string
           status?: string
           theme_id?: string
           title: string
@@ -1592,12 +1592,12 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
-          slug?: string | null
           aspect_ratio?: string
           created_at?: string
           created_by?: string | null
           id?: string
           org_id?: string
+          slug?: string
           status?: string
           theme_id?: string
           title?: string
@@ -1722,33 +1722,33 @@ export type Database = {
       }
       documents: {
         Row: {
-          slug: string
           created_at: string
           created_by: string | null
           description: string | null
           id: string
+          slug: string
           tags: string[]
           title: string
           type: string
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          slug: string
           tags?: string[]
           title: string
           type: string
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          slug?: string
           tags?: string[]
           title?: string
           type?: string
@@ -2466,33 +2466,33 @@ export type Database = {
       }
       mvp_templates: {
         Row: {
-          slug: string
           created_at: string
           created_by: string | null
           description: string | null
           id: string
+          slug: string
           tags: string[] | null
           title: string
           type: string
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          slug: string
           tags?: string[] | null
           title: string
           type: string
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          slug?: string
           tags?: string[] | null
           title?: string
           type?: string
@@ -3009,7 +3009,6 @@ export type Database = {
       }
       personas: {
         Row: {
-          slug: string
           created_at: string
           created_by: string | null
           estimated_aum: string | null
@@ -3019,13 +3018,13 @@ export type Database = {
           notes: string | null
           objection_bank: string[]
           psychographic_profile: Json | null
+          slug: string
           sophistication_level: Database["public"]["Enums"]["persona_sophistication_level"]
           strategic_constraints: Json | null
           success_signals: Json | null
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           estimated_aum?: string | null
@@ -3035,13 +3034,13 @@ export type Database = {
           notes?: string | null
           objection_bank?: string[]
           psychographic_profile?: Json | null
+          slug: string
           sophistication_level?: Database["public"]["Enums"]["persona_sophistication_level"]
           strategic_constraints?: Json | null
           success_signals?: Json | null
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           estimated_aum?: string | null
@@ -3051,6 +3050,7 @@ export type Database = {
           notes?: string | null
           objection_bank?: string[]
           psychographic_profile?: Json | null
+          slug?: string
           sophistication_level?: Database["public"]["Enums"]["persona_sophistication_level"]
           strategic_constraints?: Json | null
           success_signals?: Json | null
@@ -3191,7 +3191,6 @@ export type Database = {
       }
       podcast_episodes: {
         Row: {
-          slug: string
           audio_mime_type: string | null
           audio_url: string | null
           created_at: string
@@ -3213,6 +3212,7 @@ export type Database = {
           pending_action: string | null
           published_at: string | null
           season: number | null
+          slug: string
           source_id: string | null
           summary_approved_at: string | null
           summary_approved_by: string | null
@@ -3233,7 +3233,6 @@ export type Database = {
           youtube_url: string | null
         }
         Insert: {
-          slug?: string | null
           audio_mime_type?: string | null
           audio_url?: string | null
           created_at?: string
@@ -3255,6 +3254,7 @@ export type Database = {
           pending_action?: string | null
           published_at?: string | null
           season?: number | null
+          slug: string
           source_id?: string | null
           summary_approved_at?: string | null
           summary_approved_by?: string | null
@@ -3275,7 +3275,6 @@ export type Database = {
           youtube_url?: string | null
         }
         Update: {
-          slug?: string | null
           audio_mime_type?: string | null
           audio_url?: string | null
           created_at?: string
@@ -3297,6 +3296,7 @@ export type Database = {
           pending_action?: string | null
           published_at?: string | null
           season?: number | null
+          slug?: string
           source_id?: string | null
           summary_approved_at?: string | null
           summary_approved_by?: string | null
@@ -3506,7 +3506,6 @@ export type Database = {
       }
       products_services: {
         Row: {
-          slug: string
           australian_owned: boolean
           business_name: string | null
           category: string | null
@@ -3519,10 +3518,10 @@ export type Database = {
           logo_url: string | null
           name: string
           product_image_url: string | null
+          slug: string
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
@@ -3535,10 +3534,10 @@ export type Database = {
           logo_url?: string | null
           name: string
           product_image_url?: string | null
+          slug: string
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
@@ -3551,6 +3550,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           product_image_url?: string | null
+          slug?: string
           updated_at?: string
         }
         Relationships: [
@@ -3579,7 +3579,6 @@ export type Database = {
       }
       projects: {
         Row: {
-          slug: string
           created_at: string
           created_by: string | null
           description: string | null
@@ -3587,12 +3586,12 @@ export type Database = {
           name: string
           priority: string | null
           related_company_id: string | null
+          slug: string
           status: string
           target_date: string | null
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3600,12 +3599,12 @@ export type Database = {
           name: string
           priority?: string | null
           related_company_id?: string | null
+          slug: string
           status?: string
           target_date?: string | null
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3613,6 +3612,7 @@ export type Database = {
           name?: string
           priority?: string | null
           related_company_id?: string | null
+          slug?: string
           status?: string
           target_date?: string | null
           updated_at?: string
@@ -4036,7 +4036,6 @@ export type Database = {
       }
       tasks: {
         Row: {
-          slug: string
           assigned_to: string | null
           completed_at: string | null
           created_at: string
@@ -4049,6 +4048,7 @@ export type Database = {
           project_id: string | null
           related_contact_id: string | null
           reminder_at: string | null
+          slug: string
           source: string | null
           source_activity_id: string | null
           source_interaction_id: string | null
@@ -4058,7 +4058,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          slug?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
@@ -4071,6 +4070,7 @@ export type Database = {
           project_id?: string | null
           related_contact_id?: string | null
           reminder_at?: string | null
+          slug: string
           source?: string | null
           source_activity_id?: string | null
           source_interaction_id?: string | null
@@ -4080,7 +4080,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          slug?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
@@ -4093,6 +4092,7 @@ export type Database = {
           project_id?: string | null
           related_contact_id?: string | null
           reminder_at?: string | null
+          slug?: string
           source?: string | null
           source_activity_id?: string | null
           source_interaction_id?: string | null
@@ -4508,6 +4508,7 @@ export type Database = {
           needs_disclaimer: boolean | null
           platform: string | null
           scheduled_for: string | null
+          slug: string | null
           status: string | null
           type: string | null
         }
@@ -4547,6 +4548,7 @@ export type Database = {
           objective: string | null
           pending_count: number | null
           published_count: number | null
+          slug: string | null
           start_date: string | null
           status: string | null
           total_variants: number | null
@@ -4718,6 +4720,7 @@ export type Database = {
           has_timestamps: boolean | null
           id: string | null
           published_at: string | null
+          slug: string | null
           source_name: string | null
           title: string | null
           transcribe_with_deepgram: boolean | null
@@ -4812,6 +4815,10 @@ export type Database = {
           validated: boolean
         }[]
       }
+      compute_unique_slug: {
+        Args: { p_base: string; p_id: string; p_table: string }
+        Returns: string
+      }
       match_voice_snippets: {
         Args: {
           match_count?: number
@@ -4835,6 +4842,7 @@ export type Database = {
           topic_tags: string[]
         }[]
       }
+      slugify: { Args: { txt: string }; Returns: string }
       vector_search_content: {
         Args: {
           filter_days?: number
