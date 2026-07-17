@@ -5,6 +5,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 // The insight pipeline reuses content_items filtered to type='linkedin'.
 // This action file handles the pipeline-specific fields (pain_point_id, score, research_links)
@@ -43,9 +44,8 @@ function parseResearchLinks(raw: string | undefined): Array<{ url: string; title
 }
 
 export async function createPipelineItem(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = pipelineSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(pipelineSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -74,9 +74,8 @@ export async function createPipelineItem(formData: FormData) {
 }
 
 export async function updatePipelineItem(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = pipelineSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(pipelineSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

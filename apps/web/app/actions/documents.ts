@@ -6,6 +6,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const docs = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -26,9 +27,8 @@ const versionSchema = z.object({
 });
 
 export async function createDocument(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = documentSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(documentSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -64,9 +64,8 @@ export async function createDocument(formData: FormData) {
 }
 
 export async function updateDocument(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = documentSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(documentSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -86,9 +85,8 @@ export async function updateDocument(id: string, formData: FormData) {
 }
 
 export async function createDocumentVersion(documentId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = versionSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(versionSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   let content: Record<string, unknown>;
   try {

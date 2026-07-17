@@ -5,6 +5,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const di = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('discovery_interviews');
@@ -32,12 +33,8 @@ function parsePainPoints(raw: string | undefined): string[] {
 }
 
 export async function createInterview(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = interviewSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(interviewSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -66,12 +63,8 @@ export async function createInterview(formData: FormData) {
 }
 
 export async function updateInterview(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = interviewSchema.partial().safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(interviewSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

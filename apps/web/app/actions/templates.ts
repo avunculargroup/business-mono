@@ -6,6 +6,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const tmpl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -26,9 +27,8 @@ const versionSchema = z.object({
 });
 
 export async function createTemplate(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = templateSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(templateSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -69,9 +69,8 @@ export async function createTemplate(formData: FormData) {
 }
 
 export async function updateTemplate(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = templateSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(templateSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -90,9 +89,8 @@ export async function updateTemplate(id: string, formData: FormData) {
 }
 
 export async function createTemplateVersion(templateId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = versionSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(versionSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   let content: Record<string, unknown>;
   try {

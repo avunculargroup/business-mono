@@ -6,6 +6,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champions');
@@ -84,9 +85,8 @@ export async function getChampion(id: string) {
 }
 
 export async function createChampion(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = championSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(championSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -128,9 +128,8 @@ export async function createChampion(formData: FormData) {
 }
 
 export async function updateChampion(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = championSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(championSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -173,9 +172,8 @@ export async function getChampionEvents(championId: string) {
 }
 
 export async function logChampionEvent(championId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = eventSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(eventSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

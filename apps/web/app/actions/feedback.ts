@@ -5,6 +5,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const fb = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('feedback');
@@ -32,9 +33,8 @@ function parseTags(raw: string | undefined): string[] {
 }
 
 export async function createFeedback(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = feedbackSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(feedbackSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -61,9 +61,8 @@ export async function createFeedback(formData: FormData) {
 }
 
 export async function updateFeedback(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = feedbackSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(feedbackSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

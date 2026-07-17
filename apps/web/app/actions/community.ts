@@ -5,6 +5,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const cw = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('community_watchlist');
@@ -59,9 +60,8 @@ export async function getCommunityEntries(filters?: {
 }
 
 export async function createCommunityEntry(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = communitySchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(communitySchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -91,9 +91,8 @@ export async function createCommunityEntry(formData: FormData) {
 }
 
 export async function updateCommunityEntry(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = communitySchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(communitySchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
