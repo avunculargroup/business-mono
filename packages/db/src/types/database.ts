@@ -129,7 +129,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           rate_notes?: string | null
-          slug: string
+          slug?: string
           specialization?: string | null
           type: string
           updated_at?: string
@@ -572,7 +572,7 @@ export type Database = {
           post_slots?: Json
           posts_per_week?: number | null
           schedule_plan?: Json | null
-          slug: string
+          slug?: string
           start_date?: string | null
           status?: string
           strategy?: Json
@@ -726,7 +726,7 @@ export type Database = {
           last_contacted_at?: string | null
           notes?: string | null
           role_type: string
-          slug: string
+          slug?: string
           status?: string
           updated_at?: string
         }
@@ -856,7 +856,7 @@ export type Database = {
           name: string
           notes?: string | null
           size?: string | null
-          slug: string
+          slug?: string
           source?: string | null
           updated_at?: string
           website?: string | null
@@ -1125,7 +1125,7 @@ export type Database = {
           pipeline_stage?: string
           role?: Database["public"]["Enums"]["stakeholder_role"] | null
           signal_uuid?: string | null
-          slug: string
+          slug?: string
           source?: string | null
           tags?: string[] | null
           updated_at?: string
@@ -1430,7 +1430,7 @@ export type Database = {
           research_links?: Json
           scheduled_for?: string | null
           score?: number | null
-          slug: string
+          slug?: string
           social_account_id?: string | null
           source?: string | null
           source_interaction_id?: string | null
@@ -1698,7 +1698,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           org_id: string
-          slug: string
+          slug?: string
           status?: string
           theme_id?: string
           title: string
@@ -1851,7 +1851,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          slug: string
+          slug?: string
           tags?: string[]
           title: string
           type: string
@@ -2595,7 +2595,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          slug: string
+          slug?: string
           tags?: string[] | null
           title: string
           type: string
@@ -3148,7 +3148,7 @@ export type Database = {
           notes?: string | null
           objection_bank?: string[]
           psychographic_profile?: Json | null
-          slug: string
+          slug?: string
           sophistication_level?: Database["public"]["Enums"]["persona_sophistication_level"]
           strategic_constraints?: Json | null
           success_signals?: Json | null
@@ -3368,7 +3368,7 @@ export type Database = {
           pending_action?: string | null
           published_at?: string | null
           season?: number | null
-          slug: string
+          slug?: string
           source_id?: string | null
           summary_approved_at?: string | null
           summary_approved_by?: string | null
@@ -3648,7 +3648,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           product_image_url?: string | null
-          slug: string
+          slug?: string
           updated_at?: string
         }
         Update: {
@@ -3713,7 +3713,7 @@ export type Database = {
           name: string
           priority?: string | null
           related_company_id?: string | null
-          slug: string
+          slug?: string
           status?: string
           target_date?: string | null
           updated_at?: string
@@ -4184,7 +4184,7 @@ export type Database = {
           project_id?: string | null
           related_contact_id?: string | null
           reminder_at?: string | null
-          slug: string
+          slug?: string
           source?: string | null
           source_activity_id?: string | null
           source_interaction_id?: string | null

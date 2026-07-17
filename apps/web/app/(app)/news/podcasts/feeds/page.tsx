@@ -3,6 +3,7 @@ import { Podcast, Youtube } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { formatRelativeDate } from '@/lib/utils';
+import { DeepgramToggle } from './DeepgramToggle';
 import styles from './feeds.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -109,10 +110,7 @@ export default async function PodcastFeedsPage() {
                   <div className={styles.cardHead}>
                     <span className={styles.name}>{f.name}</span>
                     {f.source_type === 'podcast' && (
-                      <span className={styles.deepgramDot}>
-                        <span className={`${styles.dot} ${f.transcribe_with_deepgram ? styles.dotOn : ''}`} />
-                        Deepgram {f.transcribe_with_deepgram ? 'on' : 'off'}
-                      </span>
+                      <DeepgramToggle sourceId={f.id} enabled={f.transcribe_with_deepgram} />
                     )}
                   </div>
                   <div className={styles.stats}>

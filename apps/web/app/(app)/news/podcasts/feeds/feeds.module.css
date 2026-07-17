@@ -76,25 +76,63 @@
   font-size: var(--text-sm);
 }
 
-.deepgramDot {
+.switchRow {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  gap: var(--space-2);
+  cursor: pointer;
   white-space: nowrap;
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-border);
+.switchRow input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-.dotOn {
+.switchTrack {
+  flex-shrink: 0;
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-border);
+  transition: background var(--duration-base) var(--ease-in-out);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-in-out);
+}
+
+.switchRow input:checked + .switchTrack {
   background: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.switchRow input:checked + .switchTrack .switchThumb {
+  transform: translateX(12px);
+}
+
+.switchRow input:focus-visible + .switchTrack {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.switchRow input:disabled {
+  cursor: default;
+}
+
+.deepgramLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 .stats {
