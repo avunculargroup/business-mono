@@ -15,7 +15,7 @@
 --
 -- Tables covered (source column in parentheses):
 --   projects(name), companies(name), personas(name), contacts(first+last),
---   champions(name), tasks(title), mvp_templates(title), content_items(title),
+--   champions(linked contact name), tasks(title), mvp_templates(title), content_items(title),
 --   podcast_episodes(title), advisors_partners(name), products_services(name),
 --   documents(title), campaigns(name), decks(title)
 -- ============================================================
@@ -159,18 +159,53 @@ DROP TRIGGER IF EXISTS trg_set_slug ON public.contacts;
 CREATE TRIGGER trg_set_slug BEFORE INSERT ON public.contacts
   FOR EACH ROW EXECUTE FUNCTION public.set_slug('first_name', 'last_name');
 
--- champions(name)
+-- champions(linked contact name) — champions has no name column of its own; the
+-- human-facing handle comes from the associated contact (contact_id → contacts).
+-- The generic set_slug() only reads columns off NEW, so champions gets a
+-- dedicated trigger that resolves the contact name.
 ALTER TABLE public.champions ADD COLUMN IF NOT EXISTS slug text;
 DO $$ DECLARE r record; BEGIN
-  FOR r IN SELECT id, name FROM public.champions WHERE slug IS NULL ORDER BY created_at, id LOOP
-    UPDATE public.champions SET slug = public.compute_unique_slug('champions', r.name, r.id) WHERE id = r.id;
+  FOR r IN
+    SELECT ch.id,
+           trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')) AS base
+    FROM public.champions ch
+    LEFT JOIN public.contacts c ON c.id = ch.contact_id
+    WHERE ch.slug IS NULL
+    ORDER BY ch.created_at, ch.id
+  LOOP
+    UPDATE public.champions SET slug = public.compute_unique_slug('champions', r.base, r.id) WHERE id = r.id;
   END LOOP;
 END $$;
 ALTER TABLE public.champions ALTER COLUMN slug SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS champions_slug_key ON public.champions (slug);
+
+-- Dedicated slug trigger: resolve the contact name from NEW.contact_id (the
+-- generic set_slug reads columns off NEW, which champions has none of).
+CREATE OR REPLACE FUNCTION public.set_champion_slug()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  base text;
+BEGIN
+  IF NEW.slug IS NOT NULL AND NEW.slug <> '' THEN
+    NEW.slug := public.compute_unique_slug('champions', NEW.slug, NEW.id);
+    RETURN NEW;
+  END IF;
+
+  SELECT trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, ''))
+    INTO base
+    FROM public.contacts c
+    WHERE c.id = NEW.contact_id;
+
+  NEW.slug := public.compute_unique_slug('champions', base, NEW.id);
+  RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS trg_set_slug ON public.champions;
 CREATE TRIGGER trg_set_slug BEFORE INSERT ON public.champions
-  FOR EACH ROW EXECUTE FUNCTION public.set_slug('name');
+  FOR EACH ROW EXECUTE FUNCTION public.set_champion_slug();
 
 -- tasks(title)
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS slug text;
