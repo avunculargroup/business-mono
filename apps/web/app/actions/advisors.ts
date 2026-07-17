@@ -4,6 +4,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const advisorSchema = z.object({
   name:                z.string().min(1, 'Name is required'),
@@ -22,9 +23,8 @@ const advisorSchema = z.object({
 });
 
 export async function createAdvisor(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = advisorSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(advisorSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -58,9 +58,8 @@ export async function createAdvisor(formData: FormData) {
 }
 
 export async function updateAdvisor(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = advisorSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(advisorSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

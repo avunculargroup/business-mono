@@ -14,7 +14,7 @@ Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work land
 | 4. Shared form hook + field components | ☐ todo | |
 | 5. Promote shared form stylesheet | ☐ todo | |
 | 6. Shared CRUD list-page scaffold | ☐ todo | |
-| 7. Shared parse/map helpers for CRUD actions | ☐ todo | |
+| 7. Shared parse/map helpers for CRUD actions | ◐ in progress | 2026-07-17 — added `lib/forms.ts`: `parseForm(schema, formData)` (returns `{ ok, data }` \| `{ ok, error }`, mirroring `getAuthedClient`) and `buildUpdate(data)` (the standardised loop-skip update mapper, `''`-stripped via an `Exclude` return type). Tested (`lib/forms.test.ts`). Adopted in 8 CRUD files (contacts, companies, advisors, products, projects, brand, segments, personas). Remaining parse sites (champions, community, feedback, interviews, lexicon, pipeline, tasks, documents, templates) follow the identical mechanical swap — incremental. |
 | 8. One set of Supabase client factories | ☐ todo | |
 | 9. Centralise status→label/color maps | ☐ todo | |
 | 10. Decompose the three giant client views | ☐ todo | |

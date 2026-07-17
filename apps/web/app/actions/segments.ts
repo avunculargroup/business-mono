@@ -4,6 +4,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 type AuthedClient = Extract<Awaited<ReturnType<typeof getAuthedClient>>, { ok: true }>['supabase'];
 const ss = (supabase: AuthedClient) => supabase.from('segment_scorecards');
@@ -17,12 +18,8 @@ const segmentSchema = z.object({
 });
 
 export async function createSegment(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = segmentSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(segmentSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -47,12 +44,8 @@ export async function createSegment(formData: FormData) {
 }
 
 export async function updateSegment(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = segmentSchema.partial().safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(segmentSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };

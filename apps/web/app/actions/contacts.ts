@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getAuthedClient } from '@/lib/action';
+import { parseForm, buildUpdate } from '@/lib/forms';
 import { humanizeError } from '@/lib/errors';
 
 const contactSchema = z.object({
@@ -20,12 +21,8 @@ const contactSchema = z.object({
 });
 
 export async function createContact(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = contactSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(contactSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -53,26 +50,14 @@ export async function createContact(formData: FormData) {
 }
 
 export async function updateContact(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = contactSchema.partial().safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(contactSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
-  const data = parsed.data;
 
-  const updateData: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== '') {
-      updateData[key] = value;
-    }
-  }
-
-  const { error } = await supabase.from('contacts').update(updateData).eq('id', id);
+  const { error } = await supabase.from('contacts').update(buildUpdate(parsed.data)).eq('id', id);
 
   if (error) return { error: humanizeError(error) };
 

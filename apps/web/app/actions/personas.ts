@@ -4,6 +4,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const personaSchema = z.object({
   name:                  z.string().min(1, 'Name is required').max(100),
@@ -33,12 +34,8 @@ function splitLines(value: string | undefined): string[] {
 }
 
 export async function createPersona(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = personaSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(personaSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const d = parsed.data;
 
@@ -84,12 +81,8 @@ export async function createPersona(formData: FormData) {
 }
 
 export async function updatePersona(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = personaSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(personaSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const d = parsed.data;
 
