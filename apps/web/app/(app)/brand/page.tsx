@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { BrandHubTabs } from '@/components/brand/BrandHubTabs';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from '@/components/brand/voiceTypes';
+import type { AccountGuidelinesRow, ContentFeedbackRow } from '@/components/brand/FeedbackGuidelinesPanel';
 
 export default async function BrandPage() {
   const supabase = await createClient();
@@ -9,7 +10,14 @@ export default async function BrandPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const [{ data: assets }, { data: voice }, { data: snippets }, { data: accounts }] = await Promise.all([
+  const [
+    { data: assets },
+    { data: voice },
+    { data: snippets },
+    { data: accounts },
+    { data: guidelines },
+    { data: feedback },
+  ] = await Promise.all([
     supabase.from('brand_assets').select('*').order('name'),
     db
       .from('brand_voice')
@@ -29,6 +37,12 @@ export default async function BrandPage() {
       // Company accounts first, then founders; stable within group.
       .order('account_type', { ascending: true })
       .order('display_name', { ascending: true }),
+    db.from('account_feedback_guidelines').select('social_account_id, guidelines'),
+    db
+      .from('content_feedback')
+      .select('id, social_account_id, verdict, feedback, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50),
   ]);
 
   return (
@@ -39,6 +53,8 @@ export default async function BrandPage() {
         snippets={(snippets as VoiceSnippetRow[]) ?? []}
         accounts={(accounts as SocialAccountRow[]) ?? []}
         assets={assets || []}
+        guidelines={(guidelines as AccountGuidelinesRow[]) ?? []}
+        feedback={(feedback as ContentFeedbackRow[]) ?? []}
       />
     </>
   );

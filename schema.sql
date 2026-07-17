@@ -2413,3 +2413,47 @@ CREATE TABLE onchain_observations (
 --     (fee_share, realised_price, hash_ribbons) are computed inline; the trend_valuation
 --     rows are unioned in from v_btc_trend_metrics. Non-trend derived metrics carry NULL
 --     deltas; trend metrics carry deltas.
+
+-- ============================================================
+-- SOCIAL DRAFT FEEDBACK (migration: 20260717000000_add_content_feedback)
+-- ============================================================
+-- Founder feedback on generated social drafts, distilled into durable
+-- per-account guidelines injected into every future generation. The /content/[id]
+-- review page inserts raw feedback; a Realtime listener on the agents server
+-- (feedbackDistillListener) claims undistilled rows and rewrites the account's
+-- guideline list via the editorial agent. Guidelines are editable in Brand Hub.
+
+-- Raw feedback log. platform / post_form denormalised and the draft text
+-- snapshotted at submit time so the distiller needs no joins. distilled_at is
+-- the distiller's claim column (NULL = not yet folded into guidelines).
+CREATE TABLE content_feedback (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id   UUID        REFERENCES content_items(id) ON DELETE SET NULL,
+  social_account_id UUID        NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
+  platform          TEXT        NOT NULL
+                      CHECK (platform IN ('linkedin', 'twitter_x')),
+  post_form         TEXT,                              -- denormalised from content_items
+  verdict           TEXT        CHECK (verdict IN ('positive', 'negative')),  -- optional quick verdict
+  feedback          TEXT        NOT NULL,
+  draft_excerpt     TEXT,                              -- snapshot of the draft the feedback referred to
+  created_by        UUID        REFERENCES auth.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  distilled_at      TIMESTAMPTZ                        -- NULL = not yet folded into guidelines
+);
+
+-- The distilled state: one row per social account, a compact JSONB string[] of
+-- standing guidelines. Deliberately NOT a key inside social_accounts.voice_profile
+-- (that JSONB is human-curated override data with merge semantics). updated_by
+-- NULL = the distiller wrote it; non-NULL = a human edited it in Brand Hub.
+CREATE TABLE account_feedback_guidelines (
+  social_account_id UUID        PRIMARY KEY REFERENCES social_accounts(id) ON DELETE CASCADE,
+  guidelines        JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- string[]
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by        UUID        REFERENCES auth.users(id)      -- NULL = distiller wrote it
+);
+
+-- Indexes: idx_content_feedback_undistilled (social_account_id) WHERE distilled_at IS NULL;
+--          idx_content_feedback_item (content_item_id).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
+-- Realtime: content_feedback REPLICA IDENTITY FULL + added to supabase_realtime
+--   publication (wakes the agents-side feedbackDistillListener on INSERT).

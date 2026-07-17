@@ -6,6 +6,28 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-17 — social draft feedback → distilled per-account guidelines
+
+**Migration:** `20260717000000_add_content_feedback.sql`
+
+The daily `social_post_from_news` routine emails founders their drafts but captured no
+feedback, so nothing improved future generations. This adds the feedback loop:
+
+- **`content_feedback`** — raw feedback log written by the `/content/[id]` review page.
+  `platform` / `post_form` are denormalised and `draft_excerpt` snapshots the draft text
+  at submit time so the distiller needs no joins (and survives draft deletion —
+  `content_item_id` is `ON DELETE SET NULL`). `distilled_at` is the distiller's claim
+  column: `NULL` = not yet folded into the account's guidelines.
+- **`account_feedback_guidelines`** — the distilled state: one row per `social_accounts`
+  row holding a compact JSONB `string[]` of standing guidelines, injected into every
+  future generation and editable in Brand Hub. Deliberately NOT a key inside
+  `social_accounts.voice_profile`, which is human-curated override data with merge
+  semantics (override counting / cleaning on save would fight machine writes).
+  `updated_by NULL` = distiller wrote it; non-`NULL` = human edit.
+- **Realtime** — `content_feedback` gets `REPLICA IDENTITY FULL` and joins the
+  `supabase_realtime` publication so an INSERT wakes the agents-side
+  `feedbackDistillListener` (web→agents handoff, same pattern as the campaign gates).
+
 ## 2026-07-16 — human-friendly slugs on detail-page tables
 
 **Migration:** `20260716020000_add_human_friendly_slugs.sql`
