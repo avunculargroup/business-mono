@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -9,7 +8,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PersonaForm } from './PersonaForm';
 import { deletePersona } from '@/app/actions/personas';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import {
   PERSONA_MARKET_SEGMENT_LABELS,
   PERSONA_SOPHISTICATION_LABELS,
@@ -18,7 +17,6 @@ import {
   type PersonaSophisticationLevel,
 } from '@platform/shared';
 import { Plus, UserSquare2, Eye, Pencil, Trash2 } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
 import styles from './PersonasList.module.css';
 
 interface PersonasListProps {
@@ -27,33 +25,25 @@ interface PersonasListProps {
 }
 
 export function PersonasList({ initialPersonas, totalCount: _totalCount }: PersonasListProps) {
-  const [showCreate, setShowCreate]     = useState(false);
-  const [editPersona, setEditPersona]   = useState<Persona | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Persona | null>(null);
-  const [isDeleting, setIsDeleting]     = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const { success, error } = useToast();
-  const { items: personas, optimisticAdd } = useOptimisticList(initialPersonas);
-
-  const handleCreated = useCallback((persona?: Persona) => {
-    if (persona) optimisticAdd(persona, async () => {});
-    setShowCreate(false);
-  }, [optimisticAdd]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deletePersona(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Persona deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
+  const {
+    items: personas,
+    showCreate,
+    setShowCreate,
+    editing: editPersona,
+    setEditing: setEditPersona,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<Persona>({
+    initialItems: initialPersonas,
+    entityLabel: 'Persona',
+    remove: deletePersona,
+  });
 
   const columns: Column<Persona>[] = [
     {
@@ -194,7 +184,7 @@ export function PersonasList({ initialPersonas, totalCount: _totalCount }: Perso
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete persona"
         description={`Permanently delete "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel="Delete persona"
