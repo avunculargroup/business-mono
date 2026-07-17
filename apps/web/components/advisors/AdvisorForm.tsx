@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
 import { createAdvisor } from '@/app/actions/advisors';
-import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
-import styles from '@/components/crm/ContactForm.module.css';
+import { useEntityForm } from '@/hooks/useEntityForm';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import styles from '@/components/ui/Form.module.css';
 
 type AdvisorRow = {
   id: string;
@@ -29,117 +29,74 @@ interface AdvisorFormProps {
 
 export function AdvisorForm({ companies, teamMembers, onSuccess, onPendingChange }: AdvisorFormProps) {
   const user = useCurrentUser();
-  const { success, error } = useToast();
-
-  const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
-    const result = await createAdvisor(formData);
-    if ('error' in result) {
-      error(result.error!);
-      return { error: result.error! };
-    }
-    success('Advisor added');
-    onSuccess({ ...result.advisor, companies: null, team_members: null } as unknown as AdvisorRow);
-    return null;
-  };
-
-  const [state, formAction, isPending] = useActionState(handleSubmit, null);
-
-  useEffect(() => {
-    onPendingChange?.(isPending);
-  }, [isPending, onPendingChange]);
+  const { state, formAction } = useEntityForm({
+    mode: 'create',
+    entityLabel: 'Advisor',
+    create: createAdvisor,
+    onSuccess: (result) =>
+      onSuccess({ ...(result.advisor as object), companies: null, team_members: null } as unknown as AdvisorRow),
+    onPendingChange,
+  });
 
   return (
     <form id="advisor-form" action={formAction} className={styles.form}>
       <input type="hidden" name="created_by" value={user.id} />
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Name *</label>
-          <input name="name" required className={styles.input} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Type *</label>
-          <select name="type" required defaultValue="" className={styles.select}>
-            <option value="" disabled>Select type</option>
-            <option value="advisor">Advisor</option>
-            <option value="partner">Partner</option>
-          </select>
-        </div>
-      </div>
+      <FormRow>
+        <FormField label="Name" name="name" required />
+        <FormSelect label="Type" name="type" required defaultValue="">
+          <option value="" disabled>Select type</option>
+          <option value="advisor">Advisor</option>
+          <option value="partner">Partner</option>
+        </FormSelect>
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Specialization</label>
-        <input name="specialization" className={styles.input} placeholder="Area of expertise or focus" />
-      </div>
+      <FormField label="Specialization" name="specialization" placeholder="Area of expertise or focus" />
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Company</label>
-          <select name="company_id" defaultValue="" className={styles.select}>
-            <option value="">None</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Engagement model</label>
-          <select name="engagement_model" defaultValue="" className={styles.select}>
-            <option value="">None</option>
-            <option value="ongoing_retainer">Ongoing retainer</option>
-            <option value="project_based">Project based</option>
-            <option value="ad_hoc">Ad hoc</option>
-            <option value="revenue_share">Revenue share</option>
-            <option value="honorary">Honorary</option>
-          </select>
-        </div>
-      </div>
+      <FormRow>
+        <FormSelect label="Company" name="company_id" defaultValue="">
+          <option value="">None</option>
+          {companies.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </FormSelect>
+        <FormSelect label="Engagement model" name="engagement_model" defaultValue="">
+          <option value="">None</option>
+          <option value="ongoing_retainer">Ongoing retainer</option>
+          <option value="project_based">Project based</option>
+          <option value="ad_hoc">Ad hoc</option>
+          <option value="revenue_share">Revenue share</option>
+          <option value="honorary">Honorary</option>
+        </FormSelect>
+      </FormRow>
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Key relationship</label>
-          <select name="key_relationship_id" defaultValue="" className={styles.select}>
-            <option value="">None</option>
-            {teamMembers.map((m) => (
-              <option key={m.id} value={m.id}>{m.full_name}</option>
-            ))}
-          </select>
-        </div>
+      <FormRow>
+        <FormSelect label="Key relationship" name="key_relationship_id" defaultValue="">
+          <option value="">None</option>
+          {teamMembers.map((m) => (
+            <option key={m.id} value={m.id}>{m.full_name}</option>
+          ))}
+        </FormSelect>
         <div className={styles.field} style={{ justifyContent: 'flex-end', paddingBottom: 'var(--space-2)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
             <input type="checkbox" name="active" defaultChecked />
-            <span className={styles.label} style={{ textTransform: 'none', letterSpacing: 'normal', marginBottom: 0 }}>Active</span>
+            <span className={styles.label} style={{ marginBottom: 0 }}>Active</span>
           </label>
         </div>
-      </div>
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Bio</label>
-        <textarea name="bio" rows={4} className={styles.textarea} placeholder="Background and experience" />
-      </div>
+      <FormTextarea label="Bio" name="bio" rows={4} placeholder="Background and experience" />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Rate notes</label>
-        <input name="rate_notes" className={styles.input} placeholder="Compensation arrangement" />
-      </div>
+      <FormField label="Rate notes" name="rate_notes" placeholder="Compensation arrangement" />
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Website</label>
-          <input name="website" type="url" className={styles.input} placeholder="https://" />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>LinkedIn</label>
-          <input name="linkedin_url" type="url" className={styles.input} placeholder="https://" />
-        </div>
-      </div>
+      <FormRow>
+        <FormField label="Website" name="website" type="url" placeholder="https://" />
+        <FormField label="LinkedIn" name="linkedin_url" type="url" placeholder="https://" />
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Logo URL</label>
-        <input name="logo_url" type="url" className={styles.input} placeholder="https://" />
-      </div>
+      <FormField label="Logo URL" name="logo_url" type="url" placeholder="https://" />
 
-      {state?.error && <p className={styles.error}>{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
     </form>
   );
 }
