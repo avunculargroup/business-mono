@@ -6,6 +6,21 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-17 — `news_sources.image_url` — show-level artwork
+
+**Migration:** `20260717000000_add_news_source_image.sql`
+
+The podcasts page (`/news/podcasts/feeds`) shows one card per podcast/YouTube
+source with artwork. Until now the artwork was borrowed from the most recently
+published episode's `image_url`, which is unreliable (per-episode art, or none
+at all). This adds a nullable **`image_url TEXT`** to `news_sources`, populated
+for podcast sources by the `podcast_ingest` routine from the feed's
+channel-level `<itunes:image>` (falling back to the standard RSS
+`<image><url>`) on each successful scan. Only overwritten when the feed carries
+artwork — a scan that finds none leaves the stored value alone. YouTube sources
+have no scan path, so they stay null and the UI keeps its episode-image
+fallback.
+
 ## 2026-07-16 — human-friendly slugs on detail-page tables
 
 **Migration:** `20260716020000_add_human_friendly_slugs.sql`

@@ -1488,6 +1488,7 @@ CREATE TABLE news_sources (
                               CHECK (source_type IN ('rss','podcast','youtube','email')),
   -- podcast / youtube config
   youtube_channel_url       TEXT,
+  image_url                 TEXT,                              -- show artwork; set by podcast_ingest from channel-level feed art
   transcribe_with_deepgram  BOOLEAN     NOT NULL DEFAULT false,
   preferred_transcript_lang TEXT        NOT NULL DEFAULT 'en',
   max_backfill_episodes     INT         NOT NULL DEFAULT 25,
