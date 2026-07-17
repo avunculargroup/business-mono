@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { Button } from '@/components/ui/Button';
@@ -8,9 +7,8 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CompanyForm } from './CompanyForm';
 import { deleteCompany } from '@/app/actions/companies';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { Plus, Building2, Eye, Pencil, Trash2 } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
 import styles from './ContactsList.module.css';
 
 type CompanyRow = {
@@ -29,35 +27,25 @@ interface CompaniesListProps {
 }
 
 export function CompaniesList({ initialCompanies, totalCount: _totalCount }: CompaniesListProps) {
-  const [showCreate, setShowCreate] = useState(false);
-  const [editCompany, setEditCompany] = useState<CompanyRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<CompanyRow | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const { success, error } = useToast();
-  const { items: companies, optimisticAdd } = useOptimisticList(initialCompanies);
-
-  const handleCompanyCreated = useCallback((company?: CompanyRow) => {
-    if (company) {
-      optimisticAdd(company, async () => {});
-    }
-    setShowCreate(false);
-  }, [optimisticAdd]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteCompany(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Company deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
+  const {
+    items: companies,
+    showCreate,
+    setShowCreate,
+    editing: editCompany,
+    setEditing: setEditCompany,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<CompanyRow>({
+    initialItems: initialCompanies,
+    entityLabel: 'Company',
+    remove: deleteCompany,
+  });
 
   const columns: Column<CompanyRow>[] = [
     {
@@ -142,7 +130,7 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
 
       {/* Create modal */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add company" size="md">
-        <CompanyForm onSuccess={handleCompanyCreated} />
+        <CompanyForm onSuccess={handleCreated} />
       </Modal>
 
       {/* Edit modal */}
@@ -176,7 +164,7 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete company"
         description={`Permanently delete ${deleteTarget?.name}? This cannot be undone.`}
         confirmLabel="Delete company"
