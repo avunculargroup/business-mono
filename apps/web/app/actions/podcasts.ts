@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -16,7 +16,9 @@ type EpisodeAction = (typeof EPISODE_ACTIONS)[number];
 export async function requestEpisodeAction(id: string, action: EpisodeAction) {
   if (!EPISODE_ACTIONS.includes(action)) return { error: 'Unknown action.' };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('podcast_episodes')
     // pending_action is picked up by the listener; resolving reflects the
@@ -53,7 +55,9 @@ export async function ingestEpisodeBrief(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid input' };
 
   const input = parsed.data;
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data, error } = await supabase
     .from('podcast_episodes')
@@ -83,7 +87,9 @@ export async function ingestEpisodeBrief(formData: FormData) {
 // persist a `proposed` summary (the web app can't reach the agent server over
 // HTTP). Also (re)generates when a proposed draft is rejected or revised.
 export async function generateEpisodeBrief(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('podcast_episodes')
     .update({ pending_action: 'summarize' })
@@ -100,7 +106,9 @@ export async function generateEpisodeBrief(id: string) {
 export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reject') {
   if (decision !== 'approve' && decision !== 'reject') return { error: 'Unknown decision.' };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const { data: current, error: readErr } = await supabase
     .from('podcast_episodes')
     .select('summary_status')
@@ -113,16 +121,11 @@ export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reje
 
   const patch =
     decision === 'approve'
-      ? await (async () => {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          return {
-            summary_status: 'approved',
-            summary_approved_at: new Date().toISOString(),
-            summary_approved_by: user?.id ?? null,
-          };
-        })()
+      ? {
+          summary_status: 'approved',
+          summary_approved_at: new Date().toISOString(),
+          summary_approved_by: user.id,
+        }
       : {
           summary_status: 'none',
           episode_summary: null,

@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { humanizeError } from '@/lib/errors';
 
@@ -83,9 +84,9 @@ export async function getFiles(filters?: FileFilters): Promise<{ files: Platform
 export async function createFileUploadUrl(
   filename: string,
 ): Promise<{ error: string } | { success: true; signedUrl: string; token: string; path: string; fileId: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Unauthenticated' };
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const ext = filename.split('.').pop()?.toLowerCase() ?? 'bin';
   const fileId = crypto.randomUUID();
@@ -107,8 +108,9 @@ export async function registerFile(params: {
   tags?: string[];
   isPublic?: boolean;
 }): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { data, error } = await supabase
     .from('platform_files')
@@ -123,7 +125,7 @@ export async function registerFile(params: {
       byte_size: params.byteSize ?? null,
       tags: params.tags ?? [],
       is_public: params.isPublic ?? false,
-      uploaded_by: user?.id ?? null,
+      uploaded_by: user.id,
     })
     .select('id')
     .single();
@@ -140,7 +142,9 @@ export async function renameFile(
   name: string,
 ): Promise<{ error?: string; success?: boolean }> {
   if (!name.trim()) return { error: 'Name is required' };
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('platform_files').update({ name: name.trim() }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
@@ -151,7 +155,9 @@ export async function updateFileTags(
   id: string,
   tags: string[],
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('platform_files').update({ tags }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
@@ -162,7 +168,9 @@ export async function updateFileVisibility(
   id: string,
   isPublic: boolean,
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('platform_files').update({ is_public: isPublic }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/files');
@@ -172,7 +180,9 @@ export async function updateFileVisibility(
 // ── Delete ────────────────────────────────────────────────
 
 export async function deleteFile(id: string): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: file } = await supabase
     .from('platform_files')

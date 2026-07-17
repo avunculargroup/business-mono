@@ -1,6 +1,6 @@
 # Review: Web App (`apps/web`) — Refactoring Opportunities
 
-**Date:** 2026-07-16 · **Status:** in progress — implementation underway (see Progress log).
+**Date:** 2026-07-16 · **Status:** in progress — all three P1 items shipped; P2/P3 open (see Progress log).
 
 ## Progress log
 
@@ -8,7 +8,7 @@ Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work land
 
 | Item | Status | Notes |
 |------|--------|-------|
-| 1. Finish `getAuthedClient()` migration | ☐ todo | |
+| 1. Finish `getAuthedClient()` migration | ☑ done | 2026-07-17 — migrated every mutating server action across 29 files to the `getAuthedClient()` preamble; read-only `get*` helpers keep raw `createClient()`. Writes previously attributed via `user?.id ?? null` now use the guaranteed `user.id` (dropping the redundant `auth.getUser()` round-trip). `auth.ts` (the sign-in flow) and read-only `podcastSearch.ts` deliberately left on `createClient()`. Typecheck + lint + 271 web tests green. |
 | 2. One error contract for server actions | ☑ done | 2026-07-16 — 21 raw `throw new Error(error.message)` across 12 read helpers now throw `humanizeError(error)`; `podcastSearch.ts` re-throws the original error so its existing catch humanizes with the Postgres `code` intact. Typecheck + 271 web tests green. |
 | 3. Delete stale type-cast escape hatches | ☑ done | 2026-07-16 — removed all Database-related `any` casts (read pages/components + `campaigns.ts` `AnyDb`) and every `as never` write-cast in the action files, restoring column/type checking on inserts & updates. Typed `routines.buildActionConfig` → `Json`; asserted three genuine boundaries honestly (see notes below). Standardised the 9 `Database` imports on `@platform/db` and deleted the dead `lib/database.ts`. Left deferred: the `useRealtimeSubscription` channel `as never` casts (hygiene item) and test fixtures. **Surfaced:** `v_campaign_matrix.slug` (human-friendly-slugs migration) is missing from the generated view type — the types lag that migration for this view column; a `pnpm --filter @platform/db generate-types` run would let the `as unknown as MatrixRow[]` narrow revert to a plain assertion. Typecheck + 271 web tests green. |
 | 4. Shared form hook + field components | ☐ todo | |
@@ -312,6 +312,11 @@ interaction models through one abstraction today buys little.
 - **`useRealtimeSubscription.ts`** carries `'postgres_changes' as never` /
   `callback as never` casts to sidestep channel typing — worth revisiting
   after item 3's type refresh.
+- **`modelConfigs.ts`** still wraps its `model_configs` upsert/delete in a
+  hand-written structural cast (`supabase as unknown as { from: … }`) — the
+  same stale-type escape hatch as item 3, but structural rather than `any`,
+  so the item-3 sweep's `no-explicit-any` grep missed it. `model_configs`
+  is now in the generated types; the cast can be removed the same way.
 
 ## Suggested sequencing
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import type {
   CompanyRecord,
   CompanyRecordType,
@@ -36,7 +37,9 @@ export async function createCompanyRecordType(params: {
   category: string;
   is_singleton: boolean;
 }): Promise<{ error: string } | { success: true; key: string }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const key = params.label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
@@ -63,7 +66,9 @@ export async function createCompanyRecordType(params: {
 export async function deleteCompanyRecordType(
   key: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: type } = await supabase
     .from('company_record_types')
@@ -114,10 +119,9 @@ export async function createCompanyRecord(params: {
   mime_type?: string;
   is_pinned?: boolean;
 }): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { data: type } = await supabase
     .from('company_record_types')
@@ -143,7 +147,7 @@ export async function createCompanyRecord(params: {
       filename:     params.filename     ?? null,
       mime_type:    params.mime_type    ?? null,
       is_pinned:    params.is_pinned    ?? false,
-      created_by:   user?.id            ?? null,
+      created_by:   user.id,
     })
     .select('id')
     .single();
@@ -164,7 +168,9 @@ export async function updateCompanyRecord(
     display_order?: number;
   },
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_records')
     .update({
@@ -185,7 +191,9 @@ export async function updateCompanyRecord(
 export async function deleteCompanyRecord(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_records')
     .delete()
@@ -204,11 +212,9 @@ export async function createCompanyUploadSignedUrl(
   filename: string,
   _mimeType: string,
 ): Promise<{ error: string } | { success: true; signedUrl: string; path: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'Unauthenticated' };
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const ext = filename.split('.').pop() ?? 'bin';
   const id = crypto.randomUUID();
@@ -249,7 +255,9 @@ export async function createDomain(params: {
   renewal_date?: string;
   notes?: string;
 }): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data, error } = await supabase
     .from('company_domains')
     .insert({
@@ -274,7 +282,9 @@ export async function updateDomain(
     notes?: string;
   },
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_domains')
     .update({
@@ -292,7 +302,9 @@ export async function updateDomain(
 export async function deleteDomain(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_domains')
     .delete()
@@ -327,7 +339,9 @@ export async function createSubscription(params: {
   account_email?: string;
   notes?: string;
 }): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data, error } = await supabase
     .from('company_subscriptions')
     .insert({
@@ -358,7 +372,9 @@ export async function updateSubscription(
     notes?: string;
   },
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_subscriptions')
     .update({
@@ -379,7 +395,9 @@ export async function updateSubscription(
 export async function deleteSubscription(
   id: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('company_subscriptions')
     .delete()

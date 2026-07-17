@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -46,8 +47,9 @@ export async function createPipelineItem(formData: FormData) {
   const parsed = pipelineSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const data = parsed.data;
 
   const { error } = await supabase.from('content_items').insert({
@@ -58,7 +60,7 @@ export async function createPipelineItem(formData: FormData) {
     topic_tags:     parseTags(data.topic_tags),
     scheduled_for:  data.scheduled_for || null,
     assigned_to:    data.assigned_to || null,
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
     pain_point_id:  data.pain_point_id || null,
     score:          data.score === '' || data.score === undefined ? null : Number(data.score),
     research_links: parseResearchLinks(data.research_links),
@@ -76,7 +78,9 @@ export async function updatePipelineItem(id: string, formData: FormData) {
   const parsed = pipelineSchema.partial().safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(parsed.data)) {
@@ -96,7 +100,9 @@ export async function updatePipelineItem(id: string, formData: FormData) {
 }
 
 export async function movePipelineItem(id: string, status: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('content_items')
     .update({ status })
@@ -130,8 +136,9 @@ export async function getPipelineItems() {
 export async function overrideValidation(id: string, validated: boolean, reason: string) {
   if (!reason.trim()) return { error: 'Reason is required for manual override.' };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { error } = await supabase
     .from('content_items')
@@ -148,7 +155,7 @@ export async function overrideValidation(id: string, validated: boolean, reason:
     trigger_type: 'manual',
     entity_type:  'content_item',
     entity_id:    id,
-    proposed_actions: { reason, validated, overridden_by: user?.id ?? null },
+    proposed_actions: { reason, validated, overridden_by: user.id },
   });
 
   revalidatePath('/discovery/pipeline');

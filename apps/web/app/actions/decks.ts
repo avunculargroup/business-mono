@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { getDefaultSlideContent, type DeckRow, type DeckSlideRow } from '@/lib/decks/schema';
 import type { SlideType } from '@platform/shared';
 import { humanizeError } from '@/lib/errors';
@@ -68,14 +69,13 @@ export async function getDeckWithSlides(
 export async function createDeck(
   title: string,
 ): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { data, error } = await supabase
     .from('decks')
-    .insert({ org_id: ORG_ID, title: title.trim(), created_by: user?.id, updated_by: user?.id })
+    .insert({ org_id: ORG_ID, title: title.trim(), created_by: user.id, updated_by: user.id })
     .select('id')
     .single();
 
@@ -88,14 +88,13 @@ export async function updateDeckMeta(
   deckId: string,
   patch: Partial<Pick<DeckRow, 'title' | 'status' | 'theme_id' | 'aspect_ratio'>>,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { error } = await supabase
     .from('decks')
-    .update({ ...patch, updated_by: user?.id })
+    .update({ ...patch, updated_by: user.id })
     .eq('id', deckId);
 
   if (error) return { error: humanizeError(error) };
@@ -107,7 +106,9 @@ export async function updateDeckMeta(
 export async function deleteDeck(
   deckId: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('decks').delete().eq('id', deckId);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/decks');
@@ -123,7 +124,9 @@ export async function addSlide(
   type: SlideType,
   insertAfterIndex?: number,
 ): Promise<{ error: string } | { success: true; slide: DeckSlideRow }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   // Determine order_index: append at end, or insert after given index
   const { data: existing } = await supabase
@@ -159,7 +162,9 @@ export async function updateSlide(
   slideId: string,
   contentPatch: Record<string, unknown>,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   // Fetch current content and merge patch
   const { data: current, error: fetchErr } = await supabase
@@ -187,7 +192,9 @@ export async function reorderSlides(
   deckId: string,
   orderedSlideIds: string[],
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const updates = orderedSlideIds.map((id, index) =>
     supabase
@@ -209,7 +216,9 @@ export async function duplicateSlide(
   deckId: string,
   slideId: string,
 ): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: slide, error: fetchErr } = await supabase
     .from('deck_slides')
@@ -240,7 +249,9 @@ export async function deleteSlide(
   deckId: string,
   slideId: string,
 ): Promise<{ error: string } | { success: true }> {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('deck_slides')
     .delete()
