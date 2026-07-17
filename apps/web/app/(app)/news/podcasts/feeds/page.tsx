@@ -24,12 +24,13 @@ export default async function PodcastFeedsPage() {
   const [{ data: sources }, { data: episodes }] = await Promise.all([
     supabase
       .from('news_sources')
-      .select('id, name, source_type, transcribe_with_deepgram, last_scanned_at')
+      .select('id, name, source_type, transcribe_with_deepgram, last_scanned_at, image_url')
       .in('source_type', ['podcast', 'youtube'])
       .order('name', { ascending: true }),
-    // Aggregated per source below: episode count, transcript coverage, and the
-    // show artwork (news_sources has no image column, so we borrow the most
-    // recently published episode's image_url — feeds fall back to channel art).
+    // Aggregated per source below: episode count, transcript coverage, and a
+    // fallback artwork (the most recently published episode's image_url) for
+    // sources without stored channel art — youtube sources have no scan path
+    // that could populate news_sources.image_url.
     supabase.from('podcast_episodes').select('source_id, transcript_status, image_url, published_at'),
   ]);
 
@@ -62,6 +63,7 @@ export default async function PodcastFeedsPage() {
       source_type: string;
       transcribe_with_deepgram: boolean | null;
       last_scanned_at: string | null;
+      image_url: string | null;
     };
     const agg = bySource.get(src.id) ?? { total: 0, available: 0, image_url: null, imageAt: -1 };
     return {
@@ -70,7 +72,7 @@ export default async function PodcastFeedsPage() {
       source_type: src.source_type,
       transcribe_with_deepgram: Boolean(src.transcribe_with_deepgram),
       last_scanned_at: src.last_scanned_at,
-      image_url: agg.image_url,
+      image_url: src.image_url ?? agg.image_url,
       episodes: agg.total,
       coverage: agg.total > 0 ? Math.round((agg.available / agg.total) * 100) : 0,
     };

@@ -2638,6 +2638,7 @@ export type Database = {
           created_by: string | null
           feed_url: string | null
           id: string
+          image_url: string | null
           inbound_address: string | null
           is_active: boolean
           last_error: string | null
@@ -2662,6 +2663,7 @@ export type Database = {
           created_by?: string | null
           feed_url?: string | null
           id?: string
+          image_url?: string | null
           inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null
@@ -2686,6 +2688,7 @@ export type Database = {
           created_by?: string | null
           feed_url?: string | null
           id?: string
+          image_url?: string | null
           inbound_address?: string | null
           is_active?: boolean
           last_error?: string | null

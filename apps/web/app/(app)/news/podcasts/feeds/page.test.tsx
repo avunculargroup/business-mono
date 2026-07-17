@@ -19,8 +19,8 @@ beforeEach(() => {
 });
 
 const sources = [
-  { id: 's1', name: 'The Show', source_type: 'podcast', transcribe_with_deepgram: true, last_scanned_at: '2026-07-15T00:00:00Z' },
-  { id: 's2', name: 'The Channel', source_type: 'youtube', transcribe_with_deepgram: false, last_scanned_at: null },
+  { id: 's1', name: 'The Show', source_type: 'podcast', transcribe_with_deepgram: true, last_scanned_at: '2026-07-15T00:00:00Z', image_url: null },
+  { id: 's2', name: 'The Channel', source_type: 'youtube', transcribe_with_deepgram: false, last_scanned_at: null, image_url: null },
 ];
 
 const episodes = [
@@ -51,7 +51,7 @@ describe('PodcastFeedsPage', () => {
     expect(screen.queryByText('Deepgram off')).not.toBeInTheDocument();
   });
 
-  it('uses the most recently published episode image as the artwork, with a placeholder otherwise', async () => {
+  it('falls back to the most recently published episode image when the source has no stored art', async () => {
     fake.__setResponse('news_sources', { data: sources, error: null });
     fake.__setResponse('podcast_episodes', { data: episodes, error: null });
 
@@ -62,11 +62,26 @@ describe('PodcastFeedsPage', () => {
     expect(images[0]).toHaveAttribute('src', 'https://art.example/new.jpg');
   });
 
+  it('prefers the source-level image_url (channel art) over episode images', async () => {
+    fake.__setResponse('news_sources', {
+      data: [{ ...sources[0], image_url: 'https://art.example/show.jpg' }],
+      error: null,
+    });
+    fake.__setResponse('podcast_episodes', { data: episodes, error: null });
+
+    const { container } = render(await PodcastFeedsPage());
+
+    expect(container.querySelector('img')).toHaveAttribute('src', 'https://art.example/show.jpg');
+  });
+
   it('queries podcast/youtube sources ordered by name and the episode fields it aggregates', async () => {
     render(await PodcastFeedsPage());
 
     expect(fake.from).toHaveBeenCalledWith('news_sources');
     const [sourcesBuilder] = fake.__buildersFor('news_sources');
+    expect(sourcesBuilder.select).toHaveBeenCalledWith(
+      'id, name, source_type, transcribe_with_deepgram, last_scanned_at, image_url',
+    );
     expect(sourcesBuilder.in).toHaveBeenCalledWith('source_type', ['podcast', 'youtube']);
     expect(sourcesBuilder.order).toHaveBeenCalledWith('name', { ascending: true });
 

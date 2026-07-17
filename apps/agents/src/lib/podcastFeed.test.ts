@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePodcastItems, parseItunesDuration, extractYoutubeUrl } from './podcastFeed.js';
+import { normalizePodcastItems, parseItunesDuration, extractYoutubeUrl, feedImageUrl } from './podcastFeed.js';
 
 describe('parseItunesDuration', () => {
   it('parses HH:MM:SS, MM:SS, and raw seconds', () => {
@@ -24,6 +24,26 @@ describe('extractYoutubeUrl', () => {
   it('returns null when no youtube link present', () => {
     expect(extractYoutubeUrl('just text https://example.com')).toBeNull();
     expect(extractYoutubeUrl(null)).toBeNull();
+  });
+});
+
+describe('feedImageUrl', () => {
+  it('prefers the channel-level itunes:image in its attribute, object, and string shapes', () => {
+    expect(feedImageUrl({ itunesImage: { $: { href: 'https://art/show.jpg' } } })).toBe('https://art/show.jpg');
+    expect(feedImageUrl({ itunesImage: { href: 'https://art/show.jpg' } })).toBe('https://art/show.jpg');
+    expect(feedImageUrl({ itunesImage: 'https://art/show.jpg' })).toBe('https://art/show.jpg');
+  });
+
+  it('falls back to the standard RSS <image><url>', () => {
+    expect(feedImageUrl({ image: { url: 'https://art/rss.jpg' } })).toBe('https://art/rss.jpg');
+    expect(feedImageUrl({ itunesImage: 'https://art/itunes.jpg', image: { url: 'https://art/rss.jpg' } })).toBe(
+      'https://art/itunes.jpg',
+    );
+  });
+
+  it('returns null when the feed carries no artwork', () => {
+    expect(feedImageUrl({})).toBeNull();
+    expect(feedImageUrl({ itunesImage: {}, image: {} })).toBeNull();
   });
 });
 

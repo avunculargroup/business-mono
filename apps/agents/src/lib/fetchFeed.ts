@@ -104,6 +104,9 @@ const podcastParser = new Parser<
   Record<string, unknown>
 >({
   customFields: {
+    // rss-parser's runtime accepts [from, to] mapping tuples for feed fields
+    // (same copyFromXML as items), but its typings only allow plain field names.
+    feed: [['itunes:image', 'itunesImage'] as unknown as string],
     item: [
       ['podcast:transcript', 'podcastTranscripts', { keepArray: true }],
       ['itunes:duration', 'itunesDuration'],

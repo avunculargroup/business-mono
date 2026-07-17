@@ -203,11 +203,14 @@ The server component (`feeds/page.tsx`) renders the whole page — there is no
 client child. It queries `news_sources` (podcast/youtube types, ordered by
 name) and `podcast_episodes` (`source_id`, `transcript_status`, `image_url`,
 `published_at`), then aggregates per source: episode count, `coverage` (percent
-of episodes with an `available` transcript), and the show artwork.
-`news_sources` has no image column, so the artwork is borrowed from the most
-recently published episode with an `image_url` (feed items commonly fall back
-to channel art); sources with no episode image get a placeholder tile with a
-Lucide `Podcast`/`Youtube` icon.
+of episodes with an `available` transcript), and the show artwork. Artwork
+prefers `news_sources.image_url` — the channel-level feed art the
+`podcast_ingest` routine stores on each successful scan (see
+`20260717000000_add_news_source_image.sql` and `feedImageUrl` in
+`apps/agents/src/lib/podcastFeed.ts`) — falling back to the most recently
+published episode with an `image_url` (YouTube sources have no scan path, so
+they only ever get the fallback); sources with neither get a placeholder tile
+with a Lucide `Podcast`/`Youtube` icon.
 
 Each card in the responsive grid (`auto-fill`, min 220px): square artwork on
 top, then the feed name, a **Deepgram on/off** pill (for `podcast` sources
