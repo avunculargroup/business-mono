@@ -35,6 +35,8 @@ interface UseEntityFormOptions {
   update?: (formData: FormData) => Promise<ActionResult>;
   onSuccess: (result: ActionResult) => void;
   onPendingChange?: (pending: boolean) => void;
+  /** Override the default `${entityLabel} created/updated` success toast. */
+  successMessage?: (mode: 'create' | 'edit') => string;
 }
 
 type FormState = { error: string } | null;
@@ -46,6 +48,7 @@ export function useEntityForm({
   update,
   onSuccess,
   onPendingChange,
+  successMessage,
 }: UseEntityFormOptions) {
   const { success, error } = useToast();
 
@@ -55,7 +58,7 @@ export function useEntityForm({
       error(result.error);
       return { error: result.error };
     }
-    success(`${entityLabel} ${mode === 'edit' ? 'updated' : 'created'}`);
+    success(successMessage ? successMessage(mode) : `${entityLabel} ${mode === 'edit' ? 'updated' : 'created'}`);
     onSuccess(result);
     return null;
   };
