@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ContactsList } from '@/components/crm/ContactsList';
+import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -11,14 +12,10 @@ export default async function ContactsPage() {
     .order('created_at', { ascending: false })
     .limit(25);
 
-  const { data: companies } = await supabase
-    .from('companies')
-    .select('id, name')
-    .order('name');
-
-  const { data: teamMembers } = await supabase
-    .from('team_members')
-    .select('id, full_name');
+  const [companies, teamMembers] = await Promise.all([
+    getCompanyOptions(supabase),
+    getTeamMemberOptions(supabase),
+  ]);
 
   return (
     <>
@@ -26,8 +23,8 @@ export default async function ContactsPage() {
       <ContactsList
         initialContacts={contacts || []}
         totalCount={count || 0}
-        companies={companies || []}
-        teamMembers={teamMembers || []}
+        companies={companies}
+        teamMembers={teamMembers}
       />
     </>
   );
