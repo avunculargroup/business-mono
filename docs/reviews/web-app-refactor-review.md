@@ -1,6 +1,6 @@
 # Review: Web App (`apps/web`) — Refactoring Opportunities
 
-**Date:** 2026-07-16 · **Status:** in progress — P1 done (items 1–3); P2 abstractions landed with broad migration (items 4–7); P3 items 8 done, 9/10/11 in progress. Remaining: finish incremental migrations, item 12 (deferred by design), and the diffuse tails of 9/10/11 (see Progress log).
+**Date:** 2026-07-16 · **Status:** substantially complete. Done: P1 (1–3), items 5/6/7/8, and all flagged hygiene items (not-found page, tz-aware dates, `useRealtimeSubscription` casts, modelConfigs straggler). Items 4/9/10/11 have their shared abstractions shipped + broad migration; their remaining tails are either diffuse/low-value or need the running app to verify safely. Item 12 deferred by design (awaits a 4th board). See per-item notes + the "Remaining" list at the foot.
 
 ## Progress log
 
@@ -14,7 +14,7 @@ Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work land
 | 4. Shared form hook + field components | ◐ in progress | 2026-07-17 — built the kit: `hooks/useEntityForm.ts` (owns the create/edit branch, toast, `useActionState`, and the `onPendingChange` relay; optional `successMessage` override) and `components/ui/FormField.tsx` (`FormField`/`FormRow`/`FormSelect`/`FormTextarea`/`FormError`, each wiring `htmlFor`/`id` + `aria-describedby`/`aria-invalid` — closes the unassociated-label a11y gap). Tested (`FormField.test.tsx`). Migrated 13 forms: Contact, Company, Segment, Project, Advisor, Persona, Product, Lexicon, Champion, plus the chip forms Feedback, Interview, Community, Template (now on `ui/TagInput`, see item 10). Each drops ~20 lines + its cross-imported feature CSS. **Remaining:** PipelineItemForm (bespoke research-links editor), ChampionEventLog, and misc forms (Routine, campaigns, fastmail, docs, brand-voice) — incremental. |
 | 5. Promote shared form stylesheet | ☑ done | 2026-07-17 — extracted `components/ui/Form.module.css` (consolidated `.form/.field/.label/.input/.select/.textarea/.row/.error` + `.required/.hint/.formError`, tokens only), consumed by the item-4 field components (the doc's "fold into field components" variant). Forms lose their cross-imports of other features' CSS as they migrate to the kit. |
 | 6. Shared CRUD list-page scaffold | ☑ done | 2026-07-17 — added `hooks/useEntityList.ts`: owns the create/edit/delete dialog-state triad, the async delete flow (confirm → action → toast → refresh), and an optimistic list (composes `useOptimisticList`). Tested (`useEntityList.test.tsx`). Migrated all 7 CRUD lists — Companies, Contacts, Segments, Personas, Interviews, discovery/Feedback, tasks/TasksView (each keeps its bespoke bits: role flow, score editor, filter bars, list/board toggle). Moved the hand-rolled ChampionsList onto `useOptimisticList`. **Left as-is:** discovery/PipelineBoard — its optimistic status-move (explicit revert + `movingId` indicator + per-move toast) doesn't map onto `useOptimisticList`'s throw-on-error API without a UX regression, so its hand-rolled `useState` is intentional. |
-| 7. Shared parse/map helpers for CRUD actions | ◐ in progress | 2026-07-17 — added `lib/forms.ts`: `parseForm(schema, formData)` (returns `{ ok, data }` \| `{ ok, error }`, mirroring `getAuthedClient`) and `buildUpdate(data)` (the standardised loop-skip update mapper, `''`-stripped via an `Exclude` return type). Tested (`lib/forms.test.ts`). Adopted in 8 CRUD files (contacts, companies, advisors, products, projects, brand, segments, personas). Remaining parse sites (champions, community, feedback, interviews, lexicon, pipeline, tasks, documents, templates) follow the identical mechanical swap — incremental. |
+| 7. Shared parse/map helpers for CRUD actions | ☑ done | 2026-07-17 — added `lib/forms.ts`: `parseForm(schema, formData)` (returns `{ ok, data }` \| `{ ok, error }`, mirroring `getAuthedClient`) and `buildUpdate(data)` (the standardised loop-skip update mapper, `''`-stripped via an `Exclude` return type). Tested (`lib/forms.test.ts`). `parseForm` adopted in **every** standard create/update action (17 files); `buildUpdate` in contacts + companies. Only `importDocxDocument` keeps its inline parse (it validates a hand-built object, not the whole FormData). |
 | 8. One set of Supabase client factories | ☑ done | 2026-07-17 — deleted the unused `packages/db` `createServerSupabaseClient`/`createBrowserSupabaseClient` (zero importers) + their index exports; `apps/web/lib/supabase/` is now the single home. Leaves `@supabase/ssr` unused in `packages/db` (droppable later) and `middleware.ts`'s auth-critical inline copy untouched. |
 | 9. Centralise status→label/color maps | ◐ in progress | 2026-07-17 — added `PIPELINE_STAGE_LABELS` + `TASK_PRIORITY_LABELS` to `@platform/shared` (the two enums that lacked maps); adopted in PipelineChip/PriorityChip + ContactForm's stage options; colours stay in the chips. **Not done (deliberately):** deriving AgentActivityCard's `AGENT_LABELS` / RoutineForm's `AGENT_OPTIONS` from `AGENT_REGISTRY` — they carry short-label formats, `enabled` flags, "coming soon" copy, and ordering the registry doesn't, so deriving would change text or lose config. Per-component colour-map moves remain opportunistic. |
 | 10. Decompose the three giant client views | ◐ in progress | 2026-07-17 — shared tag inputs: `components/ui/TagInput` (form-oriented) + `components/ui/ChipField` (controlled primitive; TagInput wraps it). Unified the chip inputs across InterviewForm, FeedbackForm, TemplateForm, CommunityForm (had a local duplicate), and RoutineForm's `ChipInput`. Pure extractions from the giant views (no behaviour change, unit-tested): `lib/files.ts` (format/upload helpers) + `components/files/FileIcon` (FilesView 913→867); `lib/podcasts.ts` metrics — `computeKpis`/`computeSourceBreakdown`/`dailyCounts`/`episodeRecency`/`statusOptions` (PodcastDashboard 622→517); RoutineForm 582→535. **Remaining (deferred — better driven with the app running):** splitting FilesView's 4 stateful dialogs + PodcastDashboard's inline chart components (`KpiCard`/`StackedBar`/`AreaChart`) into their own files, and swapping FilesView's bespoke-styled `TagInput` onto `ChipField` (a visual change). |
@@ -326,3 +326,21 @@ Items 1–3 are small, independent, correctness-flavoured PRs — do them first.
 Item 4+5 is one project (form kit) with incremental migration; item 6 follows
 it naturally. Items 7–11 are opportunistic — adopt when touching the relevant
 files. Item 12 waits for a trigger.
+
+## Remaining after this pass (2026-07-17)
+
+Everything above is done except these tails, left deliberately:
+
+- **Item 4** — migrate the last forms (PipelineItemForm's bespoke research-links
+  editor, ChampionEventLog, Routine/campaigns/fastmail/docs/brand-voice forms).
+  Mechanical; do when touching each.
+- **Item 9** — per-component colour-map moves (opportunistic). Agent-list
+  derivation intentionally skipped (would change text / lose config).
+- **Item 10** — split FilesView's 4 stateful dialogs + PodcastDashboard's inline
+  chart components into their own files, and move FilesView's bespoke `TagInput`
+  onto `ChipField` (a visual change). Better driven with the app running.
+- **Item 11** — per-feature `REVALIDATE` path constants + dropping redundant
+  client `router.refresh()` (diffuse, low value).
+- **Item 12** — board abstraction; awaits a 4th board.
+- **Chore** — `@supabase/ssr` is now an unused dep in `packages/db` (droppable);
+  `middleware.ts` still inlines its own client (auth-critical, left as-is).
