@@ -10,6 +10,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable } from '@/components/ui/DataTable';
 import { createDomain, updateDomain, deleteDomain } from '@/app/actions/company';
 import { useToast } from '@/providers/ToastProvider';
+import { formatDate } from '@/lib/utils';
 import type { CompanyDomain } from '@platform/shared';
 import styles from './DomainsSection.module.css';
 
@@ -19,7 +20,7 @@ function renewalChip(dateStr: string | null): React.ReactNode {
   if (days < 0) return <StatusChip label="Expired" color="destructive" />;
   if (days <= 30) return <StatusChip label={`${days}d`} color="destructive" />;
   if (days <= 90) return <StatusChip label={`${days}d`} color="warning" />;
-  return <StatusChip label={new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} color="neutral" />;
+  return <StatusChip label={formatDate(dateStr)} color="neutral" />;
 }
 
 interface DomainFormState {
