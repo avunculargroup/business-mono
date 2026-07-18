@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { MediaEmbed } from '@/components/podcasts/MediaEmbed';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useToast } from '@/providers/ToastProvider';
-import { formatRelativeDate, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import {
   formatTimestamp,
   estimateDeepgramCost,
@@ -48,21 +48,11 @@ export interface DashboardEpisode {
   topic_tags: string[];
 }
 
-export interface FeedHealth {
-  name: string;
-  source_type: string;
-  transcribe_with_deepgram: boolean;
-  last_scanned_at: string | null;
-  episodes: number;
-  coverage: number;
-}
-
 interface Props {
   episodes: DashboardEpisode[];
-  feeds: FeedHealth[];
 }
 
-export function PodcastDashboard({ episodes: initial, feeds }: Props) {
+export function PodcastDashboard({ episodes: initial }: Props) {
   const router = useRouter();
   const { success, error } = useToast();
   const { items: episodes, optimisticUpdate } = useOptimisticList(initial);
@@ -251,36 +241,6 @@ export function PodcastDashboard({ episodes: initial, feeds }: Props) {
           <AreaChart points={timeline} />
         </section>
       </div>
-
-      {/* ── Per-feed health ── */}
-      {feeds.length > 0 && (
-        <section className={styles.panel}>
-          <h2 className={styles.panelTitle}>Feed health</h2>
-          <div className={styles.feedGrid}>
-            {feeds.map((f) => (
-              <div key={f.name} className={styles.feedCard}>
-                <div className={styles.feedHead}>
-                  <span className={styles.feedName}>{f.name}</span>
-                  {f.source_type === 'podcast' && (
-                    <span className={styles.deepgramDot}>
-                      <span className={`${styles.dot} ${f.transcribe_with_deepgram ? styles.dotOn : ''}`} />
-                      Deepgram {f.transcribe_with_deepgram ? 'on' : 'off'}
-                    </span>
-                  )}
-                </div>
-                <div className={styles.feedStats}>
-                  <span className={styles.mono}>{f.episodes}</span> episodes
-                  <span className={styles.feedDivider}>·</span>
-                  <span className={styles.mono}>{f.coverage}%</span> transcribed
-                </div>
-                <div className={styles.feedRun}>
-                  Last run {f.last_scanned_at ? formatRelativeDate(f.last_scanned_at) : 'never'}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── Recent episodes with media ── */}
       {recent.length > 0 && (

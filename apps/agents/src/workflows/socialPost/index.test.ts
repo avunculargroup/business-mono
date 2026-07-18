@@ -186,6 +186,46 @@ describe('runSocialPost', () => {
     expect(liPrompt).toContain('We keep saying the same thing.');
   });
 
+  it('feeds distilled feedback guidelines into the editor + Charlie prompts', async () => {
+    wireHappyPath();
+    fakeSupabase.__setResponse('account_feedback_guidelines', {
+      data: [
+        { social_account_id: 'acc-li', guidelines: ['Never open with a question.'] },
+        { social_account_id: 'acc-x', guidelines: ['Skip hashtags.'] },
+      ],
+      error: null,
+    });
+
+    await runSocialPost(ROUTINE);
+
+    // The editor sees the selection (LinkedIn) account's standing feedback.
+    const editorPrompt = editorGenerate.mock.calls[0][0][0].content as string;
+    expect(editorPrompt).toContain('Standing feedback');
+    expect(editorPrompt).toContain('Never open with a question.');
+
+    // Each Charlie draft carries its own account's guidelines block.
+    const liPrompt = charlieGenerate.mock.calls[0][0][0].content as string;
+    expect(liPrompt).toContain('Standing feedback from the founder');
+    expect(liPrompt).toContain('Never open with a question.');
+    const xPrompt = charlieGenerate.mock.calls[1][0][0].content as string;
+    expect(xPrompt).toContain('Skip hashtags.');
+    expect(xPrompt).not.toContain('Never open with a question.');
+  });
+
+  it('drafts without guidelines when the guidelines read fails', async () => {
+    wireHappyPath();
+    fakeSupabase.__setResponse('account_feedback_guidelines', {
+      data: null,
+      error: { message: 'down' },
+    });
+
+    const outcome = await runSocialPost(ROUTINE);
+
+    expect(outcome.status).toBe('success');
+    const liPrompt = charlieGenerate.mock.calls[0][0][0].content as string;
+    expect(liPrompt).not.toContain('Standing feedback');
+  });
+
   it('runs one rewrite pass when the first draft trips the AI-tell linter', async () => {
     wireHappyPath();
     // Single account to keep call-counting unambiguous.

@@ -62,6 +62,12 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     label: 'Market analyst',
     description: 'Writes the daily market report intro from on-chain + macro trends (internal to the market_report routine)',
   },
+  {
+    key: 'newsVerifier',
+    type: 'agent',
+    label: 'News verifier',
+    description: 'Fact-checks the daily news digest intro against the curated stories (internal to the news_curation routine)',
+  },
 
   // ── Recorder workflow steps ───────────────────────────────────────────────
   {
@@ -163,6 +169,14 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     description: 'Charlie writes the one-sentence mood/topic summary for the curated set',
     workflow: 'executeRoutine',
     fallbackAgent: 'charlie',
+  },
+  {
+    key: 'executeRoutine.news_curation_verify',
+    type: 'workflow_step',
+    label: 'News curation — verify intro',
+    description: 'Fact-checks the drafted digest intro against the stories\' key facts and rewrites unsupported claims',
+    workflow: 'executeRoutine',
+    fallbackAgent: 'newsVerifier',
   },
 
   // ── Newsletter workflow steps ─────────────────────────────────────────────
@@ -283,6 +297,14 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     description: 'Lex classifies advice risk and decides on a disclaimer for the founder post',
     workflow: 'social_post',
     fallbackAgent: 'lex',
+  },
+  {
+    key: 'social_post.distill_feedback',
+    type: 'workflow_step',
+    label: 'Distill feedback guidelines',
+    description: 'The editor folds founder review feedback into the account\'s standing guideline list',
+    workflow: 'social_post',
+    fallbackAgent: 'editor',
   },
 
   // ── Content compliance review (Lex, on draft persistence) ──────────────────

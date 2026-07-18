@@ -63,4 +63,22 @@ describe('ContentEditor', () => {
 
     expect(screen.getByRole('button', { name: 'Copy text' })).toBeInTheDocument();
   });
+
+  it('shows the feedback box only for drafts linked to a social account', () => {
+    const { rerender } = render(
+      <ContentEditor
+        item={{ ...baseItem, is_thread: false, body: 'Post.', social_account_id: 'acc-li' }}
+        threadSegments={[]}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Save feedback' })).toBeInTheDocument();
+
+    rerender(
+      <ContentEditor
+        item={{ ...baseItem, is_thread: false, body: 'Post.', social_account_id: null }}
+        threadSegments={[]}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Save feedback' })).not.toBeInTheDocument();
+  });
 });

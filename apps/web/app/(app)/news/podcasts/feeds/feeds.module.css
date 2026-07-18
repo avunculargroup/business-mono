@@ -1,0 +1,151 @@
+.container {
+  padding: var(--space-6);
+  max-width: var(--content-max-width);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.emptyLink {
+  color: var(--color-accent);
+}
+
+.emptyLink:hover {
+  color: var(--color-accent-hover);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.artwork {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.artworkPlaceholder {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.name {
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.switchRow input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switchTrack {
+  flex-shrink: 0;
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-border);
+  transition: background var(--duration-base) var(--ease-in-out);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-in-out);
+}
+
+.switchRow input:checked + .switchTrack {
+  background: var(--color-accent);
+}
+
+.switchRow input:checked + .switchTrack .switchThumb {
+  transform: translateX(12px);
+}
+
+.switchRow input:focus-visible + .switchTrack {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.switchRow input:disabled {
+  cursor: default;
+}
+
+.deepgramLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.stats {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.divider {
+  margin: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+.run {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}

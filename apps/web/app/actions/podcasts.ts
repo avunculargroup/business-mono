@@ -80,6 +80,23 @@ export async function ingestEpisodeBrief(formData: FormData) {
   return { success: true, id: (data as { id: string }).id };
 }
 
+// Toggle a podcast source's Deepgram transcription setting from the feeds page.
+// A plain DB flip on news_sources.transcribe_with_deepgram — the scan path reads
+// it on the next run, so there's no agent round-trip.
+export async function setDeepgramTranscription(id: string, enabled: boolean) {
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { error } = await supabase
+    .from('news_sources')
+    .update({ transcribe_with_deepgram: enabled })
+    .eq('id', id);
+
+  if (error) return { error: humanizeError(error) };
+  revalidatePath('/news/podcasts/feeds');
+  return { success: true };
+}
+
 // ── Episode intelligence (Phase 1: summary) ──────────────────────────────────
 
 // Request the episode-intelligence pass. Writes pending_action = 'summarize';

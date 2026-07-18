@@ -66,6 +66,15 @@ function imageUrl(raw: unknown): string | null {
   return typeof href === 'string' ? href : null;
 }
 
+// Channel-level show artwork: <itunes:image> (surfaced by fetchPodcastFeed's
+// feed customField), falling back to the standard RSS <image><url> that
+// rss-parser exposes as feed.image.
+export function feedImageUrl(feed: { itunesImage?: unknown; image?: { url?: unknown } }): string | null {
+  const itunes = imageUrl(feed.itunesImage);
+  if (itunes) return itunes;
+  return typeof feed.image?.url === 'string' ? feed.image.url : null;
+}
+
 function toInt(raw: string | undefined): number | null {
   if (!raw) return null;
   const n = Number(raw.trim());

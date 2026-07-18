@@ -47,6 +47,7 @@ import { fetchUrl } from '../agents/researcher/tools.js';
 import { coerceToSchema } from './newsletter/coerce.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
+import { verifyMoodSummary } from './newsCurationVerify.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
@@ -56,7 +57,7 @@ import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
 import { normalizeFeedItems } from '../lib/newsFeed.js';
 import { fetchFeed, fetchPodcastFeed } from '../lib/fetchFeed.js';
-import { normalizePodcastItems } from '../lib/podcastFeed.js';
+import { normalizePodcastItems, feedImageUrl } from '../lib/podcastFeed.js';
 import { resolveTranscript } from '../lib/transcripts/resolveTranscript.js';
 import {
   insertEpisodeIfNew,
@@ -365,6 +366,8 @@ async function runResearchDigest(
 /** One normalized item in the curation candidate pool. */
 interface CurationCandidate extends NewsCurationStory {
   summary: string;
+  /** Extracted key points (news items); empty for podcasts. Used by the intro fact-check. */
+  key_points: string[];
   published_at: string | null;
 }
 
@@ -396,7 +399,7 @@ export async function runNewsCuration(
   const [newsRes, podcastRes] = await Promise.all([
     supabase
       .from('news_items')
-      .select('id, title, url, summary, category, source_name, relevance_score, published_at')
+      .select('id, title, url, summary, key_points, category, source_name, relevance_score, published_at')
       .gte('fetched_at', since)
       .neq('status', 'archived')
       .order('relevance_score', { ascending: false, nullsFirst: false })
@@ -425,6 +428,9 @@ export async function runNewsCuration(
     source_name: (r.source_name as string) ?? 'News',
     category: (r.category as string) ?? 'news',
     summary: (r.summary as string | null) ?? '',
+    key_points: Array.isArray(r.key_points)
+      ? (r.key_points as unknown[]).filter((p): p is string => typeof p === 'string')
+      : [],
     published_at: (r.published_at as string | null) ?? null,
   }));
 
@@ -441,6 +447,7 @@ export async function runNewsCuration(
       category: 'podcast',
       image_url: (r.image_url as string | null) ?? undefined,
       summary: (r.description as string | null) ?? '',
+      key_points: [],
       published_at: (r.published_at as string | null) ?? null,
     };
   });
@@ -528,6 +535,30 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
     moodSummary = coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
   } catch (err) {
     curationLog.warn({ err }, 'Charlie mood summary failed');
+  }
+
+  // ── Fact-check the intro against the stories' key facts ──────────────────────
+  // Charlie is primed on BTS's corporate-treasury audience and works from a
+  // truncated summary, so it can reframe a story onto that audience (e.g. cast an
+  // individuals/sole-trader tax change as a corporate obligation). The verifier
+  // passes a faithful draft through, rewrites an unsupported one, or — when it
+  // can't be salvaged — hands back a neutral fallback. Best-effort: never throws.
+  if (moodSummary) {
+    const neutralFallback = `Curated ${selected.length} ${selected.length === 1 ? 'story' : 'stories'}.`;
+    const verification = await verifyMoodSummary({
+      draft: moodSummary,
+      stories: selected.map((c) => ({
+        title: c.title,
+        source_name: c.source_name,
+        key_points: c.key_points,
+        summary: c.summary,
+      })),
+      neutralFallback,
+    });
+    if (verification.status !== 'ok') {
+      curationLog.info({ status: verification.status }, 'intro adjusted by verifier');
+    }
+    moodSummary = verification.summary;
   }
 
   // ── Headline image: walk the ranked stories and use the first that resolves ──
@@ -1464,6 +1495,7 @@ async function runPodcastIngest(
     result.sources_scanned += 1;
     try {
       const feed = await fetchPodcastFeed(src.feed_url);
+      const artwork = feedImageUrl(feed as { itunesImage?: unknown; image?: { url?: unknown } });
       const items = normalizePodcastItems(
         (feed.items ?? []) as Parameters<typeof normalizePodcastItems>[0],
         { cutoffMs: cutoff, maxItems: maxPerSource },
@@ -1546,9 +1578,16 @@ async function runPodcastIngest(
         }
       }
 
+      // Only overwrite stored artwork when the feed carries some — a scan that
+      // finds none leaves the previous value alone.
       await supabase
         .from('news_sources')
-        .update({ last_scanned_at: new Date().toISOString(), last_status: 'success', last_error: null })
+        .update({
+          last_scanned_at: new Date().toISOString(),
+          last_status: 'success',
+          last_error: null,
+          ...(artwork ? { image_url: artwork } : {}),
+        })
         .eq('id', src.id);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

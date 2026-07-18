@@ -42,6 +42,17 @@ describe('buildEditorSelectionPrompt', () => {
     const p = buildEditorSelectionPrompt([STORY], 'V', 'Chris');
     expect(p).not.toContain('Recently used forms');
   });
+
+  it('adds the standing-feedback section when guidelines are supplied', () => {
+    const p = buildEditorSelectionPrompt([STORY], 'V', 'Chris', [], ['Stop posting about ETF flows.']);
+    expect(p).toContain('## Standing feedback from Chris');
+    expect(p).toContain('- Stop posting about ETF flows.');
+  });
+
+  it('omits the standing-feedback section when there are no guidelines', () => {
+    const p = buildEditorSelectionPrompt([STORY], 'V', 'Chris');
+    expect(p).not.toContain('Standing feedback');
+  });
 });
 
 describe('buildSocialPostPrompt', () => {
@@ -131,6 +142,24 @@ describe('buildSocialPostPrompt', () => {
     });
     expect(p).toContain('Do not repeat yourself');
     expect(p).toContain('- The RBA held rates again.');
+  });
+
+  it('injects the standing-feedback block when supplied and omits it otherwise', () => {
+    const base = {
+      story: STORY,
+      form: 'flat_observation' as const,
+      platform: 'linkedin' as const,
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+    };
+    const withBlock = buildSocialPostPrompt({
+      ...base,
+      guidelinesBlock: '## Standing feedback from the founder\n- Skip hashtags.',
+    });
+    expect(withBlock).toContain('## Standing feedback from the founder');
+    expect(withBlock).toContain('- Skip hashtags.');
+    expect(buildSocialPostPrompt(base)).not.toContain('Standing feedback');
   });
 
   it('omits the anti-repetition block when there are no recent openings', () => {
