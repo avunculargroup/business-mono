@@ -51,20 +51,8 @@ async function fetchOpenRouterCatalog(): Promise<{ models: CatalogModel[]; error
 export default async function ModelSettingsPage() {
   const supabase = await createClient();
 
-  // model_configs isn't in the generated Database types yet (regenerate after
-  // the migration applies). Until then, cast at the boundary and keep the
-  // shape narrow.
   const [{ data, error }, catalog] = await Promise.all([
-    (supabase as unknown as {
-      from: (t: string) => {
-        select: (cols: string) => Promise<{
-          data: Array<{ scope_key: string; model_id: string; updated_at: string }> | null;
-          error: { message: string } | null;
-        }>;
-      };
-    })
-      .from('model_configs')
-      .select('scope_key, model_id, updated_at'),
+    supabase.from('model_configs').select('scope_key, model_id, updated_at'),
     fetchOpenRouterCatalog(),
   ]);
 

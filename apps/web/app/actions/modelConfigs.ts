@@ -33,14 +33,7 @@ export async function upsertModelConfig(scopeKey: string, modelId: string) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
-  // Casts: model_configs isn't in the generated Database types until
-  // `pnpm --filter @platform/db generate-types` is re-run after the
-  // migration is applied. Once that happens these can be removed.
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      upsert: (row: Record<string, unknown>, opts: { onConflict: string }) => Promise<{ error: { message: string } | null }>;
-    };
-  })
+  const { error } = await supabase
     .from('model_configs')
     .upsert(
       {
@@ -64,11 +57,7 @@ export async function resetModelConfig(scopeKey: string) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      delete: () => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> };
-    };
-  })
+  const { error } = await supabase
     .from('model_configs')
     .delete()
     .eq('scope_key', scopeKey);
