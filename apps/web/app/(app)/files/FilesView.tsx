@@ -3,11 +3,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Search, X, Download, Pencil, Trash2, Eye, EyeOff,
-  FileText, FileImage, File, Tag, Files, Link2,
+  Tag, Files, Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/providers/ToastProvider';
+import { FileIcon } from '@/components/files/FileIcon';
+import { formatBytes, isImage, isPdf, getFileExt, uploadWithProgress } from '@/lib/files';
 import type { PlatformFile } from '@/app/actions/files';
 import {
   createFileUploadUrl,
@@ -27,54 +29,6 @@ const SUGGESTED_TAGS = [
   'proposal', 'contract', 'financial', 'report', 'presentation',
   'brand', 'research', 'marketing', 'bitcoin', 'client', 'template', 'internal',
 ];
-
-// ── Helpers ────────────────────────────────────────────────
-
-function formatBytes(bytes: number | null): string {
-  if (!bytes) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function isImage(mime: string): boolean {
-  return mime.startsWith('image/');
-}
-
-function isPdf(mime: string): boolean {
-  return mime === 'application/pdf';
-}
-
-function getFileExt(filename: string): string {
-  return filename.split('.').pop()?.toLowerCase() ?? 'file';
-}
-
-function FileIcon({ mime, size = 32 }: { mime: string; size?: number }) {
-  if (isImage(mime)) return <FileImage size={size} strokeWidth={1.5} />;
-  if (isPdf(mime)) return <FileText size={size} strokeWidth={1.5} />;
-  return <File size={size} strokeWidth={1.5} />;
-}
-
-function uploadWithProgress(
-  signedUrl: string,
-  file: File,
-  onProgress: (pct: number) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', signedUrl);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    });
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`Upload failed with status ${xhr.status}`));
-    });
-    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
-    xhr.send(file);
-  });
-}
 
 // ── Types ──────────────────────────────────────────────────
 

@@ -213,3 +213,61 @@ describe('highlightText', () => {
     expect(highlightText('nothing here', 'zzz')).toEqual([{ text: 'nothing here', match: false }]);
   });
 });
+
+import { computeKpis, computeSourceBreakdown, dailyCounts, episodeRecency, statusOptions } from './podcasts';
+
+describe('computeKpis', () => {
+  it('counts available, in-progress, needs-attention, and indexed', () => {
+    const kpis = computeKpis([
+      { transcript_status: 'available', embedded_at: '2026-01-01' },
+      { transcript_status: 'transcribing', embedded_at: null },
+      { transcript_status: 'failed', embedded_at: null },
+      { transcript_status: 'skipped', embedded_at: null },
+      { transcript_status: 'resolving', embedded_at: null },
+    ]);
+    expect(kpis).toEqual({ total: 5, available: 1, inProgress: 2, needsAttention: 2, indexed: 1 });
+  });
+});
+
+describe('computeSourceBreakdown', () => {
+  it('only counts available transcripts and buckets the rest as none', () => {
+    const b = computeSourceBreakdown([
+      { transcript_status: 'available', transcript_source: 'feed_tag' },
+      { transcript_status: 'available', transcript_source: 'youtube' },
+      { transcript_status: 'available', transcript_source: 'deepgram' },
+      { transcript_status: 'available', transcript_source: null },
+      { transcript_status: 'failed', transcript_source: null },
+    ]);
+    expect(b).toEqual({ feedTag: 1, youtube: 1, deepgram: 1, none: 2, total: 5 });
+  });
+});
+
+describe('episodeRecency', () => {
+  it('prefers published_at, falls back to created_at, then 0', () => {
+    expect(episodeRecency({ published_at: '2026-01-02', created_at: '2026-01-01' })).toBe(
+      new Date('2026-01-02').getTime(),
+    );
+    expect(episodeRecency({ published_at: null, created_at: '2026-01-01' })).toBe(
+      new Date('2026-01-01').getTime(),
+    );
+    expect(episodeRecency({ published_at: null, created_at: null })).toBe(0);
+  });
+});
+
+describe('dailyCounts', () => {
+  it('returns one MM-DD bucket per day and tallies today', () => {
+    const today = new Date().toISOString();
+    const series = dailyCounts([{ created_at: today }, { created_at: today }], 7);
+    expect(series).toHaveLength(7);
+    expect(series.every((p) => /^\d{2}-\d{2}$/.test(p.date))).toBe(true);
+    expect(series[series.length - 1].count).toBe(2);
+  });
+});
+
+describe('statusOptions', () => {
+  it('returns [value, label] pairs for every transcript status', () => {
+    const opts = statusOptions();
+    expect(opts.length).toBeGreaterThan(0);
+    expect(opts.every(([v, l]) => typeof v === 'string' && typeof l === 'string')).toBe(true);
+  });
+});

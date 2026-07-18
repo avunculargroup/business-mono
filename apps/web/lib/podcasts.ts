@@ -197,3 +197,107 @@ export const TRANSCRIPT_SOURCE_LABELS: Record<TranscriptSource, string> = {
   deepgram: 'Deepgram',
   manual: 'Manual',
 };
+
+// ── Dashboard metrics ────────────────────────────────────────────────────────
+// Pure aggregations for the podcast dashboard, extracted from PodcastDashboard
+// so the counting logic is unit-testable and the view just renders the result.
+
+/** Transcript statuses that count as "in progress" / "needs attention" on the
+ *  dashboard KPI row. */
+export const IN_PROGRESS_STATUSES: TranscriptStatus[] = ['resolving', 'transcribing'];
+export const NEEDS_ATTENTION_STATUSES: TranscriptStatus[] = ['failed', 'skipped'];
+
+export interface PodcastKpiEpisode {
+  transcript_status: TranscriptStatus;
+  embedded_at: string | null;
+}
+
+export interface PodcastKpis {
+  total: number;
+  available: number;
+  inProgress: number;
+  needsAttention: number;
+  indexed: number;
+}
+
+/** Headline counts for the KPI row. */
+export function computeKpis(episodes: PodcastKpiEpisode[]): PodcastKpis {
+  let available = 0;
+  let inProgress = 0;
+  let needsAttention = 0;
+  let indexed = 0;
+  for (const e of episodes) {
+    if (e.transcript_status === 'available') available += 1;
+    if (IN_PROGRESS_STATUSES.includes(e.transcript_status)) inProgress += 1;
+    if (NEEDS_ATTENTION_STATUSES.includes(e.transcript_status)) needsAttention += 1;
+    if (e.embedded_at) indexed += 1;
+  }
+  return { total: episodes.length, available, inProgress, needsAttention, indexed };
+}
+
+export interface PodcastSourceEpisode {
+  transcript_status: TranscriptStatus;
+  transcript_source: TranscriptSource | null;
+}
+
+export interface PodcastSourceBreakdown {
+  feedTag: number;
+  youtube: number;
+  deepgram: number;
+  none: number;
+  total: number;
+}
+
+/** How the available transcripts were obtained (feed tag / YouTube / Deepgram),
+ *  with the remainder counted as "none". */
+export function computeSourceBreakdown(episodes: PodcastSourceEpisode[]): PodcastSourceBreakdown {
+  let feedTag = 0;
+  let youtube = 0;
+  let deepgram = 0;
+  for (const e of episodes) {
+    if (e.transcript_status !== 'available') continue;
+    if (e.transcript_source === 'feed_tag') feedTag += 1;
+    else if (e.transcript_source === 'youtube') youtube += 1;
+    else if (e.transcript_source === 'deepgram') deepgram += 1;
+  }
+  const none = episodes.length - feedTag - youtube - deepgram;
+  return { feedTag, youtube, deepgram, none, total: episodes.length };
+}
+
+/** Sort key for "most recent" — published date, falling back to creation date. */
+export function episodeRecency(e: { published_at: string | null; created_at: string | null }): number {
+  const d = e.published_at ?? e.created_at;
+  return d ? new Date(d).getTime() : 0;
+}
+
+function dayKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Episodes ingested per day over the trailing N days (by created_at), labelled MM-DD. */
+export function dailyCounts(
+  episodes: { created_at: string | null }[],
+  days: number,
+): { date: string; count: number }[] {
+  const buckets = new Map<string, number>();
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    buckets.set(dayKey(d), 0);
+  }
+  for (const e of episodes) {
+    if (!e.created_at) continue;
+    const key = dayKey(new Date(e.created_at));
+    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  return Array.from(buckets.entries()).map(([date, count]) => ({ date: date.slice(5), count }));
+}
+
+/** [value, label] pairs for the transcript-status filter dropdown. */
+export function statusOptions(): [string, string][] {
+  return (Object.keys(TRANSCRIPT_STATUS_LABELS) as TranscriptStatus[]).map((s) => [
+    s,
+    TRANSCRIPT_STATUS_LABELS[s],
+  ]);
+}
