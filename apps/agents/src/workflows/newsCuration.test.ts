@@ -11,6 +11,7 @@ const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const editorGenerate = vi.fn();
 const charlieGenerate = vi.fn();
 const fetchOgImage = vi.fn();
+const verifyMoodSummary = vi.fn();
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../agents/researcher/index.js', () => ({ rex: { generate: vi.fn() } }));
@@ -28,6 +29,7 @@ vi.mock('../lib/transcripts/store.js', () => ({
   storeAvailableTranscript: vi.fn(),
 }));
 vi.mock('../lib/fetchOgImage.js', () => ({ fetchOgImage }));
+vi.mock('./newsCurationVerify.js', () => ({ verifyMoodSummary }));
 vi.mock('../config/model.js', () => ({
   stepRequestContext: vi.fn(() => ({})),
   dynamicModelFor: vi.fn(() => 'mock-model'),
@@ -83,6 +85,8 @@ beforeEach(() => {
   fakeSupabase.__responses.clear();
   charlieGenerate.mockResolvedValue({ object: { mood_summary: 'Quiet markets, steady accumulation.' } });
   fetchOgImage.mockResolvedValue('https://og.example.com/headline.jpg');
+  // Default: the intro passes verification unchanged.
+  verifyMoodSummary.mockImplementation(async ({ draft }: { draft: string }) => ({ summary: draft, status: 'ok' }));
 });
 
 describe('runNewsCuration', () => {
@@ -104,6 +108,22 @@ describe('runNewsCuration', () => {
       'https://podcast.example.com/3',
       'https://news.example.com/0',
     ]);
+  });
+
+  it('replaces the intro with the verifier rewrite when the draft is unfaithful', async () => {
+    setPool([newsItem(0), newsItem(1)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });
+    verifyMoodSummary.mockResolvedValue({ summary: 'Corrected, fact-checked intro.', status: 'revised' });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    // The verifier saw the drafted intro and the curated stories' facts.
+    expect(verifyMoodSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ draft: 'Quiet markets, steady accumulation.' }),
+    );
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(meta['mood_summary']).toBe('Corrected, fact-checked intro.');
+    expect(outcome.result?.summary).toBe('Corrected, fact-checked intro.');
   });
 
   it('uses the podcast feed artwork when the headline is a podcast (no og fetch)', async () => {
