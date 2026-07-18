@@ -1,11 +1,11 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
 import { createTemplate, updateTemplate } from '@/app/actions/templates';
-import { useToast } from '@/providers/ToastProvider';
-import { X } from 'lucide-react';
 import type { TemplateRow } from './TemplatesList';
-import styles from './DiscoveryForm.module.css';
+import { useEntityForm } from '@/hooks/useEntityForm';
+import { FormField, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import { TagInput } from '@/components/ui/TagInput';
+import styles from '@/components/ui/Form.module.css';
 
 interface TemplateFormProps {
   onSuccess: (id?: string) => void;
@@ -15,103 +15,38 @@ interface TemplateFormProps {
 }
 
 export function TemplateForm({ onSuccess, onPendingChange, mode = 'create', defaultValues }: TemplateFormProps) {
-  const { success, error } = useToast();
-  const [tags, setTags] = useState<string[]>(defaultValues?.tags ?? []);
-  const [tagInput, setTagInput] = useState('');
+  const { state, formAction } = useEntityForm({
+    mode,
+    entityLabel: 'Template',
+    create: createTemplate,
+    update: (formData) => updateTemplate(defaultValues!.id, formData),
+    onSuccess: (result) => onSuccess((result.template as { id: string } | undefined)?.id),
+    onPendingChange,
+  });
 
-  const addTag = () => {
-    const v = tagInput.trim().toLowerCase();
-    if (v && !tags.includes(v)) setTags((prev) => [...prev, v]);
-    setTagInput('');
-  };
-
-  const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
-    formData.set('tags', JSON.stringify(tags));
-
-    if (mode === 'edit' && defaultValues) {
-      const result = await updateTemplate(defaultValues.id, formData);
-      if (result.error) { error(result.error); return { error: result.error }; }
-      success('Template updated');
-      onSuccess();
-      return null;
-    }
-
-    const result = await createTemplate(formData);
-    if (result.error) { error(result.error); return { error: result.error }; }
-    success('Template created');
-    onSuccess(result.template?.id);
-    return null;
-  };
-
-  const [state, formAction, isPending] = useActionState(handleSubmit, null);
   const formId = mode === 'edit' ? 'template-edit-form' : 'template-form';
-
-  useEffect(() => { onPendingChange?.(isPending); }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Type <span className={styles.required}>*</span></label>
-        <select
-          name="type"
-          required
-          defaultValue={defaultValues?.type ?? 'one_pager'}
-          className={styles.select}
-          disabled={mode === 'edit'}
-        >
-          <option value="one_pager">One-pager</option>
-          <option value="briefing_deck">Briefing deck</option>
-        </select>
-      </div>
+      <FormSelect label="Type" name="type" required defaultValue={defaultValues?.type ?? 'one_pager'} disabled={mode === 'edit'}>
+        <option value="one_pager">One-pager</option>
+        <option value="briefing_deck">Briefing deck</option>
+      </FormSelect>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Title <span className={styles.required}>*</span></label>
-        <input
-          type="text"
-          name="title"
-          required
-          defaultValue={defaultValues?.title ?? ''}
-          className={styles.input}
-          placeholder="e.g. Treasury Risk One-pager"
-        />
-      </div>
+      <FormField label="Title" name="title" required defaultValue={defaultValues?.title ?? ''} placeholder="e.g. Treasury Risk One-pager" />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
-        <textarea
-          name="description"
-          rows={3}
-          defaultValue={defaultValues?.description ?? ''}
-          className={styles.textarea}
-          placeholder="Short description of when to use this template…"
-        />
-      </div>
+      <FormTextarea label="Description" name="description" rows={3} defaultValue={defaultValues?.description ?? ''} placeholder="Short description of when to use this template…" />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Tags</label>
-        <div className={styles.chipArea}>
-          {tags.map((tag) => (
-            <span key={tag} className={styles.chip}>
-              {tag}
-              <button type="button" className={styles.chipRemove} onClick={() => setTags((p) => p.filter((t) => t !== tag))}>
-                <X size={12} strokeWidth={2} />
-              </button>
-            </span>
-          ))}
-          <input
-            type="text"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }}
-            placeholder={tags.length === 0 ? 'Add tags…' : 'Add another…'}
-            className={styles.chipInput}
-          />
-        </div>
-        <input type="hidden" name="tags" value={JSON.stringify(tags)} />
-        <span className={styles.hint}>Press Enter or comma to add tags</span>
-      </div>
+      <TagInput
+        name="tags"
+        label="Tags"
+        defaultValue={defaultValues?.tags ?? []}
+        placeholder="Add tags…"
+        hint="Press Enter or comma to add tags"
+        transform={(s) => s.trim().toLowerCase()}
+      />
 
-      {state?.error && <p className={styles.error}>{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
     </form>
   );
 }
