@@ -716,6 +716,22 @@ export const INSIGHT_PIPELINE_STAGE_LABELS: Record<string, string> = {
   archived:  'Archived',
 };
 
+// Contact CRM pipeline stage (distinct from the content INSIGHT pipeline above).
+export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  lead:    'Lead',
+  warm:    'Warm',
+  active:  'Active',
+  client:  'Client',
+  dormant: 'Dormant',
+};
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low:    'Low',
+  medium: 'Medium',
+  high:   'High',
+  urgent: 'Urgent',
+};
+
 export interface ResearchLink {
   url: string;
   title: string;

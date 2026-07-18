@@ -4,6 +4,7 @@ import { createContact, updateContact } from '@/app/actions/contacts';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { useEntityForm } from '@/hooks/useEntityForm';
 import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import { PIPELINE_STAGE_LABELS } from '@platform/shared';
 import styles from '@/components/ui/Form.module.css';
 
 type ContactRow = {
@@ -66,11 +67,9 @@ export function ContactForm({ companies, teamMembers, onSuccess, onPendingChange
 
       <FormRow>
         <FormSelect label="Pipeline stage" name="pipeline_stage" defaultValue={defaultValues?.pipeline_stage ?? 'lead'}>
-          <option value="lead">Lead</option>
-          <option value="warm">Warm</option>
-          <option value="active">Active</option>
-          <option value="client">Client</option>
-          <option value="dormant">Dormant</option>
+          {Object.entries(PIPELINE_STAGE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </FormSelect>
         <FormSelect label="Bitcoin literacy" name="bitcoin_literacy" defaultValue={defaultValues?.bitcoin_literacy ?? 'unknown'}>
           <option value="unknown">Unknown</option>
