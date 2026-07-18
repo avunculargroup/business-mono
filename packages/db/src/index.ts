@@ -12,7 +12,3 @@ export type { FulltextSearchResult } from './rpc/fulltextSearch.js';
 export type { ContentVectorSearchResult } from './rpc/contentSearch.js';
 export type { NewsVectorSearchResult } from './rpc/newsSearch.js';
 export type { TranscriptVectorSearchResult } from './rpc/transcriptSearch.js';
-
-// Web app client factories (cookie-based auth via @supabase/ssr)
-export { createServerSupabaseClient } from './server.js';
-export { createBrowserSupabaseClient } from './browser.js';
