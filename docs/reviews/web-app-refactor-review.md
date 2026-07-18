@@ -18,7 +18,7 @@ Each item is tagged ☐ todo · ◐ in progress · ☑ done. Update as work land
 | 8. One set of Supabase client factories | ☑ done | 2026-07-17 — deleted the unused `packages/db` `createServerSupabaseClient`/`createBrowserSupabaseClient` (zero importers) + their index exports; `apps/web/lib/supabase/` is now the single home. Leaves `@supabase/ssr` unused in `packages/db` (droppable later) and `middleware.ts`'s auth-critical inline copy untouched. |
 | 9. Centralise status→label/color maps | ◐ in progress | 2026-07-17 — added `PIPELINE_STAGE_LABELS` + `TASK_PRIORITY_LABELS` to `@platform/shared` (the two enums that lacked maps); adopted in PipelineChip/PriorityChip + ContactForm's stage options; colours stay in the chips. **Not done (deliberately):** deriving AgentActivityCard's `AGENT_LABELS` / RoutineForm's `AGENT_OPTIONS` from `AGENT_REGISTRY` — they carry short-label formats, `enabled` flags, "coming soon" copy, and ordering the registry doesn't, so deriving would change text or lose config. Per-component colour-map moves remain opportunistic. |
 | 10. Decompose the three giant client views | ◐ in progress | 2026-07-17 — shared tag inputs: `components/ui/TagInput` (form-oriented) + `components/ui/ChipField` (controlled primitive; TagInput wraps it). Unified the chip inputs across InterviewForm, FeedbackForm, TemplateForm, CommunityForm (had a local duplicate), and RoutineForm's `ChipInput`. Pure extractions from the giant views (no behaviour change, unit-tested): `lib/files.ts` (format/upload helpers) + `components/files/FileIcon` (FilesView 913→867); `lib/podcasts.ts` metrics — `computeKpis`/`computeSourceBreakdown`/`dailyCounts`/`episodeRecency`/`statusOptions` (PodcastDashboard 622→517); RoutineForm 582→535. **Remaining (deferred — better driven with the app running):** splitting FilesView's 4 stateful dialogs + PodcastDashboard's inline chart components (`KpiCard`/`StackedBar`/`AreaChart`) into their own files, and swapping FilesView's bespoke-styled `TagInput` onto `ChipField` (a visual change). |
-| 11. Shared reference-data fetchers + revalidation | ◐ in progress | 2026-07-17 — added `lib/referenceData.ts` (`getCompanyOptions`/`getTeamMemberOptions`) for the picklist queries copy-pasted across ~15 server components; adopted in feedback/contacts/interviews/champions pages (remaining sites are the identical swap). **Not done:** per-feature `REVALIDATE` path constants and dropping redundant client `router.refresh()` — diffuse, lower value. |
+| 11. Shared reference-data fetchers + revalidation | ◐ in progress | 2026-07-17 — added `lib/referenceData.ts` (`getCompanyOptions`/`getTeamMemberOptions`); adopted at **every** matching picklist site (CRM list + detail pages, dashboard, Products/Advisors/Projects content). Only `discovery/pipeline/page.tsx` keeps its inline team_members query (it orders by full_name; the helper is unordered). **Not done:** per-feature `REVALIDATE` path constants and dropping redundant client `router.refresh()` — diffuse, lower value. |
 | 12. Board abstraction | ☐ todo | deferred until a 4th board appears |
 
 ## Context
@@ -295,16 +295,18 @@ interaction models through one abstraction today buys little.
 
 ## Smaller hygiene items
 
-- **No `not-found.tsx` anywhere** despite `notFound()` calls in many detail
-  pages (`tasks/[id]`, `crm/*/[id]`, …) — users get the unstyled Next.js
-  default 404. One `app/(app)/not-found.tsx` using `EmptyState` fixes it.
+- ~~**No `not-found.tsx` anywhere**~~ — **done** (2026-07-17): added
+  `app/(app)/not-found.tsx` (EmptyState + "Back to dashboard"), so
+  `notFound()` renders inside the app shell instead of Next's bare default.
 - **Middleware matcher is broad**: `auth.getUser()` (a network round-trip)
   runs on essentially every request, with `/share/*` exempted in code rather
   than in the matcher. Narrowing the matcher trims latency on public paths.
-- **5 files hand-roll date formatting** (`discovery/PipelineBoard`,
-  `company/DomainsSection`, `company/SubscriptionsSection`, `news/NewsCard`,
-  `news/daily/page.tsx`) instead of the timezone-aware formatters in
-  `lib/utils.ts` (used by 42 files).
+- **Hand-rolled date formatting** — **mostly done** (2026-07-17):
+  `company/DomainsSection`, `company/SubscriptionsSection`, and
+  `news/NewsCard` now use `lib/utils` `formatDate` (identical format, now
+  timezone-aware). `discovery/PipelineBoard` and `news/daily/page.tsx` keep
+  their day-month (no-year) formats — no shared formatter matches, and
+  news/daily is already tz-aware.
 - **Test coverage is lopsided**: 5 of 35 action files tested, 0 of 5 hooks,
   and whole features (campaigns, crm, discovery, decks, company) untested —
   while the shared `test/mocks/supabase.ts` fake makes action tests cheap.
