@@ -311,9 +311,10 @@ interaction models through one abstraction today buys little.
   and whole features (campaigns, crm, discovery, decks, company) untested —
   while the shared `test/mocks/supabase.ts` fake makes action tests cheap.
   Items 1, 4 and 6 are natural moments to add them.
-- **`useRealtimeSubscription.ts`** carries `'postgres_changes' as never` /
-  `callback as never` casts to sidestep channel typing — worth revisiting
-  after item 3's type refresh.
+- ~~**`useRealtimeSubscription.ts`** `'postgres_changes' as never` /
+  `callback as never` casts~~ — **done** (2026-07-17): both removed; the
+  Supabase `.on()` overloads now accept the typed args directly, so the
+  casts were dead.
 - ~~**`modelConfigs.ts`** structural `model_configs` cast~~ — **done** (2026-07-17):
   removed the `supabase as unknown as { from: … }` casts in `modelConfigs.ts`
   (upsert/delete) and `settings/models/page.tsx` (select) now that
