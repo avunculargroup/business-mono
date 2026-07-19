@@ -39,9 +39,16 @@ export interface MarketReportEmailInput {
   /** When the report was produced; formatted in the recipient-facing date line. */
   date: Date;
   company: CompanyFooter;
-  /** Optional ≤50-word analyst intro rendered above the sections. */
-  commentary?: string | null;
+  /** Optional findings narration rendered above the sections. */
+  narration?: string | null;
+  /** Absolute link to the report's web review page ("Review this report"). */
+  reviewUrl?: string | null;
 }
+
+// Always rendered — the report describes market conditions, so it carries the
+// general-advice warning whether or not a narration made it in.
+const DISCLAIMER =
+  'General information only. It is not financial advice and does not consider your objectives, financial situation or needs.';
 
 export interface RenderedEmail {
   subject: string;
@@ -64,7 +71,8 @@ function safeHref(url: string): string | null {
 
 export function renderMarketReportEmail(input: MarketReportEmailInput): RenderedEmail {
   const { sections, company } = input;
-  const commentary = input.commentary?.trim() || null;
+  const narration = input.narration?.trim() || null;
+  const reviewUrl = input.reviewUrl && safeHref(input.reviewUrl) ? input.reviewUrl : null;
 
   const dateStr = new Intl.DateTimeFormat('en-AU', {
     day: 'numeric',
@@ -77,7 +85,7 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
 
   // ── Plain-text part ─────────────────────────────────────────────────────────
   const textLines: string[] = [`${company.name}`, subject, ''];
-  if (commentary) textLines.push(commentary, '');
+  if (narration) textLines.push(narration, '');
   for (const section of sections) {
     textLines.push(section.heading.toUpperCase(), '');
     for (const it of section.items) {
@@ -86,6 +94,8 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
     }
     textLines.push('');
   }
+  if (reviewUrl) textLines.push(`Review this report: ${reviewUrl}`, '');
+  textLines.push(DISCLAIMER, '');
   const footerBits = [company.name, company.abn ? `ABN ${company.abn}` : '', company.website ?? ''].filter(Boolean);
   textLines.push(footerBits.join(' · '));
   const text = textLines.join('\n');
@@ -117,13 +127,24 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
     })
     .join('');
 
-  // Analyst intro — serif, sitting between the date line and the first section,
-  // set off by a subtle accent rule. Uses the inlined palette only.
-  const commentaryHtml = commentary
+  // Findings narration — serif, sitting between the date line and the first
+  // section, set off by a subtle accent rule. Paragraph breaks preserved.
+  const narrationHtml = narration
     ? `<tr><td style="padding:16px 0 4px 0;">
-          <div style="font-family:${FONT_DISPLAY};font-size:15px;line-height:1.55;color:${C.textPrimary};border-left:3px solid ${C.accent};padding-left:14px;">${escapeHtml(commentary)}</div>
+          <div style="font-family:${FONT_DISPLAY};font-size:15px;line-height:1.55;color:${C.textPrimary};border-left:3px solid ${C.accent};padding-left:14px;">${narration
+            .split(/\n{2,}/)
+            .map((p) => `<p style="margin:0 0 10px 0;">${escapeHtml(p.trim())}</p>`)
+            .join('')}</div>
         </td></tr>`
     : '';
+
+  const reviewLinkHtml = reviewUrl
+    ? `<tr><td style="padding:18px 0 0 0;font-family:${FONT_BODY};font-size:13px;">
+          <a href="${escapeHtml(reviewUrl)}" style="color:${C.accentDark};text-decoration:none;font-weight:600;">Review this report →</a>
+        </td></tr>`
+    : '';
+
+  const disclaimerHtml = `<tr><td style="padding:20px 0 0 0;font-family:${FONT_BODY};font-size:11px;line-height:1.5;color:${C.textTertiary};">${escapeHtml(DISCLAIMER)}</td></tr>`;
 
   const logoHref = safeHref(LOGO_URL);
   const logoHtml = logoHref
@@ -164,8 +185,10 @@ export function renderMarketReportEmail(input: MarketReportEmailInput): Rendered
               <tr>
                 <td style="font-family:${FONT_BODY};font-size:13px;color:${C.textSecondary};padding-bottom:4px;">${escapeHtml(dateStr)}</td>
               </tr>
-              ${commentaryHtml}
+              ${narrationHtml}
               ${sectionsHtml}
+              ${reviewLinkHtml}
+              ${disclaimerHtml}
             </table>
           </td>
         </tr>

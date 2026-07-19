@@ -196,6 +196,26 @@ export async function upsertMarketReport(row: MarketReportRow): Promise<string |
   return data?.id ?? null;
 }
 
+/**
+ * Standing narration guidelines distilled from founder feedback
+ * (market_report_guidelines singleton). Best-effort: [] on any error, so the
+ * pipeline runs before the feedback loop's migration lands.
+ */
+export async function loadReportGuidelines(): Promise<string[]> {
+  try {
+    const { data, error } = await db
+      .from('market_report_guidelines')
+      .select('guidelines')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error || !data) return [];
+    const guidelines = data.guidelines;
+    return Array.isArray(guidelines) ? guidelines.filter((g: unknown) => typeof g === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Best-effort: mark the day's report as included in a delivered email. */
 export async function markReportEmailed(reportId: string): Promise<void> {
   const { error } = await db.from('market_reports').update({ emailed: true }).eq('id', reportId);

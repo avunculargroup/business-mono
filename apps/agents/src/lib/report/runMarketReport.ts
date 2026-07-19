@@ -8,11 +8,13 @@
  * via the shared deliverTeamEmail transport. It writes nothing beyond the
  * routine's audit row.
  *
- * The one LLM touch is a short intro: once the sections are assembled, the
- * internal marketAnalyst agent gets the snapshot plus several days of recent
- * history and writes a ≤50-word commentary on what changed (see
- * marketCommentary.ts). It is best-effort — a failure just drops the intro, the
- * report still sends. Everything else stays deterministic.
+ * The lead commentary comes from the findings engine (lib/findings/): findings
+ * are computed deterministically, scored for materiality, narrated by the
+ * internal marketAnalyst agent, mechanically linted, and Lex-reviewed when a
+ * valuation-sensitive finding is in play. Best-effort — a held/errored
+ * narration just drops the commentary (the persisted market_reports row keeps
+ * it for review at /market-reports), the report still sends. Everything else
+ * stays deterministic.
  *
  * The "Bitcoin" section (block height, BTC/AUD price, Fear & Greed) is the
  * exception: those three are fetched LIVE at send time via the same adapters
@@ -35,7 +37,7 @@ import {
 } from '@platform/shared';
 import { deliverTeamEmail, loadCompanyFooter } from '../sendNewsDigest.js';
 import { renderMarketReportEmail } from '../marketReportEmail.js';
-import { generateMarketCommentary } from './marketCommentary.js';
+import { generateFindingsNarration, markReportEmailed } from '../findings/index.js';
 import { mempoolAdapter } from '../onchain/adapters/mempool.js';
 import { coingeckoAdapter } from '../onchain/adapters/coingecko.js';
 import { alternativeMeAdapter } from '../onchain/adapters/alternativeMe.js';
@@ -98,7 +100,7 @@ export async function runMarketReport(
     bitcoin_count: 0,
     trend_count: 0,
     emailed: false,
-    commentary: null,
+    narration: null,
   };
 
   const [onchainRes, macroRes, bitcoinItems] = await Promise.all([
@@ -159,22 +161,55 @@ export async function runMarketReport(
     );
   }
 
-  // Best-effort intro: the analyst reads the snapshot + recent history and writes
-  // a ≤50-word commentary. A null result (error/empty/over-length) just omits it.
-  const commentary = await generateMarketCommentary(sections, now);
-  result.commentary = commentary;
+  // Best-effort lead commentary from the findings engine. A held/errored
+  // narration returns null and the email sends without it.
+  const findingsResult = await generateFindingsNarration(now);
+  result.narration = findingsResult.narration;
+  result.report_id = findingsResult.reportId;
+  result.report_mode = findingsResult.reportMode;
+  result.narration_status = findingsResult.status;
+  result.findings_total = findingsResult.findingsTotal;
+  result.findings_selected = findingsResult.findingsSelected;
+  result.stale_metrics = findingsResult.staleMetrics;
+
+  const webAppUrl = process.env['WEB_APP_URL'];
+  const reviewUrl =
+    webAppUrl && findingsResult.reportId
+      ? `${webAppUrl.replace(/\/$/, '')}/market-reports/${findingsResult.reportId}`
+      : null;
 
   const company = await loadCompanyFooter();
-  const message = renderMarketReportEmail({ title: routine.name, sections, date: now, company, commentary });
+  const message = renderMarketReportEmail({
+    title: routine.name,
+    sections,
+    date: now,
+    company,
+    narration: findingsResult.narration,
+    reviewUrl,
+  });
   const delivery = await deliverTeamEmail({ id: routine.id, title: routine.name }, message);
   result.emailed = delivery.sent > 0;
+  if (result.emailed && findingsResult.reportId && findingsResult.status === 'published') {
+    await markReportEmailed(findingsResult.reportId);
+  }
 
+  const staleNote = findingsResult.staleMetrics.length
+    ? `; ${findingsResult.staleMetrics.length} stale feed${findingsResult.staleMetrics.length === 1 ? '' : 's'}: ${findingsResult.staleMetrics.join(', ')}`
+    : '';
+  const narrationNote =
+    findingsResult.status === 'published'
+      ? ''
+      : findingsResult.status === 'held'
+        ? '; narration withheld (lint/Lex)'
+        : '; narration unavailable';
   const summary =
     `Market report: ${result.bitcoin_count} bitcoin + ${result.trend_count} trend + ` +
     `${result.onchain_count} on-chain + ${result.macro_count} macro indicators` +
     (delivery.configured
       ? ` — emailed to ${delivery.sent}/${delivery.attempted} team members`
-      : ' — email not configured');
+      : ' — email not configured') +
+    narrationNote +
+    staleNote;
 
   return outcome(
     routine,

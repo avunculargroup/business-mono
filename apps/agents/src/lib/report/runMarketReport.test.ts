@@ -5,9 +5,26 @@ import type { AdapterResult } from '../onchain/types.js';
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const deliverTeamEmail = vi.fn(async () => ({ configured: true, attempted: 2, sent: 2, failed: 0 }));
 const loadCompanyFooter = vi.fn(async () => ({ name: 'Bitcoin Treasury Solutions' }));
-const generateMarketCommentary = vi.fn(
-  async (): Promise<string | null> => 'Momentum is building across the network.',
-);
+type FindingsNarrationResult = {
+  narration: string | null;
+  status: 'published' | 'held' | 'error' | null;
+  reportId: string | null;
+  reportMode: 'normal' | 'quiet' | null;
+  findingsTotal: number;
+  findingsSelected: number;
+  staleMetrics: string[];
+};
+const PUBLISHED_NARRATION: FindingsNarrationResult = {
+  narration: 'Momentum is building across the network.',
+  status: 'published',
+  reportId: 'mr-1',
+  reportMode: 'normal',
+  findingsTotal: 5,
+  findingsSelected: 2,
+  staleMetrics: [],
+};
+const generateFindingsNarration = vi.fn(async (): Promise<FindingsNarrationResult> => PUBLISHED_NARRATION);
+const markReportEmailed = vi.fn(async () => {});
 const notFound: AdapterResult = { ok: false, error: { kind: 'not_found', message: 'unmocked' } };
 const mempoolFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
 const coingeckoFetchLatest = vi.fn(async (): Promise<AdapterResult> => notFound);
@@ -27,8 +44,9 @@ vi.mock('../onchain/adapters/coingecko.js', () => ({
 vi.mock('../onchain/adapters/alternativeMe.js', () => ({
   alternativeMeAdapter: { provider: 'alternative_me', fetchLatest: (...args: unknown[]) => alternativeMeFetchLatest(...(args as [])) },
 }));
-vi.mock('./marketCommentary.js', () => ({
-  generateMarketCommentary: (...args: unknown[]) => generateMarketCommentary(...(args as [])),
+vi.mock('../findings/index.js', () => ({
+  generateFindingsNarration: (...args: unknown[]) => generateFindingsNarration(...(args as [])),
+  markReportEmailed: (...args: unknown[]) => markReportEmailed(...(args as [])),
 }));
 
 const { runMarketReport } = await import('./runMarketReport.js');
@@ -64,8 +82,9 @@ beforeEach(() => {
   mempoolFetchLatest.mockClear();
   coingeckoFetchLatest.mockClear();
   alternativeMeFetchLatest.mockClear();
-  generateMarketCommentary.mockClear();
-  generateMarketCommentary.mockResolvedValue('Momentum is building across the network.');
+  generateFindingsNarration.mockClear();
+  generateFindingsNarration.mockResolvedValue(PUBLISHED_NARRATION);
+  markReportEmailed.mockClear();
 });
 
 describe('runMarketReport', () => {
@@ -105,11 +124,15 @@ describe('runMarketReport', () => {
     const [ref, message] = deliverTeamEmail.mock.calls[0] as unknown as [unknown, { subject: string; text: string }];
     expect(ref).toMatchObject({ id: 'r1' });
     expect(message.subject).toMatch(/^Market Report — /);
-    // The analyst intro is generated from the assembled sections and threaded
-    // into both the result and the rendered email.
-    expect(generateMarketCommentary).toHaveBeenCalledWith(res.sections, expect.any(Date));
-    expect(res.commentary).toBe('Momentum is building across the network.');
+    // The findings narration is threaded into both the result and the email,
+    // the disclaimer always renders, and the published report is flagged emailed.
+    expect(generateFindingsNarration).toHaveBeenCalledWith(expect.any(Date));
+    expect(res.narration).toBe('Momentum is building across the network.');
+    expect(res.narration_status).toBe('published');
+    expect(res.report_id).toBe('mr-1');
     expect(message.text).toContain('Momentum is building across the network.');
+    expect(message.text).toContain('not financial advice');
+    expect(markReportEmailed).toHaveBeenCalledWith('mr-1');
   });
 
   it('splits trend_valuation rows into their own ordered section with a neutral cross label', async () => {
@@ -145,19 +168,47 @@ describe('runMarketReport', () => {
     expect(onchain.items.map((i) => i.label)).toEqual(['MVRV']);
   });
 
-  it('still sends (without an intro) when commentary generation yields null', async () => {
+  it('still sends (without a narration, disclaimer intact) when the narration is held', async () => {
     setOnchain([
       { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,
         value: 900, observed_at: '2026-07-03', change_since_prior: 10, pct_change_since_prior: 1.1, signal: null },
     ]);
     setMacro([]);
-    generateMarketCommentary.mockResolvedValueOnce(null);
+    generateFindingsNarration.mockResolvedValueOnce({
+      ...PUBLISHED_NARRATION,
+      narration: null,
+      status: 'held',
+    });
 
     const out = await runMarketReport(ROUTINE, new Date('2026-07-03T22:00:00Z'));
 
     expect(out.status).toBe('success');
-    expect(out.market_report_result?.commentary).toBeNull();
+    expect(out.market_report_result?.narration).toBeNull();
+    expect(out.market_report_result?.narration_status).toBe('held');
     expect(deliverTeamEmail).toHaveBeenCalledTimes(1);
+    const [, message] = deliverTeamEmail.mock.calls[0] as unknown as [unknown, { text: string }];
+    expect(message.text).not.toContain('Momentum is building');
+    expect(message.text).toContain('not financial advice');
+    // A held report is never flagged as emailed — its narration wasn't sent.
+    expect(markReportEmailed).not.toHaveBeenCalled();
+    expect(out.result?.summary).toContain('narration withheld');
+  });
+
+  it('surfaces stale feeds in the outcome summary', async () => {
+    setOnchain([
+      { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,
+        value: 900, observed_at: '2026-07-03', change_since_prior: 10, pct_change_since_prior: 1.1, signal: null },
+    ]);
+    setMacro([]);
+    generateFindingsNarration.mockResolvedValueOnce({
+      ...PUBLISHED_NARRATION,
+      staleMetrics: ['mvrv', 'macro:gold'],
+    });
+
+    const out = await runMarketReport(ROUTINE, new Date('2026-07-03T22:00:00Z'));
+
+    expect(out.result?.summary).toContain('2 stale feeds: mvrv, macro:gold');
+    expect(out.market_report_result?.stale_metrics).toEqual(['mvrv', 'macro:gold']);
   });
 
   it('skips the email when there is no indicator data yet', async () => {

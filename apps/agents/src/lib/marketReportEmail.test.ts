@@ -60,43 +60,72 @@ describe('renderMarketReportEmail', () => {
     expect(text).toContain('[neutral]');
   });
 
-  it('omits the intro block when no commentary is supplied', () => {
-    // The intro's accent rule is the marker for its presence.
+  it('omits the narration block when no narration is supplied', () => {
+    // The narration's accent rule is the marker for its presence.
     expect(html).not.toContain('border-left:3px solid');
   });
 
-  describe('with commentary', () => {
-    const withIntro = renderMarketReportEmail({
+  it('always renders the general-advice disclaimer', () => {
+    expect(html).toContain('not financial advice');
+    expect(text).toContain('not financial advice');
+  });
+
+  it('omits the review link when no reviewUrl is supplied', () => {
+    expect(html).not.toContain('Review this report');
+    expect(text).not.toContain('Review this report');
+  });
+
+  describe('with narration', () => {
+    const withNarration = renderMarketReportEmail({
       title: 'Daily market report',
       sections,
       date: new Date('2026-07-03T22:00:00Z'),
       company,
-      commentary: 'Hash rate keeps grinding higher while the 10-year eases — the network is tightening as macro loosens.',
+      narration:
+        'Hash rate keeps grinding higher while the 10-year eases — the network is tightening as macro loosens.\n\nFear & Greed has now sat in the mid-20s for three weeks.',
     });
 
-    it('renders the intro in both HTML and plain text', () => {
-      expect(withIntro.html).toContain('the network is tightening as macro loosens');
-      expect(withIntro.html).toContain('border-left:3px solid');
-      expect(withIntro.text).toContain('Hash rate keeps grinding higher');
+    it('renders the narration paragraphs in both HTML and plain text', () => {
+      expect(withNarration.html).toContain('the network is tightening as macro loosens');
+      expect(withNarration.html).toContain('border-left:3px solid');
+      expect(withNarration.html).toContain('sat in the mid-20s'); // second paragraph
+      expect(withNarration.text).toContain('Hash rate keeps grinding higher');
     });
 
-    it('escapes HTML in the commentary to prevent markup injection', () => {
+    it('escapes HTML in the narration to prevent markup injection', () => {
       const evil = renderMarketReportEmail({
         title: 'x',
         sections,
         date: new Date('2026-07-03T22:00:00Z'),
         company,
-        commentary: '<script>alert(1)</script>',
+        narration: '<script>alert(1)</script>',
       });
       expect(evil.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
       expect(evil.html).not.toContain('<script>alert(1)</script>');
     });
 
-    it('treats whitespace-only commentary as absent', () => {
+    it('treats whitespace-only narration as absent', () => {
       const blank = renderMarketReportEmail({
-        title: 'x', sections, date: new Date('2026-07-03T22:00:00Z'), company, commentary: '   ',
+        title: 'x', sections, date: new Date('2026-07-03T22:00:00Z'), company, narration: '   ',
       });
       expect(blank.html).not.toContain('border-left:3px solid');
+    });
+  });
+
+  describe('with reviewUrl', () => {
+    it('renders the review link in both parts, https only', () => {
+      const withLink = renderMarketReportEmail({
+        title: 'x', sections, date: new Date('2026-07-03T22:00:00Z'), company,
+        reviewUrl: 'https://hq.example/market-reports/mr-1',
+      });
+      expect(withLink.html).toContain('https://hq.example/market-reports/mr-1');
+      expect(withLink.text).toContain('Review this report: https://hq.example/market-reports/mr-1');
+
+      const unsafe = renderMarketReportEmail({
+        title: 'x', sections, date: new Date('2026-07-03T22:00:00Z'), company,
+        reviewUrl: 'javascript:alert(1)',
+      });
+      expect(unsafe.html).not.toContain('javascript:alert(1)');
     });
   });
 });

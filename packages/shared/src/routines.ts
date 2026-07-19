@@ -1,5 +1,6 @@
 import type { AgentName } from './types.js';
 import type { ResearchSource } from './types.js';
+import type { MarketReportMode, MarketReportStatus } from './findings.js';
 
 // Schedule cadence for a routine.
 export const RoutineFrequency = {
@@ -38,10 +39,11 @@ export type RoutineFrequency = (typeof RoutineFrequency)[keyof typeof RoutineFre
 //    Block height, BTC/AUD price, and the Fear & Greed Index get their own "Bitcoin"
 //    section fetched LIVE at send time (not from the last onchain_poll run), with the
 //    delta computed against the most recently stored observation.
-//    A short (≤50-word) intro is written by the internal marketAnalyst agent from the
-//    snapshot + several days of recent history — best-effort, so a failure just drops
-//    the intro. Otherwise reads only (plus the three live fetches), writes nothing
-//    beyond the audit trail.
+//    The lead commentary comes from the findings engine (apps/agents/src/lib/findings/):
+//    deterministically computed findings, scored for materiality, narrated by the
+//    internal marketAnalyst agent, mechanically linted, and Lex-reviewed when
+//    valuation-sensitive. Best-effort — a held/errored narration just drops the
+//    commentary while the persisted market_reports row keeps it for review.
 export const RoutineActionType = {
   RESEARCH_DIGEST:       'research_digest',
   MONITOR_CHANGE:        'monitor_change',
@@ -267,9 +269,19 @@ export interface MarketReportResult {
   trend_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
-  // The ≤50-word analyst intro, or null when it was skipped (no data, generation
-  // error, or an over-length response). Best-effort — never blocks the report.
-  commentary?: string | null;
+  // The findings narration included in the email, or null when it was withheld
+  // (held/error) or the pipeline was skipped. Best-effort — never blocks the report.
+  narration?: string | null;
+  // The persisted market_reports row for the day, when the pipeline produced one.
+  report_id?: string | null;
+  report_mode?: MarketReportMode | null;
+  // published = narration in the email; held = withheld (lint/Lex); error =
+  // pipeline failed; null = pipeline errored before persisting.
+  narration_status?: MarketReportStatus | null;
+  findings_total?: number;
+  findings_selected?: number;
+  // Metric keys whose feeds were stale at report time (ops visibility).
+  stale_metrics?: string[];
 }
 
 export type RoutineActionConfig =
