@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getAuthedClient } from '@/lib/action';
+import { parseForm, buildUpdate } from '@/lib/forms';
 import { humanizeError } from '@/lib/errors';
 
 const companySchema = z.object({
@@ -15,12 +16,8 @@ const companySchema = z.object({
 });
 
 export async function createCompany(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = companySchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(companySchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -44,24 +41,14 @@ export async function createCompany(formData: FormData) {
 }
 
 export async function updateCompany(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = companySchema.partial().safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(companySchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
-  const updateData: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(parsed.data)) {
-    if (value !== undefined && value !== '') {
-      updateData[key] = value;
-    }
-  }
 
-  const { error } = await supabase.from('companies').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('companies').update(buildUpdate(parsed.data)).eq('id', id);
 
   if (error) return { error: humanizeError(error) };
 

@@ -1,12 +1,13 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
-const ss = (supabase: Awaited<ReturnType<typeof createClient>>) =>
-  supabase.from('segment_scorecards');
+type AuthedClient = Extract<Awaited<ReturnType<typeof getAuthedClient>>, { ok: true }>['supabase'];
+const ss = (supabase: AuthedClient) => supabase.from('segment_scorecards');
 
 const segmentSchema = z.object({
   segment_name:       z.string().min(1, 'Segment name is required'),
@@ -17,14 +18,12 @@ const segmentSchema = z.object({
 });
 
 export async function createSegment(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = segmentSchema.safeParse(raw);
+  const parsed = parseForm(segmentSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
-
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: segment, error } = await ss(supabase)
@@ -45,14 +44,12 @@ export async function createSegment(formData: FormData) {
 }
 
 export async function updateSegment(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = segmentSchema.partial().safeParse(raw);
+  const parsed = parseForm(segmentSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
-
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const updateData: Record<string, unknown> = {};
@@ -74,7 +71,9 @@ export async function updateSegment(id: string, formData: FormData) {
 }
 
 export async function deleteSegment(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await ss(supabase).delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };

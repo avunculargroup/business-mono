@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const personaSchema = z.object({
   name:                  z.string().min(1, 'Name is required').max(100),
@@ -33,12 +34,8 @@ function splitLines(value: string | undefined): string[] {
 }
 
 export async function createPersona(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = personaSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(personaSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const d = parsed.data;
 
@@ -62,7 +59,9 @@ export async function createPersona(formData: FormData) {
 
   const objection_bank = splitLines(d.objection_bank).slice(0, 5);
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data: persona, error } = await supabase.from('personas').insert({
     name:                 d.name,
     market_segment:       d.market_segment,
@@ -82,12 +81,8 @@ export async function createPersona(formData: FormData) {
 }
 
 export async function updatePersona(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = personaSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
+  const parsed = parseForm(personaSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const d = parsed.data;
 
@@ -111,7 +106,9 @@ export async function updatePersona(id: string, formData: FormData) {
 
   const objection_bank = splitLines(d.objection_bank).slice(0, 5);
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('personas').update({
     name:                 d.name,
     market_segment:       d.market_segment,
@@ -132,7 +129,9 @@ export async function updatePersona(id: string, formData: FormData) {
 }
 
 export async function deletePersona(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('personas').delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };

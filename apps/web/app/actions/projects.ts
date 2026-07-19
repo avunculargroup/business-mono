@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -15,11 +16,12 @@ const projectSchema = z.object({
 });
 
 export async function createProject(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = projectSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(projectSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: project, error } = await supabase
@@ -42,7 +44,9 @@ export async function createProject(formData: FormData) {
 }
 
 export async function deleteProject(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
 

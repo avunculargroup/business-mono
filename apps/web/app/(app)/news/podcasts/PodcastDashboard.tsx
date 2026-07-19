@@ -15,6 +15,11 @@ import {
   formatTimestamp,
   estimateDeepgramCost,
   formatAud,
+  computeKpis,
+  computeSourceBreakdown,
+  dailyCounts,
+  episodeRecency,
+  statusOptions,
   TRANSCRIPT_STATUS_LABELS,
   TRANSCRIPT_STATUS_COLORS,
   TRANSCRIPT_SOURCE_LABELS,
@@ -47,9 +52,6 @@ interface Props {
   episodes: DashboardEpisode[];
 }
 
-const IN_PROGRESS: TranscriptStatus[] = ['resolving', 'transcribing'];
-const NEEDS_ATTENTION: TranscriptStatus[] = ['failed', 'skipped'];
-
 export function PodcastDashboard({ episodes: initial }: Props) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -63,37 +65,13 @@ export function PodcastDashboard({ episodes: initial }: Props) {
   const [submittingBrief, setSubmittingBrief] = useState(false);
 
   // ── Aggregates ──────────────────────────────────────────────────────────────
-  const kpis = useMemo(() => {
-    let available = 0;
-    let inProgress = 0;
-    let needsAttention = 0;
-    let indexed = 0;
-    for (const e of episodes) {
-      if (e.transcript_status === 'available') available += 1;
-      if (IN_PROGRESS.includes(e.transcript_status)) inProgress += 1;
-      if (NEEDS_ATTENTION.includes(e.transcript_status)) needsAttention += 1;
-      if (e.embedded_at) indexed += 1;
-    }
-    return { total: episodes.length, available, inProgress, needsAttention, indexed };
-  }, [episodes]);
+  const kpis = useMemo(() => computeKpis(episodes), [episodes]);
 
   // Estimated realized Deepgram spend (paid transcriptions only) — the money the
   // source-count gauge hides. See estimateDeepgramCost for the rate/assumptions.
   const spend = useMemo(() => estimateDeepgramCost(episodes), [episodes]);
 
-  const sourceBreakdown = useMemo(() => {
-    let feedTag = 0;
-    let youtube = 0;
-    let deepgram = 0;
-    for (const e of episodes) {
-      if (e.transcript_status !== 'available') continue;
-      if (e.transcript_source === 'feed_tag') feedTag += 1;
-      else if (e.transcript_source === 'youtube') youtube += 1;
-      else if (e.transcript_source === 'deepgram') deepgram += 1;
-    }
-    const none = episodes.length - feedTag - youtube - deepgram;
-    return { feedTag, youtube, deepgram, none, total: episodes.length };
-  }, [episodes]);
+  const sourceBreakdown = useMemo(() => computeSourceBreakdown(episodes), [episodes]);
 
   const timeline = useMemo(() => dailyCounts(episodes, 30), [episodes]);
 
@@ -110,7 +88,7 @@ export function PodcastDashboard({ episodes: initial }: Props) {
     () =>
       [...episodes]
         .filter((e) => e.youtube_url || e.audio_url)
-        .sort((a, b) => byRecency(b) - byRecency(a))
+        .sort((a, b) => episodeRecency(b) - episodeRecency(a))
         .slice(0, 4),
     [episodes],
   );
@@ -497,36 +475,3 @@ function BriefForm({
 
 // ── Pure helpers ────────────────────────────────────────────────────────────────
 
-function statusOptions(): [string, string][] {
-  return (Object.keys(TRANSCRIPT_STATUS_LABELS) as TranscriptStatus[]).map((s) => [s, TRANSCRIPT_STATUS_LABELS[s]]);
-}
-
-function byRecency(e: DashboardEpisode): number {
-  const d = e.published_at ?? e.created_at;
-  return d ? new Date(d).getTime() : 0;
-}
-
-// Episodes ingested per day over the trailing N days (by created_at).
-function dailyCounts(episodes: DashboardEpisode[], days: number): { date: string; count: number }[] {
-  const buckets = new Map<string, number>();
-  const today = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    buckets.set(dayKey(d), 0);
-  }
-  for (const e of episodes) {
-    if (!e.created_at) continue;
-    const key = dayKey(new Date(e.created_at));
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-  return Array.from(buckets.entries()).map(([date, count]) => ({ date: shortDay(date), count }));
-}
-
-function dayKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function shortDay(key: string): string {
-  return key.slice(5); // MM-DD
-}

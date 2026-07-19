@@ -9,6 +9,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ChampionForm } from './ChampionForm';
 import { deleteChampion } from '@/app/actions/champions';
+import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useToast } from '@/providers/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import {
@@ -55,7 +56,7 @@ interface ChampionsListProps {
 }
 
 export function ChampionsList({ initialChampions, contacts, companies }: ChampionsListProps) {
-  const [champions, setChampions] = useState(initialChampions);
+  const { items: champions, optimisticRemove } = useOptimisticList(initialChampions);
   const [showCreate,   setShowCreate]   = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChampionRow | null>(null);
   const [isDeleting,   setIsDeleting]   = useState(false);
@@ -90,7 +91,7 @@ export function ChampionsList({ initialChampions, contacts, companies }: Champio
     } else {
       success('Champion designation removed');
       setDeleteTarget(null);
-      setChampions((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      optimisticRemove(deleteTarget.id, async () => {});
       router.refresh();
     }
   };

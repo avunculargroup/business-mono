@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo } from 'react';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
@@ -10,8 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FeedbackForm } from './FeedbackForm';
 import { FeedbackDetail } from './FeedbackDetail';
 import { deleteFeedback } from '@/app/actions/feedback';
-import { useToast } from '@/providers/ToastProvider';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { formatRelativeDate } from '@/lib/utils';
 import {
   FEEDBACK_SOURCE_LABELS,
@@ -69,19 +67,27 @@ interface FeedbackListProps {
 }
 
 export function FeedbackList({ initialEntries, contacts, companies, painPoints }: FeedbackListProps) {
-  const [showCreate, setShowCreate]     = useState(false);
-  const [viewEntry,  setViewEntry]      = useState<FeedbackRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FeedbackRow | null>(null);
-  const [isDeleting,   setIsDeleting]   = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [viewEntry, setViewEntry] = useState<FeedbackRow | null>(null);
   const [filterCategory,  setFilterCategory]  = useState('');
   const [filterSource,    setFilterSource]    = useState('');
   const [filterPainPoint, setFilterPainPoint] = useState('');
 
-  const router = useRouter();
-  const { success, error } = useToast();
-  const { items: entries, optimisticAdd } = useOptimisticList(initialEntries);
+  const {
+    items: entries,
+    showCreate,
+    setShowCreate,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<FeedbackRow>({
+    initialItems: initialEntries,
+    entityLabel: 'Feedback',
+    remove: deleteFeedback,
+  });
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
@@ -91,25 +97,6 @@ export function FeedbackList({ initialEntries, contacts, companies, painPoints }
       return true;
     });
   }, [entries, filterCategory, filterSource, filterPainPoint]);
-
-  const handleCreated = useCallback((entry?: FeedbackRow) => {
-    if (entry) optimisticAdd(entry, async () => {});
-    setShowCreate(false);
-  }, [optimisticAdd]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteFeedback(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Feedback deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
 
   const columns: Column<FeedbackRow>[] = [
     {
@@ -270,7 +257,7 @@ export function FeedbackList({ initialEntries, contacts, companies, painPoints }
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete feedback"
         description="Permanently remove this feedback entry? This cannot be undone."
         confirmLabel="Delete"

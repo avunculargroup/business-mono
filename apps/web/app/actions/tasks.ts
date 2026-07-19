@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -17,10 +18,8 @@ const taskSchema = z.object({
 });
 
 export async function createTask(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = taskSchema.safeParse(raw);
-
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(taskSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -65,7 +64,7 @@ export async function updateTaskStatus(id: string, status: string) {
     updateData.completed_at = null;
   }
 
-  const { error } = await supabase.from('tasks').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('tasks').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/tasks');
@@ -74,10 +73,8 @@ export async function updateTaskStatus(id: string, status: string) {
 }
 
 export async function updateTask(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = taskSchema.partial().safeParse(raw);
-
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(taskSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -103,7 +100,7 @@ export async function updateTask(id: string, formData: FormData) {
 
   const { error } = await supabase
     .from('tasks')
-    .update(updateData as never)
+    .update(updateData)
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };

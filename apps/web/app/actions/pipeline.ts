@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 // The insight pipeline reuses content_items filtered to type='linkedin'.
 // This action file handles the pipeline-specific fields (pain_point_id, score, research_links)
@@ -42,12 +44,12 @@ function parseResearchLinks(raw: string | undefined): Array<{ url: string; title
 }
 
 export async function createPipelineItem(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = pipelineSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(pipelineSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const data = parsed.data;
 
   const { error } = await supabase.from('content_items').insert({
@@ -58,11 +60,11 @@ export async function createPipelineItem(formData: FormData) {
     topic_tags:     parseTags(data.topic_tags),
     scheduled_for:  data.scheduled_for || null,
     assigned_to:    data.assigned_to || null,
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
     pain_point_id:  data.pain_point_id || null,
     score:          data.score === '' || data.score === undefined ? null : Number(data.score),
     research_links: parseResearchLinks(data.research_links),
-  } as never);
+  });
 
   if (error) return { error: humanizeError(error) };
 
@@ -72,11 +74,12 @@ export async function createPipelineItem(formData: FormData) {
 }
 
 export async function updatePipelineItem(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = pipelineSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(pipelineSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(parsed.data)) {
@@ -87,7 +90,7 @@ export async function updatePipelineItem(id: string, formData: FormData) {
     updateData[key] = value === '' ? null : value;
   }
 
-  const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('content_items').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/discovery/pipeline');
@@ -96,10 +99,12 @@ export async function updatePipelineItem(id: string, formData: FormData) {
 }
 
 export async function movePipelineItem(id: string, status: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('content_items')
-    .update({ status } as never)
+    .update({ status })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -117,7 +122,7 @@ export async function getPipelineItems() {
     .neq('status', 'archived')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // Normalise for the board's row type: title null → ''; research_links is a
   // jsonb column typed loosely as Json — assert the link-array shape.
   return (data ?? []).map((row) => ({
@@ -130,8 +135,9 @@ export async function getPipelineItems() {
 export async function overrideValidation(id: string, validated: boolean, reason: string) {
   if (!reason.trim()) return { error: 'Reason is required for manual override.' };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { error } = await supabase
     .from('content_items')
@@ -148,7 +154,7 @@ export async function overrideValidation(id: string, validated: boolean, reason:
     trigger_type: 'manual',
     entity_type:  'content_item',
     entity_id:    id,
-    proposed_actions: { reason, validated, overridden_by: user?.id ?? null },
+    proposed_actions: { reason, validated, overridden_by: user.id },
   });
 
   revalidatePath('/discovery/pipeline');
@@ -162,6 +168,6 @@ export async function getPainPointsForPicker() {
     .select('id, content, interview_id, discovery_interviews(contact_id, contacts(first_name, last_name))')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }

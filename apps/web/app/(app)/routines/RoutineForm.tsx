@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ChipField } from '@/components/ui/ChipField';
 import {
   AgentName,
   RoutineActionType,
@@ -27,54 +27,6 @@ const RELEVANCE_FILTER_LABELS: Record<NewsRelevanceFilterT, string> = {
   none: 'Keep all curated stories',
 };
 import styles from './routines.module.css';
-
-function ChipInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string[];
-  onChange: (next: string[]) => void;
-  placeholder?: string;
-}) {
-  const [input, setInput] = useState('');
-  const add = () => {
-    const v = input.trim();
-    if (v && !value.includes(v)) onChange([...value, v]);
-    setInput('');
-  };
-  return (
-    <div className={styles.chipArea}>
-      {value.map((t, i) => (
-        <span key={`${t}-${i}`} className={styles.chip}>
-          {t}
-          <button
-            type="button"
-            className={styles.chipRemove}
-            onClick={() => onChange(value.filter((x) => x !== t))}
-            aria-label={`Remove ${t}`}
-          >
-            <X size={12} strokeWidth={2} />
-          </button>
-        </span>
-      ))}
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            add();
-          }
-        }}
-        onBlur={add}
-        placeholder={value.length === 0 ? (placeholder ?? 'Type and press Enter…') : 'Add more…'}
-        className={styles.chipInput}
-      />
-    </div>
-  );
-}
 
 export interface RoutineFormValues {
   name: string;
@@ -356,10 +308,11 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
 
           <div className={styles.field}>
             <label className={styles.label}>Search queries</label>
-            <ChipInput
+            <ChipField
               value={Array.isArray(cfg['queries']) ? (cfg['queries'] as string[]) : []}
               onChange={(next) => updateConfig({ queries: next })}
               placeholder="e.g. ASIC Bitcoin regulation Australia 2026"
+              addOnBlur
             />
             <span className={styles.hint}>
               One query per chip. Press Enter to add. 2–4 angles per category works well.

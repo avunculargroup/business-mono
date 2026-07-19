@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { InterviewForm } from './InterviewForm';
 import { InterviewDetail } from './InterviewDetail';
 import { deleteInterview } from '@/app/actions/interviews';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { formatRelativeDate } from '@/lib/utils';
 import {
   STAKEHOLDER_ROLE_LABELS,
@@ -21,7 +21,6 @@ import {
   type InterviewStatus,
 } from '@platform/shared';
 import { CalendarSearch, Eye, Pencil, Trash2, Plus } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
 import styles from './InterviewsList.module.css';
 
 type ContactJoin = { id: string; first_name: string; last_name: string; job_title: string | null; role: string | null } | null;
@@ -58,20 +57,30 @@ interface InterviewsListProps {
 }
 
 export function InterviewsList({ initialInterviews, companies, contacts }: InterviewsListProps) {
-  const [showCreate, setShowCreate]       = useState(false);
-  const [editInterview, setEditInterview] = useState<InterviewRow | null>(null);
   const [viewInterview, setViewInterview] = useState<InterviewRow | null>(null);
-  const [deleteTarget, setDeleteTarget]   = useState<InterviewRow | null>(null);
-  const [isDeleting, setIsDeleting]       = useState(false);
-  const [isSubmitting, setIsSubmitting]   = useState(false);
-
   const [filterStatus,  setFilterStatus]  = useState('');
   const [filterRole,    setFilterRole]    = useState('');
   const [filterTrigger, setFilterTrigger] = useState('');
 
-  const router  = useRouter();
-  const { success, error } = useToast();
-  const { items: interviews, optimisticAdd } = useOptimisticList(initialInterviews);
+  const router = useRouter();
+  const {
+    items: interviews,
+    showCreate,
+    setShowCreate,
+    editing: editInterview,
+    setEditing: setEditInterview,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<InterviewRow>({
+    initialItems: initialInterviews,
+    entityLabel: 'Interview',
+    remove: deleteInterview,
+  });
 
   const filtered = useMemo(() => {
     return interviews.filter((row) => {
@@ -81,25 +90,6 @@ export function InterviewsList({ initialInterviews, companies, contacts }: Inter
       return true;
     });
   }, [interviews, filterStatus, filterRole, filterTrigger]);
-
-  const handleCreated = useCallback((interview?: InterviewRow) => {
-    if (interview) optimisticAdd(interview, async () => {});
-    setShowCreate(false);
-  }, [optimisticAdd]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteInterview(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Interview deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
 
   const columns: Column<InterviewRow>[] = [
     {
@@ -325,7 +315,7 @@ export function InterviewsList({ initialInterviews, companies, contacts }: Inter
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete interview"
         description="Permanently delete this interview record and its pain point log? This cannot be undone."
         confirmLabel="Delete interview"

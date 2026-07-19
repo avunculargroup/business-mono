@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
 import { createProject } from '@/app/actions/projects';
-import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
-import styles from '@/components/crm/ContactForm.module.css';
+import { useEntityForm } from '@/hooks/useEntityForm';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import styles from '@/components/ui/Form.module.css';
 
 interface CreatedProject {
   id: string;
@@ -23,64 +23,38 @@ interface ProjectFormProps {
 
 export function ProjectForm({ teamMembers, onSuccess, onPendingChange }: ProjectFormProps) {
   const user = useCurrentUser();
-  const { success, error } = useToast();
-
-  const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
-    const result = await createProject(formData);
-    if ('error' in result) {
-      error(result.error!);
-      return { error: result.error! };
-    }
-    success('Project created');
-    onSuccess(result.project as CreatedProject);
-    return null;
-  };
-
-  const [state, formAction, isPending] = useActionState(handleSubmit, null);
-
-  useEffect(() => {
-    onPendingChange?.(isPending);
-  }, [isPending, onPendingChange]);
+  const { state, formAction } = useEntityForm({
+    mode: 'create',
+    entityLabel: 'Project',
+    create: createProject,
+    onSuccess: (result) => onSuccess(result.project as CreatedProject),
+    onPendingChange,
+  });
 
   return (
     <form id="project-form" action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Name *</label>
-        <input name="name" required className={styles.input} />
-      </div>
+      <FormField label="Name" name="name" required />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
-        <textarea name="description" rows={3} className={styles.textarea} />
-      </div>
+      <FormTextarea label="Description" name="description" rows={3} />
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Priority</label>
-          <select name="priority" defaultValue="medium" className={styles.select}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Owner</label>
-          <select name="created_by" defaultValue={user.id} className={styles.select}>
-            <option value="">None</option>
-            {teamMembers.map((m) => (
-              <option key={m.id} value={m.id}>{m.full_name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <FormRow>
+        <FormSelect label="Priority" name="priority" defaultValue="medium">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </FormSelect>
+        <FormSelect label="Owner" name="created_by" defaultValue={user.id}>
+          <option value="">None</option>
+          {teamMembers.map((m) => (
+            <option key={m.id} value={m.id}>{m.full_name}</option>
+          ))}
+        </FormSelect>
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Target date</label>
-        <input name="target_date" type="date" className={styles.input} />
-      </div>
+      <FormField label="Target date" name="target_date" type="date" />
 
-      {state?.error && <p className={styles.error}>{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
     </form>
   );
 }

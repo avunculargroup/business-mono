@@ -1,18 +1,13 @@
 import { StatusChip } from './StatusChip';
-import type { TaskPriority } from '@platform/shared';
+import { TASK_PRIORITY_LABELS, type TaskPriority } from '@platform/shared';
 
+// Colours stay here — the chip components are the single visual source of truth.
+// Labels come from @platform/shared alongside the other enum label maps.
 const priorityColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'destructive'> = {
   low: 'neutral',
   medium: 'neutral',
   high: 'warning',
   urgent: 'destructive',
-};
-
-const priorityLabels: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  urgent: 'Urgent',
 };
 
 interface PriorityChipProps {
@@ -22,7 +17,7 @@ interface PriorityChipProps {
 export function PriorityChip({ priority }: PriorityChipProps) {
   return (
     <StatusChip
-      label={priorityLabels[priority] || priority}
+      label={TASK_PRIORITY_LABELS[priority as TaskPriority] || priority}
       color={priorityColors[priority] || 'neutral'}
     />
   );

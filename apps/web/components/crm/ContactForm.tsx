@@ -1,10 +1,11 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
 import { createContact, updateContact } from '@/app/actions/contacts';
-import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
-import styles from './ContactForm.module.css';
+import { useEntityForm } from '@/hooks/useEntityForm';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import { PIPELINE_STAGE_LABELS } from '@platform/shared';
+import styles from '@/components/ui/Form.module.css';
 
 type ContactRow = {
   id: string;
@@ -34,111 +35,62 @@ interface ContactFormProps {
 
 export function ContactForm({ companies, teamMembers, onSuccess, onPendingChange, mode = 'create', defaultValues }: ContactFormProps) {
   const user = useCurrentUser();
-  const { success, error } = useToast();
+  const { state, formAction } = useEntityForm({
+    mode,
+    entityLabel: 'Contact',
+    create: createContact,
+    update: (formData) => updateContact(defaultValues!.id, formData),
+    onSuccess: (result) => onSuccess(result.contact as ContactRow | undefined),
+    onPendingChange,
+  });
 
-  const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
-    if (mode === 'edit' && defaultValues) {
-      const result = await updateContact(defaultValues.id, formData);
-      if (result.error) {
-        error(result.error);
-        return { error: result.error };
-      }
-      success('Contact updated');
-      onSuccess();
-      return null;
-    }
-
-    const result = await createContact(formData);
-    if (result.error) {
-      error(result.error);
-      return { error: result.error };
-    }
-    success('Contact created');
-    onSuccess(result.contact as ContactRow);
-    return null;
-  };
-
-  const [state, formAction, isPending] = useActionState(handleSubmit, null);
   const formId = mode === 'edit' ? 'contact-edit-form' : 'contact-form';
-
-  useEffect(() => {
-    onPendingChange?.(isPending);
-  }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>First name *</label>
-          <input name="first_name" required defaultValue={defaultValues?.first_name ?? ''} className={styles.input} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Last name *</label>
-          <input name="last_name" required defaultValue={defaultValues?.last_name ?? ''} className={styles.input} />
-        </div>
-      </div>
+      <FormRow>
+        <FormField label="First name" name="first_name" required defaultValue={defaultValues?.first_name ?? ''} />
+        <FormField label="Last name" name="last_name" required defaultValue={defaultValues?.last_name ?? ''} />
+      </FormRow>
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Email</label>
-          <input name="email" type="email" defaultValue={defaultValues?.email ?? ''} className={styles.input} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Phone</label>
-          <input name="phone" type="tel" defaultValue={defaultValues?.phone ?? ''} className={styles.input} />
-        </div>
-      </div>
+      <FormRow>
+        <FormField label="Email" name="email" type="email" defaultValue={defaultValues?.email ?? ''} />
+        <FormField label="Phone" name="phone" type="tel" defaultValue={defaultValues?.phone ?? ''} />
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Company</label>
-        <select name="company_id" defaultValue={defaultValues?.company_id ?? ''} className={styles.select}>
-          <option value="">None</option>
-          {companies.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+      <FormSelect label="Company" name="company_id" defaultValue={defaultValues?.company_id ?? ''}>
+        <option value="">None</option>
+        {companies.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </FormSelect>
+
+      <FormRow>
+        <FormSelect label="Pipeline stage" name="pipeline_stage" defaultValue={defaultValues?.pipeline_stage ?? 'lead'}>
+          {Object.entries(PIPELINE_STAGE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
           ))}
-        </select>
-      </div>
+        </FormSelect>
+        <FormSelect label="Bitcoin literacy" name="bitcoin_literacy" defaultValue={defaultValues?.bitcoin_literacy ?? 'unknown'}>
+          <option value="unknown">Unknown</option>
+          <option value="none">None</option>
+          <option value="basic">Basic</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </FormSelect>
+      </FormRow>
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Pipeline stage</label>
-          <select name="pipeline_stage" defaultValue={defaultValues?.pipeline_stage ?? 'lead'} className={styles.select}>
-            <option value="lead">Lead</option>
-            <option value="warm">Warm</option>
-            <option value="active">Active</option>
-            <option value="client">Client</option>
-            <option value="dormant">Dormant</option>
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Bitcoin literacy</label>
-          <select name="bitcoin_literacy" defaultValue={defaultValues?.bitcoin_literacy ?? 'unknown'} className={styles.select}>
-            <option value="unknown">Unknown</option>
-            <option value="none">None</option>
-            <option value="basic">Basic</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
-        </div>
-      </div>
+      <FormSelect label="Owner" name="owner_id" defaultValue={defaultValues?.owner_id ?? user.id}>
+        {teamMembers.map((m) => (
+          <option key={m.id} value={m.id}>{m.full_name}</option>
+        ))}
+      </FormSelect>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Owner</label>
-        <select name="owner_id" defaultValue={defaultValues?.owner_id ?? user.id} className={styles.select}>
-          {teamMembers.map((m) => (
-            <option key={m.id} value={m.id}>{m.full_name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label}>Notes</label>
-        <textarea name="notes" rows={3} defaultValue={defaultValues?.notes ?? ''} className={styles.textarea} />
-      </div>
+      <FormTextarea label="Notes" name="notes" rows={3} defaultValue={defaultValues?.notes ?? ''} />
 
       <input type="hidden" name="source" value="manual" />
 
-      {state?.error && <p className={styles.error}>{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
     </form>
   );
 }

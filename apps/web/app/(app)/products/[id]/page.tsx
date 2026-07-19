@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ProductDetail } from '@/components/products/ProductDetail';
+import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { idColumn } from '@/lib/utils';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,8 +25,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const [
     { data: keyContacts },
     { data: agreements },
-    { data: companies },
-    { data: teamMembers },
+    companies,
+    teamMembers,
     { data: allContacts },
   ] = await Promise.all([
     supabase
@@ -37,8 +38,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       .select('*')
       .eq('product_service_id', product.id)
       .order('created_at', { ascending: false }),
-    supabase.from('companies').select('id, name').order('name'),
-    supabase.from('team_members').select('id, full_name'),
+    getCompanyOptions(supabase),
+    getTeamMemberOptions(supabase),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),
   ]);
 

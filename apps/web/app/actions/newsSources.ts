@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
@@ -124,8 +124,10 @@ export async function createNewsSource(formData: FormData) {
     if (!feedCheck.ok) return { error: feedCheck.error };
   }
 
-  const supabase = await createClient();
-  const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url) as never);
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url));
 
   if (dbError) return { error: humanizeError(dbError) };
   revalidatePath(REVALIDATE);
@@ -145,10 +147,12 @@ export async function updateNewsSource(id: string, formData: FormData) {
     if (!feedCheck.ok) return { error: feedCheck.error };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error: dbError } = await supabase
     .from('news_sources')
-    .update(buildRow(input, feed_url) as never)
+    .update(buildRow(input, feed_url))
     .eq('id', id);
 
   if (dbError) return { error: humanizeError(dbError) };
@@ -157,7 +161,9 @@ export async function updateNewsSource(id: string, formData: FormData) {
 }
 
 export async function deleteNewsSource(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('news_sources').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
@@ -165,7 +171,9 @@ export async function deleteNewsSource(id: string) {
 }
 
 export async function toggleNewsSourceActive(id: string, isActive: boolean) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('news_sources').update({ is_active: isActive }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);

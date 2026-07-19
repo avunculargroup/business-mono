@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { TaskDetailActions } from '@/components/tasks/TaskDetailActions';
+import { getTeamMemberOptions } from '@/lib/referenceData';
 import { formatDate, formatRelativeDate, idColumn } from '@/lib/utils';
 import Link from 'next/link';
 import styles from './task-detail.module.css';
@@ -24,7 +25,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const [
     projectResult,
     contactResult,
-    { data: teamMembers },
+    teamMembers,
     { data: allProjects },
     { data: allContacts },
   ] = await Promise.all([
@@ -34,7 +35,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     task.related_contact_id
       ? supabase.from('contacts').select('id, slug, first_name, last_name').eq('id', task.related_contact_id).single()
       : Promise.resolve({ data: null }),
-    supabase.from('team_members').select('id, full_name'),
+    getTeamMemberOptions(supabase),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
   ]);

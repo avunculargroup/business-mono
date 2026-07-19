@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { formatDate } from '@/lib/utils';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
 
@@ -21,15 +22,6 @@ interface NewsCardProps {
   relevanceScore?: number | null;
   curatorNotes?: string | null;
   onStatusChange?: (id: string, status: NewsStatus) => void;
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-AU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 export function NewsCard({
@@ -115,7 +107,7 @@ export function NewsCard({
         {publishedAt && (
           <>
             <span className={styles.dot}>·</span>
-            <span className={styles.date}>{formatDate(publishedAt)}</span>
+            <span className={styles.date}>{publishedAt ? formatDate(publishedAt) : ''}</span>
           </>
         )}
         {relevanceScore != null && (

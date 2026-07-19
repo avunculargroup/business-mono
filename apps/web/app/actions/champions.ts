@@ -2,9 +2,11 @@
 
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const ch  = (supabase: Awaited<ReturnType<typeof createClient>>) => supabase.from('champions');
@@ -63,7 +65,7 @@ export async function getChampions(filters?: {
   if (filters?.company_id) query = query.eq('company_id', filters.company_id);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
@@ -78,16 +80,17 @@ export async function getChampion(id: string) {
     .eq(idColumn(id), id)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data;
 }
 
 export async function createChampion(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = championSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(championSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { data, error } = await ch(supabase)
@@ -125,11 +128,12 @@ export async function createChampion(formData: FormData) {
 }
 
 export async function updateChampion(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = championSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(championSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
   const d = parsed.data;
 
@@ -147,7 +151,9 @@ export async function updateChampion(id: string, formData: FormData) {
 }
 
 export async function deleteChampion(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await ch(supabase).delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/champions');
@@ -161,16 +167,17 @@ export async function getChampionEvents(championId: string) {
     .eq('champion_id', championId)
     .order('event_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
 export async function logChampionEvent(championId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = eventSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(eventSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { error: insertError } = await che(supabase).insert({

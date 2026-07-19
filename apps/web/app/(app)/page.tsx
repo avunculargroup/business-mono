@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PriorityChip } from '@/components/ui/PriorityChip';
 import { Card } from '@/components/ui/Card';
@@ -26,8 +27,8 @@ export default async function DashboardPage() {
   // Parallel data fetching
   const [
     { data: openTasks },
-    { data: companies },
-    { data: teamMembers },
+    companies,
+    teamMembers,
     { data: activeProjects },
     { data: allContacts },
     { data: dashboardRoutines },
@@ -44,8 +45,8 @@ export default async function DashboardPage() {
       .order('priority', { ascending: true })
       .order('due_date', { ascending: true })
       .limit(8),
-    supabase.from('companies').select('id, name').order('name'),
-    supabase.from('team_members').select('id, full_name'),
+    getCompanyOptions(supabase),
+    getTeamMemberOptions(supabase),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
     supabase

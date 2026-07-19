@@ -12,24 +12,22 @@ import { idColumn } from '@/lib/utils';
 export default async function CampaignQueuePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  const { data: campaign } = await db
+  const { data: campaign } = await supabase
     .from('campaigns')
     .select('id, slug, name')
     .eq(idColumn(id), id)
     .maybeSingle();
   if (!campaign) notFound();
 
-  const { data: rows } = await db.from('v_ready_to_post').select('*').eq('campaign_id', campaign.id);
+  const { data: rows } = await supabase.from('v_ready_to_post').select('*').eq('campaign_id', campaign.id);
   const items = (rows ?? []) as QueueItem[];
 
   // Thread segments for the threaded rows (a view can't cleanly nest children).
   const threadIds = items.filter((i) => i.is_thread).map((i) => i.id);
   const segmentsByItem: Record<string, string[]> = {};
   if (threadIds.length > 0) {
-    const { data: segs } = await db
+    const { data: segs } = await supabase
       .from('thread_segments')
       .select('content_item_id, sequence, body')
       .in('content_item_id', threadIds)

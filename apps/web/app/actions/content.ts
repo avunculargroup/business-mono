@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -19,7 +19,9 @@ export async function createContent(formData: FormData) {
   const parsed = contentSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { error } = await supabase.from('content_items').insert({
@@ -42,14 +44,16 @@ export async function createContent(formData: FormData) {
 }
 
 export async function updateContentStatus(id: string, status: string, extras?: { published_url?: string; published_at?: string }) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const updateData: Record<string, unknown> = { status };
   if (status === 'published' && extras) {
     if (extras.published_at) updateData.published_at = extras.published_at;
   }
 
-  const { error } = await supabase.from('content_items').update(updateData as never).eq('id', id);
+  const { error } = await supabase.from('content_items').update(updateData).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
   revalidatePath('/content');

@@ -17,8 +17,7 @@ export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: file } = await (supabase as any)
+  const { data: file } = await supabase
     .from('platform_files')
     .select('storage_path, is_public')
     .eq('id', id)

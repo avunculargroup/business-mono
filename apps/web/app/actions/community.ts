@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const cw = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('community_watchlist');
@@ -53,16 +55,17 @@ export async function getCommunityEntries(filters?: {
   if (filters?.industry_tag)      query = query.contains('industry_tags', [filters.industry_tag]);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
 export async function createCommunityEntry(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = communitySchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(communitySchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { error } = await cw(supabase).insert({
@@ -88,11 +91,12 @@ export async function createCommunityEntry(formData: FormData) {
 }
 
 export async function updateCommunityEntry(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = communitySchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(communitySchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
   const d = parsed.data;
 
@@ -118,7 +122,9 @@ export async function updateCommunityEntry(id: string, formData: FormData) {
 }
 
 export async function deleteCommunityEntry(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await cw(supabase).update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/crm/community');

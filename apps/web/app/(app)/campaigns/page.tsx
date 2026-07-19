@@ -11,12 +11,7 @@ import styles from './campaigns.module.css';
 
 export default async function CampaignsPage() {
   const supabase = await createClient();
-  // v_campaign_overview isn't in the generated web types until db:generate-types
-  // runs post-migration — cast at the boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
-    .from('v_campaign_overview')
-    .select('*');
+  const { data } = await supabase.from('v_campaign_overview').select('*');
   const campaigns = (data ?? []) as OverviewRow[];
 
   return (

@@ -2,9 +2,11 @@
 
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const docs = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -25,12 +27,12 @@ const versionSchema = z.object({
 });
 
 export async function createDocument(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = documentSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(documentSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const tags = parseTags(parsed.data.tags);
 
@@ -40,7 +42,7 @@ export async function createDocument(formData: FormData) {
       title:       parsed.data.title,
       description: parsed.data.description || null,
       tags,
-      created_by:  user?.id ?? null,
+      created_by:  user.id,
     })
     .select()
     .single();
@@ -52,7 +54,7 @@ export async function createDocument(formData: FormData) {
     version_number: 1,
     status:         'draft',
     content:        { markdown: '' },
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
   });
 
   if (verErr) return { error: humanizeError(verErr) };
@@ -62,11 +64,12 @@ export async function createDocument(formData: FormData) {
 }
 
 export async function updateDocument(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = documentSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(documentSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   if (parsed.data.type        !== undefined) updateData.type        = parsed.data.type;
@@ -82,9 +85,8 @@ export async function updateDocument(id: string, formData: FormData) {
 }
 
 export async function createDocumentVersion(documentId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = versionSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(versionSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   let content: Record<string, unknown>;
   try {
@@ -93,8 +95,9 @@ export async function createDocumentVersion(documentId: string, formData: FormDa
     return { error: 'Content must be valid JSON' };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { data: versions } = await vers(supabase)
     .select('version_number')
@@ -109,7 +112,7 @@ export async function createDocumentVersion(documentId: string, formData: FormDa
     version_number: nextVersion,
     status:         'draft',
     content:        content as Json,
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
   });
 
   if (error) return { error: humanizeError(error) };
@@ -123,7 +126,9 @@ export async function updateDocumentVersion(versionId: string, content: Record<s
     return { error: 'Content must be an object' };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { error } = await vers(supabase)
     .update({ content: content as Json })
@@ -137,8 +142,9 @@ export async function updateDocumentVersion(versionId: string, content: Record<s
 }
 
 export async function approveDocumentVersion(documentId: string, versionId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   await vers(supabase)
     .update({ status: 'deprecated' })
@@ -146,7 +152,7 @@ export async function approveDocumentVersion(documentId: string, versionId: stri
     .eq('status', 'approved');
 
   const { error } = await vers(supabase)
-    .update({ status: 'approved', approved_by: user?.id ?? null })
+    .update({ status: 'approved', approved_by: user.id })
     .eq('id', versionId);
 
   if (error) return { error: humanizeError(error) };
@@ -161,7 +167,7 @@ export async function getDocuments() {
     .select('*, document_versions(*)')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // Each version's content is a jsonb column typed loosely as Json — assert the
   // object shape the view uses.
   return (data ?? []).map((row) => ({
@@ -181,7 +187,7 @@ export async function getDocument(id: string) {
     .order('version_number', { referencedTable: 'document_versions', ascending: false })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return {
     ...data,
     document_versions: data.document_versions.map((v) => ({
@@ -213,8 +219,9 @@ export async function importDocxDocument(formData: FormData) {
   const mammoth = require('mammoth') as any;
   const { value: markdown } = await mammoth.convertToMarkdown({ buffer }) as { value: string };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const tags = parseTags(parsed.data.tags);
 
@@ -224,7 +231,7 @@ export async function importDocxDocument(formData: FormData) {
       title:       parsed.data.title,
       description: parsed.data.description || null,
       tags,
-      created_by:  user?.id ?? null,
+      created_by:  user.id,
     })
     .select()
     .single();
@@ -236,7 +243,7 @@ export async function importDocxDocument(formData: FormData) {
     version_number: 1,
     status:         'draft',
     content:        { markdown },
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
   });
 
   if (verErr) return { error: humanizeError(verErr) };

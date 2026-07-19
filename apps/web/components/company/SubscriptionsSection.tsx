@@ -10,6 +10,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable } from '@/components/ui/DataTable';
 import { createSubscription, updateSubscription, deleteSubscription } from '@/app/actions/company';
 import { useToast } from '@/providers/ToastProvider';
+import { formatDate } from '@/lib/utils';
 import type { CompanySubscription, SubscriptionPaymentType } from '@platform/shared';
 import styles from './SubscriptionsSection.module.css';
 
@@ -25,7 +26,7 @@ function expiryChip(dateStr: string | null): React.ReactNode {
   if (days < 0) return <StatusChip label="Expired" color="destructive" />;
   if (days <= 30) return <StatusChip label={`${days}d`} color="destructive" />;
   if (days <= 90) return <StatusChip label={`${days}d`} color="warning" />;
-  return <StatusChip label={new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} color="neutral" />;
+  return <StatusChip label={formatDate(dateStr)} color="neutral" />;
 }
 
 interface SubFormState {

@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
 import { createCompany, updateCompany } from '@/app/actions/companies';
-import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
-import styles from './ContactForm.module.css';
+import { useEntityForm } from '@/hooks/useEntityForm';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import styles from '@/components/ui/Form.module.css';
 
 type CompanyRow = {
   id: string;
@@ -27,76 +27,44 @@ interface CompanyFormProps {
 }
 
 export function CompanyForm({ onSuccess, onPendingChange, mode = 'create', defaultValues }: CompanyFormProps) {
-  const { success, error } = useToast();
+  const { state, formAction, isPending } = useEntityForm({
+    mode,
+    entityLabel: 'Company',
+    create: createCompany,
+    update: (formData) => updateCompany(defaultValues!.id, formData),
+    onSuccess: (result) => onSuccess(result.company as CompanyRow | undefined),
+    onPendingChange,
+  });
 
-  const handleSubmit = async (_prev: { error: string } | null, formData: FormData) => {
-    if (mode === 'edit' && defaultValues) {
-      const result = await updateCompany(defaultValues.id, formData);
-      if (result.error) {
-        error(result.error);
-        return { error: result.error };
-      }
-      success('Company updated');
-      onSuccess();
-      return null;
-    }
-
-    const result = await createCompany(formData);
-    if (result.error) {
-      error(result.error);
-      return { error: result.error };
-    }
-    success('Company created');
-    onSuccess(result.company as CompanyRow);
-    return null;
-  };
-
-  const [state, formAction, isPending] = useActionState(handleSubmit, null);
   const formId = mode === 'edit' ? 'company-edit-form' : 'company-form';
-
-  useEffect(() => {
-    onPendingChange?.(isPending);
-  }, [isPending, onPendingChange]);
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Name *</label>
-        <input name="name" required defaultValue={defaultValues?.name ?? ''} className={styles.input} />
-      </div>
+      <FormField label="Name" name="name" required defaultValue={defaultValues?.name ?? ''} />
 
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Industry</label>
-          <input name="industry" defaultValue={defaultValues?.industry ?? ''} className={styles.input} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Size</label>
-          <select name="size" defaultValue={defaultValues?.size ?? ''} className={styles.select}>
-            <option value="">Select</option>
-            <option value="SME">SME</option>
-            <option value="Mid-market">Mid-market</option>
-            <option value="Enterprise">Enterprise</option>
-          </select>
-        </div>
-      </div>
+      <FormRow>
+        <FormField label="Industry" name="industry" defaultValue={defaultValues?.industry ?? ''} />
+        <FormSelect label="Size" name="size" defaultValue={defaultValues?.size ?? ''}>
+          <option value="">Select</option>
+          <option value="SME">SME</option>
+          <option value="Mid-market">Mid-market</option>
+          <option value="Enterprise">Enterprise</option>
+        </FormSelect>
+      </FormRow>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Website</label>
-        <input name="website" type="url" placeholder="https://" defaultValue={defaultValues?.website ?? ''} className={styles.input} />
-      </div>
+      <FormField label="Website" name="website" type="url" placeholder="https://" defaultValue={defaultValues?.website ?? ''} />
 
-      <div className={styles.field}>
-        <label className={styles.label}>LinkedIn URL</label>
-        <input name="linkedin_url" type="url" placeholder="https://linkedin.com/company/..." defaultValue={defaultValues?.linkedin_url ?? ''} className={styles.input} />
-      </div>
+      <FormField
+        label="LinkedIn URL"
+        name="linkedin_url"
+        type="url"
+        placeholder="https://linkedin.com/company/..."
+        defaultValue={defaultValues?.linkedin_url ?? ''}
+      />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Notes</label>
-        <textarea name="notes" rows={3} defaultValue={defaultValues?.notes ?? ''} className={styles.textarea} />
-      </div>
+      <FormTextarea label="Notes" name="notes" rows={3} defaultValue={defaultValues?.notes ?? ''} />
 
-      {state?.error && <p className={styles.error}>{state.error}</p>}
+      {state?.error && <FormError>{state.error}</FormError>}
 
       {mode !== 'edit' && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { SimonThread } from '@/components/simon/SimonThread';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 
 type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];
 

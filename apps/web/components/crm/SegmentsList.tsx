@@ -8,7 +8,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SegmentForm } from './SegmentForm';
 import { deleteSegment, updateSegment } from '@/app/actions/segments';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { LayoutGrid, Pencil, Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/providers/ToastProvider';
 import type { SegmentScorecard } from '@platform/shared';
@@ -85,38 +85,30 @@ function ScoreCell({
 }
 
 export function SegmentsList({ initialSegments }: SegmentsListProps) {
-  const [showCreate, setShowCreate]     = useState(false);
-  const [editSegment, setEditSegment]   = useState<SegmentScorecard | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<SegmentScorecard | null>(null);
-  const [isDeleting, setIsDeleting]     = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const router  = useRouter();
-  const { success, error } = useToast();
-  const { items: segments, optimisticAdd, optimisticUpdate } = useOptimisticList(initialSegments);
-
-  const handleCreated = useCallback((segment?: SegmentScorecard) => {
-    if (segment) optimisticAdd(segment, async () => {});
-    setShowCreate(false);
-  }, [optimisticAdd]);
+  const router = useRouter();
+  const {
+    items: segments,
+    optimisticUpdate,
+    showCreate,
+    setShowCreate,
+    editing: editSegment,
+    setEditing: setEditSegment,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated,
+    confirmDelete,
+  } = useEntityList<SegmentScorecard>({
+    initialItems: initialSegments,
+    entityLabel: 'Segment',
+    remove: deleteSegment,
+  });
 
   const handleScoreSaved = useCallback((id: string, field: string, val: number) => {
     optimisticUpdate(id, { [field]: val } as Partial<SegmentScorecard>, async () => {});
   }, [optimisticUpdate]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteSegment(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Segment deleted');
-      setDeleteTarget(null);
-      router.refresh();
-    }
-  };
 
   // Find the max weighted score for highlighting
   const maxWeighted = Math.max(
@@ -280,7 +272,7 @@ export function SegmentsList({ initialSegments }: SegmentsListProps) {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete segment"
         description={`Permanently delete "${deleteTarget?.segment_name}"? This cannot be undone.`}
         confirmLabel="Delete segment"

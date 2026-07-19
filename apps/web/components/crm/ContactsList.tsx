@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { PipelineChip } from '@/components/ui/PipelineChip';
@@ -10,7 +10,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ContactForm } from './ContactForm';
 import { deleteContact, updateContact } from '@/app/actions/contacts';
-import { useOptimisticList } from '@/hooks/useOptimisticList';
+import { useEntityList } from '@/hooks/useEntityList';
 import { formatRelativeDate } from '@/lib/utils';
 import { STAKEHOLDER_ROLE_LABELS, type StakeholderRole } from '@platform/shared';
 import { Plus, Users, Eye, Pencil, Trash2 } from 'lucide-react';
@@ -39,23 +39,29 @@ interface ContactsListProps {
 }
 
 export function ContactsList({ initialContacts, totalCount: _totalCount, companies, teamMembers }: ContactsListProps) {
-  const [showCreate, setShowCreate]       = useState(false);
-  const [editContact, setEditContact]     = useState<ContactRow | null>(null);
-  const [roleTarget, setRoleTarget]       = useState<ContactRow | null>(null);
-  const [deleteTarget, setDeleteTarget]   = useState<ContactRow | null>(null);
-  const [isDeleting, setIsDeleting]       = useState(false);
-  const [isSubmitting, setIsSubmitting]   = useState(false);
-  const [roleSubmitting, setRoleSubmitting] = useState(false);
   const router = useRouter();
   const { success, error } = useToast();
-  const { items: contacts, optimisticAdd, optimisticUpdate } = useOptimisticList(initialContacts);
-
-  const handleContactCreated = useCallback((contact?: ContactRow) => {
-    if (contact) {
-      optimisticAdd(contact, async () => {});
-    }
-    setShowCreate(false);
-  }, [optimisticAdd]);
+  const [roleTarget, setRoleTarget] = useState<ContactRow | null>(null);
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
+  const {
+    items: contacts,
+    optimisticUpdate,
+    showCreate,
+    setShowCreate,
+    editing: editContact,
+    setEditing: setEditContact,
+    deleteTarget,
+    setDeleteTarget,
+    isDeleting,
+    isSubmitting,
+    setIsSubmitting,
+    handleCreated: handleContactCreated,
+    confirmDelete,
+  } = useEntityList<ContactRow>({
+    initialItems: initialContacts,
+    entityLabel: 'Contact',
+    remove: deleteContact,
+  });
 
   const handleRoleSave = async (role: string) => {
     if (!roleTarget) return;
@@ -70,20 +76,6 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
       success('Role updated');
       optimisticUpdate(roleTarget.id, { role: role || null }, async () => {});
       setRoleTarget(null);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const result = await deleteContact(deleteTarget.id);
-    setIsDeleting(false);
-    if (result.error) {
-      error(result.error);
-    } else {
-      success('Contact deleted');
-      setDeleteTarget(null);
-      router.refresh();
     }
   };
 
@@ -251,7 +243,7 @@ export function ContactsList({ initialContacts, totalCount: _totalCount, compani
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
         title="Delete contact"
         description={`Permanently delete ${deleteTarget?.first_name} ${deleteTarget?.last_name}? This cannot be undone.`}
         confirmLabel="Delete contact"

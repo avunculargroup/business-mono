@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const advisorSchema = z.object({
   name:                z.string().min(1, 'Name is required'),
@@ -22,11 +23,12 @@ const advisorSchema = z.object({
 });
 
 export async function createAdvisor(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = advisorSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(advisorSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { data: advisor, error } = await supabase
@@ -56,11 +58,12 @@ export async function createAdvisor(formData: FormData) {
 }
 
 export async function updateAdvisor(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = advisorSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(advisorSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const d = parsed.data;
 
   const { error } = await supabase
@@ -89,7 +92,9 @@ export async function updateAdvisor(id: string, formData: FormData) {
 }
 
 export async function deleteAdvisor(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('advisors_partners').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
 
@@ -98,7 +103,9 @@ export async function deleteAdvisor(id: string) {
 }
 
 export async function addAdvisorContact(advisorId: string, contactId: string, role: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data, error } = await supabase
     .from('advisor_partner_contacts')
     .insert({ advisor_partner_id: advisorId, contact_id: contactId, role: role || null })
@@ -112,7 +119,9 @@ export async function addAdvisorContact(advisorId: string, contactId: string, ro
 }
 
 export async function removeAdvisorContact(advisorId: string, contactId: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('advisor_partner_contacts')
     .delete()

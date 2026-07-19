@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { AdvisorDetail } from '@/components/advisors/AdvisorDetail';
+import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { idColumn } from '@/lib/utils';
 
 export default async function AdvisorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,16 +24,16 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
 
   const [
     { data: contacts },
-    { data: companies },
-    { data: teamMembers },
+    companies,
+    teamMembers,
     { data: allContacts },
   ] = await Promise.all([
     supabase
       .from('advisor_partner_contacts')
       .select('id, role, contacts(id, first_name, last_name, email)')
       .eq('advisor_partner_id', advisor.id),
-    supabase.from('companies').select('id, name').order('name'),
-    supabase.from('team_members').select('id, full_name'),
+    getCompanyOptions(supabase),
+    getTeamMemberOptions(supabase),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),
   ]);
 

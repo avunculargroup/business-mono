@@ -2,9 +2,11 @@
 
 import type { Json } from '@platform/db';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 import { idColumn } from '@/lib/utils';
 
 const tmpl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
@@ -25,12 +27,12 @@ const versionSchema = z.object({
 });
 
 export async function createTemplate(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = templateSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(templateSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const tags = parseTags(parsed.data.tags);
 
@@ -40,7 +42,7 @@ export async function createTemplate(formData: FormData) {
       title:       parsed.data.title,
       description: parsed.data.description || null,
       tags,
-      created_by:  user?.id ?? null,
+      created_by:  user.id,
     })
     .select()
     .single();
@@ -57,7 +59,7 @@ export async function createTemplate(formData: FormData) {
     version_number: 1,
     status:         'draft',
     content:        initialContent,
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
   });
 
   if (verErr) return { error: humanizeError(verErr) };
@@ -67,11 +69,12 @@ export async function createTemplate(formData: FormData) {
 }
 
 export async function updateTemplate(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = templateSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(templateSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   if (parsed.data.title       !== undefined) updateData.title       = parsed.data.title;
@@ -86,9 +89,8 @@ export async function updateTemplate(id: string, formData: FormData) {
 }
 
 export async function createTemplateVersion(templateId: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = versionSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(versionSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
   let content: Record<string, unknown>;
   try {
@@ -97,8 +99,9 @@ export async function createTemplateVersion(templateId: string, formData: FormDa
     return { error: 'Content must be valid JSON' };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   // Get current max version
   const { data: versions } = await ver(supabase)
@@ -114,7 +117,7 @@ export async function createTemplateVersion(templateId: string, formData: FormDa
     version_number: nextVersion,
     status:         'draft',
     content:        content as Json,
-    created_by:     user?.id ?? null,
+    created_by:     user.id,
   });
 
   if (error) return { error: humanizeError(error) };
@@ -128,7 +131,9 @@ export async function updateTemplateVersion(versionId: string, content: Record<s
     return { error: 'Content must be an object' };
   }
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { error } = await ver(supabase)
     .update({ content: content as Json })
@@ -142,8 +147,9 @@ export async function updateTemplateVersion(versionId: string, content: Record<s
 }
 
 export async function approveTemplateVersion(templateId: string, versionId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   // Deprecate any currently approved version for this template
   await ver(supabase)
@@ -152,7 +158,7 @@ export async function approveTemplateVersion(templateId: string, versionId: stri
     .eq('status', 'approved');
 
   const { error } = await ver(supabase)
-    .update({ status: 'approved', approved_by: user?.id ?? null })
+    .update({ status: 'approved', approved_by: user.id })
     .eq('id', versionId);
 
   if (error) return { error: humanizeError(error) };
@@ -167,7 +173,7 @@ export async function getTemplates() {
     .select('*, mvp_template_versions(*)')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // tags is a nullable text[] (normalise null → []); each version's content is a
   // jsonb column typed loosely as Json — assert the object shape the view uses.
   return (data ?? []).map((row) => ({
@@ -188,7 +194,7 @@ export async function getTemplate(id: string) {
     .order('version_number', { referencedTable: 'mvp_template_versions', ascending: false })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return {
     ...data,
     tags: data.tags ?? [],

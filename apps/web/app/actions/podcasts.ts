@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -16,13 +16,15 @@ type EpisodeAction = (typeof EPISODE_ACTIONS)[number];
 export async function requestEpisodeAction(id: string, action: EpisodeAction) {
   if (!EPISODE_ACTIONS.includes(action)) return { error: 'Unknown action.' };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('podcast_episodes')
     // pending_action is picked up by the listener; resolving reflects the
     // in-flight state immediately in the UI. (pending_action is post-migration,
     // so cast at the boundary like the agents code does.)
-    .update({ pending_action: action, transcript_status: 'resolving', transcript_error: null } as never)
+    .update({ pending_action: action, transcript_status: 'resolving', transcript_error: null })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -53,7 +55,9 @@ export async function ingestEpisodeBrief(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid input' };
 
   const input = parsed.data;
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data, error } = await supabase
     .from('podcast_episodes')
@@ -67,7 +71,7 @@ export async function ingestEpisodeBrief(formData: FormData) {
       curator_note: input.why,
       transcript_status: 'pending',
       pending_action: input.allow_deepgram ? 'deepgram' : 'refetch',
-    } as never)
+    })
     .select('id')
     .single();
 
@@ -80,10 +84,12 @@ export async function ingestEpisodeBrief(formData: FormData) {
 // A plain DB flip on news_sources.transcribe_with_deepgram — the scan path reads
 // it on the next run, so there's no agent round-trip.
 export async function setDeepgramTranscription(id: string, enabled: boolean) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('news_sources')
-    .update({ transcribe_with_deepgram: enabled } as never)
+    .update({ transcribe_with_deepgram: enabled })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -98,10 +104,12 @@ export async function setDeepgramTranscription(id: string, enabled: boolean) {
 // persist a `proposed` summary (the web app can't reach the agent server over
 // HTTP). Also (re)generates when a proposed draft is rejected or revised.
 export async function generateEpisodeBrief(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('podcast_episodes')
-    .update({ pending_action: 'summarize' } as never)
+    .update({ pending_action: 'summarize' })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -115,7 +123,9 @@ export async function generateEpisodeBrief(id: string) {
 export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reject') {
   if (decision !== 'approve' && decision !== 'reject') return { error: 'Unknown decision.' };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const { data: current, error: readErr } = await supabase
     .from('podcast_episodes')
     .select('summary_status')
@@ -128,16 +138,11 @@ export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reje
 
   const patch =
     decision === 'approve'
-      ? await (async () => {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          return {
-            summary_status: 'approved',
-            summary_approved_at: new Date().toISOString(),
-            summary_approved_by: user?.id ?? null,
-          };
-        })()
+      ? {
+          summary_status: 'approved',
+          summary_approved_at: new Date().toISOString(),
+          summary_approved_by: user.id,
+        }
       : {
           summary_status: 'none',
           episode_summary: null,
@@ -149,7 +154,7 @@ export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reje
 
   const { error } = await supabase
     .from('podcast_episodes')
-    .update(patch as never)
+    .update(patch)
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };

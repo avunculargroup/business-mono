@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const cl = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('corporate_lexicon');
@@ -18,12 +20,12 @@ const lexiconSchema = z.object({
 });
 
 export async function createLexiconEntry(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = lexiconSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(lexiconSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { error } = await cl(supabase).insert({
     ...parsed.data,
@@ -31,7 +33,7 @@ export async function createLexiconEntry(formData: FormData) {
     category:      parsed.data.category      || null,
     example_usage: parsed.data.example_usage || null,
     version:       1,
-    created_by:    user?.id ?? null,
+    created_by:    user.id,
   });
 
   if (error) return { error: humanizeError(error) };
@@ -41,11 +43,12 @@ export async function createLexiconEntry(formData: FormData) {
 }
 
 export async function updateLexiconEntry(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = lexiconSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(lexiconSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   // Fetch current version to increment
   const { data: current } = await cl(supabase).select('version').eq('id', id).single();
@@ -64,11 +67,12 @@ export async function updateLexiconEntry(id: string, formData: FormData) {
 }
 
 export async function approveLexiconEntry(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { error } = await cl(supabase)
-    .update({ status: 'approved', approved_by: user?.id ?? null })
+    .update({ status: 'approved', approved_by: user.id })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -78,7 +82,9 @@ export async function approveLexiconEntry(id: string) {
 }
 
 export async function deprecateLexiconEntry(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await cl(supabase).update({ status: 'deprecated' }).eq('id', id);
   if (error) return { error: humanizeError(error) };
 
@@ -92,6 +98,6 @@ export async function getLexiconEntries() {
     .select('*, created_by_member:team_members!corporate_lexicon_created_by_fkey(full_name), approved_by_member:team_members!corporate_lexicon_approved_by_fkey(full_name)')
     .order('term', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }

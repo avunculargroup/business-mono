@@ -4,8 +4,7 @@ import { SegmentsList } from '@/components/crm/SegmentsList';
 
 export default async function SegmentsPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: segments } = await (supabase as any)
+  const { data: segments } = await supabase
     .from('segment_scorecards')
     .select('*')
     .order('created_at', { ascending: true });

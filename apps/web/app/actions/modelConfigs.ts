@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { MODEL_SCOPES, type ModelScopeType } from '@platform/shared';
 import { humanizeError } from '@/lib/errors';
@@ -30,15 +30,10 @@ export async function upsertModelConfig(scopeKey: string, modelId: string) {
   const scopeType = SCOPE_TYPE_BY_KEY.get(scopeKey);
   if (!scopeType) return { error: `Unknown scope: ${scopeKey}` };
 
-  const supabase = await createClient();
-  // Casts: model_configs isn't in the generated Database types until
-  // `pnpm --filter @platform/db generate-types` is re-run after the
-  // migration is applied. Once that happens these can be removed.
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      upsert: (row: Record<string, unknown>, opts: { onConflict: string }) => Promise<{ error: { message: string } | null }>;
-    };
-  })
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { error } = await supabase
     .from('model_configs')
     .upsert(
       {
@@ -59,12 +54,10 @@ export async function resetModelConfig(scopeKey: string) {
     return { error: `Unknown scope: ${scopeKey}` };
   }
 
-  const supabase = await createClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      delete: () => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> };
-    };
-  })
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { error } = await supabase
     .from('model_configs')
     .delete()
     .eq('scope_key', scopeKey);

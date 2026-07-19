@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -34,7 +34,9 @@ export async function runNewsletter(formData: FormData) {
   }
   const input = parsed.data;
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: routine, error: findError } = await supabase
     .from('routines')
@@ -58,7 +60,7 @@ export async function runNewsletter(formData: FormData) {
   const { error: updateError } = await supabase
     .from('routines')
     .update({
-      action_config: actionConfig as never,
+      action_config: actionConfig,
       next_run_at: new Date().toISOString(),
       is_active: true,
     })
@@ -104,7 +106,9 @@ export async function submitNewsletterGateDecision(
   workflowRunId: string,
   decision: GateDecision,
 ) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const { data: run, error: findError } = await supabase
     .from('newsletter_runs')

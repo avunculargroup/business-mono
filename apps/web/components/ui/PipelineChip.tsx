@@ -1,20 +1,14 @@
 import { StatusChip } from './StatusChip';
-import type { PipelineStage } from '@platform/shared';
+import { PIPELINE_STAGE_LABELS, type PipelineStage } from '@platform/shared';
 
+// Colours stay here — the chip components are the single visual source of truth.
+// Labels come from @platform/shared alongside the other enum label maps.
 const stageColors: Record<string, 'neutral' | 'accent' | 'success' | 'warning' | 'destructive'> = {
   lead: 'neutral',
   warm: 'warning',
   active: 'accent',
   client: 'success',
   dormant: 'destructive',
-};
-
-const stageLabels: Record<string, string> = {
-  lead: 'Lead',
-  warm: 'Warm',
-  active: 'Active',
-  client: 'Client',
-  dormant: 'Dormant',
 };
 
 interface PipelineChipProps {
@@ -24,7 +18,7 @@ interface PipelineChipProps {
 export function PipelineChip({ stage }: PipelineChipProps) {
   return (
     <StatusChip
-      label={stageLabels[stage] || stage}
+      label={PIPELINE_STAGE_LABELS[stage as PipelineStage] || stage}
       color={stageColors[stage] || 'neutral'}
     />
   );

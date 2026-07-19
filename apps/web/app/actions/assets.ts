@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import type { AssetRow } from '@/lib/decks/schema';
 import { humanizeError } from '@/lib/errors';
 
@@ -18,7 +19,7 @@ export async function getAssets(): Promise<AssetRow[]> {
     .select('*')
     .eq('org_id', ORG_ID)
     .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data ?? [];
 }
 
@@ -41,11 +42,9 @@ export async function createUploadSignedUrl(
   filename: string,
   _mimeType: string,
 ): Promise<{ error: string } | { success: true; signedUrl: string; path: string; assetId: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: 'Unauthenticated' };
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
 
   const ext = filename.split('.').pop() ?? 'bin';
   const assetId = crypto.randomUUID();
@@ -69,17 +68,16 @@ export async function registerUploadedAsset(params: {
   height?: number;
   altText?: string;
 }): Promise<{ error: string } | { success: true; id: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
 
   const { data, error } = await supabase
     .from('assets')
     .insert({
       id: params.assetId,
       org_id: ORG_ID,
-      uploaded_by: user?.id,
+      uploaded_by: user.id,
       bucket: BUCKET,
       path: params.path,
       filename: params.filename,

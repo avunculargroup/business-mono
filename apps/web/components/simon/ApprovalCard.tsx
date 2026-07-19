@@ -1,5 +1,5 @@
 import { AgentActivityCard } from '@/components/agent/AgentActivityCard';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 
 type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];
 

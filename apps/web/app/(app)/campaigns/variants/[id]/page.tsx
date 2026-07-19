@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { VariantEditor } from '@/components/campaigns/VariantEditor';
+import { VariantEditor, type GateState } from '@/components/campaigns/VariantEditor';
 import { idColumn } from '@/lib/utils';
 
 // Variant review (Gate 3). Deep-linked per variant — the campaign matrix
@@ -12,10 +12,7 @@ export default async function VariantReviewPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const supabase = await createClient();
 
-  // content_items gate columns aren't in the web Database types until
-  // db:generate-types runs post-migration — cast at the boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from('content_items')
     .select('id, status, workflow_run_id, gate_state, campaign_id')
     .eq(idColumn(id), id)
@@ -40,7 +37,11 @@ export default async function VariantReviewPage({ params }: { params: Promise<{ 
   return (
     <>
       <PageHeader title="Variant review" backHref={backHref} backLabel={backLabel} />
-      <VariantEditor contentItemId={data.id} status={data.status} gateState={data.gate_state ?? null} />
+      <VariantEditor
+        contentItemId={data.id}
+        status={data.status}
+        gateState={(data.gate_state as GateState | null) ?? null}
+      />
     </>
   );
 }

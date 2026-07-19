@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const di = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('discovery_interviews');
@@ -31,14 +33,12 @@ function parsePainPoints(raw: string | undefined): string[] {
 }
 
 export async function createInterview(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = interviewSchema.safeParse(raw);
+  const parsed = parseForm(interviewSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
-
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const { data: interview, error } = await di(supabase)
@@ -63,14 +63,12 @@ export async function createInterview(formData: FormData) {
 }
 
 export async function updateInterview(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = interviewSchema.partial().safeParse(raw);
+  const parsed = parseForm(interviewSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
-  }
-
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const data = parsed.data;
 
   const updateData: Record<string, unknown> = {};
@@ -98,7 +96,9 @@ export async function updateInterview(id: string, formData: FormData) {
 }
 
 export async function deleteInterview(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await di(supabase).delete().eq('id', id);
 
   if (error) return { error: humanizeError(error) };
@@ -113,7 +113,7 @@ export async function getInterviews() {
     .select('*, contacts(id, first_name, last_name, job_title, role), companies(id, name)')
     .order('interview_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // pain_points is a nullable text[] column; normalise null → [] so the list
   // view's row type stays non-null.
   return (data ?? []).map((row) => ({ ...row, pain_points: row.pain_points ?? [] }));
@@ -127,6 +127,6 @@ export async function getInterview(id: string) {
     .order('changed_at', { referencedTable: 'pain_point_log', ascending: true })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   return data;
 }

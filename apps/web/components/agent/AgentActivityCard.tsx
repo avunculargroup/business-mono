@@ -2,7 +2,7 @@
 
 import { AgentBadge } from '@/components/ui/AgentBadge';
 import { ApprovalControls } from './ApprovalControls';
-import type { Database } from '@/lib/database';
+import type { Database } from '@platform/db';
 import { formatDateTime } from '@/lib/utils';
 import styles from './AgentActivityCard.module.css';
 

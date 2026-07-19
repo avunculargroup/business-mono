@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import type { Json } from '@platform/db';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { computeNextRunAt, DEFAULT_TIMEZONE, NewsCategory } from '@platform/shared';
@@ -107,7 +108,7 @@ function normalizeTime(t: string): string {
   return /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t;
 }
 
-function buildActionConfig(input: z.infer<typeof createSchema>): Record<string, unknown> {
+function buildActionConfig(input: z.infer<typeof createSchema>): Json {
   if (input.action_type === 'research_digest') {
     return {
       subject: input.subject,
@@ -162,7 +163,9 @@ export async function createRoutine(formData: FormData) {
     timezone: input.timezone,
   });
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { data, error } = await supabase
     .from('routines')
     .insert({
@@ -170,7 +173,7 @@ export async function createRoutine(formData: FormData) {
       description: input.description || null,
       agent_name: input.agent_name,
       action_type: input.action_type,
-      action_config: buildActionConfig(input) as never,
+      action_config: buildActionConfig(input),
       frequency: input.frequency,
       time_of_day: timeOfDay,
       timezone: input.timezone,
@@ -203,7 +206,9 @@ export async function updateRoutine(id: string, formData: FormData) {
     timezone: input.timezone,
   });
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('routines')
     .update({
@@ -211,7 +216,7 @@ export async function updateRoutine(id: string, formData: FormData) {
       description: input.description || null,
       agent_name: input.agent_name,
       action_type: input.action_type,
-      action_config: buildActionConfig(input) as never,
+      action_config: buildActionConfig(input),
       frequency: input.frequency,
       time_of_day: timeOfDay,
       timezone: input.timezone,
@@ -230,7 +235,9 @@ export async function updateRoutine(id: string, formData: FormData) {
 }
 
 export async function deleteRoutine(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase.from('routines').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/routines');
@@ -239,7 +246,9 @@ export async function deleteRoutine(id: string) {
 }
 
 export async function toggleRoutineActive(id: string, isActive: boolean) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('routines')
     .update({ is_active: isActive })
@@ -251,7 +260,9 @@ export async function toggleRoutineActive(id: string, isActive: boolean) {
 }
 
 export async function runRoutineNow(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await supabase
     .from('routines')
     .update({ next_run_at: new Date().toISOString() })

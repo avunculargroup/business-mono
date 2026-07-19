@@ -1,9 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { parseForm } from '@/lib/forms';
 
 const fb = (supabase: Awaited<ReturnType<typeof createClient>>) =>
   supabase.from('feedback');
@@ -31,12 +33,12 @@ function parseTags(raw: string | undefined): string[] {
 }
 
 export async function createFeedback(formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = feedbackSchema.safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(feedbackSchema, formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase, user } = auth;
   const data = parsed.data;
 
   const { data: entry, error } = await fb(supabase).insert({
@@ -49,7 +51,7 @@ export async function createFeedback(formData: FormData) {
     rating:        data.rating === '' || data.rating === undefined ? null : Number(data.rating),
     description:   data.description,
     tags:          parseTags(data.tags),
-    created_by:    user?.id ?? null,
+    created_by:    user.id,
   }).select().single();
 
   if (error) return { error: humanizeError(error) };
@@ -59,11 +61,12 @@ export async function createFeedback(formData: FormData) {
 }
 
 export async function updateFeedback(id: string, formData: FormData) {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = feedbackSchema.partial().safeParse(raw);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const parsed = parseForm(feedbackSchema.partial(), formData);
+  if (!parsed.ok) return { error: parsed.error };
 
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const updateData: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(parsed.data)) {
@@ -85,7 +88,9 @@ export async function updateFeedback(id: string, formData: FormData) {
 }
 
 export async function deleteFeedback(id: string) {
-  const supabase = await createClient();
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
   const { error } = await fb(supabase)
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
@@ -103,7 +108,7 @@ export async function getFeedback() {
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(humanizeError(error));
   // tags is a nullable text[]; normalise null → []. sentiment is a jsonb column
   // typed loosely as Json — assert the structured shape the list view renders.
   return (data ?? []).map((row) => ({
