@@ -21,6 +21,7 @@ import {
   Clock,
   Presentation,
   Rss,
+  LineChart,
   Globe,
   HardDrive,
   ScrollText,
@@ -60,6 +61,7 @@ const workNav = [
     { href: '/news/podcasts', label: 'Podcasts'      },
     { href: '/news/sources',  label: 'Sources'       },
   ]},
+  { href: '/market-reports', label: 'Market reports', icon: LineChart },
   { href: '/discovery', label: 'Discovery', icon: Search, children: [
     { href: '/crm/interviews', label: 'Interviews'  },
     { href: '/crm/segments',   label: 'Segments'    },
@@ -122,6 +124,7 @@ const moreNav: MoreNavSection[] = [
         { href: '/news/podcasts', label: 'Podcasts'     },
         { href: '/news/sources',  label: 'Sources'      },
       ]},
+      { href: '/market-reports', label: 'Market reports', icon: LineChart },
       { href: '/discovery', label: 'Discovery', icon: Search, children: [
         { href: '/crm/interviews',        label: 'Interviews' },
         { href: '/crm/segments',          label: 'Segments'   },

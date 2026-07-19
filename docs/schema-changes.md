@@ -6,6 +6,24 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-19 — market report feedback → distilled narration guidelines
+
+**Migration:** `20260719010000_add_market_report_feedback.sql`
+
+The daily market report email now links to `/market-reports/{id}`; founders can
+leave feedback there. Mirrors the social-draft loop (`20260717010000`):
+
+- **`market_report_feedback`** — raw feedback log written by the review page's
+  server action, snapshotting a `narration_excerpt` so the distiller needs no
+  joins. `distilled_at` is the claim column.
+- **`market_report_guidelines`** — the distilled state: a **singleton** row
+  (`id = 1` — one report stream, unlike per-account social guidelines) holding a
+  JSONB `string[]` injected into every future narration as tone/emphasis
+  guidance. The narration's hard compliance rules always win over guidelines.
+- **Realtime** — `market_report_feedback` gets `REPLICA IDENTITY FULL` and joins
+  the `supabase_realtime` publication so an INSERT wakes the agents-side
+  `marketReportFeedbackListener`.
+
 ## 2026-07-19 — findings engine: deterministic config + persisted market reports
 
 **Migration:** `20260719000000_add_findings_engine.sql`

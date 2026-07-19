@@ -2546,3 +2546,35 @@ CREATE TABLE market_reports (
 
 -- Indexes: idx_finding_watch_active (expires_at).
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on all five tables.
+
+-- ============================================================
+-- MARKET REPORT FEEDBACK (migration: 20260719010000_add_market_report_feedback)
+-- ============================================================
+-- Founder feedback on market-report narrations → distilled standing guidelines
+-- injected into every future narration. Mirrors the social-draft loop.
+
+CREATE TABLE market_report_feedback (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  market_report_id   UUID        REFERENCES market_reports(id) ON DELETE SET NULL,
+  verdict            TEXT        CHECK (verdict IN ('positive', 'negative')),  -- optional quick verdict
+  feedback           TEXT        NOT NULL,
+  narration_excerpt  TEXT,                              -- snapshot of the narration the feedback referred to
+  created_by         UUID        REFERENCES auth.users(id),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  distilled_at       TIMESTAMPTZ                        -- NULL = not yet folded into guidelines (claim column)
+);
+
+-- The distilled state — a SINGLETON row (one report stream), a compact JSONB
+-- string[] injected into every future narration. updated_by NULL = distiller.
+CREATE TABLE market_report_guidelines (
+  id          SMALLINT    PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  guidelines  JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- string[]
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by  UUID        REFERENCES auth.users(id)
+);
+
+-- Indexes: idx_market_report_feedback_undistilled (created_at) WHERE distilled_at IS NULL;
+--          idx_market_report_feedback_report (market_report_id).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
+-- Realtime: market_report_feedback REPLICA IDENTITY FULL + added to
+--   supabase_realtime publication (wakes marketReportFeedbackListener on INSERT).
