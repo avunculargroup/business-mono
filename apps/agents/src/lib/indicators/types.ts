@@ -11,7 +11,7 @@
  * See docs/features/economic-indicators/adapter-contract.md.
  */
 
-export type Provider = 'fred' | 'rba' | 'abs' | 'oecd';
+export type Provider = 'fred' | 'rba' | 'abs' | 'oecd' | 'stooq';
 
 /** The natural reference period of a series — how often it genuinely prints,
  *  NOT the operational poll cadence. Governs how the adapter stamps periodDate:
