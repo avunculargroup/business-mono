@@ -316,6 +316,32 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'lex',
   },
 
+  // ── Market report findings narration ───────────────────────────────────────
+  {
+    key: 'market_report.narrate',
+    type: 'workflow_step',
+    label: 'Findings narration',
+    description: 'The market analyst narrates the day\'s selected deterministic findings into the report lead commentary',
+    workflow: 'market_report',
+    fallbackAgent: 'marketAnalyst',
+  },
+  {
+    key: 'market_report.compliance_review',
+    type: 'workflow_step',
+    label: 'Narration compliance review',
+    description: 'Lex reviews the findings narration for valuation/advice framing before it is emailed',
+    workflow: 'market_report',
+    fallbackAgent: 'lex',
+  },
+  {
+    key: 'market_report.distill_feedback',
+    type: 'workflow_step',
+    label: 'Distill report feedback',
+    description: 'The editor folds founder feedback on market reports into standing narration guidelines',
+    workflow: 'market_report',
+    fallbackAgent: 'editor',
+  },
+
   // ── Podcast episode intelligence (summary) ─────────────────────────────────
   {
     key: 'podcast_intel.narrate',
@@ -344,6 +370,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   strategy: 'Campaign Strategy',
   social_post: 'Social Posts from News',
   podcast_intel: 'Podcast Intelligence',
+  market_report: 'Market Report',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

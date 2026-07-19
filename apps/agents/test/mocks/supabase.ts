@@ -82,7 +82,9 @@ function makeBuilder(table: string, response: SupabaseResponse): FakeQueryBuilde
   builder.select = passthrough('select');
   builder.insert = passthrough('insert');
   builder.update = passthrough('update');
-  builder.upsert = vi.fn(() => Promise.resolve(builder.__response));
+  // Passthrough like the other verbs: `await ...upsert(x)` still resolves via the
+  // thenable, and `.upsert(x).select().single()` chains work too.
+  builder.upsert = passthrough('upsert');
   builder.delete = passthrough('delete');
   builder.eq = passthrough('eq');
   builder.neq = passthrough('neq');

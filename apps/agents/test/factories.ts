@@ -136,3 +136,31 @@ export function buildRoutine(overrides: Partial<{
     timezone: overrides.timezone ?? 'Australia/Melbourne',
   };
 }
+
+// A scored-or-unscored finding for the findings-engine tests. Defaults model the
+// spec's worked example: an 8% overnight hash-rate drop, persistence 1.
+export function buildFinding(
+  overrides: Partial<import('@platform/shared').Finding> = {},
+): import('@platform/shared').Finding {
+  return {
+    id: 'anomaly:hash_rate:2026-07-18',
+    finding_type: 'anomaly',
+    metric_key: 'hash_rate',
+    metric_group: 'network_security',
+    period: 'day',
+    as_of: '2026-07-18',
+    window_days: 90,
+    observed: -8,
+    baseline: { mean: 0.1, sd: 1.2, p05: -2.1, p50: 0.1, p95: 2.2 },
+    unusualness: 0.96,
+    magnitude_norm: 0.8,
+    persistence_periods: 1,
+    direction: 'down',
+    materiality: 0,
+    compliance_class: 'informational',
+    allowed_vocab: ['hash rate', 'difficulty'],
+    narration_hint: { means: 'Hash rate fell 8.0% over the day', verdict_allowed: false },
+    evidence_refs: ['view:v_onchain_series', 'key:hash_rate', 'date:2026-07-18'],
+    ...overrides,
+  };
+}

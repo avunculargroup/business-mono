@@ -6,6 +6,58 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-19 — market report feedback → distilled narration guidelines
+
+**Migration:** `20260719010000_add_market_report_feedback.sql`
+
+The daily market report email now links to `/market-reports/{id}`; founders can
+leave feedback there. Mirrors the social-draft loop (`20260717010000`):
+
+- **`market_report_feedback`** — raw feedback log written by the review page's
+  server action, snapshotting a `narration_excerpt` so the distiller needs no
+  joins. `distilled_at` is the claim column.
+- **`market_report_guidelines`** — the distilled state: a **singleton** row
+  (`id = 1` — one report stream, unlike per-account social guidelines) holding a
+  JSONB `string[]` injected into every future narration as tone/emphasis
+  guidance. The narration's hard compliance rules always win over guidelines.
+- **Realtime** — `market_report_feedback` gets `REPLICA IDENTITY FULL` and joins
+  the `supabase_realtime` publication so an INSERT wakes the agents-side
+  `marketReportFeedbackListener`.
+
+## 2026-07-19 — findings engine: deterministic config + persisted market reports
+
+**Migration:** `20260719000000_add_findings_engine.sql`
+
+The daily market-report email narrated raw indicator levels with no baseline or
+history. The findings engine (docs/features/findings-engine-spec.md, implemented
+in `apps/agents/src/lib/findings/`) computes scored, compliance-classified
+findings deterministically; the LLM only narrates the findings selected as
+material. These tables carry its config and output:
+
+- **`finding_metric_config`** — per metric-group scoring config: `thesis_weight`
+  (static CFO/liquidity-thesis prior), `vol_class` (drives the persistence guard
+  that stops single-day noise being narrated as a verdict), and `allowed_vocab`
+  (the only characterising words the narrator may use). "capitulation"/"recovery"
+  are in NO group's vocab by design — they attach only to a hash-ribbons
+  state-transition finding (the capitulation lock).
+- **`finding_divergence_pairs`** — curated correlation pairs (never all-pairs).
+  Macro legs use the unified `macro:<slug>` key form (`macroMetricKey` in
+  `@platform/shared`). The US M2 pair's window is 540d ≈ 18 monthly prints once
+  resampled to monthly (90d over a monthly series would be 3 points).
+- **`finding_thresholds`** — pre-registered level crossings (MVRV 1.0/3.0, Mayer
+  1.0/2.4, RSI 30/70, 50d×200d cross, F&G bands). `valuation_sensitive` rows
+  route the narration through Lex review. `btc_price_usd × ma_200w` is a dynamic
+  threshold computed in code against `v_btc_trend`, not seeded.
+- **`finding_watch`** — human watch boosts (curator-note analogue) that
+  temporarily lift a group's/pair's thesis weight. No UI yet; rows are inserted
+  directly, `note` retained as audit context.
+- **`market_reports`** — one row per report date (upsert on `as_of`): status
+  (`published` = narration passed lint + Lex and went into the email; `held` =
+  withheld, email sent without it; `error` = pipeline failed), report mode
+  (`normal`/`quiet`), the narration markdown, and the full selected findings +
+  ops (staleness) findings + lint/Lex results as JSONB — the audit chain from
+  every narrated claim back to its deterministic evidence.
+
 ## 2026-07-17 — social draft feedback → distilled per-account guidelines
 
 **Migration:** `20260717010000_add_content_feedback.sql`

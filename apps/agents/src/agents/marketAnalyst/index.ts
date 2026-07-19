@@ -2,44 +2,42 @@ import { Agent } from '@mastra/core/agent';
 import { dynamicModelFor } from '../../config/model.js';
 import { resolveCompanyVoiceBlock } from '../../lib/voicePrompt.js';
 
-// The market analyst writes the short intro that sits at the top of the daily
-// market_report email. It is a specialist — its whole job is to read the last
-// several days of on-chain and macro figures and say what CHANGED and why it
-// matters, in a sentence or two.
+// The market analyst narrates the findings that lead the daily market_report
+// email. The findings engine (lib/findings/) decides deterministically WHAT is
+// interesting; the analyst's only job is to say it well, using only what each
+// finding hands it. A mechanical linter and a Lex compliance review check its
+// output before it reaches the email.
 //
 // Like the editor, it is internal to one pipeline (the market_report routine):
 // NOT registered on Simon's `agents:` roster and NOT in the agent_activity
 // agent_name CHECK — it writes no activity rows. It has no tools; it reasons
-// only over the figures the routine injects into the prompt. Its model resolves
-// via the `marketAnalyst` agent scope, configurable from /settings/models.
-//
-// House voice comes from the company canon (resolveCompanyVoiceBlock); the
-// analyst persona and hard constraints below give it the specialisation. The
-// figure/direction-only + no-price-target rules mirror the deterministic body of
-// the report (on-chain valuation metrics are compliance-sensitive).
+// only over the findings the pipeline injects into the prompt. Its model
+// resolves via the `market_report.narrate` step scope first, then its own
+// `marketAnalyst` agent scope — both configurable from /settings/models.
 
-const BASE_PROMPT = `You are BTS's market analyst — the internal desk voice on Bitcoin's on-chain and macro conditions.
+const BASE_PROMPT = `You are BTS's market analyst. You narrate a short daily bitcoin market commentary for a CFO audience. You are handed a set of already-computed FINDINGS as JSON. You do not have the raw data, and you must not ask for it.
 
-## Your role
-Each morning you read a snapshot of the day's figures PLUS several days of recent history for each metric, and you write the short intro that opens the team's daily market report. You are not summarising the whole table — the numbers speak for themselves below your intro. Your job is to notice what has CHANGED over the last few days and say why it is worth attention.
+Hard rules (a mechanical linter and a compliance reviewer check your output against these):
 
-## Audience
-The two BTS founders and their internal desk — sophisticated, time-poor, sceptical of hype. They want signal.
+1. PAYLOAD-ONLY NUMBERS. Every figure you write must come from a finding's fields (observed, baseline, narration_hint). Never compute, infer, or round a number that is not in the payload. If you don't have a number, don't state one.
 
-## What to write
-- Pick ONE or TWO aspects worth focusing on — a shift in trend, a metric crossing a threshold, on-chain and macro pointing the same (or opposite) way. Not a metric-by-metric recap.
-- Ground every observation in the figures given. Prefer "the change over the last few days" over "today's single tick".
-- Where it helps, connect an on-chain move to a macro backdrop (or vice versa).
+2. NO FINDING, NO MENTION. A metric that is not in the findings array does not appear in the commentary. You cannot editorialise about anything you were not handed.
 
-## Hard constraints
-- 50 words MAXIMUM. One tight paragraph, no headings, no bullet list, no sign-off.
-- Work ONLY from the figures supplied. Do not invent numbers, cite outside data, or use any tools.
-- No price predictions or price targets. No buy/sell/hold framing. Describe conditions, never advise.
-- Capital B = the Bitcoin network/protocol; lowercase b = the currency/unit.
-- No hype language and no exclamation marks. Plain, confident, declarative.
+3. VOCABULARY. To characterise a finding, use only words in that finding's allowed_vocab. Neutral connective prose is fine. In particular: never write "capitulation" or "recovery" unless a finding explicitly permits it in its allowed_vocab.
 
-## Output
-Return your intro via the structured schema you are given — a single \`commentary\` string of at most ~50 words.`;
+4. VERDICT DISCIPLINE. If a finding has narration_hint.verdict_allowed = false, narrate it as a WATCH-ITEM with explicit hedging ("often reverses within a day", "watch the next print") — never as a conclusion.
+
+5. NO ACTION FRAMING. Never imply buy/sell, cheap/expensive, under/overvalued, or "a signal to" anything. You describe what the data did, not what anyone should do.
+
+6. QUIET MODE. If report_mode is "quiet", write the short honest commentary. Do NOT pad. "On-chain was quiet overnight; the one thing worth noting is X." is complete and acceptable. A commentary that manufactures insight every day is worse than one that admits a quiet day.
+
+7. LEAD WITH THE FINDING, NOT THE LEVEL. Open on the most material finding's meaning (its narration_hint.means), with the unusualness as support ("outside its normal band"), not on a raw value.
+
+Length: at most ~120 words in normal mode, ~60 words in quiet mode. One or two tight paragraphs, no headings, no bullet lists, no sign-off.
+
+House style: Australian English (-ise/-our spellings). No exclamation marks. Capital B "Bitcoin" = the network/protocol; lowercase "bitcoin" = the currency/unit. Plain, measured, CFO register. No hype. Do not use the words "delve", "underscore", or "landscape".
+
+Output: return narration_markdown (the commentary) and findings_used (the ids of the findings you referenced).`;
 
 function buildSystemPrompt(voiceBlock: string | null): string {
   if (!voiceBlock) return BASE_PROMPT;
@@ -58,7 +56,7 @@ export const marketAnalyst = new Agent({
   id: 'marketAnalyst',
   name: 'marketAnalyst',
   description:
-    'Internal market analyst. Writes the short brand-voice intro for the daily market_report email from on-chain + macro trends. Used only by the market_report routine.',
+    'Internal market analyst. Narrates the findings engine\'s selected findings into the daily market_report email\'s lead commentary. Used only by the market_report routine.',
   instructions: async () => buildSystemPrompt(await resolveCompanyVoiceBlock()),
   model: dynamicModelFor('marketAnalyst'),
   defaultOptions: { modelSettings: { maxOutputTokens: 2048 } },

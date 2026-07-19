@@ -37,6 +37,7 @@ import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
 import { startComplianceRecheckListener } from '../listeners/complianceRecheck.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
 import { startFeedbackDistillListener } from '../listeners/feedbackDistillListener.js';
+import { startMarketReportFeedbackListener } from '../listeners/marketReportFeedbackListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
@@ -243,3 +244,8 @@ startPodcastActionListener();
 // durable per-account guidelines that every future generation injects. Same
 // web→DB→agents pattern; includes a startup sweep for feedback missed while down.
 startFeedbackDistillListener();
+
+// Distill founder feedback on market-report narrations (written by
+// /market-reports/[id]) into the standing guideline list every future
+// narration injects. Same web→DB→agents pattern, singleton guideline row.
+startMarketReportFeedbackListener();

@@ -2458,3 +2458,123 @@ CREATE TABLE account_feedback_guidelines (
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
 -- Realtime: content_feedback REPLICA IDENTITY FULL + added to supabase_realtime
 --   publication (wakes the agents-side feedbackDistillListener on INSERT).
+
+
+-- ============================================================
+-- FINDINGS ENGINE (migration: 20260719000000_add_findings_engine)
+-- ============================================================
+-- Deterministic config + persisted daily report for the market-report insight
+-- layer (docs/features/findings-engine-spec.md). Findings are computed in
+-- apps/agents/src/lib/findings/, scored for materiality, narrated by the
+-- internal marketAnalyst agent, linted mechanically, and reviewed by Lex before
+-- the narration is allowed into the report email.
+--
+-- Metric keys: onchain_indicators.key as-is; macro series use
+-- 'macro:<slug(short_label)>' (macroMetricKey in @platform/shared).
+
+-- Per-group scoring config: thesis weight (static CFO/liquidity-thesis prior),
+-- volatility class (drives the persistence guard), and the vocabulary the
+-- narrator MAY use. 'capitulation'/'recovery' appear in NO group's vocab by
+-- design — they attach only to a hash-ribbons state-transition finding.
+CREATE TABLE finding_metric_config (
+  metric_group   TEXT PRIMARY KEY,                    -- onchain metric_group / macro category
+  thesis_weight  NUMERIC(4,2) NOT NULL DEFAULT 1.00,
+  vol_class      TEXT NOT NULL DEFAULT 'low' CHECK (vol_class IN ('low','high')),
+  allowed_vocab  TEXT[] NOT NULL DEFAULT '{}',
+  notes          TEXT
+);
+
+-- Declared divergence pairs (curated only — never all-pairs). The finding fires
+-- when the trailing correlation flips sign or |corr| falls below break_threshold.
+CREATE TABLE finding_divergence_pairs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  primary_key       TEXT NOT NULL,                    -- unified metric key
+  secondary_key     TEXT NOT NULL,
+  expected_sign     TEXT NOT NULL CHECK (expected_sign IN ('positive','negative')),
+  corr_window_days  INT  NOT NULL DEFAULT 60,
+  break_threshold   NUMERIC(3,2) NOT NULL DEFAULT 0.35,
+  thesis_note       TEXT,
+  active            BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (primary_key, secondary_key)
+);
+
+-- Named threshold crossings (pre-registered levels only). valuation_sensitive
+-- rows route the narration through Lex. btc_price_usd × ma_200w is a dynamic
+-- threshold computed in code against v_btc_trend, not seeded here.
+CREATE TABLE finding_thresholds (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  metric_key        TEXT NOT NULL,
+  level_name        TEXT NOT NULL,
+  level_value       NUMERIC NOT NULL,
+  cross_direction   TEXT NOT NULL CHECK (cross_direction IN ('up','down','either')),
+  compliance_class  TEXT NOT NULL DEFAULT 'valuation_sensitive'
+                    CHECK (compliance_class IN ('informational','valuation_sensitive')),
+  active            BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (metric_key, level_name)
+);
+
+-- Human watch boosts (curator-note analogue): temporarily lifts thesis_weight
+-- for a group or declared pair. No UI — rows are inserted directly.
+CREATE TABLE finding_watch (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_type TEXT NOT NULL CHECK (target_type IN ('metric_group','pair')),
+  target_ref  TEXT NOT NULL,                          -- group name, or 'primary|secondary'
+  boost       NUMERIC(3,2) NOT NULL DEFAULT 1.50,
+  note        TEXT,                                   -- WHY — retained as audit context
+  created_by  UUID REFERENCES team_members(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at  TIMESTAMPTZ
+);
+
+-- The persisted daily report. One row per date (upsert on as_of). published =
+-- narration passed lint + Lex and went into the email; held = withheld (email
+-- sent without it); error = the pipeline failed before producing a narration.
+CREATE TABLE market_reports (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  as_of              DATE NOT NULL UNIQUE,            -- UTC date
+  status             TEXT NOT NULL CHECK (status IN ('published','held','error')),
+  report_mode        TEXT NOT NULL CHECK (report_mode IN ('normal','quiet')),
+  narration_markdown TEXT,
+  findings           JSONB NOT NULL DEFAULT '[]',     -- selected Finding records (audit trail)
+  ops_findings       JSONB NOT NULL DEFAULT '[]',     -- staleness set — ops only, never narrated
+  lint_result        JSONB,
+  lex_result         JSONB,
+  emailed            BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()  -- market_reports_updated_at trigger
+);
+
+-- Indexes: idx_finding_watch_active (expires_at).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on all five tables.
+
+-- ============================================================
+-- MARKET REPORT FEEDBACK (migration: 20260719010000_add_market_report_feedback)
+-- ============================================================
+-- Founder feedback on market-report narrations → distilled standing guidelines
+-- injected into every future narration. Mirrors the social-draft loop.
+
+CREATE TABLE market_report_feedback (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  market_report_id   UUID        REFERENCES market_reports(id) ON DELETE SET NULL,
+  verdict            TEXT        CHECK (verdict IN ('positive', 'negative')),  -- optional quick verdict
+  feedback           TEXT        NOT NULL,
+  narration_excerpt  TEXT,                              -- snapshot of the narration the feedback referred to
+  created_by         UUID        REFERENCES auth.users(id),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  distilled_at       TIMESTAMPTZ                        -- NULL = not yet folded into guidelines (claim column)
+);
+
+-- The distilled state — a SINGLETON row (one report stream), a compact JSONB
+-- string[] injected into every future narration. updated_by NULL = distiller.
+CREATE TABLE market_report_guidelines (
+  id          SMALLINT    PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  guidelines  JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- string[]
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by  UUID        REFERENCES auth.users(id)
+);
+
+-- Indexes: idx_market_report_feedback_undistilled (created_at) WHERE distilled_at IS NULL;
+--          idx_market_report_feedback_report (market_report_id).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
+-- Realtime: market_report_feedback REPLICA IDENTITY FULL + added to
+--   supabase_realtime publication (wakes marketReportFeedbackListener on INSERT).
