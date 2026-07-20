@@ -6,9 +6,31 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-20 — renumber findings-engine / gold migrations off a duplicate version
+
+The findings-engine and gold-price migrations were both authored as
+`20260719000000_*`. `supabase_migrations.schema_migrations.version` is a primary
+key, so `supabase db push` recorded one and then aborted on the other with
+`duplicate key (version)=(20260719000000)` — which also blocked
+`20260719010000_add_market_report_feedback`. Net effect in prod: the findings
+tables (`market_reports`, `finding_*`) were never created, so the nightly market
+report failed soft to metrics-only (no narration). Renumbered to distinct,
+dependency-ordered versions (findings must precede the feedback FK):
+
+- `20260720000000_add_findings_engine.sql`
+- `20260720010000_gold_price_stooq_source.sql`
+- `20260720020000_add_market_report_feedback.sql`
+
+All three are idempotent, so re-applying where they partially landed is safe.
+The stale `20260719000000` ledger row is cleared once with
+`supabase migration repair --status reverted 20260719000000` so the renumbered
+files push cleanly.
+
+---
+
 ## 2026-07-19 — market report feedback → distilled narration guidelines
 
-**Migration:** `20260719010000_add_market_report_feedback.sql`
+**Migration:** `20260720020000_add_market_report_feedback.sql`
 
 The daily market report email now links to `/market-reports/{id}`; founders can
 leave feedback there. Mirrors the social-draft loop (`20260717010000`):
@@ -26,7 +48,7 @@ leave feedback there. Mirrors the social-draft loop (`20260717010000`):
 
 ## 2026-07-19 — findings engine: deterministic config + persisted market reports
 
-**Migration:** `20260719000000_add_findings_engine.sql`
+**Migration:** `20260720000000_add_findings_engine.sql`
 
 The daily market-report email narrated raw indicator levels with no baseline or
 history. The findings engine (docs/features/findings-engine-spec.md, implemented

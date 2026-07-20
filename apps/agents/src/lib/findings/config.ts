@@ -1,6 +1,6 @@
 // Findings-engine config loader: unifies the two indicator catalogs
 // (onchain_indicators + economic_indicators) under one metric-key namespace and
-// loads the seed tables from 20260719000000_add_findings_engine.sql.
+// loads the seed tables from 20260720000000_add_findings_engine.sql.
 //
 // Every seeded divergence pair / threshold is validated against the loaded
 // catalog; unresolvable rows are dropped with a log rather than throwing — a
