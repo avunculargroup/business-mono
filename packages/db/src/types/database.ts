@@ -2144,6 +2144,134 @@ export type Database = {
           },
         ]
       }
+      finding_divergence_pairs: {
+        Row: {
+          active: boolean
+          break_threshold: number
+          corr_window_days: number
+          expected_sign: string
+          id: string
+          primary_key: string
+          secondary_key: string
+          thesis_note: string | null
+        }
+        Insert: {
+          active?: boolean
+          break_threshold?: number
+          corr_window_days?: number
+          expected_sign: string
+          id?: string
+          primary_key: string
+          secondary_key: string
+          thesis_note?: string | null
+        }
+        Update: {
+          active?: boolean
+          break_threshold?: number
+          corr_window_days?: number
+          expected_sign?: string
+          id?: string
+          primary_key?: string
+          secondary_key?: string
+          thesis_note?: string | null
+        }
+        Relationships: []
+      }
+      finding_metric_config: {
+        Row: {
+          allowed_vocab: string[]
+          metric_group: string
+          notes: string | null
+          thesis_weight: number
+          vol_class: string
+        }
+        Insert: {
+          allowed_vocab?: string[]
+          metric_group: string
+          notes?: string | null
+          thesis_weight?: number
+          vol_class?: string
+        }
+        Update: {
+          allowed_vocab?: string[]
+          metric_group?: string
+          notes?: string | null
+          thesis_weight?: number
+          vol_class?: string
+        }
+        Relationships: []
+      }
+      finding_thresholds: {
+        Row: {
+          active: boolean
+          compliance_class: string
+          cross_direction: string
+          id: string
+          level_name: string
+          level_value: number
+          metric_key: string
+        }
+        Insert: {
+          active?: boolean
+          compliance_class?: string
+          cross_direction: string
+          id?: string
+          level_name: string
+          level_value: number
+          metric_key: string
+        }
+        Update: {
+          active?: boolean
+          compliance_class?: string
+          cross_direction?: string
+          id?: string
+          level_name?: string
+          level_value?: number
+          metric_key?: string
+        }
+        Relationships: []
+      }
+      finding_watch: {
+        Row: {
+          boost: number
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          note: string | null
+          target_ref: string
+          target_type: string
+        }
+        Insert: {
+          boost?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          note?: string | null
+          target_ref: string
+          target_type: string
+        }
+        Update: {
+          boost?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          note?: string | null
+          target_ref?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finding_watch_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           contact_id: string | null
@@ -2495,6 +2623,113 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      market_report_feedback: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          distilled_at: string | null
+          feedback: string
+          id: string
+          market_report_id: string | null
+          narration_excerpt: string | null
+          verdict: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          distilled_at?: string | null
+          feedback: string
+          id?: string
+          market_report_id?: string | null
+          narration_excerpt?: string | null
+          verdict?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          distilled_at?: string | null
+          feedback?: string
+          id?: string
+          market_report_id?: string | null
+          narration_excerpt?: string | null
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_report_feedback_market_report_id_fkey"
+            columns: ["market_report_id"]
+            isOneToOne: false
+            referencedRelation: "market_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_report_guidelines: {
+        Row: {
+          guidelines: Json
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          guidelines?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          guidelines?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      market_reports: {
+        Row: {
+          as_of: string
+          created_at: string
+          emailed: boolean
+          findings: Json
+          id: string
+          lex_result: Json | null
+          lint_result: Json | null
+          narration_markdown: string | null
+          ops_findings: Json
+          report_mode: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          as_of: string
+          created_at?: string
+          emailed?: boolean
+          findings?: Json
+          id?: string
+          lex_result?: Json | null
+          lint_result?: Json | null
+          narration_markdown?: string | null
+          ops_findings?: Json
+          report_mode: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          as_of?: string
+          created_at?: string
+          emailed?: boolean
+          findings?: Json
+          id?: string
+          lex_result?: Json | null
+          lint_result?: Json | null
+          narration_markdown?: string | null
+          ops_findings?: Json
+          report_mode?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       model_configs: {
         Row: {
