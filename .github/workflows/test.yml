@@ -6,6 +6,19 @@ on:
     branches: [main]
 
 jobs:
+  migrations:
+    name: Check migration versions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      # Fails if two migrations share a 14-digit version prefix (the
+      # schema_migrations primary key) or a filename is malformed. A collision
+      # silently breaks `supabase db push`; see docs/schema-changes.md 2026-07-20.
+      - name: Check migration version prefixes are unique
+        run: bash scripts/check-migration-versions.sh
+
   test:
     name: Typecheck, lint, and unit tests
     runs-on: ubuntu-latest

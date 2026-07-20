@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "db:check-migrations": "bash scripts/check-migration-versions.sh",
     "db:generate-types": "pnpm --filter @platform/db generate-types",
     "db:migrate": "pnpm --filter @platform/db db:migrate",
     "db:diff": "pnpm --filter @platform/db db:diff",
