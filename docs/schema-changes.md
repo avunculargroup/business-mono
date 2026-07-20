@@ -10,21 +10,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 The findings-engine and gold-price migrations were both authored as
 `20260719000000_*`. `supabase_migrations.schema_migrations.version` is a primary
-key, so `supabase db push` recorded one and then aborted on the other with
-`duplicate key (version)=(20260719000000)` — which also blocked
-`20260719010000_add_market_report_feedback`. Net effect in prod: the findings
-tables (`market_reports`, `finding_*`) were never created, so the nightly market
-report failed soft to metrics-only (no narration). Renumbered to distinct,
-dependency-ordered versions (findings must precede the feedback FK):
+key, so only one could be recorded: `gold_price_stooq_source` won the slot and
+applied, and `supabase db push` then silently treated the findings migration as
+"already applied" (version match) and skipped it — while
+`20260719010000_add_market_report_feedback` was blocked behind the collision.
+Net effect in prod: the findings tables (`market_reports`, `finding_*`) were
+never created, so the nightly market report failed soft at `loadFindingConfig`
+and sent metrics-only (no narration).
 
-- `20260720000000_add_findings_engine.sql`
-- `20260720010000_gold_price_stooq_source.sql`
-- `20260720020000_add_market_report_feedback.sql`
+Fix: gold keeps `20260719000000` (it is the version genuinely recorded in prod);
+the two unapplied migrations are renumbered *above* it, in dependency order
+(findings must precede the `market_report_feedback` → `market_reports` FK):
 
-All three are idempotent, so re-applying where they partially landed is safe.
-The stale `20260719000000` ledger row is cleared once with
-`supabase migration repair --status reverted 20260719000000` so the renumbered
-files push cleanly.
+- `20260719000000_gold_price_stooq_source.sql` — unchanged; already applied
+- `20260720000000_add_findings_engine.sql` — renumbered from `20260719000000`
+- `20260720020000_add_market_report_feedback.sql` — renumbered from `20260719010000`
+
+Because gold's version stays put, every remote ledger row still maps to a local
+file (no orphan), so no `migration repair` is needed — the next `db push` simply
+applies the two new versions. Both are idempotent (`IF NOT EXISTS`,
+`ON CONFLICT DO NOTHING`).
 
 ---
 
