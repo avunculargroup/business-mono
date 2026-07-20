@@ -12,6 +12,12 @@ manager / CEO, accessing and sifting content).
 
 ## TL;DR
 
+> **Status note (2026-07-20):** this review was written 2026-07-14 as a state-of-play + build
+> plan. Its **entire P0 tier has since shipped** — including the "no search surface" gap called
+> out below, now built at `/news/podcasts/search`. The narrative below is preserved as the
+> original assessment; see **Prioritised roadmap → Build status** for what's done vs. open and
+> **Open questions — resolved** for the settled decisions.
+
 The pages are genuinely well built for **one** of their two jobs. As a **director's
 ingestion console** they're clear, honest, and tastefully restrained — the spend gauge,
 feed-health grid and optimistic row actions are the work of someone who has actually run
@@ -359,24 +365,32 @@ first than to retrofit it after a summary has already gone out.
 
 Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = high impact-to-effort.
 
-### P0 — Do first (unblocks the client half + cheap ops wins)
-1. **Episode intelligence pass, Phase 1** — `episode_summary` + Lex gate + publish-wall
-   (B1 core, D3). `L`, but it's the keystone; everything client-facing leans on it. Ship
-   summary-only first.
-2. **"Ask the library" search, minimum version** — `match_transcript_segments` RPC + a
-   results surface with timestamp deep-links (B2 min). `M`. The embeddings are *right there*.
-3. **Dollars on the dashboard** (A1) + **"In research index" state** (A4). `S` each. High
-   signal, trivial cost, both purely additive.
-4. **Triage lane** from `v_episodes_awaiting_action` (A2). `S`. Closes the Simon→dashboard
-   loop you use daily.
+> **Build status (reconciled 2026-07-20).** The entire **P0 tier has shipped** since this
+> review was written (2026-07-14), plus one P1 item pulled forward. Items are marked `✅ DONE`
+> with the commit that landed them. The **next slice is now P1-5 (takeaways-with-timestamps)** —
+> see "Next slice" at the end.
+
+### P0 — Do first (unblocks the client half + cheap ops wins) — ✅ COMPLETE
+1. ✅ **DONE** (`f345c08`) — **Episode intelligence pass, Phase 1** — `episode_summary` + Lex
+   gate + publish-wall (B1 core, D3). Pass lives at `apps/agents/src/workflows/podcastIntel/`;
+   `summary_status` (`none|proposed|approved`) is the publish-wall. Summary-only, as planned.
+2. ✅ **DONE** (`e360ee3`) — **"Ask the library" search, minimum version** — pgvector RPC + a
+   results surface with timestamp deep-links (B2 min), at `/news/podcasts/search`. *Elevated
+   RAG-answer version (item 6) is still open.*
+3. ✅ **DONE** — **Dollars on the dashboard** (A1, `estimateDeepgramCost`) + **"In research
+   index" state** (A4, `embedded_at` KPI + per-row "not indexed" indicator).
+4. ✅ **DONE** (`f80c17b`) — **Triage lane** from `v_episodes_awaiting_action` (A2), on its own
+   "Needs a decision" page.
 
 ### P1 — Next (depth on both heads)
-5. **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and **restructured episode page**
-   leading with the brief (C1). `M`–`L`.
+5. ⏳ **NEXT** — **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and **restructured
+   episode page** leading with the brief (C1). `M`–`L`. *Extends the existing intel pass; see
+   "Next slice".*
 6. **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`.
 7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
-   boundary** (D2). `M`.
-8. **Actionable Deepgram toggle** in feed health (A3). `M`.
+   boundary** (D2, per Q1 resolution → build the `v_episode_library` seam here). `M`.
+8. ✅ **DONE** (`6efd9e3`) — **Actionable Deepgram toggle** in feed health (A3). *Pulled
+   forward from P1.*
 9. **Copy-with-citation** + in-transcript search + chapter rail (C2, B5 core). `S` each.
 
 ### P2 — Then (compounding value once the above lands)
@@ -385,12 +399,36 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
 12. **Export** — one-page PDF / email brief (B5). `M`.
 13. **Bulk actions** (A5) + **pipeline-latency stat** (A6). `M` / `S`. When volume justifies.
 
-### Recommended first slice
-If you want one coherent, demoable increment: **P0-1 (summary) + P0-2 (search) + the
-timestamp deep-link that already exists on the episode page.** That trio is the smallest
-thing that lets a CFO *type a treasury question and get a cited, readable answer that plays
-the exact moment in the source* — which is the whole product thesis in one interaction, and
-it reuses plumbing you've already built.
+### Recommended first slice — ✅ SHIPPED
+The original recommendation — **P0-1 (summary) + P0-2 (search) + the timestamp deep-link on
+the episode page** — has shipped. A CFO can now type a treasury question and get ranked,
+deep-linked transcript moments, and an episode carries a Lex-gated, publish-walled brief.
+
+### Next slice — P1-5, takeaways-with-timestamps (prepared 2026-07-20)
+The most direct next increment: extend the *existing* intelligence pass
+(`apps/agents/src/workflows/podcastIntel/`) from summary-only to **summary + key takeaways,
+each anchored to a real `start_seconds`**, rendered as deep-links on the episode page. It
+reuses every seam already built — the `pending_action='summarize'` trigger, roger's
+narration step, the Lex gate, the `summary_status` publish-wall, and the deep-link plumbing
+from B2 — so it's additive, not new architecture. Shape:
+
+- **Data:** add `key_takeaways JSONB` to `podcast_episodes` (additive migration). Shape:
+  `[{ text, start_seconds }]`. Reuse the existing `summary_status` publish-wall — takeaways
+  are client-visible prose, so they ride the *same* gate, not a new one.
+- **Deterministic-before-LLM (house rule):** the narration step must read `transcript_segments`
+  (which carry `start_seconds`), not the flat `transcript_text` the summary uses — so every
+  takeaway cites a real timestamp rather than a hallucinated one. Extend `schemas.ts`
+  (`summaryDraftSchema` → add a `takeaways` array with `text` + `start_seconds`) and the
+  narrate prompt.
+- **Compliance:** the *same* Lex review covers takeaways (they're synthesised commentary too) —
+  extend `buildSummaryLexPrompt` to include them; no second gate.
+- **Web:** render an approved episode's takeaways above the transcript as a bulleted list, each
+  bullet a deep-link (`{youtube_url}&t={start}s` or audio seek — plumbing exists on the detail
+  page). This is also the first half of **C1** (lead with the brief).
+- **Sibling (fold in or sequence next):** episode **relevance score + category** (B1's last
+  bullet) via the **Q3 resolution** — reuse Rex's rubric engine (`newsRubric.ts`), fork the
+  prompt to `podcast-v1`, scored per-episode from the summary+takeaways. Can ride this slice or
+  immediately follow it.
 
 ---
 
