@@ -27,3 +27,4 @@ pnpm-debug.log*
 
 # Supabase
 supabase/.temp/
+.claude/settings.local.json
