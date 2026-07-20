@@ -394,19 +394,45 @@ it reuses plumbing you've already built.
 
 ---
 
-## Open questions
+## Open questions — resolved
 
-- **One route or two?** Recommendation: keep `/news/podcasts` as the console; give the
-  client experience its own home (a `/library` or client-portal route) reading the
-  `v_episode_library` safe view. A per-user "mode toggle" on one page is tempting but risks
-  leaking ops vocabulary to clients — the D2 view boundary is the safer seam.
-- **Who curates collections, and when does Charlie propose vs. you assemble?** Affects
-  whether B4 needs an approval gate from day one.
-- **Relevance scoring for episodes — reuse Rex's news scorer, or a podcast-tuned variant?**
-  A 90-minute episode isn't a headline; the scoring prompt probably wants adjusting.
-- **Per-minute Deepgram rate for A1** — hardcode, config, or read from the
-  `domains_and_subscriptions` cost fields you already model in the Company feature? The
-  latter keeps a single source of truth for what things cost.
-- **What does a client actually *do* with a takeaway?** Save it, share it, book a call about
-  it? The answer shapes whether the library is a reading surface or a lead-gen surface — and
-  that's a design-thinking conversation worth having before B is fully built, not after.
+The five below were the review's original open questions. All are now settled (decisions
+taken 2026-07-20); the resolution and its reasoning are recorded inline so the build can
+proceed without re-litigating them.
+
+- **One route or two? → ONE route now, with the safe-view seam built early.** There is no
+  client-facing surface anywhere in the app today — everything under `app/(app)/` is the
+  internal two-founder shell behind one auth — so a "client library" is a second *audience*
+  that doesn't exist yet, not just a second route. Build the reader lens **inside the
+  internal app** now (director gets the value immediately, same auth), but build the D2
+  `v_episode_library` approved/client-safe boundary early so a later external portal is a
+  config change, not a refactor. Don't stand up an external client route until there's a
+  client to put in it.
+- **Who curates collections, and when does Charlie propose vs. you assemble? → Deferred (no
+  decision needed yet).** This only gates B4, which is P2. Start with **manual assembly**
+  (you/Carri), which needs no approval gate. When "Charlie proposes a collection" is added
+  later, it rides the existing `agent_activity` proposed→approved gate (same as campaigns),
+  so the gate comes for free at that point — nothing to build speculatively now.
+- **Relevance scoring for episodes — reuse Rex's news scorer, or a podcast-tuned variant? →
+  REUSE the engine, fork the prompt.** Keep Rex's machinery — the 3 dimensions
+  (material 0.5 / novelty 0.3 / citation 0.2), the composite-computed-in-code discipline,
+  the review flags, the `stepRequestContext` model-scope wiring in `newsRubric.ts` — but
+  supply a **podcast-tuned prompt** under a new `RUBRIC_VERSION` (e.g. `podcast-v1`), and
+  score the **episode** from its stage-2 summary/takeaways, not the raw transcript. One
+  retrieval/scoring idiom, parameterised — not a second engine to maintain. (Novelty in
+  particular needs rethinking for a long-form, multi-topic conversation.)
+- **Per-minute Deepgram rate for A1 → RESOLVED: keep it hardcoded.** A1 is already built:
+  `estimateDeepgramCost()` + `DEEPGRAM_COST_PER_MINUTE_AUD = 0.0065` in
+  `apps/web/lib/podcasts.ts`, explicitly a display estimate. The review's suggestion to read
+  it from `domains_and_subscriptions` is not viable — `company_subscriptions` has no
+  cost/rate-per-unit column (`business / service_type / payment_type / expiry`) and models
+  *clients'* vendor subscriptions, not BTS's own Deepgram contract rate. Leave it hardcoded;
+  if it ever needs tuning without a deploy, promote it to an env var or a `/settings` row —
+  not that table.
+- **What does a client actually *do* with a takeaway? → Build a READING / reference
+  surface.** The library's first job is curated knowledge: search, read briefs, save/
+  organise takeaways — optimising for depth and trust, which is the design-brief
+  personality. This works regardless of any later lead-gen direction, so it's the safe first
+  build. CTAs / shareable-gated briefs (the lead-gen framing) stay an **additive layer**
+  layered on later if the model calls for it — B5 (export/share) drops to nice-to-have for
+  now rather than a priority.
