@@ -2461,7 +2461,7 @@ CREATE TABLE account_feedback_guidelines (
 
 
 -- ============================================================
--- FINDINGS ENGINE (migration: 20260719000000_add_findings_engine)
+-- FINDINGS ENGINE (migration: 20260720000000_add_findings_engine)
 -- ============================================================
 -- Deterministic config + persisted daily report for the market-report insight
 -- layer (docs/features/findings-engine-spec.md). Findings are computed in
@@ -2548,7 +2548,7 @@ CREATE TABLE market_reports (
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on all five tables.
 
 -- ============================================================
--- MARKET REPORT FEEDBACK (migration: 20260719010000_add_market_report_feedback)
+-- MARKET REPORT FEEDBACK (migration: 20260720020000_add_market_report_feedback)
 -- ============================================================
 -- Founder feedback on market-report narrations → distilled standing guidelines
 -- injected into every future narration. Mirrors the social-draft loop.

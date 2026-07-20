@@ -6,9 +6,36 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-20 — renumber findings-engine / gold migrations off a duplicate version
+
+The findings-engine and gold-price migrations were both authored as
+`20260719000000_*`. `supabase_migrations.schema_migrations.version` is a primary
+key, so only one could be recorded: `gold_price_stooq_source` won the slot and
+applied, and `supabase db push` then silently treated the findings migration as
+"already applied" (version match) and skipped it — while
+`20260719010000_add_market_report_feedback` was blocked behind the collision.
+Net effect in prod: the findings tables (`market_reports`, `finding_*`) were
+never created, so the nightly market report failed soft at `loadFindingConfig`
+and sent metrics-only (no narration).
+
+Fix: gold keeps `20260719000000` (it is the version genuinely recorded in prod);
+the two unapplied migrations are renumbered *above* it, in dependency order
+(findings must precede the `market_report_feedback` → `market_reports` FK):
+
+- `20260719000000_gold_price_stooq_source.sql` — unchanged; already applied
+- `20260720000000_add_findings_engine.sql` — renumbered from `20260719000000`
+- `20260720020000_add_market_report_feedback.sql` — renumbered from `20260719010000`
+
+Because gold's version stays put, every remote ledger row still maps to a local
+file (no orphan), so no `migration repair` is needed — the next `db push` simply
+applies the two new versions. Both are idempotent (`IF NOT EXISTS`,
+`ON CONFLICT DO NOTHING`).
+
+---
+
 ## 2026-07-19 — market report feedback → distilled narration guidelines
 
-**Migration:** `20260719010000_add_market_report_feedback.sql`
+**Migration:** `20260720020000_add_market_report_feedback.sql`
 
 The daily market report email now links to `/market-reports/{id}`; founders can
 leave feedback there. Mirrors the social-draft loop (`20260717010000`):
@@ -26,7 +53,7 @@ leave feedback there. Mirrors the social-draft loop (`20260717010000`):
 
 ## 2026-07-19 — findings engine: deterministic config + persisted market reports
 
-**Migration:** `20260719000000_add_findings_engine.sql`
+**Migration:** `20260720000000_add_findings_engine.sql`
 
 The daily market-report email narrated raw indicator levels with no baseline or
 history. The findings engine (docs/features/findings-engine-spec.md, implemented
