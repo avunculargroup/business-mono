@@ -153,6 +153,26 @@ export interface PodcastEpisode {
   updated_at: string;
 }
 
+// One card in the client-safe library browse view. Mirrors the v_episode_library
+// view (approved episodes only, no ops internals) — the Q1/D2 reader boundary.
+export interface EpisodeLibraryCard {
+  id: string;
+  slug: string;
+  title: string;
+  published_at: string | null;
+  image_url: string | null;
+  duration_seconds: number | null;
+  youtube_url: string | null;
+  audio_url: string | null;
+  episode_summary: string | null;
+  key_takeaways: EpisodeTakeaway[];
+  chapters: EpisodeChapter[];
+  category: NewsCategory | null;
+  relevance_score: number | null;
+  topic_tags: string[];
+  source_name: string | null;
+}
+
 // One embedded transcript chunk (embedding omitted from the read surface, like
 // NewsItemRecord). start/end seconds are null when the source had no timestamps.
 export interface TranscriptSegment {

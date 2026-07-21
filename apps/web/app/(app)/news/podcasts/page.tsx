@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Search, AlertTriangle, Podcast } from 'lucide-react';
+import { Search, AlertTriangle, Podcast, Library } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PodcastDashboard, type DashboardEpisode } from './PodcastDashboard';
@@ -69,9 +69,13 @@ export default async function PodcastsPage() {
           <span className={styles.headerLinkLabel}>Needs a decision</span>
           {needsDecision > 0 && <span className={styles.headerBadge}>{needsDecision}</span>}
         </Link>
-        <Link href="/news/podcasts/search" className={styles.headerLink} aria-label="Search transcripts">
+        <Link href="/news/podcasts/library" className={styles.headerLink} aria-label="Library">
+          <Library size={16} strokeWidth={1.5} />
+          <span className={styles.headerLinkLabel}>Library</span>
+        </Link>
+        <Link href="/news/podcasts/search" className={styles.headerLink} aria-label="Ask the library">
           <Search size={16} strokeWidth={1.5} />
-          <span className={styles.headerLinkLabel}>Search transcripts</span>
+          <span className={styles.headerLinkLabel}>Ask the library</span>
         </Link>
       </PageHeader>
       <PodcastDashboard episodes={episodes} />

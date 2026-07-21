@@ -2232,8 +2232,10 @@ CREATE TABLE transcript_segments (
 );
 -- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops).
 
--- Views: v_podcast_ingestion_status (health dashboard) and
--- v_episodes_awaiting_action (stuck/errored episodes for Simon).
+-- Views: v_podcast_ingestion_status (health dashboard),
+-- v_episodes_awaiting_action (stuck/errored episodes for Simon), and
+-- v_episode_library (client-safe reader view — approved episodes + safe fields
+-- only; the Q1/D2 boundary, migration 20260721040000).
 -- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
 -- filter_days) — cosine search returning one row per matching segment, joined to
 -- episode + source for title/provenance/timestamp.

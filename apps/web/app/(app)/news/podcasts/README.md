@@ -3,8 +3,9 @@
 Reference for the web UI at `/news/podcasts` (the ingestion dashboard),
 `/news/podcasts/feeds` (the per-show podcasts list with feed health),
 `/news/podcasts/[id]` (a single episode), `/news/podcasts/decisions` (the
-stalled-episode triage worklist), and `/news/podcasts/search` (semantic
-transcript search). This document describes the **current state** of the UX and
+stalled-episode triage worklist), `/news/podcasts/library` (the reader-lensed
+browse view over the client-safe `v_episode_library`), and `/news/podcasts/search`
+(Ask the library — RAG answer + transcript search). This document describes the **current state** of the UX and
 UI only — the ingestion pipeline itself lives in `apps/agents` and is specced in
 `docs/podcast-ingestion-spec.md`.
 
@@ -29,6 +30,11 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 | `[id]/EpisodeDetail.tsx` | Client component. Header + actions, media, description, transcript (with in-transcript find + copy-with-citation), provenance sidebar. |
 | `[id]/detail.module.css` | Episode styles. |
 | `[id]/EpisodeDetail.test.tsx` | Component tests for the episode view. |
+| `library/page.tsx` | Server component for the reader library. Reads `v_episode_library` (safe view) → `LibraryBrowse`. |
+| `library/LibraryBrowse.tsx` | Client component. Card grid + category/source/has-takeaways/title filters + relevance sort. |
+| `library/LibraryBrowse.test.tsx` | Component tests for the browse UI. |
+| `library/page.test.tsx` | Server-component test: reads the view, not the base table. |
+| `library/library.module.css` | Library page styles. |
 | `search/page.tsx` | Server component for the Ask-the-library page. Renders `PageHeader` + `AskLibrary` + `TranscriptSearch`. |
 | `search/AskLibrary.tsx` | Client component. Question box → cited RAG answer (submits + polls `library_questions`). |
 | `search/AskLibrary.test.tsx` | Component tests for the Ask panel. |
@@ -387,6 +393,29 @@ when known). Below the list, when present: a **Curator note** block (the "why"
 from a brief) and a wrap of **topic tags**.
 
 ---
+
+## Podcast library — `/news/podcasts/library`
+
+The reader-lensed browse surface (B3), re-lensed for a reader rather than an
+operator. It reads **only** `v_episode_library` — the client-safe view (Q1/D2
+boundary): approved episodes only, and only client-safe fields (brief, takeaways,
+chapters, category, relevance, playback urls, artwork). No transcript internals,
+Deepgram ids, Lex verdicts, or unapproved briefs can reach it, because the view
+doesn't expose them — the ops/client split is enforced in the data layer, not the
+component.
+
+- **`library/page.tsx`** queries the view (via a boundary cast, since it isn't in
+  the generated types) and hands the rows to `LibraryBrowse`. It must never touch
+  `podcast_episodes` — the boundary is the view (`page.test.tsx` asserts this).
+- **`LibraryBrowse.tsx`** is a card grid sorted **by relevance first** (the reader
+  lens — "most relevant to treasury", not "most recent"), with client-relevant
+  filters: category, source, has-takeaways, and a title filter. Each card links to
+  the episode page by slug.
+- Internal now (team auth). When an external client portal is added, the view is
+  what gets granted to the client role — the base table never is — so the portal
+  is a config change, not a refactor.
+
+Reachable from the dashboard header (**Library**).
 
 ## Ask the library — `/news/podcasts/search`
 

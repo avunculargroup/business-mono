@@ -365,10 +365,12 @@ first than to retrofit it after a summary has already gone out.
 
 Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = high impact-to-effort.
 
-> **Build status (reconciled 2026-07-20).** The entire **P0 tier has shipped** since this
-> review was written (2026-07-14), plus one P1 item pulled forward. Items are marked `✅ DONE`
-> with the commit that landed them. The **next slice is now P1-5 (takeaways-with-timestamps)** —
-> see "Next slice" at the end.
+> **Build status (updated 2026-07-21).** The entire **P0 and P1 tiers have shipped** since this
+> review was written (2026-07-14): episode intelligence (summary → takeaways → chapters),
+> relevance + category, both search tiers (retrieval + the Lex-gated RAG answer), the C1
+> episode-page restructure, and the client library browse view on the `v_episode_library`
+> safe-view boundary. Items are marked `✅ DONE`. What remains is **P2** (collections,
+> cross-links, export, bulk actions, latency stat) — the compounding-value tier.
 
 ### P0 — Do first (unblocks the client half + cheap ops wins) — ✅ COMPLETE
 1. ✅ **DONE** (`f345c08`) — **Episode intelligence pass, Phase 1** — `episode_summary` + Lex
@@ -399,11 +401,17 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
    vector search), Rex synthesises a cited answer, Lex reviews it (D3), and the page polls the
    row for the answer. Citations are resolved in code from the retrieved segments (never
    hallucinated) and deep-link to the exact moment.
-7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
-   boundary** (D2, per Q1 resolution → build the `v_episode_library` seam here). `M`.
+7. ✅ **DONE** — **Client library browse view** re-lensed for readers (B3) + **client-safe
+   view/route boundary** (D2, per Q1 resolution). `M`. `v_episode_library` exposes only
+   approved episodes + client-safe fields (the publish-wall + ops/client split enforced in the
+   data layer). A `/news/podcasts/library` browse page reads *only* that view — card grid,
+   relevance-first sort, category/source/has-takeaways/title filters. Internal now (team auth);
+   when an external portal is added, the view is what gets granted, so it's a config change.
 8. ✅ **DONE** (`6efd9e3`) — **Actionable Deepgram toggle** in feed health (A3). *Pulled
    forward from P1.*
-9. **Copy-with-citation** + in-transcript search + chapter rail (C2, B5 core). `S` each.
+9. ✅ **DONE** — **Copy-with-citation** + in-transcript search + chapter rail (C2, B5 core).
+   Copy-with-citation and in-transcript find were already on the episode page; the chapter rail
+   shipped with item 5. `S` each.
 
 ### P2 — Then (compounding value once the above lands)
 10. **Collections / briefing packs** (B4). `M`.
