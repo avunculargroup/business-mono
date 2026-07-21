@@ -51,6 +51,9 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [transcriptOverflows, setTranscriptOverflows] = useState(false);
 
+  // Raw show-notes are secondary to the brief, so they start collapsed.
+  const [showNotesExpanded, setShowNotesExpanded] = useState(false);
+
   // In-transcript find: highlight matches, and step through them with prev/next.
   const [query, setQuery] = useState('');
   const [activeMatch, setActiveMatch] = useState(0);
@@ -191,15 +194,19 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
           </div>
         </div>
         <div className={styles.actions}>
-          <Button variant="secondary" size="sm" loading={pending}
-            onClick={() => runAction('refetch', 'Re-running the transcript waterfall')}>
-            Fetch transcript
-          </Button>
-          {episode.transcript_source !== 'deepgram' && (
-            <Button variant="secondary" size="sm" loading={pending}
-              onClick={() => runAction('deepgram', 'Submitting to Deepgram')}>
-              Transcribe with Deepgram
-            </Button>
+          {episode.transcript_status !== 'available' && (
+            <>
+              <Button variant="secondary" size="sm" loading={pending}
+                onClick={() => runAction('refetch', 'Re-running the transcript waterfall')}>
+                Fetch transcript
+              </Button>
+              {episode.transcript_source !== 'deepgram' && (
+                <Button variant="secondary" size="sm" loading={pending}
+                  onClick={() => runAction('deepgram', 'Submitting to Deepgram')}>
+                  Transcribe with Deepgram
+                </Button>
+              )}
+            </>
           )}
           {episode.transcript_status === 'failed' && (
             <Button variant="secondary" size="sm" loading={pending}
@@ -326,8 +333,25 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
         </section>
       ) : null}
 
-      {/* Raw show-notes — demoted below the brief (C1). */}
-      {description && <p className={styles.description}>{description}</p>}
+      {/* Raw show-notes — demoted below the brief (C1) and collapsed by default. */}
+      {description && (
+        <section className={styles.showNotes}>
+          <button
+            type="button"
+            className={styles.showNotesToggle}
+            onClick={() => setShowNotesExpanded((v) => !v)}
+            aria-expanded={showNotesExpanded}
+          >
+            Show notes
+            <ChevronDown
+              size={16}
+              strokeWidth={1.5}
+              className={showNotesExpanded ? styles.chevOpen : undefined}
+            />
+          </button>
+          {showNotesExpanded && <p className={styles.description}>{description}</p>}
+        </section>
+      )}
 
       <div className={styles.body}>
         {/* ── Transcript ── */}

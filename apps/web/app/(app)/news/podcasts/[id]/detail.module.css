@@ -136,6 +136,30 @@
   overflow-wrap: anywhere;
 }
 
+.showNotes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.showNotesToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.showNotesToggle:hover {
+  color: var(--color-accent-hover);
+}
+
 .body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
