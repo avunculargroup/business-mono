@@ -324,6 +324,14 @@ summary — one gate, not two. The brief renders by `summary_status`:
 (roger + Lex, model-configurable via the `podcast_intel.*` scopes) lives in
 `apps/agents/src/workflows/podcastIntel/`.
 
+The same pass also scores the episode's **relevance** (a 0–1 composite) and
+**category** (regulatory/corporate/macro/international) — Rex's news rubric engine
+with a podcast-tuned prompt (`podcast-v1`), scored from the brief in
+`apps/agents/src/workflows/podcastRubric.ts` (`podcast_intel.relevance` scope).
+Unlike the summary, relevance is director/ops metadata, so it is **not** gated by
+`summary_status` or Lex — it is written immediately and shown in the provenance
+sidebar (`Category`, `Relevance`).
+
 ### Body — two columns
 
 A grid: transcript (fluid) + a 280px provenance sidebar, collapsing to a single

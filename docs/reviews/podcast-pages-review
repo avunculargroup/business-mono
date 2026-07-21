@@ -383,9 +383,14 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
    "Needs a decision" page.
 
 ### P1 — Next (depth on both heads)
-5. ⏳ **NEXT** — **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and **restructured
-   episode page** leading with the brief (C1). `M`–`L`. *Extends the existing intel pass; see
-   "Next slice".*
+5. 🔨 **IN PROGRESS** — **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and
+   **restructured episode page** leading with the brief (C1). `M`–`L`.
+   - ✅ **DONE** — takeaways-with-timestamps (extends the intel pass; snap-to-segment guard).
+   - ✅ **DONE** — episode **relevance score + category** (B1's relevance bullet, Q3
+     resolution): podcast-tuned fork of Rex's rubric (`podcast-v1`) in
+     `apps/agents/src/workflows/podcastRubric.ts`, scored from the brief, shown in provenance.
+   - ⏳ **Remaining:** chapters (`chapters JSONB` + chapter rail) and the C1 episode-page
+     restructure (lead with the brief).
 6. **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`.
 7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
    boundary** (D2, per Q1 resolution → build the `v_episode_library` seam here). `M`.
@@ -425,10 +430,13 @@ from B2 — so it's additive, not new architecture. Shape:
 - **Web:** render an approved episode's takeaways above the transcript as a bulleted list, each
   bullet a deep-link (`{youtube_url}&t={start}s` or audio seek — plumbing exists on the detail
   page). This is also the first half of **C1** (lead with the brief).
-- **Sibling (fold in or sequence next):** episode **relevance score + category** (B1's last
-  bullet) via the **Q3 resolution** — reuse Rex's rubric engine (`newsRubric.ts`), fork the
-  prompt to `podcast-v1`, scored per-episode from the summary+takeaways. Can ride this slice or
-  immediately follow it.
+- **Sibling — ✅ DONE:** episode **relevance score + category** (B1's last bullet) via the
+  **Q3 resolution** — Rex's rubric engine reused (`newsRubric.ts` helpers), prompt forked to
+  `podcast-v1` (`podcastRubric.ts`), scored per-episode from the summary+takeaways and written
+  ungated (director metadata). Surfaced in the episode provenance sidebar.
+
+**Still open in this slice:** chapters (`chapters JSONB` + a chapter rail) and the C1
+episode-page restructure (lead with the brief). These are the next increments.
 
 ---
 

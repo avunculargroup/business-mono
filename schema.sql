@@ -2200,6 +2200,11 @@ CREATE TABLE podcast_episodes (
   summary_generated_at  TIMESTAMPTZ,
   summary_approved_at   TIMESTAMPTZ,
   summary_approved_by   UUID REFERENCES team_members(id),
+  -- Episode relevance (podcast-tuned fork of Rex's news rubric, scored from the
+  -- brief). Director/ops metadata — not gated by summary_status. See 20260721010000.
+  relevance_score       NUMERIC(3,2),
+  category              TEXT CHECK (category IS NULL OR category IN ('regulatory','corporate','macro','international')),
+  relevance_metadata    JSONB,  -- dimension scores, flags, reasoning, rubric_version
   fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
   created_by            UUID REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),

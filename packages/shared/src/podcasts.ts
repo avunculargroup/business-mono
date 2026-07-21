@@ -4,6 +4,8 @@
 // See docs/podcast-ingestion-spec.md. Episodes live in podcast_episodes;
 // embedded transcript chunks live in transcript_segments.
 
+import type { NewsCategory } from './news.js';
+
 // Lifecycle of an episode's transcript:
 //   pending → resolving → available            (feed tag or YouTube hit)
 //   pending → resolving → transcribing → available   (Deepgram, resolved by webhook)
@@ -77,6 +79,17 @@ export interface EpisodeTakeaway {
   start_seconds: number | null;
 }
 
+// Rex's rubric working: the three dimension scores, the derived flags, the candid
+// internal reasoning, and the rubric version. Stored on the episode (mirrors
+// news_items.rex_metadata) so the director can see how a relevance_score was
+// reached. Not client-facing.
+export interface EpisodeRelevanceMetadata {
+  dimension_scores: { material: number; novelty: number; citation: number };
+  relevance_reasoning: string;
+  flags: string[];
+  rubric_version: string;
+}
+
 // One ingested episode. Mirrors the podcast_episodes table (embedding columns
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
@@ -119,6 +132,12 @@ export interface PodcastEpisode {
   summary_generated_at: string | null;
   summary_approved_at: string | null;
   summary_approved_by: string | null;
+  // Episode relevance (Q3 resolution: podcast-tuned fork of Rex's news rubric,
+  // scored from the brief). Director/ops metadata — NOT gated by summary_status.
+  // Null until the intelligence pass scores the episode (or if scoring failed).
+  relevance_score: number | null;
+  category: NewsCategory | null;
+  relevance_metadata: EpisodeRelevanceMetadata | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -13,6 +13,7 @@ import {
   type SummaryEpisode,
   type TimedSegment,
 } from './prompts.js';
+import { scoreEpisodeRelevance } from '../podcastRubric.js';
 
 const log = createLogger('podcast-intel');
 
@@ -151,6 +152,15 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
 
   const verdict = await reviewBrief(episode, brief);
 
+  // Relevance is director/ops metadata (a score + category), not client prose, so
+  // it's scored from the brief and written immediately — no publish-wall, no Lex.
+  // A scoring failure leaves relevance null without blocking the summary.
+  const scored = await scoreEpisodeRelevance({
+    title: ep.title,
+    summary: brief.summary,
+    takeaways: brief.takeaways.map((t) => t.text),
+  });
+
   const now = new Date().toISOString();
   const { error: upErr } = await db
     .from('podcast_episodes')
@@ -160,6 +170,16 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
       summary_status: 'proposed',
       summary_lex_verdict: verdict,
       summary_generated_at: now,
+      relevance_score: scored?.relevanceScore ?? null,
+      category: scored?.category ?? null,
+      relevance_metadata: scored
+        ? {
+            dimension_scores: scored.dimensionScores,
+            relevance_reasoning: scored.relevanceReasoning,
+            flags: scored.flags,
+            rubric_version: scored.rubricVersion,
+          }
+        : null,
     })
     .eq('id', episodeId);
   if (upErr) {
@@ -197,5 +217,8 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     log.error({ episodeId, error: actErr.message }, 'failed to log episode summary activity');
   }
 
-  log.info({ episodeId, passes: verdict.passes, takeaways: brief.takeaways.length }, 'episode brief proposed');
+  log.info(
+    { episodeId, passes: verdict.passes, takeaways: brief.takeaways.length, relevance: scored?.relevanceScore ?? null },
+    'episode brief proposed',
+  );
 }

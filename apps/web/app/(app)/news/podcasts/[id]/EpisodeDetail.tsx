@@ -20,6 +20,7 @@ import {
   TRANSCRIPT_SOURCE_LABELS,
 } from '@/lib/podcasts';
 import { requestEpisodeAction, generateEpisodeBrief, decideEpisodeBrief } from '@/app/actions/podcasts';
+import { NEWS_CATEGORY_LABELS } from '@platform/shared';
 import type { EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 import styles from './detail.module.css';
 
@@ -459,6 +460,10 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
         <aside className={styles.provenance}>
           <h2 className={styles.sectionTitle}>Provenance</h2>
           <dl className={styles.provList}>
+            {episode.category && <ProvRow label="Category" value={NEWS_CATEGORY_LABELS[episode.category]} />}
+            {episode.relevance_score != null && (
+              <ProvRow label="Relevance" value={episode.relevance_score.toFixed(2)} mono />
+            )}
             <ProvRow label="Source" value={episode.transcript_source ? TRANSCRIPT_SOURCE_LABELS[episode.transcript_source] : '—'} />
             <ProvRow label="Format" value={episode.transcript_format ?? '—'} />
             <ProvRow label="Language" value={episode.transcript_lang ?? '—'} />

@@ -359,6 +359,14 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'podcast_intel',
     fallbackAgent: 'lex',
   },
+  {
+    key: 'podcast_intel.relevance',
+    type: 'workflow_step',
+    label: 'Episode relevance',
+    description: 'Rex scores an episode on material/novelty/citation and classifies its category, from the brief (podcast-tuned fork of the news rubric)',
+    workflow: 'podcast_intel',
+    fallbackAgent: 'rex',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
