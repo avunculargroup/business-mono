@@ -29,10 +29,15 @@ client component. They live under the authenticated `app/(app)/` shell, in the
 | `[id]/EpisodeDetail.tsx` | Client component. Header + actions, media, description, transcript (with in-transcript find + copy-with-citation), provenance sidebar. |
 | `[id]/detail.module.css` | Episode styles. |
 | `[id]/EpisodeDetail.test.tsx` | Component tests for the episode view. |
-| `search/page.tsx` | Server component for the transcript search page. Renders `PageHeader` + `TranscriptSearch`. |
+| `search/page.tsx` | Server component for the Ask-the-library page. Renders `PageHeader` + `AskLibrary` + `TranscriptSearch`. |
+| `search/AskLibrary.tsx` | Client component. Question box → cited RAG answer (submits + polls `library_questions`). |
+| `search/AskLibrary.test.tsx` | Component tests for the Ask panel. |
 | `search/TranscriptSearch.tsx` | Client component. Query box + ranked segment results with timestamped deep-links. |
-| `search/search.module.css` | Search page styles. |
+| `search/search.module.css` | Ask + search page styles. |
 | `search/TranscriptSearch.test.tsx` | Component tests for the search UI. |
+| `../../../app/actions/library.ts` | Server actions: `askLibraryQuestion` (INSERT), `getLibraryQuestion` (poll). |
+| `apps/agents/src/workflows/libraryAnswer/` | Agent-side RAG: retrieve → Rex synthesises cited answer → Lex reviews → persist. |
+| `apps/agents/src/listeners/libraryQuestionListener.ts` | Realtime listener that claims pending `library_questions` and runs `libraryAnswer`. |
 | `../../../components/podcasts/` | Shared media components: `MediaEmbed`, `YouTubeFacade`, `AudioPlayer`. |
 | `../../../lib/podcasts.ts` | Client-safe helpers: video-ID parsing, HTML→text, timestamp formatting, status/source label + colour maps, Deepgram spend estimate (`estimateDeepgramCost`, `formatAud`), and in-transcript highlight (`highlightText`). |
 | `../../../lib/openaiEmbedding.ts` | Server-only query embedding (`embedQuery`) via the OpenAI REST endpoint — used by transcript search. |
@@ -383,12 +388,34 @@ from a brief) and a wrap of **topic tags**.
 
 ---
 
-## Transcript search — `/news/podcasts/search`
+## Ask the library — `/news/podcasts/search`
 
-Titled **"Search transcripts"**, back link → the dashboard. Semantic ("ask the
-library") search across every ingested transcript, giving the embedding pipeline
-a UI: `transcript_segments` are embedded on ingest, but until this page nothing
-in the web app queried them.
+Titled **"Ask the library"**, back link → the dashboard. Two surfaces over the same
+embedded `transcript_segments`: an **Ask** panel (`AskLibrary.tsx`) that returns a
+synthesised, cited answer to a question, and a **Find exact passages** panel
+(`TranscriptSearch.tsx`) that returns ranked segment matches. `transcript_segments`
+are embedded on ingest, but until this page nothing in the web app queried them.
+
+### Ask panel (RAG answer — B2 elevated)
+
+Built on the async web→agents seam (the web app can't reach the agents server over
+HTTP), so the answer is generated agent-side and Lex-gated (option A in the review):
+
+- **`AskLibrary.tsx`** submits the question via `askLibraryQuestion`
+  (`app/actions/library.ts`), which INSERTs a `library_questions` row (status
+  `pending`), then **polls** `getLibraryQuestion` every 2s until the row resolves
+  (a `requestId` ref discards a stale poll if a newer question is asked).
+- Agent-side, **`libraryQuestionListener`** claims the row (pending → answering) and
+  runs **`libraryAnswer`**: embed the question → `transcriptVectorSearch` (the same
+  B2 retrieval) → **Rex** synthesises a 2–4 sentence answer citing source *numbers* →
+  citations are resolved **in code** from the retrieved segments (never hallucinated)
+  → **Lex** reviews the answer for advice risk (D3) → persist.
+- **Render:** the answer, then a citation list — each a deep-link to
+  `/news/podcasts/{id}?t={start}` labelled with episode + timestamp and the quoted
+  snippet. A `no_answer` row shows a graceful "not covered yet" note; a Lex-flagged
+  answer shows an internal-only compliance caution above it.
+
+### Find-passages panel (retrieval — B2 minimum)
 
 - **`search/page.tsx`** is a thin server component; **`TranscriptSearch.tsx`** is
   the client component holding the query box and results. Submitting calls the
@@ -412,14 +439,11 @@ in the web app queried them.
   "No matching passages" empty state when nothing clears the similarity
   threshold.
 
-> **Scope.** This is the minimum (retrieval + deep-links) version — the "P0-2"
-> item from `docs/reviews/podcast-pages-review`. The elevated RAG
-> *answer-with-citations* and the Lex compliance gate for client-facing prose are
-> deliberately **not** built here; see that review for the roadmap.
-
 **Environment.** The search action needs `OPENAI_API_KEY` in the web app's
-server environment (Vercel). Without it, `searchTranscripts` returns a humane
-error rather than throwing; the rest of the podcast pages are unaffected.
+server environment (Vercel) to embed the query; the Ask panel's synthesis runs on
+the agents server (Railway), which owns its own model config. Without the web key,
+`searchTranscripts` returns a humane error rather than throwing; the rest of the
+podcast pages are unaffected.
 
 ---
 

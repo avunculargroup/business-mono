@@ -6,5 +6,6 @@ export * from './computeNextRunAt.js';
 export * from './tz.js';
 export * from './news.js';
 export * from './podcasts.js';
+export * from './library.js';
 export * from './modelScopes.js';
 export * from './findings.js';

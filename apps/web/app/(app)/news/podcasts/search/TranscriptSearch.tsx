@@ -61,7 +61,7 @@ export function TranscriptSearch() {
             className={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask the library — e.g. how are companies accounting for bitcoin?"
+            placeholder="Find exact passages — e.g. cost basis, custody, FASB"
             aria-label="Search transcripts"
           />
         </div>

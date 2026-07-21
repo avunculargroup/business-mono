@@ -36,6 +36,7 @@ import { startVariantGateWebListener } from '../listeners/variantGateWeb.js';
 import { startStrategyGateWebListener } from '../listeners/strategyGateWeb.js';
 import { startComplianceRecheckListener } from '../listeners/complianceRecheck.js';
 import { startPodcastActionListener } from '../listeners/podcastActionListener.js';
+import { startLibraryQuestionListener } from '../listeners/libraryQuestionListener.js';
 import { startFeedbackDistillListener } from '../listeners/feedbackDistillListener.js';
 import { startMarketReportFeedbackListener } from '../listeners/marketReportFeedbackListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
@@ -239,6 +240,11 @@ startComplianceRecheckListener();
 // pages request it (Fetch transcript / Transcribe with Deepgram / Retry). Same
 // DB-driven pattern as the newsletter gate above.
 startPodcastActionListener();
+
+// Answer "Ask the library" questions (written by /news/podcasts/search): Rex
+// retrieves transcript segments + synthesises a cited answer, Lex reviews it.
+// Same web→DB→agents pattern; includes a startup sweep for questions missed while down.
+startLibraryQuestionListener();
 
 // Distill founder feedback on social drafts (written by /content/[id]) into
 // durable per-account guidelines that every future generation injects. Same

@@ -393,7 +393,12 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
      real segment starts (anchorless dropped), sorted; rendered as a chapter rail that seeks.
    - ✅ **C1 restructure**: the episode page now leads with the brief (summary + takeaways +
      chapter rail); the raw show-notes are demoted below it.
-6. **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`.
+6. ✅ **DONE** — **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`. Built
+   **agent-side + Lex-gated** (option A): `/news/podcasts/search` INSERTs a `library_questions`
+   row; `libraryQuestionListener` claims it; `libraryAnswer` retrieves segments (reusing the B2
+   vector search), Rex synthesises a cited answer, Lex reviews it (D3), and the page polls the
+   row for the answer. Citations are resolved in code from the retrieved segments (never
+   hallucinated) and deep-link to the exact moment.
 7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
    boundary** (D2, per Q1 resolution → build the `v_episode_library` seam here). `M`.
 8. ✅ **DONE** (`6efd9e3`) — **Actionable Deepgram toggle** in feed health (A3). *Pulled
@@ -438,8 +443,9 @@ from B2 — so it's additive, not new architecture. Shape:
   ungated (director metadata). Surfaced in the episode provenance sidebar.
 
 **This slice is complete** — takeaways, relevance + category, chapters, and the C1 restructure
-have all shipped. The next increments are item 6 (RAG answer-with-citations on the existing
-search) and item 7 (client browse view + the `v_episode_library` safe-view boundary).
+have all shipped. The **RAG answer-with-citations** (item 6) has since shipped too. The next
+increment is item 7 (client browse view + the `v_episode_library` safe-view boundary) — which
+is also where the Q1 client/ops boundary and the client-facing gating of these answers land.
 
 ---
 

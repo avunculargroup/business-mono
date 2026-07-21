@@ -367,6 +367,24 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'podcast_intel',
     fallbackAgent: 'rex',
   },
+
+  // ── Ask the library (RAG answer over transcripts) ──────────────────────────
+  {
+    key: 'library_answer.synthesize',
+    type: 'workflow_step',
+    label: 'Library answer',
+    description: 'Rex synthesises a cited answer to a director question from retrieved transcript segments',
+    workflow: 'library_answer',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'library_answer.compliance_check',
+    type: 'workflow_step',
+    label: 'Answer compliance check',
+    description: 'Lex reviews a synthesised library answer for advice risk',
+    workflow: 'library_answer',
+    fallbackAgent: 'lex',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
@@ -378,6 +396,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   strategy: 'Campaign Strategy',
   social_post: 'Social Posts from News',
   podcast_intel: 'Podcast Intelligence',
+  library_answer: 'Ask the Library',
   market_report: 'Market Report',
 };
 
