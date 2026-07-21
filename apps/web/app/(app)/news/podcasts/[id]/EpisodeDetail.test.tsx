@@ -62,6 +62,7 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
     embedded_at: null,
     episode_summary: null,
     key_takeaways: [],
+    chapters: [],
     summary_status: 'none',
     summary_lex_verdict: null,
     summary_generated_at: null,
@@ -340,6 +341,28 @@ describe('EpisodeDetail', () => {
       // Timestamped takeaway renders a seek button; the untimed one does not.
       expect(screen.getByRole('button', { name: '1:30' })).toBeInTheDocument();
       expect(screen.getByText('A point with no timestamp.')).toBeInTheDocument();
+    });
+
+    it('renders a chapter rail that deep-links into the media', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            chapters: [
+              { title: 'Introduction', start_seconds: 0 },
+              { title: 'Custody', start_seconds: 90 },
+            ],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Chapters')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Custody/ })).toBeInTheDocument();
+      expect(screen.getByText('Introduction')).toBeInTheDocument();
     });
 
     it('shows category and relevance in provenance when scored', () => {

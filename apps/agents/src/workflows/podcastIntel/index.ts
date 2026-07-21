@@ -3,7 +3,7 @@ import { roger } from '../../agents/recorder/agent.js';
 import { lex, complianceVerdictSchema, type ComplianceVerdict } from '../../agents/compliance/index.js';
 import { stepRequestContext } from '../../config/model.js';
 import { createLogger } from '../../lib/logger.js';
-import { summaryDraftSchema, type Takeaway } from './schemas.js';
+import { summaryDraftSchema, type Takeaway, type Chapter } from './schemas.js';
 import {
   buildSummaryPrompt,
   buildSummaryLexPrompt,
@@ -43,6 +43,7 @@ interface EpisodeRow {
 interface Brief {
   summary: string;
   takeaways: Takeaway[];
+  chapters: Chapter[];
 }
 
 /**
@@ -56,7 +57,7 @@ async function narrateBrief(
   transcriptText: string,
   segmentStarts: number[],
 ): Promise<Brief> {
-  const fallback = { summary: '', takeaways: [] as Takeaway[] };
+  const fallback = { summary: '', takeaways: [] as Takeaway[], chapters: [] as Chapter[] };
   const response = await roger.generate(
     [{ role: 'user', content: buildSummaryPrompt(episode, transcriptText) }],
     {
@@ -74,6 +75,12 @@ async function narrateBrief(
     takeaways: draft.takeaways
       .map((t) => ({ text: t.text.trim(), start_seconds: snapToSegment(t.start_seconds, segmentStarts) }))
       .filter((t) => t.text.length > 0),
+    // A chapter without a jump target is useless, so drop any whose snapped start
+    // is null (or title is empty); keep them in chronological order.
+    chapters: draft.chapters
+      .map((c) => ({ title: c.title.trim(), start_seconds: snapToSegment(c.start_seconds, segmentStarts) }))
+      .filter((c): c is { title: string; start_seconds: number } => c.title.length > 0 && c.start_seconds != null)
+      .sort((a, b) => a.start_seconds - b.start_seconds),
   };
 }
 
@@ -167,6 +174,7 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     .update({
       episode_summary: brief.summary,
       key_takeaways: brief.takeaways,
+      chapters: brief.chapters,
       summary_status: 'proposed',
       summary_lex_verdict: verdict,
       summary_generated_at: now,
@@ -218,7 +226,13 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
   }
 
   log.info(
-    { episodeId, passes: verdict.passes, takeaways: brief.takeaways.length, relevance: scored?.relevanceScore ?? null },
+    {
+      episodeId,
+      passes: verdict.passes,
+      takeaways: brief.takeaways.length,
+      chapters: brief.chapters.length,
+      relevance: scored?.relevanceScore ?? null,
+    },
     'episode brief proposed',
   );
 }

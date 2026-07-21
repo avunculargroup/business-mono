@@ -21,7 +21,7 @@ import {
 } from '@/lib/podcasts';
 import { requestEpisodeAction, generateEpisodeBrief, decideEpisodeBrief } from '@/app/actions/podcasts';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
-import type { EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
+import type { EpisodeChapter, EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 import styles from './detail.module.css';
 
 interface Props {
@@ -239,9 +239,8 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
         </div>
       )}
 
-      {description && <p className={styles.description}>{description}</p>}
-
-      {/* ── Episode brief (intelligence pass) ── */}
+      {/* ── Episode brief (intelligence pass) — C1: lead with the brief, not the
+          raw show-notes, which are demoted below it. ── */}
       {episode.summary_status === 'approved' ? (
         <section className={styles.brief}>
           <div className={styles.briefHead}>
@@ -249,6 +248,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
           </div>
           <p className={styles.briefText}>{episode.episode_summary}</p>
           <Takeaways takeaways={episode.key_takeaways} onSeek={seekTo} canSeek={canSeek} />
+          <Chapters chapters={episode.chapters} onSeek={seekTo} canSeek={canSeek} />
         </section>
       ) : episode.summary_status === 'proposed' ? (
         <section className={`${styles.brief} ${styles.briefDraft}`}>
@@ -258,6 +258,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
           </div>
           <p className={styles.briefText}>{episode.episode_summary}</p>
           <Takeaways takeaways={episode.key_takeaways} onSeek={seekTo} canSeek={canSeek} />
+          <Chapters chapters={episode.chapters} onSeek={seekTo} canSeek={canSeek} />
           {verdict && (
             <div className={`${styles.verdict} ${verdict.passes ? styles.verdictPass : styles.verdictFlag}`}>
               <span className={styles.verdictLabel}>
@@ -312,6 +313,9 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
           </div>
         </section>
       ) : null}
+
+      {/* Raw show-notes — demoted below the brief (C1). */}
+      {description && <p className={styles.description}>{description}</p>}
 
       <div className={styles.body}>
         {/* ── Transcript ── */}
@@ -546,6 +550,41 @@ function Takeaways({
               </button>
             )}
             <span>{t.text}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+// Chapter rail — a table of contents that jumps into the media. Each chapter has
+// a real timestamp (anchorless ones are dropped at generation). Renders nothing
+// when there are no chapters.
+function Chapters({
+  chapters,
+  onSeek,
+  canSeek,
+}: {
+  chapters: EpisodeChapter[];
+  onSeek: (seconds: number | null) => void;
+  canSeek: boolean;
+}) {
+  if (chapters.length === 0) return null;
+  return (
+    <>
+      <p className={styles.takeawaysTitle}>Chapters</p>
+      <ul className={styles.chapters}>
+        {chapters.map((c, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              className={styles.chapter}
+              onClick={() => onSeek(c.start_seconds)}
+              disabled={!canSeek}
+            >
+              <span className={styles.chapterStamp}>{formatTimestamp(c.start_seconds)}</span>
+              <span className={styles.chapterTitle}>{c.title}</span>
+            </button>
           </li>
         ))}
       </ul>

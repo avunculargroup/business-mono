@@ -81,6 +81,12 @@ describe('buildSummaryPrompt', () => {
     expect(p).toContain('[<seconds>s]');
   });
 
+  it('asks for chapters in chronological order', () => {
+    const p = buildSummaryPrompt(episode, 'body');
+    expect(p).toMatch(/chapters/i);
+    expect(p).toMatch(/chronological/i);
+  });
+
   it('instructs descriptive, non-advice framing', () => {
     const p = buildSummaryPrompt(episode, 'body');
     expect(p).toMatch(/describe, never advise/i);

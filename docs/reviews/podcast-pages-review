@@ -383,14 +383,16 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
    "Needs a decision" page.
 
 ### P1 — Next (depth on both heads)
-5. 🔨 **IN PROGRESS** — **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and
-   **restructured episode page** leading with the brief (C1). `M`–`L`.
-   - ✅ **DONE** — takeaways-with-timestamps (extends the intel pass; snap-to-segment guard).
-   - ✅ **DONE** — episode **relevance score + category** (B1's relevance bullet, Q3
-     resolution): podcast-tuned fork of Rex's rubric (`podcast-v1`) in
+5. ✅ **DONE** — **Takeaways-with-timestamps + chapters** (B1 Phases 2–3) and **restructured
+   episode page** leading with the brief (C1). `M`–`L`.
+   - ✅ takeaways-with-timestamps (extends the intel pass; snap-to-segment guard).
+   - ✅ episode **relevance score + category** (B1's relevance bullet, Q3 resolution):
+     podcast-tuned fork of Rex's rubric (`podcast-v1`) in
      `apps/agents/src/workflows/podcastRubric.ts`, scored from the brief, shown in provenance.
-   - ⏳ **Remaining:** chapters (`chapters JSONB` + chapter rail) and the C1 episode-page
-     restructure (lead with the brief).
+   - ✅ **chapters** (`chapters JSONB` + chapter rail): generated in the intel pass, snapped to
+     real segment starts (anchorless dropped), sorted; rendered as a chapter rail that seeks.
+   - ✅ **C1 restructure**: the episode page now leads with the brief (summary + takeaways +
+     chapter rail); the raw show-notes are demoted below it.
 6. **RAG answer-with-citations** on top of B2 search (B2 elevated). `L`.
 7. **Client library browse view** re-lensed for readers (B3) + **client-safe view/route
    boundary** (D2, per Q1 resolution → build the `v_episode_library` seam here). `M`.
@@ -435,8 +437,9 @@ from B2 — so it's additive, not new architecture. Shape:
   `podcast-v1` (`podcastRubric.ts`), scored per-episode from the summary+takeaways and written
   ungated (director metadata). Surfaced in the episode provenance sidebar.
 
-**Still open in this slice:** chapters (`chapters JSONB` + a chapter rail) and the C1
-episode-page restructure (lead with the brief). These are the next increments.
+**This slice is complete** — takeaways, relevance + category, chapters, and the C1 restructure
+have all shipped. The next increments are item 6 (RAG answer-with-citations on the existing
+search) and item 7 (client browse view + the `v_episode_library` safe-view boundary).
 
 ---
 

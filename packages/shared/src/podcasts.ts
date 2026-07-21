@@ -79,6 +79,15 @@ export interface EpisodeTakeaway {
   start_seconds: number | null;
 }
 
+// One chapter of an episode (episode intelligence, Phase 3): a short section
+// title and the second it begins, so the episode page can offer a chapter rail
+// that jumps into the media. start_seconds is always set — anchorless chapters
+// are dropped at generation. Rides the same summary_status publish-wall.
+export interface EpisodeChapter {
+  title: string;
+  start_seconds: number;
+}
+
 // Rex's rubric working: the three dimension scores, the derived flags, the candid
 // internal reasoning, and the rubric version. Stored on the episode (mirrors
 // news_items.rex_metadata) so the director can see how a relevance_score was
@@ -127,6 +136,7 @@ export interface PodcastEpisode {
   // client-visible. key_takeaways is always an array (defaults to [] in the DB).
   episode_summary: string | null;
   key_takeaways: EpisodeTakeaway[];
+  chapters: EpisodeChapter[];
   summary_status: SummaryStatus;
   summary_lex_verdict: SummaryComplianceVerdict | null;
   summary_generated_at: string | null;

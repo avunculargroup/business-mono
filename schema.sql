@@ -2195,6 +2195,8 @@ CREATE TABLE podcast_episodes (
   episode_summary       TEXT,
   -- [{ "text": string, "start_seconds": number | null }] — always an array.
   key_takeaways         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- [{ "title": string, "start_seconds": number }] chronological — chapter rail. See 20260721020000.
+  chapters              JSONB NOT NULL DEFAULT '[]'::jsonb,
   summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','proposed','approved')),
   summary_lex_verdict   JSONB,
   summary_generated_at  TIMESTAMPTZ,

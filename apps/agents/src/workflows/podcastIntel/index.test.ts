@@ -69,6 +69,12 @@ beforeEach(() => {
       summary: 'The host argued custody is a board decision.',
       // 88 snaps to the 90s segment start below.
       takeaways: [{ text: 'Custody is a board decision.', start_seconds: 88 }],
+      // Out of order + one anchorless: expect snapped, sorted, and the null dropped.
+      chapters: [
+        { title: 'Custody', start_seconds: 88 },
+        { title: 'Intro', start_seconds: 1 },
+        { title: 'No anchor', start_seconds: null },
+      ],
     },
   });
   lexGenerate.mockResolvedValue({ object: PASS });
@@ -99,6 +105,11 @@ describe('runEpisodeIntel', () => {
       episode_summary: 'The host argued custody is a board decision.',
       // The proposed 88s snaps to the real 90s segment start.
       key_takeaways: [{ text: 'Custody is a board decision.', start_seconds: 90 }],
+      // Chapters snapped (1→0, 88→90), sorted chronologically, anchorless dropped.
+      chapters: [
+        { title: 'Intro', start_seconds: 0 },
+        { title: 'Custody', start_seconds: 90 },
+      ],
       summary_status: 'proposed',
       summary_lex_verdict: PASS,
       relevance_score: 0.78,

@@ -295,14 +295,23 @@ preserved newlines read as paragraph breaks. Muted, relaxed line height.
 
 ### Episode brief (intelligence pass)
 
-Between the description and the transcript sits the **episode brief** — a short,
-agent-written summary plus **key takeaways** a reader can skim instead of the full
-transcript. Summary is Phase 1 (`docs/reviews/podcast-pages-review` P0-1);
-takeaways are Phase 2 (P1-5) — 4–7 short points, each anchored to a
-`start_seconds` so it deep-links into the media at the moment it's discussed
-(rendered under the summary; untimed takeaways render without a link). Takeaways
-ride the **same** `summary_status` publish-wall and the **same** Lex review as the
-summary — one gate, not two. The brief renders by `summary_status`:
+The page **leads with the episode brief** (C1) — the raw show-notes are demoted
+below it. The brief is a short, agent-written **summary** plus **key takeaways**
+and a **chapter rail** a reader can skim instead of the full transcript. Summary
+is Phase 1 (`docs/reviews/podcast-pages-review` P0-1); takeaways (Phase 2) and
+chapters (Phase 3) are P1-5:
+
+- **Takeaways** — 4–7 short points, each anchored to a `start_seconds` so it
+  deep-links into the media at the moment it's discussed (untimed ones render
+  without a link).
+- **Chapters** — 3–8 `{ title, start_seconds }` in chronological order, rendered
+  as a chapter rail that jumps into the media; anchorless chapters are dropped at
+  generation.
+
+Takeaways and chapters ride the **same** `summary_status` publish-wall as the
+summary; the summary + takeaways also share the **same** Lex review — one gate,
+not two (chapters are navigational structure, not advice prose). The brief renders
+by `summary_status`:
 
 - **`none`** (transcript `available`) → a **"Generate brief"** button.
   `generateEpisodeBrief` writes `pending_action = 'summarize'`; the agents
