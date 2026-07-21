@@ -2624,6 +2624,48 @@ export type Database = {
           },
         ]
       }
+      library_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          asked_by: string | null
+          citations: Json
+          created_at: string
+          error: string | null
+          id: string
+          lex_verdict: Json | null
+          no_answer: boolean
+          question: string
+          status: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          asked_by?: string | null
+          citations?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          lex_verdict?: Json | null
+          no_answer?: boolean
+          question: string
+          status?: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          asked_by?: string | null
+          citations?: Json
+          created_at?: string
+          error?: string | null
+          id?: string
+          lex_verdict?: Json | null
+          no_answer?: boolean
+          question?: string
+          status?: string
+        }
+        Relationships: []
+      }
       market_report_feedback: {
         Row: {
           created_at: string
@@ -3542,6 +3584,8 @@ export type Database = {
         Row: {
           audio_mime_type: string | null
           audio_url: string | null
+          category: string | null
+          chapters: Json
           created_at: string
           created_by: string | null
           curator_note: string | null
@@ -3558,8 +3602,11 @@ export type Database = {
           id: string
           image_url: string | null
           ingestion_origin: string
+          key_takeaways: Json
           pending_action: string | null
           published_at: string | null
+          relevance_metadata: Json | null
+          relevance_score: number | null
           season: number | null
           slug: string
           source_id: string | null
@@ -3584,6 +3631,8 @@ export type Database = {
         Insert: {
           audio_mime_type?: string | null
           audio_url?: string | null
+          category?: string | null
+          chapters?: Json
           created_at?: string
           created_by?: string | null
           curator_note?: string | null
@@ -3600,8 +3649,11 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingestion_origin?: string
+          key_takeaways?: Json
           pending_action?: string | null
           published_at?: string | null
+          relevance_metadata?: Json | null
+          relevance_score?: number | null
           season?: number | null
           slug?: string
           source_id?: string | null
@@ -3626,6 +3678,8 @@ export type Database = {
         Update: {
           audio_mime_type?: string | null
           audio_url?: string | null
+          category?: string | null
+          chapters?: Json
           created_at?: string
           created_by?: string | null
           curator_note?: string | null
@@ -3642,8 +3696,11 @@ export type Database = {
           id?: string
           image_url?: string | null
           ingestion_origin?: string
+          key_takeaways?: Json
           pending_action?: string | null
           published_at?: string | null
+          relevance_metadata?: Json | null
+          relevance_score?: number | null
           season?: number | null
           slug?: string
           source_id?: string | null
@@ -4648,6 +4705,13 @@ export type Database = {
             foreignKeyName: "transcript_segments_episode_id_fkey"
             columns: ["episode_id"]
             isOneToOne: false
+            referencedRelation: "v_episode_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcript_segments_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
             referencedRelation: "v_episodes_awaiting_action"
             referencedColumns: ["id"]
           },
@@ -4916,6 +4980,26 @@ export type Database = {
           owner_name: string | null
           pipeline_stage: string | null
           tags: string[] | null
+        }
+        Relationships: []
+      }
+      v_episode_library: {
+        Row: {
+          audio_url: string | null
+          category: string | null
+          chapters: Json | null
+          duration_seconds: number | null
+          episode_summary: string | null
+          id: string | null
+          image_url: string | null
+          key_takeaways: Json | null
+          published_at: string | null
+          relevance_score: number | null
+          slug: string | null
+          source_name: string | null
+          title: string | null
+          topic_tags: string[] | null
+          youtube_url: string | null
         }
         Relationships: []
       }
