@@ -3,12 +3,15 @@ import { roger } from '../../agents/recorder/agent.js';
 import { lex, complianceVerdictSchema, type ComplianceVerdict } from '../../agents/compliance/index.js';
 import { stepRequestContext } from '../../config/model.js';
 import { createLogger } from '../../lib/logger.js';
-import { summaryDraftSchema } from './schemas.js';
+import { summaryDraftSchema, type Takeaway } from './schemas.js';
 import {
   buildSummaryPrompt,
   buildSummaryLexPrompt,
+  buildTimestampedTranscript,
   prepareTranscript,
+  snapToSegment,
   type SummaryEpisode,
+  type TimedSegment,
 } from './prompts.js';
 
 const log = createLogger('podcast-intel');
@@ -36,9 +39,23 @@ interface EpisodeRow {
   transcript_status: string;
 }
 
-/** roger narrates a short descriptive brief from the transcript. Returns '' on failure. */
-async function narrateSummary(episode: SummaryEpisode, transcriptText: string): Promise<string> {
-  const fallback = { summary: '' };
+interface Brief {
+  summary: string;
+  takeaways: Takeaway[];
+}
+
+/**
+ * roger narrates a short descriptive brief (summary + key takeaways) from the
+ * transcript. Each takeaway's model-proposed timestamp is snapped to a real
+ * segment start so deep-links point at moments that exist. Returns an empty brief
+ * on failure.
+ */
+async function narrateBrief(
+  episode: SummaryEpisode,
+  transcriptText: string,
+  segmentStarts: number[],
+): Promise<Brief> {
+  const fallback = { summary: '', takeaways: [] as Takeaway[] };
   const response = await roger.generate(
     [{ role: 'user', content: buildSummaryPrompt(episode, transcriptText) }],
     {
@@ -50,14 +67,21 @@ async function narrateSummary(episode: SummaryEpisode, transcriptText: string): 
       },
     },
   );
-  return summaryDraftSchema.parse(response.object ?? fallback).summary.trim();
+  const draft = summaryDraftSchema.parse(response.object ?? fallback);
+  return {
+    summary: draft.summary.trim(),
+    takeaways: draft.takeaways
+      .map((t) => ({ text: t.text.trim(), start_seconds: snapToSegment(t.start_seconds, segmentStarts) }))
+      .filter((t) => t.text.length > 0),
+  };
 }
 
-/** Lex reviews the proposed summary for advice risk. Never throws (fail-safe). */
-async function reviewSummary(episode: SummaryEpisode, summary: string): Promise<ComplianceVerdict> {
+/** Lex reviews the proposed brief (summary + takeaways) for advice risk. Never
+ *  throws (fail-safe). */
+async function reviewBrief(episode: SummaryEpisode, brief: Brief): Promise<ComplianceVerdict> {
   try {
     const response = await lex.generate(
-      [{ role: 'user', content: buildSummaryLexPrompt(episode, summary) }],
+      [{ role: 'user', content: buildSummaryLexPrompt(episode, brief.summary, brief.takeaways.map((t) => t.text)) }],
       {
         requestContext: stepRequestContext('podcast_intel.compliance_check'),
         structuredOutput: {
@@ -74,12 +98,13 @@ async function reviewSummary(episode: SummaryEpisode, summary: string): Promise<
 }
 
 /**
- * Episode intelligence pass (Phase 1: summary). Deterministic load → roger
- * narrates → Lex reviews → persist a `proposed` summary behind the publish-wall.
+ * Episode intelligence pass (Phase 2: summary + takeaways). Deterministic load →
+ * roger narrates a brief → Lex reviews → persist a `proposed` brief behind the
+ * publish-wall. Takeaways ride the same summary_status gate as the summary.
  *
  * There is no suspend/resume gate: nothing runs after approval (approval is a
  * plain DB flip via decideEpisodeBrief), so the pass runs straight through and
- * leaves the summary as `proposed`. A human approves it separately from the
+ * leaves the brief as `proposed`. A human approves it separately from the
  * episode page. Triggered on demand by podcastActionListener when the web app
  * writes pending_action = 'summarize'.
  */
@@ -101,20 +126,37 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     return;
   }
 
+  // Prefer timestamped segments so takeaways can anchor to real moments; fall
+  // back to the flat transcript when there are none (takeaways then have no
+  // timestamps to snap to and render without a deep-link).
+  const { data: segRows } = await db
+    .from('transcript_segments')
+    .select('start_seconds, speaker, content')
+    .eq('episode_id', episodeId)
+    .order('segment_index', { ascending: true });
+  const segments = (segRows ?? []) as TimedSegment[];
+  const segmentStarts = segments
+    .map((s) => s.start_seconds)
+    .filter((s): s is number => s != null);
+  const transcriptText = prepareTranscript(
+    segments.length > 0 ? buildTimestampedTranscript(segments) : ep.transcript_text,
+  );
+
   const episode: SummaryEpisode = { title: ep.title, description: ep.description };
-  const summary = await narrateSummary(episode, prepareTranscript(ep.transcript_text));
-  if (!summary) {
+  const brief = await narrateBrief(episode, transcriptText, segmentStarts);
+  if (!brief.summary) {
     log.error({ episodeId }, 'summary narration returned empty');
     return;
   }
 
-  const verdict = await reviewSummary(episode, summary);
+  const verdict = await reviewBrief(episode, brief);
 
   const now = new Date().toISOString();
   const { error: upErr } = await db
     .from('podcast_episodes')
     .update({
-      episode_summary: summary,
+      episode_summary: brief.summary,
+      key_takeaways: brief.takeaways,
       summary_status: 'proposed',
       summary_lex_verdict: verdict,
       summary_generated_at: now,
@@ -155,5 +197,5 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     log.error({ episodeId, error: actErr.message }, 'failed to log episode summary activity');
   }
 
-  log.info({ episodeId, passes: verdict.passes }, 'episode summary proposed');
+  log.info({ episodeId, passes: verdict.passes, takeaways: brief.takeaways.length }, 'episode brief proposed');
 }

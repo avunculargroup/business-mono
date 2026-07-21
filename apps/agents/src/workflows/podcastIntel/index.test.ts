@@ -51,8 +51,21 @@ beforeEach(() => {
   fakeSupabase.from.mockClear();
   fakeSupabase.__builders.length = 0;
   fakeSupabase.__responses.clear();
-  rogerGenerate.mockResolvedValue({ object: { summary: 'The host argued custody is a board decision.' } });
+  rogerGenerate.mockResolvedValue({
+    object: {
+      summary: 'The host argued custody is a board decision.',
+      // 88 snaps to the 90s segment start below.
+      takeaways: [{ text: 'Custody is a board decision.', start_seconds: 88 }],
+    },
+  });
   lexGenerate.mockResolvedValue({ object: PASS });
+  fakeSupabase.__setResponse('transcript_segments', {
+    data: [
+      { start_seconds: 0, speaker: 'HOST', content: 'Intro.' },
+      { start_seconds: 90, speaker: 'GUEST', content: 'Custody is a board decision.' },
+    ],
+    error: null,
+  });
   fakeSupabase.__setResponse('agent_activity', { data: null, error: null });
 });
 
@@ -71,6 +84,8 @@ describe('runEpisodeIntel', () => {
     const update = updateCallFor('podcast_episodes');
     expect(update).toMatchObject({
       episode_summary: 'The host argued custody is a board decision.',
+      // The proposed 88s snaps to the real 90s segment start.
+      key_takeaways: [{ text: 'Custody is a board decision.', start_seconds: 90 }],
       summary_status: 'proposed',
       summary_lex_verdict: PASS,
     });
@@ -110,6 +125,23 @@ describe('runEpisodeIntel', () => {
 
     expect(rogerGenerate).not.toHaveBeenCalled();
     expect(updateCallFor('podcast_episodes')).toBeUndefined();
+  });
+
+  it('nulls takeaway timestamps when the transcript has no segments to anchor to', async () => {
+    fakeSupabase.__setResponse('transcript_segments', { data: [], error: null });
+    rogerGenerate.mockResolvedValue({
+      object: { summary: 'A neutral brief.', takeaways: [{ text: 'A point.', start_seconds: 42 }] },
+    });
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null },
+      { data: null, error: null },
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    expect(updateCallFor('podcast_episodes')).toMatchObject({
+      key_takeaways: [{ text: 'A point.', start_seconds: null }],
+    });
   });
 
   it('fails safe (Lex pending) when the compliance call throws', async () => {

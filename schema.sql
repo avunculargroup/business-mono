@@ -2189,9 +2189,12 @@ CREATE TABLE podcast_episodes (
   -- Web-requested re-run / intelligence action; claimed atomically by
   -- podcastActionListener (see 20260607000000 + 20260716010000).
   pending_action        TEXT CHECK (pending_action IN ('refetch','deepgram','retry','summarize')),
-  -- Episode intelligence (Phase 1: summary). The draft lives in episode_summary;
-  -- summary_status gates client visibility (publish-wall). See 20260716010000.
+  -- Episode intelligence (Phase 1: summary; Phase 2: takeaways). The drafts live
+  -- on the row; summary_status gates client visibility (publish-wall) for both.
+  -- See 20260716010000 (summary) and 20260721000000 (takeaways).
   episode_summary       TEXT,
+  -- [{ "text": string, "start_seconds": number | null }] — always an array.
+  key_takeaways         JSONB NOT NULL DEFAULT '[]'::jsonb,
   summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','proposed','approved')),
   summary_lex_verdict   JSONB,
   summary_generated_at  TIMESTAMPTZ,

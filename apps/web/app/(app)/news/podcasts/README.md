@@ -296,9 +296,13 @@ preserved newlines read as paragraph breaks. Muted, relaxed line height.
 ### Episode brief (intelligence pass)
 
 Between the description and the transcript sits the **episode brief** — a short,
-agent-written summary a reader can skim instead of the full transcript. This is
-Phase 1 of the "episode intelligence" build (`docs/reviews/podcast-pages-review`
-P0-1): summary only, behind a **publish-wall**. It renders by `summary_status`:
+agent-written summary plus **key takeaways** a reader can skim instead of the full
+transcript. Summary is Phase 1 (`docs/reviews/podcast-pages-review` P0-1);
+takeaways are Phase 2 (P1-5) — 4–7 short points, each anchored to a
+`start_seconds` so it deep-links into the media at the moment it's discussed
+(rendered under the summary; untimed takeaways render without a link). Takeaways
+ride the **same** `summary_status` publish-wall and the **same** Lex review as the
+summary — one gate, not two. The brief renders by `summary_status`:
 
 - **`none`** (transcript `available`) → a **"Generate brief"** button.
   `generateEpisodeBrief` writes `pending_action = 'summarize'`; the agents

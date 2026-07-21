@@ -68,6 +68,15 @@ export interface SummaryComplianceVerdict {
   suggested_rewrite: string | null;
 }
 
+// One key takeaway from an episode (episode intelligence, Phase 2). Anchored to
+// the moment it is discussed so the episode page can deep-link into the media;
+// start_seconds is null when the transcript carried no timestamps. Rides the same
+// summary_status publish-wall as the summary — client-visible only once approved.
+export interface EpisodeTakeaway {
+  text: string;
+  start_seconds: number | null;
+}
+
 // One ingested episode. Mirrors the podcast_episodes table (embedding columns
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
@@ -100,9 +109,11 @@ export interface PodcastEpisode {
   topic_tags: string[];
   transcript_fetched_at: string | null;
   embedded_at: string | null;
-  // Episode intelligence (Phase 1: summary). The draft lives in episode_summary
-  // the whole time; summary_status gates whether it is client-visible.
+  // Episode intelligence (summary — Phase 1; takeaways — Phase 2). The drafts
+  // live on the row the whole time; summary_status gates whether they are
+  // client-visible. key_takeaways is always an array (defaults to [] in the DB).
   episode_summary: string | null;
+  key_takeaways: EpisodeTakeaway[];
   summary_status: SummaryStatus;
   summary_lex_verdict: SummaryComplianceVerdict | null;
   summary_generated_at: string | null;

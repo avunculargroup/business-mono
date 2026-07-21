@@ -20,7 +20,7 @@ import {
   TRANSCRIPT_SOURCE_LABELS,
 } from '@/lib/podcasts';
 import { requestEpisodeAction, generateEpisodeBrief, decideEpisodeBrief } from '@/app/actions/podcasts';
-import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
+import type { EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 import styles from './detail.module.css';
 
 interface Props {
@@ -58,6 +58,8 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
   const videoId = extractVideoId(episode.youtube_url);
   const description = htmlToText(episode.description);
   const hasTimestamps = episode.has_timestamps && segments.some((s) => s.start_seconds != null);
+  // A takeaway timestamp can only deep-link when there's media to seek.
+  const canSeek = Boolean(videoId || episode.audio_url);
 
   const transcriptTexts = useMemo(
     () =>
@@ -245,6 +247,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
             <h2 className={styles.sectionTitle}>Episode brief</h2>
           </div>
           <p className={styles.briefText}>{episode.episode_summary}</p>
+          <Takeaways takeaways={episode.key_takeaways} onSeek={seekTo} canSeek={canSeek} />
         </section>
       ) : episode.summary_status === 'proposed' ? (
         <section className={`${styles.brief} ${styles.briefDraft}`}>
@@ -253,6 +256,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
             <span className={styles.briefBadge}>Draft · team only</span>
           </div>
           <p className={styles.briefText}>{episode.episode_summary}</p>
+          <Takeaways takeaways={episode.key_takeaways} onSeek={seekTo} canSeek={canSeek} />
           {verdict && (
             <div className={`${styles.verdict} ${verdict.passes ? styles.verdictPass : styles.verdictFlag}`}>
               <span className={styles.verdictLabel}>
@@ -503,6 +507,43 @@ function Highlighted({ text, query }: { text: string; query: string }) {
           <span key={i}>{p.text}</span>
         ),
       )}
+    </>
+  );
+}
+
+// Key takeaways for an episode brief. Each is a short point, optionally
+// deep-linked to the moment it's discussed (when the transcript had timestamps
+// and there's media to seek). Renders nothing when there are no takeaways.
+function Takeaways({
+  takeaways,
+  onSeek,
+  canSeek,
+}: {
+  takeaways: EpisodeTakeaway[];
+  onSeek: (seconds: number | null) => void;
+  canSeek: boolean;
+}) {
+  if (takeaways.length === 0) return null;
+  return (
+    <>
+      <p className={styles.takeawaysTitle}>Key takeaways</p>
+      <ul className={styles.takeaways}>
+        {takeaways.map((t, i) => (
+          <li key={i} className={styles.takeaway}>
+            {t.start_seconds != null && (
+              <button
+                type="button"
+                className={styles.takeawayStamp}
+                onClick={() => onSeek(t.start_seconds)}
+                disabled={!canSeek}
+              >
+                {formatTimestamp(t.start_seconds)}
+              </button>
+            )}
+            <span>{t.text}</span>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   prepareTranscript,
+  buildTimestampedTranscript,
+  snapToSegment,
   buildSummaryPrompt,
   buildSummaryLexPrompt,
   MAX_TRANSCRIPT_CHARS,
@@ -24,6 +26,39 @@ describe('prepareTranscript', () => {
   });
 });
 
+describe('buildTimestampedTranscript', () => {
+  it('prefixes each timestamped segment with a [Ns] marker and speaker', () => {
+    const out = buildTimestampedTranscript([
+      { start_seconds: 12.8, speaker: 'HOST', content: 'Welcome.' },
+      { start_seconds: 90, speaker: null, content: 'Custody matters.' },
+    ]);
+    expect(out).toBe('[12s] HOST: Welcome.\n\n[90s] Custody matters.');
+  });
+
+  it('omits the marker when a segment has no start', () => {
+    const out = buildTimestampedTranscript([{ start_seconds: null, speaker: null, content: 'No stamp.' }]);
+    expect(out).toBe('No stamp.');
+  });
+});
+
+describe('snapToSegment', () => {
+  const starts = [0, 30, 90, 150];
+
+  it('snaps a proposed second to the nearest real segment start', () => {
+    expect(snapToSegment(88, starts)).toBe(90);
+    expect(snapToSegment(20, starts)).toBe(30);
+    expect(snapToSegment(0, starts)).toBe(0);
+  });
+
+  it('returns null when there is nothing to snap to', () => {
+    expect(snapToSegment(42, [])).toBeNull();
+  });
+
+  it('returns null when there is no proposal', () => {
+    expect(snapToSegment(null, starts)).toBeNull();
+  });
+});
+
 describe('buildSummaryPrompt', () => {
   const episode = { title: 'Custody in 2026', description: 'A chat about cold storage.' };
 
@@ -39,6 +74,13 @@ describe('buildSummaryPrompt', () => {
     expect(p).not.toContain('SHOW NOTES:');
   });
 
+  it('asks for takeaways anchored to timestamp markers', () => {
+    const p = buildSummaryPrompt(episode, 'body');
+    expect(p).toMatch(/takeaways/i);
+    expect(p).toMatch(/start_seconds/);
+    expect(p).toContain('[<seconds>s]');
+  });
+
   it('instructs descriptive, non-advice framing', () => {
     const p = buildSummaryPrompt(episode, 'body');
     expect(p).toMatch(/describe, never advise/i);
@@ -47,10 +89,18 @@ describe('buildSummaryPrompt', () => {
 });
 
 describe('buildSummaryLexPrompt', () => {
-  it('carries the episode title and summary for review', () => {
-    const p = buildSummaryLexPrompt({ title: 'Ep 1', description: null }, 'The host argued X.');
+  it('carries the episode title, summary, and takeaways for review', () => {
+    const p = buildSummaryLexPrompt({ title: 'Ep 1', description: null }, 'The host argued X.', [
+      'Custody is a board decision.',
+    ]);
     expect(p).toContain('Ep 1');
     expect(p).toContain('The host argued X.');
+    expect(p).toContain('Custody is a board decision.');
     expect(p).toMatch(/advice risk/i);
+  });
+
+  it('omits the takeaways block when there are none', () => {
+    const p = buildSummaryLexPrompt({ title: 'Ep 1', description: null }, 'The host argued X.', []);
+    expect(p).not.toContain('TAKEAWAYS:');
   });
 });

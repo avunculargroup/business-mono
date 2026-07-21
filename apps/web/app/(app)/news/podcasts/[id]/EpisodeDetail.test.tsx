@@ -61,6 +61,7 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
     transcript_fetched_at: null,
     embedded_at: null,
     episode_summary: null,
+    key_takeaways: [],
     summary_status: 'none',
     summary_lex_verdict: null,
     summary_generated_at: null,
@@ -312,6 +313,47 @@ describe('EpisodeDetail', () => {
       expect(screen.getByText('A concise, published brief.')).toBeInTheDocument();
       expect(screen.queryByText('Draft · team only')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Approve and publish' })).not.toBeInTheDocument();
+    });
+
+    it('renders key takeaways, deep-linking timestamped ones to the media', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            key_takeaways: [
+              { text: 'Custody is a board decision.', start_seconds: 90 },
+              { text: 'A point with no timestamp.', start_seconds: null },
+            ],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Key takeaways')).toBeInTheDocument();
+      expect(screen.getByText('Custody is a board decision.')).toBeInTheDocument();
+      // Timestamped takeaway renders a seek button; the untimed one does not.
+      expect(screen.getByRole('button', { name: '1:30' })).toBeInTheDocument();
+      expect(screen.getByText('A point with no timestamp.')).toBeInTheDocument();
+    });
+
+    it('shows no takeaways block when there are none', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            key_takeaways: [],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.queryByText('Key takeaways')).not.toBeInTheDocument();
     });
   });
 });

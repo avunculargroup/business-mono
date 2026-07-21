@@ -1,0 +1,24 @@
+-- ============================================================
+-- Podcast episodes — episode intelligence (Phase 2: takeaways)
+-- ============================================================
+-- Extends the episode-intelligence pass (podcast-pages-review P1-5) from
+-- summary-only to summary + key takeaways. Each takeaway is a short,
+-- treasury-relevant point anchored to a `start_seconds` so the episode page can
+-- deep-link it into the audio/video at the exact moment it is discussed.
+--
+-- Takeaways are client-visible prose, so they ride the SAME publish-wall as the
+-- summary (summary_status) — they are generated together as 'proposed' and only
+-- become client-visible once a human approves the brief. No new status column.
+--
+-- roger (Recorder) narrates them alongside the summary; lex reviews the whole
+-- brief (summary + takeaways) for AFSL/AR advice risk in one pass.
+--
+-- See docs/reviews/podcast-pages-review §B1 "Next slice" and
+-- apps/agents/src/workflows/podcastIntel/.
+-- ============================================================
+
+-- [{ "text": string, "start_seconds": number | null }]. Non-null and defaulted
+-- so the read surface is always an array — never null — even for episodes that
+-- pre-date this pass. start_seconds is null when the transcript had no
+-- timestamps to anchor to.
+ALTER TABLE podcast_episodes ADD COLUMN IF NOT EXISTS key_takeaways JSONB NOT NULL DEFAULT '[]'::jsonb;
