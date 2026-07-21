@@ -136,7 +136,7 @@ describe('EpisodeDetail', () => {
     expect(container.querySelector('audio')).not.toBeNull();
   });
 
-  it('renders the episode description when present', () => {
+  it('collapses the show notes by default and reveals them on toggle', () => {
     render(
       <EpisodeDetail
         episode={makeEpisode({ description: 'A calm look at treasury strategy.' })}
@@ -145,6 +145,13 @@ describe('EpisodeDetail', () => {
       />,
     );
 
+    // Collapsed by default: the toggle is present but the text is not.
+    const toggle = screen.getByRole('button', { name: 'Show notes' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('A calm look at treasury strategy.')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('A calm look at treasury strategy.')).toBeInTheDocument();
   });
 
@@ -159,8 +166,29 @@ describe('EpisodeDetail', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Show notes' }));
     expect(screen.getByText('A calm look at treasury strategy. More')).toBeInTheDocument();
     expect(screen.queryByText(/<p>|<strong>/)).not.toBeInTheDocument();
+  });
+
+  it('offers fetch/transcribe actions when no transcript is available', () => {
+    render(<EpisodeDetail episode={makeEpisode({ transcript_status: 'skipped' })} segments={[]} sourceName={null} />);
+
+    expect(screen.getByRole('button', { name: 'Fetch transcript' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Transcribe with Deepgram' })).toBeInTheDocument();
+  });
+
+  it('hides fetch/transcribe actions once a transcript is available', () => {
+    render(
+      <EpisodeDetail
+        episode={makeEpisode({ transcript_status: 'available' })}
+        segments={[makeSegment()]}
+        sourceName={null}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Fetch transcript' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Transcribe with Deepgram' })).not.toBeInTheDocument();
   });
 
   it('does not show a transcript toggle when the transcript fits', () => {
