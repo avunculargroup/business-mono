@@ -49,14 +49,21 @@ export type IngestionOrigin = (typeof IngestionOrigin)[keyof typeof IngestionOri
 
 // Lifecycle of an episode's synthesised brief (episode intelligence, Phase 1).
 // The draft text lives in episode_summary throughout; this status is the
-// publish-wall: only 'approved' is client-visible.
-//   none → proposed        (roger drafts, lex reviews — director-only)
-//   proposed → approved     (a human approves at the wall)
-//   proposed → none         (a human rejects; draft is cleared)
+// publish-wall: only 'approved' is client-visible. 'generating' and 'failed' are
+// the durable in-flight/failure signals — the pass runs on the agent server
+// async, so the web page reads these to survive a reload instead of reverting to
+// the bare "Generate brief" button.
+//   none → generating       (director clicks Generate; web writes the request)
+//   generating → proposed    (roger drafts, lex reviews — director-only)
+//   generating → failed      (the pass could not produce a brief; retry allowed)
+//   proposed → approved      (a human approves at the wall)
+//   proposed → none          (a human rejects; draft is cleared)
 export const SummaryStatus = {
-  NONE:     'none',
-  PROPOSED: 'proposed',
-  APPROVED: 'approved',
+  NONE:       'none',
+  GENERATING: 'generating',
+  PROPOSED:   'proposed',
+  APPROVED:   'approved',
+  FAILED:     'failed',
 } as const;
 export type SummaryStatus = (typeof SummaryStatus)[keyof typeof SummaryStatus];
 

@@ -46,6 +46,19 @@ interface Brief {
   chapters: Chapter[];
 }
 
+// The web sets summary_status = 'generating' when the pass is requested; every
+// terminal path here must resolve it (to 'proposed' on success, 'failed' on any
+// failure) so the episode page never stays stuck on "generating…". Best-effort:
+// if even this write fails the row is already in trouble, and there is nothing
+// more to do but log it.
+async function markSummaryFailed(episodeId: string): Promise<void> {
+  const { error } = await db
+    .from('podcast_episodes')
+    .update({ summary_status: 'failed' })
+    .eq('id', episodeId);
+  if (error) log.error({ episodeId, error: error.message }, 'failed to mark summary failed');
+}
+
 /**
  * roger narrates a short descriptive brief (summary + key takeaways) from the
  * transcript. Each takeaway's model-proposed timestamp is snapped to a real
@@ -128,9 +141,13 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
   }
   const ep = data as EpisodeRow;
 
-  // Can only summarise an episode that has a stored transcript.
+  // Can only summarise an episode that has a stored transcript. The web only
+  // offers "Generate brief" once the transcript is available, so this is a
+  // defensive guard — but the request already flipped the row to 'generating',
+  // so resolve it to 'failed' rather than leaving it stuck.
   if (ep.transcript_status !== 'available' || !ep.transcript_text?.trim()) {
     log.warn({ episodeId, status: ep.transcript_status }, 'no transcript to summarise');
+    await markSummaryFailed(episodeId);
     return;
   }
 
@@ -151,9 +168,21 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
   );
 
   const episode: SummaryEpisode = { title: ep.title, description: ep.description };
-  const brief = await narrateBrief(episode, transcriptText, segmentStarts);
+  // roger.generate falls back to an empty brief on a schema miss, but can still
+  // throw on a transport/model error — catch it so a failed run resolves the
+  // 'generating' state instead of leaving it stuck (the listener's outer catch
+  // would not know to).
+  let brief: Brief;
+  try {
+    brief = await narrateBrief(episode, transcriptText, segmentStarts);
+  } catch (err) {
+    log.error({ err, episodeId }, 'summary narration threw');
+    await markSummaryFailed(episodeId);
+    return;
+  }
   if (!brief.summary) {
     log.error({ episodeId }, 'summary narration returned empty');
+    await markSummaryFailed(episodeId);
     return;
   }
 
@@ -192,6 +221,7 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     .eq('id', episodeId);
   if (upErr) {
     log.error({ episodeId, error: upErr.message }, 'failed to persist summary');
+    await markSummaryFailed(episodeId);
     return;
   }
 

@@ -293,9 +293,21 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
             </Button>
           </div>
         </section>
-      ) : requested ? (
+      ) : episode.summary_status === 'generating' || requested ? (
         <section className={styles.brief}>
           <p className={styles.stateNote}>Generating the brief — it appears here once it is ready.</p>
+        </section>
+      ) : episode.summary_status === 'failed' ? (
+        <section className={styles.brief}>
+          <div className={styles.briefHead}>
+            <h2 className={styles.sectionTitle}>Episode brief</h2>
+          </div>
+          <p className={styles.stateNote}>Brief generation did not complete. Try again.</p>
+          <div className={styles.briefActions}>
+            <Button size="sm" loading={briefPending} onClick={generateBrief}>
+              Try again
+            </Button>
+          </div>
         </section>
       ) : episode.transcript_status === 'available' ? (
         <section className={styles.brief}>

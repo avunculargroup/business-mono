@@ -2197,7 +2197,9 @@ CREATE TABLE podcast_episodes (
   key_takeaways         JSONB NOT NULL DEFAULT '[]'::jsonb,
   -- [{ "title": string, "start_seconds": number }] chronological — chapter rail. See 20260721020000.
   chapters              JSONB NOT NULL DEFAULT '[]'::jsonb,
-  summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','proposed','approved')),
+  -- 'generating'/'failed' are the durable in-flight/failure signals (async pass on
+  -- the agent server); see 20260721050000.
+  summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','generating','proposed','approved','failed')),
   summary_lex_verdict   JSONB,
   summary_generated_at  TIMESTAMPTZ,
   summary_approved_at   TIMESTAMPTZ,
