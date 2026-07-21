@@ -151,7 +151,7 @@ describe('runEpisodeIntel', () => {
     expect(lexRow?.proposed_actions).toEqual([{ kind: 'suggested_rewrite', body: FLAG.suggested_rewrite }]);
   });
 
-  it('does nothing when the episode has no available transcript', async () => {
+  it('marks the summary failed when the episode has no available transcript', async () => {
     fakeSupabase.__setResponse('podcast_episodes', {
       data: availableEpisode({ transcript_status: 'skipped', transcript_text: null }),
       error: null,
@@ -160,7 +160,33 @@ describe('runEpisodeIntel', () => {
     await runEpisodeIntel('ep-1');
 
     expect(rogerGenerate).not.toHaveBeenCalled();
-    expect(updateCallFor('podcast_episodes')).toBeUndefined();
+    // The request already flipped the row to 'generating'; resolve it, don't strand it.
+    expect(updateCallFor('podcast_episodes')).toEqual({ summary_status: 'failed' });
+  });
+
+  it('marks the summary failed when narration returns empty', async () => {
+    rogerGenerate.mockResolvedValue({ object: { summary: '', takeaways: [], chapters: [] } });
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null }, // select
+      { data: null, error: null }, // markSummaryFailed update
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    expect(lexGenerate).not.toHaveBeenCalled();
+    expect(updateCallFor('podcast_episodes')).toEqual({ summary_status: 'failed' });
+  });
+
+  it('marks the summary failed when narration throws', async () => {
+    rogerGenerate.mockRejectedValue(new Error('model down'));
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null }, // select
+      { data: null, error: null }, // markSummaryFailed update
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    expect(updateCallFor('podcast_episodes')).toEqual({ summary_status: 'failed' });
   });
 
   it('persists null relevance when scoring fails, without blocking the summary', async () => {

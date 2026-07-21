@@ -266,6 +266,34 @@ describe('EpisodeDetail', () => {
       expect(generateEpisodeBrief).toHaveBeenCalledWith('ep-1');
     });
 
+    it('shows a durable generating state while the pass runs', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available', summary_status: 'generating' })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText(/Generating the brief/)).toBeInTheDocument();
+      // The bare "Generate brief" button must not reappear over an in-flight run.
+      expect(screen.queryByRole('button', { name: 'Generate brief' })).not.toBeInTheDocument();
+    });
+
+    it('surfaces a failed generation with a retry instead of reverting silently', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available', summary_status: 'failed' })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Brief generation did not complete. Try again.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(generateEpisodeBrief).toHaveBeenCalledWith('ep-1');
+    });
+
     it('does not offer a brief action when there is no transcript yet', () => {
       render(<EpisodeDetail episode={makeEpisode({ transcript_status: 'skipped' })} segments={[]} sourceName={null} />);
 

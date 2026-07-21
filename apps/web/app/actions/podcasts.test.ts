@@ -28,7 +28,7 @@ describe('generateEpisodeBrief', () => {
     const result = await generateEpisodeBrief('ep-1');
 
     expect(result).toEqual({ success: true });
-    expect(updateCall()).toEqual({ pending_action: 'summarize' });
+    expect(updateCall()).toEqual({ pending_action: 'summarize', summary_status: 'generating' });
     expect(revalidatePath).toHaveBeenCalledWith('/news/podcasts/ep-1');
   });
 

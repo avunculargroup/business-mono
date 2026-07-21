@@ -103,13 +103,19 @@ export async function setDeepgramTranscription(id: string, enabled: boolean) {
 // the agents server's podcastActionListener claims it and runs roger → Lex →
 // persist a `proposed` summary (the web app can't reach the agent server over
 // HTTP). Also (re)generates when a proposed draft is rejected or revised.
+//
+// summary_status is flipped to 'generating' in the SAME write so the "generating…"
+// state is durable — it survives a reload/navigation (unlike client-local state)
+// and covers the whole window until the agent writes 'proposed' or 'failed'. If
+// the agent server is down, the row self-heals via reconcilePendingActions on
+// reconnect.
 export async function generateEpisodeBrief(id: string) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
   const { error } = await supabase
     .from('podcast_episodes')
-    .update({ pending_action: 'summarize' })
+    .update({ pending_action: 'summarize', summary_status: 'generating' })
     .eq('id', id);
 
   if (error) return { error: humanizeError(error) };
