@@ -146,6 +146,8 @@ export async function decideEpisodeBrief(id: string, decision: 'approve' | 'reje
       : {
           summary_status: 'none',
           episode_summary: null,
+          key_takeaways: [],
+          chapters: [],
           summary_lex_verdict: null,
           summary_generated_at: null,
           summary_approved_at: null,

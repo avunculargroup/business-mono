@@ -5,6 +5,7 @@ import type { ComplianceVerdict } from '../../agents/compliance/index.js';
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const rogerGenerate = vi.fn();
 const lexGenerate = vi.fn();
+const scoreEpisodeRelevance = vi.fn();
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../../agents/recorder/agent.js', () => ({ roger: { generate: rogerGenerate } }));
@@ -12,6 +13,16 @@ vi.mock('../../agents/compliance/index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../agents/compliance/index.js')>();
   return { ...actual, lex: { generate: lexGenerate } };
 });
+vi.mock('../podcastRubric.js', () => ({ scoreEpisodeRelevance }));
+
+const SCORE = {
+  relevanceScore: 0.78,
+  dimensionScores: { material: 0.8, novelty: 0.7, citation: 0.8 },
+  category: 'macro',
+  relevanceReasoning: 'Material macro thesis, familiar framing.',
+  flags: [],
+  rubricVersion: 'podcast-v1',
+};
 
 const { runEpisodeIntel } = await import('./index.js');
 
@@ -48,11 +59,32 @@ function activityInserts(): Record<string, unknown>[] {
 beforeEach(() => {
   rogerGenerate.mockReset();
   lexGenerate.mockReset();
+  scoreEpisodeRelevance.mockReset();
+  scoreEpisodeRelevance.mockResolvedValue(SCORE);
   fakeSupabase.from.mockClear();
   fakeSupabase.__builders.length = 0;
   fakeSupabase.__responses.clear();
-  rogerGenerate.mockResolvedValue({ object: { summary: 'The host argued custody is a board decision.' } });
+  rogerGenerate.mockResolvedValue({
+    object: {
+      summary: 'The host argued custody is a board decision.',
+      // 88 snaps to the 90s segment start below.
+      takeaways: [{ text: 'Custody is a board decision.', start_seconds: 88 }],
+      // Out of order + one anchorless: expect snapped, sorted, and the null dropped.
+      chapters: [
+        { title: 'Custody', start_seconds: 88 },
+        { title: 'Intro', start_seconds: 1 },
+        { title: 'No anchor', start_seconds: null },
+      ],
+    },
+  });
   lexGenerate.mockResolvedValue({ object: PASS });
+  fakeSupabase.__setResponse('transcript_segments', {
+    data: [
+      { start_seconds: 0, speaker: 'HOST', content: 'Intro.' },
+      { start_seconds: 90, speaker: 'GUEST', content: 'Custody is a board decision.' },
+    ],
+    error: null,
+  });
   fakeSupabase.__setResponse('agent_activity', { data: null, error: null });
 });
 
@@ -71,10 +103,29 @@ describe('runEpisodeIntel', () => {
     const update = updateCallFor('podcast_episodes');
     expect(update).toMatchObject({
       episode_summary: 'The host argued custody is a board decision.',
+      // The proposed 88s snaps to the real 90s segment start.
+      key_takeaways: [{ text: 'Custody is a board decision.', start_seconds: 90 }],
+      // Chapters snapped (1→0, 88→90), sorted chronologically, anchorless dropped.
+      chapters: [
+        { title: 'Intro', start_seconds: 0 },
+        { title: 'Custody', start_seconds: 90 },
+      ],
       summary_status: 'proposed',
       summary_lex_verdict: PASS,
+      relevance_score: 0.78,
+      category: 'macro',
+      relevance_metadata: {
+        dimension_scores: { material: 0.8, novelty: 0.7, citation: 0.8 },
+        rubric_version: 'podcast-v1',
+      },
     });
     expect(update?.summary_generated_at).toEqual(expect.any(String));
+    // Relevance is scored from the brief (summary + takeaway texts), not the transcript.
+    expect(scoreEpisodeRelevance).toHaveBeenCalledWith({
+      title: 'Custody in 2026',
+      summary: 'The host argued custody is a board decision.',
+      takeaways: ['Custody is a board decision.'],
+    });
 
     const inserts = activityInserts();
     expect(inserts).toEqual([
@@ -110,6 +161,40 @@ describe('runEpisodeIntel', () => {
 
     expect(rogerGenerate).not.toHaveBeenCalled();
     expect(updateCallFor('podcast_episodes')).toBeUndefined();
+  });
+
+  it('persists null relevance when scoring fails, without blocking the summary', async () => {
+    scoreEpisodeRelevance.mockResolvedValue(null);
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null },
+      { data: null, error: null },
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    expect(updateCallFor('podcast_episodes')).toMatchObject({
+      summary_status: 'proposed',
+      relevance_score: null,
+      category: null,
+      relevance_metadata: null,
+    });
+  });
+
+  it('nulls takeaway timestamps when the transcript has no segments to anchor to', async () => {
+    fakeSupabase.__setResponse('transcript_segments', { data: [], error: null });
+    rogerGenerate.mockResolvedValue({
+      object: { summary: 'A neutral brief.', takeaways: [{ text: 'A point.', start_seconds: 42 }] },
+    });
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null },
+      { data: null, error: null },
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    expect(updateCallFor('podcast_episodes')).toMatchObject({
+      key_takeaways: [{ text: 'A point.', start_seconds: null }],
+    });
   });
 
   it('fails safe (Lex pending) when the compliance call throws', async () => {

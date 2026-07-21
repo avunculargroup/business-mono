@@ -61,7 +61,7 @@ describe('decideEpisodeBrief', () => {
     const result = await decideEpisodeBrief('ep-1', 'reject');
 
     expect(result).toEqual({ success: true });
-    expect(updateCall()).toMatchObject({ summary_status: 'none', episode_summary: null, summary_lex_verdict: null });
+    expect(updateCall()).toMatchObject({ summary_status: 'none', episode_summary: null, key_takeaways: [], summary_lex_verdict: null });
   });
 
   it('refuses to decide when there is no proposed draft', async () => {

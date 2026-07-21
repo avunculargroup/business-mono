@@ -61,11 +61,16 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
     transcript_fetched_at: null,
     embedded_at: null,
     episode_summary: null,
+    key_takeaways: [],
+    chapters: [],
     summary_status: 'none',
     summary_lex_verdict: null,
     summary_generated_at: null,
     summary_approved_at: null,
     summary_approved_by: null,
+    relevance_score: null,
+    category: null,
+    relevance_metadata: null,
     created_by: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -312,6 +317,91 @@ describe('EpisodeDetail', () => {
       expect(screen.getByText('A concise, published brief.')).toBeInTheDocument();
       expect(screen.queryByText('Draft · team only')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Approve and publish' })).not.toBeInTheDocument();
+    });
+
+    it('renders key takeaways, deep-linking timestamped ones to the media', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            key_takeaways: [
+              { text: 'Custody is a board decision.', start_seconds: 90 },
+              { text: 'A point with no timestamp.', start_seconds: null },
+            ],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Key takeaways')).toBeInTheDocument();
+      expect(screen.getByText('Custody is a board decision.')).toBeInTheDocument();
+      // Timestamped takeaway renders a seek button; the untimed one does not.
+      expect(screen.getByRole('button', { name: '1:30' })).toBeInTheDocument();
+      expect(screen.getByText('A point with no timestamp.')).toBeInTheDocument();
+    });
+
+    it('renders a chapter rail that deep-links into the media', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            chapters: [
+              { title: 'Introduction', start_seconds: 0 },
+              { title: 'Custody', start_seconds: 90 },
+            ],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Chapters')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Custody/ })).toBeInTheDocument();
+      expect(screen.getByText('Introduction')).toBeInTheDocument();
+    });
+
+    it('shows category and relevance in provenance when scored', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available', category: 'macro', relevance_score: 0.82 })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.getByText('Category')).toBeInTheDocument();
+      expect(screen.getByText('Macro')).toBeInTheDocument();
+      expect(screen.getByText('Relevance')).toBeInTheDocument();
+      expect(screen.getByText('0.82')).toBeInTheDocument();
+    });
+
+    it('omits category and relevance from provenance when unscored', () => {
+      render(<EpisodeDetail episode={makeEpisode({ transcript_status: 'available' })} segments={[makeSegment()]} sourceName={null} />);
+
+      expect(screen.queryByText('Category')).not.toBeInTheDocument();
+      expect(screen.queryByText('Relevance')).not.toBeInTheDocument();
+    });
+
+    it('shows no takeaways block when there are none', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({
+            transcript_status: 'available',
+            summary_status: 'approved',
+            episode_summary: 'A concise, published brief.',
+            key_takeaways: [],
+          })}
+          segments={[makeSegment()]}
+          sourceName={null}
+        />,
+      );
+
+      expect(screen.queryByText('Key takeaways')).not.toBeInTheDocument();
     });
   });
 });

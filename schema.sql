@@ -2189,14 +2189,24 @@ CREATE TABLE podcast_episodes (
   -- Web-requested re-run / intelligence action; claimed atomically by
   -- podcastActionListener (see 20260607000000 + 20260716010000).
   pending_action        TEXT CHECK (pending_action IN ('refetch','deepgram','retry','summarize')),
-  -- Episode intelligence (Phase 1: summary). The draft lives in episode_summary;
-  -- summary_status gates client visibility (publish-wall). See 20260716010000.
+  -- Episode intelligence (Phase 1: summary; Phase 2: takeaways). The drafts live
+  -- on the row; summary_status gates client visibility (publish-wall) for both.
+  -- See 20260716010000 (summary) and 20260721000000 (takeaways).
   episode_summary       TEXT,
+  -- [{ "text": string, "start_seconds": number | null }] — always an array.
+  key_takeaways         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- [{ "title": string, "start_seconds": number }] chronological — chapter rail. See 20260721020000.
+  chapters              JSONB NOT NULL DEFAULT '[]'::jsonb,
   summary_status        TEXT NOT NULL DEFAULT 'none' CHECK (summary_status IN ('none','proposed','approved')),
   summary_lex_verdict   JSONB,
   summary_generated_at  TIMESTAMPTZ,
   summary_approved_at   TIMESTAMPTZ,
   summary_approved_by   UUID REFERENCES team_members(id),
+  -- Episode relevance (podcast-tuned fork of Rex's news rubric, scored from the
+  -- brief). Director/ops metadata — not gated by summary_status. See 20260721010000.
+  relevance_score       NUMERIC(3,2),
+  category              TEXT CHECK (category IS NULL OR category IN ('regulatory','corporate','macro','international')),
+  relevance_metadata    JSONB,  -- dimension scores, flags, reasoning, rubric_version
   fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
   created_by            UUID REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2222,8 +2232,10 @@ CREATE TABLE transcript_segments (
 );
 -- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops).
 
--- Views: v_podcast_ingestion_status (health dashboard) and
--- v_episodes_awaiting_action (stuck/errored episodes for Simon).
+-- Views: v_podcast_ingestion_status (health dashboard),
+-- v_episodes_awaiting_action (stuck/errored episodes for Simon), and
+-- v_episode_library (client-safe reader view — approved episodes + safe fields
+-- only; the Q1/D2 boundary, migration 20260721040000).
 -- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
 -- filter_days) — cosine search returning one row per matching segment, joined to
 -- episode + source for title/provenance/timestamp.

@@ -4,6 +4,8 @@
 // See docs/podcast-ingestion-spec.md. Episodes live in podcast_episodes;
 // embedded transcript chunks live in transcript_segments.
 
+import type { NewsCategory } from './news.js';
+
 // Lifecycle of an episode's transcript:
 //   pending → resolving → available            (feed tag or YouTube hit)
 //   pending → resolving → transcribing → available   (Deepgram, resolved by webhook)
@@ -68,6 +70,35 @@ export interface SummaryComplianceVerdict {
   suggested_rewrite: string | null;
 }
 
+// One key takeaway from an episode (episode intelligence, Phase 2). Anchored to
+// the moment it is discussed so the episode page can deep-link into the media;
+// start_seconds is null when the transcript carried no timestamps. Rides the same
+// summary_status publish-wall as the summary — client-visible only once approved.
+export interface EpisodeTakeaway {
+  text: string;
+  start_seconds: number | null;
+}
+
+// One chapter of an episode (episode intelligence, Phase 3): a short section
+// title and the second it begins, so the episode page can offer a chapter rail
+// that jumps into the media. start_seconds is always set — anchorless chapters
+// are dropped at generation. Rides the same summary_status publish-wall.
+export interface EpisodeChapter {
+  title: string;
+  start_seconds: number;
+}
+
+// Rex's rubric working: the three dimension scores, the derived flags, the candid
+// internal reasoning, and the rubric version. Stored on the episode (mirrors
+// news_items.rex_metadata) so the director can see how a relevance_score was
+// reached. Not client-facing.
+export interface EpisodeRelevanceMetadata {
+  dimension_scores: { material: number; novelty: number; citation: number };
+  relevance_reasoning: string;
+  flags: string[];
+  rubric_version: string;
+}
+
 // One ingested episode. Mirrors the podcast_episodes table (embedding columns
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
@@ -100,17 +131,46 @@ export interface PodcastEpisode {
   topic_tags: string[];
   transcript_fetched_at: string | null;
   embedded_at: string | null;
-  // Episode intelligence (Phase 1: summary). The draft lives in episode_summary
-  // the whole time; summary_status gates whether it is client-visible.
+  // Episode intelligence (summary — Phase 1; takeaways — Phase 2). The drafts
+  // live on the row the whole time; summary_status gates whether they are
+  // client-visible. key_takeaways is always an array (defaults to [] in the DB).
   episode_summary: string | null;
+  key_takeaways: EpisodeTakeaway[];
+  chapters: EpisodeChapter[];
   summary_status: SummaryStatus;
   summary_lex_verdict: SummaryComplianceVerdict | null;
   summary_generated_at: string | null;
   summary_approved_at: string | null;
   summary_approved_by: string | null;
+  // Episode relevance (Q3 resolution: podcast-tuned fork of Rex's news rubric,
+  // scored from the brief). Director/ops metadata — NOT gated by summary_status.
+  // Null until the intelligence pass scores the episode (or if scoring failed).
+  relevance_score: number | null;
+  category: NewsCategory | null;
+  relevance_metadata: EpisodeRelevanceMetadata | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// One card in the client-safe library browse view. Mirrors the v_episode_library
+// view (approved episodes only, no ops internals) — the Q1/D2 reader boundary.
+export interface EpisodeLibraryCard {
+  id: string;
+  slug: string;
+  title: string;
+  published_at: string | null;
+  image_url: string | null;
+  duration_seconds: number | null;
+  youtube_url: string | null;
+  audio_url: string | null;
+  episode_summary: string | null;
+  key_takeaways: EpisodeTakeaway[];
+  chapters: EpisodeChapter[];
+  category: NewsCategory | null;
+  relevance_score: number | null;
+  topic_tags: string[];
+  source_name: string | null;
 }
 
 // One embedded transcript chunk (embedding omitted from the read surface, like
