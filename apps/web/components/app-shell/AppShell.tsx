@@ -1,6 +1,8 @@
 'use client';
 
+import { useRef } from 'react';
 import { Sidebar } from './Sidebar';
+import { PullToRefresh } from './PullToRefresh';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -9,10 +11,15 @@ interface AppShellProps {
 }
 
 export function AppShell({ pendingCount, children }: AppShellProps) {
+  const mainRef = useRef<HTMLElement>(null);
+
   return (
     <div className={styles.shell}>
       <Sidebar pendingCount={pendingCount} />
-      <main className={styles.main}>{children}</main>
+      <main ref={mainRef} className={styles.main}>
+        <PullToRefresh scrollRef={mainRef} />
+        {children}
+      </main>
     </div>
   );
 }

@@ -8,6 +8,8 @@
   margin-left: var(--sidebar-width);
   min-width: 0;
   overflow-y: auto;
+  /* Own the top overscroll so our pull-to-refresh replaces the browser's. */
+  overscroll-behavior-y: contain;
 }
 
 @media (max-width: 1023px) {
