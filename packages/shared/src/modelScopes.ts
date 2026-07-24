@@ -342,6 +342,16 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'editor',
   },
 
+  // ── Podcast transcript processing ──────────────────────────────────────────
+  {
+    key: 'podcast_transcript.identify_speakers',
+    type: 'workflow_step',
+    label: 'Identify speakers',
+    description: 'Maps Deepgram "Speaker N" diarisation labels to real names from the episode description + transcript',
+    workflow: 'podcast_transcript',
+    fallbackAgent: 'roger',
+  },
+
   // ── Podcast episode intelligence (summary) ─────────────────────────────────
   {
     key: 'podcast_intel.narrate',
@@ -395,6 +405,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   variant: 'Variant Generation',
   strategy: 'Campaign Strategy',
   social_post: 'Social Posts from News',
+  podcast_transcript: 'Podcast Transcript',
   podcast_intel: 'Podcast Intelligence',
   library_answer: 'Ask the Library',
   market_report: 'Market Report',
