@@ -1,0 +1,36 @@
+.indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: calc(8px + env(safe-area-inset-top, 0px));
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-accent);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Pull-to-refresh is a touch gesture — hide the indicator on desktop widths. */
+@media (min-width: 768px) {
+  .indicator {
+    display: none;
+  }
+}
+
+.spinning {
+  animation: pull-refresh-spin 0.7s linear infinite;
+}
+
+@keyframes pull-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
