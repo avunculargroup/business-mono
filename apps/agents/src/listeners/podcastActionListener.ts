@@ -14,6 +14,22 @@ const log = createLogger('podcast-action');
 
 const supabase = createRealtimeClient();
 
+// Realtime postgres_changes only delivers events that occur while the channel is
+// SUBSCRIBED, and reconcile otherwise runs only on (re)connect — so a web action
+// whose event is missed with no subsequent reconnect sits unclaimed forever, and
+// a brief whose run was claimed but never finished sits in 'generating' forever.
+// A periodic sweep is the safety net: independent of channel health it re-runs
+// any unclaimed pending_action and fails stale 'generating' rows.
+const RECONCILE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+// A brief 'generating' longer than this whose pending_action has already been
+// cleared is treated as orphaned — the run was claimed (which nulls
+// pending_action) but the process crashed, redeployed, or the model call hung
+// before it could resolve the status. Generous enough not to trip a legitimately
+// slow in-flight pass (a single narrate + compliance + scoring pass is minutes,
+// not tens of minutes).
+const STALE_GENERATING_MS = 15 * 60 * 1000; // 15 minutes
+
 export interface EpisodeActionRow {
   id: string;
   pending_action: string | null;
@@ -89,18 +105,65 @@ export async function reconcilePendingActions(): Promise<void> {
 }
 
 /**
+ * Fail briefs stuck in 'generating' past STALE_GENERATING_MS whose pending_action
+ * has already been cleared — i.e. the run was claimed but never resolved the
+ * status (crash, redeploy, or a hung model call). Flipping them to 'failed'
+ * surfaces the episode page's retry affordance instead of an indefinite
+ * "Generating…". Rows that still carry a pending_action are deliberately left to
+ * reconcilePendingActions, which re-runs (rather than fails) them. Exported for
+ * unit testing.
+ */
+export async function failStaleGeneratingBriefs(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as unknown as { from: (t: string) => any };
+  const cutoff = new Date(Date.now() - STALE_GENERATING_MS).toISOString();
+  const { data, error } = await db
+    .from('podcast_episodes')
+    .update({ summary_status: 'failed' })
+    .eq('summary_status', 'generating')
+    .is('pending_action', null)
+    .lt('updated_at', cutoff)
+    .select('id');
+  if (error) {
+    log.error({ error: error.message }, 'failed to sweep stale generating briefs');
+    return;
+  }
+  if (data && data.length > 0) {
+    log.warn(
+      { count: data.length, ids: (data as { id: string }[]).map((r) => r.id) },
+      'failed stale generating briefs',
+    );
+  }
+}
+
+/**
+ * One reconcile pass: catch up on unclaimed pending_action rows (missed Realtime
+ * events / actions written while disconnected), then fail any orphaned
+ * 'generating' briefs. Run on every (re)connect and on a periodic timer so
+ * recovery never depends on a single Realtime event landing. Exported for unit
+ * testing.
+ */
+export async function reconcile(): Promise<void> {
+  await reconcilePendingActions();
+  await failStaleGeneratingBriefs();
+}
+
+/**
  * Subscribe to podcast_episodes and re-run the waterfall for any episode whose
  * web-requested action has been written to pending_action.
  */
 export function startPodcastActionListener(): void {
+  // Periodic safety net: recover missed events and orphaned 'generating' rows
+  // even if the Realtime channel never cycles to trigger an onSubscribed sweep.
+  setInterval(() => void reconcile(), RECONCILE_INTERVAL_MS);
   subscribeWithReconnect({
     client: supabase,
     channelName: 'podcast-action',
     logPrefix: '[podcast-action]',
     onSubscribed: () => {
       log.info('listening for episode re-run actions via Supabase Realtime');
-      // Catch up on any actions missed while the subscription was down.
-      void reconcilePendingActions();
+      // Catch up on anything missed while the subscription was down.
+      void reconcile();
     },
     attachHandlers: (channel) =>
       channel.on(
