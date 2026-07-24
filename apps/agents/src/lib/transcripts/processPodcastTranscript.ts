@@ -1,5 +1,6 @@
 import { logActivity } from '../../tools/activity.js';
 import { storeAvailableTranscript, updateEpisode } from './store.js';
+import { inferAndApplySpeakerNames } from './inferSpeakerNames.js';
 import type { TimedSegment } from './parsers.js';
 import { createLogger } from '../logger.js';
 
@@ -49,6 +50,16 @@ export async function processPodcastTranscript(
         transcript_error: 'Deepgram returned no utterances',
       });
       return;
+    }
+
+    // Relabel the generic "Speaker N" diarisation labels with inferred real names
+    // (from the episode description + transcript) before the text is built and the
+    // segments are embedded, so both stay consistent. Best-effort: a naming failure
+    // must never demote a good transcript, so swallow it and keep the raw labels.
+    try {
+      await inferAndApplySpeakerNames(episodeId, segments);
+    } catch (err) {
+      log.warn({ err, episodeId }, 'speaker-name inference failed (keeping generic labels)');
     }
 
     const text = segments

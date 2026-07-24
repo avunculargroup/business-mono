@@ -12,6 +12,11 @@ vi.mock('../../tools/activity.js', () => ({
   logActivity: { execute: (...args: unknown[]) => logActivityExecute(...args) },
 }));
 
+const inferAndApplySpeakerNames = vi.fn();
+vi.mock('./inferSpeakerNames.js', () => ({
+  inferAndApplySpeakerNames: (...args: unknown[]) => inferAndApplySpeakerNames(...args),
+}));
+
 const { processPodcastTranscript } = await import('./processPodcastTranscript.js');
 
 const results = {
@@ -26,6 +31,37 @@ describe('processPodcastTranscript', () => {
     storeAvailableTranscript.mockReset().mockResolvedValue({ segments: 2 });
     updateEpisode.mockReset().mockResolvedValue(undefined);
     logActivityExecute.mockReset().mockResolvedValue(undefined);
+    inferAndApplySpeakerNames.mockReset().mockResolvedValue(0);
+  });
+
+  it('relabels the stored transcript text and segments with inferred names', async () => {
+    // The helper renames segments in place; processPodcastTranscript builds the
+    // flat text and embeds the segments AFTER it runs, so both pick up the name.
+    inferAndApplySpeakerNames.mockImplementation((_id: string, segments: Array<{ speaker: string | null }>) => {
+      for (const s of segments) if (s.speaker === 'Speaker 0') s.speaker = 'Obi-Wan';
+      return Promise.resolve(1);
+    });
+
+    await processPodcastTranscript('ep-1', results);
+
+    const stored = storeAvailableTranscript.mock.calls[0][1] as {
+      text: string;
+      segments: Array<{ speaker: string | null }>;
+    };
+    expect(stored.text).toContain('[Obi-Wan] Hello there');
+    expect(stored.segments[0].speaker).toBe('Obi-Wan');
+  });
+
+  it('keeps generic labels and still stores when speaker inference throws', async () => {
+    inferAndApplySpeakerNames.mockRejectedValue(new Error('model unavailable'));
+
+    await expect(processPodcastTranscript('ep-1', results)).resolves.toBeUndefined();
+
+    expect(storeAvailableTranscript).toHaveBeenCalledTimes(1);
+    const stored = storeAvailableTranscript.mock.calls[0][1] as { text: string };
+    expect(stored.text).toContain('[Speaker 0] Hello there');
+    // A best-effort naming failure must not demote the transcript to 'failed'.
+    expect(updateEpisode).not.toHaveBeenCalled();
   });
 
   it('stores the transcript with source deepgram and logs with an allowed trigger_type', async () => {
