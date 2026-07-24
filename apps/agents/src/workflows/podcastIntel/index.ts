@@ -14,6 +14,8 @@ import {
   type TimedSegment,
 } from './prompts.js';
 import { scoreEpisodeRelevance } from '../podcastRubric.js';
+import { extractMentionedCompanies } from './entities.js';
+import type { MentionedCompany } from '@platform/shared';
 
 const log = createLogger('podcast-intel');
 
@@ -95,6 +97,21 @@ async function narrateBrief(
       .filter((c): c is { title: string; start_seconds: number } => c.title.length > 0 && c.start_seconds != null)
       .sort((a, b) => a.start_seconds - b.start_seconds),
   };
+}
+
+/**
+ * Cross-link entities (C3): deterministically match the transcript against known
+ * CRM companies. Director/ops metadata, so a failure never blocks the brief — it
+ * just yields no mentions. Loads the (small, two-founder) companies gazetteer and
+ * runs the pure matcher.
+ */
+async function extractEntities(transcript: string | null): Promise<MentionedCompany[]> {
+  const { data, error } = await db.from('companies').select('id, slug, name');
+  if (error) {
+    log.error({ error: error.message }, 'failed to load companies for entity extraction');
+    return [];
+  }
+  return extractMentionedCompanies(transcript, (data ?? []) as MentionedCompany[]);
 }
 
 /** Lex reviews the proposed brief (summary + takeaways) for advice risk. Never
@@ -197,6 +214,9 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     takeaways: brief.takeaways.map((t) => t.text),
   });
 
+  // Cross-link entities from the transcript (director metadata, ungated).
+  const companies = await extractEntities(ep.transcript_text);
+
   const now = new Date().toISOString();
   const { error: upErr } = await db
     .from('podcast_episodes')
@@ -217,6 +237,7 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
             rubric_version: scored.rubricVersion,
           }
         : null,
+      mentioned_entities: { companies },
     })
     .eq('id', episodeId);
   if (upErr) {
@@ -262,6 +283,7 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
       takeaways: brief.takeaways.length,
       chapters: brief.chapters.length,
       relevance: scored?.relevanceScore ?? null,
+      companies: companies.length,
     },
     'episode brief proposed',
   );

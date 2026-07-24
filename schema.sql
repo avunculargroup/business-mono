@@ -2209,6 +2209,10 @@ CREATE TABLE podcast_episodes (
   relevance_score       NUMERIC(3,2),
   category              TEXT CHECK (category IS NULL OR category IN ('regulatory','corporate','macro','international')),
   relevance_metadata    JSONB,  -- dimension scores, flags, reasoning, rubric_version
+  -- Cross-link entities (C3): { "companies": [{ "id", "slug", "name" }] } — a
+  -- deterministic gazetteer match of the transcript against known CRM companies.
+  -- Director/ops metadata; deliberately absent from v_episode_library. See 20260724010000.
+  mentioned_entities    JSONB NOT NULL DEFAULT '{}'::jsonb,
   fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
   created_by            UUID REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),

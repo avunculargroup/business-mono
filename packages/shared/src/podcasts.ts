@@ -106,6 +106,22 @@ export interface EpisodeRelevanceMetadata {
   rubric_version: string;
 }
 
+// One CRM company an episode mentions: enough to render a link into the CRM.
+// Resolved deterministically (a gazetteer match of the transcript against known
+// companies), so a mention is always a real, linkable record.
+export interface MentionedCompany {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+// The cross-link entity snapshot stored on an episode (mentioned_entities JSONB).
+// Only `companies` today; the shape is extensible (tickers/people) without a
+// migration. Director/ops metadata — NOT in the client-safe library view.
+export interface EpisodeMentionedEntities {
+  companies?: MentionedCompany[];
+}
+
 // One ingested episode. Mirrors the podcast_episodes table (embedding columns
 // excluded — those live on transcript_segments).
 export interface PodcastEpisode {
@@ -155,9 +171,22 @@ export interface PodcastEpisode {
   relevance_score: number | null;
   category: NewsCategory | null;
   relevance_metadata: EpisodeRelevanceMetadata | null;
+  // Cross-link entities (C3): CRM companies the transcript mentions. Always an
+  // object (defaults to {} in the DB); `companies` is absent until the intel pass
+  // runs. Director/ops metadata — not client-facing.
+  mentioned_entities: EpisodeMentionedEntities;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// The episode-page cross-links (C3): what an episode connects to elsewhere in the
+// platform. Companies come from mentioned_entities; related news/episodes are
+// computed from shared topic tags at render time.
+export interface EpisodeConnections {
+  companies: MentionedCompany[];
+  relatedNews: { id: string; title: string; url: string; published_at: string | null; category: NewsCategory }[];
+  relatedEpisodes: { id: string; slug: string; title: string; published_at: string | null }[];
 }
 
 // One card in the client-safe library browse view. Mirrors the v_episode_library

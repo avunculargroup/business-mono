@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { EpisodeDetail } from './EpisodeDetail';
 import { idColumn } from '@/lib/utils';
-import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
+import type { EpisodeConnections, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,14 @@ export default async function EpisodeDetailPage({
 
   const ep = episode as unknown as PodcastEpisode;
 
-  const [{ data: segments }, sourceName] = await Promise.all([
+  // Cross-links (C3): related news + episodes share ≥1 topic tag; companies come
+  // from the deterministic gazetteer stored on the episode. Tag-based queries are
+  // skipped entirely when the episode carries no tags (overlaps([]) matches
+  // nothing anyway).
+  const tags = ep.topic_tags ?? [];
+  const emptyRows = Promise.resolve({ data: [] as unknown[] });
+
+  const [{ data: segments }, sourceName, { data: relatedNews }, { data: relatedEpisodes }] = await Promise.all([
     supabase
       .from('transcript_segments')
       .select('id, episode_id, segment_index, start_seconds, end_seconds, speaker, content, token_count, created_at')
@@ -39,7 +46,30 @@ export default async function EpisodeDetailPage({
           .single()
           .then((r) => (r.data as { name: string } | null)?.name ?? null)
       : Promise.resolve(null),
+    tags.length
+      ? supabase
+          .from('news_items')
+          .select('id, title, url, published_at, category')
+          .overlaps('topic_tags', tags)
+          .order('published_at', { ascending: false })
+          .limit(5)
+      : emptyRows,
+    tags.length
+      ? supabase
+          .from('podcast_episodes')
+          .select('id, slug, title, published_at')
+          .overlaps('topic_tags', tags)
+          .neq('id', ep.id)
+          .order('published_at', { ascending: false })
+          .limit(6)
+      : emptyRows,
   ]);
+
+  const connections: EpisodeConnections = {
+    companies: ep.mentioned_entities?.companies ?? [],
+    relatedNews: (relatedNews ?? []) as EpisodeConnections['relatedNews'],
+    relatedEpisodes: (relatedEpisodes ?? []) as EpisodeConnections['relatedEpisodes'],
+  };
 
   return (
     <>
@@ -49,6 +79,7 @@ export default async function EpisodeDetailPage({
         segments={(segments ?? []) as unknown as TranscriptSegment[]}
         sourceName={sourceName}
         initialSeek={initialSeek}
+        connections={connections}
       />
     </>
   );

@@ -86,6 +86,15 @@ beforeEach(() => {
     error: null,
   });
   fakeSupabase.__setResponse('agent_activity', { data: null, error: null });
+  // Gazetteer for entity extraction: "Multisig" appears in the transcript text,
+  // "Acme Corp" does not.
+  fakeSupabase.__setResponse('companies', {
+    data: [
+      { id: 'co-1', slug: 'multisig-labs', name: 'Multisig' },
+      { id: 'co-2', slug: 'acme', name: 'Acme Corp' },
+    ],
+    error: null,
+  });
 });
 
 describe('runEpisodeIntel', () => {
@@ -118,6 +127,8 @@ describe('runEpisodeIntel', () => {
         dimension_scores: { material: 0.8, novelty: 0.7, citation: 0.8 },
         rubric_version: 'podcast-v1',
       },
+      // Deterministic gazetteer match: only the company named in the transcript.
+      mentioned_entities: { companies: [{ id: 'co-1', slug: 'multisig-labs', name: 'Multisig' }] },
     });
     expect(update?.summary_generated_at).toEqual(expect.any(String));
     // Relevance is scored from the brief (summary + takeaway texts), not the transcript.

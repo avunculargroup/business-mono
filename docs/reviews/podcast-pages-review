@@ -370,8 +370,9 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
 > relevance + category, both search tiers (retrieval + the Lex-gated RAG answer), the C1
 > episode-page restructure, and the client library browse view on the `v_episode_library`
 > safe-view boundary. Items are marked `✅ DONE`. **P2-10 (collections / briefing packs) has
-> since shipped too.** What remains is the rest of **P2** (cross-links, export, bulk actions,
-> latency stat) — the compounding-value tier.
+> since shipped too, and **P2-11 (cross-links) with it** — including the previously-missing
+> `mentioned_entities` extraction (B1's last bullet).** What remains is the rest of **P2**
+> (export, bulk actions, latency stat) — the compounding-value tier.
 
 ### P0 — Do first (unblocks the client half + cheap ops wins) — ✅ COMPLETE
 1. ✅ **DONE** (`f345c08`) — **Episode intelligence pass, Phase 1** — `episode_summary` + Lex
@@ -423,7 +424,16 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
     only), so a pack — the eventual client hand-off unit — never carries an unapproved brief
     or an ops internal; a member whose brief is later un-approved simply drops out of the
     rendered pack. Server actions in `apps/web/app/actions/podcastCollections.ts`.
-11. **Cross-links** — mentioned entities → CRM / news / related episodes (C3). `M`.
+11. ✅ **DONE** — **Cross-links** — mentioned entities → CRM / news / related episodes (C3). `M`.
+    B1's last intelligence bullet finally landed here: `mentioned_entities JSONB` on
+    `podcast_episodes` (migration `20260724010000`), populated by the intel pass via a
+    **deterministic gazetteer** (`podcastIntel/entities.ts`) that matches the transcript
+    against known CRM companies — per D1, "extract, don't guess", so every mention is a real,
+    linkable record (precision-biased: full-name, whole-token match only). The episode page
+    now renders a **Connections** panel: companies mentioned → `/crm/companies/[slug]`, related
+    news (news_items sharing ≥1 topic tag), and other episodes on the same topic (computed at
+    render time from `topic_tags`, no extraction needed). `mentioned_entities` is deliberately
+    kept off `v_episode_library`, so CRM cross-links never leak to a future client surface.
 12. **Export** — one-page PDF / email brief (B5). `M`.
 13. **Bulk actions** (A5) + **pipeline-latency stat** (A6). `M` / `S`. When volume justifies.
 
