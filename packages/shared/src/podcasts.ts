@@ -180,6 +180,64 @@ export interface EpisodeLibraryCard {
   source_name: string | null;
 }
 
+// A "briefing pack" (podcast-pages-review B4): a named, ordered set of episodes
+// with a short intro. Mirrors the podcast_collections table. Manual assembly —
+// no approval gate (see the Open-questions resolution).
+export interface PodcastCollection {
+  id: string;
+  slug: string;
+  title: string;
+  intro: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// One episode's membership in a collection (podcast_collection_items). Ordered
+// within the pack by `position`.
+export interface PodcastCollectionItem {
+  id: string;
+  collection_id: string;
+  episode_id: string;
+  position: number;
+  created_at: string;
+}
+
+// A collection as shown on the index: the pack plus how many episodes it holds.
+export interface PodcastCollectionCard extends PodcastCollection {
+  episode_count: number;
+}
+
+// One member episode as rendered on the collection detail page: the item row
+// (id + position, so it can be removed/reordered) joined to its episode's
+// display fields. Membership is drawn from the client-safe v_episode_library
+// (approved episodes only), so a pack — the eventual client hand-off unit —
+// never carries an unapproved brief or an ops internal.
+export interface PodcastCollectionEpisode {
+  item_id: string;
+  position: number;
+  episode_id: string;
+  slug: string;
+  title: string;
+  source_name: string | null;
+  image_url: string | null;
+  duration_seconds: number | null;
+  published_at: string | null;
+  relevance_score: number | null;
+  category: NewsCategory | null;
+  episode_summary: string | null;
+}
+
+// One episode as offered in the "add episode" picker: the client-safe library
+// episodes not already in the pack. Enough to identify it, nothing operational.
+export interface PodcastCollectionPickerEpisode {
+  id: string;
+  slug: string;
+  title: string;
+  source_name: string | null;
+  published_at: string | null;
+}
+
 // One embedded transcript chunk (embedding omitted from the read surface, like
 // NewsItemRecord). start/end seconds are null when the source had no timestamps.
 export interface TranscriptSegment {

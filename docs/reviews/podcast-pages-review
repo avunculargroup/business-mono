@@ -369,8 +369,9 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
 > review was written (2026-07-14): episode intelligence (summary → takeaways → chapters),
 > relevance + category, both search tiers (retrieval + the Lex-gated RAG answer), the C1
 > episode-page restructure, and the client library browse view on the `v_episode_library`
-> safe-view boundary. Items are marked `✅ DONE`. What remains is **P2** (collections,
-> cross-links, export, bulk actions, latency stat) — the compounding-value tier.
+> safe-view boundary. Items are marked `✅ DONE`. **P2-10 (collections / briefing packs) has
+> since shipped too.** What remains is the rest of **P2** (cross-links, export, bulk actions,
+> latency stat) — the compounding-value tier.
 
 ### P0 — Do first (unblocks the client half + cheap ops wins) — ✅ COMPLETE
 1. ✅ **DONE** (`f345c08`) — **Episode intelligence pass, Phase 1** — `episode_summary` + Lex
@@ -414,7 +415,14 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
    shipped with item 5. `S` each.
 
 ### P2 — Then (compounding value once the above lands)
-10. **Collections / briefing packs** (B4). `M`.
+10. ✅ **DONE** — **Collections / briefing packs** (B4). `M`. Manual assembly (the
+    Q-resolution: no approval gate). Two additive tables (`podcast_collections` +
+    `podcast_collection_items`, migration `20260724000000`); a `/news/podcasts/collections`
+    index (create) + `/collections/[id]` editor (rename, intro, add/remove, reorder up/down,
+    delete). Membership is drawn from the client-safe `v_episode_library` (approved episodes
+    only), so a pack — the eventual client hand-off unit — never carries an unapproved brief
+    or an ops internal; a member whose brief is later un-approved simply drops out of the
+    rendered pack. Server actions in `apps/web/app/actions/podcastCollections.ts`.
 11. **Cross-links** — mentioned entities → CRM / news / related episodes (C3). `M`.
 12. **Export** — one-page PDF / email brief (B5). `M`.
 13. **Bulk actions** (A5) + **pipeline-latency stat** (A6). `M` / `S`. When volume justifies.

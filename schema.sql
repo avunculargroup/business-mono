@@ -2242,6 +2242,29 @@ CREATE TABLE transcript_segments (
 -- filter_days) — cosine search returning one row per matching segment, joined to
 -- episode + source for title/provenance/timestamp.
 
+-- Podcast collections — "briefing packs" (migration:
+-- 20260724000000_add_podcast_collections; podcast-pages-review B4). A named,
+-- ordered set of episodes with a short intro; manual assembly, no approval gate.
+CREATE TABLE podcast_collections (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug        TEXT NOT NULL DEFAULT '',           -- set_slug('title') on INSERT
+  title       TEXT NOT NULL,
+  intro       TEXT,
+  created_by  UUID REFERENCES auth.users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One row per (collection, episode); rendered/reordered by position. Cascades
+-- both ways so a deleted pack or episode leaves no orphan.
+CREATE TABLE podcast_collection_items (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  collection_id UUID NOT NULL REFERENCES podcast_collections(id) ON DELETE CASCADE,
+  episode_id    UUID NOT NULL REFERENCES podcast_episodes(id) ON DELETE CASCADE,
+  position      INT NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (collection_id, episode_id)
+);
+
 
 -- ============================================================
 -- ECONOMIC INDICATORS (migration: 20260620000000_add_economic_indicators)
