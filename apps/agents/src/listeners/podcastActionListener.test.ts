@@ -23,9 +23,8 @@ vi.mock('../workflows/podcastIntel/index.js', () => ({
   runEpisodeIntel: runEpisodeIntelSpy,
 }));
 
-const { handleEpisodeActionRow, reconcilePendingActions } = await import(
-  './podcastActionListener.js'
-);
+const { handleEpisodeActionRow, reconcilePendingActions, failStaleGeneratingBriefs, reconcile } =
+  await import('./podcastActionListener.js');
 
 describe('handleEpisodeActionRow', () => {
   beforeEach(() => {
@@ -111,5 +110,63 @@ describe('reconcilePendingActions', () => {
     await reconcilePendingActions();
 
     expect(reResolveSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('failStaleGeneratingBriefs', () => {
+  beforeEach(() => {
+    runEpisodeIntelSpy.mockClear();
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+  });
+
+  it('fails only orphaned generating rows older than the timeout', async () => {
+    fakeSupabase.__setResponse('podcast_episodes', { data: [{ id: 'ep-stale' }], error: null });
+
+    await failStaleGeneratingBriefs();
+
+    const builder = fakeSupabase.__buildersFor('podcast_episodes')[0];
+    expect(builder?.update).toHaveBeenCalledWith({ summary_status: 'failed' });
+    // Scoped to generating rows whose pending_action is already cleared (the
+    // claimed-then-died orphan case) and that have been generating past the
+    // timeout — a row still carrying a pending_action is left to the re-run sweep.
+    expect(builder?.eq).toHaveBeenCalledWith('summary_status', 'generating');
+    expect(builder?.is).toHaveBeenCalledWith('pending_action', null);
+    expect(builder?.lt).toHaveBeenCalledWith('updated_at', expect.any(String));
+  });
+
+  it('does not run the intelligence pass (fails, never re-runs)', async () => {
+    fakeSupabase.__setResponse('podcast_episodes', { data: [], error: null });
+
+    await failStaleGeneratingBriefs();
+
+    expect(runEpisodeIntelSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcile', () => {
+  beforeEach(() => {
+    reResolveSpy.mockClear();
+    runEpisodeIntelSpy.mockClear();
+    fakeSupabase.from.mockClear();
+    fakeSupabase.__responses.clear();
+    fakeSupabase.__builders.length = 0;
+  });
+
+  it('re-runs an unclaimed pending action and sweeps stale generating rows in one pass', async () => {
+    // First from(): the pending-action select. Second: the claim update. Third:
+    // the stale-generating sweep.
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: [{ id: 'ep-9', pending_action: 'summarize' }], error: null },
+      { data: [{ id: 'ep-9' }], error: null },
+      { data: [], error: null },
+    ]);
+
+    await reconcile();
+
+    expect(runEpisodeIntelSpy).toHaveBeenCalledWith('ep-9');
+    const sweep = fakeSupabase.__buildersFor('podcast_episodes').at(-1);
+    expect(sweep?.update).toHaveBeenCalledWith({ summary_status: 'failed' });
   });
 });
