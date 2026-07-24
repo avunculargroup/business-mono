@@ -3580,6 +3580,96 @@ export type Database = {
         }
         Relationships: []
       }
+      podcast_collection_items: {
+        Row: {
+          collection_id: string
+          created_at: string
+          episode_id: string
+          id: string
+          position: number
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          episode_id: string
+          id?: string
+          position?: number
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          episode_id?: string
+          id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_collection_items_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "podcast_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collection_items_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "podcast_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collection_items_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_episode_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collection_items_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_episodes_awaiting_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collection_items_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "v_podcast_ingestion_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      podcast_collections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          intro: string | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          intro?: string | null
+          slug?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          intro?: string | null
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       podcast_episodes: {
         Row: {
           audio_mime_type: string | null
@@ -3603,6 +3693,7 @@ export type Database = {
           image_url: string | null
           ingestion_origin: string
           key_takeaways: Json
+          mentioned_entities: Json
           pending_action: string | null
           published_at: string | null
           relevance_metadata: Json | null
@@ -3650,6 +3741,7 @@ export type Database = {
           image_url?: string | null
           ingestion_origin?: string
           key_takeaways?: Json
+          mentioned_entities?: Json
           pending_action?: string | null
           published_at?: string | null
           relevance_metadata?: Json | null
@@ -3697,6 +3789,7 @@ export type Database = {
           image_url?: string | null
           ingestion_origin?: string
           key_takeaways?: Json
+          mentioned_entities?: Json
           pending_action?: string | null
           published_at?: string | null
           relevance_metadata?: Json | null
