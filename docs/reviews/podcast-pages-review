@@ -431,9 +431,16 @@ Effort: `S` ≈ hours, `M` ≈ a session or two, `L` ≈ multi-session. 🎯 = h
     against known CRM companies — per D1, "extract, don't guess", so every mention is a real,
     linkable record (precision-biased: full-name, whole-token match only). The episode page
     now renders a **Connections** panel: companies mentioned → `/crm/companies/[slug]`, related
-    news (news_items sharing ≥1 topic tag), and other episodes on the same topic (computed at
-    render time from `topic_tags`, no extraction needed). `mentioned_entities` is deliberately
-    kept off `v_episode_library`, so CRM cross-links never leak to a future client surface.
+    news (news_items sharing ≥1 topic tag), and other episodes on the same topic (both computed
+    at render time from `topic_tags` overlap). `mentioned_entities` is deliberately kept off
+    `v_episode_library`, so CRM cross-links never leak to a future client surface.
+    - **Episode topic tags** (prerequisite, fixed here): `podcast_episodes.topic_tags` was read
+      by the dashboard filter, the library, and these cross-links but **never written** by any
+      pipeline — so the related-news/related-episodes links would have stayed empty. The intel
+      pass now produces 2–8 normalised (lowercase-hyphenated, de-duped) tags in the narration
+      step and writes them ungated (director metadata, mirroring news_items), only overwriting
+      when non-empty so a re-run can't wipe them. Tags populate per episode as briefs are
+      (re)generated.
 12. **Export** — one-page PDF / email brief (B5). `M`.
 13. **Bulk actions** (A5) + **pipeline-latency stat** (A6). `M` / `S`. When volume justifies.
 

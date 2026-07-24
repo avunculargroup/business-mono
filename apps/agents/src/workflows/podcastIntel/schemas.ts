@@ -20,13 +20,15 @@ export const chapterSchema = z.object({
 export type Chapter = z.infer<typeof chapterSchema>;
 
 // Episode intelligence — the narration step returns a short prose brief, key
-// takeaways (Phase 2), and chapters (Phase 3). Entities are a later phase. Both
-// arrays default to [] so the narration fallback value ({ summary: '' }) still
-// parses cleanly.
+// takeaways (Phase 2), chapters (Phase 3), and topic tags (which place the
+// episode among related news/episodes). Entities are extracted separately (a
+// deterministic gazetteer, not the model). All arrays default to [] so the
+// narration fallback value ({ summary: '' }) still parses cleanly.
 export const summaryDraftSchema = z.object({
   summary: z.string(),
   takeaways: z.array(takeawaySchema).default([]),
   chapters: z.array(chapterSchema).default([]),
+  topic_tags: z.array(z.string()).default([]),
 });
 
 export type SummaryDraft = z.infer<typeof summaryDraftSchema>;
