@@ -249,7 +249,12 @@ export function PodcastDashboard({ episodes: initial }: Props) {
           <div className={styles.recentGrid}>
             {recent.map((e) => (
               <div key={e.id} className={styles.recentCard}>
-                <MediaEmbed youtubeUrl={e.youtube_url} audioUrl={e.audio_url} title={e.title} />
+                <MediaEmbed
+                  youtubeUrl={e.youtube_url}
+                  audioUrl={e.audio_url}
+                  title={e.title}
+                  durationSeconds={e.duration_seconds}
+                />
                 <div className={styles.recentMeta}>
                   <Link href={`/news/podcasts/${e.slug}`} className={styles.recentTitle}>
                     {e.title}
