@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { EpisodeDetail } from './EpisodeDetail';
-import type { PodcastEpisode, TranscriptSegment } from '@platform/shared';
+import type { EpisodeConnections, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -71,6 +71,7 @@ function makeEpisode(overrides: Partial<PodcastEpisode> = {}): PodcastEpisode {
     relevance_score: null,
     category: null,
     relevance_metadata: null,
+    mentioned_entities: {},
     created_by: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -458,6 +459,53 @@ describe('EpisodeDetail', () => {
       );
 
       expect(screen.queryByText('Key takeaways')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('connections (C3 cross-links)', () => {
+    const connections: EpisodeConnections = {
+      companies: [{ id: 'co-1', slug: 'acme-corp', name: 'Acme Corp' }],
+      relatedNews: [
+        { id: 'n-1', title: 'Custody rules tighten', url: 'https://example.com/news', published_at: null, category: 'regulatory' },
+      ],
+      relatedEpisodes: [{ id: 'ep-9', slug: 'other-ep', title: 'Another custody episode', published_at: null }],
+    };
+
+    it('renders companies, related news, and related episodes with correct links', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available' })}
+          segments={[makeSegment()]}
+          sourceName={null}
+          connections={connections}
+        />,
+      );
+
+      expect(screen.getByText('Connections')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/crm/companies/acme-corp');
+      expect(screen.getByRole('link', { name: /Custody rules tighten/ })).toHaveAttribute('href', 'https://example.com/news');
+      expect(screen.getByRole('link', { name: 'Another custody episode' })).toHaveAttribute('href', '/news/podcasts/other-ep');
+    });
+
+    it('renders no Connections section when there are no cross-links', () => {
+      render(
+        <EpisodeDetail episode={makeEpisode({ transcript_status: 'available' })} segments={[makeSegment()]} sourceName={null} />,
+      );
+      expect(screen.queryByText('Connections')).not.toBeInTheDocument();
+    });
+
+    it('shows only the groups that have entries', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available' })}
+          segments={[makeSegment()]}
+          sourceName={null}
+          connections={{ ...connections, companies: [], relatedNews: [] }}
+        />,
+      );
+      expect(screen.getByText('Related episodes')).toBeInTheDocument();
+      expect(screen.queryByText('Companies mentioned')).not.toBeInTheDocument();
+      expect(screen.queryByText('Related news')).not.toBeInTheDocument();
     });
   });
 });

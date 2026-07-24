@@ -75,6 +75,8 @@ beforeEach(() => {
         { title: 'Intro', start_seconds: 1 },
         { title: 'No anchor', start_seconds: null },
       ],
+      // Mixed case / spaces / duplicate — expect normalised + de-duped.
+      topic_tags: ['Custody', 'Board Decision', 'custody'],
     },
   });
   lexGenerate.mockResolvedValue({ object: PASS });
@@ -86,6 +88,15 @@ beforeEach(() => {
     error: null,
   });
   fakeSupabase.__setResponse('agent_activity', { data: null, error: null });
+  // Gazetteer for entity extraction: "Multisig" appears in the transcript text,
+  // "Acme Corp" does not.
+  fakeSupabase.__setResponse('companies', {
+    data: [
+      { id: 'co-1', slug: 'multisig-labs', name: 'Multisig' },
+      { id: 'co-2', slug: 'acme', name: 'Acme Corp' },
+    ],
+    error: null,
+  });
 });
 
 describe('runEpisodeIntel', () => {
@@ -118,6 +129,10 @@ describe('runEpisodeIntel', () => {
         dimension_scores: { material: 0.8, novelty: 0.7, citation: 0.8 },
         rubric_version: 'podcast-v1',
       },
+      // Deterministic gazetteer match: only the company named in the transcript.
+      mentioned_entities: { companies: [{ id: 'co-1', slug: 'multisig-labs', name: 'Multisig' }] },
+      // Tags normalised to lowercase-hyphenated and de-duped.
+      topic_tags: ['custody', 'board-decision'],
     });
     expect(update?.summary_generated_at).toEqual(expect.any(String));
     // Relevance is scored from the brief (summary + takeaway texts), not the transcript.
@@ -132,6 +147,21 @@ describe('runEpisodeIntel', () => {
       expect.objectContaining({ agent_name: 'roger', action: 'episode_summarized', status: 'pending', entity_id: 'ep-1' }),
       expect.objectContaining({ agent_name: 'lex', status: 'auto', entity_type: 'podcast_episodes', entity_id: 'ep-1' }),
     ]);
+  });
+
+  it('leaves topic_tags untouched when the model returns none (no wipe on re-run)', async () => {
+    rogerGenerate.mockResolvedValueOnce({
+      object: { summary: 'A brief.', takeaways: [], chapters: [], topic_tags: [] },
+    });
+    fakeSupabase.__setResponses('podcast_episodes', [
+      { data: availableEpisode(), error: null },
+      { data: null, error: null },
+    ]);
+
+    await runEpisodeIntel('ep-1');
+
+    // The update omits topic_tags entirely, so an existing value survives.
+    expect(updateCallFor('podcast_episodes')).not.toHaveProperty('topic_tags');
   });
 
   it('logs Lex as pending and surfaces flags when the summary is flagged', async () => {

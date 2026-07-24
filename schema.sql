@@ -2209,6 +2209,10 @@ CREATE TABLE podcast_episodes (
   relevance_score       NUMERIC(3,2),
   category              TEXT CHECK (category IS NULL OR category IN ('regulatory','corporate','macro','international')),
   relevance_metadata    JSONB,  -- dimension scores, flags, reasoning, rubric_version
+  -- Cross-link entities (C3): { "companies": [{ "id", "slug", "name" }] } — a
+  -- deterministic gazetteer match of the transcript against known CRM companies.
+  -- Director/ops metadata; deliberately absent from v_episode_library. See 20260724010000.
+  mentioned_entities    JSONB NOT NULL DEFAULT '{}'::jsonb,
   fts                   TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', coalesce(transcript_text, ''))) STORED,
   created_by            UUID REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2241,6 +2245,29 @@ CREATE TABLE transcript_segments (
 -- RPC: vector_search_transcripts(query_embedding, match_threshold, match_count,
 -- filter_days) — cosine search returning one row per matching segment, joined to
 -- episode + source for title/provenance/timestamp.
+
+-- Podcast collections — "briefing packs" (migration:
+-- 20260724000000_add_podcast_collections; podcast-pages-review B4). A named,
+-- ordered set of episodes with a short intro; manual assembly, no approval gate.
+CREATE TABLE podcast_collections (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug        TEXT NOT NULL DEFAULT '',           -- set_slug('title') on INSERT
+  title       TEXT NOT NULL,
+  intro       TEXT,
+  created_by  UUID REFERENCES auth.users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One row per (collection, episode); rendered/reordered by position. Cascades
+-- both ways so a deleted pack or episode leaves no orphan.
+CREATE TABLE podcast_collection_items (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  collection_id UUID NOT NULL REFERENCES podcast_collections(id) ON DELETE CASCADE,
+  episode_id    UUID NOT NULL REFERENCES podcast_episodes(id) ON DELETE CASCADE,
+  position      INT NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (collection_id, episode_id)
+);
 
 
 -- ============================================================

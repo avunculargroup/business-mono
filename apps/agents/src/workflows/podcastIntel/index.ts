@@ -14,6 +14,8 @@ import {
   type TimedSegment,
 } from './prompts.js';
 import { scoreEpisodeRelevance } from '../podcastRubric.js';
+import { extractMentionedCompanies } from './entities.js';
+import type { MentionedCompany } from '@platform/shared';
 
 const log = createLogger('podcast-intel');
 
@@ -44,6 +46,24 @@ interface Brief {
   summary: string;
   takeaways: Takeaway[];
   chapters: Chapter[];
+  topicTags: string[];
+}
+
+// Normalise the model's topic tags to the same shape news_items use: lowercase,
+// hyphenated, trimmed, de-duped, capped. These feed the dashboard topic filter
+// and the episode-page related-news/related-episodes cross-links (overlap on
+// topic_tags), so a consistent vocabulary matters more than exact wording.
+function normaliseTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of tags) {
+    const tag = raw
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (tag.length >= 2) seen.add(tag);
+  }
+  return [...seen].slice(0, 8);
 }
 
 // The web sets summary_status = 'generating' when the pass is requested; every
@@ -70,7 +90,7 @@ async function narrateBrief(
   transcriptText: string,
   segmentStarts: number[],
 ): Promise<Brief> {
-  const fallback = { summary: '', takeaways: [] as Takeaway[], chapters: [] as Chapter[] };
+  const fallback = { summary: '', takeaways: [] as Takeaway[], chapters: [] as Chapter[], topic_tags: [] as string[] };
   const response = await roger.generate(
     [{ role: 'user', content: buildSummaryPrompt(episode, transcriptText) }],
     {
@@ -94,7 +114,23 @@ async function narrateBrief(
       .map((c) => ({ title: c.title.trim(), start_seconds: snapToSegment(c.start_seconds, segmentStarts) }))
       .filter((c): c is { title: string; start_seconds: number } => c.title.length > 0 && c.start_seconds != null)
       .sort((a, b) => a.start_seconds - b.start_seconds),
+    topicTags: normaliseTags(draft.topic_tags),
   };
+}
+
+/**
+ * Cross-link entities (C3): deterministically match the transcript against known
+ * CRM companies. Director/ops metadata, so a failure never blocks the brief — it
+ * just yields no mentions. Loads the (small, two-founder) companies gazetteer and
+ * runs the pure matcher.
+ */
+async function extractEntities(transcript: string | null): Promise<MentionedCompany[]> {
+  const { data, error } = await db.from('companies').select('id, slug, name');
+  if (error) {
+    log.error({ error: error.message }, 'failed to load companies for entity extraction');
+    return [];
+  }
+  return extractMentionedCompanies(transcript, (data ?? []) as MentionedCompany[]);
 }
 
 /** Lex reviews the proposed brief (summary + takeaways) for advice risk. Never
@@ -197,6 +233,9 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
     takeaways: brief.takeaways.map((t) => t.text),
   });
 
+  // Cross-link entities from the transcript (director metadata, ungated).
+  const companies = await extractEntities(ep.transcript_text);
+
   const now = new Date().toISOString();
   const { error: upErr } = await db
     .from('podcast_episodes')
@@ -204,6 +243,11 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
       episode_summary: brief.summary,
       key_takeaways: brief.takeaways,
       chapters: brief.chapters,
+      // Topic tags are director/ops metadata (dashboard filter + cross-link
+      // overlap), not client prose, so they're written ungated alongside
+      // relevance. Only overwrite when the model produced some, so a re-run that
+      // returns none doesn't wipe existing tags.
+      ...(brief.topicTags.length > 0 ? { topic_tags: brief.topicTags } : {}),
       summary_status: 'proposed',
       summary_lex_verdict: verdict,
       summary_generated_at: now,
@@ -217,6 +261,7 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
             rubric_version: scored.rubricVersion,
           }
         : null,
+      mentioned_entities: { companies },
     })
     .eq('id', episodeId);
   if (upErr) {
@@ -262,6 +307,8 @@ export async function runEpisodeIntel(episodeId: string): Promise<void> {
       takeaways: brief.takeaways.length,
       chapters: brief.chapters.length,
       relevance: scored?.relevanceScore ?? null,
+      companies: companies.length,
+      tags: brief.topicTags.length,
     },
     'episode brief proposed',
   );

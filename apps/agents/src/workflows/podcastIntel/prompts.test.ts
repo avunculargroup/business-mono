@@ -92,6 +92,12 @@ describe('buildSummaryPrompt', () => {
     expect(p).toMatch(/describe, never advise/i);
     expect(p).toMatch(/never/i);
   });
+
+  it('asks for lowercase hyphenated topic tags', () => {
+    const p = buildSummaryPrompt(episode, 'body');
+    expect(p).toMatch(/topic_tags/i);
+    expect(p).toMatch(/lowercase, hyphenated/i);
+  });
 });
 
 describe('buildSummaryLexPrompt', () => {

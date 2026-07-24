@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, Copy, Search, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Building2, ChevronDown, ChevronUp, Copy, ExternalLink, Newspaper, Podcast, Search, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { BtsLogo } from '@/components/app-shell/BtsLogo';
@@ -21,8 +22,10 @@ import {
 } from '@/lib/podcasts';
 import { requestEpisodeAction, generateEpisodeBrief, decideEpisodeBrief } from '@/app/actions/podcasts';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
-import type { EpisodeChapter, EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
+import type { EpisodeChapter, EpisodeConnections, EpisodeTakeaway, PodcastEpisode, TranscriptSegment } from '@platform/shared';
 import styles from './detail.module.css';
+
+const EMPTY_CONNECTIONS: EpisodeConnections = { companies: [], relatedNews: [], relatedEpisodes: [] };
 
 interface Props {
   episode: PodcastEpisode;
@@ -30,9 +33,11 @@ interface Props {
   sourceName: string | null;
   // Deep-link arrival second (from transcript search ?t=): seek the media once.
   initialSeek?: number | null;
+  // Cross-links (C3): companies mentioned, related news, related episodes.
+  connections?: EpisodeConnections;
 }
 
-export function EpisodeDetail({ episode, segments, sourceName, initialSeek = null }: Props) {
+export function EpisodeDetail({ episode, segments, sourceName, initialSeek = null, connections = EMPTY_CONNECTIONS }: Props) {
   const router = useRouter();
   const { success, error } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -496,6 +501,8 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
           })()}
         </div>
 
+        {/* ── Sidebar: provenance + connections stacked ── */}
+        <div className={styles.sidebar}>
         {/* ── Provenance ── */}
         <aside className={styles.provenance}>
           <h2 className={styles.sectionTitle}>Provenance</h2>
@@ -532,6 +539,71 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
             </div>
           )}
         </aside>
+
+        {/* ── Connections (C3): what this episode links to elsewhere ── */}
+        {(connections.companies.length > 0 ||
+          connections.relatedNews.length > 0 ||
+          connections.relatedEpisodes.length > 0) && (
+          <aside className={styles.connections}>
+            <h2 className={styles.sectionTitle}>Connections</h2>
+
+            {connections.companies.length > 0 && (
+              <div className={styles.connGroup}>
+                <span className={styles.connLabel}>
+                  <Building2 size={14} strokeWidth={1.5} />
+                  Companies mentioned
+                </span>
+                <ul className={styles.connList}>
+                  {connections.companies.map((c) => (
+                    <li key={c.id}>
+                      <Link href={`/crm/companies/${c.slug}`} className={styles.connLink}>
+                        {c.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {connections.relatedNews.length > 0 && (
+              <div className={styles.connGroup}>
+                <span className={styles.connLabel}>
+                  <Newspaper size={14} strokeWidth={1.5} />
+                  Related news
+                </span>
+                <ul className={styles.connList}>
+                  {connections.relatedNews.map((n) => (
+                    <li key={n.id}>
+                      <a href={n.url} target="_blank" rel="noopener noreferrer" className={styles.connLink}>
+                        <span>{n.title}</span>
+                        <ExternalLink size={12} strokeWidth={1.5} className={styles.connExt} />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {connections.relatedEpisodes.length > 0 && (
+              <div className={styles.connGroup}>
+                <span className={styles.connLabel}>
+                  <Podcast size={14} strokeWidth={1.5} />
+                  Related episodes
+                </span>
+                <ul className={styles.connList}>
+                  {connections.relatedEpisodes.map((e) => (
+                    <li key={e.id}>
+                      <Link href={`/news/podcasts/${e.slug}`} className={styles.connLink}>
+                        {e.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </aside>
+        )}
+        </div>
       </div>
     </div>
   );
