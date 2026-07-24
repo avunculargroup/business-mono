@@ -63,8 +63,3 @@
 .facade:hover .playButton {
   transform: scale(1.06);
 }
-
-.audio {
-  width: 100%;
-  height: 40px;
-}
