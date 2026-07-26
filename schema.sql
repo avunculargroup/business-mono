@@ -2619,3 +2619,56 @@ CREATE TABLE market_report_guidelines (
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
 -- Realtime: market_report_feedback REPLICA IDENTITY FULL + added to
 --   supabase_realtime publication (wakes marketReportFeedbackListener on INSERT).
+
+
+-- ============================================================
+-- LINKEDIN POSTING (migration: 20260725000000_add_social_credentials)
+-- ============================================================
+-- OAuth credentials for API publishing, one per social_accounts row
+-- (LinkedIn-only for now). Kept separate from social_accounts so token
+-- columns are never selected by existing UI queries. Tokens are LinkedIn
+-- OAuth access tokens (60-day lifetime, never exposed in the UI).
+-- Spec: docs/features/linkedin-posting/feature-spec.md
+
+CREATE TABLE social_credentials (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  social_account_id    UUID        NOT NULL UNIQUE
+                                   REFERENCES social_accounts(id) ON DELETE CASCADE,
+  provider             TEXT        NOT NULL DEFAULT 'linkedin'
+                                   CHECK (provider IN ('linkedin')),
+  access_token         TEXT        NOT NULL,
+  author_urn           TEXT        NOT NULL,   -- urn:li:person:… or urn:li:organization:…
+  scopes               TEXT[],
+  expires_at           TIMESTAMPTZ NOT NULL,
+  connected_by         UUID        REFERENCES team_members(id),
+  last_error           TEXT,
+  last_error_at        TIMESTAMPTZ,
+  consecutive_failures INT         NOT NULL DEFAULT 0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Short-lived CSRF state for the web OAuth flow: written by
+-- /api/integrations/linkedin/start, consumed (deleted) by the callback,
+-- which rejects states older than 10 minutes.
+CREATE TABLE oauth_states (
+  state             TEXT        PRIMARY KEY,
+  social_account_id UUID        NOT NULL
+                                REFERENCES social_accounts(id) ON DELETE CASCADE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Publish tracking consumed by socialPublishListener. publish_locked_at is
+-- the atomic claim marker: the poller only posts after flipping it from
+-- NULL, so overlapping ticks can never double-post.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS publish_error     TEXT,
+  ADD COLUMN IF NOT EXISTS publish_attempts  INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS publish_locked_at TIMESTAMPTZ;
+
+CREATE INDEX idx_content_scheduled_due
+  ON content_items (scheduled_for)
+  WHERE status = 'scheduled' AND publish_locked_at IS NULL;
+
+-- Triggers: social_credentials_updated_at (update_updated_at).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.

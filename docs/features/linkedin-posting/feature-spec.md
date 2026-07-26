@@ -1,7 +1,7 @@
 # Feature Spec — LinkedIn Scheduling & Posting
 
 **Branch:** `claude/linkedin-scheduling-posting-plan-0iuzew`
-**Status:** Spec approved, not yet built. See [Progress / Status](#progress--status).
+**Status:** Phases 1–2 built and tested; awaiting Phase 0 LinkedIn app setup to connect real accounts. See [Progress / Status](#progress--status).
 
 ## Overview
 
@@ -165,8 +165,16 @@ Answers not needed to start Phase 1 code, but needed before go-live.
 
 Update this section as each phase lands.
 
-- [ ] **Phase 0 — LinkedIn app setup** (founder action): developer app created, products added, callback URL registered, Community Management API application submitted
-- [ ] **Phase 1 — Accounts & OAuth**: migration (`social_credentials`, `oauth_states`, `content_items` publish cols); start/callback routes; `lib/linkedin/oauth.ts`; settings page + integrations card; `socialCredentials` actions; Chris & Carri connected
-- [ ] **Phase 2 — Publish & schedule**: `lib/linkedin.ts` client + escaping; `socialPublishListener` poller; `scheduleContent`/`postContentNow`/`updateContentBody` actions; ContentEditor save + formatting preview + schedule panel; complianceRecheck guard relaxed; Kanban error surfacing
-- [ ] **Phase 3 — Company page**: `w_organization_social` scope, org URN selection in callback, BTS page connected and posting
-- [ ] **Post-launch**: expiry-warning flow observed working; open questions above resolved and recorded here
+- [ ] **Phase 0 — LinkedIn app setup** (founder action, blocks go-live): developer app created, "Sign In with LinkedIn using OpenID Connect" + "Share on LinkedIn" products added, callback URL `<app-origin>/api/integrations/linkedin/callback` registered, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET` set in Vercel, app associated with the BTS page, Community Management API application submitted
+- [x] **Phase 1 — Accounts & OAuth** (code complete): migration `20260725000000_add_social_credentials.sql` (`social_credentials`, `oauth_states`, `content_items` publish cols) + `schema.sql` + changelog + types; `lib/linkedin/oauth.ts` (+ test); `app/api/integrations/linkedin/{start,callback}/route.ts`; `settings/integrations/linkedin/` page + client + dynamic integrations card; `actions/socialCredentials.ts`
+  - Still needs Phase 0 before Chris & Carri can actually connect; the three `social_accounts` rows must exist (`platform='linkedin'`)
+- [x] **Phase 2 — Publish & schedule** (code complete): `apps/agents/src/lib/linkedin.ts` client + `escapeLinkedInText` (+ test); `socialPublishListener` poller registered in `mastra/index.ts` (+ test); `updateContentBody`/`scheduleContent`/`postContentNow` (+ test); `ContentEditor` save, char-count vs `platform_specs`, fold preview, markdown warning, schedule panel, Post now (+ tests); `complianceRecheck` guard relaxed to account-linked drafts (+ test); `ContentBoard` publish-error surfacing + drag-to-scheduled block (+ tests)
+- [ ] **Phase 3 — Company page**: `w_organization_social` scope + `fetchOrganizationUrn` are already wired in the callback; needs LinkedIn approval, then connect the BTS page and verify a post
+- [ ] **Post-launch**: migration applied on merge to `main`; end-to-end connect → approve → Post now verified against the real API; expiry-warning flow observed; open questions above resolved and recorded here
+
+### Verification run (2026-07-25)
+
+- `pnpm --filter @platform/agents test` — 949 tests / 116 files pass
+- `pnpm --filter @platform/agents typecheck` — clean
+- `pnpm --filter @platform/web test` — 426 tests / 62 files pass
+- Not yet run: end-to-end against the live LinkedIn API (blocked on Phase 0)

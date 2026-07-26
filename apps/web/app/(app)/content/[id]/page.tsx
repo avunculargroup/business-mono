@@ -39,6 +39,12 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
         .order('created_at', { ascending: false })
     : { data: null };
 
+  // Platform char limit for the LinkedIn format preview + schedule guard.
+  const { data: spec } =
+    item.type === 'linkedin'
+      ? await db.from('platform_specs').select('max_chars').eq('platform', 'linkedin').maybeSingle()
+      : { data: null };
+
   return (
     <>
       <PageHeader title={item.title || 'Untitled'} backHref="/content" />
@@ -46,6 +52,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
         item={item}
         threadSegments={threadSegments ?? []}
         priorFeedback={(priorFeedback ?? []) as DraftFeedbackEntry[]}
+        maxChars={spec?.max_chars ?? null}
       />
     </>
   );

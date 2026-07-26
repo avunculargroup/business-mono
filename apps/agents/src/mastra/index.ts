@@ -29,6 +29,7 @@ import { startContentCreatorListener } from '../listeners/contentCreatorListener
 import { startPMListener } from '../listeners/pmListener.js';
 import { startFastmailListener } from '../listeners/fastmailListener.js';
 import { startResearchMailListener } from '../listeners/researchMailListener.js';
+import { startSocialPublishListener } from '../listeners/socialPublishListener.js';
 import { startContentEmbeddingListener } from '../listeners/contentEmbeddingListener.js';
 import { startVoiceEmbeddingListener } from '../listeners/voiceEmbeddingListener.js';
 import { startNewsletterGateWebListener } from '../listeners/newsletterGateWeb.js';
@@ -255,3 +256,10 @@ startFeedbackDistillListener();
 // /market-reports/[id]) into the standing guideline list every future
 // narration injects. Same web→DB→agents pattern, singleton guideline row.
 startMarketReportFeedbackListener();
+
+// Publish due scheduled LinkedIn posts (content_items status='scheduled',
+// scheduled_for <= now) via the Posts API using stored social_credentials.
+// Human-approval + compliance gates enforced per item; atomic claim on
+// publish_locked_at prevents double-posting. 60s cadence so "Post now"
+// from /content lands within a minute.
+startSocialPublishListener();

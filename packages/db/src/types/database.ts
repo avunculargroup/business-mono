@@ -1383,6 +1383,9 @@ export type Database = {
           pain_point_id: string | null
           pending_decision: Json | null
           post_form: string | null
+          publish_attempts: number
+          publish_error: string | null
+          publish_locked_at: string | null
           published_at: string | null
           published_url: string | null
           question_count: number
@@ -1424,6 +1427,9 @@ export type Database = {
           pain_point_id?: string | null
           pending_decision?: Json | null
           post_form?: string | null
+          publish_attempts?: number
+          publish_error?: string | null
+          publish_locked_at?: string | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
@@ -1465,6 +1471,9 @@ export type Database = {
           pain_point_id?: string | null
           pending_decision?: Json | null
           post_form?: string | null
+          publish_attempts?: number
+          publish_error?: string | null
+          publish_locked_at?: string | null
           published_at?: string | null
           published_url?: string | null
           question_count?: number
@@ -3213,6 +3222,32 @@ export type Database = {
           },
         ]
       }
+      oauth_states: {
+        Row: {
+          created_at: string
+          social_account_id: string
+          state: string
+        }
+        Insert: {
+          created_at?: string
+          social_account_id: string
+          state: string
+        }
+        Update: {
+          created_at?: string
+          social_account_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_states_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onchain_indicators: {
         Row: {
           alert_config: Json
@@ -4529,6 +4564,69 @@ export type Database = {
             columns: ["team_member_id"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_credentials: {
+        Row: {
+          access_token: string
+          author_urn: string
+          connected_by: string | null
+          consecutive_failures: number
+          created_at: string
+          expires_at: string
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          provider: string
+          scopes: string[] | null
+          social_account_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          author_urn: string
+          connected_by?: string | null
+          consecutive_failures?: number
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          provider?: string
+          scopes?: string[] | null
+          social_account_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          author_urn?: string
+          connected_by?: string | null
+          consecutive_failures?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          provider?: string
+          scopes?: string[] | null
+          social_account_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_credentials_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_credentials_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "social_accounts"
             referencedColumns: ["id"]
           },
         ]

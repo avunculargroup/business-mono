@@ -6,6 +6,15 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-25 — LinkedIn posting: social_credentials, oauth_states, publish tracking
+
+- **`social_credentials` table** — one OAuth credential per `social_accounts` row (LinkedIn-only CHECK for now, extensible to X later). Kept separate from `social_accounts` so the plaintext `access_token` is never selected by existing UI queries; follows the `fastmail_accounts.token` precedent (RLS-protected, never returned to the browser). `author_urn` stores the LinkedIn post author (`urn:li:person:…` for founders, `urn:li:organization:…` for the company page). `expires_at` tracks the 60-day LinkedIn token lifetime (no refresh tokens for standard apps — reconnect via the same OAuth flow). Fastmail-style error columns (`last_error`, `consecutive_failures`) drive auto-disable + reconnect badges.
+- **`oauth_states` table** — short-lived CSRF state for the net-new web OAuth flow: `/api/integrations/linkedin/start` writes a row, the callback validates + deletes it (rejecting states older than 10 minutes). Persisted server-side rather than a cookie so it survives across Vercel invocations.
+- **`content_items` publish columns** — `publish_error`, `publish_attempts`, `publish_locked_at`. `publish_locked_at` is the atomic claim marker used by the `socialPublishListener` poller (conditional UPDATE from NULL) so overlapping ticks can never double-post. Partial index `idx_content_scheduled_due` on `scheduled_for WHERE status='scheduled' AND publish_locked_at IS NULL` keeps the 60s poll cheap.
+- Spec: `docs/features/linkedin-posting/feature-spec.md`.
+
+---
+
 ## 2026-07-20 — renumber findings-engine / gold migrations off a duplicate version
 
 The findings-engine and gold-price migrations were both authored as

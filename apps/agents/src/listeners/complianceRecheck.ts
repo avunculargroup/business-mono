@@ -33,6 +33,7 @@ interface DisclaimerRef {
 export interface RecheckRow {
   id: string;
   campaign_id: string | null;
+  social_account_id: string | null;
   is_thread: boolean;
   title: string | null;
   body: string | null;
@@ -122,7 +123,10 @@ async function classify(draft: CharlieVariant, snippets: DisclaimerRef[]): Promi
  * Exported for testing.
  */
 export async function handleRecheckRow(row: RecheckRow): Promise<void> {
-  if (row.compliance_status !== 'pending' || !row.campaign_id) return;
+  if (row.compliance_status !== 'pending') return;
+  // Campaign variants and account-linked social drafts both get rechecked;
+  // anything else (newsletters, blogs, ideas) never carries a Lex verdict.
+  if (!row.campaign_id && !row.social_account_id) return;
 
   // Claim: only the caller that flips compliance_checked_at from NULL proceeds.
   const claimedAt = new Date().toISOString();

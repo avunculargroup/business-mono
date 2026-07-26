@@ -1,13 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // The module imports @platform/db (supabase + createRealtimeClient) at load. Stub
-// both so importing the pure mappers doesn't require a live client.
+// both so importing the pure mappers doesn't require a live client; the fake
+// query builder also lets the guard tests observe whether a claim was attempted.
+import { createFakeSupabase, type FakeSupabaseClient } from '../../test/mocks/supabase.js';
+
+const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
+
 vi.mock('@platform/db', () => ({
   createRealtimeClient: () => ({}),
-  supabase: {},
+  get supabase() {
+    return fakeSupabase;
+  },
 }));
 
-const { draftFromRow, buildComplianceFields, patchGateStatePreview } = await import('./complianceRecheck.js');
+const { draftFromRow, buildComplianceFields, patchGateStatePreview, handleRecheckRow } = await import('./complianceRecheck.js');
 import type { LexVerdict } from '../workflows/variant/schemas.js';
 
 const verdict: LexVerdict = {
@@ -24,7 +31,7 @@ const snippets = [
 describe('draftFromRow', () => {
   it('builds a single-post draft', () => {
     const draft = draftFromRow(
-      { id: 'ci', campaign_id: 'c', is_thread: false, title: 'T', body: 'A post.', compliance_status: 'pending', gate_state: null },
+      { id: 'ci', campaign_id: 'c', social_account_id: null, is_thread: false, title: 'T', body: 'A post.', compliance_status: 'pending', gate_state: null },
       [],
     );
     expect(draft).toMatchObject({ is_thread: false, body: 'A post.', segments: [] });
@@ -32,7 +39,7 @@ describe('draftFromRow', () => {
 
   it('builds a thread draft from segment bodies', () => {
     const draft = draftFromRow(
-      { id: 'ci', campaign_id: 'c', is_thread: true, title: '', body: 'lead', compliance_status: 'pending', gate_state: null },
+      { id: 'ci', campaign_id: 'c', social_account_id: null, is_thread: true, title: '', body: 'lead', compliance_status: 'pending', gate_state: null },
       ['one', 'two'],
     );
     expect(draft.is_thread).toBe(true);
@@ -41,7 +48,7 @@ describe('draftFromRow', () => {
 
   it('is not a thread when flagged but segments are missing', () => {
     const draft = draftFromRow(
-      { id: 'ci', campaign_id: 'c', is_thread: true, title: '', body: 'x', compliance_status: 'pending', gate_state: null },
+      { id: 'ci', campaign_id: 'c', social_account_id: null, is_thread: true, title: '', body: 'x', compliance_status: 'pending', gate_state: null },
       [],
     );
     expect(draft.is_thread).toBe(false);
@@ -72,10 +79,37 @@ describe('buildComplianceFields', () => {
   });
 });
 
+describe('handleRecheckRow guard', () => {
+  const base = {
+    id: 'ci',
+    is_thread: false,
+    title: 'T',
+    body: 'A post.',
+    compliance_status: 'pending',
+    gate_state: null,
+  };
+
+  it('skips rows linked to neither a campaign nor a social account', async () => {
+    fakeSupabase.__builders.length = 0;
+    await handleRecheckRow({ ...base, campaign_id: null, social_account_id: null });
+    expect(fakeSupabase.__buildersFor('content_items')).toHaveLength(0);
+  });
+
+  it('attempts a claim for an account-linked social draft without a campaign', async () => {
+    fakeSupabase.__builders.length = 0;
+    // Claim returns no rows → handler stops after the claim attempt.
+    fakeSupabase.__setResponse('content_items', { data: [], error: null });
+    await handleRecheckRow({ ...base, campaign_id: null, social_account_id: 'acc-1' });
+    const claim = fakeSupabase.__buildersFor('content_items')[0]!;
+    expect(claim.update).toHaveBeenCalledWith({ compliance_checked_at: expect.any(String) });
+    expect(claim.is).toHaveBeenCalledWith('compliance_checked_at', null);
+  });
+});
+
 describe('patchGateStatePreview', () => {
   it('returns null when the row is not suspended at a gate', () => {
     const draft = draftFromRow(
-      { id: 'ci', campaign_id: 'c', is_thread: false, title: '', body: 'x', compliance_status: 'pending', gate_state: null },
+      { id: 'ci', campaign_id: 'c', social_account_id: null, is_thread: false, title: '', body: 'x', compliance_status: 'pending', gate_state: null },
       [],
     );
     expect(patchGateStatePreview(null, draft, verdict)).toBeNull();
@@ -83,7 +117,7 @@ describe('patchGateStatePreview', () => {
 
   it('patches the preview copy, char count, and compliance chip', () => {
     const draft = draftFromRow(
-      { id: 'ci', campaign_id: 'c', is_thread: false, title: 'T', body: 'Edited copy.', compliance_status: 'pending', gate_state: {} },
+      { id: 'ci', campaign_id: 'c', social_account_id: null, is_thread: false, title: 'T', body: 'Edited copy.', compliance_status: 'pending', gate_state: {} },
       [],
     );
     const gateState = { gate: 'gate3', contentItemId: 'ci', preview: { body: 'old', charCount: 3, classification: 'educational', needsDisclaimer: false } };
