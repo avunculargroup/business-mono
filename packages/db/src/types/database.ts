@@ -3246,6 +3246,13 @@ export type Database = {
             referencedRelation: "social_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "oauth_states_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
         ]
       }
       onchain_indicators: {
@@ -4629,6 +4636,13 @@ export type Database = {
             referencedRelation: "social_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "social_credentials_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["account_id"]
+          },
         ]
       }
       tasks: {
@@ -5432,26 +5446,6 @@ export type Database = {
       }
     }
     Functions: {
-      delete_social_credential: {
-        Args: { p_social_account_id: string }
-        Returns: undefined
-      }
-      social_credential_token: {
-        Args: { p_social_account_id: string }
-        Returns: string
-      }
-      store_social_credential: {
-        Args: {
-          p_author_urn: string
-          p_connected_by?: string
-          p_expires_at: string
-          p_provider?: string
-          p_scopes?: string[]
-          p_social_account_id: string
-          p_token: string
-        }
-        Returns: undefined
-      }
       compute_pipeline_validation: {
         Args: { pain_point_uuid: string }
         Returns: {
@@ -5462,6 +5456,10 @@ export type Database = {
       compute_unique_slug: {
         Args: { p_base: string; p_id: string; p_table: string }
         Returns: string
+      }
+      delete_social_credential: {
+        Args: { p_social_account_id: string }
+        Returns: undefined
       }
       match_voice_snippets: {
         Args: {
@@ -5487,6 +5485,22 @@ export type Database = {
         }[]
       }
       slugify: { Args: { txt: string }; Returns: string }
+      social_credential_token: {
+        Args: { p_social_account_id: string }
+        Returns: string
+      }
+      store_social_credential: {
+        Args: {
+          p_author_urn: string
+          p_connected_by?: string
+          p_expires_at: string
+          p_provider?: string
+          p_scopes?: string[]
+          p_social_account_id: string
+          p_token: string
+        }
+        Returns: undefined
+      }
       vector_search_content: {
         Args: {
           filter_days?: number
