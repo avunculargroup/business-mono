@@ -42,7 +42,6 @@ function dueItem(overrides: Record<string, unknown> = {}) {
 function credential(overrides: Record<string, unknown> = {}) {
   return {
     social_account_id: ACCOUNT_ID,
-    access_token: 'tok',
     author_urn: 'urn:li:person:abc',
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     consecutive_failures: 0,
@@ -81,6 +80,8 @@ function wireTick({
     error: null,
   });
   fakeSupabase.__setResponse('agent_activity', { data: null, error: null });
+  // Vault decryption RPC — the token never comes back on the credential row.
+  fakeSupabase.rpc.mockResolvedValue({ data: 'tok', error: null });
 }
 
 beforeEach(() => {
@@ -230,6 +231,38 @@ describe('runPublishTick', () => {
     expect(createLinkedInPost).not.toHaveBeenCalled();
     // Only the due select — no claim, no error rewrite.
     expect(fakeSupabase.__buildersFor('content_items')).toHaveLength(1);
+  });
+
+  it('decrypts the token via the Vault RPC, never selecting it on the row', async () => {
+    wireTick();
+    createLinkedInPost.mockResolvedValue({ postUrn: 'urn:li:share:9' });
+
+    await runPublishTick();
+
+    expect(fakeSupabase.rpc).toHaveBeenCalledWith('social_credential_token', {
+      p_social_account_id: ACCOUNT_ID,
+    });
+    // The credential SELECT must not ask for a token column.
+    const credentialSelect = fakeSupabase.__buildersFor('social_credentials')[0]!;
+    expect(credentialSelect.select.mock.calls[0]?.[0]).not.toMatch(/access_token/);
+  });
+
+  it('holds the post and releases the claim when the Vault secret is missing', async () => {
+    wireTick();
+    fakeSupabase.rpc.mockResolvedValue({ data: null, error: null });
+    createLinkedInPost.mockResolvedValue({ postUrn: 'urn:li:share:9' });
+
+    await runPublishTick();
+
+    expect(createLinkedInPost).not.toHaveBeenCalled();
+    const failure = fakeSupabase.__buildersFor('content_items')[2]!;
+    expect(failure.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publish_locked_at: null,
+        publish_attempts: 1,
+        publish_error: expect.stringMatching(/reconnect the account/i),
+      }),
+    );
   });
 });
 

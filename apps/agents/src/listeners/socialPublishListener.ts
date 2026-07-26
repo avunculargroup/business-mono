@@ -43,9 +43,14 @@ type DueItem = {
   social_account_id: string | null;
 };
 
+/**
+ * Credential metadata only — the access token itself lives in Supabase Vault
+ * and is decrypted per publish via the social_credential_token RPC (granted to
+ * service_role alone), so a plaintext token never sits in this process longer
+ * than one post.
+ */
 type Credential = {
   social_account_id: string;
-  access_token: string;
   author_urn: string;
   expires_at: string;
   consecutive_failures: number;
@@ -103,7 +108,7 @@ export async function runPublishTick(): Promise<void> {
     supabase.from('social_accounts').select('id, display_name, is_active').in('id', accountIds),
     supabase
       .from('social_credentials')
-      .select('social_account_id, access_token, author_urn, expires_at, consecutive_failures')
+      .select('social_account_id, author_urn, expires_at, consecutive_failures')
       .in('social_account_id', accountIds),
   ]);
 
@@ -182,8 +187,19 @@ async function publishItem(item: DueItem, credential: Credential): Promise<void>
   if (!claimed || claimed.length !== 1) return; // claimed by an overlapping tick
 
   try {
+    // Decrypt the token only now, after the claim succeeded and immediately
+    // before the API call.
+    const { data: accessToken, error: tokenError } = await supabase.rpc(
+      'social_credential_token',
+      { p_social_account_id: credential.social_account_id },
+    );
+    if (tokenError) throw tokenError;
+    if (!accessToken) {
+      throw new Error('No stored LinkedIn token — reconnect the account in Settings');
+    }
+
     const { postUrn } = await createLinkedInPost({
-      accessToken: credential.access_token,
+      accessToken,
       authorUrn: credential.author_urn,
       text: item.body as string,
     });

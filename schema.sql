@@ -2625,9 +2625,12 @@ CREATE TABLE market_report_guidelines (
 -- LINKEDIN POSTING (migration: 20260725000000_add_social_credentials)
 -- ============================================================
 -- OAuth credentials for API publishing, one per social_accounts row
--- (LinkedIn-only for now). Kept separate from social_accounts so token
--- columns are never selected by existing UI queries. Tokens are LinkedIn
--- OAuth access tokens (60-day lifetime, never exposed in the UI).
+-- (LinkedIn-only for now). Access tokens (60-day lifetime) live in Supabase
+-- Vault, NOT here: they can post publicly as a founder, so only the vault
+-- secret's UUID is stored. The vault schema is unreachable over PostgREST, so
+-- the three SECURITY DEFINER wrappers below are the only door — and the read
+-- wrapper is service_role-only, so the web app can store a token it can never
+-- read back.
 -- Spec: docs/features/linkedin-posting/feature-spec.md
 
 CREATE TABLE social_credentials (
@@ -2636,7 +2639,9 @@ CREATE TABLE social_credentials (
                                    REFERENCES social_accounts(id) ON DELETE CASCADE,
   provider             TEXT        NOT NULL DEFAULT 'linkedin'
                                    CHECK (provider IN ('linkedin')),
-  access_token         TEXT        NOT NULL,
+  -- vault.secrets.id holding the OAuth access token. No FK: vault.secrets is
+  -- extension-owned. delete_social_credential() keeps the two in step.
+  access_token_id      UUID        NOT NULL,
   author_urn           TEXT        NOT NULL,   -- urn:li:person:… or urn:li:organization:…
   scopes               TEXT[],
   expires_at           TIMESTAMPTZ NOT NULL,
@@ -2647,6 +2652,15 @@ CREATE TABLE social_credentials (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Vault wrappers (SECURITY DEFINER, pinned search_path):
+--   store_social_credential(social_account_id, author_urn, token, expires_at,
+--     scopes, connected_by, provider) → creates or rotates the vault secret and
+--     upserts the row in one call. GRANT: authenticated, service_role.
+--   social_credential_token(social_account_id) → decrypted token.
+--     GRANT: service_role ONLY (the agents publish poller).
+--   delete_social_credential(social_account_id) → drops row + ciphertext.
+--     GRANT: authenticated, service_role.
 
 -- Short-lived CSRF state for the web OAuth flow: written by
 -- /api/integrations/linkedin/start, consumed (deleted) by the callback,

@@ -4570,7 +4570,7 @@ export type Database = {
       }
       social_credentials: {
         Row: {
-          access_token: string
+          access_token_id: string
           author_urn: string
           connected_by: string | null
           consecutive_failures: number
@@ -4585,7 +4585,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          access_token: string
+          access_token_id: string
           author_urn: string
           connected_by?: string | null
           consecutive_failures?: number
@@ -4600,7 +4600,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          access_token?: string
+          access_token_id?: string
           author_urn?: string
           connected_by?: string | null
           consecutive_failures?: number
@@ -5432,6 +5432,26 @@ export type Database = {
       }
     }
     Functions: {
+      delete_social_credential: {
+        Args: { p_social_account_id: string }
+        Returns: undefined
+      }
+      social_credential_token: {
+        Args: { p_social_account_id: string }
+        Returns: string
+      }
+      store_social_credential: {
+        Args: {
+          p_author_urn: string
+          p_connected_by?: string
+          p_expires_at: string
+          p_provider?: string
+          p_scopes?: string[]
+          p_social_account_id: string
+          p_token: string
+        }
+        Returns: undefined
+      }
       compute_pipeline_validation: {
         Args: { pain_point_uuid: string }
         Returns: {

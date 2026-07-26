@@ -75,23 +75,20 @@ export async function GET(request: Request) {
         ? await fetchOrganizationUrn(token.accessToken)
         : await fetchMemberUrn(token.accessToken);
 
-    const { error: upsertError } = await supabase.from('social_credentials').upsert(
-      {
-        social_account_id: account.id,
-        provider: 'linkedin',
-        access_token: token.accessToken,
-        author_urn: authorUrn,
-        scopes: token.scopes,
-        expires_at: token.expiresAt,
-        // team_members.id IS the auth user id (PK references auth.users).
-        connected_by: user.id,
-        last_error: null,
-        last_error_at: null,
-        consecutive_failures: 0,
-      },
-      { onConflict: 'social_account_id' },
-    );
-    if (upsertError) {
+    // The token goes into Supabase Vault via this wrapper, which also upserts
+    // the credential row. The web app can store a token but never read one
+    // back — social_credential_token() is granted to service_role only.
+    const { error: storeError } = await supabase.rpc('store_social_credential', {
+      p_social_account_id: account.id,
+      p_author_urn: authorUrn,
+      p_token: token.accessToken,
+      p_expires_at: token.expiresAt,
+      p_scopes: token.scopes,
+      // team_members.id IS the auth user id (PK references auth.users).
+      p_connected_by: user.id,
+      p_provider: 'linkedin',
+    });
+    if (storeError) {
       return settingsRedirect(request.url, { error: 'store_failed' });
     }
 

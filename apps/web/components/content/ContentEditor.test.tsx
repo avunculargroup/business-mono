@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 import { ContentEditor } from './ContentEditor';
 
-const updateContentBody = vi.fn(async () => ({}));
+const updateContentBody = vi.fn((..._args: unknown[]) => Promise.resolve({}));
 vi.mock('@/app/actions/content', () => ({
   updateContentStatus: vi.fn(async () => ({})),
   updateContentBody: (...args: unknown[]) => updateContentBody(...args),

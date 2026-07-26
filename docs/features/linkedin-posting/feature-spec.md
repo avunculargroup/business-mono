@@ -48,14 +48,14 @@ One migration: `supabase/migrations/2026XXXXXXXXXX_add_social_credentials.sql` (
 
 ### `social_credentials` (new)
 
-Separate from `social_accounts` so token columns are never selected by existing UI queries; extensible to X later.
+Separate from `social_accounts` so credential columns are never selected by existing UI queries; extensible to X later.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `social_account_id` | UUID NOT NULL UNIQUE → `social_accounts(id)` ON DELETE CASCADE | one credential per account |
 | `provider` | TEXT NOT NULL DEFAULT 'linkedin' CHECK IN ('linkedin') | |
-| `access_token` | TEXT NOT NULL | plaintext, matching `fastmail_accounts.token` precedent (RLS-protected, never returned to the browser) |
+| `access_token_id` | UUID NOT NULL | `vault.secrets.id` — the token itself is encrypted in Supabase Vault, never on this row (see below). No FK: `vault.secrets` is extension-owned |
 | `author_urn` | TEXT NOT NULL | `urn:li:person:…` or `urn:li:organization:…` |
 | `scopes` | TEXT[] | |
 | `expires_at` | TIMESTAMPTZ NOT NULL | 60-day LinkedIn token lifetime |
@@ -64,6 +64,25 @@ Separate from `social_accounts` so token columns are never selected by existing 
 | `created_at` / `updated_at` | TIMESTAMPTZ | + `update_updated_at()` trigger |
 
 RLS policy identical to `fastmail_accounts_all`.
+
+### Token storage — Supabase Vault
+
+A LinkedIn token can post publicly as a founder, so it is **not** stored the way `fastmail_accounts.token` is. The ciphertext lives in `vault.secrets` (extension `supabase_vault`, already installed); the credential row holds only the secret's UUID.
+
+The `vault` schema is not exposed over PostgREST, so three `SECURITY DEFINER` functions with a pinned `search_path` are the only access path:
+
+| Function | Purpose | GRANT |
+|---|---|---|
+| `store_social_credential(social_account_id, author_urn, token, expires_at, scopes, connected_by, provider)` | Creates the secret (or rotates it in place on reconnect, keeping the same id) and upserts the credential row in one call, so the caller never handles the secret id | `authenticated`, `service_role` |
+| `social_credential_token(social_account_id)` | Returns the decrypted token | **`service_role` only** |
+| `delete_social_credential(social_account_id)` | Drops the row and its ciphertext together | `authenticated`, `service_role` |
+
+Two things make this worth more than encryption-at-rest theatre:
+
+- **The web app can store a token it can never read back.** The OAuth callback runs as the signed-in user and calls the store wrapper; nothing in `apps/web` can call the read wrapper. Granting `social_credential_token` to `authenticated` would put the token back within reach of any signed-in session over the REST API and undo the point of using Vault.
+- **The plaintext exists in the agents process for one post.** The poller selects credential metadata only, and decrypts via RPC after the claim succeeds, immediately before the API call.
+
+`EXECUTE` is revoked from `PUBLIC` on all three first, since Postgres grants it by default.
 
 ### `content_items` additions
 
@@ -153,7 +172,7 @@ Answers not needed to start Phase 1 code, but needed before go-live.
 1. **LinkedIn developer app**: does one already exist? Who creates it? It must be associated with (and verified by) the BTS company page — requires a page admin.
 2. **Page admin roles**: does Chris or Carri hold the ADMINISTRATOR role on the BTS LinkedIn page? Required for app verification and later for the company-page token.
 3. **Community Management API application**: OK to apply immediately (2–4 week review)? Someone needs to fill in the use-case form on the LinkedIn developer portal.
-4. **Token storage**: plaintext in Supabase behind RLS (matches the Fastmail precedent, two-person team) — acceptable, or encrypted storage (e.g. Supabase Vault) now? Spec assumes plaintext.
+4. ~~**Token storage**: plaintext in Supabase behind RLS, or encrypted storage now?~~ **Resolved 2026-07-25 — Supabase Vault.** Tokens are encrypted in `vault.secrets`; only the secret UUID is on the row, and decryption is `service_role`-only. See [Token storage](#token-storage--supabase-vault).
 5. **Carri's consent flow**: each person authorizes their own profile by clicking Connect while logged into their LinkedIn account — fine for Carri to do this herself from the settings page?
 6. **Scheduling granularity**: poller runs every 60s, so posts land within ~1 minute of the scheduled time — acceptable?
 7. **Kanban drag-to-scheduled**: block without a time (planned) or default to e.g. next 9:00 AEST?
@@ -166,15 +185,14 @@ Answers not needed to start Phase 1 code, but needed before go-live.
 Update this section as each phase lands.
 
 - [ ] **Phase 0 — LinkedIn app setup** (founder action, blocks go-live): developer app created, "Sign In with LinkedIn using OpenID Connect" + "Share on LinkedIn" products added, callback URL `<app-origin>/api/integrations/linkedin/callback` registered, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET` set in Vercel, app associated with the BTS page, Community Management API application submitted
-- [x] **Phase 1 — Accounts & OAuth** (code complete): migration `20260725000000_add_social_credentials.sql` (`social_credentials`, `oauth_states`, `content_items` publish cols) + `schema.sql` + changelog + types; `lib/linkedin/oauth.ts` (+ test); `app/api/integrations/linkedin/{start,callback}/route.ts`; `settings/integrations/linkedin/` page + client + dynamic integrations card; `actions/socialCredentials.ts`
+- [x] **Phase 1 — Accounts & OAuth** (code complete): migration `20260725000000_add_social_credentials.sql` (`social_credentials`, `oauth_states`, `content_items` publish cols, Vault wrappers) + `schema.sql` + changelog + types; `lib/linkedin/oauth.ts` (+ test); `app/api/integrations/linkedin/{start,callback}/route.ts`; `settings/integrations/linkedin/` page + client + dynamic integrations card; `actions/socialCredentials.ts`
   - Still needs Phase 0 before Chris & Carri can actually connect; the three `social_accounts` rows must exist (`platform='linkedin'`)
 - [x] **Phase 2 — Publish & schedule** (code complete): `apps/agents/src/lib/linkedin.ts` client + `escapeLinkedInText` (+ test); `socialPublishListener` poller registered in `mastra/index.ts` (+ test); `updateContentBody`/`scheduleContent`/`postContentNow` (+ test); `ContentEditor` save, char-count vs `platform_specs`, fold preview, markdown warning, schedule panel, Post now (+ tests); `complianceRecheck` guard relaxed to account-linked drafts (+ test); `ContentBoard` publish-error surfacing + drag-to-scheduled block (+ tests)
 - [ ] **Phase 3 — Company page**: `w_organization_social` scope + `fetchOrganizationUrn` are already wired in the callback; needs LinkedIn approval, then connect the BTS page and verify a post
 - [ ] **Post-launch**: migration applied on merge to `main`; end-to-end connect → approve → Post now verified against the real API; expiry-warning flow observed; open questions above resolved and recorded here
 
-### Verification run (2026-07-25)
+### Verification run (2026-07-25, after the Vault change)
 
-- `pnpm --filter @platform/agents test` — 949 tests / 116 files pass
-- `pnpm --filter @platform/agents typecheck` — clean
-- `pnpm --filter @platform/web test` — 426 tests / 62 files pass
-- Not yet run: end-to-end against the live LinkedIn API (blocked on Phase 0)
+- `pnpm test` (root, all packages) — 116 agents + 62 web + 3 voice test files pass
+- `pnpm typecheck` (root, all 10 packages) — clean
+- Not yet run: end-to-end against the live LinkedIn API (blocked on Phase 0), and the migration itself has not been applied to any database — it applies on merge to `main` via `.github/workflows/migrate.yml`. The Vault wrappers are therefore unexercised against real Postgres; first apply is the moment to confirm `vault.create_secret`/`update_secret` behave as expected and that `social_credential_token` is callable by `service_role` but not `authenticated`.
