@@ -2619,3 +2619,70 @@ CREATE TABLE market_report_guidelines (
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
 -- Realtime: market_report_feedback REPLICA IDENTITY FULL + added to
 --   supabase_realtime publication (wakes marketReportFeedbackListener on INSERT).
+
+
+-- ============================================================
+-- LINKEDIN POSTING (migration: 20260725000000_add_social_credentials)
+-- ============================================================
+-- OAuth credentials for API publishing, one per social_accounts row
+-- (LinkedIn-only for now). Access tokens (60-day lifetime) live in Supabase
+-- Vault, NOT here: they can post publicly as a founder, so only the vault
+-- secret's UUID is stored. The vault schema is unreachable over PostgREST, so
+-- the three SECURITY DEFINER wrappers below are the only door — and the read
+-- wrapper is service_role-only, so the web app can store a token it can never
+-- read back.
+-- Spec: docs/features/linkedin-posting/feature-spec.md
+
+CREATE TABLE social_credentials (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  social_account_id    UUID        NOT NULL UNIQUE
+                                   REFERENCES social_accounts(id) ON DELETE CASCADE,
+  provider             TEXT        NOT NULL DEFAULT 'linkedin'
+                                   CHECK (provider IN ('linkedin')),
+  -- vault.secrets.id holding the OAuth access token. No FK: vault.secrets is
+  -- extension-owned. delete_social_credential() keeps the two in step.
+  access_token_id      UUID        NOT NULL,
+  author_urn           TEXT        NOT NULL,   -- urn:li:person:… or urn:li:organization:…
+  scopes               TEXT[],
+  expires_at           TIMESTAMPTZ NOT NULL,
+  connected_by         UUID        REFERENCES team_members(id),
+  last_error           TEXT,
+  last_error_at        TIMESTAMPTZ,
+  consecutive_failures INT         NOT NULL DEFAULT 0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Vault wrappers (SECURITY DEFINER, pinned search_path):
+--   store_social_credential(social_account_id, author_urn, token, expires_at,
+--     scopes, connected_by, provider) → creates or rotates the vault secret and
+--     upserts the row in one call. GRANT: authenticated, service_role.
+--   social_credential_token(social_account_id) → decrypted token.
+--     GRANT: service_role ONLY (the agents publish poller).
+--   delete_social_credential(social_account_id) → drops row + ciphertext.
+--     GRANT: authenticated, service_role.
+
+-- Short-lived CSRF state for the web OAuth flow: written by
+-- /api/integrations/linkedin/start, consumed (deleted) by the callback,
+-- which rejects states older than 10 minutes.
+CREATE TABLE oauth_states (
+  state             TEXT        PRIMARY KEY,
+  social_account_id UUID        NOT NULL
+                                REFERENCES social_accounts(id) ON DELETE CASCADE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Publish tracking consumed by socialPublishListener. publish_locked_at is
+-- the atomic claim marker: the poller only posts after flipping it from
+-- NULL, so overlapping ticks can never double-post.
+ALTER TABLE content_items
+  ADD COLUMN IF NOT EXISTS publish_error     TEXT,
+  ADD COLUMN IF NOT EXISTS publish_attempts  INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS publish_locked_at TIMESTAMPTZ;
+
+CREATE INDEX idx_content_scheduled_due
+  ON content_items (scheduled_for)
+  WHERE status = 'scheduled' AND publish_locked_at IS NULL;
+
+-- Triggers: social_credentials_updated_at (update_updated_at).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.

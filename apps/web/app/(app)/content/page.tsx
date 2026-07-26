@@ -8,7 +8,7 @@ export default async function ContentPage() {
   const { data: items } = await supabase
     .from('content_items')
     .select(
-      'id, slug, title, type, status, scheduled_for, created_by, campaign_id, social_account_id, campaigns(name), social_accounts(display_name, platform)'
+      'id, slug, title, type, status, scheduled_for, publish_error, created_by, campaign_id, social_account_id, campaigns(name), social_accounts(display_name, platform)'
     )
     .order('created_at', { ascending: false });
 
@@ -23,6 +23,7 @@ export default async function ContentPage() {
     type: item.type,
     status: item.status,
     scheduled_for: item.scheduled_for,
+    publish_error: item.publish_error,
     created_by: item.created_by,
     campaign_name: item.campaigns?.name ?? null,
     account_name: item.social_accounts?.display_name ?? null,

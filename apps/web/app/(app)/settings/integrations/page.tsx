@@ -34,12 +34,19 @@ const staticIntegrations = [
 
 export default async function IntegrationsPage() {
   const supabase = await createClient();
-  const { count: activeAccountCount } = await supabase
-    .from('fastmail_accounts')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true);
+  const [{ count: activeAccountCount }, { count: linkedinCredentialCount }] = await Promise.all([
+    supabase
+      .from('fastmail_accounts')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true),
+    supabase
+      .from('social_credentials')
+      .select('*', { count: 'exact', head: true })
+      .eq('provider', 'linkedin'),
+  ]);
 
   const fastmailConfigured = (activeAccountCount ?? 0) > 0;
+  const linkedinConfigured = (linkedinCredentialCount ?? 0) > 0;
 
   return (
     <>
@@ -73,6 +80,27 @@ export default async function IntegrationsPage() {
               <p className={styles.details}>
                 {fastmailConfigured
                   ? `${activeAccountCount} active account${activeAccountCount === 1 ? '' : 's'} · 5-minute polling`
+                  : 'No accounts connected — click to configure'}
+              </p>
+            </Card>
+          </Link>
+
+          {/* LinkedIn — dynamic, links to management page */}
+          <Link href="/settings/integrations/linkedin" style={{ textDecoration: 'none' }}>
+            <Card padding="md" hoverable>
+              <div className={styles.header}>
+                <h3 className={styles.name}>LinkedIn</h3>
+                <StatusChip
+                  label={linkedinConfigured ? 'configured' : 'needs setup'}
+                  color={linkedinConfigured ? 'success' : 'warning'}
+                />
+              </div>
+              <p className={styles.description}>
+                API posting for founder profiles and the company page — schedule from /content
+              </p>
+              <p className={styles.details}>
+                {linkedinConfigured
+                  ? `${linkedinCredentialCount} connected account${linkedinCredentialCount === 1 ? '' : 's'} · tokens last 60 days`
                   : 'No accounts connected — click to configure'}
               </p>
             </Card>

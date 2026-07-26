@@ -19,6 +19,7 @@ type ContentItem = {
   type: string;
   status: string;
   scheduled_for: string | null;
+  publish_error: string | null;
   created_by: string | null;
   campaign_name: string | null;
   account_name: string | null;
@@ -65,6 +66,14 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
     const itemId = e.dataTransfer.getData('text/plain');
     if (!itemId) return;
 
+    // LinkedIn posts are scheduled with a date/time from the editor — a bare
+    // status flip would leave the publisher with nothing to act on.
+    const item = optimisticItems.find((i) => i.id === itemId);
+    if (newStatus === 'scheduled' && item?.type === 'linkedin') {
+      setError('Open the post and use Schedule to pick a date and time.');
+      return;
+    }
+
     setError(null);
     startTransition(async () => {
       setOptimisticStatus({ id: itemId, status: newStatus });
@@ -109,6 +118,11 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
         <span className={styles.cardCampaign}>{item.campaign_name}</span>
       )}
       <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
+      {item.publish_error && item.status === 'scheduled' && (
+        <span className={styles.cardPublishError} title={item.publish_error}>
+          {item.publish_error}
+        </span>
+      )}
       <div className={styles.cardMeta}>
         <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
         {item.account_name && (

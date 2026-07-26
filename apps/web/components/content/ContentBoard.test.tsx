@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ContentBoard } from './ContentBoard';
@@ -29,6 +29,7 @@ const baseCard: Card = {
   type: 'linkedin',
   status: 'draft',
   scheduled_for: null,
+  publish_error: null,
   created_by: null,
   campaign_name: null,
   account_name: null,
@@ -90,5 +91,27 @@ describe('ContentBoard archiving', () => {
     expect(screen.getByText('Archive')).toBeInTheDocument();
     const card = screen.getByRole('link', { name: /Why treasuries hold Bitcoin/ });
     expect(within(card).queryByRole('button', { name: 'Archive' })).toBeNull();
+  });
+});
+
+describe('ContentBoard LinkedIn publishing', () => {
+  it('blocks dragging a LinkedIn card into Scheduled without a time', () => {
+    vi.mocked(updateContentStatus).mockClear();
+    renderBoard([{ ...baseCard, status: 'approved' }]);
+
+    const columns = screen.getAllByText('Scheduled');
+    const scheduledColumn = columns[0].closest('div')!.parentElement!;
+    fireEvent.drop(scheduledColumn, { dataTransfer: { getData: () => '1' } });
+
+    expect(updateContentStatus).not.toHaveBeenCalled();
+    expect(screen.getByText(/use Schedule to pick a date and time/)).toBeInTheDocument();
+  });
+
+  it('shows the publish error on a held scheduled card', () => {
+    renderBoard([
+      { ...baseCard, status: 'scheduled', publish_error: 'LinkedIn token has expired' },
+    ]);
+
+    expect(screen.getByText('LinkedIn token has expired')).toBeInTheDocument();
   });
 });

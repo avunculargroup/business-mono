@@ -100,3 +100,79 @@
   font-size: 14px;
   color: var(--color-text-secondary);
 }
+
+.countActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.overLimit {
+  color: var(--color-destructive);
+  font-weight: 600;
+}
+
+.formatNotes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.formatWarning {
+  font-size: var(--text-xs);
+  color: var(--color-destructive);
+  margin: 0;
+}
+
+.formatNote {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+.foldPreview {
+  display: block;
+  margin-top: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.publishError {
+  font-size: var(--text-xs);
+  color: var(--color-destructive);
+}
+
+.schedulePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.datetimeInput {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+
+.datetimeInput:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.scheduleActions {
+  display: flex;
+  gap: var(--space-2);
+}

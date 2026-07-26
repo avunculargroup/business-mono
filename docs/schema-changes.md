@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-25 — LinkedIn posting: social_credentials, oauth_states, publish tracking
+
+- **`social_credentials` table** — one OAuth credential per `social_accounts` row (LinkedIn-only CHECK for now, extensible to X later). Kept separate from `social_accounts` so credential columns are never selected by existing UI queries. `author_urn` stores the LinkedIn post author (`urn:li:person:…` for founders, `urn:li:organization:…` for the company page). `expires_at` tracks the 60-day LinkedIn token lifetime (no refresh tokens for standard apps — reconnect via the same OAuth flow). Fastmail-style error columns (`last_error`, `consecutive_failures`) drive auto-disable + reconnect badges.
+- **Access tokens in Supabase Vault, not in the table** — a LinkedIn token can post publicly as a founder, so it is not stored the way `fastmail_accounts.token` is. The ciphertext lives in `vault.secrets` and only `access_token_id` (the secret's UUID) is stored on the row. The `vault` schema is not exposed over PostgREST, so three `SECURITY DEFINER` wrappers with pinned `search_path` are the only access path: `store_social_credential()` creates-or-rotates the secret and upserts the row in one call (GRANT: `authenticated`, `service_role` — the web app can store a token it can never read back), `social_credential_token()` decrypts it (**GRANT: `service_role` only** — granting this to `authenticated` would put the token back within reach of any signed-in session and undo the point of using Vault), and `delete_social_credential()` drops the row and its ciphertext together. `EXECUTE` is revoked from `PUBLIC` on all three first, since Postgres grants it by default.
+- **`oauth_states` table** — short-lived CSRF state for the net-new web OAuth flow: `/api/integrations/linkedin/start` writes a row, the callback validates + deletes it (rejecting states older than 10 minutes). Persisted server-side rather than a cookie so it survives across Vercel invocations.
+- **`content_items` publish columns** — `publish_error`, `publish_attempts`, `publish_locked_at`. `publish_locked_at` is the atomic claim marker used by the `socialPublishListener` poller (conditional UPDATE from NULL) so overlapping ticks can never double-post. Partial index `idx_content_scheduled_due` on `scheduled_for WHERE status='scheduled' AND publish_locked_at IS NULL` keeps the 60s poll cheap.
+- Spec: `docs/features/linkedin-posting/feature-spec.md`.
+
+---
+
 ## 2026-07-20 — renumber findings-engine / gold migrations off a duplicate version
 
 The findings-engine and gold-price migrations were both authored as
