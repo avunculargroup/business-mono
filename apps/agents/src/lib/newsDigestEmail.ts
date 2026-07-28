@@ -60,6 +60,9 @@ interface DigestItem {
   title: string;
   url: string;
   source: string;
+  /** news_items / podcast id, for the in-app fallback link. */
+  id?: string;
+  kind?: 'news' | 'podcast';
 }
 
 /**
@@ -97,6 +100,21 @@ function safeHref(url: string): string | null {
   return /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
 }
 
+/**
+ * Where a story's headline should point. Email-sourced items carry a synthetic
+ * `email://…` url that opens nothing, so those fall back to the in-app reading
+ * view. Null when neither is available — the caller renders unlinked text.
+ */
+function storyHref(item: DigestItem, webAppUrl?: string): string | null {
+  const external = safeHref(item.url);
+  if (external) return external;
+  if (!item.id || !webAppUrl) return null;
+  const base = webAppUrl.replace(/\/$/, '');
+  return item.kind === 'podcast'
+    ? `${base}/news/podcasts/${item.id}`
+    : `${base}/news/${item.id}`;
+}
+
 function digestItems(result: RoutineResult): DigestItem[] {
   const meta = (result.metadata ?? {}) as { stories?: NewsCurationStory[] };
   if (meta.stories && meta.stories.length > 0) {
@@ -104,6 +122,8 @@ function digestItems(result: RoutineResult): DigestItem[] {
       title: cleanTitle(s.title),
       url: s.url,
       source: s.source_name,
+      id: s.id,
+      kind: s.kind,
     }));
   }
   // Fall back to the action-agnostic sources[] the tile also reads from.
@@ -154,7 +174,8 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   if (mood) textLines.push(mood, '');
   items.forEach((it, i) => {
     textLines.push(`${i + 1}. ${it.title}${it.source ? ` (${it.source})` : ''}`);
-    textLines.push(`   ${it.url}`);
+    const href = storyHref(it, input.webAppUrl);
+    if (href) textLines.push(`   ${href}`);
   });
   if (moreNewsUrl) textLines.push('', `More news: ${moreNewsUrl}`);
   const footerBits = [company.name, company.abn ? `ABN ${company.abn}` : '', company.website ?? ''].filter(Boolean);
@@ -164,7 +185,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   // ── HTML part ───────────────────────────────────────────────────────────────
   const storyRows = items
     .map((it) => {
-      const href = safeHref(it.url);
+      const href = storyHref(it, input.webAppUrl);
       const titleHtml = escapeHtml(it.title);
       const linked = href
         ? `<a href="${escapeHtml(href)}" style="color:${C.textPrimary};text-decoration:none;font-weight:600;">${titleHtml}</a>`

@@ -116,6 +116,11 @@ export interface NewsSourceRecord {
   // Shared Rex-rubric curation fields.
   tier: NewsTier | null;
   relevance_threshold: number;
+  // Link following: when on, links inside an ingested item are fetched and
+  // ingested as their own news_items rows. Off by default — each followed link
+  // costs a fetch plus two LLM calls.
+  follow_links: boolean;
+  max_followed_links: number;
   last_scanned_at: string | null;
   last_status: 'success' | 'failed' | null;
   last_error: string | null;

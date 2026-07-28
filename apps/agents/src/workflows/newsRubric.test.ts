@@ -1,5 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import { composeRelevanceScore, deriveFlags, RUBRIC_VERSION } from './newsRubric.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// The scorer builds its Agent internally, so stub the class and capture the
+// scope key handed to stepRequestContext.
+const generateMock = vi.fn();
+const stepRequestContextMock = vi.fn((key: string) => ({ key }));
+
+vi.mock('@mastra/core/agent', () => ({
+  Agent: class {
+    generate = generateMock;
+  },
+}));
+vi.mock('../config/model.js', () => ({
+  dynamicModelFor: vi.fn(() => vi.fn()),
+  stepRequestContext: stepRequestContextMock,
+}));
+
+const { composeRelevanceScore, deriveFlags, RUBRIC_VERSION, scoreNewsItem, RUBRIC_SCOPE_KEY } =
+  await import('./newsRubric.js');
 
 describe('composeRelevanceScore', () => {
   it('weights material 0.5, novelty 0.3, citation 0.2', () => {
@@ -47,5 +64,39 @@ describe('deriveFlags', () => {
 describe('RUBRIC_VERSION', () => {
   it('is pinned', () => {
     expect(RUBRIC_VERSION).toBe('v1');
+  });
+});
+
+describe('scoreNewsItem model scope', () => {
+  const input = {
+    title: 'RBA holds',
+    body: 'A long enough body to score.',
+    sourceName: 'Gromen Tree Rings',
+    sourceTier: 'tier_1',
+    similar: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    generateMock.mockResolvedValue({
+      object: {
+        dimension_scores: { material: 0.8, novelty: 0.7, citation: 0.75 },
+        relevance_reasoning: 'r',
+        summary: 's',
+        topics: ['macro'],
+        suggested_curator_notes: 'n',
+        flags: [],
+      },
+    });
+  });
+
+  it('uses the shared rubric scope by default', async () => {
+    await scoreNewsItem(input);
+    expect(stepRequestContextMock).toHaveBeenCalledWith(RUBRIC_SCOPE_KEY);
+  });
+
+  it('uses a caller-supplied scope key when given', async () => {
+    await scoreNewsItem({ ...input, scopeKey: 'newsletterLinks.rubric_score' });
+    expect(stepRequestContextMock).toHaveBeenCalledWith('newsletterLinks.rubric_score');
   });
 });

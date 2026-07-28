@@ -33,6 +33,10 @@ const schema = z.object({
   relevance_threshold: z.coerce.number().min(0).max(1).optional().default(0.7),
   // Newline/comma-separated From addresses or domains.
   sender_allowlist: z.string().optional().default(''),
+  // NOT z.coerce.boolean() — that is Boolean(input), and Boolean('false') is
+  // true, so an unchecked box would persist as enabled.
+  follow_links: z.enum(['true', 'false']).optional().default('false').transform((v) => v === 'true'),
+  max_followed_links: z.coerce.number().int().min(0).max(20).optional().default(5),
 });
 
 type SourceInput = z.infer<typeof schema>;
@@ -95,6 +99,8 @@ function buildRow(input: SourceInput, feedUrl: string | null) {
       sender_allowlist: parseSenderAllowlist(input.sender_allowlist),
       tier: input.tier || null,
       relevance_threshold: input.relevance_threshold,
+      follow_links: input.follow_links,
+      max_followed_links: input.max_followed_links,
     };
   }
   if (input.source_type === 'rss') {

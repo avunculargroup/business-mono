@@ -36,6 +36,8 @@ import {
   synthesizeEmailUrl,
   senderAllowed,
 } from '../lib/newsletterExtract.js';
+import { extractNewsletterLinks } from '../lib/newsletterLinks.js';
+import { fetchUrl } from '../agents/researcher/tools.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
 import { createLogger } from '../lib/logger.js';
@@ -43,12 +45,38 @@ import { createLogger } from '../lib/logger.js';
 const log = createLogger('research-mail');
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
+// Ceiling on followed links across every source in one poll cycle. The
+// per-source cap alone is meaningless when several newsletters land in the
+// same five-minute window — eight sources at five links each would be eighty
+// LLM calls before the next tick.
+const MAX_FOLLOWED_LINKS_PER_CYCLE = 20;
+
+// Followed articles shorter than this are paywall stubs or navigation shells,
+// not content. Higher than the RSS path's 200 because there we still have a
+// real feed summary to fall back on; here we have nothing.
+const MIN_FOLLOWED_BODY_CHARS = 1000;
+
+const PAYWALL_RE =
+  /subscribe to (?:continue|read)|create an account to|this content is for (?:subscribers|members)|already a (?:subscriber|member)\?/i;
+
+// Model scopes for the followed-link path, configurable at /settings/models
+// independently of the RSS/feed ingestion steps.
+const LINK_EXTRACT_SCOPE = 'newsletterLinks.extract';
+const LINK_RUBRIC_SCOPE = 'newsletterLinks.rubric_score';
+
 export interface EmailSource {
   id: string;
   name: string;
   slug: string;
   tier: string | null;
   sender_allowlist: string[];
+  follow_links: boolean;
+  max_followed_links: number;
+}
+
+/** Mutable per-poll-cycle allowance, shared across accounts and sources. */
+export interface LinkBudget {
+  remaining: number;
 }
 
 type ResearchAccount = {
@@ -68,7 +96,24 @@ export function startResearchMailListener(): void {
 
 // ── Poll all accounts ─────────────────────────────────────────────────────────
 
+// Following links turns a cycle that used to take seconds into one that can
+// take minutes, so overlapping ticks are now a real possibility.
+let polling = false;
+
 async function pollAllResearchAccounts(): Promise<void> {
+  if (polling) {
+    log.info('previous poll cycle still running — skipping this tick');
+    return;
+  }
+  polling = true;
+  try {
+    await runPollCycle();
+  } finally {
+    polling = false;
+  }
+}
+
+async function runPollCycle(): Promise<void> {
   let accounts: ResearchAccount[];
   let sourcesBySlug: Map<string, EmailSource>;
 
@@ -80,7 +125,7 @@ async function pollAllResearchAccounts(): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase
         .from('news_sources')
-        .select('id, name, slug, tier, sender_allowlist, is_active, source_type')
+        .select('id, name, slug, tier, sender_allowlist, follow_links, max_followed_links, is_active, source_type')
         .eq('source_type' as any, 'email')
         .eq('is_active', true) as any),
     ]);
@@ -106,9 +151,11 @@ async function pollAllResearchAccounts(): Promise<void> {
     return;
   }
 
+  const budget: LinkBudget = { remaining: MAX_FOLLOWED_LINKS_PER_CYCLE };
+
   for (const account of accounts) {
     try {
-      await pollResearchAccount(account, sourcesBySlug);
+      await pollResearchAccount(account, sourcesBySlug, budget);
     } catch (err) {
       log.error({ err, account: account.username }, 'error polling account');
     }
@@ -120,6 +167,7 @@ async function pollAllResearchAccounts(): Promise<void> {
 async function pollResearchAccount(
   account: ResearchAccount,
   sourcesBySlug: Map<string, EmailSource>,
+  budget: LinkBudget,
 ): Promise<void> {
   const client = new FastmailJmapClient(account.username, account.token);
   const { accountId, apiUrl } = await client.getSession();
@@ -146,12 +194,18 @@ async function pollResearchAccount(
     const emails = await client.getEmails(accountId, apiUrl, result.emailIds);
     for (const email of emails) {
       try {
-        const outcome = await processResearchEmail(email, sourcesBySlug);
+        const outcome = await processResearchEmail(email, sourcesBySlug, budget);
         if (outcome.status === 'skipped') {
           log.info({ emailId: email.id, reason: outcome.reason }, 'skipped');
         } else if (outcome.status === 'ingested') {
           log.info(
-            { emailId: email.id, newsItemId: outcome.newsItemId, score: outcome.relevanceScore ?? 'n/a' },
+            {
+              emailId: email.id,
+              newsItemId: outcome.newsItemId,
+              score: outcome.relevanceScore ?? 'n/a',
+              linksIngested: outcome.followedLinks?.ingested ?? 0,
+              linksSkipped: outcome.followedLinks?.skipped ?? 0,
+            },
             'ingested → news_item',
           );
         }
@@ -181,13 +235,20 @@ async function pollResearchAccount(
 // ── Process a single research email ─────────────────────────────────────────────
 
 export type ResearchEmailOutcome =
-  | { status: 'ingested'; newsItemId?: string; relevanceScore?: number | null }
+  | {
+      status: 'ingested';
+      newsItemId?: string;
+      relevanceScore?: number | null;
+      /** Present only when the source has link following enabled. */
+      followedLinks?: { ingested: number; skipped: number };
+    }
   | { status: 'duplicate'; reason?: string }
   | { status: 'skipped'; reason: string };
 
 export async function processResearchEmail(
   email: JmapEmail,
   sourcesBySlug: Map<string, EmailSource>,
+  budget?: LinkBudget,
 ): Promise<ResearchEmailOutcome> {
   // 1. Route by plus-address slug.
   const slug = extractResearchSlug(email);
@@ -248,5 +309,133 @@ export async function processResearchEmail(
 
   if (result.status === 'duplicate') return { status: 'duplicate', reason: result.reason };
   if (result.status === 'failed') return { status: 'skipped', reason: `ingest_failed:${result.reason ?? 'unknown'}` };
-  return { status: 'ingested', newsItemId: result.newsItemId, relevanceScore: result.relevanceScore };
+
+  // 5. Follow the links in the body, when the source opts in. Only on a fresh
+  //    insert — a re-delivered newsletter would otherwise pay for N fetches and
+  //    2N LLM calls before per-link dedup caught up with it.
+  let followedLinks: { ingested: number; skipped: number } | undefined;
+  if (source.follow_links && html && result.newsItemId) {
+    followedLinks = await ingestNewsletterLinks({
+      html,
+      source,
+      parentNewsItemId: result.newsItemId,
+      parentIngestionRef: ingestionRef,
+      excludeUrls: [url, canonicalUrl].filter((u): u is string => Boolean(u)),
+      budget: budget ?? { remaining: MAX_FOLLOWED_LINKS_PER_CYCLE },
+    });
+  }
+
+  return {
+    status: 'ingested',
+    newsItemId: result.newsItemId,
+    relevanceScore: result.relevanceScore,
+    ...(followedLinks ? { followedLinks } : {}),
+  };
+}
+
+// ── Follow the links inside a newsletter ────────────────────────────────────────
+
+/**
+ * Fetches each substantive link in a newsletter and ingests it as its own
+ * news_items row. Sequential by design: every link is two serialised LLM calls
+ * regardless, and concurrency would risk Jina's unauthenticated rate limit.
+ *
+ * Children carry `{parentRef}#link:{url}` as their ingestion_ref — unique per
+ * source_id, so a re-delivered issue is deduped before any spend — and the
+ * parent id in rex_metadata for queryability.
+ */
+export async function ingestNewsletterLinks(args: {
+  html: string;
+  source: EmailSource;
+  parentNewsItemId: string;
+  parentIngestionRef: string;
+  excludeUrls: string[];
+  budget: LinkBudget;
+}): Promise<{ ingested: number; skipped: number }> {
+  const { html, source, parentNewsItemId, parentIngestionRef, excludeUrls, budget } = args;
+
+  const max = Math.min(source.max_followed_links, budget.remaining);
+  if (max <= 0) {
+    log.warn({ source: source.name }, 'link budget exhausted for this poll cycle');
+    return { ingested: 0, skipped: 0 };
+  }
+
+  const links = extractNewsletterLinks(html, { max, excludeUrls });
+  let ingested = 0;
+  let skipped = 0;
+
+  for (const link of links) {
+    if (budget.remaining <= 0) {
+      log.warn({ source: source.name }, 'link budget exhausted mid-newsletter');
+      break;
+    }
+    budget.remaining -= 1;
+
+    // Every candidate is logged so the deny-lists can be tuned from real
+    // newsletters rather than guesses.
+    log.info({ source: source.name, url: link.url }, 'following newsletter link');
+
+    try {
+      const fetched = (await fetchUrl.execute!({ url: link.url } as never, {} as never)) as
+        | { title?: string; markdown?: string; resolved_url?: string }
+        | undefined;
+
+      const markdown = fetched?.markdown?.trim() ?? '';
+      if (markdown.length < MIN_FOLLOWED_BODY_CHARS) {
+        skipped += 1;
+        log.info({ url: link.url, chars: markdown.length }, 'link skipped — body too short');
+        continue;
+      }
+      if (PAYWALL_RE.test(markdown.slice(0, 2000))) {
+        skipped += 1;
+        log.info({ url: link.url }, 'link skipped — paywall stub');
+        continue;
+      }
+
+      // Jina follows redirects server-side, so this unwraps tracking wrappers.
+      const url = fetched?.resolved_url ?? link.url;
+      const title = fetched?.title?.trim() || link.anchorText || link.url;
+
+      const { data: extracted } = await extractNewsMetadata({
+        title,
+        source: source.name,
+        content: markdown.slice(0, 12000),
+        scopeKey: LINK_EXTRACT_SCOPE,
+      });
+
+      const result = await ingestNewsItem({
+        source: { id: source.id, name: source.name, tier: source.tier },
+        title,
+        body: markdown,
+        fallbackSummary: extracted?.summary ?? title,
+        category: (extracted?.category ?? 'macro') as NewsCategory,
+        keyPoints: extracted?.key_points ?? [],
+        topicTags: extracted?.topic_tags ?? [],
+        australianRelevance: extracted?.australian_relevance ?? false,
+        publishedAt: null,
+        url,
+        ingestionRef: `${parentIngestionRef}#link:${link.url}`,
+        ingestedBy: 'rex',
+        rubricScopeKey: LINK_RUBRIC_SCOPE,
+        rexMetadataExtra: {
+          from_newsletter_item_id: parentNewsItemId,
+          from_newsletter_anchor_text: link.anchorText || null,
+        },
+        status: extracted ? 'new' : 'extraction_failed',
+      });
+
+      if (result.status === 'inserted') {
+        ingested += 1;
+        log.info({ url, newsItemId: result.newsItemId, score: result.relevanceScore ?? 'n/a' }, 'link → news_item');
+      } else {
+        skipped += 1;
+        log.info({ url, status: result.status, reason: result.reason }, 'link not stored');
+      }
+    } catch (err) {
+      skipped += 1;
+      log.warn({ err, url: link.url }, 'link failed — skipping');
+    }
+  }
+
+  return { ingested, skipped };
 }

@@ -7,23 +7,28 @@ import { buildJmapEmail } from '../../test/factories.js';
 // polling functions (processResearchEmail itself never touches it).
 const extractNewsMetadata = vi.fn();
 const ingestNewsItem = vi.fn();
+const fetchUrlExecute = vi.fn();
 
 vi.mock('@platform/db', () => ({ supabase: {} }));
 vi.mock('../workflows/newsExtract.js', () => ({ extractNewsMetadata }));
 vi.mock('../workflows/ingestNewsItem.js', () => ({ ingestNewsItem }));
+vi.mock('../agents/researcher/tools.js', () => ({ fetchUrl: { execute: fetchUrlExecute } }));
 
 const { processResearchEmail } = await import('./researchMailListener.js');
+type EmailSource = Parameters<typeof processResearchEmail>[1] extends Map<string, infer S> ? S : never;
 
-const GROMEN = {
+const GROMEN: EmailSource = {
   id: 'src-gromen',
   name: 'Gromen Tree Rings',
   slug: 'gromen',
   tier: 'tier_1',
   sender_allowlist: ['gromen.com'],
+  follow_links: false,
+  max_followed_links: 5,
 };
 
-function sources(...list: Array<typeof GROMEN>): Map<string, typeof GROMEN> {
-  const m = new Map<string, typeof GROMEN>();
+function sources(...list: EmailSource[]): Map<string, EmailSource> {
+  const m = new Map<string, EmailSource>();
   for (const s of list) m.set(s.slug, s);
   return m;
 }
@@ -151,5 +156,127 @@ describe('processResearchEmail', () => {
     expect(res.status).toBe('ingested');
     const arg = ingestNewsItem.mock.calls[0][0];
     expect(arg.ingestionRef).toContain('gromen:');
+  });
+});
+
+describe('processResearchEmail link following', () => {
+  const ROUNDUP = {
+    ...GROMEN,
+    follow_links: true,
+    max_followed_links: 5,
+  };
+
+  /** A roundup issue linking out to two articles plus the usual chrome. */
+  function roundupEmail(): ReturnType<typeof newsletterEmail> {
+    return newsletterEmail({
+      htmlBody:
+        '<p><a href="https://pub.example/issue/42">View this email in your browser</a></p>' +
+        '<p>Commentary. <a href="https://afr.com/rba-holds">RBA holds rates</a></p>' +
+        '<p>And <a href="https://wsj.com/fed-pivot">Fed signals pivot</a>.</p>' +
+        '<p><a href="https://pub.example/u/1">Unsubscribe</a></p>',
+    });
+  }
+
+  const ARTICLE_BODY = 'A'.repeat(2000);
+
+  beforeEach(() => {
+    fetchUrlExecute.mockReset();
+    fetchUrlExecute.mockResolvedValue({
+      title: 'Fetched headline',
+      markdown: ARTICLE_BODY,
+      resolved_url: undefined,
+    });
+  });
+
+  it('does not follow links when the source has not opted in', async () => {
+    const res = await processResearchEmail(roundupEmail(), sources(GROMEN));
+    expect(res).toEqual({ status: 'ingested', newsItemId: 'news-1', relevanceScore: 0.84 });
+    expect(fetchUrlExecute).not.toHaveBeenCalled();
+    expect(ingestNewsItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('ingests each substantive link as its own item, skipping chrome', async () => {
+    const res = await processResearchEmail(roundupEmail(), sources(ROUNDUP));
+
+    expect(res).toMatchObject({ status: 'ingested', followedLinks: { ingested: 2, skipped: 0 } });
+    expect(fetchUrlExecute.mock.calls.map((c) => c[0].url)).toEqual([
+      'https://afr.com/rba-holds',
+      'https://wsj.com/fed-pivot',
+    ]);
+    expect(ingestNewsItem).toHaveBeenCalledTimes(3); // parent + 2 links
+
+    const child = ingestNewsItem.mock.calls[1][0];
+    expect(child).toMatchObject({
+      source: { id: 'src-gromen', name: 'Gromen Tree Rings', tier: 'tier_1' },
+      url: 'https://afr.com/rba-holds',
+      title: 'Fetched headline',
+      ingestionRef: 'issue-42@gromen.com#link:https://afr.com/rba-holds',
+      rubricScopeKey: 'newsletterLinks.rubric_score',
+      rexMetadataExtra: {
+        from_newsletter_item_id: 'news-1',
+        from_newsletter_anchor_text: 'RBA holds rates',
+      },
+    });
+    expect(child.body).toBe(ARTICLE_BODY);
+    // the followed-link metadata call uses its own model scope
+    expect(extractNewsMetadata).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scopeKey: 'newsletterLinks.extract' }),
+    );
+  });
+
+  it('never follows links when the parent was a duplicate', async () => {
+    ingestNewsItem.mockResolvedValue({ status: 'duplicate', reason: 'ingestion_ref' });
+    const res = await processResearchEmail(roundupEmail(), sources(ROUNDUP));
+    expect(res).toEqual({ status: 'duplicate', reason: 'ingestion_ref' });
+    expect(fetchUrlExecute).not.toHaveBeenCalled();
+  });
+
+  it('honours the per-source cap', async () => {
+    await processResearchEmail(roundupEmail(), sources({ ...ROUNDUP, max_followed_links: 1 }));
+    expect(fetchUrlExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops when the poll-cycle budget runs out mid-newsletter', async () => {
+    const budget = { remaining: 1 };
+    const res = await processResearchEmail(roundupEmail(), sources(ROUNDUP), budget);
+    expect(fetchUrlExecute).toHaveBeenCalledTimes(1);
+    expect(res).toMatchObject({ followedLinks: { ingested: 1, skipped: 0 } });
+    expect(budget.remaining).toBe(0);
+  });
+
+  it('skips a paywall stub and a short body but still ingests its siblings', async () => {
+    fetchUrlExecute
+      .mockResolvedValueOnce({ title: 'Paywalled', markdown: `${'B'.repeat(1200)} Subscribe to continue reading` })
+      .mockResolvedValueOnce({ title: 'Real', markdown: ARTICLE_BODY });
+    const res = await processResearchEmail(roundupEmail(), sources(ROUNDUP));
+    expect(res).toMatchObject({ followedLinks: { ingested: 1, skipped: 1 } });
+    expect(ingestNewsItem).toHaveBeenCalledTimes(2); // parent + 1 link
+  });
+
+  it('skips a link whose fetch throws, without failing the newsletter', async () => {
+    fetchUrlExecute
+      .mockRejectedValueOnce(new Error('jina timeout'))
+      .mockResolvedValueOnce({ title: 'Real', markdown: ARTICLE_BODY });
+    const res = await processResearchEmail(roundupEmail(), sources(ROUNDUP));
+    expect(res).toMatchObject({ status: 'ingested', followedLinks: { ingested: 1, skipped: 1 } });
+  });
+
+  it('prefers the redirect-resolved url over the tracking wrapper', async () => {
+    fetchUrlExecute.mockResolvedValue({
+      title: 'Fetched headline',
+      markdown: ARTICLE_BODY,
+      resolved_url: 'https://afr.com/final-destination',
+    });
+    await processResearchEmail(roundupEmail(), sources({ ...ROUNDUP, max_followed_links: 1 }));
+    const child = ingestNewsItem.mock.calls[1][0];
+    expect(child.url).toBe('https://afr.com/final-destination');
+    // the ingestion_ref still keys off the in-email href, so re-delivery dedups
+    expect(child.ingestionRef).toBe('issue-42@gromen.com#link:https://afr.com/rba-holds');
+  });
+
+  it('falls back to anchor text when the fetch returns no title', async () => {
+    fetchUrlExecute.mockResolvedValue({ title: '  ', markdown: ARTICLE_BODY });
+    await processResearchEmail(roundupEmail(), sources({ ...ROUNDUP, max_followed_links: 1 }));
+    expect(ingestNewsItem.mock.calls[1][0].title).toBe('RBA holds rates');
   });
 });

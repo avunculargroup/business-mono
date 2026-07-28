@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-27 — news_sources.follow_links / max_followed_links
+
+- **`follow_links` + `max_followed_links` on `news_sources`** — research newsletters are frequently link roundups where the substance sits behind the links rather than in the email body. When `follow_links` is true, `researchMailListener` extracts the substantive links from the newsletter HTML, fetches each article, and ingests it as its own `news_items` row with a real `http(s)` URL. That fixes two things at once: the linked articles become first-class, dedupable, individually-scored items, and the digest email gets a clickable heading instead of the unlinkable synthetic `email://…` URL.
+- **Default `false`** — every followed link costs a Jina Reader fetch plus two LLM calls (metadata extraction + Rex rubric), so this is opt-in per source and nothing starts spending on deploy. A global per-poll-cycle cap in the listener bounds the damage when several newsletters land in the same 5-minute window.
+- **`CHECK (max_followed_links BETWEEN 0 AND 20)`** — the one guardrail worth a constraint: a typo of `500` in the source form would otherwise turn a single poll cycle into a four-figure LLM bill.
+- **Not restricted to `source_type = 'email'`** — the columns sit alongside the other shared curation settings (`tier`, `relevance_threshold`) rather than in the email block, so an RSS path could adopt them later without a second migration.
+- Parent↔child linkage needs no column: children carry `ingestion_ref = '{parent-ref}#link:{url}'` (unique per `source_id`, so re-delivery is deduped before any spend) and `rex_metadata->>'from_newsletter_item_id'`.
+
+---
+
 ## 2026-07-25 — LinkedIn posting: social_credentials, oauth_states, publish tracking
 
 - **`social_credentials` table** — one OAuth credential per `social_accounts` row (LinkedIn-only CHECK for now, extensible to X later). Kept separate from `social_accounts` so credential columns are never selected by existing UI queries. `author_urn` stores the LinkedIn post author (`urn:li:person:…` for founders, `urn:li:organization:…` for the company page). `expires_at` tracks the 60-day LinkedIn token lifetime (no refresh tokens for standard apps — reconnect via the same OAuth flow). Fastmail-style error columns (`last_error`, `consecutive_failures`) drive auto-disable + reconnect badges.

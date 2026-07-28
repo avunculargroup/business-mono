@@ -62,6 +62,11 @@ export async function extractNewsMetadata(input: {
   // When omitted (source scan), the extractor classifies the article itself.
   category?: NewsCategory;
   content: string;
+  /**
+   * Model scope key for this call, so an ingestion path can be configured
+   * separately in /settings/models. Defaults to the shared extractor scope.
+   */
+  scopeKey?: string;
 }): Promise<{
   data: NewsExtraction | null;
   reason: string | null;
@@ -96,7 +101,7 @@ export async function extractNewsMetadata(input: {
             schema: newsExtractionSchema,
             errorStrategy: 'strict',
           },
-          requestContext: stepRequestContext('executeRoutine.news_extractor'),
+          requestContext: stepRequestContext(input.scopeKey ?? 'executeRoutine.news_extractor'),
         },
       );
       const obj = response.object as NewsExtraction | undefined;

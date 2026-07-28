@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { newsItemHref } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
@@ -91,6 +93,8 @@ export function NewsCard({
     toast.success('Article promoted to the knowledge base.');
   };
 
+  const titleLink = newsItemHref(id, url);
+
   const cardClass = [
     styles.card,
     status === 'reviewed' ? styles.reviewed : '',
@@ -118,15 +122,21 @@ export function NewsCard({
       </div>
 
       <h4 className={styles.title}>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.titleLink}
-        >
-          {cleanNewsTitle(title)}
-          <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
-        </a>
+        {titleLink.external ? (
+          <a
+            href={titleLink.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.titleLink}
+          >
+            {cleanNewsTitle(title)}
+            <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
+          </a>
+        ) : (
+          <Link href={titleLink.href} className={styles.titleLink}>
+            {cleanNewsTitle(title)}
+          </Link>
+        )}
       </h4>
 
       {summary && <p className={styles.summary}>{summary}</p>}
