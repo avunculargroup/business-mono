@@ -111,6 +111,7 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                 id={item.id}
                 title={item.title}
                 url={item.url}
+                canonicalUrl={item.canonical_url}
                 sourceName={item.source_name}
                 publishedAt={item.published_at}
                 summary={item.summary}

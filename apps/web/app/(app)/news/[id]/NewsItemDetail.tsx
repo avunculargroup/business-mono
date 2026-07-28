@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import { CategoryChip } from '@/components/news/CategoryChip';
 import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDisplay';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
 import styles from './detail.module.css';
 import type { NewsItemRecord } from '@platform/shared';
@@ -13,19 +14,8 @@ interface NewsItemDetailProps {
   sourceName: string;
 }
 
-/**
- * The original article, when there is one. canonical_url is the publisher's
- * hosted copy of a newsletter issue; url is the article itself for feed and
- * followed-link items. Email items with neither have nothing to link to.
- */
-function originalUrl(item: NewsItemRecord): string | null {
-  if (/^https?:\/\//i.test(item.url)) return item.url;
-  if (item.canonical_url && /^https?:\/\//i.test(item.canonical_url)) return item.canonical_url;
-  return null;
-}
-
 export function NewsItemDetail({ item, sourceName }: NewsItemDetailProps) {
-  const original = originalUrl(item);
+  const original = newsOriginalUrl(item.url, item.canonical_url);
 
   return (
     <div className={styles.container}>

@@ -15,3 +15,17 @@ export function newsItemHref(id: string, url: string): { href: string; external:
     ? { href: url.trim(), external: true }
     : { href: `/news/${id}`, external: false };
 }
+
+/**
+ * The item's real address on the public web, or null when it has none.
+ *
+ * `url` is the article itself for feed and followed-link items. For an email
+ * item it is synthetic, and canonical_url — the publisher's hosted copy of the
+ * issue — is the only real link there is. Null means "nothing worth storing or
+ * linking to", which is a better answer than a dead `email://` URL.
+ */
+export function newsOriginalUrl(url: string, canonicalUrl?: string | null): string | null {
+  if (/^https?:\/\//i.test(url.trim())) return url.trim();
+  if (canonicalUrl && /^https?:\/\//i.test(canonicalUrl.trim())) return canonicalUrl.trim();
+  return null;
+}

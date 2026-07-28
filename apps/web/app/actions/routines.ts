@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { computeNextRunAt, DEFAULT_TIMEZONE, NewsCategory } from '@platform/shared';
 import { humanizeError } from '@/lib/errors';
+import { formBoolean } from '@/lib/formBoolean';
 
 const FREQUENCIES = ['daily', 'weekly', 'fortnightly'] as const;
 const AGENTS = ['simon', 'roger', 'archie', 'petra', 'bruno', 'charlie', 'rex', 'della'] as const;
@@ -28,7 +29,7 @@ const researchDigestConfig = z.object({
   subject: z.string().min(1, 'Subject is required'),
   context: z.string().optional().default(''),
   search_queries: queriesSchema.refine((v) => v.length > 0, 'At least one search query is required'),
-  archive_sources: z.coerce.boolean().optional().default(false),
+  archive_sources: formBoolean(false),
   max_sources: z.coerce.number().int().min(1).max(50).optional().default(10),
 });
 
@@ -37,7 +38,7 @@ const monitorChangeConfig = z.object({
   subject: z.string().min(1, 'Subject is required'),
   context: z.string().optional().default(''),
   search_queries: queriesSchema.refine((v) => v.length > 0, 'At least one search query is required'),
-  notify_signal: z.coerce.boolean().optional().default(false),
+  notify_signal: formBoolean(false),
   notify_agent: z.enum(AGENTS).optional().nullable(),
 });
 
@@ -80,9 +81,9 @@ const baseSchema = z.object({
   frequency: z.enum(FREQUENCIES),
   time_of_day: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Invalid time'),
   timezone: z.string().min(1).default(DEFAULT_TIMEZONE),
-  show_on_dashboard: z.coerce.boolean().optional().default(false),
+  show_on_dashboard: formBoolean(false),
   dashboard_title: z.string().optional().default(''),
-  is_active: z.coerce.boolean().optional().default(true),
+  is_active: formBoolean(true),
 });
 
 const createSchema = z

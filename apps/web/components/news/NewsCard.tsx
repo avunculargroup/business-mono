@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
-import { newsItemHref } from '@/lib/news/itemHref';
+import { newsItemHref, newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
@@ -16,6 +16,8 @@ interface NewsCardProps {
   id: string;
   title: string;
   url: string;
+  /** Publisher's hosted copy, for email items whose url is synthetic. */
+  canonicalUrl?: string | null;
   sourceName: string;
   publishedAt: string | null;
   summary: string | null;
@@ -30,6 +32,7 @@ export function NewsCard({
   id,
   title,
   url,
+  canonicalUrl,
   sourceName,
   publishedAt,
   summary,
@@ -67,7 +70,9 @@ export function NewsCard({
       .from('knowledge_items')
       .insert({
         title,
-        source_url: url,
+        // Never the synthetic email:// url — an email item's real address is
+        // its canonical_url, and null is better than a link that opens nothing.
+        source_url: newsOriginalUrl(url, canonicalUrl),
         source_type: 'article',
         summary: summary ?? undefined,
         archived_by: 'rex',

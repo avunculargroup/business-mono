@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newsItemHref } from './itemHref';
+import { newsItemHref, newsOriginalUrl } from './itemHref';
 
 describe('newsItemHref', () => {
   it('links out for http and https urls', () => {
@@ -28,5 +28,26 @@ describe('newsItemHref', () => {
     expect(newsItemHref('item-9', '').href).toBe('/news/item-9');
     expect(newsItemHref('item-9', 'javascript:alert(1)').href).toBe('/news/item-9');
     expect(newsItemHref('item-9', 'not a url').href).toBe('/news/item-9');
+  });
+});
+
+describe('newsOriginalUrl', () => {
+  it('uses the item url when it is a real one', () => {
+    expect(newsOriginalUrl('https://afr.com/story', 'https://pub.example/issue')).toBe(
+      'https://afr.com/story',
+    );
+  });
+
+  it('falls back to canonical_url for a synthetic email url', () => {
+    expect(newsOriginalUrl('email://gromen/abc', 'https://pub.example/issue/42')).toBe(
+      'https://pub.example/issue/42',
+    );
+  });
+
+  it('is null when neither is a real url', () => {
+    expect(newsOriginalUrl('email://gromen/abc', null)).toBeNull();
+    expect(newsOriginalUrl('email://gromen/abc', undefined)).toBeNull();
+    expect(newsOriginalUrl('email://gromen/abc', '')).toBeNull();
+    expect(newsOriginalUrl('email://gromen/abc', 'javascript:alert(1)')).toBeNull();
   });
 });
