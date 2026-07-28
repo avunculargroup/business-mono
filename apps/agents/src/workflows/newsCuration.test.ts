@@ -100,11 +100,14 @@ describe('runNewsCuration', () => {
     expect(outcome.status).toBe('success');
     const meta = outcome.result?.metadata as Record<string, unknown>;
     const stories = meta['stories'] as Array<{ kind: string; id: string }>;
-    expect(stories.map((s) => s.id)).toEqual(['pod-3', 'news-0']);
+    // The editor's picks lead in its own order; the two remaining candidates are
+    // topped up behind them, since a digest short of max_stories is the signature
+    // of an unusable selection rather than a deliberately tiny one.
+    expect(stories.map((s) => s.id)).toEqual(['pod-3', 'news-0', 'news-1', 'news-2']);
     expect(stories[0].kind).toBe('podcast');
     expect(meta['mood_summary']).toBe('Quiet markets, steady accumulation.');
     expect(meta['more_news_url']).toBe('/news');
-    expect(outcome.result?.sources?.map((s) => s.url)).toEqual([
+    expect(outcome.result?.sources?.slice(0, 2).map((s) => s.url)).toEqual([
       'https://podcast.example.com/3',
       'https://news.example.com/0',
     ]);
@@ -194,6 +197,97 @@ describe('runNewsCuration', () => {
 
     const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as unknown[];
     expect(stories).toHaveLength(3);
+  });
+
+  // Regression: coerceToSchema rewrites a non-numeric index to 0, so a pick list
+  // in the wrong shape used to become [0,0,0,…], dedup down to a single index and
+  // ship a one-headline digest — while still reporting success. Malformed entries
+  // must be dropped and the shortfall topped up from the ranked pool instead.
+  it.each([
+    ['string indices', [{ index: '1' }, { index: '2' }, { index: '3' }]],
+    ['a renamed key', [{ candidate_index: 1 }, { candidate_index: 2 }]],
+    ['null entries', [null, null, null]],
+  ])('does not ship a single headline when the editor returns %s', async (_label, selected) => {
+    const news = Array.from({ length: 8 }, (_, i) => newsItem(i));
+    setPool(news, []);
+    editorGenerate.mockResolvedValue({ object: { selected } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as Array<{ id: string }>;
+    expect(stories).toHaveLength(6);
+    // Topped up from the top of the relevance-ranked pool, not collapsed to news-0 alone.
+    expect(stories.map((s) => s.id)).toEqual([
+      'news-0', 'news-1', 'news-2', 'news-3', 'news-4', 'news-5',
+    ]);
+    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 0, stories: 6 });
+  });
+
+  it('accepts bare numeric indices as well as { index } objects', async () => {
+    const news = Array.from({ length: 8 }, (_, i) => newsItem(i));
+    setPool(news, []);
+    editorGenerate.mockResolvedValue({ object: { selected: [4, 2, 6] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as Array<{ id: string }>;
+    // The editor's own ordering leads; the rest is topped up to six.
+    expect(stories.slice(0, 3).map((s) => s.id)).toEqual(['news-4', 'news-2', 'news-6']);
+    expect(stories).toHaveLength(6);
+    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 3, stories: 6 });
+  });
+
+  it('keeps the editor picks first and tops up a short selection', async () => {
+    const news = Array.from({ length: 8 }, (_, i) => newsItem(i));
+    setPool(news, []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 5 }] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as Array<{ id: string }>;
+    expect(stories.map((s) => s.id)).toEqual([
+      'news-5', 'news-0', 'news-1', 'news-2', 'news-3', 'news-4',
+    ]);
+    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 1, stories: 6 });
+  });
+
+  it('drops out-of-range and duplicate indices without shrinking the digest', async () => {
+    const news = Array.from({ length: 8 }, (_, i) => newsItem(i));
+    setPool(news, []);
+    editorGenerate.mockResolvedValue({
+      object: { selected: [{ index: 2 }, { index: 2 }, { index: 99 }, { index: -1 }] },
+    });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as Array<{ id: string }>;
+    expect(stories[0].id).toBe('news-2');
+    expect(stories).toHaveLength(6);
+    expect(new Set(stories.map((s) => s.id)).size).toBe(6);
+    expect(outcome.news_curation_result?.editor_picked).toBe(1);
+  });
+
+  it('tops up only to the pool size when the pool is smaller than max_stories', async () => {
+    setPool([newsItem(0), newsItem(1)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: '0' }] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as unknown[];
+    expect(stories).toHaveLength(2);
+    expect(outcome.news_curation_result).toEqual({ candidates: 2, editor_picked: 0, stories: 2 });
+  });
+
+  it('reports selection stats on a clean run', async () => {
+    const news = Array.from({ length: 8 }, (_, i) => newsItem(i));
+    setPool(news, []);
+    editorGenerate.mockResolvedValue({
+      object: { selected: [0, 1, 2, 3, 4, 5].map((index) => ({ index })) },
+    });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 6, stories: 6 });
   });
 
   it('hard-caps the curated set at six items even if configured higher', async () => {

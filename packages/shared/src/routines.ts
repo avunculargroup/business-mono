@@ -150,6 +150,19 @@ export interface NewsCurationResult {
   headline_image_url?: string;
 }
 
+// Selection counts for one news_curation run, serialised into agent_activity.notes.
+// Without these a short digest (the editor's picks failing to parse, so the pool
+// tops the list up) is indistinguishable from a full one in the audit trail.
+export interface NewsCurationRunStats {
+  // Size of the merged news + podcast candidate pool the editor chose from.
+  candidates: number;
+  // How many of the editor's picks survived parsing — below `stories` means the
+  // rest of the digest was filled from the top of the ranked pool.
+  editor_picked: number;
+  // Items actually featured in the digest.
+  stories: number;
+}
+
 // action_config shape for an 'indicator_poll' routine. Polls economic_indicators.
 export interface IndicatorPollConfig {
   // How many historical periods to pull the first time an indicator is seen,

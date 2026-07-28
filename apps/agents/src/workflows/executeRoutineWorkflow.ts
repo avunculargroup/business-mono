@@ -31,6 +31,7 @@ import type {
   PodcastIngestResult,
   NewsCurationConfig,
   NewsCurationStory,
+  NewsCurationRunStats,
   IndicatorPollResult,
   OnchainPollResult,
   MarketReportResult,
@@ -232,6 +233,8 @@ export interface RoutineOutcome {
   onchain_poll_result?: OnchainPollResult;
   // market_report assembled sections + delivery flag:
   market_report_result?: MarketReportResult;
+  // news_curation selection counts:
+  news_curation_result?: NewsCurationRunStats;
 }
 
 const runRoutine = createStep({
@@ -372,6 +375,61 @@ interface CurationCandidate extends NewsCurationStory {
 }
 
 /**
+ * Reads the editor's picked candidate indices out of its raw structured output.
+ *
+ * Deliberately does NOT route through coerceToSchema: that helper's ZodNumber
+ * branch rewrites a non-numeric index to 0, so a pick list the model emitted in
+ * the wrong shape (string indices, bare numbers, a renamed key) becomes a run of
+ * zeros that dedups down to a single index — the top-ranked candidate. That is
+ * how the digest shipped one headline while still reporting success. Here a
+ * malformed entry is dropped instead, leaving a short list the caller tops up.
+ *
+ * Accepts both `{ index: n }` and a bare `n`, the two unambiguous shapes; every
+ * other entry is skipped. Out-of-range and repeat indices are dropped too, so
+ * the result is always a deduped, in-range, editor-ordered list.
+ */
+export function parseCurationIndices(raw: unknown, candidateCount: number): number[] {
+  const entries = (raw as { selected?: unknown } | null | undefined)?.selected;
+  if (!Array.isArray(entries)) return [];
+
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const entry of entries) {
+    const value = typeof entry === 'number' ? entry : (entry as { index?: unknown } | null)?.index;
+    if (typeof value !== 'number' || !Number.isInteger(value)) continue;
+    if (value < 0 || value >= candidateCount || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+/**
+ * Tops a short selection up to `target` items from the ranked candidate pool,
+ * preserving the editor's order and its picks at the front.
+ *
+ * The digest is meant to carry `maxStories`; anything less means the editor's
+ * output was unusable in part or in whole. Shipping it short is what turns a
+ * parsing hiccup into a one-headline email, so we fill from the top of the
+ * relevance-ranked pool rather than sending a stub.
+ */
+export function topUpSelection<T extends { id: string }>(
+  selected: T[],
+  candidates: T[],
+  target: number,
+): T[] {
+  const out = [...selected];
+  const chosen = new Set(out.map((c) => c.id));
+  for (const candidate of candidates) {
+    if (out.length >= target) break;
+    if (chosen.has(candidate.id)) continue;
+    chosen.add(candidate.id);
+    out.push(candidate);
+  }
+  return out;
+}
+
+/**
  * Curates the day's best stories across BOTH the news_items feed and ingested
  * podcast_episodes into a dashboard tile. The editor selects and ranks ≤6 items;
  * Charlie writes a two-sentence, fact-grounded summary; the headline item's image (podcast
@@ -465,6 +523,7 @@ export async function runNewsCuration(
         sources: [],
         metadata: { mood_summary: '', stories: [], more_news_url: moreNewsUrl },
       },
+      news_curation_result: { candidates: 0, editor_picked: 0, stories: 0 },
     };
   }
 
@@ -491,19 +550,25 @@ ${candidateLines}`;
         fallbackValue: { selected: [] },
       },
     });
-    const picked = coerceToSchema(curationSelectSchema, resp.object ?? { selected: [] });
-    const seen = new Set<number>();
-    selected = picked.selected
-      .map((s) => s.index)
-      .filter((i) => Number.isInteger(i) && i >= 0 && i < candidates.length && !seen.has(i) && seen.add(i))
-      .map((i) => candidates[i])
+    selected = parseCurationIndices(resp.object, candidates.length)
+      .map((i) => candidates[i]!)
       .slice(0, maxStories);
   } catch (err) {
     curationLog.warn({ err }, 'editor selection failed');
   }
 
-  // Fallback: if the editor produced nothing usable, take the top ranked candidates.
-  if (selected.length === 0) selected = candidates.slice(0, maxStories);
+  // Fallback: top up from the ranked candidates whenever the editor came back
+  // short — not just when it produced nothing. A partially-parsed pick list used
+  // to ship as-is, which is how a digest went out with a single headline.
+  const editorPicked = selected.length;
+  const targetStories = Math.min(maxStories, candidates.length);
+  if (editorPicked < targetStories) {
+    selected = topUpSelection(selected, candidates, targetStories);
+    curationLog.warn(
+      { editorPicked, targetStories, candidates: candidates.length },
+      'editor selection short — topped up from ranked candidates',
+    );
+  }
 
   const stories: NewsCurationStory[] = selected.map((c) => ({
     kind: c.kind,
@@ -604,7 +669,17 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
   // throws, so a delivery problem can't fail the routine.
   await deliverNewsDigest({ id: routine.id, title: routine.name }, result);
 
-  return { ...base, status: 'success', result, error: null };
+  return {
+    ...base,
+    status: 'success',
+    result,
+    error: null,
+    news_curation_result: {
+      candidates: candidates.length,
+      editor_picked: editorPicked,
+      stories: stories.length,
+    },
+  };
 }
 
 const NEWS_CURATION_NO_TOOL_INSTRUCTION =
@@ -1696,6 +1771,17 @@ const persistAndSchedule = createStep({
       const marketReportNotes = isMarketReport && outcome.market_report_result
         ? JSON.stringify(outcome.market_report_result)
         : null;
+      const isNewsCuration = outcome.action_type === 'news_curation';
+      const curationNotes = isNewsCuration && outcome.news_curation_result
+        ? JSON.stringify(outcome.news_curation_result)
+        : null;
+      // A digest that had a pool to choose from but shipped fewer stories than the
+      // editor should have picked means its output failed to parse — flag it so a
+      // short digest is visible without reading the email.
+      const curationHasAnomaly = isNewsCuration && outcome.news_curation_result
+        ? outcome.news_curation_result.candidates > 0
+          && outcome.news_curation_result.editor_picked < outcome.news_curation_result.stories
+        : false;
       const podcastNotes = isPodcastIngest && outcome.podcast_ingest_result
         ? JSON.stringify(outcome.podcast_ingest_result)
         : null;
@@ -1713,7 +1799,7 @@ const persistAndSchedule = createStep({
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
       const activityStatus: 'auto' | 'error' = outcome.status === 'success'
-        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly || onchainHasAnomaly ? 'error' : 'auto')
+        ? (newsHasAnomaly || podcastHasAnomaly || indicatorHasAnomaly || onchainHasAnomaly || curationHasAnomaly ? 'error' : 'auto')
         : 'error';
       await supabase.from('agent_activity').insert({
         agent_name: isPodcastIngest ? 'archie' : (isIndicatorPoll || isOnchainPoll || isMarketReport) ? 'simon' : 'rex',
@@ -1725,7 +1811,7 @@ const persistAndSchedule = createStep({
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,
-        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? onchainNotes ?? marketReportNotes ?? outcome.error ?? outcome.change_summary ?? null,
+        notes: newsNotes ?? podcastNotes ?? indicatorNotes ?? onchainNotes ?? marketReportNotes ?? curationNotes ?? outcome.error ?? outcome.change_summary ?? null,
       });
 
       // monitor_change notify flow.
