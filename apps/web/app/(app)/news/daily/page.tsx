@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CategoryChip } from '@/components/news/CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { newsItemHref } from '@/lib/news/itemHref';
 import type { NewsCategory, NewsItemRecord } from '@platform/shared';
 import { NEWS_CATEGORY_LABELS, DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import styles from './DailyDigest.module.css';
@@ -65,7 +66,9 @@ export default async function DailyDigestPage() {
                 <h2 className={styles.sectionTitle}>{NEWS_CATEGORY_LABELS[cat]}</h2>
               </div>
               <div className={styles.items}>
-                {(byCategory[cat] ?? []).map((item) => (
+                {(byCategory[cat] ?? []).map((item) => {
+                  const link = newsItemHref(item.id, item.url);
+                  return (
                   <article key={item.id} className={styles.item}>
                     <div className={styles.itemMeta}>
                       {item.source_name && (
@@ -82,20 +85,27 @@ export default async function DailyDigestPage() {
                       )}
                     </div>
                     <h3 className={styles.itemTitle}>
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.itemLink}
-                      >
-                        {cleanNewsTitle(item.title)}
-                      </a>
+                      {link.external ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.itemLink}
+                        >
+                          {cleanNewsTitle(item.title)}
+                        </a>
+                      ) : (
+                        <Link href={link.href} className={styles.itemLink}>
+                          {cleanNewsTitle(item.title)}
+                        </Link>
+                      )}
                     </h3>
                     {item.summary && (
                       <p className={styles.itemSummary}>{item.summary}</p>
                     )}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))

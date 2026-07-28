@@ -4,6 +4,7 @@ import { getAuthedClient } from '@/lib/action';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
+import { formBoolean } from '@/lib/formBoolean';
 
 const REVALIDATE = '/news/podcasts';
 
@@ -39,7 +40,7 @@ const briefSchema = z
     audio_url: z.string().trim().url('Audio URL must be a valid URL').optional().or(z.literal('')),
     youtube_url: z.string().trim().url('YouTube URL must be a valid URL').optional().or(z.literal('')),
     why: z.string().trim().min(1, 'Add a short note on why this is worth ingesting'),
-    allow_deepgram: z.coerce.boolean().optional().default(false),
+    allow_deepgram: formBoolean(false),
   })
   .refine((v) => (v.audio_url && v.audio_url !== '') || (v.youtube_url && v.youtube_url !== ''), {
     message: 'Provide an audio URL or a YouTube URL.',

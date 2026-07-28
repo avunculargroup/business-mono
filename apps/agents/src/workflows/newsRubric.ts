@@ -166,6 +166,11 @@ export interface ScoreNewsItemInput {
   sourceTier: string | null;
   /** Nearest neighbours for the novelty check (computed by the caller). */
   similar: SimilarItem[];
+  /**
+   * Model scope key for this call, so an ingestion path can be configured
+   * separately in /settings/models. Defaults to the shared rubric scope.
+   */
+  scopeKey?: string;
 }
 
 export interface ScoredNewsItem {
@@ -209,7 +214,7 @@ export async function scoreNewsItem(input: ScoreNewsItemInput): Promise<ScoredNe
         [{ role: 'user', content: prompt }],
         {
           structuredOutput: { schema: rubricOutputSchema, errorStrategy: 'strict' },
-          requestContext: stepRequestContext(RUBRIC_SCOPE_KEY),
+          requestContext: stepRequestContext(input.scopeKey ?? RUBRIC_SCOPE_KEY),
         },
       );
       const obj = response.object as RubricOutput | undefined;

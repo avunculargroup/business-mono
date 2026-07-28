@@ -196,6 +196,62 @@ describe('ingestNewsItem', () => {
     expect(row['rex_metadata']).toEqual({ rubric_version: 'v1', scoring_failed: true });
   });
 
+  it('merges rexMetadataExtra into rex_metadata without clobbering the rubric output', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-4' }, error: null },
+    ];
+    await ingestNewsItem({
+      ...baseInput(),
+      rexMetadataExtra: { from_newsletter_item_id: 'parent-1', from_newsletter_anchor_text: 'RBA holds' },
+    });
+    expect(insertedRows[0]!['rex_metadata']).toEqual({
+      from_newsletter_item_id: 'parent-1',
+      from_newsletter_anchor_text: 'RBA holds',
+      dimension_scores: SCORED.dimensionScores,
+      flags: SCORED.flags,
+      needs_human_review: false,
+      rubric_version: 'v1',
+    });
+  });
+
+  it('keeps rexMetadataExtra on the scoring-failed branch', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-5' }, error: null },
+    ];
+    scoreMock.mockResolvedValue(null);
+    await ingestNewsItem({ ...baseInput(), rexMetadataExtra: { from_newsletter_item_id: 'parent-1' } });
+    expect(insertedRows[0]!['rex_metadata']).toEqual({
+      from_newsletter_item_id: 'parent-1',
+      rubric_version: 'v1',
+      scoring_failed: true,
+    });
+  });
+
+  it('forwards rubricScopeKey to the scorer, and omits it by default', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-6' }, error: null },
+    ];
+    await ingestNewsItem({ ...baseInput(), rubricScopeKey: 'newsletterLinks.rubric_score' });
+    expect(scoreMock).toHaveBeenCalledWith(
+      expect.objectContaining({ scopeKey: 'newsletterLinks.rubric_score' }),
+    );
+
+    scoreMock.mockClear();
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-7' }, error: null },
+    ];
+    await ingestNewsItem(baseInput());
+    expect(scoreMock).toHaveBeenCalledWith(expect.objectContaining({ scopeKey: undefined }));
+  });
+
   it('treats a unique-violation race on insert as a duplicate', async () => {
     responseQueue = [
       { data: [], error: null },

@@ -3037,6 +3037,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           feed_url: string | null
+          follow_links: boolean
           id: string
           image_url: string | null
           inbound_address: string | null
@@ -3046,6 +3047,7 @@ export type Database = {
           last_status: string | null
           max_backfill_episodes: number
           max_episode_age_days: number | null
+          max_followed_links: number
           name: string
           preferred_transcript_lang: string
           relevance_threshold: number
@@ -3062,6 +3064,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           feed_url?: string | null
+          follow_links?: boolean
           id?: string
           image_url?: string | null
           inbound_address?: string | null
@@ -3071,6 +3074,7 @@ export type Database = {
           last_status?: string | null
           max_backfill_episodes?: number
           max_episode_age_days?: number | null
+          max_followed_links?: number
           name: string
           preferred_transcript_lang?: string
           relevance_threshold?: number
@@ -3087,6 +3091,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           feed_url?: string | null
+          follow_links?: boolean
           id?: string
           image_url?: string | null
           inbound_address?: string | null
@@ -3096,6 +3101,7 @@ export type Database = {
           last_status?: string | null
           max_backfill_episodes?: number
           max_episode_age_days?: number | null
+          max_followed_links?: number
           name?: string
           preferred_transcript_lang?: string
           relevance_threshold?: number

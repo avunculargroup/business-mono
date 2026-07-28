@@ -179,6 +179,27 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'newsVerifier',
   },
 
+  // ── Newsletter link following ─────────────────────────────────────────────
+  // Separate from the executeRoutine.news_* steps above so the per-link spend
+  // (two LLM calls per followed article) can be pointed at a cheaper model
+  // without changing what RSS/feed ingestion uses.
+  {
+    key: 'newsletterLinks.extract',
+    type: 'workflow_step',
+    label: 'Followed-link metadata',
+    description: 'Classifies and summarises an article linked from a research newsletter',
+    workflow: 'newsletterLinks',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'newsletterLinks.rubric_score',
+    type: 'workflow_step',
+    label: 'Followed-link relevance score',
+    description: 'Scores a followed article on the material/novelty/citation rubric',
+    workflow: 'newsletterLinks',
+    fallbackAgent: 'rex',
+  },
+
   // ── Newsletter workflow steps ─────────────────────────────────────────────
   {
     key: 'newsletter.story_selection',
@@ -401,6 +422,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   recorder: 'Recorder',
   pm: 'PM',
   executeRoutine: 'Routines',
+  newsletterLinks: 'Newsletter Link Following',
   newsletter: 'Newsletter',
   variant: 'Variant Generation',
   strategy: 'Campaign Strategy',

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
 import { validateFeedUrl } from '@/lib/news/validateFeed';
 import { slugify, computeInboundAddress, parseSenderAllowlist } from '@/lib/news/emailSource';
+import { formBoolean } from '@/lib/formBoolean';
 import { humanizeError } from '@/lib/errors';
 
 const REVALIDATE = '/news/sources';
@@ -21,8 +22,8 @@ const schema = z.object({
     .url('YouTube channel URL must be a valid URL')
     .optional()
     .or(z.literal('')),
-  is_active: z.coerce.boolean().optional().default(true),
-  transcribe_with_deepgram: z.coerce.boolean().optional().default(false),
+  is_active: formBoolean(true),
+  transcribe_with_deepgram: formBoolean(false),
   preferred_transcript_lang: z.string().trim().optional().default('en'),
   max_backfill_episodes: z.coerce.number().int().positive().optional().default(25),
   // Empty string → undefined → null (no cap).
@@ -33,6 +34,8 @@ const schema = z.object({
   relevance_threshold: z.coerce.number().min(0).max(1).optional().default(0.7),
   // Newline/comma-separated From addresses or domains.
   sender_allowlist: z.string().optional().default(''),
+  follow_links: formBoolean(false),
+  max_followed_links: z.coerce.number().int().min(0).max(20).optional().default(5),
 });
 
 type SourceInput = z.infer<typeof schema>;
@@ -95,6 +98,8 @@ function buildRow(input: SourceInput, feedUrl: string | null) {
       sender_allowlist: parseSenderAllowlist(input.sender_allowlist),
       tier: input.tier || null,
       relevance_threshold: input.relevance_threshold,
+      follow_links: input.follow_links,
+      max_followed_links: input.max_followed_links,
     };
   }
   if (input.source_type === 'rss') {

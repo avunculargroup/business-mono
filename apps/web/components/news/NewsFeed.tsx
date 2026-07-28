@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
@@ -8,6 +9,7 @@ import type { NewsCategory, NewsStatus, NewsItemRecord } from '@platform/shared'
 import { CategoryChip } from './CategoryChip';
 import { NewsCard } from './NewsCard';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { newsItemHref } from '@/lib/news/itemHref';
 import styles from './NewsFeed.module.css';
 
 const CATEGORIES: Array<NewsCategory | 'all'> = [
@@ -109,6 +111,7 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                 id={item.id}
                 title={item.title}
                 url={item.url}
+                canonicalUrl={item.canonical_url}
                 sourceName={item.source_name}
                 publishedAt={item.published_at}
                 summary={item.summary}
@@ -164,18 +167,27 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                 <div className={styles.digestSectionLabel}>
                   <CategoryChip category={cat} />
                 </div>
-                {(digestByCat[cat] ?? []).slice(0, 3).map((item) => (
-                  <div key={item.id} className={styles.digestItem}>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.digestLink}
-                    >
-                      {cleanNewsTitle(item.title)}
-                    </a>
-                  </div>
-                ))}
+                {(digestByCat[cat] ?? []).slice(0, 3).map((item) => {
+                  const link = newsItemHref(item.id, item.url);
+                  return (
+                    <div key={item.id} className={styles.digestItem}>
+                      {link.external ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.digestLink}
+                        >
+                          {cleanNewsTitle(item.title)}
+                        </a>
+                      ) : (
+                        <Link href={link.href} className={styles.digestLink}>
+                          {cleanNewsTitle(item.title)}
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))
           )}

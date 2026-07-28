@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/providers/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
+import { newsItemHref, newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
@@ -14,6 +16,8 @@ interface NewsCardProps {
   id: string;
   title: string;
   url: string;
+  /** Publisher's hosted copy, for email items whose url is synthetic. */
+  canonicalUrl?: string | null;
   sourceName: string;
   publishedAt: string | null;
   summary: string | null;
@@ -28,6 +32,7 @@ export function NewsCard({
   id,
   title,
   url,
+  canonicalUrl,
   sourceName,
   publishedAt,
   summary,
@@ -65,7 +70,9 @@ export function NewsCard({
       .from('knowledge_items')
       .insert({
         title,
-        source_url: url,
+        // Never the synthetic email:// url — an email item's real address is
+        // its canonical_url, and null is better than a link that opens nothing.
+        source_url: newsOriginalUrl(url, canonicalUrl),
         source_type: 'article',
         summary: summary ?? undefined,
         archived_by: 'rex',
@@ -90,6 +97,8 @@ export function NewsCard({
     onStatusChange?.(id, 'promoted');
     toast.success('Article promoted to the knowledge base.');
   };
+
+  const titleLink = newsItemHref(id, url);
 
   const cardClass = [
     styles.card,
@@ -118,15 +127,21 @@ export function NewsCard({
       </div>
 
       <h4 className={styles.title}>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.titleLink}
-        >
-          {cleanNewsTitle(title)}
-          <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
-        </a>
+        {titleLink.external ? (
+          <a
+            href={titleLink.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.titleLink}
+          >
+            {cleanNewsTitle(title)}
+            <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
+          </a>
+        ) : (
+          <Link href={titleLink.href} className={styles.titleLink}>
+            {cleanNewsTitle(title)}
+          </Link>
+        )}
       </h4>
 
       {summary && <p className={styles.summary}>{summary}</p>}

@@ -61,6 +61,8 @@ function valuesToFormData(v: NewsSourceFormValues): FormData {
   fd.set('tier', v.tier);
   fd.set('relevance_threshold', String(v.relevance_threshold));
   fd.set('sender_allowlist', v.sender_allowlist);
+  fd.set('follow_links', v.follow_links ? 'true' : 'false');
+  fd.set('max_followed_links', String(v.max_followed_links));
   return fd;
 }
 
@@ -229,6 +231,8 @@ export function NewsSourcesClient({ initialSources, stats, inboundDomain }: Prop
     tier: r.tier ?? 'tier_2',
     relevance_threshold: r.relevance_threshold ?? 0.7,
     sender_allowlist: (r.sender_allowlist ?? []).join('\n'),
+    follow_links: r.follow_links ?? false,
+    max_followed_links: r.max_followed_links ?? 5,
   });
 
   return (

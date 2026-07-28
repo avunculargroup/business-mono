@@ -23,6 +23,8 @@ export interface NewsSourceFormValues {
   tier: NewsTier | '';
   relevance_threshold: number;
   sender_allowlist: string; // textarea: one entry per line
+  follow_links: boolean;
+  max_followed_links: number;
 }
 
 const DEFAULTS: NewsSourceFormValues = {
@@ -40,6 +42,8 @@ const DEFAULTS: NewsSourceFormValues = {
   tier: 'tier_2',
   relevance_threshold: 0.7,
   sender_allowlist: '',
+  follow_links: false,
+  max_followed_links: 5,
 };
 
 const TYPE_OPTIONS: { value: NewsSourceType; label: string; icon: typeof Rss }[] = [
@@ -234,6 +238,45 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
               Approved From domains or addresses, one per line. Leave empty to accept the first sender, then
               trust it from the source list.
             </span>
+          </div>
+
+          {/* The money switch. Default off; an honest warning line when on. */}
+          <div className={styles.moneySwitch}>
+            <label className={styles.switchRow}>
+              <input
+                type="checkbox"
+                checked={values.follow_links}
+                onChange={(e) => update('follow_links', e.target.checked)}
+              />
+              <span className={styles.switchTrack} aria-hidden="true">
+                <span className={styles.switchThumb} />
+              </span>
+              <span className={styles.switchLabel}>Fetch the articles this newsletter links to</span>
+            </label>
+            {values.follow_links && (
+              <>
+                <p className={styles.moneyWarning}>
+                  Each followed link costs a page fetch and two model calls. Best for link roundups, not
+                  long-form essays that only cite their sources in passing.
+                </p>
+                <div className={styles.field}>
+                  <label className={styles.label}>Maximum links per issue</label>
+                  <input
+                    className={`${styles.input} ${styles.inputMono}`}
+                    type="number"
+                    min={0}
+                    max={20}
+                    step={1}
+                    value={values.max_followed_links}
+                    onChange={(e) => update('max_followed_links', Number(e.target.value))}
+                  />
+                  <span className={styles.hint}>
+                    Links are taken in the order they appear. A separate cap limits how many are followed
+                    across all sources in one poll.
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

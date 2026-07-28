@@ -157,4 +157,74 @@ describe('renderNewsDigestEmail', () => {
     expect(html).toContain('href="https://x.example/a"');
     expect(html).toContain('mood from summary');
   });
+
+  describe('email-sourced stories with no real URL', () => {
+    /** What email ingestion stores: a synthetic url that opens nothing. */
+    function emailSourcedResult(kind: 'news' | 'podcast' = 'news'): RoutineResult {
+      const result = sampleResult();
+      (result.metadata as { stories: Array<Record<string, unknown>> }).stories = [
+        {
+          kind,
+          id: 'item-9',
+          title: 'Tree Rings — Issue 42',
+          url: 'email://gromen/issue-42%40gromen.com',
+          source_name: 'Gromen Tree Rings',
+          category: 'macro',
+        },
+      ];
+      return result;
+    }
+
+    it('links the heading to the in-app reading view in both parts', () => {
+      const { html, text } = renderNewsDigestEmail({
+        title: 'X',
+        result: emailSourcedResult(),
+        date,
+        company,
+        webAppUrl: 'https://app.example/',
+      });
+      expect(html).toContain('href="https://app.example/news/item-9"');
+      expect(html).not.toContain('email://');
+      expect(text).toContain('https://app.example/news/item-9');
+      expect(text).not.toContain('email://');
+    });
+
+    it('routes a podcast story to the podcast detail page', () => {
+      const { html } = renderNewsDigestEmail({
+        title: 'X',
+        result: emailSourcedResult('podcast'),
+        date,
+        company,
+        webAppUrl: 'https://app.example',
+      });
+      expect(html).toContain('href="https://app.example/news/podcasts/item-9"');
+    });
+
+    it('renders unlinked text and omits the URL line when webAppUrl is unset', () => {
+      const { html, text } = renderNewsDigestEmail({
+        title: 'X',
+        result: emailSourcedResult(),
+        date,
+        company,
+      });
+      // The headline renders as unlinked text, not an anchor.
+      expect(html).toContain('<span style="color:#1A1915;font-weight:600;">Tree Rings');
+      expect(html).not.toContain('email://');
+      // " — Issue 42" is stripped as a source suffix, same as any other headline.
+      expect(text).toContain('1. Tree Rings (Gromen Tree Rings)');
+      expect(text).not.toContain('email://');
+    });
+
+    it('still prefers a real http(s) url over the in-app view', () => {
+      const { html } = renderNewsDigestEmail({
+        title: 'X',
+        result: sampleResult(),
+        date,
+        company,
+        webAppUrl: 'https://app.example',
+      });
+      expect(html).toContain('href="https://afr.example/asic"');
+      expect(html).not.toContain('/news/1"');
+    });
+  });
 });

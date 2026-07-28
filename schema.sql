@@ -1500,6 +1500,9 @@ CREATE TABLE news_sources (
   -- shared curation (Rex rubric)
   tier                      TEXT        CHECK (tier IS NULL OR tier IN ('tier_1','tier_2','tier_3')),
   relevance_threshold       NUMERIC(3,2) NOT NULL DEFAULT 0.70,
+  follow_links              BOOLEAN     NOT NULL DEFAULT false, -- fetch links inside an item as their own news_items
+  max_followed_links        INT         NOT NULL DEFAULT 5      -- per-item cap; CHECK 0..20
+                              CHECK (max_followed_links >= 0 AND max_followed_links <= 20),
   is_active                 BOOLEAN     NOT NULL DEFAULT true,
   last_scanned_at           TIMESTAMPTZ,
   last_status               TEXT        CHECK (last_status IN ('success','failed')),

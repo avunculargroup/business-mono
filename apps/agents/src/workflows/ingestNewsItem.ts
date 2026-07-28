@@ -54,6 +54,10 @@ export interface IngestNewsItemInput {
   precomputedEmbedding?: number[] | null;
   /** Persisted news_items.status. Defaults to 'new'; callers pass 'extraction_failed' when metadata extraction failed. */
   status?: 'new' | 'extraction_failed';
+  /** Extra keys merged into rex_metadata alongside the rubric output. */
+  rexMetadataExtra?: Record<string, unknown>;
+  /** Model scope key for the rubric call, so an ingestion path can be configured separately. */
+  rubricScopeKey?: string;
 }
 
 export type IngestStatus = 'inserted' | 'duplicate' | 'failed';
@@ -144,6 +148,7 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     sourceName: input.source.name,
     sourceTier: input.source.tier,
     similar,
+    scopeKey: input.rubricScopeKey,
   });
 
   // 6. persist. news_items gained source_id/ingestion_ref/rubric columns in
@@ -169,12 +174,13 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     curator_notes: scored?.suggestedCuratorNotes ?? null,
     rex_metadata: scored
       ? {
+          ...input.rexMetadataExtra,
           dimension_scores: scored.dimensionScores,
           flags: scored.flags,
           needs_human_review: scored.needsHumanReview,
           rubric_version: scored.rubricVersion,
         }
-      : { rubric_version: RUBRIC_VERSION, scoring_failed: true },
+      : { ...input.rexMetadataExtra, rubric_version: RUBRIC_VERSION, scoring_failed: true },
     has_pdf_attachment: input.hasPdfAttachment ?? false,
     attachment_count: input.attachmentCount ?? 0,
     embedding: embedding as unknown as string,
