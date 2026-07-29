@@ -143,9 +143,19 @@ export const mastra = new Mastra({
   //      also declared as a direct dependency in package.json so the deployer
   //      can resolve it out of pnpm's nested layout (otherwise: "couldn't load
   //      xmlbuilder from rss").
+  //   3. `turndown` is externalized for the same reason, but the symptom was
+  //      silent: its DOM backend (`@mixmark-io/domino`) is CJS with a circular
+  //      require between Document and DOMImplementation. Flattening it emits
+  //      `var DOMImplementation$2 = DOMImplementation_1` thousands of lines
+  //      above the `DOMImplementation_1` assignment, so the alias stays
+  //      `undefined` and every parse throws "DOMImplementation$2 is not a
+  //      constructor". htmlToMarkdown caught that and fell back to a tag strip,
+  //      so every newsletter body landed in news_items as raw CSS + text. Only
+  //      the bundle was affected — vitest runs against source, where turndown
+  //      resolves to its own CJS build and works — so keep it external.
   bundler: {
     transpilePackages: ['@platform/shared', '@platform/db', '@platform/signal', '@platform/voice'],
-    externals: ['xmlbuilder'],
+    externals: ['xmlbuilder', 'turndown'],
   },
   // Route Mastra's framework-internal logs through pino too, so they emit the
   // same single-line JSON as the app logger. prettyPrint is off in production

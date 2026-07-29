@@ -10,6 +10,9 @@
 
 import TurndownService from 'turndown';
 import type { JmapEmail } from './fastmailJmap.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('newsletter-extract');
 
 // Bound the HTML fed to Turndown — newsletters can be large and the agents host
 // is memory-constrained (see fastmailJmap.stripHtml). A real body is tens of KB.
@@ -36,6 +39,25 @@ function getTurndown(): TurndownService {
 }
 
 /**
+ * Tag strip used when Turndown fails. Style and script bodies are cut first —
+ * `<[^>]+>` only removes the tags, so without this the email's CSS survives as
+ * body text (a whole month of newsletters landed that way when Turndown was
+ * broken by the bundler). Entity decoding matches fastmailJmap.stripHtml.
+ */
+function stripToText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+/**
  * Converts newsletter HTML to clean markdown: images/scripts/styles removed,
  * stray image markdown stripped, blank lines collapsed.
  */
@@ -44,9 +66,12 @@ export function htmlToMarkdown(html: string): string {
   let md: string;
   try {
     md = getTurndown().turndown(capped);
-  } catch {
-    // Turndown can throw on pathological markup; fall back to a tag strip.
-    md = capped.replace(/<[^>]+>/g, ' ');
+  } catch (err) {
+    // Turndown can throw on pathological markup; fall back to a tag strip. Logged
+    // because a systemic failure here is otherwise invisible — the feed just
+    // quietly degrades to plain text.
+    log.warn({ err, chars: capped.length }, 'turndown failed — falling back to tag strip');
+    md = stripToText(capped);
   }
   return md
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // any image markdown that slipped through
