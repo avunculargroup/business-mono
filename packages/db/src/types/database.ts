@@ -2067,6 +2067,13 @@ export type Database = {
             referencedRelation: "ecosystem_watches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ecosystem_changes_watch_id_fkey"
+            columns: ["watch_id"]
+            isOneToOne: false
+            referencedRelation: "v_ecosystem_watch_health"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ecosystem_watches: {
@@ -5435,7 +5442,22 @@ export type Database = {
           watch_label: string | null
           watch_type: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ecosystem_changes_advisor_partner_id_fkey"
+            columns: ["advisor_partner_id"]
+            isOneToOne: false
+            referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_changes_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_ecosystem_watch_health: {
         Row: {
