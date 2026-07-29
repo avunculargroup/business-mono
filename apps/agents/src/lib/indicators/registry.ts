@@ -7,11 +7,13 @@ import type { Provider, ProviderAdapter } from './types.js';
 import { fredAdapter } from './adapters/fred.js';
 import { rbaAdapter } from './adapters/rba.js';
 import { stooqAdapter } from './adapters/stooq.js';
+import { goldApiAdapter } from './adapters/goldApi.js';
 
 export const adapterRegistry: Partial<Record<Provider, ProviderAdapter>> = {
   fred: fredAdapter,
   rba: rbaAdapter,
   stooq: stooqAdapter,
+  gold_api: goldApiAdapter,
 };
 
 export function getAdapter(provider: Provider): ProviderAdapter | undefined {

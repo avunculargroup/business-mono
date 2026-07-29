@@ -6,6 +6,17 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-29 — Repoint gold from Stooq to the Gold API (Stooq never actually worked)
+
+- **`economic_indicators.provider` / `indicator_observations.source`** — widened to add `'gold_api'` alongside the existing `'stooq'`. The 20260719000000 migration moved gold off a discontinued FRED series and onto Stooq's keyless CSV feed, but that has failed on every `indicator_poll` run since — Stooq answers server-side requests to `/q/d/l/` with an HTML bot-verification page, not CSV, so gold has had zero rows in `indicator_observations` for the whole 10+ days that migration has been live. Confirmed via `agent_activity.notes` on the "Daily economic indicator poll" routine, which logs the raw failure body on every run.
+- **Gold repointed to `gold_api`** (`api.gold-api.com`) — free, keyless, current-price-only (no backfill endpoint used; the daily poll builds history one observation at a time, same as any newly-seeded indicator). Adapter: `apps/agents/src/lib/indicators/adapters/goldApi.ts`.
+- The adapter's response-shape parsing was **not hand-verified against a live call** (no network egress available while writing it) — it fails loudly with the raw response body attached on any shape it doesn't recognise, so a wrong guess surfaces in `agent_activity` exactly like the Stooq failure did, rather than silently storing garbage or the JS-challenge page as a "value".
+- **`indicator_observations` cleared for Gold** — same clean-first-ingest pattern as the Stooq migration.
+
+Migration: `20260729130000_gold_price_gold_api_source.sql`
+
+---
+
 ## 2026-07-29 — ecosystem signals: watches + detected changes
 
 **Migration:** `20260729000000_add_ecosystem_signals.sql`
