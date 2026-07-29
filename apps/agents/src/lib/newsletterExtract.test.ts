@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import TurndownService from 'turndown';
 import {
   getHtmlBody,
   htmlToMarkdown,
@@ -40,6 +41,27 @@ describe('htmlToMarkdown', () => {
   it('collapses blank-line runs', () => {
     const md = htmlToMarkdown('<p>a</p><p></p><p></p><p>b</p>');
     expect(md).not.toMatch(/\n{3,}/);
+  });
+
+  // Turndown was silently throwing inside the deploy bundle for a month, and the
+  // fallback shipped the email's stylesheet into news_items as body text.
+  it('keeps css and entities out of the body when turndown throws', () => {
+    const spy = vi.spyOn(TurndownService.prototype, 'turndown').mockImplementation(() => {
+      throw new TypeError('DOMImplementation$2 is not a constructor');
+    });
+    try {
+      const md = htmlToMarkdown(
+        '<html><head><style>@media only screen{.wrapper{font-size:8px !important}}</style></head>' +
+          '<body><p>ASIC&nbsp;released a <a href="https://asic.gov.au/mr">media release</a>.</p></body></html>',
+      );
+      expect(md).toContain('ASIC released a');
+      expect(md).toContain('media release');
+      expect(md).not.toContain('@media');
+      expect(md).not.toContain('!important');
+      expect(md).not.toContain('&nbsp;');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
