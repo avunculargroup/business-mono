@@ -363,6 +363,26 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'editor',
   },
 
+  // ── Ecosystem signals ──────────────────────────────────────────────────────
+  {
+    key: 'ecosystemScan.narrate',
+    type: 'workflow_step',
+    label: 'Narrate a change',
+    description:
+      'Writes the one neutral sentence for a detected change, using only the vocabulary in its payload',
+    workflow: 'ecosystemScan',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'ecosystemScan.classify',
+    type: 'workflow_step',
+    label: 'Classify a change',
+    description:
+      'Lex tags each change neutral / valuation / advice / solvency adjacent, pre-computing the client-promotion gate',
+    workflow: 'ecosystemScan',
+    fallbackAgent: 'lex',
+  },
+
   // ── Podcast transcript processing ──────────────────────────────────────────
   {
     key: 'podcast_transcript.identify_speakers',
@@ -431,6 +451,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   podcast_intel: 'Podcast Intelligence',
   library_answer: 'Ask the Library',
   market_report: 'Market Report',
+  ecosystemScan: 'Ecosystem Signals',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

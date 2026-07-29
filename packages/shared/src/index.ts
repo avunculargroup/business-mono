@@ -9,3 +9,4 @@ export * from './podcasts.js';
 export * from './library.js';
 export * from './modelScopes.js';
 export * from './findings.js';
+export * from './ecosystem.js';

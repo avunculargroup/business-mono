@@ -11,6 +11,9 @@ import { useToast } from '@/providers/ToastProvider';
 import { deleteAdvisor, removeAdvisorContact } from '@/app/actions/advisors';
 import { AdvisorEditForm } from './AdvisorEditForm';
 import { AdvisorContactForm } from './AdvisorContactForm';
+import { WatchesCard } from '@/components/ecosystem/WatchesCard';
+import { ChangesCard, type EntityChange } from '@/components/ecosystem/ChangesCard';
+import type { WatchRow } from '@/components/ecosystem/EcosystemWatchForm';
 import { getInitials, formatDate } from '@/lib/utils';
 import styles from '@/app/(app)/advisors/[id]/advisor-detail.module.css';
 
@@ -63,6 +66,8 @@ interface AdvisorDetailProps {
   advisor: Advisor;
   contacts: AdvisorContact[];
   interactions: Interaction[];
+  watches: WatchRow[];
+  changes: EntityChange[];
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   allContacts: { id: string; first_name: string; last_name: string; email: string | null }[];
@@ -72,6 +77,8 @@ export function AdvisorDetail({
   advisor,
   contacts: initialContacts,
   interactions,
+  watches,
+  changes,
   companies,
   teamMembers,
   allContacts,
@@ -251,6 +258,16 @@ export function AdvisorDetail({
             <div className={styles.emptyCard}>No key contacts added yet.</div>
           )}
         </div>
+
+        {/* What's changed */}
+        <ChangesCard changes={changes} hasWatches={watches.length > 0} />
+
+        {/* Watches */}
+        <WatchesCard
+          advisorPartnerId={advisor.id}
+          watches={watches}
+          teamMembers={teamMembers}
+        />
 
         {/* Interaction history */}
         <div className={styles.card}>

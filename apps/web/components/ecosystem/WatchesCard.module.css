@@ -1,0 +1,111 @@
+/* Watches section card. Self-contained rather than reaching into the product /
+   advisor detail modules, because the same card renders on both. The card,
+   header and row rules match those modules so it sits flush beside them. */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.itemRow:last-child {
+  border-bottom: none;
+}
+
+.itemBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.itemMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* Timestamps and counts read as data. */
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Health dot: warning for degraded, destructive for failing. A healthy watch is
+   deliberately quiet — it gets the border colour, not a success green, because
+   "working" is the baseline, not an achievement. */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-border);
+}
+
+.dotDegraded {
+  background: var(--color-warning);
+}
+
+.dotFailing {
+  background: var(--color-destructive);
+}
+
+.dotDisabled {
+  background: var(--color-border);
+  opacity: 0.5;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.iconBtn:hover {
+  color: var(--color-text-primary);
+}
+
+.removeBtn:hover {
+  color: var(--color-destructive);
+}
+
+.emptyCard {
+  padding: var(--space-6);
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+}
