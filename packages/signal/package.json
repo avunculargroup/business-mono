@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@platform/shared": "workspace:*",
-    "ws": "^8.20.0"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
