@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RequestContext } from '@mastra/core/request-context';
 import { createFakeSupabase } from '../../test/mocks/supabase.js';
 
-// Build a fake LanguageModelV2 with doGenerate/doStream spies so the fallback
+// Build a fake LanguageModelV4 with doGenerate/doStream spies so the fallback
 // wrapper has the fields it reads (provider/modelId) and call sites to assert.
 function makeModel(provider: string, id: string) {
   return {
     provider,
     id,
     modelId: id,
-    specificationVersion: 'v2' as const,
+    specificationVersion: 'v4' as const,
     supportedUrls: {},
     doGenerate: vi.fn(async () => ({ provider, id, kind: 'generate' })),
     doStream: vi.fn(async () => ({ provider, id, kind: 'stream' })),

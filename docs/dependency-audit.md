@@ -1,8 +1,10 @@
 # Dependency Audit — `apps/agents`
 
-**Date:** 2026-07-29 · **Scope:** the agent server (`apps/agents`), with `packages/*` touched only where the agent server's runtime depends on them.
+**Date:** 2026-07-29 · **Scope:** the agent server (`apps/agents`), with `packages/*` and `apps/web` touched only where a reachable security advisory or the agent server's runtime required it.
 
 Previous dependency work: `da5dc7c` ("upgrade Mastra to core 1.50"). Mastra shipped four minor releases in the gap.
+
+Done in two commits: the Mastra/hygiene pass first, then the AI SDK migration plus the Next.js security bump.
 
 -----
 
@@ -20,6 +22,10 @@ Previous dependency work: `da5dc7c` ("upgrade Mastra to core 1.50"). Mastra ship
 | `ai` | ^4.3.0 | **removed** | Unimported, and the wrong major for anything in the tree (below) |
 | `hono` | ^4.12.8 | **removed** | Unimported; `src/mastra/index.ts` deliberately avoids hono's types |
 | `@anthropic-ai/sdk` | ^0.32.0 | **removed** | Unimported, 83 minors stale |
+| `@ai-sdk/anthropic` | ^2.0.74 | ^4.0.24 | Two majors behind; moves onto the actively-developed AI SDK v7 line |
+| `@ai-sdk/openai` | ^2.0.102 | ^4.0.24 | Same |
+| `@ai-sdk/provider` | ^2.0.1 | ^4.0.4 | Supplies the `LanguageModelV4` types used by `src/config/model.ts` |
+| `next` in `apps/web` | ^15.1.0 (resolved 15.5.14) | ^15.5.22 | Clears **11 HIGH advisories** — the most serious reachable exposure in the repo |
 
 `@mastra/loggers` stayed at `^1.2.0` — already latest. `pino`, `pino-pretty`, `rss-parser`, `turndown`, `@types/turndown`, and `zod` are all already at their latest release (`zod@3.25.76` **is** the newest 3.x; zod 4 is a separate major).
 
@@ -41,6 +47,12 @@ Two consequences: no Railway deploy was reproducible, and a Mastra regression co
 Fixed by copying the lockfile in the deps stage and switching to `--frozen-lockfile`, so the image matches what CI validated. The trade-off is intentional: a manifest edit without a matching `pnpm install` commit now fails the Docker build loudly instead of drifting silently.
 
 **Don't reintroduce this.** If a future Dockerfile change needs a fresh resolve, change the lockfile in the repo, not the install flag.
+
+### Related gap, not fixed: `apps/web` is never built in CI
+
+`.github/workflows/test.yml`'s build job runs `turbo run build --filter=@platform/agents...` only. Nothing in CI runs `next build`, so a Next.js build break — a bad import, a prerender failure, a config regression — passes CI and fails on Vercel instead. The web test suite (479 tests) catches logic but not build-time errors.
+
+Flagged rather than fixed, because adding a CI job is a separate decision. Until then, run `pnpm --filter @platform/web build` locally before merging anything that touches `apps/web` (it needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and placeholders are fine — `lib/supabase/{server,browser}.ts` read them inside functions, not at module scope).
 
 -----
 
@@ -66,7 +78,7 @@ Checked against upstream changelogs, not assumed:
 
 ## Finding 4 — advisory reachability matters more than the count
 
-`pnpm audit` reports 97 findings (3 critical, 37 high) after this work, down from 99. **That number is misleading in both directions, and chasing it to zero would be counterproductive.**
+`pnpm audit` reports **74 findings (3 critical, 26 high) after this work, down from 99 (3 critical, 37 high)** — nearly all of the reduction from the `next` bump. **The remaining number is misleading, and chasing it to zero would be counterproductive.**
 
 A plain `pnpm install` does *not* re-resolve transitive dependencies that still satisfy their ranges — pnpm treats the lockfile as authoritative. So most of these advisories can only be moved by adding permanent `pnpm.overrides`. Before doing that, each one was traced to a reachable code path. **None of the remaining critical/high advisories are reachable from the agent server's runtime surface:**
 
@@ -81,37 +93,63 @@ A plain `pnpm install` does *not* re-resolve transitive dependencies that still 
 
 Deliberately **not** adding `pnpm.overrides` for these: overrides go stale, silently mask upstream fixes, and here would buy a cosmetically lower number with no security gain. Revisit if any of the above becomes reachable.
 
-**The genuinely urgent advisories are in `apps/web`, not here** — 11 HIGH findings against `next` (SSRF in Server Actions and in rewrites, middleware/proxy bypass in App Router, several DoS), all fixed by `next >= 15.5.21` against a current `^15.1.0`. Plus HIGH `postcss` and `sharp`. That is out of this audit's scope but is the most valuable dependency work available in the repo right now.
+**The genuinely urgent advisories were in `apps/web`** — 11 HIGH findings against `next` (SSRF in Server Actions and in rewrites via attacker-controlled destination hostname, middleware/proxy bypass in App Router via segment-prefetch and dynamic route param injection, several DoS). **Fixed:** `next` → 15.5.22, and `pnpm audit` now reports zero `next` advisories. HIGH `postcss` and `sharp` remain, both transitive under the Next toolchain.
 
-One advisory *is* a real argument for an upgrade: **`@ai-sdk/provider-utils <= 3.0.97`** is marked `patched: <0.0.0` — there is no fix on the 3.x line. It's only reachable by moving `@ai-sdk/*` off 2.x. See below.
+### `@ai-sdk/provider-utils` — a correction
+
+An earlier draft of this doc claimed the `@ai-sdk/provider-utils <= 3.0.97` advisory (LOW, marked `patched: <0.0.0`, i.e. no fix on the 3.x line) could only be cleared by moving `@ai-sdk/*` off 2.x, and used that as the security case for the AI SDK migration. **That was wrong.** The migration did move the app's own copy to `provider-utils@5.0.15`, but the vulnerable 3.x copy is still in the tree and the advisory still fires, because it is pinned *inside* `@mastra/core`:
+
+```
+@mastra/core@1.54.0 → @ai-sdk/provider-utils-v5: npm:@ai-sdk/provider-utils@3.0.30
+@ai-sdk/ui-utils@1.2.11 → @ai-sdk/provider-utils@2.2.8
+```
+
+Mastra carries all three provider generations side by side deliberately, so it can accept V2/V3/V4 models. Nothing the app declares can dislodge those. The advisory closes only when Mastra drops its v5-generation alias — not something this repo controls. The AI SDK migration was still worth doing (two majors of currency, the actively-developed line, and it unlocks `reasoning` — see below), but **not** for that advisory.
+
+-----
+
+## The AI SDK migration (done) — V2 → V4
+
+`@ai-sdk/{anthropic,openai,provider}` moved 2.x → 4.x, i.e. from the AI SDK v5 provider generation to v7. Smaller than the version jump suggests, because the whole AI SDK surface in this repo is `src/config/model.ts` plus its test — nothing else imports `@ai-sdk/*`, and `apps/web` doesn't use it at all.
+
+**`LanguageModelV4` has exactly the same six members as `LanguageModelV2`** — `specificationVersion`, `provider`, `modelId`, `supportedUrls`, `doGenerate`, `doStream`. The v4 result types are extracted into named aliases (`LanguageModelV4GenerateResult` / `…StreamResult`), which is invisible to a wrapper that only delegates. So the change was ten type positions plus a stale comment, and no logic moved.
+
+Things checked so nobody has to re-check them:
+
+- **Mastra accepts V4 at the type level.** `MastraModelConfig = LanguageModelV1 | V2 | V3 | V4 | ModelRouterModelId | OpenAICompatibleConfig | MastraLanguageModel`, and `Agent` takes `DynamicArgument<MastraModelConfig>` — exactly what `dynamicModelFor` returns. Core vendors `@ai-sdk/provider@4.0.3` as `provider-v7` while the app carries 4.0.4; same minor, structurally compatible. Watch this if the two ever drift by more than a patch.
+- **`createAnthropic({ apiKey })` / `createOpenAI({ apiKey, baseURL })` are unchanged** in v4.
+- **`.chat()` is still required for OpenRouter.** In `@ai-sdk/openai@4`, `provider.languageModel` still returns `createResponsesModel(modelId)`, so bare `openai(id)` would hit the Responses API that OpenRouter rejects. The comment in `model.ts` is still accurate; only its version reference changed.
+- **Both model-ID unions still end in `| (string & {})`**, so the runtime strings from `model_configs` and `POPULAR_MODELS` type-check fine.
+
+### Why `createFallbackModel` was kept
+
+Mastra 1.54 added native model fallbacks, which look like they could replace the hand-rolled wrapper. They can't. `ModelFallbacks` is `{ id, model, maxRetries, enabled, modelSettings?, providerOptions?, headers? }[]` — there is **no error-predicate field** anywhere in the agent or LLM type surface (no `retryOn`, `shouldRetry`, `isRetryable`, `errorFilter`). It's a positional chain driven by `maxRetries`.
+
+The wrapper encodes something that shape cannot express: `isKeyLimitError` (`src/lib/llmErrors.ts`) matches a 403 whose body reads *"key limit exceeded"*, and failover happens **immediately, with zero retries** — deliberately, because the key is out of budget and retrying it is pointless. Mastra's chain would burn `maxRetries` against the dead key before advancing, adding latency to every request once the budget runs out, and would also fail over on permanent errors (bad request, context-length) where calling Anthropic is wasted spend. Don't re-open this without an upstream predicate field.
+
+### What V4 unlocks
+
+`ModelFallbackSettings.reasoning` is documented as *"Only effective with LanguageModelV4 (AI SDK v7) model providers that support reasoning. When used with older model providers (V2/V3), this option is a no-op."* Reasoning-effort control is now available; not wired up.
 
 -----
 
 ## Deferred upgrades, in recommended order
 
-### 1. `@ai-sdk/{anthropic,openai,provider}` 2.x → 4.x — do this next
-
-Two majors behind (`@ai-sdk/anthropic@2.0.74` → `4.0.24`), and the only way to clear the unpatchable `provider-utils` advisory.
-
-Sized precisely, and smaller than the version jump suggests: **`LanguageModelV4` is structurally identical to `LanguageModelV2`** — same `specificationVersion`, `provider`, `modelId`, `supportedUrls`, `doGenerate`, `doStream`. So:
-
-- `createFallbackModel` in `src/config/model.ts` is a mechanical type swap: `LanguageModelV2` → `LanguageModelV4`, `LanguageModelV2CallOptions` → `LanguageModelV4CallOptions`.
-- `src/config/model.test.ts` needs `specificationVersion: 'v2'` → `'v4'` in its fake model.
-- `openai.chat(modelId)` still exists in `@ai-sdk/openai@4`, so the OpenRouter workaround documented in `src/config/model.ts` (must use `.chat()` because the provider defaults to the Responses API, which OpenRouter rejects) still applies unchanged.
-
-Independent of the Mastra version: `@mastra/core` has bundled `@ai-sdk/provider-v7` (the v4 spec) since 1.50.1, so it already accepts V4-spec models. It internally carries all three generations side by side (`provider-v5`/`-v6`/`-v7`).
-
-### 2. `vitest` 2 → 4 (+ `@vitest/coverage-v8`)
+### 1. `vitest` 2 → 4 (+ `@vitest/coverage-v8`)
 
 Clears a CRITICAL and a HIGH (`vite`) and gets off an EOL major. Must move together across `apps/agents`, `apps/web`, and `packages/voice`, which share the lockfile. Worth doing for maintenance reasons more than security ones, given the reachability analysis above.
 
-### 3. `openai` 4.104.0 → 7.1.0
+### 2. `openai` 4.104.0 → 7.1.0
 
 Three majors, but the used surface is tiny: only `embeddings.create`, at six call sites — `src/tools/openai.ts`, `src/lib/embedText.ts`, `src/lib/contentEmbeddings.ts`, `src/agents/archivist/tools.ts`, `src/agents/researcher/tools.ts`, `src/workflows/executeRoutineWorkflow.ts`. Note `packages/voice` also declares `openai@^4.68.0` and must move in lockstep.
 
-### 4. `@deepgram/sdk` 3.13.0 → 5.7.0 — lowest priority
+### 3. `@deepgram/sdk` 3.13.0 → 5.7.0
 
 The only genuinely breaking upgrade here. v5 replaces `createClient()` with `new DeepgramClient()`, and folds `listen.prerecorded.transcribeUrlCallback` into `listen.v1.media.transcribeUrl()` with a `callback` option. Touches `src/tools/deepgram.ts` and its test, on the transcription path. Pinned v3 is fine; its `ws` advisory isn't reachable (above).
+
+### 4. Next.js 15 → 16
+
+`next@16.2.12` is now the stable `latest`. This bump stayed on the 15 line (15.5.22) because that clears every open advisory without a major migration. Moving to 16 is real work with its own breaking changes and should be scoped on its own, not folded into a security patch.
 
 ### 5. Trivia left on the table
 
@@ -131,6 +169,7 @@ pnpm outdated -r                              # current vs latest across the wor
 pnpm --filter @platform/agents typecheck      # catches Mastra type changes
 pnpm --filter @platform/agents test           # 1079 tests, fully mocked, ~20s
 pnpm exec turbo run build --filter=@platform/agents...   # the only check covering the mastra bundler/deployer path
+pnpm --filter @platform/web build             # the only check covering next build — CI does not do this
 docker build -f apps/agents/Dockerfile .      # the only check covering --frozen-lockfile resolution
 ```
 
@@ -139,4 +178,10 @@ Two things `mastra build` reports that are **pre-existing and not caused by depe
 - Three `Circular dependency found` warnings for `src/mastra/index.ts -> src/webhooks/{telnyx,zoom,deepgram}.ts -> src/mastra/index.ts`. Inherent to the current structure — `index.ts` registers the webhook handlers while each handler imports the `mastra` instance back. Rollup resolves them; they're warnings, not errors.
 - A `PostHog` / `SELF_SIGNED_CERT_IN_CHAIN` stack trace when building behind a TLS-terminating proxy. That's the Mastra CLI's own telemetry failing to flush; it doesn't affect bundle output. Set `MASTRA_TELEMETRY_DISABLED=1` to silence it.
 
-`pnpm --filter @platform/agents test:eval` hits a real LLM and is not in CI — run it only when Simon's routing, specialist registrations, or an agent system prompt changes. Dependency bumps alone don't require it.
+`pnpm --filter @platform/agents test:eval` hits a real LLM and is not in CI — run it when Simon's routing, specialist registrations, or an agent system prompt changes.
+
+### The one thing the test suite cannot tell you
+
+`src/config/model.test.ts` mocks `@ai-sdk/anthropic` and `@ai-sdk/openai` at the module boundary, and every other agent test mocks the model layer too. **A green suite proves the types line up, not that a model actually round-trips against a live provider.** That gap matters most after an AI SDK provider-generation change (V2 → V4, as done here): a runtime incompatibility in Mastra's V4 code path would pass typecheck, pass 1079 tests, bundle cleanly, and only surface on Railway.
+
+If you change the provider generation again, `test:eval` with a real key is the only pre-merge check that exercises it. The V2 → V4 move in this audit shipped **without** that check.

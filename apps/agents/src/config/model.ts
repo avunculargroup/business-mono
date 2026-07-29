@@ -1,6 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
-import type { LanguageModelV2, LanguageModelV2CallOptions } from '@ai-sdk/provider';
+import type { LanguageModelV4, LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import { RequestContext } from '@mastra/core/request-context';
 import { DEFAULT_MODEL, MODEL_SCOPES } from '@platform/shared';
 import { supabase } from '@platform/db';
@@ -30,16 +30,16 @@ const ENV_DEFAULT_MODEL_ID =
  * catching at the `doStream` call site is sufficient — no mid-stream replay.
  */
 function createFallbackModel(
-  primary: LanguageModelV2,
-  fallback: LanguageModelV2,
+  primary: LanguageModelV4,
+  fallback: LanguageModelV4,
   shouldFallback: (err: unknown) => boolean,
-): LanguageModelV2 {
+): LanguageModelV4 {
   return {
     specificationVersion: primary.specificationVersion,
     provider: primary.provider,
     modelId: primary.modelId,
     supportedUrls: primary.supportedUrls,
-    async doGenerate(options: LanguageModelV2CallOptions) {
+    async doGenerate(options: LanguageModelV4CallOptions) {
       try {
         return await primary.doGenerate(options);
       } catch (err) {
@@ -48,7 +48,7 @@ function createFallbackModel(
         return fallback.doGenerate(options);
       }
     },
-    async doStream(options: LanguageModelV2CallOptions) {
+    async doStream(options: LanguageModelV4CallOptions) {
       try {
         return await primary.doStream(options);
       } catch (err) {
@@ -66,13 +66,13 @@ function createFallbackModel(
  * Priority:
  * 1. OpenRouter (if OPENROUTER_API_KEY set) → OpenAI-compatible chat completions
  *    endpoint. Must use `openai.chat()` rather than `openai()` because
- *    `@ai-sdk/openai` v2 defaults to the Responses API, which OpenRouter rejects.
+ *    `@ai-sdk/openai` v4 defaults to the Responses API, which OpenRouter rejects.
  *    When ANTHROPIC_API_KEY is also set, the OpenRouter model is wrapped so a
  *    key/credit-limit 403 transparently fails over to the direct Anthropic API.
  * 2. Anthropic SDK (if only ANTHROPIC_API_KEY is set) → direct Anthropic API.
  * 3. Fail fast.
  */
-function buildModel(modelId: string): LanguageModelV2 {
+function buildModel(modelId: string): LanguageModelV4 {
   const anthropicApiKey = process.env['ANTHROPIC_API_KEY'];
   const openrouterApiKey = process.env['OPENROUTER_API_KEY'];
 
@@ -106,7 +106,7 @@ function buildModel(modelId: string): LanguageModelV2 {
  * back-compat with any caller that doesn't have a scope (and as the absolute
  * fallback inside the dynamic resolver below).
  */
-export function getModelConfig(): LanguageModelV2 {
+export function getModelConfig(): LanguageModelV4 {
   return buildModel(ENV_DEFAULT_MODEL_ID);
 }
 
@@ -184,7 +184,7 @@ export function invalidateModelConfigCache(): void {
 async function resolveModel(
   primaryScopeKey: string,
   fallbackKeys: readonly string[] = [],
-): Promise<LanguageModelV2> {
+): Promise<LanguageModelV4> {
   const configs = await getConfigs();
   const lookup = (key: string): string | undefined => configs.get(key);
 
@@ -210,7 +210,7 @@ async function resolveModel(
  */
 export function dynamicModelFor(
   agentScopeKey: string,
-): (args: { requestContext: RequestContext }) => Promise<LanguageModelV2> {
+): (args: { requestContext: RequestContext }) => Promise<LanguageModelV4> {
   return async ({ requestContext }) => {
     const stepScope = requestContext.get(STEP_SCOPE_KEY) as string | undefined;
     if (stepScope) {

@@ -16,9 +16,9 @@
     "seed:voice": "tsx src/seeds/seedVoice.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.74",
-    "@ai-sdk/openai": "^2.0.102",
-    "@ai-sdk/provider": "^2.0.1",
+    "@ai-sdk/anthropic": "^4.0.24",
+    "@ai-sdk/openai": "^4.0.24",
+    "@ai-sdk/provider": "^4.0.4",
     "@deepgram/sdk": "^3.9.0",
     "@mastra/core": "^1.54.0",
     "@mastra/loggers": "^1.2.0",
