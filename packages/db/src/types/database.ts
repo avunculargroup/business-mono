@@ -1953,6 +1953,220 @@ export type Database = {
           },
         ]
       }
+      ecosystem_changes: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          advisor_partner_id: string | null
+          change_type: string
+          client_relevant: boolean
+          compliance_class: string | null
+          compliance_notes: string | null
+          created_at: string
+          curator_note: string | null
+          dedup_key: string
+          detected_at: string
+          entity_name: string
+          external_url: string | null
+          id: string
+          materiality: number | null
+          occurred_at: string | null
+          payload: Json
+          pinned: boolean
+          product_service_id: string | null
+          severity: string | null
+          source: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          watch_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          advisor_partner_id?: string | null
+          change_type: string
+          client_relevant?: boolean
+          compliance_class?: string | null
+          compliance_notes?: string | null
+          created_at?: string
+          curator_note?: string | null
+          dedup_key: string
+          detected_at?: string
+          entity_name: string
+          external_url?: string | null
+          id?: string
+          materiality?: number | null
+          occurred_at?: string | null
+          payload?: Json
+          pinned?: boolean
+          product_service_id?: string | null
+          severity?: string | null
+          source?: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          watch_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          advisor_partner_id?: string | null
+          change_type?: string
+          client_relevant?: boolean
+          compliance_class?: string | null
+          compliance_notes?: string | null
+          created_at?: string
+          curator_note?: string | null
+          dedup_key?: string
+          detected_at?: string
+          entity_name?: string
+          external_url?: string | null
+          id?: string
+          materiality?: number | null
+          occurred_at?: string | null
+          payload?: Json
+          pinned?: boolean
+          product_service_id?: string | null
+          severity?: string | null
+          source?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          watch_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ecosystem_changes_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_changes_advisor_partner_id_fkey"
+            columns: ["advisor_partner_id"]
+            isOneToOne: false
+            referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_changes_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_changes_watch_id_fkey"
+            columns: ["watch_id"]
+            isOneToOne: false
+            referencedRelation: "ecosystem_watches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ecosystem_watches: {
+        Row: {
+          advisor_partner_id: string | null
+          centrality: number
+          check_frequency: string
+          config: Json
+          consecutive_failures: number
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          health: string
+          id: string
+          label: string
+          last_change_at: string | null
+          last_checked_at: string | null
+          last_state: Json | null
+          notes: string | null
+          owner_id: string | null
+          product_service_id: string | null
+          source_url: string | null
+          updated_at: string
+          watch_type: string
+        }
+        Insert: {
+          advisor_partner_id?: string | null
+          centrality?: number
+          check_frequency?: string
+          config?: Json
+          consecutive_failures?: number
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          health?: string
+          id?: string
+          label: string
+          last_change_at?: string | null
+          last_checked_at?: string | null
+          last_state?: Json | null
+          notes?: string | null
+          owner_id?: string | null
+          product_service_id?: string | null
+          source_url?: string | null
+          updated_at?: string
+          watch_type: string
+        }
+        Update: {
+          advisor_partner_id?: string | null
+          centrality?: number
+          check_frequency?: string
+          config?: Json
+          consecutive_failures?: number
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          health?: string
+          id?: string
+          label?: string
+          last_change_at?: string | null
+          last_checked_at?: string | null
+          last_state?: Json | null
+          notes?: string | null
+          owner_id?: string | null
+          product_service_id?: string | null
+          source_url?: string | null
+          updated_at?: string
+          watch_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ecosystem_watches_advisor_partner_id_fkey"
+            columns: ["advisor_partner_id"]
+            isOneToOne: false
+            referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_watches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_watches_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_watches_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fastmail_accounts: {
         Row: {
           consecutive_failures: number
@@ -5191,6 +5405,52 @@ export type Database = {
           owner_name: string | null
           pipeline_stage: string | null
           tags: string[] | null
+        }
+        Relationships: []
+      }
+      v_ecosystem_feed: {
+        Row: {
+          advisor_partner_id: string | null
+          advisor_slug: string | null
+          advisor_type: string | null
+          change_type: string | null
+          client_relevant: boolean | null
+          compliance_class: string | null
+          curator_note: string | null
+          detected_at: string | null
+          entity_name: string | null
+          external_url: string | null
+          id: string | null
+          materiality: number | null
+          occurred_at: string | null
+          owner_name: string | null
+          pinned: boolean | null
+          product_category: string | null
+          product_service_id: string | null
+          product_slug: string | null
+          severity: string | null
+          status: string | null
+          summary: string | null
+          title: string | null
+          watch_label: string | null
+          watch_type: string | null
+        }
+        Relationships: []
+      }
+      v_ecosystem_watch_health: {
+        Row: {
+          check_frequency: string | null
+          consecutive_failures: number | null
+          days_since_check: number | null
+          enabled: boolean | null
+          entity_name: string | null
+          health: string | null
+          id: string | null
+          label: string | null
+          last_change_at: string | null
+          last_checked_at: string | null
+          owner_name: string | null
+          watch_type: string | null
         }
         Relationships: []
       }

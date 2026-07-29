@@ -2689,3 +2689,96 @@ CREATE INDEX idx_content_scheduled_due
 
 -- Triggers: social_credentials_updated_at (update_updated_at).
 -- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
+
+
+-- ============================================================
+-- ECOSYSTEM SIGNALS (migration: 20260729000000_add_ecosystem_signals)
+-- Spec: docs/features/ecosystem/ecosystem-signal-feature.md
+--
+-- A separate layer over the Ecosystem registers: typed watches on a
+-- product/advisor row, and the changes an adapter detected. Nothing
+-- here writes back to the registers. Detection commits payload/title/
+-- dedup_key first; summary, materiality, severity and compliance_class
+-- are nullable so a change survives an LLM outage un-narrated.
+-- ============================================================
+
+CREATE TABLE ecosystem_watches (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_service_id   UUID        REFERENCES products_services(id) ON DELETE CASCADE,
+  advisor_partner_id   UUID        REFERENCES advisors_partners(id) ON DELETE CASCADE,
+  watch_type           TEXT        NOT NULL CHECK (watch_type IN (
+                         'regulatory_register', 'github_release', 'github_advisory',
+                         'rss', 'newsletter', 'status_page', 'attestation', 'policy_diff'
+                       )),
+  label                TEXT        NOT NULL,
+  config               JSONB       NOT NULL DEFAULT '{}'::jsonb,  -- shapes typed in @platform/shared
+  source_url           TEXT,
+  enabled              BOOLEAN     NOT NULL DEFAULT TRUE,
+  check_frequency      TEXT        NOT NULL DEFAULT 'daily'       -- realtime = never polled
+                         CHECK (check_frequency IN ('realtime', 'hourly', 'daily', 'weekly')),
+  last_checked_at      TIMESTAMPTZ,
+  last_change_at       TIMESTAMPTZ,
+  last_state           JSONB,                                     -- the diff anchor
+  consecutive_failures INT         NOT NULL DEFAULT 0,
+  health               TEXT        NOT NULL DEFAULT 'healthy'
+                         CHECK (health IN ('healthy', 'degraded', 'failing')),
+  centrality           NUMERIC(3,2) NOT NULL DEFAULT 1.00         -- explicit materiality weight
+                         CHECK (centrality > 0 AND centrality <= 2),
+  owner_id             UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  notes                TEXT,
+  created_by           UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ecosystem_watches_one_parent
+    CHECK (num_nonnulls(product_service_id, advisor_partner_id) = 1)
+);
+
+-- Indexes: idx_watches_product, idx_watches_advisor, idx_watches_health, and
+-- idx_watches_due (enabled, check_frequency, last_checked_at) for the scan tick.
+
+CREATE TABLE ecosystem_changes (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  watch_id           UUID        NOT NULL REFERENCES ecosystem_watches(id) ON DELETE CASCADE,
+  product_service_id UUID        REFERENCES products_services(id) ON DELETE CASCADE,  -- denormalised
+  advisor_partner_id UUID        REFERENCES advisors_partners(id) ON DELETE CASCADE,  -- denormalised
+  entity_name        TEXT        NOT NULL,   -- survives a later rename of the register row
+  change_type        TEXT        NOT NULL CHECK (change_type IN (
+                       'release', 'advisory', 'staleness', 'discontinuity',
+                       'policy_change', 'pricing_change', 'regulatory_change',
+                       'corporate_event', 'incident', 'mention', 'other'
+                     )),
+  title              TEXT        NOT NULL,   -- payload-derived, never LLM-written
+  summary            TEXT,                   -- narrator output; NULL until enrichment
+  payload            JSONB       NOT NULL DEFAULT '{}'::jsonb,  -- the narration contract's only source
+  dedup_key          TEXT        NOT NULL,
+  materiality        INT         CHECK (materiality IS NULL OR (materiality >= 0 AND materiality <= 100)),
+  severity           TEXT        CHECK (severity IS NULL OR severity IN ('info','low','medium','high','critical')),
+  compliance_class   TEXT        CHECK (compliance_class IS NULL OR compliance_class IN (
+                       'neutral', 'valuation_adjacent', 'advice_adjacent', 'solvency_adjacent'
+                     )),
+  compliance_notes   TEXT,
+  status             TEXT        NOT NULL DEFAULT 'new'
+                       CHECK (status IN ('new','acknowledged','actioned','dismissed','archived')),
+  pinned             BOOLEAN     NOT NULL DEFAULT FALSE,
+  client_relevant    BOOLEAN     NOT NULL DEFAULT FALSE,  -- gated on compliance_class = 'neutral'
+  curator_note       TEXT,
+  occurred_at        TIMESTAMPTZ,
+  detected_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  external_url       TEXT,
+  source             TEXT        NOT NULL DEFAULT 'ecosystem_workflow',
+  acknowledged_by    UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  acknowledged_at    TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- UNIQUE (watch_id, dedup_key) as uq_changes_dedup — the idempotency guard.
+-- Indexes: idx_changes_product, idx_changes_advisor, idx_changes_status,
+-- idx_changes_type, idx_changes_detected (detected_at DESC),
+-- idx_changes_client WHERE client_relevant, idx_changes_unenriched WHERE summary IS NULL.
+
+-- Triggers: ecosystem_watches_updated_at, ecosystem_changes_updated_at (update_updated_at).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on both tables.
+-- Views: v_ecosystem_feed (live changes + entity context, pinned then most
+--   material; excludes dismissed/archived) and v_ecosystem_watch_health
+--   (enabled watches, failing/degraded first, never-checked before stale).

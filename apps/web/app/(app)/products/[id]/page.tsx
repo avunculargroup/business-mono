@@ -25,6 +25,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const [
     { data: keyContacts },
     { data: agreements },
+    { data: watches },
     companies,
     teamMembers,
     { data: allContacts },
@@ -36,6 +37,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     supabase
       .from('product_referral_agreements')
       .select('*')
+      .eq('product_service_id', product.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('ecosystem_watches')
+      .select('id, watch_type, label, source_url, enabled, check_frequency, health, last_checked_at, last_change_at')
       .eq('product_service_id', product.id)
       .order('created_at', { ascending: false }),
     getCompanyOptions(supabase),
@@ -64,6 +70,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         keyContacts={keyContacts ?? []}
         agreements={agreements ?? []}
         interactions={interactions ?? []}
+        watches={watches ?? []}
         companies={companies ?? []}
         teamMembers={teamMembers ?? []}
         allContacts={allContacts ?? []}

@@ -12,6 +12,8 @@ import { deleteProduct, removeProductKeyContact, deleteReferralAgreement } from 
 import { ProductEditForm } from './ProductEditForm';
 import { ProductKeyContactForm } from './ProductKeyContactForm';
 import { ProductReferralAgreementForm } from './ProductReferralAgreementForm';
+import { WatchesCard } from '@/components/ecosystem/WatchesCard';
+import type { WatchRow } from '@/components/ecosystem/EcosystemWatchForm';
 import { formatDate } from '@/lib/utils';
 import styles from '@/app/(app)/products/[id]/product-detail.module.css';
 
@@ -86,6 +88,7 @@ interface ProductDetailProps {
   keyContacts: KeyContact[];
   agreements: Agreement[];
   interactions: Interaction[];
+  watches: WatchRow[];
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   allContacts: { id: string; first_name: string; last_name: string; email: string | null }[];
@@ -96,6 +99,7 @@ export function ProductDetail({
   keyContacts: initialKeyContacts,
   agreements: initialAgreements,
   interactions,
+  watches,
   companies,
   teamMembers,
   allContacts,
@@ -303,6 +307,13 @@ export function ProductDetail({
             <div className={styles.emptyCard}>No referral agreements recorded.</div>
           )}
         </div>
+
+        {/* Watches */}
+        <WatchesCard
+          productServiceId={product.id}
+          watches={watches}
+          teamMembers={teamMembers}
+        />
 
         {/* Interaction history */}
         <div className={styles.card}>

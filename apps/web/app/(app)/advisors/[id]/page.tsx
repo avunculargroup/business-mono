@@ -24,6 +24,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
 
   const [
     { data: contacts },
+    { data: watches },
     companies,
     teamMembers,
     { data: allContacts },
@@ -32,6 +33,11 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
       .from('advisor_partner_contacts')
       .select('id, role, contacts(id, first_name, last_name, email)')
       .eq('advisor_partner_id', advisor.id),
+    supabase
+      .from('ecosystem_watches')
+      .select('id, watch_type, label, source_url, enabled, check_frequency, health, last_checked_at, last_change_at')
+      .eq('advisor_partner_id', advisor.id)
+      .order('created_at', { ascending: false }),
     getCompanyOptions(supabase),
     getTeamMemberOptions(supabase),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),
@@ -57,6 +63,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
         advisor={advisor as typeof advisor & { type: 'advisor' | 'partner' }}
         contacts={contacts ?? []}
         interactions={interactions ?? []}
+        watches={watches ?? []}
         companies={companies ?? []}
         teamMembers={teamMembers ?? []}
         allContacts={allContacts ?? []}

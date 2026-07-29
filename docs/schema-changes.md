@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-29 — ecosystem signals: watches + detected changes
+
+**Migration:** `20260729000000_add_ecosystem_signals.sql`
+
+The Ecosystem registers (`products_services`, `advisors_partners`) have been human-maintained reference tables with no agent touching them. This adds the first agent-adjacent layer *on top of* them — typed watches and the changes an adapter detected — as a separate layer that references the registers by FK and never writes back. The registers stay director-owned.
+
+- **`ecosystem_watches`** — one typed watch per register row, `watch_type` selecting the adapter (`regulatory_register`, `github_release`, `github_advisory`, `rss`, `newsletter`, `status_page`, `attestation`, `policy_diff`) and `config` carrying its settings, whose shapes are typed in `@platform/shared` rather than constrained here — the eight variants have nothing in common structurally, and a JSONB CHECK would be unmaintainable against a discriminated union that changes with each adapter.
+- **`last_state` is the diff anchor, and it is what makes detection cheap and idempotent.** Last-seen release id, item guids, content hash, attestation date, register status. The adapter is a pure function of `(config, last_state, fetched) → (changes[], next_state)`, which is also what makes it testable against a recorded fixture with no network and no Supabase.
+- **`CHECK (num_nonnulls(product_service_id, advisor_partner_id) = 1)`** — a watch belongs to exactly one register entity. Enforced in the server actions too (the `contracts` `contact_id`/`company_id` pattern); the constraint is belt and braces against a direct insert.
+- **`centrality NUMERIC(3,2)` on the watch** — an explicit materiality weight, answering the spec's open question the way it recommends. Inferring an entity's importance from `australian_owned` or `category` would bake a guess into the score with no way for a director to correct it.
+- **`ecosystem_changes` is deliberately two-phase, and the nullability is the point.** Detection commits `payload`, `title`, `dedup_key`, `occurred_at`, `external_url`; `summary`, `materiality`, `severity` and `compliance_class` are all NULLABLE and filled by a second pass. A failed enrichment leaves a valid, verifiable, un-narrated change in the feed rather than losing it — facts never depend on the LLM being up. Re-enrichment is a re-run over `summary IS NULL`, which `idx_changes_unenriched` serves.
+- **`UNIQUE (watch_id, dedup_key)`** — the idempotency guard, the same idiom as `news_items_source_ingestion_ref_uniq` and `podcast_episodes (source_id, guid)`. Both columns are `NOT NULL` here, so the usual NULLs-are-distinct trap does not apply and no partial index is needed. Overlapping scan ticks and re-runs cannot double-insert.
+- **`entity_name` denormalised onto the change** — preserves who a change was about even if the register row is later renamed, the same rationale as `contracts.counterparty_name`. `product_service_id` / `advisor_partner_id` are denormalised off the watch too, so the feed view needs no double join.
+- **`compliance_class` is nullable, and NULL is treated as restrictively as a non-neutral class.** Lex classifies at ingest so the client-promotion gate has its answer before anyone asks; a failed classification must not become an accidental promotion, so `flagClientRelevant` refuses anything that is not explicitly `'neutral'`. The gate is built now and dormant — it activates the day a client-facing surface consumes this data, as a **new, narrower** RLS policy over the `client_relevant = true AND compliance_class = 'neutral'` subset, never a loosening of the two policies added here.
+- **`change_type` carries no valence.** A `release` is an event, not good news. The CHECK list is neutral categories only, and the UI rule that follows from it (no success-green on any change) is in the spec.
+- **Views** — `v_ecosystem_feed` (the internal feed: pinned, then most material, excluding dismissed/archived, carrying both register slugs so a row can deep-link without a second query) and `v_ecosystem_watch_health` (failing/degraded first, never-checked before stale — an unattended failing watch is a quieter trust failure than a missed change, so it gets a surface rather than a log line).
+- Spec: `docs/features/ecosystem/ecosystem-signal-feature.md`.
+
+---
+
 ## 2026-07-27 — news_sources.follow_links / max_followed_links
 
 - **`follow_links` + `max_followed_links` on `news_sources`** — research newsletters are frequently link roundups where the substance sits behind the links rather than in the email body. When `follow_links` is true, `researchMailListener` extracts the substantive links from the newsletter HTML, fetches each article, and ingests it as its own `news_items` row with a real `http(s)` URL. That fixes two things at once: the linked articles become first-class, dedupable, individually-scored items, and the digest email gets a clickable heading instead of the unlinkable synthetic `email://…` URL.
