@@ -2288,7 +2288,7 @@ CREATE TABLE economic_indicators (
   short_label            TEXT NOT NULL,
   region                 TEXT NOT NULL CHECK (region IN ('au','us','global')),
   category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation','activity')),
-  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs','oecd')),
+  provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs','oecd','stooq','gold_api')),
   provider_series_code   TEXT,                     -- FRED series_id, e.g. 'M2SL'
   provider_table_ref     TEXT,                     -- RBA/ABS table or dataflow ref, e.g. 'D3'
   unit                   TEXT NOT NULL,            -- 'percent','aud_billion','usd_billion','index'
@@ -2318,7 +2318,7 @@ CREATE TABLE indicator_observations (
   is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage of this period
   is_revision      BOOLEAN NOT NULL DEFAULT FALSE,  -- supersedes an earlier value for this period
   superseded_value NUMERIC(18,4),
-  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','oecd','manual')),
+  source           TEXT NOT NULL CHECK (source IN ('fred','rba','abs','oecd','stooq','gold_api','manual')),
   raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
