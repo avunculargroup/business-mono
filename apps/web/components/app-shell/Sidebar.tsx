@@ -71,6 +71,7 @@ const workNav = [
     { href: '/discovery/pipeline',  label: 'Pipeline'  },
   ]},
   { href: '/ecosystem', label: 'Ecosystem', icon: Globe, children: [
+    { href: '/signals',  label: 'Signals'             },
     { href: '/products', label: 'Products & services' },
     { href: '/advisors', label: 'Advisors & partners'  },
   ]},
@@ -134,6 +135,7 @@ const moreNav: MoreNavSection[] = [
         { href: '/discovery/pipeline',    label: 'Pipeline'   },
       ]},
       { href: '/ecosystem', label: 'Ecosystem', icon: Globe, children: [
+        { href: '/signals',  label: 'Signals'             },
         { href: '/products', label: 'Products & services' },
         { href: '/advisors', label: 'Advisors & partners'  },
       ]},
@@ -161,7 +163,7 @@ export function Sidebar({ pendingCount }: SidebarProps) {
     if (href === '/') return pathname === '/';
     if (href === '/crm') return pathname.startsWith('/crm') && !pathname.startsWith('/crm/interviews') && !pathname.startsWith('/crm/segments');
     if (href === '/discovery') return pathname.startsWith('/discovery') || pathname.startsWith('/crm/interviews') || pathname.startsWith('/crm/segments');
-    if (href === '/ecosystem') return pathname.startsWith('/products') || pathname.startsWith('/advisors');
+    if (href === '/ecosystem') return pathname.startsWith('/products') || pathname.startsWith('/advisors') || pathname.startsWith('/signals');
     return pathname.startsWith(href);
   };
 
