@@ -12,8 +12,13 @@ const resume = vi.fn();
 const createRun = vi.fn(async () => ({ resume }));
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
+// `class` rather than an arrow implementation: the module under test calls
+// `new SignalClient(...)`, and Vitest 4 constructs mocks invoked with `new`,
+// which throws for arrow functions.
 vi.mock('@platform/signal', () => ({
-  SignalClient: vi.fn().mockImplementation(() => ({ sendMessage })),
+  SignalClient: class {
+    sendMessage = sendMessage;
+  },
 }));
 vi.mock('../mastra/index.js', () => ({
   mastra: { getWorkflow: () => ({ getWorkflowRunById, createRun }) },

@@ -65,3 +65,47 @@ jobs:
       # required (index.ts's runtime env is not evaluated at build time).
       - name: Build agents
         run: pnpm exec turbo run build --filter=@platform/agents...
+
+  build-web:
+    name: Build web app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Runs `next build` (the Vercel deploy path). Without this job a web
+      # build break — bad import, prerender failure, config regression — passes
+      # CI and fails on Vercel instead; the web unit suite covers logic, not
+      # build-time errors.
+      #
+      # Must be the turbo `...` form, NOT `pnpm --filter @platform/web build`.
+      # apps/web has ~50 runtime value imports from @platform/shared
+      # (TASK_PRIORITY_LABELS etc.) which resolve via exports["."].import →
+      # ./dist/index.js, so the workspace packages must be compiled first.
+      # `transpilePackages` in next.config.ts changes how Next compiles those
+      # files, not how it resolves them. On a cold checkout the plain filter
+      # fails with "Can't resolve '@platform/shared'".
+      #
+      # The Supabase vars are deliberately literal placeholders rather than
+      # repository secrets: this is a compile check, not a deploy, and
+      # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+      # so real credentials would be baked into a throwaway CI artifact for no
+      # benefit. The build only needs them to exist — lib/supabase/{server,
+      # browser}.ts read them inside functions, not at module scope.
+      - name: Build web
+        run: pnpm exec turbo run build --filter=@platform/web...
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key

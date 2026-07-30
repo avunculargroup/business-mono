@@ -5,15 +5,21 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 WORKDIR /repo
 
-# Copy manifests first for layer cache optimisation
-COPY package.json pnpm-workspace.yaml ./
+# Copy manifests first for layer cache optimisation. The lockfile has to be
+# copied here, not left to stage 2's `COPY . .` — that runs after install, too
+# late to affect resolution. Without it, install resolves every caret range
+# fresh and the deployed tree drifts from the one CI validates.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/agents/package.json ./apps/agents/
 COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/signal/package.json ./packages/signal/
 COPY packages/voice/package.json ./packages/voice/
 
-RUN pnpm install --no-frozen-lockfile
+# --frozen-lockfile matches the CI workflow, so this image gets the exact tree
+# the test + build jobs ran against. A manifest change without a matching
+# `pnpm install` commit now fails the build loudly instead of drifting silently.
+RUN pnpm install --frozen-lockfile
 
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
 FROM deps AS builder
