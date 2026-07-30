@@ -142,6 +142,28 @@ a zero.
 Coin Metrics serves a same-day **flash** value that may later revise; accept it and let the
 workflow's supersession catch the revision (or request reviewed values at a lag — Open Question).
 
+**Update 2026-07-30:** `CapRealUSD` was never actually community-entitled — confirmed via
+production data (zero observations ever, vs. ~36,000 for `SplyCur`/`AdrActCnt` on the same batched
+call). `realised_cap` has moved off this adapter onto BGeometrics below; `mvrv` and `supply` /
+`active_addresses` are unaffected. See `20260730120000_realised_cap_bgeometrics_source.sql`.
+
+### BGeometrics — `apps/agents/.../adapters/bgeometrics.ts`
+
+Free, JSON REST, self-serve API key (no card) at `portal.bgeometrics.com` — needs
+`BGEOMETRICS_API_KEY` set. Fetches `realised_cap` only (one metric, one call, full history returned
+per request — no date-range params needed):
+
+```
+GET https://api.bgeometrics.com/v1/realized-cap?token=...
+```
+
+*Response shape not hand-verified* — no network egress from the environment this was written in
+(same situation as the Gold API fix, `20260729130000_gold_price_gold_api_source.sql`). Best-guess
+shape: an array of `{ d: "YYYY-MM-DD", realizedCap: "<number>" }` rows. The parser fails loudly —
+raw body attached — on anything else, so a wrong guess surfaces via the failed poll rather than
+silently storing garbage; correct the field names in `bgeometrics.ts` from the real error on first
+live run if needed.
+
 -----
 
 ## How the workflow consumes a result

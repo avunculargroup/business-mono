@@ -8,12 +8,14 @@ import { mempoolAdapter } from './adapters/mempool.js';
 import { coinmetricsAdapter } from './adapters/coinmetrics.js';
 import { coingeckoAdapter } from './adapters/coingecko.js';
 import { alternativeMeAdapter } from './adapters/alternativeMe.js';
+import { bgeometricsAdapter } from './adapters/bgeometrics.js';
 
 export const adapterRegistry: Partial<Record<OnchainProvider, OnchainAdapter>> = {
   mempool: mempoolAdapter,
   coinmetrics: coinmetricsAdapter,
   coingecko: coingeckoAdapter,
   alternative_me: alternativeMeAdapter,
+  bgeometrics: bgeometricsAdapter,
 };
 
 export function getAdapter(provider: OnchainProvider): OnchainAdapter | undefined {

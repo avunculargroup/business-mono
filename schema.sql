@@ -2372,8 +2372,8 @@ CREATE TABLE onchain_indicators (
   short_label           TEXT NOT NULL,
   metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot','trend_valuation')),
   derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
-  provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me')),  -- NULL for derived
-  provider_metric_code  TEXT,                          -- e.g. CM 'CapRealUSD'; NULL for derived
+  provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics')),  -- NULL for derived
+  provider_metric_code  TEXT,                          -- e.g. BGeometrics 'realized-cap'; NULL for derived
   derivation_spec       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- documents derived formula; NOT executed
   unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc'
   decimals              INT  NOT NULL DEFAULT 2,
@@ -2403,7 +2403,7 @@ CREATE TABLE onchain_observations (
   is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage for this observed_at
   is_revision      BOOLEAN NOT NULL DEFAULT FALSE,
   superseded_value NUMERIC(24,6),
-  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics','coingecko','alternative_me')),
+  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics')),
   raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
   ingested_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()

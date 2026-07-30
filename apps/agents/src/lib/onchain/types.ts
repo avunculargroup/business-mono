@@ -18,7 +18,7 @@
  * See docs/features/onchain-indicators/adapter-contract.md.
  */
 
-export type OnchainProvider = 'mempool' | 'coinmetrics' | 'coingecko' | 'alternative_me';
+export type OnchainProvider = 'mempool' | 'coinmetrics' | 'coingecko' | 'alternative_me' | 'bgeometrics';
 
 /** What every adapter returns, per observation. The DB columns observed_at /
  *  value / raw map 1:1; `key` selects the indicator row. */
