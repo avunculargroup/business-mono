@@ -38,6 +38,7 @@ import {
 } from '../lib/newsletterExtract.js';
 import { extractNewsletterLinks } from '../lib/newsletterLinks.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
+import { fetchOgImage } from '../lib/fetchOgImage.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
 import { createLogger } from '../lib/logger.js';
@@ -395,6 +396,7 @@ export async function ingestNewsletterLinks(args: {
       // Jina follows redirects server-side, so this unwraps tracking wrappers.
       const url = fetched?.resolved_url ?? link.url;
       const title = fetched?.title?.trim() || link.anchorText || link.url;
+      const imageUrl = await fetchOgImage(url);
 
       const { data: extracted } = await extractNewsMetadata({
         title,
@@ -414,6 +416,7 @@ export async function ingestNewsletterLinks(args: {
         australianRelevance: extracted?.australian_relevance ?? false,
         publishedAt: null,
         url,
+        imageUrl,
         ingestionRef: `${parentIngestionRef}#link:${link.url}`,
         ingestedBy: 'rex',
         rubricScopeKey: LINK_RUBRIC_SCOPE,

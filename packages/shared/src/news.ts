@@ -160,6 +160,9 @@ export interface NewsItemRecord {
   ingestion_ref: string | null;
   // Real "view in browser"/original link, distinct from the synthetic url (email).
   canonical_url: string | null;
+  // og:image/twitter:image scraped from the source page. Null for email-sourced
+  // items (newsletter body) and when the scrape found nothing.
+  image_url: string | null;
   author: string | null;
   published_at: string | null;
   fetched_at: string;
