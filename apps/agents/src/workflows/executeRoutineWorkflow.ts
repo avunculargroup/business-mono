@@ -1091,9 +1091,6 @@ async function runNewsIngest(
   let itemsFilteredIrrelevant = 0;
   const failedUrls: string[] = [];
   const storedSources: NonNullable<RoutineResult['sources']> = [];
-  // First story's image wins — keeps the tile from flickering between stories'
-  // images across runs and avoids an extra fetch once one is found.
-  let headlineImageUrl: string | undefined;
 
   for (const item of shortlist) {
     try {
@@ -1191,8 +1188,8 @@ async function runNewsIngest(
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
+          image_url: imageUrl,
         });
-        if (!headlineImageUrl && imageUrl) headlineImageUrl = imageUrl;
       }
     } catch (err) {
       ingestLog.warn({ err, url: item.url, title: item.title }, 'item failed — skipping');
@@ -1226,7 +1223,6 @@ async function runNewsIngest(
   const result: RoutineResult = {
     summary: summaryLine,
     sources: storedSources.slice(0, 5),
-    metadata: headlineImageUrl ? { headline_image_url: headlineImageUrl } : undefined,
   };
 
   return {
@@ -1394,8 +1390,6 @@ async function runNewsSourceScan(
   let itemsStored = 0;
   let extractionFailures = 0;
   const storedSources: NonNullable<RoutineResult['sources']> = [];
-  // First story's image wins — same rationale as runNewsIngest.
-  let headlineImageUrl: string | undefined;
 
   for (const item of fresh) {
     try {
@@ -1474,8 +1468,8 @@ async function runNewsSourceScan(
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
+          image_url: imageUrl,
         });
-        if (!headlineImageUrl && imageUrl) headlineImageUrl = imageUrl;
       }
     } catch (err) {
       scanLog.warn({ err, url: item.url }, 'item failed — skipping');
@@ -1504,10 +1498,7 @@ async function runNewsSourceScan(
   const result: RoutineResult = {
     summary: summaryLine,
     sources: storedSources.slice(0, 5),
-    metadata: {
-      ...(scanResult as unknown as Record<string, unknown>),
-      headline_image_url: headlineImageUrl,
-    },
+    metadata: scanResult as unknown as Record<string, unknown>,
   };
 
   return {

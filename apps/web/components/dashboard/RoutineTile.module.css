@@ -29,8 +29,24 @@
 
 .item {
   display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.itemThumb {
+  flex-shrink: 0;
+  width: 56px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.itemText {
+  display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .headline {
