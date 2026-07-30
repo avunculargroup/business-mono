@@ -48,11 +48,14 @@ Fixed by copying the lockfile in the deps stage and switching to `--frozen-lockf
 
 **Don't reintroduce this.** If a future Dockerfile change needs a fresh resolve, change the lockfile in the repo, not the install flag.
 
-### Related gap, not fixed: `apps/web` is never built in CI
+### Related gap, now fixed: `apps/web` was never built in CI
 
-`.github/workflows/test.yml`'s build job runs `turbo run build --filter=@platform/agents...` only. Nothing in CI runs `next build`, so a Next.js build break — a bad import, a prerender failure, a config regression — passes CI and fails on Vercel instead. The web test suite (479 tests) catches logic but not build-time errors.
+`.github/workflows/test.yml`'s build job ran `turbo run build --filter=@platform/agents...` only. Nothing in CI ran `next build`, so a Next.js build break — a bad import, a prerender failure, a config regression — passed CI and failed on Vercel instead. The web test suite (479 tests) catches logic but not build-time errors.
 
-Flagged rather than fixed, because adding a CI job is a separate decision. Until then, run `pnpm --filter @platform/web build` locally before merging anything that touches `apps/web` (it needs `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and placeholders are fine — `lib/supabase/{server,browser}.ts` read them inside functions, not at module scope).
+Fixed by adding a `build-web` job. Two details in it are load-bearing:
+
+- **It must use `turbo run build --filter=@platform/web...`, not `pnpm --filter @platform/web build`.** `apps/web` has ~50 *runtime value* imports from `@platform/shared` (`TASK_PRIORITY_LABELS`, `PIPELINE_STAGE_LABELS`, …) which resolve through `exports["."].import` → `./dist/index.js`, so the workspace packages have to be compiled first. `transpilePackages` in `next.config.ts` changes how Next *compiles* those files, not how it *resolves* them. Verified from a cold checkout (`rm -rf packages/*/dist`): the plain filter fails with `Module not found: Can't resolve '@platform/shared'`, the turbo form succeeds. **Don't "simplify" this to the plain filter** — it will pass locally, where `dist/` already exists, and fail in CI.
+- **The Supabase vars are literal placeholders, not repository secrets.** The job is a compile check, not a deploy, and `NEXT_PUBLIC_*` values are inlined into the client bundle at build time — real credentials would be baked into a throwaway CI artifact for nothing. The build only needs them to be set, because `lib/supabase/{server,browser}.ts` read them inside functions rather than at module scope.
 
 -----
 
@@ -93,7 +96,32 @@ A plain `pnpm install` does *not* re-resolve transitive dependencies that still 
 
 Deliberately **not** adding `pnpm.overrides` for these: overrides go stale, silently mask upstream fixes, and here would buy a cosmetically lower number with no security gain. Revisit if any of the above becomes reachable.
 
-**The genuinely urgent advisories were in `apps/web`** — 11 HIGH findings against `next` (SSRF in Server Actions and in rewrites via attacker-controlled destination hostname, middleware/proxy bypass in App Router via segment-prefetch and dynamic route param injection, several DoS). **Fixed:** `next` → 15.5.22, and `pnpm audit` now reports zero `next` advisories. HIGH `postcss` and `sharp` remain, both transitive under the Next toolchain.
+**The genuinely urgent advisories were in `apps/web`** — 11 HIGH findings against `next` (SSRF in Server Actions and in rewrites via attacker-controlled destination hostname, middleware/proxy bypass in App Router via segment-prefetch and dynamic route param injection, several DoS). **Fixed:** `next` → 15.5.22, and `pnpm audit` now reports zero `next` advisories. HIGH `postcss` and `sharp` remain — see below for why they are staying.
+
+### `postcss` and `sharp` — unfixable, and unreachable
+
+These two keep appearing in `pnpm audit` and are **not ordinary transitive bumps**. Next constrains both below the advisory floors, in every release including 16:
+
+| | Next's declared range | Advisory floor | Verdict |
+|---|---|---|---|
+| `postcss` | **exactly `8.4.31`** — in both 15.5.22 and 16.2.12 | ≥ 8.5.18 | An exact pin, not a range. Next's CSS pipeline is built against that specific version. |
+| `sharp` | `^0.34.3` (15.5.22) / `^0.34.5` (16.2.12) | ≥ 0.35.0 | **Outside the caret in every Next version.** No supported combination exists — upgrading Next does not help. |
+
+Neither is reachable from this app:
+
+- **`sharp`** is Next's *optional* dependency for the image optimizer. **`next/image` is used nowhere in `apps/web`** — the single image render is a plain `<img>` whose eslint-disable comment records that it is "remote, unknown host; avoids next/image remotePatterns config". `next.config.ts` has no `images` block, so remote optimization is off by default. The libvips CVEs require sharp to process image bytes; it never does. (If someone adds `next/image`, re-evaluate this.)
+- **`postcss`** runs at build time over the app's own CSS modules. Both advisories — arbitrary file read via attacker-controlled `sourceMappingURL`, and path traversal in previous-source-map auto-loading — require attacker-controlled CSS. There is no user-supplied CSS path.
+
+**Not** forcing them with `pnpm.overrides`: that would replace a dependency Next pins exactly and push sharp outside every Next version's accepted range — running an untested combination to suppress two advisories neither of which is reachable.
+
+One distinction worth keeping straight: there are **two `postcss` copies**, and only one is Next's.
+
+```
+postcss@8.4.31  ← next@15.5.22        (exact pin, unfixable)
+postcss@8.5.15  ← vite@5.4.21         (i.e. vitest 2 — FIXABLE by the vitest upgrade below)
+```
+
+So a future `pnpm audit` showing postcss "still there" after the vitest upgrade is expected — the Next copy remains.
 
 ### `@ai-sdk/provider-utils` — a correction
 
@@ -137,7 +165,14 @@ The wrapper encodes something that shape cannot express: `isKeyLimitError` (`src
 
 ### 1. `vitest` 2 → 4 (+ `@vitest/coverage-v8`)
 
-Clears a CRITICAL and a HIGH (`vite`) and gets off an EOL major. Must move together across `apps/agents`, `apps/web`, and `packages/voice`, which share the lockfile. Worth doing for maintenance reasons more than security ones, given the reachability analysis above.
+The best-value deferred item. Clears the `vitest` CRITICAL, the `vite` HIGH, an `esbuild` HIGH, and the `postcss@8.5.15` copy (vitest 4 needs vite ^6/^7/^8, and vite 8's `postcss` range resolves above the 8.5.18 floor). Must move together across `apps/agents`, `apps/web`, and `packages/voice` — all three are on `^2.1.9` and share the lockfile — plus `@vitest/coverage-v8` in lockstep.
+
+**It is a config migration, not a version bump.** `environmentMatchGlobs` is **removed in vitest 4** — confirmed absent from 4.1.10 and present in 2.1.9. `apps/web/vitest.config.ts` uses it (`environmentMatchGlobs: [['**/*.test.tsx', 'jsdom']]`) to route **41 `*.test.tsx` to jsdom** and **29 `*.test.ts` to node**, so it has to move to `test.projects` (two projects) or per-file `// @vitest-environment` docblocks. `test.projects` keeps the routing in one place and is the better fit.
+
+Two traps for whoever does this:
+
+- A config mistake here fails *silently* — component tests would run in `node` and pass or fail for the wrong reason rather than erroring. Verify not just that all 479 web tests pass, but that a jsdom-dependent test actually gets jsdom (e.g. assert `document` is defined in one component test).
+- **`CLAUDE.md` documents `environmentMatchGlobs` by name** in the `apps/web` testing conventions paragraph. Update it in the same commit, or the docs will describe an option that no longer exists.
 
 ### 2. `openai` 4.104.0 → 7.1.0
 
@@ -169,9 +204,11 @@ pnpm outdated -r                              # current vs latest across the wor
 pnpm --filter @platform/agents typecheck      # catches Mastra type changes
 pnpm --filter @platform/agents test           # 1079 tests, fully mocked, ~20s
 pnpm exec turbo run build --filter=@platform/agents...   # the only check covering the mastra bundler/deployer path
-pnpm --filter @platform/web build             # the only check covering next build — CI does not do this
+pnpm exec turbo run build --filter=@platform/web...       # next build (also a CI job now); needs NEXT_PUBLIC_SUPABASE_*
 docker build -f apps/agents/Dockerfile .      # the only check covering --frozen-lockfile resolution
 ```
+
+`docker build` is the one gate with no CI equivalent. Everything else above runs in `.github/workflows/test.yml` (`test`, `build`, `build-web`).
 
 Two things `mastra build` reports that are **pre-existing and not caused by dependency changes**, so they aren't a signal that an upgrade went wrong:
 
