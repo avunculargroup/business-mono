@@ -4,7 +4,7 @@
 
 Previous dependency work: `da5dc7c` ("upgrade Mastra to core 1.50"). Mastra shipped four minor releases in the gap.
 
-Done in two commits: the Mastra/hygiene pass first, then the AI SDK migration plus the Next.js security bump.
+Done in four commits: the Mastra/hygiene pass; the AI SDK migration plus the Next.js security bump; the CI web-build job plus the postcss/sharp conclusion; and the vitest 2 → 4 migration.
 
 -----
 
@@ -26,6 +26,9 @@ Done in two commits: the Mastra/hygiene pass first, then the AI SDK migration pl
 | `@ai-sdk/openai` | ^2.0.102 | ^4.0.24 | Same |
 | `@ai-sdk/provider` | ^2.0.1 | ^4.0.4 | Supplies the `LanguageModelV4` types used by `src/config/model.ts` |
 | `next` in `apps/web` | ^15.1.0 (resolved 15.5.14) | ^15.5.22 | Clears **11 HIGH advisories** — the most serious reachable exposure in the repo |
+| `vitest` + `@vitest/coverage-v8` | ^2.1.9 | ^4.1.10 | All three packages. Clears a CRITICAL and three HIGHs — see below |
+| `vite` (new, explicit) | *auto-installed peer* | ^8.1.5 | vitest 4 needs vite ≥6; the auto-installed peer was stuck at 5.4.21 |
+| `tsx` | ^4.21.0 | ^4.23.1 | Last holder of a vulnerable `esbuild` (`~0.27.0` → `~0.28.0`) |
 
 `@mastra/loggers` stayed at `^1.2.0` — already latest. `pino`, `pino-pretty`, `rss-parser`, `turndown`, `@types/turndown`, and `zod` are all already at their latest release (`zod@3.25.76` **is** the newest 3.x; zod 4 is a separate major).
 
@@ -81,17 +84,18 @@ Checked against upstream changelogs, not assumed:
 
 ## Finding 4 — advisory reachability matters more than the count
 
-`pnpm audit` reports **74 findings (3 critical, 26 high) after this work, down from 99 (3 critical, 37 high)** — nearly all of the reduction from the `next` bump. **The remaining number is misleading, and chasing it to zero would be counterproductive.**
+`pnpm audit` reports **61 findings (1 critical, 21 high) after this work, down from 99 (3 critical, 37 high)** — most of the reduction from the `next` bump, the rest from vitest 2 → 4. **The remaining number is misleading, and chasing it to zero would be counterproductive.**
+
+The one surviving **critical is `shell-quote`**, reached only through the `mastra` CLI at build time (row below). The `vitest` critical is gone.
 
 A plain `pnpm install` does *not* re-resolve transitive dependencies that still satisfy their ranges — pnpm treats the lockfile as authoritative. So most of these advisories can only be moved by adding permanent `pnpm.overrides`. Before doing that, each one was traced to a reachable code path. **None of the remaining critical/high advisories are reachable from the agent server's runtime surface:**
 
 | Module | Sev | Path | Reachable? |
 |---|---|---|---|
 | `hono` | HIGH | `@mastra/deployer` | **No.** The advisory needs wildcard origin **plus** credentials. `src/mastra/index.ts` sets `server: { apiRoutes }` with no `cors` and no `auth`; Mastra's `getCorsConfig(server?.cors, hasAuth)` therefore resolves `origin: '*'` with `credentials: false`. The dangerous combination can't occur. |
-| `vitest` | CRITICAL | devDep | No. Requires the Vitest **UI** server to be listening; `--ui` is never used. |
-| `shell-quote` | CRITICAL + HIGH | `mastra` CLI | No. Build-time CLI, local input only. |
+| `shell-quote` | CRITICAL + HIGH | `mastra` CLI | No. Build-time CLI, local input only. The only critical left. |
 | `ws` (8.19.0) | HIGH | `@deepgram/sdk` | Effectively no. `src/tools/deepgram.ts` uses the HTTP `transcribeUrlCallback` path, not live streaming, so no socket is opened. Deepgram pins this copy; the reachable `ws` copies (`packages/db`, `packages/signal`) **were** bumped. |
-| `fast-uri`, `brace-expansion`, `picomatch`, `js-yaml`, `vite` | HIGH | dev tooling | No. |
+| `fast-uri`, `brace-expansion`, `picomatch`, `js-yaml` | HIGH | dev tooling | No. |
 | `path-to-regexp`, `qs`, `form-data` | HIGH | `@mastra/core > @a2a-js/sdk > express` | No. A2A is never instantiated. |
 
 Deliberately **not** adding `pnpm.overrides` for these: overrides go stale, silently mask upstream fixes, and here would buy a cosmetically lower number with no security gain. Revisit if any of the above becomes reachable.
@@ -117,11 +121,11 @@ Neither is reachable from this app:
 One distinction worth keeping straight: there are **two `postcss` copies**, and only one is Next's.
 
 ```
-postcss@8.4.31  ← next@15.5.22        (exact pin, unfixable)
-postcss@8.5.15  ← vite@5.4.21         (i.e. vitest 2 — FIXABLE by the vitest upgrade below)
+postcss@8.4.31  ← next@15.5.22        (exact pin — unfixable, still reported)
+postcss@8.5.25  ← vite@8.1.5          (was 8.5.15 under vite 5; FIXED by the vitest upgrade)
 ```
 
-So a future `pnpm audit` showing postcss "still there" after the vitest upgrade is expected — the Next copy remains.
+So `pnpm audit` still reporting postcss is **expected** — that is Next's copy. The vite-sourced one is above the 8.5.18 floor and no longer contributes.
 
 ### `@ai-sdk/provider-utils` — a correction
 
@@ -161,36 +165,61 @@ The wrapper encodes something that shape cannot express: `isKeyLimitError` (`src
 
 -----
 
+## The vitest migration (done) — 2 → 4
+
+Cleared four advisories at once: the **`vitest` CRITICAL** (UI-server file read), **`vite` HIGH**, **`esbuild` HIGH**, and the fixable **`postcss@8.5.15`**. `vitest`, `@vitest/coverage-v8` → `^4.1.10` across `apps/agents`, `apps/web`, and `packages/voice` (all shared one lockfile, so they had to move together).
+
+Three things were needed beyond the version bump:
+
+### `vite` had to become an explicit dependency
+
+vitest 4 needs `vite ^6 || ^7 || ^8`, but `vite` was only ever an **auto-installed peer** (`autoInstallPeers: true`), and pnpm kept the stale `5.4.21` it had resolved for vitest 2. A plain `pnpm install` left an unmet peer, and `pnpm update` couldn't fix it because no package declared `vite`. It failed hard at runtime: `ERR_PACKAGE_PATH_NOT_EXPORTED: './module-runner' is not defined by "exports"` — vitest 4 imports `vite/module-runner`, which doesn't exist in vite 5.
+
+Fixed by declaring `vite: ^8.1.5` as a devDependency in all three packages. That is the correct way to satisfy a peer dependency, and it makes the version visible and updatable instead of an invisible resolution artifact.
+
+### `environmentMatchGlobs` → `test.projects`
+
+Removed in vitest 4 (absent from 4.1.10, present in 2.1.9). `apps/web/vitest.config.ts` now declares two projects — `node` matching `*.test.ts` and `jsdom` matching `*.test.tsx` — reproducing the previous routing exactly (**29 node + 41 jsdom = 70 files**).
+
+**Each project needs `extends: true`.** In vitest 4 inline projects do *not* inherit the root config (v5 flips that default), and the root carries the `resolve.alias` entries and `oxc.jsx`. Without it the aliases vanish.
+
+### `esbuild.jsx` → `oxc.jsx` — the one genuine surprise
+
+vitest 4 pulls **vite 8, which transforms with oxc/rolldown**, not esbuild. The `esbuild` option is `@deprecated Use \`oxc\` option instead` there and is **silently ignored** — all 42 component test files failed to parse JSX, with the stack trace pointing at `rolldown/parse-ast-index.mjs`.
+
+This setting is load-bearing and cannot simply be dropped: `apps/web/tsconfig.json` sets `"jsx": "preserve"` for Next, Vite picks that up as the oxc default, and nothing else supplies the automatic runtime. Verified by removing the option entirely — JSX broke immediately.
+
+The correct form is `oxc: { jsx: { runtime: 'automatic' } }`. Note that the bare string (`jsx: 'automatic'`) *runs* fine but fails `tsc` — the type is `'preserve' | JsxOptions`, and `JsxOptions.runtime` is `'classic' | 'automatic'`. **Typecheck catches this and the test run does not**, which is a good argument for keeping `pnpm typecheck` in the loop when touching vitest config.
+
+### Mocks constructed with `new`
+
+v4 constructs mocks invoked with `new`, and *"arrow functions will fail with a constructor error"*. Four files mocked a constructor with `vi.fn().mockImplementation(() => ({ … }))` while the module under test called it with `new` — `tools/openai.test.ts` (OpenAI), `tools/signal.test.ts` and `workflows/startNewsletterRun.test.ts` (SignalClient), `lib/sendNewsDigest.test.ts` (FastmailJmapClient). All converted to `class`, matching the pattern already used in `agents/researcher/tools.test.ts`. No assertions changed: every assertion targets an instance method held in a module-scope `vi.fn()`, which the class closes over identically.
+
+### Not affected
+
+Confirmed unused, so no work needed: `poolMatchGlobs`, the `workspace` → `projects` rename, `deps.*` → `server.deps.*`, `poolOptions`/`maxThreads`/`singleFork`, the removed reporter APIs, custom-environment `transformMode`, browser mode, and snapshot shadow-root printing. Coverage already set `coverage.include` (which v4 now requires) and is not gated anywhere, so v4's switch to AST-based V8 remapping shifts percentages without failing anything.
+
+-----
+
 ## Deferred upgrades, in recommended order
 
-### 1. `vitest` 2 → 4 (+ `@vitest/coverage-v8`)
-
-The best-value deferred item. Clears the `vitest` CRITICAL, the `vite` HIGH, an `esbuild` HIGH, and the `postcss@8.5.15` copy (vitest 4 needs vite ^6/^7/^8, and vite 8's `postcss` range resolves above the 8.5.18 floor). Must move together across `apps/agents`, `apps/web`, and `packages/voice` — all three are on `^2.1.9` and share the lockfile — plus `@vitest/coverage-v8` in lockstep.
-
-**It is a config migration, not a version bump.** `environmentMatchGlobs` is **removed in vitest 4** — confirmed absent from 4.1.10 and present in 2.1.9. `apps/web/vitest.config.ts` uses it (`environmentMatchGlobs: [['**/*.test.tsx', 'jsdom']]`) to route **41 `*.test.tsx` to jsdom** and **29 `*.test.ts` to node**, so it has to move to `test.projects` (two projects) or per-file `// @vitest-environment` docblocks. `test.projects` keeps the routing in one place and is the better fit.
-
-Two traps for whoever does this:
-
-- A config mistake here fails *silently* — component tests would run in `node` and pass or fail for the wrong reason rather than erroring. Verify not just that all 479 web tests pass, but that a jsdom-dependent test actually gets jsdom (e.g. assert `document` is defined in one component test).
-- **`CLAUDE.md` documents `environmentMatchGlobs` by name** in the `apps/web` testing conventions paragraph. Update it in the same commit, or the docs will describe an option that no longer exists.
-
-### 2. `openai` 4.104.0 → 7.1.0
+### 1. `openai` 4.104.0 → 7.1.0
 
 Three majors, but the used surface is tiny: only `embeddings.create`, at six call sites — `src/tools/openai.ts`, `src/lib/embedText.ts`, `src/lib/contentEmbeddings.ts`, `src/agents/archivist/tools.ts`, `src/agents/researcher/tools.ts`, `src/workflows/executeRoutineWorkflow.ts`. Note `packages/voice` also declares `openai@^4.68.0` and must move in lockstep.
 
-### 3. `@deepgram/sdk` 3.13.0 → 5.7.0
+### 2. `@deepgram/sdk` 3.13.0 → 5.7.0
 
 The only genuinely breaking upgrade here. v5 replaces `createClient()` with `new DeepgramClient()`, and folds `listen.prerecorded.transcribeUrlCallback` into `listen.v1.media.transcribeUrl()` with a `callback` option. Touches `src/tools/deepgram.ts` and its test, on the transcription path. Pinned v3 is fine; its `ws` advisory isn't reachable (above).
 
-### 4. Next.js 15 → 16
+### 3. Next.js 15 → 16
 
 `next@16.2.12` is now the stable `latest`. This bump stayed on the 15 line (15.5.22) because that clears every open advisory without a major migration. Moving to 16 is real work with its own breaking changes and should be scoped on its own, not folded into a security patch.
 
-### 5. Trivia left on the table
+### 4. Trivia left on the table
 
-Not bumped here only because they were outside the agreed scope, and each is a one-line change whenever someone is next in this file: `youtube-transcript` 1.3.0 → 1.3.1 (patch) and `tsx` 4.21.0 → 4.23.1 (dev, used only by `seed:voice`). `xmlbuilder` 11.0.1 → 15.1.1 is a four-major jump for a package used in one place — check the actual API surface before attempting it. `typescript` 5.9.3 → 7.0.2 is the native-port major and deserves its own piece of work across the whole monorepo, not a drive-by.
+One-line changes whenever someone is next in these files: `youtube-transcript` 1.3.0 → 1.3.1 (patch). (`tsx` was on this list and has since been bumped to `^4.23.1` — it turned out to be the last holder of a vulnerable `esbuild`.) `xmlbuilder` 11.0.1 → 15.1.1 is a four-major jump for a package used in one place — check the actual API surface before attempting it. `typescript` 5.9.3 → 7.0.2 is the native-port major and deserves its own piece of work across the whole monorepo, not a drive-by.
 
-### 6. `zod` 3 → 4
+### 5. `zod` 3 → 4
 
 Cross-app, 41 files in `apps/agents` alone. All Mastra peers already accept `^3.25.0 || ^4.0.0`, so there's no external pressure. No reason to do this until something needs a zod 4 feature.
 

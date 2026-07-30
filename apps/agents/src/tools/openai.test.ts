@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 
 const create = vi.fn();
+// `class` rather than an arrow implementation: the module under test calls
+// `new OpenAI(...)`, and Vitest 4 constructs mocks invoked with `new`, which
+// throws for arrow functions.
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    embeddings: { create },
-  })),
+  default: class {
+    embeddings = { create };
+  },
 }));
 
 const { generateEmbedding } = await import('./openai.js');

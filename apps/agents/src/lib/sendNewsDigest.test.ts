@@ -18,13 +18,16 @@ vi.mock('@platform/db', () => ({
   },
 }));
 
+// `class` rather than an arrow implementation: the module under test calls
+// `new FastmailJmapClient(...)`, and Vitest 4 constructs mocks invoked with
+// `new`, which throws for arrow functions.
 vi.mock('./fastmailJmap.js', () => ({
-  FastmailJmapClient: vi.fn().mockImplementation(() => ({
-    getSession: h.getSession,
-    getIdentities: h.getIdentities,
-    getDraftsAndSentMailboxIds: h.getMailboxes,
-    sendHtmlEmail: h.sendHtmlEmail,
-  })),
+  FastmailJmapClient: class {
+    getSession = h.getSession;
+    getIdentities = h.getIdentities;
+    getDraftsAndSentMailboxIds = h.getMailboxes;
+    sendHtmlEmail = h.sendHtmlEmail;
+  },
 }));
 
 import { deliverNewsDigest } from './sendNewsDigest.js';

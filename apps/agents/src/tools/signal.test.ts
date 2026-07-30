@@ -3,11 +3,14 @@ import { describe, it, expect, vi } from 'vitest';
 const sendMessage = vi.fn();
 const receiveMessages = vi.fn();
 
+// `class` rather than an arrow implementation: the module under test calls
+// `new SignalClient(...)`, and Vitest 4 constructs mocks invoked with `new`,
+// which throws for arrow functions.
 vi.mock('@platform/signal', () => ({
-  SignalClient: vi.fn().mockImplementation(() => ({
-    sendMessage,
-    receiveMessages,
-  })),
+  SignalClient: class {
+    sendMessage = sendMessage;
+    receiveMessages = receiveMessages;
+  },
 }));
 
 const { signalSend, signalReceive } = await import('./signal.js');
