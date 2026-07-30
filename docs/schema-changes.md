@@ -6,6 +6,17 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-07-30 — Repoint realised_cap from Coin Metrics to BGeometrics (CapRealUSD never actually worked)
+
+- **`onchain_indicators.provider` / `onchain_observations.source`** — widened to add `'bgeometrics'` alongside the existing on-chain providers. Coin Metrics' free community tier has never served `CapRealUSD`: confirmed via production data — `realised_cap` has **zero** observations ever, while sibling metrics on the same batched call (`SplyCur`, `AdrActCnt`) have ~36,000 rows apiece going back to 2019. Same Pro-gating that hit `CapMVRVCur` (`20260710000000_derive_mvrv.sql`), except realised cap can't be derived from data already on hand (it's cost-basis-weighted, not price × supply), so it needed an actual replacement source.
+- This is why `realised_price` (`realised_cap ÷ supply`) has never displayed a value, and — since `mvrv` was redefined in the same earlier migration to derive from `realised_cap` too — why the MVRV card has silently been **missing from the dashboard entirely** as well (its per-day series view inner-joins on `realised_cap`, which has never had a row).
+- **`realised_cap` repointed to `bgeometrics`** (`api.bgeometrics.com`, free self-serve API key, no card — needs `BGEOMETRICS_API_KEY` set). Adapter: `apps/agents/src/lib/onchain/adapters/bgeometrics.ts`.
+- The adapter's response-shape parsing was **not hand-verified against a live call** (no network egress available while writing it) — same caveat as the Gold API fix below. It fails loudly with the raw response body attached on any shape it doesn't recognise.
+
+Migration: `20260730120000_realised_cap_bgeometrics_source.sql`
+
+---
+
 ## 2026-07-29 — Repoint gold from Stooq to the Gold API (Stooq never actually worked)
 
 - **`economic_indicators.provider` / `indicator_observations.source`** — widened to add `'gold_api'` alongside the existing `'stooq'`. The 20260719000000 migration moved gold off a discontinued FRED series and onto Stooq's keyless CSV feed, but that has failed on every `indicator_poll` run since — Stooq answers server-side requests to `/q/d/l/` with an HTML bot-verification page, not CSV, so gold has had zero rows in `indicator_observations` for the whole 10+ days that migration has been live. Confirmed via `agent_activity.notes` on the "Daily economic indicator poll" routine, which logs the raw failure body on every run.
