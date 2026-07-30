@@ -457,7 +457,7 @@ export async function runNewsCuration(
   const [newsRes, podcastRes] = await Promise.all([
     supabase
       .from('news_items')
-      .select('id, title, url, summary, key_points, category, source_name, relevance_score, published_at')
+      .select('id, title, url, summary, key_points, category, source_name, relevance_score, published_at, image_url')
       .gte('fetched_at', since)
       .neq('status', 'archived')
       .order('relevance_score', { ascending: false, nullsFirst: false })
@@ -485,6 +485,7 @@ export async function runNewsCuration(
     url: r.url as string,
     source_name: (r.source_name as string) ?? 'News',
     category: (r.category as string) ?? 'news',
+    image_url: (r.image_url as string | null) ?? undefined,
     summary: (r.summary as string | null) ?? '',
     key_points: Array.isArray(r.key_points)
       ? (r.key_points as unknown[]).filter((p): p is string => typeof p === 'string')
@@ -627,17 +628,17 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
   }
 
   // ── Headline image: walk the ranked stories and use the first that resolves ──
-  // (podcast feed artwork, else best-effort og:image). Falling through to the
-  // second/third story means a single missing og:image no longer leaves the
-  // digest — email and dashboard tile — without any image.
+  // (podcast feed artwork or the news item's stored image_url, else a live
+  // best-effort og:image fetch for older rows ingested before that column
+  // existed). Falling through to the second/third story means a single missing
+  // image no longer leaves the digest — email and dashboard tile — without any.
   let headlineImageUrl: string | undefined;
   for (const story of stories) {
-    if (story.kind === 'podcast') {
-      if (story.image_url) {
-        headlineImageUrl = story.image_url;
-        break;
-      }
-    } else if (story.url) {
+    if (story.image_url) {
+      headlineImageUrl = story.image_url;
+      break;
+    }
+    if (story.kind === 'news' && story.url) {
       const og = await fetchOgImage(story.url);
       if (og) {
         headlineImageUrl = og;
@@ -1093,12 +1094,16 @@ async function runNewsIngest(
 
   for (const item of shortlist) {
     try {
-      // Fetch full article body via Jina Reader.
+      // Fetch full article body via Jina Reader, and the page's og:image in parallel.
       let bodyMarkdown: string | null = null;
+      let imageUrl: string | null = null;
       try {
-        const fetched = await fetchUrl.execute!({ url: item.url } as never, {} as never) as
-          | { title?: string; markdown?: string }
-          | undefined;
+        const [fetched] = await Promise.all([
+          fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
+            { title?: string; markdown?: string } | undefined
+          >,
+          fetchOgImage(item.url).then((og) => { imageUrl = og; }),
+        ]);
         const md = fetched?.markdown?.trim();
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
@@ -1158,6 +1163,7 @@ async function runNewsIngest(
         australianRelevance: extracted?.australian_relevance ?? true,
         publishedAt: item.published_at,
         url: item.url,
+        imageUrl,
         routineId: routine.id,
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,
@@ -1182,6 +1188,7 @@ async function runNewsIngest(
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
+          image_url: imageUrl,
         });
       }
     } catch (err) {
@@ -1387,10 +1394,14 @@ async function runNewsSourceScan(
   for (const item of fresh) {
     try {
       let bodyMarkdown: string | null = null;
+      let imageUrl: string | null = null;
       try {
-        const fetched = await fetchUrl.execute!({ url: item.url } as never, {} as never) as
-          | { title?: string; markdown?: string }
-          | undefined;
+        const [fetched] = await Promise.all([
+          fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
+            { title?: string; markdown?: string } | undefined
+          >,
+          fetchOgImage(item.url).then((og) => { imageUrl = og; }),
+        ]);
         const md = fetched?.markdown?.trim();
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
@@ -1434,6 +1445,7 @@ async function runNewsSourceScan(
         australianRelevance: extracted?.australian_relevance ?? false,
         publishedAt: item.published_at,
         url: item.url,
+        imageUrl,
         routineId: routine.id,
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,
@@ -1456,6 +1468,7 @@ async function runNewsSourceScan(
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
+          image_url: imageUrl,
         });
       }
     } catch (err) {

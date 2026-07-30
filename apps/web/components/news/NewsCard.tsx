@@ -18,6 +18,8 @@ interface NewsCardProps {
   url: string;
   /** Publisher's hosted copy, for email items whose url is synthetic. */
   canonicalUrl?: string | null;
+  /** og:image scraped from the source page. Null for email-sourced items. */
+  imageUrl?: string | null;
   sourceName: string;
   publishedAt: string | null;
   summary: string | null;
@@ -33,6 +35,7 @@ export function NewsCard({
   title,
   url,
   canonicalUrl,
+  imageUrl,
   sourceName,
   publishedAt,
   summary,
@@ -110,41 +113,50 @@ export function NewsCard({
 
   return (
     <article className={cardClass}>
-      <div className={styles.meta}>
-        <CategoryChip category={category} />
-        {sourceName && <span className={styles.source}>{sourceName}</span>}
-        {publishedAt && (
-          <>
-            <span className={styles.dot}>·</span>
-            <span className={styles.date}>{publishedAt ? formatDate(publishedAt) : ''}</span>
-          </>
-        )}
-        {relevanceScore != null && (
-          <span className={styles.score} title="Rex relevance score">
-            {relevanceScore.toFixed(2)}
-          </span>
+      <div className={styles.top}>
+        <div className={styles.content}>
+          <div className={styles.meta}>
+            <CategoryChip category={category} />
+            {sourceName && <span className={styles.source}>{sourceName}</span>}
+            {publishedAt && (
+              <>
+                <span className={styles.dot}>·</span>
+                <span className={styles.date}>{publishedAt ? formatDate(publishedAt) : ''}</span>
+              </>
+            )}
+            {relevanceScore != null && (
+              <span className={styles.score} title="Rex relevance score">
+                {relevanceScore.toFixed(2)}
+              </span>
+            )}
+          </div>
+
+          <h4 className={styles.title}>
+            {titleLink.external ? (
+              <a
+                href={titleLink.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.titleLink}
+              >
+                {cleanNewsTitle(title)}
+                <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
+              </a>
+            ) : (
+              <Link href={titleLink.href} className={styles.titleLink}>
+                {cleanNewsTitle(title)}
+              </Link>
+            )}
+          </h4>
+
+          {summary && <p className={styles.summary}>{summary}</p>}
+        </div>
+
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- remote, unknown host; avoids next/image remotePatterns config
+          <img src={imageUrl} alt="" className={styles.thumb} loading="lazy" />
         )}
       </div>
-
-      <h4 className={styles.title}>
-        {titleLink.external ? (
-          <a
-            href={titleLink.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.titleLink}
-          >
-            {cleanNewsTitle(title)}
-            <ExternalLink size={12} strokeWidth={1.5} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.5 }} />
-          </a>
-        ) : (
-          <Link href={titleLink.href} className={styles.titleLink}>
-            {cleanNewsTitle(title)}
-          </Link>
-        )}
-      </h4>
-
-      {summary && <p className={styles.summary}>{summary}</p>}
 
       {curatorNotes && (
         <div className={styles.curatorNote}>

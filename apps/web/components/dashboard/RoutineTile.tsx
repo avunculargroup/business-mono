@@ -9,6 +9,7 @@ interface RoutineSource {
   title?: string;
   excerpt?: string;
   source?: string;
+  image_url?: string | null;
 }
 
 interface RoutineResult {
@@ -64,13 +65,19 @@ export function RoutineTile({ routine }: RoutineTileProps) {
         <ul className={styles.list}>
           {sources.slice(0, 6).map((s) => (
             <li key={s.url} className={styles.item}>
-              <span className={styles.headline}>
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
-                  {s.title ? cleanNewsTitle(s.title) : s.url}
-                </a>
-                {s.source && <span className={styles.source}>{s.source}</span>}
-              </span>
-              {s.excerpt && <span className={styles.excerpt}>{s.excerpt}</span>}
+              {s.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element -- remote, unknown host; avoids next/image remotePatterns config
+                <img src={s.image_url} alt="" className={styles.itemThumb} loading="lazy" />
+              )}
+              <div className={styles.itemText}>
+                <span className={styles.headline}>
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
+                    {s.title ? cleanNewsTitle(s.title) : s.url}
+                  </a>
+                  {s.source && <span className={styles.source}>{s.source}</span>}
+                </span>
+                {s.excerpt && <span className={styles.excerpt}>{s.excerpt}</span>}
+              </div>
             </li>
           ))}
         </ul>

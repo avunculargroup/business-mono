@@ -3144,6 +3144,7 @@ export type Database = {
           fts: unknown
           has_pdf_attachment: boolean
           id: string
+          image_url: string | null
           ingested_by: string
           ingestion_ref: string | null
           key_points: Json
@@ -3177,6 +3178,7 @@ export type Database = {
           fts?: unknown
           has_pdf_attachment?: boolean
           id?: string
+          image_url?: string | null
           ingested_by?: string
           ingestion_ref?: string | null
           key_points?: Json
@@ -3210,6 +3212,7 @@ export type Database = {
           fts?: unknown
           has_pdf_attachment?: boolean
           id?: string
+          image_url?: string | null
           ingested_by?: string
           ingestion_ref?: string | null
           key_points?: Json

@@ -329,6 +329,8 @@ export interface ResearchSource {
   excerpt: string;
   retrieved_at: string;
   source?: string;
+  /** og:image scraped from the source page, when available (news routines). */
+  image_url?: string | null;
 }
 
 export interface ResearchBrief {
