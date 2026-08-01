@@ -198,6 +198,9 @@ export interface NewsIngestResult {
   // Rows inserted with status='extraction_failed' because the LLM call could
   // not produce a valid structured response after one retry.
   extraction_failures?: number;
+  // Candidates that made it past dedup/filtering but whose insert into
+  // news_items errored (e.g. a schema mismatch) — distinct from a duplicate.
+  items_insert_failed?: number;
   failed_urls?: string[];
   // True when the LLM judge call failed or returned nothing — the run curated
   // zero stories by design rather than falling back to raw Tavily ranking.

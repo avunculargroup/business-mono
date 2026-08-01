@@ -1089,6 +1089,7 @@ async function runNewsIngest(
   let itemsStored = 0;
   let extractionFailures = 0;
   let itemsFilteredIrrelevant = 0;
+  let itemsInsertFailed = 0;
   const failedUrls: string[] = [];
   const storedSources: NonNullable<RoutineResult['sources']> = [];
 
@@ -1177,6 +1178,7 @@ async function runNewsIngest(
         continue;
       }
       if (ingest.status === 'failed') {
+        itemsInsertFailed += 1;
         ingestLog.warn({ url: item.url, title: item.title, error: ingest.reason }, 'insert skipped');
         continue;
       }
@@ -1197,7 +1199,7 @@ async function runNewsIngest(
   }
 
   ingestLog.info(
-    { category, stored: itemsStored, shortlist: shortlist.length, extraction_failures: extractionFailures, filtered: itemsFilteredIrrelevant },
+    { category, stored: itemsStored, shortlist: shortlist.length, extraction_failures: extractionFailures, filtered: itemsFilteredIrrelevant, insert_failed: itemsInsertFailed },
     'ingest complete',
   );
 
@@ -1208,17 +1210,19 @@ async function runNewsIngest(
     items_skipped_duplicate: itemsSkippedDuplicate,
     items_filtered_irrelevant: itemsFilteredIrrelevant,
     extraction_failures: extractionFailures,
+    items_insert_failed: itemsInsertFailed,
     failed_urls: failedUrls,
     judge_failed: judgeFailed,
     judge_failure_reason: judgeFailureReason ?? undefined,
   };
 
   const judgeFailSuffix = judgeFailureReason ? ` (${judgeFailureReason})` : '';
+  const insertFailedSuffix = itemsInsertFailed > 0 ? ` ${itemsInsertFailed} failed to insert.` : '';
   const summaryLine = judgeFailed
     ? `No ${category} stories curated this run — the ranking judge failed${judgeFailSuffix}; ${fresh.length} fresh candidates left unranked from a pool of ${tavilyCandidates.length}.`
     : extractionFailures > 0
-      ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`
-      : `Stored ${itemsStored} new ${category} articles (${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).`;
+      ? `Stored ${itemsStored} new ${category} articles (${extractionFailures} with failed extraction, ${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).${insertFailedSuffix}`
+      : `Stored ${itemsStored} new ${category} articles (${itemsFilteredIrrelevant} filtered as irrelevant, ${itemsSkippedDuplicate} skipped as duplicates from a pool of ${tavilyCandidates.length}).${insertFailedSuffix}`;
 
   const result: RoutineResult = {
     summary: summaryLine,
@@ -1808,6 +1812,7 @@ const persistAndSchedule = createStep({
       const newsHasAnomaly = isNewsIngest && outcome.news_ingest_result
         ? (outcome.news_ingest_result.extraction_failures ?? 0) > 0
           || outcome.news_ingest_result.judge_failed === true
+          || (outcome.news_ingest_result.items_insert_failed ?? 0) > 0
           || (outcome.news_ingest_result.items_stored === 0
               && (outcome.news_ingest_result.items_filtered_irrelevant ?? 0) > 0)
         : false;
