@@ -13,7 +13,7 @@ const REVALIDATE = '/news/sources';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  source_type: z.enum(['rss', 'podcast', 'youtube', 'email']).default('rss'),
+  source_type: z.enum(['rss', 'podcast', 'youtube', 'email', 'report_watch']).default('rss'),
   site_url: z.string().trim().url('Site URL must be a valid URL').optional().or(z.literal('')),
   feed_url: z.string().trim().url('Feed URL must be a valid URL').optional().or(z.literal('')),
   youtube_channel_url: z
@@ -36,7 +36,45 @@ const schema = z.object({
   sender_allowlist: z.string().optional().default(''),
   follow_links: formBoolean(false),
   max_followed_links: z.coerce.number().int().min(0).max(20).optional().default(5),
+  // Report-watch fields. detection_config arrives as a JSON string from the
+  // form: the three strategies share almost nothing structurally, so a flat set
+  // of form fields would need one input per strategy per key.
+  detection_strategies: z.string().optional().default(''),
+  detection_config: z.string().optional().default('{}'),
+  redistribution_default: z
+    .enum(['internal_only', 'quotable', 'client_shareable'])
+    .optional()
+    .default('internal_only'),
+  licence_notes: z.string().optional().default(''),
+  ocr_enabled: formBoolean(false),
+  ocr_page_limit: z.coerce.number().int().min(1).max(500).optional().default(40),
+  crawl_delay_seconds: z.coerce.number().int().min(0).max(120).optional().default(5),
+  max_candidates_per_run: z.coerce.number().int().min(1).max(200).optional().default(25),
 });
+
+const STRATEGIES = ['rss', 'sitemap', 'index_page'] as const;
+
+/** Comma-separated strategy list from the form, order preserved, unknowns dropped. */
+function parseStrategies(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s): s is (typeof STRATEGIES)[number] => (STRATEGIES as readonly string[]).includes(s));
+}
+
+/** A malformed config blob is a validation error, not something to persist. */
+function parseDetectionConfig(raw: string): { config: Record<string, unknown> } | { error: string } {
+  if (!raw.trim()) return { config: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { error: 'Detection configuration must be a JSON object.' };
+    }
+    return { config: parsed as Record<string, unknown> };
+  } catch {
+    return { error: 'Detection configuration is not valid JSON.' };
+  }
+}
 
 type SourceInput = z.infer<typeof schema>;
 
@@ -61,6 +99,14 @@ function resolveLocation(input: SourceInput): { feed_url: string | null; error?:
     }
     return { feed_url: null };
   }
+  if (input.source_type === 'report_watch') {
+    // A report watch has no feed_url — its URLs live in detection_config, which
+    // is validated in buildRow along with the strategy list.
+    if (parseStrategies(input.detection_strategies).length === 0) {
+      return { feed_url: null, error: 'Choose at least one detection strategy.' };
+    }
+    return { feed_url: null };
+  }
   const feedUrl = resolveFeedUrl(input.site_url || null, input.feed_url || null);
   if (!feedUrl) {
     return {
@@ -76,7 +122,7 @@ function resolveLocation(input: SourceInput): { feed_url: string | null; error?:
 
 // Build the news_sources row. Transcript settings only apply to podcast/youtube;
 // slug/inbound_address/allowlist/tier/threshold apply to email.
-function buildRow(input: SourceInput, feedUrl: string | null) {
+function buildRow(input: SourceInput, feedUrl: string | null): Record<string, unknown> | { error: string } {
   const base = {
     name: input.name,
     source_type: input.source_type,
@@ -100,6 +146,26 @@ function buildRow(input: SourceInput, feedUrl: string | null) {
       relevance_threshold: input.relevance_threshold,
       follow_links: input.follow_links,
       max_followed_links: input.max_followed_links,
+    };
+  }
+  if (input.source_type === 'report_watch') {
+    const parsed = parseDetectionConfig(input.detection_config);
+    if ('error' in parsed) return parsed;
+    return {
+      ...base,
+      feed_url: null,
+      youtube_channel_url: null,
+      transcribe_with_deepgram: false,
+      detection_strategies: parseStrategies(input.detection_strategies),
+      detection_config: parsed.config,
+      redistribution_default: input.redistribution_default,
+      licence_notes: input.licence_notes.trim() || null,
+      ocr_enabled: input.ocr_enabled,
+      ocr_page_limit: input.ocr_page_limit,
+      crawl_delay_seconds: input.crawl_delay_seconds,
+      max_candidates_per_run: input.max_candidates_per_run,
+      tier: input.tier || null,
+      relevance_threshold: input.relevance_threshold,
     };
   }
   if (input.source_type === 'rss') {
@@ -132,7 +198,9 @@ export async function createNewsSource(formData: FormData) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
-  const { error: dbError } = await supabase.from('news_sources').insert(buildRow(input, feed_url));
+  const row = buildRow(input, feed_url);
+  if ('error' in row) return { error: row.error as string };
+  const { error: dbError } = await supabase.from('news_sources').insert(row as never);
 
   if (dbError) return { error: humanizeError(dbError) };
   revalidatePath(REVALIDATE);
@@ -155,9 +223,11 @@ export async function updateNewsSource(id: string, formData: FormData) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
+  const row = buildRow(input, feed_url);
+  if ('error' in row) return { error: row.error as string };
   const { error: dbError } = await supabase
     .from('news_sources')
-    .update(buildRow(input, feed_url))
+    .update(row as never)
     .eq('id', id);
 
   if (dbError) return { error: humanizeError(dbError) };

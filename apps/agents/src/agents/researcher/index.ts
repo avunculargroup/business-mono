@@ -3,6 +3,7 @@ import { dynamicModelFor } from '../../config/model.js';
 import { supabaseQuery } from '../../tools/supabase.js';
 import { logActivity } from '../../tools/activity.js';
 import { searchWeb, searchNews, fetchUrl, crawlStructured, asxLookup, queryNewsItems, queryTranscripts } from './tools.js';
+import { searchSegments } from '../../tools/segments.js';
 import { youtubeTranscript } from '../../tools/youtube.js';
 
 const RESEARCHER_SYSTEM_PROMPT = `You are Rex, BTS's Researcher and intelligence-gathering specialist.
@@ -140,6 +141,7 @@ export const rex = new Agent({
   tools: {
     query_news_items: queryNewsItems,
     query_transcripts: queryTranscripts,
+    search_segments: searchSegments,
     search_web: searchWeb,
     search_news: searchNews,
     asx_lookup: asxLookup,

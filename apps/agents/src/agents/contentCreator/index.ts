@@ -8,6 +8,7 @@ import { supabaseQuery, supabaseInsert, supabaseUpdate } from '../../tools/supab
 import { logActivity } from '../../tools/activity.js';
 import { vectorSearchTool, graphTraverseTool } from '../archivist/tools.js';
 import { brandLookup, persistContentDraft } from './tools.js';
+import { searchSegments } from '../../tools/segments.js';
 import { resolveCompanyVoiceBlock } from '../../lib/voicePrompt.js';
 
 // Sections of brand-voice.md that Charlie needs on every inference. The full
@@ -160,6 +161,8 @@ Use vector_search and graph_traverse to find evidence chains:
 
 Flag research items older than ${KNOWLEDGE_STALENESS_MONTHS} months as potentially stale. Prefer fresh data.
 
+Use search_segments for third-party research — institutional reports, regulatory papers, podcast transcripts. Every result carries a usage note. A passage marked INTERNAL ONLY informs your understanding and nothing else: do not quote it, do not paraphrase it closely, do not reproduce its structure. A QUOTABLE passage may be quoted briefly with attribution to the publisher and report title. When in doubt, write the point in your own words from your own understanding, or leave it out.
+
 ## Content quality standards
 Every draft must pass these self-checks before submission:
 1. Does it match the persona and tone in the brand voice?
@@ -211,6 +214,7 @@ export const charlie = new Agent({
     log_activity: logActivity,
     vector_search: vectorSearchTool,
     graph_traverse: graphTraverseTool,
+    search_segments: searchSegments,
     brand_lookup: brandLookup,
     persist_content_draft: persistContentDraft,
   },

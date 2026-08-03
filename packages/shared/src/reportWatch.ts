@@ -294,3 +294,105 @@ export interface ReportWatchHealthRow {
 /** Simon alerts above these. Matches the spec's morning-briefing thresholds. */
 export const REPORT_WATCH_EMPTY_RUNS_ALERT = 5;
 export const REPORT_WATCH_STALE_DAYS_ALERT = 45;
+
+// ── URL normalisation (shared with the web Test Detection dry run) ─────────
+//
+// These rules are the candidate identity contract: `url_hash` is
+// sha256(normalised url) and UNIQUE per source, so loosening them re-evaluates
+// the same report under every new tracking parameter and tightening them
+// collapses two different reports into one.
+//
+// They live here, in the leaf package, rather than beside the engine because
+// BOTH the daily scan and the /news/sources "Test detection" button have to
+// apply them — a dry run that normalises differently from the scan tells the
+// operator something untrue about what the scan will find. (The hashing itself
+// stays in the agent server: it needs node:crypto, and @platform/shared is
+// imported by client components.)
+
+/** Analytics/campaign parameters that never identify content. */
+const STRIP_PARAMS = new Set([
+  'ref', 'fbclid', 'gclid', 'mc_cid', 'mc_eid', 'igshid', 'msclkid', '_hsenc', '_hsmi',
+]);
+
+const STRIP_PREFIXES = ['utm_'];
+
+/**
+ * Normalise a discovered URL.
+ *
+ * - lowercase scheme and host (paths stay case-sensitive — many CDNs are)
+ * - strip utm_*, ref, fbclid, gclid, mc_cid, mc_eid and friends
+ * - strip the fragment
+ * - strip a trailing slash, except at the root
+ * - preserve every other query parameter, in sorted order so two orderings of
+ *   the same parameters normalise identically
+ *
+ * Everything not on the strip list is PRESERVED: some publishers genuinely route
+ * by query string (`/download?doc=q2-2026`), and a helpful-looking "strip all
+ * query params" rule would silently merge a publisher's whole library into one
+ * candidate.
+ *
+ * Returns null for anything that is not an absolute http(s) URL — a `mailto:` or
+ * `javascript:` href scraped from an index page is not a candidate.
+ */
+export function normalizeReportUrl(raw: string, base?: string | null): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+
+  let url: URL;
+  try {
+    url = base ? new URL(trimmed, base) : new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+  url.protocol = url.protocol.toLowerCase();
+  url.hostname = url.hostname.toLowerCase();
+  url.hash = '';
+
+  const keep: Array<[string, string]> = [];
+  for (const [key, value] of url.searchParams.entries()) {
+    const lower = key.toLowerCase();
+    if (STRIP_PARAMS.has(lower)) continue;
+    if (STRIP_PREFIXES.some((p) => lower.startsWith(p))) continue;
+    keep.push([key, value]);
+  }
+  keep.sort((a, b) => (a[0] === b[0] ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0])));
+  url.search = '';
+  for (const [key, value] of keep) url.searchParams.append(key, value);
+
+  let out = url.toString();
+  // Trailing slash carries no meaning except at the root, where dropping it
+  // would turn https://example.com/ into a hostname with no path.
+  if (out.endsWith('/') && url.pathname !== '/') out = out.slice(0, -1);
+  return out;
+}
+
+/**
+ * Apply a source's `url_filters`.
+ *
+ * `must_match` is an OR: the canonical two-rule config is "a PDF anywhere, OR
+ * anything under /reports/", and requiring all of them would match nothing.
+ * An invalid regex is treated as non-matching rather than thrown — a typo in one
+ * source's config should skip that source's candidates, not abort the sweep.
+ */
+export function passesUrlFilters(url: string, filters: ReportUrlFilters | undefined): boolean {
+  if (!filters) return true;
+
+  const test = (pattern: string): boolean => {
+    try {
+      return new RegExp(pattern, 'i').test(url);
+    } catch {
+      return false;
+    }
+  };
+
+  const mustMatch = filters.must_match ?? [];
+  if (mustMatch.length > 0 && !mustMatch.some(test)) return false;
+
+  const mustNot = filters.must_not_match ?? [];
+  if (mustNot.some(test)) return false;
+
+  return true;
+}
