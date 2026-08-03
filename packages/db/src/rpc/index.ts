@@ -3,3 +3,4 @@ export * from './fulltextSearch.js';
 export * from './graphTraverse.js';
 export * from './newsSearch.js';
 export * from './transcriptSearch.js';
+export * from './reportSearch.js';

@@ -2,6 +2,12 @@
 // News aggregation — types and contracts
 // ============================================================
 
+import type {
+  ReportDetectionStrategy,
+  ReportDetectionConfig,
+  ReportRedistribution,
+} from './reportWatch.js';
+
 export const NewsCategory = {
   REGULATORY:    'regulatory',    // ASIC, ATO, APRA, government policy
   CORPORATE:     'corporate',     // ASX companies, treasury announcements
@@ -83,7 +89,7 @@ export function resolveFeedUrl(
 // podcast/YouTube channel, or received as an email newsletter. Managed from the
 // web app (/news/sources) or by Simon. Distinct from the keyword-search
 // NewsIngestionConfig — sources name specific publications to watch.
-export type NewsSourceType = 'rss' | 'podcast' | 'youtube' | 'email';
+export type NewsSourceType = 'rss' | 'podcast' | 'youtube' | 'email' | 'report_watch';
 
 // Visual prominence / Rex calibration tier, shared across source types.
 export type NewsTier = 'tier_1' | 'tier_2' | 'tier_3';
@@ -107,6 +113,18 @@ export interface NewsSourceRecord {
   max_backfill_episodes: number;
   // Skip Deepgram on episodes older than this; null = no cap.
   max_episode_age_days: number | null;
+  // Report-watch fields. A report_watch source has neither a feed_url nor an
+  // inbound_address — its URLs live in detection_config. See reportWatch.ts.
+  detection_strategies: ReportDetectionStrategy[];
+  detection_config: ReportDetectionConfig;
+  detection_last_success_at: string | null;
+  detection_consecutive_empty: number;
+  redistribution_default: ReportRedistribution;
+  licence_notes: string | null;
+  ocr_enabled: boolean;
+  ocr_page_limit: number;
+  crawl_delay_seconds: number;
+  max_candidates_per_run: number;
   // Email source fields. slug is the plus-address suffix + URL slug;
   // inbound_address is the computed research+{slug}@<domain>; sender_allowlist
   // is the approved From addresses/domains (may be empty pre-onboarding).

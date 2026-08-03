@@ -2783,3 +2783,151 @@ CREATE TABLE ecosystem_changes (
 -- Views: v_ecosystem_feed (live changes + entity context, pinned then most
 --   material; excludes dismissed/archived) and v_ecosystem_watch_health
 --   (enabled watches, failing/degraded first, never-checked before stale).
+
+
+-- ============================================================
+-- REPORT INGESTION (migration: 20260803000000_add_report_watch)
+-- ============================================================
+-- A fifth news_sources type, 'report_watch', for publishers who put a PDF on a
+-- marketing page and expect a human to notice (River, Fidelity, ARK, Bitwise,
+-- ASIC/AUSTRAC). Discovery finds URLs, acquisition stores the artefact
+-- immutably, extraction produces markdown, and the result is surfaced through
+-- the EXISTING news_items feed so Rex scores it with the rubric he already has.
+-- Spec: docs/features/html-pdf-monitoring/html-pdf-monitoring.md
+-- Engine: apps/agents/src/lib/reportWatch/
+
+-- news_sources gains (all defaulted, so existing rows are unaffected):
+--   detection_strategies TEXT[] '{}'  — ordered; first strategy with candidates wins
+--   detection_config JSONB '{}'       — per-strategy settings (ReportDetectionConfig)
+--   detection_last_success_at TIMESTAMPTZ, detection_consecutive_empty INT 0
+--   redistribution_default TEXT 'internal_only' CHECK internal_only|quotable|client_shareable
+--   licence_notes TEXT
+--   ocr_enabled BOOLEAN false, ocr_page_limit INT 40   — the cost-bearing controls
+--   crawl_delay_seconds INT 5, max_candidates_per_run INT 25
+-- source_type CHECK widened to include 'report_watch'; news_sources_feed_required
+-- gains an OR branch for it (its URLs live in detection_config, not feed_url).
+
+-- Every URL discovery has ever surfaced, INCLUDING rejections — without a memory
+-- of what was rejected, every run re-evaluates the same sitemap rubbish.
+CREATE TABLE report_candidates (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id         UUID        NOT NULL REFERENCES news_sources(id) ON DELETE CASCADE,
+  url               TEXT        NOT NULL,   -- normalised (see lib/reportWatch/normalize.ts)
+  url_hash          TEXT        NOT NULL,   -- sha256(url); UNIQUE with source_id
+  raw_url           TEXT        NOT NULL,
+  discovery_method  TEXT        NOT NULL CHECK (discovery_method IN
+                      ('rss','sitemap','index_page','manual','email_attachment')),
+  title_hint        TEXT,
+  published_at_hint DATE,                   -- scraped date — not authoritative
+  status            TEXT        NOT NULL DEFAULT 'new' CHECK (status IN
+                      ('new','queued','fetching','acquired','skipped','failed','duplicate')),
+  skip_reason       TEXT        CHECK (skip_reason IS NULL OR skip_reason IN
+                      ('filter_mismatch','wrong_content_type','too_large',
+                       'robots_disallowed','already_acquired','manual_reject')),
+  http_status       INT,
+  etag              TEXT,                   -- from HEAD, for conditional GET
+  last_modified     TEXT,
+  content_type      TEXT,
+  content_length    BIGINT,                 -- checked against the size cap pre-download
+  attempts          INT         NOT NULL DEFAULT 0,   -- 3 failures → status 'failed'
+  last_attempt_at   TIMESTAMPTZ,
+  last_error        TEXT,
+  report_id         UUID        REFERENCES reports(id) ON DELETE SET NULL,
+  first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- a URL disappearing is a signal
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The acquired artefact. One row per distinct piece of CONTENT, not per URL:
+-- publishers re-upload the same PDF at new paths and CDN-bust filenames (caught
+-- by UNIQUE content_hash), and occasionally revise in place (same URL, new hash
+-- → a new row via revision_of_report_id, superseded_at stamped on the
+-- predecessor). Both rows are kept — deleting the version BTS actually read
+-- would defeat the point of storing it.
+CREATE TABLE reports (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id             UUID        REFERENCES news_sources(id) ON DELETE SET NULL,
+  candidate_id          UUID        REFERENCES report_candidates(id) ON DELETE SET NULL,
+  news_item_id          UUID        REFERENCES news_items(id) ON DELETE SET NULL,
+  title                 TEXT        NOT NULL,  -- PDF meta → first heading → title_hint → filename
+  publisher             TEXT,
+  report_type           TEXT        NOT NULL DEFAULT 'other' CHECK (report_type IN
+                          ('quarterly','annual','research_note','whitepaper',
+                           'market_update','regulatory','survey','other')),
+  published_at          DATE,
+  published_at_source   TEXT        CHECK (published_at_source IS NULL OR published_at_source IN
+                          ('pdf_metadata','scraped','http_last_modified')),
+  source_url            TEXT        NOT NULL,
+  canonical_url         TEXT,
+  file_format           TEXT        NOT NULL CHECK (file_format IN ('pdf','html')),
+  storage_path          TEXT,                  -- immutable original in the private `reports` bucket
+  file_name             TEXT,
+  file_size_bytes       BIGINT,
+  content_hash          TEXT        NOT NULL,  -- sha256 of raw bytes — the identity key
+  page_count            INT,                   -- NULL for HTML
+  word_count            INT,
+  body                  TEXT,                  -- full extracted markdown (Rex scores the whole doc)
+  extraction_method     TEXT        CHECK (extraction_method IS NULL OR extraction_method IN
+                          ('pdf_text_layer','ocr','html_jina','manual')),
+  extraction_quality    TEXT        CHECK (extraction_quality IS NULL OR extraction_quality IN
+                          ('good','partial','failed')),
+  extraction_metrics    JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  ocr_used              BOOLEAN     NOT NULL DEFAULT FALSE,
+  revision_of_report_id UUID        REFERENCES reports(id) ON DELETE SET NULL,
+  superseded_at         TIMESTAMPTZ,
+  redistribution        TEXT        NOT NULL DEFAULT 'internal_only'
+                          CHECK (redistribution IN ('internal_only','quotable','client_shareable')),
+  licence_notes         TEXT,
+  curator_note          TEXT,                  -- why this matters, in a human's words
+  tags                  TEXT[]      NOT NULL DEFAULT '{}',
+  status                TEXT        NOT NULL DEFAULT 'ingesting' CHECK (status IN
+                          ('ingesting','ingested','needs_review','archived')),
+  created_by            UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Page-anchored so a retrieved passage can cite where it came from. Publish
+-- wall: rows are written only when extraction_quality is 'good' or 'partial' —
+-- indexing garbage is worse than indexing nothing, because garbage retrieves.
+CREATE TABLE report_segments (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_id     UUID        NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+  segment_index INT         NOT NULL,
+  page_number   INT,                          -- NULL for HTML
+  heading_path  TEXT,                         -- 'Outlook > Mining economics'
+  content       TEXT        NOT NULL,
+  token_count   INT,
+  embedding     VECTOR(1536),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- news_items gains report_id UUID REFERENCES reports(id) ON DELETE SET NULL.
+-- NULL for every other item type; the rubric, feed query, archive and detail
+-- page all continue to treat items agnostically.
+
+-- Indexes: UNIQUE idx_report_candidates_url (source_id, url_hash);
+--   idx_report_candidates_{status,source,seen};
+--   UNIQUE idx_reports_content_hash; idx_reports_{source,published,status,news_item};
+--   idx_report_segments_report; idx_report_segments_embedding HNSW (vector_cosine_ops);
+--   idx_news_items_report.
+-- Triggers: report_candidates_updated_at, reports_updated_at (update_updated_at).
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on all three tables.
+--
+-- Views:
+--   v_report_watch_health — the silent-scraper-failure surface (a scraper
+--     returning nothing looks exactly like a publisher that has not published).
+--     Counts come from scalar subqueries, not joins: LEFT JOINing both
+--     report_candidates and reports to the same source multiplies the counts.
+--   v_recent_reports — browse surface; hides archived and superseded rows.
+--
+-- RPC: search_segments(query_embedding, source_types TEXT[], match_count) —
+--   one retrieval surface over report_segments AND the previously-orphaned
+--   transcript_segments. Unions two separately-ORDER BY/LIMIT-ed subqueries so
+--   both HNSW indexes are used, then merges. Every row carries `redistribution`
+--   (NULL for transcripts) so a licence restriction is never lost between
+--   retrieval and drafting.
+--
+-- Storage: bucket 'reports', PRIVATE, 50MB cap. Access via short-lived signed
+--   URLs minted server-side — never a public URL in rendered HTML.

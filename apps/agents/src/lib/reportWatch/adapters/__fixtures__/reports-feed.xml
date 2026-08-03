@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Publisher Research</title>
+  <item>
+    <title>Q2 2026 Institutional Flows</title>
+    <link>https://fidelity.example/research/q2-2026-flows</link>
+    <enclosure url="https://fidelity.example/files/q2-2026-flows.pdf" type="application/pdf" length="4194304"/>
+    <pubDate>Tue, 01 Jul 2026 09:00:00 GMT</pubDate>
+  </item>
+  <item>
+    <title><![CDATA[Week On-chain 29]]></title>
+    <link>https://fidelity.example/research/week-onchain-29?utm_campaign=rss</link>
+    <pubDate>Mon, 21 Jul 2026 06:30:00 GMT</pubDate>
+  </item>
+</channel></rss>

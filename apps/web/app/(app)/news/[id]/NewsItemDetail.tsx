@@ -6,15 +6,19 @@ import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDispla
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import { newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
+import { ReportPanel, type ReportPanelRecord } from './ReportPanel';
 import styles from './detail.module.css';
 import type { NewsItemRecord } from '@platform/shared';
 
 interface NewsItemDetailProps {
   item: NewsItemRecord;
   sourceName: string;
+  /** Set only for report_watch items. */
+  report?: ReportPanelRecord | null;
+  supersededItemId?: string | null;
 }
 
-export function NewsItemDetail({ item, sourceName }: NewsItemDetailProps) {
+export function NewsItemDetail({ item, sourceName, report, supersededItemId }: NewsItemDetailProps) {
   const original = newsOriginalUrl(item.url, item.canonical_url);
 
   return (
@@ -44,6 +48,8 @@ export function NewsItemDetail({ item, sourceName }: NewsItemDetailProps) {
 
       {item.summary && <p className={styles.summary}>{item.summary}</p>}
 
+      {report && <ReportPanel report={report} supersededItemId={supersededItemId} />}
+
       {item.curator_notes && (
         <div className={styles.curatorNote}>
           <span className={styles.curatorNoteLabel}>Why this matters</span>
@@ -67,7 +73,9 @@ export function NewsItemDetail({ item, sourceName }: NewsItemDetailProps) {
         </div>
       ) : (
         <p className={styles.muted}>
-          No full text was stored for this item. Use the original link above to read it.
+          {report
+            ? 'No readable text was extracted from this report. Download the original above.'
+            : 'No full text was stored for this item. Use the original link above to read it.'}
         </p>
       )}
     </div>

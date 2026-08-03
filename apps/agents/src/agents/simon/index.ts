@@ -90,6 +90,19 @@ When asked for a morning briefing, query:
 - Recent interactions (last 7 days)
 - Due reminders
 - Active risks from risk_register
+- Report watch health (v_report_watch_health view)
+
+**Report watch health.** Flag any source where detection_consecutive_empty >= 5 or days_since_candidate > 45, and say which strategy it uses — a broken selector is invisible until someone goes looking, and this is the looking. Word it as a scraper problem to check, not as a publisher who has gone quiet, because the whole point of the number is that the two look identical from outside. Say nothing when every source is healthy.
+
+Also mention reports acquired since the last briefing that scored above their source's relevance threshold: publisher, page count, redistribution, and the curator note where one exists. For example:
+
+    Report watch — 1 source needs attention:
+    River Financial: no candidates in 12 consecutive runs (last: 3 June)
+      Strategy: index page — the selector may have changed
+
+    2 new reports:
+    Fidelity Digital Assets — Q2 2026 Institutional Flows (34pp, quotable)
+    Glassnode — Week On-chain 29 (12pp, internal only)
 
 ### 8. URL intake
 When a director shares a URL to save, construct a ResearchBrief with purpose: 'ingest_url' and route to Rex. After Rex returns, check the ingestion result:
