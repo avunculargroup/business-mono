@@ -436,6 +436,28 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'library_answer',
     fallbackAgent: 'lex',
   },
+
+  // ── Report ingestion (report_watch sources) ────────────────────────────────
+  // Separate scopes from the shared news steps because the inputs are a
+  // different shape: a 40-page institutional PDF, not a 900-word article.
+  {
+    key: 'report_watch.metadata_extract',
+    type: 'workflow_step',
+    label: 'Report metadata',
+    description:
+      'Classifies an acquired report and pulls its summary, key points and topic tags — fills the NOT NULL category before the feed handoff',
+    workflow: 'report_watch',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'report_watch.rubric_score',
+    type: 'workflow_step',
+    label: 'Report relevance rubric',
+    description:
+      'Rex scores an acquired report on material/novelty/citation, with its extraction quality in the payload so a half-read scan is not scored as clean text',
+    workflow: 'report_watch',
+    fallbackAgent: 'rex',
+  },
 ] as const;
 
 export const WORKFLOW_LABELS: Record<string, string> = {
@@ -452,6 +474,7 @@ export const WORKFLOW_LABELS: Record<string, string> = {
   library_answer: 'Ask the Library',
   market_report: 'Market Report',
   ecosystemScan: 'Ecosystem Signals',
+  report_watch: 'Report Ingestion',
 };
 
 // Curated OpenRouter model suggestions surfaced in the settings UI. The text

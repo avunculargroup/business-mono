@@ -6,6 +6,76 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-08-03 — Report ingestion: report_watch sources, candidates, artefacts, segments
+
+Adds the fifth `news_sources` type. Report publishers are the one source shape
+that hands the platform no change signal — River, Fidelity, ARK, Bitwise and the
+ASIC/AUSTRAC publication pages put a PDF on a marketing page and expect a human
+to notice. Spec: `docs/features/html-pdf-monitoring/html-pdf-monitoring.md`.
+
+- **`news_sources` additive columns** — `detection_strategies TEXT[]`,
+  `detection_config JSONB`, `detection_last_success_at`,
+  `detection_consecutive_empty`, `redistribution_default`, `licence_notes`,
+  `ocr_enabled`, `ocr_page_limit`, `crawl_delay_seconds`,
+  `max_candidates_per_run`. All defaulted, so existing rows are untouched.
+  `source_type` CHECK widened with `'report_watch'`, and
+  `news_sources_feed_required` gains an OR branch for it — a report watch has
+  neither a `feed_url` nor an `inbound_address`; its URLs live in
+  `detection_config`.
+- **`report_candidates`** — every URL discovery has surfaced, *including the
+  rejections*. This is the table people would be tempted to skip. It earns its
+  place on the rejections: a sitemap diff on a large publisher returns hundreds
+  of URLs of which perhaps three are reports, and without a memory of what was
+  already rejected every run re-evaluates the same rubbish. Discovery is
+  idempotent — a second run produces no new rows, only a fresh `last_seen_at`.
+- **`reports`** — the acquired artefact, one row per distinct piece of *content*
+  rather than per URL. `content_hash` (sha256 of the raw bytes) is identity, not
+  the URL: publishers re-upload the same PDF at new paths and CDN-bust
+  filenames, which a UNIQUE index on the hash catches. The reverse case — same
+  URL, different hash — is a silent in-place revision; it creates a new row
+  linked by `revision_of_report_id` and stamps `superseded_at` on the
+  predecessor. Both rows are retained, because deleting the version BTS actually
+  read would defeat the point of storing it (the `variable_values` argument from
+  `generated_documents`).
+- **`report_segments`** — page-anchored chunks with `VECTOR(1536)` embeddings, so
+  a retrieved passage can cite a page. Written only when `extraction_quality` is
+  `good` or `partial`: a `failed` extraction still produces a stored artefact and
+  a feed item marked `needs_review`, but no embeddings. Indexing garbage is worse
+  than indexing nothing, because garbage retrieves.
+- **`news_items.report_id`** — the only change to the feed. Reports arrive as
+  ordinary `news_items` and Rex's rubric needs no special case, which was the
+  point of the original design. Note that `news_items` dedup stays on its
+  existing `url` UNIQUE path — `content_hash` lives on `reports`, not here.
+- **`v_report_watch_health`** — the operational surface for the feature's primary
+  risk: a scraper that returns nothing looks exactly like a publisher that has
+  not published. Its counts come from scalar subqueries rather than the spec's
+  two LEFT JOINs, which would have multiplied every candidate count by the
+  source's report count.
+- **`v_recent_reports`** — browse surface; hides archived and superseded rows.
+- **`search_segments()` RPC** — one retrieval surface across `report_segments`
+  and the previously-orphaned `transcript_segments`. A vector index cannot be
+  built on a view, so the function unions two subqueries that each carry their
+  own `ORDER BY ... LIMIT` (so both HNSW indexes are actually used) and merges.
+  Column names on `transcript_segments`/`podcast_episodes` were read from the
+  deployed definitions rather than assumed from the podcast spec — `start_seconds`
+  is `NUMERIC(10,2)`, hence the `ROUND()` in the locator. Every row carries
+  `redistribution` (NULL for transcripts) so a licence restriction cannot be lost
+  between retrieval and drafting.
+- **Storage bucket `reports`** — private, 50MB cap, with `storage.objects`
+  policies scoped to the bucket (mirroring `platform-files`). Access is via a
+  60-second signed URL minted server-side; the path is never a public URL.
+- **`routines.action_type`** — extended with `'report_watch_scan'` and a daily
+  07:00 routine seeded, ahead of Simon's 08:00 run. Scheduling goes through the
+  existing `routines` table rather than the Mastra-native-schedule bypass
+  `ecosystemScanWorkflow` uses: ecosystem needed that bypass for hourly
+  granularity `routines.frequency` cannot express, and report watching needs only
+  one uniform daily cadence.
+
+Migrations: `20260803000000_add_report_watch.sql`,
+`20260803010000_add_report_watch_routine.sql`
+
+---
+
 ## 2026-07-30 — Repoint realised_cap from Coin Metrics to BGeometrics (CapRealUSD never actually worked)
 
 - **`onchain_indicators.provider` / `onchain_observations.source`** — widened to add `'bgeometrics'` alongside the existing on-chain providers. Coin Metrics' free community tier has never served `CapRealUSD`: confirmed via production data — `realised_cap` has **zero** observations ever, while sibling metrics on the same batched call (`SplyCur`, `AdrActCnt`) have ~36,000 rows apiece going back to 2019. Same Pro-gating that hit `CapMVRVCur` (`20260710000000_derive_mvrv.sql`), except realised cap can't be derived from data already on hand (it's cost-basis-weighted, not price × supply), so it needed an actual replacement source.

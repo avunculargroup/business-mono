@@ -1,6 +1,7 @@
 import type { AgentName } from './types.js';
 import type { ResearchSource } from './types.js';
 import type { MarketReportMode, MarketReportStatus } from './findings.js';
+import type { ReportWatchScanConfig } from './reportWatch.js';
 
 // Schedule cadence for a routine.
 export const RoutineFrequency = {
@@ -56,6 +57,7 @@ export const RoutineActionType = {
   ONCHAIN_POLL:          'onchain_poll',
   SOCIAL_POST_FROM_NEWS: 'social_post_from_news',
   MARKET_REPORT:         'market_report',
+  REPORT_WATCH_SCAN:     'report_watch_scan',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -306,7 +308,8 @@ export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.INDICATOR_POLL } & IndicatorPollConfig)
   | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig)
   | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig)
-  | ({ action_type: typeof RoutineActionType.MARKET_REPORT } & MarketReportConfig);
+  | ({ action_type: typeof RoutineActionType.MARKET_REPORT } & MarketReportConfig)
+  | ({ action_type: typeof RoutineActionType.REPORT_WATCH_SCAN } & ReportWatchScanConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

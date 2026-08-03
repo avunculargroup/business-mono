@@ -35,11 +35,14 @@ import type {
   IndicatorPollResult,
   OnchainPollResult,
   MarketReportResult,
+  ReportWatchScanConfig,
+  ReportWatchScanResult,
 } from '@platform/shared';
 import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
 import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { runMarketReport } from '../lib/report/runMarketReport.js';
+import { runReportWatchScan } from '../lib/reportWatch/index.js';
 import { runSocialPost } from './socialPost/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
@@ -235,6 +238,8 @@ export interface RoutineOutcome {
   market_report_result?: MarketReportResult;
   // news_curation selection counts:
   news_curation_result?: NewsCurationRunStats;
+  // report_watch_scan discovery/acquisition counts:
+  report_watch_result?: ReportWatchScanResult;
 }
 
 const runRoutine = createStep({
@@ -275,6 +280,8 @@ const runRoutine = createStep({
           outcomes.push(await runSocialPost(routine));
         } else if (routine.action_type === 'market_report') {
           outcomes.push(await runMarketReport(routine));
+        } else if (routine.action_type === 'report_watch_scan') {
+          outcomes.push(await runReportWatch(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -1515,6 +1522,53 @@ async function runNewsSourceScan(
 
 // ── podcast_ingest ───────────────────────────────────────────────────────────
 // Scans active podcast news_sources, ingests new episodes (dedupe on guid,
+// ── report_watch_scan ────────────────────────────────────────────────────────
+// The daily report sweep. All the work lives in lib/reportWatch — this is only
+// the routine adapter: config in, RoutineOutcome out. Mirrors runMarketReport's
+// shape (a thin wrapper over a lib entry point) rather than runNewsSourceScan's
+// (the whole pipeline inline), because the pipeline here is large enough to
+// deserve its own directory and its own tests.
+
+async function runReportWatch(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as unknown as ReportWatchScanConfig;
+
+  const result = await runReportWatchScan(cfg, routine.id);
+
+  const failSuffix = result.failed_sources.length > 0
+    ? ` ${result.failed_sources.length} source(s) failed discovery: ${result.failed_sources.join(', ')}.`
+    : '';
+  // Empty sources are named in the summary as well as counted: a scraper
+  // returning nothing looks exactly like a publisher that has not published,
+  // and the only way to tell is to go and look.
+  const emptySuffix = result.empty_sources.length > 0
+    ? ` No candidates from: ${result.empty_sources.join(', ')}.`
+    : '';
+  const summary =
+    `Scanned ${result.sources_scanned} report source(s): ${result.candidates_found} candidate(s) ` +
+    `(${result.candidates_new} new), ${result.reports_acquired} report(s) acquired ` +
+    `(${result.segments_embedded} segments, ${result.news_items_created} feed item(s)), ` +
+    `${result.reports_duplicate} duplicate, ${result.reports_failed} failed.` +
+    `${failSuffix}${emptySuffix}`;
+
+  return {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'report_watch_scan' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+    // A source that failed discovery is an operational problem, not a failed
+    // run: the other sources ingested fine and the routine should not be
+    // marked failed (and retried) because one publisher redesigned their site.
+    status: 'success',
+    result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
+    error: null,
+    report_watch_result: result,
+  };
+}
+
 // backfill-capped on first fetch), and resolves each transcript through the
 // waterfall (feed tag → YouTube → Deepgram). Available transcripts are embedded
 // into transcript_segments this run; Deepgram submissions resolve later via the
