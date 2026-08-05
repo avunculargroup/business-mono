@@ -5,6 +5,15 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
+      # A change to this workflow must run this workflow. Without it, a fix to
+      # the migration process merges green and never executes — which is exactly
+      # how the --include-all fix sat on main doing nothing.
+      - '.github/workflows/migrate.yml'
+  # Run on demand. Needed whenever the ledger and the schema drift apart with no
+  # migration file to push (a repair, a manual apply, or a fix like the one
+  # above that has already merged), since there is otherwise no way to make this
+  # run without inventing a migration to trigger it.
+  workflow_dispatch:
 
 jobs:
   migrate:

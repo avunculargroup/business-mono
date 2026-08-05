@@ -34,6 +34,16 @@ live schema disagreed).
 Worth knowing for next time: a green merge is **not** evidence a migration
 applied. `supabase migration list`, or the `list_migrations` MCP call, is.
 
+**Follow-up.** The fix above merged and then did nothing, because the workflow
+only triggered on `paths: supabase/migrations/**` — and a fix to the migration
+workflow changes the workflow, not a migration. Two additions close that:
+
+- `.github/workflows/migrate.yml` is now in its own `paths` filter, so a change
+  to the migration process runs the migration process.
+- `workflow_dispatch` lets it be run by hand. That is the only way to reconcile
+  a drifted ledger without inventing a throwaway migration to trigger a push,
+  and drift is precisely the situation where you need it most.
+
 ---
 
 ## 2026-08-03 — Report ingestion: report_watch sources, candidates, artefacts, segments
