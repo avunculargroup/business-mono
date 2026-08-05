@@ -3152,6 +3152,7 @@ export type Database = {
           published_at: string | null
           relevance_reasoning: string | null
           relevance_score: number | null
+          report_id: string | null
           rex_metadata: Json
           routine_id: string | null
           source_id: string | null
@@ -3186,6 +3187,7 @@ export type Database = {
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null
+          report_id?: string | null
           rex_metadata?: Json
           routine_id?: string | null
           source_id?: string | null
@@ -3220,6 +3222,7 @@ export type Database = {
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null
+          report_id?: string | null
           rex_metadata?: Json
           routine_id?: string | null
           source_id?: string | null
@@ -3241,6 +3244,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "news_items_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_items_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "v_recent_reports"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "news_items_routine_id_fkey"
             columns: ["routine_id"]
             isOneToOne: false
@@ -3254,12 +3271,24 @@ export type Database = {
             referencedRelation: "news_sources"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "news_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_watch_health"
+            referencedColumns: ["source_id"]
+          },
         ]
       }
       news_sources: {
         Row: {
+          crawl_delay_seconds: number
           created_at: string
           created_by: string | null
+          detection_config: Json
+          detection_consecutive_empty: number
+          detection_last_success_at: string | null
+          detection_strategies: string[]
           feed_url: string | null
           follow_links: boolean
           id: string
@@ -3269,11 +3298,16 @@ export type Database = {
           last_error: string | null
           last_scanned_at: string | null
           last_status: string | null
+          licence_notes: string | null
           max_backfill_episodes: number
+          max_candidates_per_run: number
           max_episode_age_days: number | null
           max_followed_links: number
           name: string
+          ocr_enabled: boolean
+          ocr_page_limit: number
           preferred_transcript_lang: string
+          redistribution_default: string
           relevance_threshold: number
           sender_allowlist: string[]
           site_url: string | null
@@ -3285,8 +3319,13 @@ export type Database = {
           youtube_channel_url: string | null
         }
         Insert: {
+          crawl_delay_seconds?: number
           created_at?: string
           created_by?: string | null
+          detection_config?: Json
+          detection_consecutive_empty?: number
+          detection_last_success_at?: string | null
+          detection_strategies?: string[]
           feed_url?: string | null
           follow_links?: boolean
           id?: string
@@ -3296,11 +3335,16 @@ export type Database = {
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          licence_notes?: string | null
           max_backfill_episodes?: number
+          max_candidates_per_run?: number
           max_episode_age_days?: number | null
           max_followed_links?: number
           name: string
+          ocr_enabled?: boolean
+          ocr_page_limit?: number
           preferred_transcript_lang?: string
+          redistribution_default?: string
           relevance_threshold?: number
           sender_allowlist?: string[]
           site_url?: string | null
@@ -3312,8 +3356,13 @@ export type Database = {
           youtube_channel_url?: string | null
         }
         Update: {
+          crawl_delay_seconds?: number
           created_at?: string
           created_by?: string | null
+          detection_config?: Json
+          detection_consecutive_empty?: number
+          detection_last_success_at?: string | null
+          detection_strategies?: string[]
           feed_url?: string | null
           follow_links?: boolean
           id?: string
@@ -3323,11 +3372,16 @@ export type Database = {
           last_error?: string | null
           last_scanned_at?: string | null
           last_status?: string | null
+          licence_notes?: string | null
           max_backfill_episodes?: number
+          max_candidates_per_run?: number
           max_episode_age_days?: number | null
           max_followed_links?: number
           name?: string
+          ocr_enabled?: boolean
+          ocr_page_limit?: number
           preferred_transcript_lang?: string
+          redistribution_default?: string
           relevance_threshold?: number
           sender_allowlist?: string[]
           site_url?: string | null
@@ -4103,6 +4157,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "podcast_episodes_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_watch_health"
+            referencedColumns: ["source_id"]
+          },
+          {
             foreignKeyName: "podcast_episodes_summary_approved_by_fkey"
             columns: ["summary_approved_by"]
             isOneToOne: false
@@ -4487,6 +4548,322 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_open_tasks"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_candidates: {
+        Row: {
+          attempts: number
+          content_length: number | null
+          content_type: string | null
+          created_at: string
+          discovery_method: string
+          etag: string | null
+          first_seen_at: string
+          http_status: number | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_modified: string | null
+          last_seen_at: string
+          published_at_hint: string | null
+          raw_url: string
+          report_id: string | null
+          skip_reason: string | null
+          source_id: string
+          status: string
+          title_hint: string | null
+          updated_at: string
+          url: string
+          url_hash: string
+        }
+        Insert: {
+          attempts?: number
+          content_length?: number | null
+          content_type?: string | null
+          created_at?: string
+          discovery_method: string
+          etag?: string | null
+          first_seen_at?: string
+          http_status?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_modified?: string | null
+          last_seen_at?: string
+          published_at_hint?: string | null
+          raw_url: string
+          report_id?: string | null
+          skip_reason?: string | null
+          source_id: string
+          status?: string
+          title_hint?: string | null
+          updated_at?: string
+          url: string
+          url_hash: string
+        }
+        Update: {
+          attempts?: number
+          content_length?: number | null
+          content_type?: string | null
+          created_at?: string
+          discovery_method?: string
+          etag?: string | null
+          first_seen_at?: string
+          http_status?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_modified?: string | null
+          last_seen_at?: string
+          published_at_hint?: string | null
+          raw_url?: string
+          report_id?: string | null
+          skip_reason?: string | null
+          source_id?: string
+          status?: string
+          title_hint?: string | null
+          updated_at?: string
+          url?: string
+          url_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_candidates_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_candidates_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "v_recent_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_candidates_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_candidates_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_watch_health"
+            referencedColumns: ["source_id"]
+          },
+        ]
+      }
+      report_segments: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          heading_path: string | null
+          id: string
+          page_number: number | null
+          report_id: string
+          segment_index: number
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          heading_path?: string | null
+          id?: string
+          page_number?: number | null
+          report_id: string
+          segment_index: number
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          heading_path?: string | null
+          id?: string
+          page_number?: number | null
+          report_id?: string
+          segment_index?: number
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_segments_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_segments_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "v_recent_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          body: string | null
+          candidate_id: string | null
+          canonical_url: string | null
+          content_hash: string
+          created_at: string
+          created_by: string | null
+          curator_note: string | null
+          extraction_method: string | null
+          extraction_metrics: Json
+          extraction_quality: string | null
+          file_format: string
+          file_name: string | null
+          file_size_bytes: number | null
+          id: string
+          licence_notes: string | null
+          news_item_id: string | null
+          ocr_used: boolean
+          page_count: number | null
+          published_at: string | null
+          published_at_source: string | null
+          publisher: string | null
+          redistribution: string
+          report_type: string
+          revision_of_report_id: string | null
+          source_id: string | null
+          source_url: string
+          status: string
+          storage_path: string | null
+          superseded_at: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          word_count: number | null
+        }
+        Insert: {
+          body?: string | null
+          candidate_id?: string | null
+          canonical_url?: string | null
+          content_hash: string
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          extraction_method?: string | null
+          extraction_metrics?: Json
+          extraction_quality?: string | null
+          file_format: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          licence_notes?: string | null
+          news_item_id?: string | null
+          ocr_used?: boolean
+          page_count?: number | null
+          published_at?: string | null
+          published_at_source?: string | null
+          publisher?: string | null
+          redistribution?: string
+          report_type?: string
+          revision_of_report_id?: string | null
+          source_id?: string | null
+          source_url: string
+          status?: string
+          storage_path?: string | null
+          superseded_at?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          word_count?: number | null
+        }
+        Update: {
+          body?: string | null
+          candidate_id?: string | null
+          canonical_url?: string | null
+          content_hash?: string
+          created_at?: string
+          created_by?: string | null
+          curator_note?: string | null
+          extraction_method?: string | null
+          extraction_metrics?: Json
+          extraction_quality?: string | null
+          file_format?: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          licence_notes?: string | null
+          news_item_id?: string | null
+          ocr_used?: boolean
+          page_count?: number | null
+          published_at?: string | null
+          published_at_source?: string | null
+          publisher?: string | null
+          redistribution?: string
+          report_type?: string
+          revision_of_report_id?: string | null
+          source_id?: string | null
+          source_url?: string
+          status?: string
+          storage_path?: string | null
+          superseded_at?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "report_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_news_item_id_fkey"
+            columns: ["news_item_id"]
+            isOneToOne: false
+            referencedRelation: "news_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_revision_of_report_id_fkey"
+            columns: ["revision_of_report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_revision_of_report_id_fkey"
+            columns: ["revision_of_report_id"]
+            isOneToOne: false
+            referencedRelation: "v_recent_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "news_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_watch_health"
+            referencedColumns: ["source_id"]
           },
         ]
       }
@@ -5708,6 +6085,80 @@ export type Database = {
         }
         Relationships: []
       }
+      v_recent_reports: {
+        Row: {
+          curator_note: string | null
+          days_since_published: number | null
+          extraction_quality: string | null
+          file_format: string | null
+          id: string | null
+          news_item_id: string | null
+          news_item_status: string | null
+          ocr_used: boolean | null
+          page_count: number | null
+          published_at: string | null
+          publisher: string | null
+          redistribution: string | null
+          relevance_score: number | null
+          report_type: string | null
+          source_name: string | null
+          source_url: string | null
+          status: string | null
+          title: string | null
+          word_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_news_item_id_fkey"
+            columns: ["news_item_id"]
+            isOneToOne: false
+            referencedRelation: "news_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_report_watch_health: {
+        Row: {
+          acquired_30d: number | null
+          candidates_30d: number | null
+          days_since_candidate: number | null
+          detection_consecutive_empty: number | null
+          detection_last_success_at: string | null
+          detection_strategies: string[] | null
+          failed_total: number | null
+          is_active: boolean | null
+          latest_report_published_at: string | null
+          name: string | null
+          source_id: string | null
+        }
+        Insert: {
+          acquired_30d?: never
+          candidates_30d?: never
+          days_since_candidate?: never
+          detection_consecutive_empty?: number | null
+          detection_last_success_at?: string | null
+          detection_strategies?: string[] | null
+          failed_total?: never
+          is_active?: boolean | null
+          latest_report_published_at?: never
+          name?: string | null
+          source_id?: string | null
+        }
+        Update: {
+          acquired_30d?: never
+          candidates_30d?: never
+          days_since_candidate?: never
+          detection_consecutive_empty?: number | null
+          detection_last_success_at?: string | null
+          detection_strategies?: string[] | null
+          failed_total?: never
+          is_active?: boolean | null
+          latest_report_published_at?: never
+          name?: string | null
+          source_id?: string | null
+        }
+        Relationships: []
+      }
       v_unresolved_capacity_gaps: {
         Row: {
           created_at: string | null
@@ -5773,6 +6224,23 @@ export type Database = {
           snippet_type: string
           social_account_id: string
           topic_tags: string[]
+        }[]
+      }
+      search_segments: {
+        Args: {
+          match_count?: number
+          query_embedding: string
+          source_types?: string[]
+        }
+        Returns: {
+          content: string
+          locator: string
+          parent_id: string
+          parent_title: string
+          redistribution: string
+          segment_id: string
+          similarity: number
+          source_type: string
         }[]
       }
       slugify: { Args: { txt: string }; Returns: string }
