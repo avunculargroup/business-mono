@@ -46,7 +46,19 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Apply migrations
-        run: supabase db push --yes
+        # --include-all applies local migrations whose timestamp sorts BEFORE the
+        # last one already on remote. Without it, `db push` aborts the whole run
+        # the moment two branches merge out of timestamp order — which is the
+        # normal case here, since a migration is dated when it is written, not
+        # when its PR lands. That abort is silent from the app's point of view:
+        # the merge succeeds, the deploy succeeds, and the schema simply never
+        # changes.
+        #
+        # This is not a licence to apply anything: every migration in this repo
+        # is written idempotently (IF NOT EXISTS / CREATE OR REPLACE /
+        # DROP ... IF EXISTS / ON CONFLICT DO NOTHING), so re-running or
+        # late-running one is a no-op rather than a rewrite.
+        run: supabase db push --include-all --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

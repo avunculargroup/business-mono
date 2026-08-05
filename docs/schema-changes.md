@@ -6,6 +6,36 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-08-03 — Fix: `db push` silently stopped applying migrations on 30 July
+
+`.github/workflows/migrate.yml` had been failing on every push to `main` since
+`20260730120000_realised_cap_bgeometrics_source` landed. Nothing merged after
+that date reached the database, and the failure was invisible from the app: the
+merge succeeded, Vercel and Railway deployed, and the schema just never changed.
+
+**Cause.** `20260730000000_add_news_item_image.sql` was merged *after*
+`20260730120000`, but is dated *before* it. `supabase db push` refuses to apply a
+local migration that sorts earlier than the last one on remote, and aborts the
+entire run rather than skipping it:
+
+> Found local migration files to be inserted before the last migration on remote
+> database. Rerun the command with --include-all flag to apply these migrations.
+
+This is the normal case in this repo, not an edge case — a migration is dated
+when it is written, not when its PR lands, so any two branches open at once can
+merge out of order.
+
+**Fix.** The push step now runs `supabase db push --include-all --yes`. Every
+migration here is written idempotently, so applying a straggler late is a no-op:
+`add_news_item_image` is a bare `ADD COLUMN IF NOT EXISTS`, and its column was
+already present in production (added out of band, which is why the ledger and the
+live schema disagreed).
+
+Worth knowing for next time: a green merge is **not** evidence a migration
+applied. `supabase migration list`, or the `list_migrations` MCP call, is.
+
+---
+
 ## 2026-08-03 — Report ingestion: report_watch sources, candidates, artefacts, segments
 
 Adds the fifth `news_sources` type. Report publishers are the one source shape
