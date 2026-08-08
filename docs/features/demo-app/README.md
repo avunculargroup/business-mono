@@ -28,6 +28,7 @@ it is.
 | `repository-contract.md` | The adapter contract — interfaces both apps implement | Session 1 |
 | `fixture-and-trace-schema.md` | Fixture shapes, narrative staging, agent trace format | Sessions 2 and 3 |
 | `assumptions.md` | What this bundle assumes, what must be verified first | Session 1, before any code |
+| `build-progress.md` | Review of this bundle against the live repo, and the revised plan that follows | **Everything — read before this file** |
 
 ---
 
