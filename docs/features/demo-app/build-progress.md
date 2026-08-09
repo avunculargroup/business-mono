@@ -4,7 +4,7 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** nothing built. Four decisions open (below) before Phase 0 starts.
+**Status:** nothing built. Decisions 1 and 3 settled; 2 and 4 open before Phase 0 starts.
 **Last updated:** 2026-08-08
 
 ---
@@ -24,18 +24,23 @@ This document records the verification pass. Checked against `schema.sql`, all 9
 
 ## Decisions open
 
-The plan below assumes the recommended option in each case. Each is cheap to change before its
-phase starts and expensive after.
+Each is cheap to change before its phase starts and expensive after.
 
-| # | Decision | Options | Assumed |
+| # | Decision | Options | Status |
 |---|---|---|---|
-| 1 | **Surfaces** — compliance and contracts do not exist | (a) re-pick from what is built; (b) build them as real features first; (c) build them demo-only | **(a)** |
-| 2 | **Seam scope** — 81 files import the Supabase client | (a) demo surfaces only (~10 pages); (b) all of `apps/web` (68 pages); (c) shared UI only, no data seam | **(a)** |
-| 3 | **Trace subject** — no Simon run and no compliance workflow exist | (a) newsletter workflow; (b) strategy or variant; (c) defer traces | **(a)** |
-| 4 | **Branding** — public URL under an AFSL Authorised Representative | (a) BTS-branded and indexed; (b) BTS-branded, noindex; (c) neutrally branded | **(a)** |
+| 1 | **Surfaces** — compliance and contracts do not exist | (a) re-pick from what is built; (b) build them as real features first; (c) build them demo-only | **Settled: (a)** |
+| 2 | **Seam scope** — 81 files import the Supabase client | (a) demo surfaces only (~10 pages); (b) all of `apps/web` (68 pages); (c) shared UI only, no data seam | Open — plan assumes (a) |
+| 3 | **Trace subject** — no Simon run and no compliance workflow exist | (a) newsletter workflow; (b) strategy or variant; (c) defer traces | **Settled: (b)** — strategy vs variant still to pick |
+| 4 | **Branding** — public URL under an AFSL Authorised Representative | (a) BTS-branded and indexed; (b) BTS-branded, noindex; (c) neutrally branded | Open — recommendation revised to (b) |
 
-Decision 1 is the consequential one. If compliance and contracts are genuine near-term roadmap
-items rather than aspirational specs, (b) is the better call and the plan reshapes around it.
+**Consequence of decision 3.** Choosing strategy or variant over the newsletter workflow trades the
+Signal-approval visual for the web gate path. [`demo-app-spec.md:196-198`](./demo-app-spec.md)
+wanted approval to arrive as an inbound Signal message, and that is no longer what the trace shows.
+The replacement story is arguably better for a technical evaluator: the web app cannot reach the
+agent server over HTTP, so `/campaigns` (or `/content`) writes a `pending_decision` column and a
+Supabase Realtime listener claims it atomically before resuming the suspended run. That is a real
+distributed-systems decision, visible in the trace, and it is the kind of thing a generic demo has
+no equivalent of.
 
 ---
 
@@ -295,10 +300,20 @@ cold and check the architecture is describable from them alone.
 - Recorder: a second `SpanOutputProcessor` registered next to `AgentActivitySpanProcessor` in
   `apps/agents/src/mastra/index.ts:103-120`, behind an env flag, off by default. Translate spans
   into the BTS-owned `TraceBundle`. **Do not copy the `VALID_AGENT_NAMES` filter** from
-  `agentActivityProcessor.ts:19`.
-- Record one newsletter run end to end: `retrieve` → `select_stories` → `gate1` suspend → Signal
-  approval → `research_enrich` → `draft_generation` → `editorial_review` → `gate2` → `persist`.
-  Redact during recording, never after
+  `agentActivityProcessor.ts:19` — it would drop `lex` spans, and the Lex compliance gate is part
+  of what the variant trace is for.
+- Record one run of the chosen workflow end to end, per decision 3:
+  - **strategy** (`apps/agents/src/workflows/strategy/index.ts`) — two gates, `gate1` at line 320
+    and `gate2` at line 392, resumed by `startStrategyGateWebListener` off `campaigns.pending_decision`
+    (`workflows/strategy/run.ts:88`). Richer: two suspend boundaries to study.
+  - **variant** (`apps/agents/src/workflows/variant/index.ts`) — one gate, `gate3` at lines 327-388,
+    resumed by `startVariantGateWebListener` off `content_items.pending_decision`
+    (`workflows/variant/run.ts:50-60`). Includes a `variant.compliance_check` step invoking Lex,
+    which carries the `compliance-as-alignment` principle inside the trace itself.
+- The `TraceStep` union in [`fixture-and-trace-schema.md:140-149`](./fixture-and-trace-schema.md)
+  assumes `channel: 'signal'` on `SuspendStep`. Widen it to `'signal' | 'web'` and render the web
+  path as the `pending_decision` write plus the Realtime claim, not as a chat message.
+- Redact during recording, never after
   ([`fixture-and-trace-schema.md:236-248`](./fixture-and-trace-schema.md)).
 - `packages/agent-traces` for the schema and recorded JSON, imported statically.
 - Replayer in `apps/demo` at `/agents/run/[traceId]`, driving the same components, with the
