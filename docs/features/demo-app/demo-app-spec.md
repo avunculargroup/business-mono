@@ -2,8 +2,8 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** `apps/demo`
-**Status:** Draft
-**Last updated:** 2026-08-07
+**Status:** Draft, reconciled against the live repo 2026-08-08
+**Last updated:** 2026-08-08
 
 ---
 
@@ -41,7 +41,7 @@ inference step.
 - Any Supabase dependency, including read-only anon access
 - Live agent inference, except the single gated path described below
 - Auth, accounts, or session state beyond client-side UI preferences
-- Mobile-first layout work — the demo inherits whatever `packages/ui` provides. Do not
+- Mobile-first layout work — the demo inherits whatever `@platform/ui` provides. Do not
   fix responsive behaviour here; fix it in the shared package or not at all.
 
 ---
@@ -49,21 +49,32 @@ inference step.
 ## Surfaces to include
 
 Include enough breadth to show the platform is a system, and enough depth in one area to
-show it is not a shell. The recommended split is four surfaces at demonstration depth and
-two at glance depth.
+show it is not a shell. Four surfaces at demonstration depth and three at glance depth.
+
+**This table was re-derived after verification.** The original named Compliance obligations
+and Contracts at Full depth; neither exists in the platform — no tables, no views, no
+routes, across 93 migrations. Per the rule in `assumptions.md` — do not fixture a feature
+that does not exist — they are dropped rather than built or faked.
 
 | Surface | Depth | What it demonstrates |
 |---|---|---|
-| Compliance obligations | Full | Urgency banding, severity, recurrence, the AR structure as a feature |
-| Contracts | Full | Notice-period logic surfacing a decision deadline rather than an expiry date |
-| Research feed | Full | Unified `news_items` surface across heterogeneous source types |
+| Market reports | Full | The materiality floor: findings computed deterministically, then narrated. Includes the quiet-day path |
+| Research feed | Full | Unified `news_items` surface across heterogeneous source types, with curator notes and rubric scoring |
 | Agent activity + approval | Full | Hub-and-spoke architecture, suspend/resume, full provenance |
-| CRM pipeline | Glance | That the CRM exists and the findings have somewhere to point |
-| Content pipeline | Glance | Publish gate, draft vs published embedding boundary |
+| Content pipeline | Full | Publish gate, draft vs published embedding boundary, Lex compliance verdicts |
+| Dashboard / indicators | Glance | Metric deltas rendered neutrally; that the platform has a live data layer |
+| Ecosystem signals | Glance | Change detection with compliance classification |
+| CRM | Glance | That the CRM exists and findings have somewhere to point |
+
+Market reports replaces Compliance as the lead surface and is a straight upgrade: it
+carries both `deterministic-before-llm` and `quiet-day-path`, the two principles the spec
+cared most about, and unlike Compliance it is real.
 
 Deliberately excluded: brand voice snippets and the voice profile system. It is the most
 BTS-specific surface, hardest to make legible to an outsider in seconds, and the fixtures
-would need to be entirely invented to avoid exposing actual positioning.
+would need to be entirely invented to avoid exposing actual positioning. Also excluded:
+podcasts, campaigns, decks, discovery, projects and tasks — all built, none load-bearing
+for the story, and each one added is fixture surface to maintain.
 
 ---
 
@@ -71,18 +82,21 @@ would need to be entirely invented to avoid exposing actual positioning.
 
 ```
 /                       Landing — what this is, who built it, entry points
-/compliance             Obligations list, urgency-banded
-/compliance/[id]        Obligation detail
-/contracts              Contract list with renewal decision deadlines
-/contracts/[id]         Contract detail, lifecycle timeline, variable values panel
-/research               Research feed, mixed source types
-/research/[id]          Item detail with segment provenance
-/agents                 Agent activity log
+/market-reports         Report list, materiality-banded
+/market-reports/[id]    Report detail, findings and narration boundary
+/news                   Research feed, mixed source types
+/news/[id]              Item detail with segment provenance and curator note
+/activity               Agent activity log
 /agents/run/[traceId]   Trace replay — the centrepiece
-/pipeline               CRM glance view
-/content                Content pipeline glance view
+/content                Content pipeline, draft vs published
+/signals                Ecosystem signals glance view
+/crm/companies          CRM glance view
 /architecture           Written architecture notes, linked from annotations
 ```
+
+Routes mirror `apps/web` wherever a surface exists there, so a component moved into
+`@platform/ui` needs no route-aware branching. `/agents/run/[traceId]` and `/architecture`
+are demo-only.
 
 `/agents/run/[traceId]` should be linked prominently from the landing page. Assume a
 recruiter clicks exactly one thing.
@@ -114,7 +128,7 @@ Interactive controls stay visible and enabled. Attempting a write throws
 toast:
 
 > This action is disabled in the demo. In the live platform this would write to
-> `compliance_obligations` and log to `agent_activity`.
+> `content_items` and log to `agent_activity`.
 
 The toast naming the actual table is doing real work — it tells an evaluator that the
 write path exists and what it touches. Disabled greyed-out buttons communicate nothing.
@@ -160,6 +174,10 @@ type PrincipleKey =
   | 'compliance-as-alignment';
 ```
 
+`PrincipleKey` is unchanged. Seven of the eight originally required annotations survived
+the surface re-pick; only the contracts notice-period one died, and it was the single
+annotation with no principle attached.
+
 ### Required annotations
 
 At minimum, one per principle. The following are non-negotiable because they are the
@@ -167,14 +185,14 @@ points where the architecture is least likely to be inferred correctly:
 
 | Route | Target | Principle | Point to make |
 |---|---|---|---|
-| `/compliance` | Urgency band on a 6-day item | `deterministic-before-llm` | The band is computed in a view, not decided by a model |
-| `/contracts` | Decision deadline column | — | Notice period makes the deadline earlier than the expiry; this is the whole reason the field exists |
-| `/research` | Any metric delta | `neutral-delta-colour` | No green-up/red-down. Treated as compliance-adjacent, not a style preference |
-| `/agents/run/[id]` | The suspend point | `hub-and-spoke` | Simon is the only human-facing agent; the others never speak to a person |
-| `/agents/run/[id]` | The payload handed to the narrator | `deterministic-before-llm` | Facts are committed first; the narrating agent cannot reference data outside this payload |
-| `/agents` | A quiet-day entry | `quiet-day-path` | The system says there is nothing material rather than manufacturing insight |
+| `/market-reports` | A quiet-day report | `quiet-day-path` | The system says there is nothing material rather than manufacturing insight |
+| `/market-reports/[id]` | The findings/narration boundary | `deterministic-before-llm` | Findings are computed and committed first; the narrating agent cannot reference data outside that payload |
+| `/news/[id]` | Curator note field | `curator-notes` | The human annotation explaining why something was saved is what separates this from generic retrieval |
+| `/news` | Rubric score on an item | `deterministic-before-llm` | The composite is arithmetic over scored dimensions, not a model's overall impression |
+| `/` | Any metric delta | `neutral-delta-colour` | No green-up/red-down. Treated as compliance-adjacent, not a style preference |
+| `/agents/run/[id]` | The suspend point | `hub-and-spoke` | Specialists never speak to a person; approval crosses a defined boundary |
 | `/content` | Draft vs published state | `publish-gate` | Drafts are never embedded; embeddings generate on publish |
-| `/research/[id]` | Curator note field | `curator-notes` | The human annotation explaining why something was saved is what separates this from generic retrieval |
+| `/content` | A Lex verdict | `compliance-as-alignment` | Compliance review is a gate in the pipeline, not a checkbox after the fact |
 
 Write these in plain declarative prose. No exclamation marks. An evaluator skimming eight
 annotations in ninety seconds should come away able to describe the architecture to
@@ -193,10 +211,20 @@ See `fixture-and-trace-schema.md` for the `TraceBundle` schema. Behaviour requir
   broken page.
 - Transport controls: play, pause, step forward, step back, restart, and a `2x` toggle.
   Step-back is what lets someone actually study the suspend boundary.
-- The human approval message appears as an inbound Signal-style message. Label the channel
-  explicitly — the fact that approval arrives over Signal rather than a web form is a
-  design decision worth making visible.
 - Deep-linkable step index in the URL hash so a specific moment can be shared.
+
+### The approval channel
+
+**Changed after verification.** The original specified that human approval appears as an
+inbound Signal-style message, on the grounds that approval arriving over Signal rather than
+a web form is a design decision worth making visible. That is true of the newsletter
+workflow, but the recorded run is the `variant` workflow, which is web-gated.
+
+Render the actual mechanism instead, and label it as deliberately: the agent server is not
+reachable over HTTP from the web app, so `/content` writes
+`content_items.pending_decision` and a Supabase Realtime listener claims it atomically
+before resuming the suspended run. Show the column write and the claim as distinct steps.
+This is a real distributed-systems decision and reads as one; a fake chat bubble would not.
 
 ### Gated live path (optional, ship last)
 
@@ -204,7 +232,7 @@ One hardcoded prompt against one agent, behind an IP-keyed rate limit of five ru
 day globally, with a server-side kill switch via environment variable. If the budget or
 the limit is exhausted, fall back silently to the recorded trace with a notice.
 
-Only build this if Sessions 1 to 3 are complete and stable. The recorded trace is the
+Only build this if every earlier phase is complete and stable. The recorded trace is the
 product; the live path is a flourish. An evaluator who hits a rate-limit error page has a
 worse experience than one who never knew the option existed.
 
@@ -234,13 +262,25 @@ reachable and carries BTS branding.
 ## Deployment
 
 - Separate Vercel project, root directory `apps/demo`, deployed from `main`.
-- Subdomain: `demo.btreasury.com.au`. Do not deploy under `hq.` — the hostname split is
-  part of the security story.
+- Subdomain: `demo.btreasury.com.au` — verified unclaimed. Do not deploy under `hq.`,
+  which already resolves to Vercel; the hostname split is part of the security story.
 - No environment variables containing secrets. If the demo project has a Supabase key set
   in Vercel, something has gone wrong; audit the project settings after first deploy.
-- `robots.txt` allows indexing. Being findable is the point.
-- Open Graph card with a screenshot of the annotated agent run view. The link will be
-  pasted into applications and messages; the preview does meaningful work.
+- Add `@platform/ui`, `@platform/data` and `@platform/data-fixtures` to the demo's
+  `transpilePackages` in `next.config.ts`. They ship raw TS/TSX and CSS Modules.
+- **`robots.txt` and a `noindex` meta tag disallow indexing.** This reverses the original
+  spec, which allowed indexing on the grounds that being findable is the point. Settled the
+  other way: passive search discovery is the least valuable channel for a link pasted into
+  applications, and disallowing it removes the failure mode with real teeth — a client or
+  counterparty searching for BTS and landing on fabricated client records under BTS
+  branding. Reasoning in `assumptions.md`.
+- Open Graph card with a screenshot of the annotated agent run view. This now matters
+  *more*, not less: with indexing off, link-pasting is the only distribution channel, so
+  the preview does all the work.
+
+**Before creating the project:** confirm whether the existing Vercel project builds from
+repo root or from `apps/web`. If the former, adding `apps/demo` changes what it builds.
+This is the one assumption that could not be resolved from the repository.
 
 ---
 
@@ -248,7 +288,8 @@ reachable and carries BTS branding.
 
 - The demo builds and runs with network access disabled
 - `apps/demo/package.json` has no Supabase, Mastra, or AI SDK dependency
-- A UI change made in `packages/ui` appears in both apps without further edits
+  (`@platform/shared` is safe — verified as a pure leaf with zero runtime dependencies)
+- A UI change made in `@platform/ui` appears in both apps without further edits
 - A recruiter can reach the agent replay in one click from the landing page
 - Someone with no context can describe "deterministic before LLM" after using it
 
@@ -256,11 +297,6 @@ reachable and carries BTS branding.
 
 ## Open questions
 
-- **Fixture drift.** When `apps/hq` adds a field, `@bts/data-fixtures` will fail to
-  compile until the fixture is updated. That is intended. The question is whether the
-  demo should be in the same CI gate as `hq` — blocking a real feature on fixture
-  maintenance may become annoying. Recommendation: same gate initially, revisit if it
-  bites more than twice.
 - **Trace freshness.** A recorded trace ages as the agent evolves. Consider a quarterly
   re-record, or accept staleness and date-stamp the trace in the UI. Date-stamping is
   cheaper and arguably more honest.
@@ -268,7 +304,11 @@ reachable and carries BTS branding.
   scale to anyone who views source. This is fine — it is a design system, not a secret —
   but worth a conscious decision rather than a default.
 - **Landing page copy authorship.** This is the one surface where the demo needs prose
-  that does not exist in the real app. Carri's register is the right fit; Charlie could
-  draft against the brand voice profile, but a portfolio piece speaking in the company's
-  voice about an individual's work is a slightly odd register. Consider writing it in
-  first person, plainly.
+  that does not exist in the real app. Charlie could draft against the brand voice profile,
+  but a portfolio piece speaking in the company's voice about an individual's work is a
+  slightly odd register. Recommend writing it in first person, plainly. The same tension
+  applies to fixture authoring — see the ownership note in `build-progress.md`.
+
+**Resolved since drafting:** fixture drift in CI now has an operational policy with a
+pre-agreed escape hatch (`build-progress.md`), sized against measured migration velocity
+rather than left as an open question.
