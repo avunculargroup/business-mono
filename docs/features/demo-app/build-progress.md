@@ -283,49 +283,129 @@ home in shipped code. Only the contracts notice-period annotation dies with cont
 Market reports is a straight upgrade on the dropped compliance surface: it carries the two
 principles the spec cared most about, and it is real.
 
-### Phase 0 — Reconcile the bundle (½ day, no code)
+### Critical path
+
+The demo is the deliverable; the seam is how it gets built. Phase 4 is by far the longest phase and
+most of it is invisible, so the ordering below is deliberate: **the demo only depends on verticals
+4.1–4.6.** Everything from 4.7 on is background work that must never block a later phase.
+
+```
+0 → 1 → 2 → 3 → 4.0 → 4.1‥4.6 → 5 → 6 → 7 → 8 → 9        ← critical path
+                       └ 4.7‥4.11 ─────────────────────→   ← background, non-blocking
+```
+
+**Kill criteria.** Check at the end of vertical 4.1 and again at 4.3. If 4.1 takes more than double
+its estimate, the full-seam assumption behind decision 2 is wrong for this codebase — stop and
+re-cut to demo surfaces only, which is decision 2 option (a) and costs nothing already spent. If the
+client app has not firmed up by the end of 4.6, revisit whether 4.7–4.11 are worth finishing at all;
+the demo does not need them.
+
+### Phase 0 — Reconcile the bundle and verify infra (½ day, no code)
 
 - Rewrite all five docs against the real repo: `apps/web`, `@platform/*`, real routes and tables.
 - Replace the surface table at [`demo-app-spec.md:55-63`](./demo-app-spec.md) and the staging table
   at [`fixture-and-trace-schema.md:47-62`](./fixture-and-trace-schema.md) with the re-picked set.
 - Correct [`README.md:102`](./README.md) and [`assumptions.md:70-76`](./assumptions.md) to the
-  newsletter workflow and the `SpanOutputProcessor` hook.
+  `variant` workflow and the `SpanOutputProcessor` hook.
+- Flip [`demo-app-spec.md:241`](./demo-app-spec.md) from "robots.txt allows indexing" to `noindex`,
+  per decision 4.
+- Reword [`assumptions.md:121-122`](./assumptions.md) from "client app out of scope entirely, and
+  should stay out" to a deferral naming the compliance question, per decision 2.
+- Widen `SuspendStep.channel` in [`fixture-and-trace-schema.md:140-149`](./fixture-and-trace-schema.md)
+  from `'signal'` to `'signal' | 'web'`.
 - Mark each verified assumption in [`assumptions.md`](./assumptions.md) resolved, with its answer.
-- Fix `.claude/skills/bts-design/SKILL.md:17` Inter → DM Sans. Record the three-way token drift as a
-  known issue; do not fix it here.
+- Fix `.claude/skills/bts-design/SKILL.md:17` Inter → DM Sans.
+- **Verify the two outstanding infra assumptions** ([`assumptions.md:78-85`](./assumptions.md)),
+  both five-minute checks that otherwise surface at first deploy: DNS control over
+  `demo.btreasury.com.au`, and whether the existing Vercel project builds from repo root or from
+  `apps/web` (adding a second app changes what it builds if the former).
 
 **Verify:** every path in the bundle resolves; every table and view named exists in
 `packages/db/src/types/database.ts`.
 
-### Phase 1 — `@platform/ui`, tokens only (1 day)
+### Phase 1 — Visual regression baselines (1 day)
+
+**Runs before any extraction.** Baselines must be captured from the current state, or they cannot
+prove the token and component moves in Phases 2–3 were inert. Capturing them afterwards proves
+nothing.
+
+Scope is deliberately far narrower than
+[`apps/web/docs/e2e-playwright-proposal.md`](../../../apps/web/docs/e2e-playwright-proposal.md),
+because this plan sidesteps that proposal's two hardest problems. Its §2 and §4 wrestle with "every
+page depends on Supabase data, so E2E needs a backend that answers", solved via `page.route` stubs
+mirroring Supabase's wire format plus hand-rolled auth-cookie injection. Neither is needed here:
+
+- **Now:** snapshot the 19 static specimen pages already in
+  `.claude/skills/bts-design/preview/*.html`. No auth, no server, no Supabase, no stubs.
+- **From Phase 5:** snapshot `apps/demo`, which is public and fixture-backed — the proposal's
+  backend problem does not exist there either.
+
+So `e2e/fixtures/auth.ts` and `e2e/fixtures/supabase.ts` — the two hardest files in the proposal —
+are never written.
+
+- Install `@playwright/test`. Chromium only. Pin viewport at 1280×800.
+- `visual.spec.ts` over the specimen pages, with `animations: 'disabled'`.
+- Baselines generated in the CI container image, never a laptop — per the proposal's §9, font and
+  antialiasing differences will otherwise diff on every run.
+- Separate `e2e.yml` workflow, **advisory not blocking**, per the proposal's §7. Keep it out of
+  `pnpm test` so the existing ~14s gate stays fast.
+
+This answers the proposal's §10 open questions for our purposes: primary goal is **visuals**, not
+journeys; **no** Option B local-Supabase stack; **advisory** CI posture; **Chromium only**;
+**primitives plus, later, the demo's seven surfaces**.
+
+**Verify:** suite green twice in a row in CI on an unchanged tree. A flaky baseline is worse than no
+baseline.
+
+### Phase 2 — `@platform/ui`, tokens (1 day)
 
 - Create `packages/ui` with `src/tokens.css` as the single source, moved from
   `apps/web/app/globals.css`. `globals.css` imports it and keeps only app-level resets.
+- **Point `.claude/skills/bts-design/colors_and_type.css` at the package** rather than leaving a
+  third copy. This resolves the three-way drift recorded in non-blocking correction 2; leaving it
+  deferred means every future UI task is calibrated off a stale file.
+- Repoint the specimen pages in `.claude/skills/bts-design/preview/` at the package so the Phase 1
+  baselines keep testing something real.
 - Add `@platform/ui` to `transpilePackages` in `apps/web/next.config.ts`, to `resolve.alias` in
   `apps/web/vitest.config.ts`, and to the `--dir` list in the `lint` script.
 
-**Verify:** `pnpm --filter @platform/web build` clean; walk `/`, `/news`, `/content`,
-`/market-reports`, `/activity` and confirm no visual change.
+**Verify:** Phase 1 visual suite green with **zero** diffs — that is the whole point of having taken
+baselines first. Then `pnpm --filter @platform/web build` clean, and walk `/`, `/news`, `/content`,
+`/market-reports`, `/activity`.
 
-### Phase 2 — `@platform/ui`, components (2–3 days)
+### Phase 3 — `@platform/ui`, components (2–3 days)
 
 - Move the 24 components in `apps/web/components/ui/` (each `X.tsx` + `X.module.css` + `X.test.tsx`)
   into `packages/ui/src/`. No Supabase coupling — this is the clean part.
 - Keep deep imports; add no barrel (the repo has none anywhere).
 - Give `packages/ui` its own `vitest.config.ts` mirroring `apps/web`'s node/jsdom project split.
 
-**Verify:** `pnpm test` and `pnpm typecheck` green at root. Walk the same five pages.
+**Verify:** visual suite green with zero diffs. `pnpm test` and `pnpm typecheck` green at root.
 
-### Phase 3 — `@platform/data`, full seam (4–6 weeks)
+### Phase 4 — `@platform/data`, full seam (4–6 weeks)
 
 Per decision 2, every page and server action in `apps/web` moves behind repository interfaces. Built
 as independent domain verticals so the app is shippable at every commit.
 
-#### 3.0 — Foundation (2–3 days)
+**Safety net.** Playwright is largely the *wrong* tool for this phase — the risk here is data
+wiring, not layout. A dropped filter, a wrong `.order()`, a broken pagination boundary: screenshots
+barely catch those. The net is the contract test suite below, plus per-vertical RSC tests using the
+existing `test/mocks/supabase.ts` pattern that `app/(app)/crm/companies/page.test.tsx` already
+establishes.
+
+**Rollback posture — a stated acceptance, not an omission.** There is no feature flag and no
+parallel-run. Reverting vertical 4.4 means reverting 4.5 and 4.6 on top of it. For a two-person team
+on an internal tool this is judged acceptable; the mitigation is that each vertical is small,
+independently verified, and committed before the next begins. If that stops being acceptable — say,
+once a client app has real users — the posture must change before, not during, the next vertical.
+
+#### 4.0 — Foundation (2–3 days)
 
 - `packages/data` — `context.ts` (`ReadContext`, `QueryOptions`, `Paginated`), `errors.ts`
   (`DemoWriteBlockedError`, `NotFoundError`), the per-domain interface convention, and the
   composable provider. Interfaces only, no implementations.
+- **Settle the scoping rule before 4.1** (see decision 2): scoping lives at bundle construction,
+  never in a method signature.
 - The contract test harness from [`repository-contract.md:350-358`](./repository-contract.md),
   written once and parameterised over an adapter, so each vertical adds its cases rather than its
   own harness.
@@ -333,62 +413,104 @@ as independent domain verticals so the app is shippable at every commit.
   call sites can omit it.
 - Mount the provider alongside `UserProvider` / `ToastProvider` in `apps/web/app/(app)/layout.tsx`.
   `UserProvider` types straight off `@platform/db` — flagged, not fixed.
-- Add `@platform/data` and `@platform/data-supabase` to `transpilePackages`, the vitest
-  `resolve.alias` map, and the lint `--dir` list.
+- Convert `lib/action.ts:getAuthedClient()` to hand back a repository bundle rather than a raw
+  client. Doing this first makes every subsequent vertical smaller.
+- Add the new packages to `transpilePackages`, the vitest `resolve.alias` map, and the lint `--dir`
+  list.
 
-#### 3.1 onwards — One vertical at a time
+#### 4.1 onwards — One vertical at a time
 
 Each vertical: define its interface, implement it in `data-supabase`, convert its pages and its
 server actions, rewrite its tests against a repository fake instead of the Supabase mock, verify,
-commit. Ordered so the demo surfaces land first — they unblock Phase 4, and the rest can proceed in
-parallel with fixture authoring.
+commit.
 
 | # | Vertical | Routes | Demo? |
 |---|---|---|---|
-| 3.1 | Agent activity + approvals | `/activity` | Yes — smallest, proves the pattern |
-| 3.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface |
-| 3.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
-| 3.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
-| 3.5 | Ecosystem signals | `/signals` | Yes |
-| 3.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
-| 3.7 | Discovery | `/discovery/*` | No |
-| 3.8 | Projects, tasks, files, docs | `/projects/*`, `/tasks/*`, `/files`, `/docs/*` | No |
-| 3.9 | Products, advisors | `/products/*`, `/advisors/*` | No |
-| 3.10 | Decks and slides | `/decks/*` | No |
-| 3.11 | Settings, routines, brand, simon | `/settings/*`, `/routines`, `/brand`, `/simon` | No |
+| 4.1 | Agent activity + approvals | `/activity` | Yes — smallest, proves the pattern |
+| 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface |
+| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
+| 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
+| 4.5 | Ecosystem signals | `/signals` | Yes |
+| 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
+| — | *critical path ends; below is background* | | |
+| 4.7 | Discovery | `/discovery/*` | No |
+| 4.8 | Projects, tasks, files, docs | `/projects/*`, `/tasks/*`, `/files`, `/docs/*` | No |
+| 4.9 | Products, advisors | `/products/*`, `/advisors/*` | No |
+| 4.10 | Decks and slides | `/decks/*` | No |
+| 4.11 | Settings, routines, brand, simon | `/settings/*`, `/routines`, `/brand`, `/simon` | No |
 
 **Watch items.** `app/actions/company.ts` has 21 `.from(` calls, `campaigns.ts` 17, `decks.ts` 15 —
-these three are the heavy ones and should not be first. `lib/action.ts:getAuthedClient()` is the
-existing wrapper every action goes through; it is the natural place to hand back a repository bundle
-instead of a raw client, and converting it early makes each subsequent vertical smaller.
-`hooks/useRealtimeSubscription.ts` is the one Supabase-coupled hook and needs a decision of its own —
-Realtime has no fixture equivalent, so the demo will need it to no-op.
+the heavy three, and none should be first. `hooks/useRealtimeSubscription.ts` is the one
+Supabase-coupled hook; Realtime has no fixture equivalent, so the demo will need it to no-op.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
-vertical's pages walked manually — types will not catch a wrong `.order()`. Commit before the next.
+vertical's pages walked manually. Commit before the next.
 
-**Verify at the end of Phase 3:** `grep -rl "createClient" apps/web/` returns only `middleware.ts`,
-the auth gate, and the provider wiring.
+**Verify at end of phase:** `grep -rl "createClient" apps/web/` returns only `middleware.ts`, the
+auth gate, and the provider wiring.
 
 **`apps/web` must be verified working and committed before `apps/demo` exists.**
 
-### Phase 4 — `apps/demo` and `@platform/data-fixtures` (4–5 days)
+### Phase 5 — `apps/demo` and `@platform/data-fixtures` (3 days)
+
+Scaffolding and plumbing only. The fixture *content* is Phase 6 — separating them is deliberate, see
+below.
 
 - Scaffold `apps/demo` (Next.js App Router). No `@supabase/*`, no `@mastra/*`, no AI SDK in its
   `package.json`, enforced by it simply not depending on `@platform/data-supabase`.
-- `packages/data-fixtures` implementing **only the seven demo domains** (verticals 3.1–3.6), mounted
+  `@platform/shared` is safe to import — verified as a pure leaf with zero runtime dependencies.
+- `packages/data-fixtures` implementing **only the seven demo domains** (verticals 4.1–4.6), mounted
   as a partial bundle per decision 2. Static typed objects, no runtime fetch, no filesystem reads.
   Writes throw `DemoWriteBlockedError(operation, table)`.
-- `useRealtimeSubscription` no-ops in the demo — there is no fixture equivalent of a live
-  subscription, and a silent no-op is more honest than a fake event stream.
-- Author fixtures per the revised staging table, keeping the offset-from-anchor rule verbatim.
-  Fictional-entity and no-allocation-figure rules apply in full.
+- `useRealtimeSubscription` no-ops in the demo — a silent no-op is more honest than a fake event
+  stream.
 - Demo chrome: disclosure banner, `Demo data` chip, write-blocked toast naming the real table.
+- Enough placeholder fixture rows to prove the wiring. Not the real set.
 
 **Verify:** `pnpm --filter @platform/demo build && start` with the network interface down. Contract
 suite green against both adapters. `grep -r "mode" apps/demo/` shows `mode` driving only chrome.
 
-### Phase 5 — Annotation layer (2–3 days)
+### Phase 6 — Fixture authoring (2–3 days, plus a Lex pass)
+
+**Its own phase because it is writing, not data entry**, and because burying it inside Phase 5
+guarantees it gets done in a last afternoon.
+[`fixture-and-trace-schema.md:43-45`](./fixture-and-trace-schema.md) names the failure mode exactly:
+"a plausible-but-flat dataset is the most common way a portfolio demo fails — everything works and
+nothing is interesting."
+
+The existing staging table at
+[`fixture-and-trace-schema.md:47-62`](./fixture-and-trace-schema.md) is **void** — every row of it
+was authored for compliance obligations and contracts, which decision 1 removed. It must be
+re-derived for the seven re-picked surfaces, which means answering design questions, not looking
+things up: what market report makes the quiet-day path legible in five seconds? What news item makes
+curator notes land without explanation?
+
+Roughly 60–100 rows across ten fixture files, plus transcript segments, plus a trace bundle that has
+to agree with all of it.
+
+Per-row obligations, none of which parallelise:
+
+- Every company and person name invented **and ASIC-searched** to confirm it does not resolve to a
+  real business ([`fixture-and-trace-schema.md:70-72`](./fixture-and-trace-schema.md))
+- Research items: invented titles and paraphrased one-liners only. Reproducing publisher content is
+  a copyright problem as well as a compliance one
+- No bitcoin allocation figure anywhere — [`demo-app-spec.md:222`](./demo-app-spec.md) calls this
+  the single highest-risk element of the build
+- Internal consistency across the whole set. A trace naming different fictional entities than the
+  lists "reads as sloppy and undermines the impression the demo exists to create"
+  ([`fixture-and-trace-schema.md:244-247`](./fixture-and-trace-schema.md))
+- Every date an offset from the anchor, never a literal
+
+**Ownership.** The typing is delegable; the narrative decisions are not. Deciding which fixtures
+make the architecture visible needs domain judgment and carries the compliance risk. Charlie can
+draft prose against brand voice, but [`demo-app-spec.md:270-274`](./demo-app-spec.md) already flags
+the register problem — a company voice describing an individual's work reads oddly. Chris sets the
+staging table; an agent fills it in afterwards.
+
+**Verify:** Lex classification pass over the full set, outcome logged to `agent_activity`
+([`demo-app-spec.md:227`](./demo-app-spec.md)). ASIC search recorded for every invented entity.
+
+### Phase 7 — Annotation layer (2–3 days)
 
 - Overlay per [`demo-app-spec.md:124-181`](./demo-app-spec.md): `data-annotation-id` targets,
   absolute positioning against a relative container, keyboard-navigable markers, Product view
@@ -396,38 +518,65 @@ suite green against both adapters. `grep -r "mode" apps/demo/` shows `mode` driv
 - Seven annotations (the eight required minus the contracts one), retargeted per the surface table.
   Plus `/architecture` prose.
 
-**Verify:** toggle on every demo route with no layout shift. Tab to every marker. Read all seven
-cold and check the architecture is describable from them alone.
+**Verify:** toggle on every demo route with no layout shift. Tab to every marker. `jsx-a11y` clean.
+Read all seven cold and check the architecture is describable from them alone.
 
-### Phase 6 — Trace recorder and replay (4–5 days)
+### Phase 8 — Trace recorder and replay (4–5 days)
 
 - `pnpm install` first, then read `node_modules/@mastra/core/dist/docs/` for the 1.54.0 surface.
 - Recorder: a second `SpanOutputProcessor` registered next to `AgentActivitySpanProcessor` in
   `apps/agents/src/mastra/index.ts:103-120`, behind an env flag, off by default. Translate spans
   into the BTS-owned `TraceBundle`. **Do not copy the `VALID_AGENT_NAMES` filter** from
-  `agentActivityProcessor.ts:19` — it would drop `lex` spans, and the Lex compliance gate is part
-  of what the variant trace is for.
+  `agentActivityProcessor.ts:19` — it would drop `lex` spans, and the Lex gate is part of what this
+  trace is for.
+- **Record against a seeded synthetic campaign, not production data.** The recorder is new code and
+  redaction is its first live exercise; recording a real run means real client data passes through
+  it before redaction. Seeding a synthetic campaign costs an hour and means real data is never in
+  scope at all. Redaction stays in the pipeline regardless — belt and braces, per
+  [`fixture-and-trace-schema.md:236-248`](./fixture-and-trace-schema.md).
 - Record one `variant` run end to end (`apps/agents/src/workflows/variant/index.ts`): the
   `variant.generate_copy` step, the `variant.compliance_check` step invoking Lex, then the `gate3`
   suspend at lines 327-388, resumed by `startVariantGateWebListener` off
   `content_items.pending_decision` (`workflows/variant/run.ts:50-60`), through to the
   `agent_activity` write at lines 116 and 126.
-- The Lex step is the reason this workflow was chosen — render its verdict as a first-class trace
-  step, not a tool call. `agents/compliance/index.ts:121` (`verdictToActivity`) writes
-  `status: 'pending'` on a fail and `'auto'` on a pass, with a `suggested_rewrite` proposed action;
-  that branch is worth showing.
-- The `TraceStep` union in [`fixture-and-trace-schema.md:140-149`](./fixture-and-trace-schema.md)
-  assumes `channel: 'signal'` on `SuspendStep`. Widen it to `'signal' | 'web'` and render the web
-  path as the `pending_decision` write plus the Realtime claim, not as a chat message.
-- Redact during recording, never after
-  ([`fixture-and-trace-schema.md:236-248`](./fixture-and-trace-schema.md)).
+- Render Lex's verdict as a first-class trace step, not a tool call. `agents/compliance/index.ts:121`
+  (`verdictToActivity`) writes `status: 'pending'` on a fail and `'auto'` on a pass, with a
+  `suggested_rewrite` proposed action; that branch is worth showing.
 - `packages/agent-traces` for the schema and recorded JSON, imported statically.
 - Replayer in `apps/demo` at `/agents/run/[traceId]`, driving the same components, with the
   transport controls and compression function from
   [`fixture-and-trace-schema.md:252-258`](./fixture-and-trace-schema.md).
 
-**Verify:** replay with the network down. Step back across both gate boundaries. Confirm no API key
-in the demo's Vercel env. Confirm the recorder is disabled by default in `apps/agents`.
+**Verify:** replay with the network down. Step back across the gate boundary. Confirm no API key in
+the demo's Vercel env. Confirm the recorder is disabled by default in `apps/agents`.
+
+### Phase 9 — Demo E2E (1 day)
+
+- Extend the Phase 1 Playwright suite to `apps/demo`: snapshot the seven surfaces, walk the
+  annotation toggle, walk the trace replay transport. No auth, no backend, no stubs — the fixture
+  adapter makes this the easy case.
+- Promote the demo specs from advisory to blocking once baselines have settled. The demo is a public
+  artefact; a silent visual break there is worse than a red build.
+
+### Fixture drift policy
+
+Not a philosophical question — a weekly operational one. Measured: **25 migrations in the three
+weeks to 2026-08-03**, many hitting demo-surface tables directly (`add_content_feedback`,
+`add_market_report_feedback`, `add_news_item_image`, `add_podcast_collections`,
+`add_findings_engine`, `add_ecosystem_signals`). CI runs `pnpm typecheck` workspace-wide, so a
+migration PR touching a demo surface will go red on fixture compile roughly every week.
+
+**Policy:** start in the shared gate, per [`demo-app-spec.md:262`](./demo-app-spec.md). The compile
+failure is the drift alarm and it is doing its job. Fixture updates are expected to be one-line
+additions; keep the fixture set narrow so they stay that way.
+
+**Escape hatch, defined in advance so it is not litigated mid-PR:** if fixing fixtures blocks an
+unrelated PR by more than ~15 minutes on three separate occasions, move `@platform/demo` and
+`@platform/data-fixtures` typecheck out of the PR gate into the nightly `e2e.yml` workflow. Drift is
+then caught within a day instead of instantly, which is the right trade once the alarm has proven
+noisy. Do **not** reach for `Partial<>` fixture types
+([`assumptions.md:98-102`](./assumptions.md)) — that trades the alarm away permanently for a
+convenience that a nightly job provides without loss.
 
 ### Deferred deliberately
 
@@ -436,8 +585,9 @@ in the demo's Vercel env. Confirm the recorder is disabled by default in `apps/a
 - The sidebar responsive collapse ([`assumptions.md:111-117`](./assumptions.md)). A real gap —
   recruiters do open links on phones — but it is `apps/web` work that should be justified on its own
   merits, not smuggled in.
-- The three-way token drift between `globals.css`, `DESIGN_BRIEF.md` and the skill's
-  `colors_and_type.css`. Documented in Phase 0, fixed separately.
+- Playwright journey tests, Option B local-Supabase, and cross-browser coverage from
+  [`apps/web/docs/e2e-playwright-proposal.md`](../../../apps/web/docs/e2e-playwright-proposal.md).
+  Phase 1 takes the visual-regression subset only.
 
 ---
 
@@ -445,23 +595,29 @@ in the demo's Vercel env. Confirm the recorder is disabled by default in `apps/a
 
 1. `pnpm install && pnpm typecheck && pnpm lint && pnpm test` green at root — the PR gate in
    `.github/workflows/test.yml`.
-2. Contract suite in `packages/data` passes against both adapters.
-3. `apps/web` walked manually across all refactored pages — types do not catch query-shape bugs.
-4. `apps/demo` builds and runs with the network disabled.
-5. `grep -r "@supabase\|@mastra" apps/demo/package.json` returns nothing.
-6. A token change in `packages/ui/src/tokens.css` appears in both apps with no further edits.
-7. Fixture set reviewed against Lex's classification rules before deploy, outcome logged to
-   `agent_activity` ([`demo-app-spec.md:227`](./demo-app-spec.md)).
-8. Someone with no context reads the demo cold and can describe "deterministic before LLM".
+2. `e2e.yml` visual suite green with zero unexplained diffs.
+3. Contract suite in `packages/data` passes against both adapters.
+4. `apps/web` walked manually across all refactored pages — types do not catch query-shape bugs.
+5. `apps/demo` builds and runs with the network disabled.
+6. `grep -r "@supabase\|@mastra" apps/demo/package.json` returns nothing.
+7. A token change in `packages/ui/src/tokens.css` appears in both apps **and** the design skill with
+   no further edits.
+8. Fixture set reviewed against Lex's classification rules, outcome logged to `agent_activity`.
+9. `demo.btreasury.com.au` serves `noindex`; no secrets in the demo's Vercel env.
+10. Someone with no context reads the demo cold and can describe "deterministic before LLM".
 
 ## Risk register
 
 | Risk | Mitigation |
 |---|---|
-| Phase 3 regresses working `apps/web` pages | One vertical at a time, each walked manually and committed before the next; the app is shippable at every commit |
-| Phase 3 stalls half-migrated | Vertical ordering puts demo surfaces first, so Phase 4 unblocks even if 3.7–3.11 slip; a partly-converted app is inconsistent but not broken |
-| ~40 tests rewritten from Supabase mocks to repository fakes | Budget it explicitly per vertical rather than discovering it late; the repository fake is a much smaller surface than `test/mocks/supabase.ts` |
-| Fixture drift blocks unrelated PRs | Accepted initially per [`demo-app-spec.md:259-263`](./demo-app-spec.md); revisit if it bites twice |
-| Mastra upgrade breaks the recorder | Schema is BTS-owned; only the recorder needs updating, and the recorded bundle keeps working |
-| A fixture entity resolves to a real business | ASIC search each name before committing |
+| Phase 4 regresses working `apps/web` pages | One vertical at a time, each walked manually and committed before the next; contract suite plus per-vertical RSC tests; app shippable at every commit |
+| Phase 4 stalls half-migrated | Critical path stops at 4.6, so Phase 5 unblocks even if 4.7–4.11 slip; kill criteria at 4.1 and 4.3 |
+| Seam ROI depends on a client app that may not happen | Kill criterion at 4.6 — if the client app has not firmed up, stop after the demo surfaces and skip 4.7–4.11 entirely |
+| ~40 tests rewritten from Supabase mocks to repository fakes | Budgeted per vertical rather than discovered late; the repository fake is a far smaller surface than `test/mocks/supabase.ts` |
+| Token or component extraction changes rendering silently | Phase 1 baselines captured **before** any extraction; zero-diff is the pass condition for Phases 2 and 3 |
+| Fixture drift blocks unrelated PRs weekly | Stated policy above, with a pre-agreed escape hatch to a nightly job |
+| Flat fixtures make a working demo that demonstrates nothing | Fixture authoring is its own phase with its own budget and a named owner |
+| Recorder exposes real client data | Record a seeded synthetic campaign; redaction stays in-pipeline as a second layer |
+| No per-vertical rollback | Stated acceptance for a two-person internal tool; must be revisited before a client app has real users |
+| A fixture entity resolves to a real business | ASIC search every invented name before committing |
 | Trace ages | Date-stamp it in the UI and accept the drift |
