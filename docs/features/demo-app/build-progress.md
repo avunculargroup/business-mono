@@ -4,8 +4,9 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** Phase 0 complete. All four decisions settled, all eight assumptions resolved.
-Phase 1 (visual regression baselines) is next.
+**Status:** Phases 0 and 1 complete — Phase 1 pending a one-time baseline bootstrap that needs
+Docker. All four decisions settled, all eight assumptions resolved. Phase 2 (`@platform/ui` tokens)
+is next.
 **Last updated:** 2026-08-08
 
 ---
@@ -234,10 +235,13 @@ and gating everything ([`README.md:75`](./README.md)).
 2. **The token source claim is wrong.** [`README.md:62-63`](./README.md) names
    `.claude/skills/bts-design/` as canonical. The implementation source of truth is
    `apps/web/app/globals.css` (74 custom properties, header comment cites `docs/DESIGN_BRIEF.md`).
-   The skill's `colors_and_type.css` is a third copy, already drifted: it defines
-   `--color-agent-pending` which globals lacks; globals defines `--color-warning-subtle`,
-   `--color-surface-active`, `--tap-highlight`, `--press-scale`, `--sidebar-collapsed-width` and
-   others which it lacks. Three copies, two drifts, plus the font typo.
+   The skill's `colors_and_type.css` is a third copy, already drifted. Exact figures,
+   computed in Phase 1 and now enforced by `apps/web/app/globals.test.ts`: 6 tokens in globals
+   are missing from the skill (`--color-accent-glow`, `--color-surface-active`,
+   `--color-warning-subtle`, `--press-scale`, `--safe-area-bottom`, `--tap-highlight`), 1 exists
+   only in the skill (`--color-agent-pending`), and all 3 font tokens differ in their fallback
+   chains while agreeing on the primary family. Three copies, drift in both directions, plus the
+   font typo.
 3. **`ReadContext.asOf` has an asymmetric cost.** It buys the demo stale-proof fixtures and buys
    `apps/web` nothing, while adding a parameter to every call site. Keep it, but default it in the
    Supabase adapter so `apps/web` call sites can omit it.
@@ -349,16 +353,62 @@ mirroring Supabase's wire format plus hand-rolled auth-cookie injection. Neither
 So `e2e/fixtures/auth.ts` and `e2e/fixtures/supabase.ts` — the two hardest files in the proposal —
 are never written.
 
-- Install `@playwright/test`. Chromium only. Pin viewport at 1280×800.
-- `visual.spec.ts` over the specimen pages, with `animations: 'disabled'`.
-- Baselines generated in the CI container image, never a laptop — per the proposal's §9, font and
-  antialiasing differences will otherwise diff on every run.
-- Separate `e2e.yml` workflow, **advisory not blocking**, per the proposal's §7. Keep it out of
-  `pnpm test` so the existing ~14s gate stays fast.
-
 This answers the proposal's §10 open questions for our purposes: primary goal is **visuals**, not
 journeys; **no** Option B local-Supabase stack; **advisory** CI posture; **Chromium only**;
 **primitives plus, later, the demo's seven surfaces**.
+
+#### What shipped, and how it differs from the above
+
+The phase split in two once it met the code. Token drift turns out to be a **static text
+property** — it needs no browser at all — so forcing it through Playwright would have put the
+precise check in the slow, flaky, advisory lane. The split:
+
+**1. `apps/web/app/globals.test.ts` — token guard, Vitest, in the blocking gate.**
+Parses the `:root` blocks of `globals.css` and the skill's `colors_and_type.css` and asserts a
+hand-maintained canonical map of all 74 tokens, plus the exact drift between the two sources.
+Runs in ~20ms inside the existing `pnpm test`. This — not the screenshots — is the real safety net
+for Phase 2.
+
+Vitest's own file snapshots are *not* used: they are unused elsewhere in this repo and hit a
+`SnapshotClient` error under the `test.projects` split in `vitest.config.ts`. The config was left
+alone rather than restructured for one file, and an explicit literal is better here anyway — a
+74-entry `.snap` blob is not something anyone reviews carefully, whereas a changed hex shows up in
+a diff as a changed hex.
+
+*Drift figures corrected while writing it.* The earlier estimate in non-blocking correction 2 was
+taken from an exploration summary rather than computed, and was wrong. Verified: 6 tokens in
+globals are missing from the skill, 1 exists only in the skill, and all 3 font tokens differ in
+their fallback chains while agreeing on primary family.
+
+**2. `e2e/design-system.spec.ts` — screenshots, Playwright, advisory.**
+Root-level `playwright.config.ts` and `e2e/`, not `apps/web/e2e/` as the proposal suggested — this
+suite never tests `apps/web`, only the static specimens now and `apps/demo` from Phase 5.
+`@playwright/test` is a root devDependency; `pnpm test:visual` is separate from `pnpm test`.
+
+Google Fonts requests are **blocked** in the spec. Left alone, each test spent ~13s fetching
+webfonts — two minutes for the file — and the suite depended on a third-party CDN being up.
+Blocking takes it to 8.8s total and makes it hermetic. The cost is that type specimens render in
+the fallback stack, so this suite does not prove the webfonts load; that is the right trade, since
+the font decision is asserted exactly in the token guard and what these screenshots cover is
+layout, spacing, colour and cascade. It also matches the demo's own constraint of working with the
+network disabled.
+
+Coverage caveat worth knowing: 14 of the 18 specimens are fully `var()`-driven, but the four colour
+swatch cards hardcode their chip fills as hex and only *label* them with the token name. Those
+chips will not catch a changed token — their surrounding chrome will, and the token guard covers
+the values exactly.
+
+**Baselines are not yet committed.** They must be generated in the CI container image, and the
+sandbox this was built in has no Docker daemon and a mismatched Chromium build. Bootstrap with
+`pnpm test:visual:update` (which shells out to `mcr.microsoft.com/playwright:v1.62.1-noble`), then
+commit `e2e/**-snapshots/`. Until that happens the `e2e.yml` workflow will report red — it is
+advisory and blocks nothing, but it is not meaningful until bootstrapped. Alternatively run the
+workflow manually with `update_baselines: true` and commit the artifact it uploads.
+
+**Status: complete, pending baseline bootstrap.** Token guard green in the blocking gate
+(`pnpm test`: 73 files, 502 tests). Screenshot specs verified working locally — 19 passed in 8.8s —
+against a browser override, but those images were discarded rather than committed because they
+would diff against CI.
 
 **Verify:** suite green twice in a row in CI on an unchanged tree. A flaky baseline is worse than no
 baseline.

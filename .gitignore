@@ -12,6 +12,12 @@ build/
 # Test coverage
 coverage/
 
+# Playwright run artefacts. Note that e2e/**-snapshots/ is NOT ignored —
+# the screenshot baselines are the committed contract.
+test-results/
+playwright-report/
+blob-report/
+
 # Environment
 .env
 .env.local

@@ -8,6 +8,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:visual": "playwright test",
+    "test:visual:update": "docker run --rm -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test --update-snapshots",
+    "test:visual:update:local": "playwright test --update-snapshots",
     "db:generate-types": "pnpm --filter @platform/db generate-types",
     "db:migrate": "pnpm --filter @platform/db db:migrate",
     "db:diff": "pnpm --filter @platform/db db:diff",
@@ -15,6 +18,7 @@
     "db:reset": "pnpm --filter @platform/db db:reset"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "turbo": "^2",
     "typescript": "^5.5"
   },

@@ -58,10 +58,19 @@ the seam is now built as eleven domain verticals rather than one session.
 
 Canonical source is **`apps/web/app/globals.css`** (74 custom properties), not
 `.claude/skills/bts-design/`. The skill's `colors_and_type.css` is a *third* copy — with
-`docs/DESIGN_BRIEF.md` as the second — and had already drifted: it defines
-`--color-agent-pending` which globals lacks, while globals defines `--color-warning-subtle`,
-`--color-surface-active`, `--tap-highlight`, `--press-scale` and `--sidebar-collapsed-width`
-which it lacks.
+`docs/DESIGN_BRIEF.md` as the second — and had already drifted.
+
+Exact drift, computed rather than eyeballed (and now enforced by
+`apps/web/app/globals.test.ts`):
+
+- **In globals, missing from the skill (6):** `--color-accent-glow`,
+  `--color-surface-active`, `--color-warning-subtle`, `--press-scale`,
+  `--safe-area-bottom`, `--tap-highlight` — mostly newer interaction tokens.
+- **In the skill, missing from globals (1):** `--color-agent-pending`.
+- **Differing values (3):** all three font tokens, in their fallback chains only. The
+  skill carries longer stacks (`'DM Sans', system-ui, -apple-system, 'Segoe UI',
+  sans-serif` against globals' `'DM Sans', system-ui, sans-serif`). Primary families
+  match, so this is cosmetic — the fallback renders only if the webfont fails.
 
 **No Tailwind anywhere.** No `tailwind.config.*`, no PostCSS. Styling is CSS Modules (128
 of them) plus CSS custom properties. Fonts load via a raw `<link>` in `app/layout.tsx`, not
