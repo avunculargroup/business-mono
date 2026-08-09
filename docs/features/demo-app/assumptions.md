@@ -2,7 +2,7 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** `apps/demo`
-**Status:** Verified against the live repo 2026-08-08. All eight resolved.
+**Status:** Verified against the live repo 2026-08-08. All eight resolved, none outstanding.
 **Last updated:** 2026-08-08
 
 ---
@@ -114,12 +114,19 @@ is a second `SpanOutputProcessor`; no workflow instrumentation is needed. Pinned
 One trap: that processor hardcodes `VALID_AGENT_NAMES` at line 19 and silently drops spans
 for `lex`, `editor`, `marketAnalyst` and `newsVerifier`. Do not copy the filter.
 
-**7. Vercel project configuration.** ⚠️ Unresolvable from the repo — **still needs a human.**
+**7. Vercel project configuration.** ✅ Confirmed from the dashboard — **Root Directory is
+`apps/web`.**
 
-There is no `vercel.json` anywhere; deploy config lives in the Vercel dashboard. Check
-before creating the second project whether the existing one builds from repo root or from
-`apps/web`; if the former, adding `apps/demo` changes what it builds.
+The risk this assumption raised does not apply: because the existing project is already
+scoped to `apps/web`, adding `apps/demo` cannot change what it builds.
 
+Two things follow by inference, since `apps/web` deploys successfully today with that root:
+"Include source files outside of the Root Directory" is already enabled (a pnpm-workspace
+app cannot build without `packages/*`), and the build command already handles compiling
+workspace dependencies. **The demo project should mirror that configuration rather than
+invent one.** Recommended settings are in `demo-app-spec.md` → Deployment.
+
+There is still no `vercel.json` anywhere; config lives in the dashboard.
 `apps/web/next.config.ts` carries only
 `transpilePackages: ['@platform/db', '@platform/shared']` — the load-bearing line every new
 package must join.

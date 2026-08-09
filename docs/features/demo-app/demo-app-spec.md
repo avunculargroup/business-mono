@@ -261,13 +261,30 @@ reachable and carries BTS branding.
 
 ## Deployment
 
-- Separate Vercel project, root directory `apps/demo`, deployed from `main`.
+A separate Vercel project, deployed from `main`. The existing project's Root Directory is
+confirmed as `apps/web`, so adding a second app cannot change what it builds.
+
+### Project settings
+
+| Setting | Value | Why |
+|---|---|---|
+| Root Directory | `apps/demo` | Mirrors `apps/web`. Makes cross-app build interference structurally impossible rather than merely unlikely |
+| Include source files outside Root Directory | On | A pnpm-workspace app cannot build without `packages/*`. Already on for `apps/web` by inference — it deploys successfully |
+| Build Command | `cd ../.. && pnpm turbo run build --filter=@platform/demo` | `@platform/db` and `@platform/shared` resolve to `dist/`, so they must compile first. `turbo.json` already declares `build: dependsOn: ["^build"]` — this just invokes it. Mirror whatever `apps/web` uses rather than inventing a second pattern |
+| Ignored Build Step | `npx turbo-ignore @platform/demo` | Skips the build when neither the app nor its dependencies changed. Without it every push to `main` rebuilds both projects; with it, an `apps/agents`-only change builds neither and a `@platform/ui` change correctly builds both |
+| Node version | 22 | Matches `.github/workflows/test.yml`. A mismatch means CI green and Vercel red |
+| Environment variables | **None at all** | Not an empty Supabase key — no entries. Then the "no Supabase dependency" claim is enforced by the platform, and the audit below is a glance rather than a review |
+
+Enable **Turborepo Remote Caching** across both projects (`vercel link` + `turbo login`,
+free on Vercel). Once `@platform/ui` and `@platform/data` are shared, the projects compile
+the same packages; remote cache means the second downloads that work instead of repeating
+it. This gets more valuable if a client app becomes a third consumer.
+
+### Domain and indexing
+
 - Subdomain: `demo.btreasury.com.au` — verified unclaimed. Do not deploy under `hq.`,
-  which already resolves to Vercel; the hostname split is part of the security story.
-- No environment variables containing secrets. If the demo project has a Supabase key set
-  in Vercel, something has gone wrong; audit the project settings after first deploy.
-- Add `@platform/ui`, `@platform/data` and `@platform/data-fixtures` to the demo's
-  `transpilePackages` in `next.config.ts`. They ship raw TS/TSX and CSS Modules.
+  which already resolves to Vercel; the hostname split is part of the security story, and
+  separate projects are what make it real rather than asserted.
 - **`robots.txt` and a `noindex` meta tag disallow indexing.** This reverses the original
   spec, which allowed indexing on the grounds that being findable is the point. Settled the
   other way: passive search discovery is the least valuable channel for a link pasted into
@@ -278,9 +295,20 @@ reachable and carries BTS branding.
   *more*, not less: with indexing off, link-pasting is the only distribution channel, so
   the preview does all the work.
 
-**Before creating the project:** confirm whether the existing Vercel project builds from
-repo root or from `apps/web`. If the former, adding `apps/demo` changes what it builds.
-This is the one assumption that could not be resolved from the repository.
+### Code-side
+
+- Add `@platform/ui`, `@platform/data` and `@platform/data-fixtures` to the demo's
+  `transpilePackages` in `next.config.ts`. They ship raw TS/TSX and CSS Modules.
+- Audit the project's environment variables after first deploy. If a Supabase key is set,
+  something has gone wrong.
+
+### Unrelated but adjacent
+
+While in the Vercel settings, consider **Deployment Protection on the `apps/web` project**.
+Preview deployments get public URLs by default, which for an internal tool holding real CRM
+data is a larger exposure than this demo will ever be. Vercel Authentication on previews
+closes it. Out of scope for this build; noted because the settings visit is already
+happening.
 
 ---
 

@@ -4,7 +4,8 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** nothing built. All four decisions settled. Ready to start Phase 0.
+**Status:** Phase 0 complete. All four decisions settled, all eight assumptions resolved.
+Phase 1 (visual regression baselines) is next.
 **Last updated:** 2026-08-08
 
 ---
@@ -315,13 +316,18 @@ the demo does not need them.
   from `'signal'` to `'signal' | 'web'`.
 - Mark each verified assumption in [`assumptions.md`](./assumptions.md) resolved, with its answer.
 - Fix `.claude/skills/bts-design/SKILL.md:17` Inter → DM Sans.
-- **Verify the two outstanding infra assumptions** ([`assumptions.md:78-85`](./assumptions.md)),
-  both five-minute checks that otherwise surface at first deploy: DNS control over
-  `demo.btreasury.com.au`, and whether the existing Vercel project builds from repo root or from
-  `apps/web` (adding a second app changes what it builds if the former).
+- **Verify the two outstanding infra assumptions** — both now closed. `demo.btreasury.com.au` is
+  unclaimed (NXDOMAIN) and `hq.btreasury.com.au` already resolves to Vercel, so the hostname split
+  the spec relies on is real. The existing Vercel project's Root Directory is `apps/web`, so adding
+  `apps/demo` cannot change what it builds. Recommended demo project settings are recorded in
+  [`demo-app-spec.md`](./demo-app-spec.md) → Deployment.
 
 **Verify:** every path in the bundle resolves; every table and view named exists in
 `packages/db/src/types/database.ts`.
+
+**Status: complete.** All five docs reconciled, all eight assumptions resolved, the DM Sans typo
+fixed at source, and no stale `apps/hq` or `@bts/*` references remain outside the resolution
+records.
 
 ### Phase 1 — Visual regression baselines (1 day)
 
