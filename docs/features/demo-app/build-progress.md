@@ -4,7 +4,7 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** nothing built. Decisions 1 and 3 settled; 2 and 4 open before Phase 0 starts.
+**Status:** nothing built. All four decisions settled. Ready to start Phase 0.
 **Last updated:** 2026-08-08
 
 ---
@@ -22,25 +22,56 @@ This document records the verification pass. Checked against `schema.sql`, all 9
 
 ---
 
-## Decisions open
+## Decisions
 
-Each is cheap to change before its phase starts and expensive after.
+| # | Decision | Settled |
+|---|---|---|
+| 1 | **Surfaces** — compliance and contracts do not exist | **Re-pick from what is built.** They are neither built for real nor fixtured. |
+| 2 | **Seam scope** — 81 files import the Supabase client | **Full seam across all of `apps/web`** (68 pages, 42 action files), not just demo surfaces. |
+| 3 | **Trace subject** — no Simon run and no compliance workflow exist | **The `variant` workflow.** |
+| 4 | **Branding** — public URL under an AFSL Authorised Representative | **BTS-branded, `noindex`.** Keeps the domain specificity, drops passive search discovery. |
 
-| # | Decision | Options | Status |
-|---|---|---|---|
-| 1 | **Surfaces** — compliance and contracts do not exist | (a) re-pick from what is built; (b) build them as real features first; (c) build them demo-only | **Settled: (a)** |
-| 2 | **Seam scope** — 81 files import the Supabase client | (a) demo surfaces only (~10 pages); (b) all of `apps/web` (68 pages); (c) shared UI only, no data seam | Open — plan assumes (a) |
-| 3 | **Trace subject** — no Simon run and no compliance workflow exist | (a) newsletter workflow; (b) strategy or variant; (c) defer traces | **Settled: (b)** — strategy vs variant still to pick |
-| 4 | **Branding** — public URL under an AFSL Authorised Representative | (a) BTS-branded and indexed; (b) BTS-branded, noindex; (c) neutrally branded | Open — recommendation revised to (b) |
+### Consequence of decision 2 — scope
 
-**Consequence of decision 3.** Choosing strategy or variant over the newsletter workflow trades the
-Signal-approval visual for the web gate path. [`demo-app-spec.md:196-198`](./demo-app-spec.md)
-wanted approval to arrive as an inbound Signal message, and that is no longer what the trace shows.
-The replacement story is arguably better for a technical evaluator: the web app cannot reach the
-agent server over HTTP, so `/campaigns` (or `/content`) writes a `pending_decision` column and a
-Supabase Realtime listener claims it atomically before resuming the suspended run. That is a real
-distributed-systems decision, visible in the trace, and it is the kind of thing a generic demo has
-no equivalent of.
+The full seam is the cleanest end state and makes every future demo page free, but it is the
+majority of the work in this document and none of it is user-facing. Honest sizing: 68 pages,
+42 server-action files, and roughly 40 existing tests that mock `@/lib/supabase/server` directly
+and must be rewritten against repository fakes. Weeks, not days.
+
+Two structural consequences follow, both handled in Phase 3:
+
+- **It is built one domain at a time**, each vertical independently verifiable and committable, so
+  there is never a long-lived branch carrying a half-migrated app.
+- **The bundle must be splittable.** `apps/web` will have ~20 repositories; the demo renders 7
+  surfaces. A monolithic `RepositoryBundle` would force `data-fixtures` to fixture domains nobody
+  demos. So `packages/data` exports per-domain interfaces, `apps/web` composes the full bundle, and
+  `apps/demo` composes a partial one typed to the slice its routes actually use. This is a change
+  from [`repository-contract.md:300-311`](./repository-contract.md), which specifies a single flat
+  bundle.
+
+**Auth stays on the raw client.** `middleware.ts` and the auth gate in `app/(app)/layout.tsx` are
+not a repository concern and do not move. This matches the done-condition at
+[`README.md:72`](./README.md) ("returns only the provider wiring and auth").
+
+### Consequence of decision 3 — the trace loses Signal
+
+`variant` is web-gated, so [`demo-app-spec.md:196-198`](./demo-app-spec.md)'s inbound Signal
+approval message is no longer what the trace shows. The replacement is better for a technical
+evaluator: the web app cannot reach the agent server over HTTP, so `/content` writes
+`content_items.pending_decision` and a Supabase Realtime listener claims it atomically before
+resuming the suspended run. A real distributed-systems decision, visible in the trace.
+
+`variant` was chosen over `strategy` despite having one gate rather than two, because its
+`variant.compliance_check` step invokes Lex — which puts `compliance-as-alignment` inside the trace
+rather than only in a static annotation, winning back some of what decision 1 removed.
+
+### Consequence of decision 4 — deployment
+
+`robots.txt` and a `noindex` meta tag, against
+[`demo-app-spec.md:241`](./demo-app-spec.md) ("robots.txt allows indexing. Being findable is the
+point"). Update that line in Phase 0. Everything else in the deployment section stands: separate
+Vercel project, `demo.btreasury.com.au`, no secrets in env, Open Graph card. The OG card still
+matters — arguably more, since link-pasting is now the only distribution channel.
 
 ---
 
@@ -248,34 +279,71 @@ principles the spec cared most about, and it is real.
 
 **Verify:** `pnpm test` and `pnpm typecheck` green at root. Walk the same five pages.
 
-### Phase 3 — `@platform/data`, demo surfaces only (4–6 days)
+### Phase 3 — `@platform/data`, full seam (4–6 weeks)
 
-Interfaces for the seven surfaces above only — roughly 10 of 68 pages. The other ~56 keep querying
-Supabase inline and are not touched.
+Per decision 2, every page and server action in `apps/web` moves behind repository interfaces. Built
+as independent domain verticals so the app is shippable at every commit.
 
-- `packages/data` — read-model types, repository interfaces, `errors.ts`, `context.ts`, and the
-  contract test suite from [`repository-contract.md:350-358`](./repository-contract.md).
-  Interfaces only.
-- `packages/data-supabase` — lift query code out of the ~10 target pages. `ReadContext.asOf`
-  defaults to `new Date()` here so `apps/web` call sites can omit it.
-- Repositories: `ResearchRepository`, `AgentActivityRepository`, `ContentRepository`,
-  `MarketReportRepository`, `IndicatorsRepository`, `EcosystemRepository`, `PipelineRepository`.
-  Drop `ComplianceRepository` and `ContractsRepository`.
+#### 3.0 — Foundation (2–3 days)
+
+- `packages/data` — `context.ts` (`ReadContext`, `QueryOptions`, `Paginated`), `errors.ts`
+  (`DemoWriteBlockedError`, `NotFoundError`), the per-domain interface convention, and the
+  composable provider. Interfaces only, no implementations.
+- The contract test harness from [`repository-contract.md:350-358`](./repository-contract.md),
+  written once and parameterised over an adapter, so each vertical adds its cases rather than its
+  own harness.
+- `packages/data-supabase` scaffold. `ReadContext.asOf` defaults to `new Date()` here so `apps/web`
+  call sites can omit it.
 - Mount the provider alongside `UserProvider` / `ToastProvider` in `apps/web/app/(app)/layout.tsx`.
-  Note `UserProvider` types straight off `@platform/db` — leave it; flagged, not fixed.
+  `UserProvider` types straight off `@platform/db` — flagged, not fixed.
+- Add `@platform/data` and `@platform/data-supabase` to `transpilePackages`, the vitest
+  `resolve.alias` map, and the lint `--dir` list.
 
-**Verify:** contract suite green against the Supabase adapter. Walk all ~10 refactored pages
-manually — types will not catch a wrong `.order()`. `git diff --stat` should show ~10 pages changed,
-not 47.
+#### 3.1 onwards — One vertical at a time
 
-**Stop and commit here.** `apps/web` must be verified working before `apps/demo` exists.
+Each vertical: define its interface, implement it in `data-supabase`, convert its pages and its
+server actions, rewrite its tests against a repository fake instead of the Supabase mock, verify,
+commit. Ordered so the demo surfaces land first — they unblock Phase 4, and the rest can proceed in
+parallel with fixture authoring.
+
+| # | Vertical | Routes | Demo? |
+|---|---|---|---|
+| 3.1 | Agent activity + approvals | `/activity` | Yes — smallest, proves the pattern |
+| 3.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface |
+| 3.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
+| 3.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
+| 3.5 | Ecosystem signals | `/signals` | Yes |
+| 3.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
+| 3.7 | Discovery | `/discovery/*` | No |
+| 3.8 | Projects, tasks, files, docs | `/projects/*`, `/tasks/*`, `/files`, `/docs/*` | No |
+| 3.9 | Products, advisors | `/products/*`, `/advisors/*` | No |
+| 3.10 | Decks and slides | `/decks/*` | No |
+| 3.11 | Settings, routines, brand, simon | `/settings/*`, `/routines`, `/brand`, `/simon` | No |
+
+**Watch items.** `app/actions/company.ts` has 21 `.from(` calls, `campaigns.ts` 17, `decks.ts` 15 —
+these three are the heavy ones and should not be first. `lib/action.ts:getAuthedClient()` is the
+existing wrapper every action goes through; it is the natural place to hand back a repository bundle
+instead of a raw client, and converting it early makes each subsequent vertical smaller.
+`hooks/useRealtimeSubscription.ts` is the one Supabase-coupled hook and needs a decision of its own —
+Realtime has no fixture equivalent, so the demo will need it to no-op.
+
+**Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
+vertical's pages walked manually — types will not catch a wrong `.order()`. Commit before the next.
+
+**Verify at the end of Phase 3:** `grep -rl "createClient" apps/web/` returns only `middleware.ts`,
+the auth gate, and the provider wiring.
+
+**`apps/web` must be verified working and committed before `apps/demo` exists.**
 
 ### Phase 4 — `apps/demo` and `@platform/data-fixtures` (4–5 days)
 
 - Scaffold `apps/demo` (Next.js App Router). No `@supabase/*`, no `@mastra/*`, no AI SDK in its
   `package.json`, enforced by it simply not depending on `@platform/data-supabase`.
-- `packages/data-fixtures` implementing the same interfaces. Static typed objects, no runtime fetch,
-  no filesystem reads. Writes throw `DemoWriteBlockedError(operation, table)`.
+- `packages/data-fixtures` implementing **only the seven demo domains** (verticals 3.1–3.6), mounted
+  as a partial bundle per decision 2. Static typed objects, no runtime fetch, no filesystem reads.
+  Writes throw `DemoWriteBlockedError(operation, table)`.
+- `useRealtimeSubscription` no-ops in the demo — there is no fixture equivalent of a live
+  subscription, and a silent no-op is more honest than a fake event stream.
 - Author fixtures per the revised staging table, keeping the offset-from-anchor rule verbatim.
   Fictional-entity and no-allocation-figure rules apply in full.
 - Demo chrome: disclosure banner, `Demo data` chip, write-blocked toast naming the real table.
@@ -302,14 +370,15 @@ cold and check the architecture is describable from them alone.
   into the BTS-owned `TraceBundle`. **Do not copy the `VALID_AGENT_NAMES` filter** from
   `agentActivityProcessor.ts:19` — it would drop `lex` spans, and the Lex compliance gate is part
   of what the variant trace is for.
-- Record one run of the chosen workflow end to end, per decision 3:
-  - **strategy** (`apps/agents/src/workflows/strategy/index.ts`) — two gates, `gate1` at line 320
-    and `gate2` at line 392, resumed by `startStrategyGateWebListener` off `campaigns.pending_decision`
-    (`workflows/strategy/run.ts:88`). Richer: two suspend boundaries to study.
-  - **variant** (`apps/agents/src/workflows/variant/index.ts`) — one gate, `gate3` at lines 327-388,
-    resumed by `startVariantGateWebListener` off `content_items.pending_decision`
-    (`workflows/variant/run.ts:50-60`). Includes a `variant.compliance_check` step invoking Lex,
-    which carries the `compliance-as-alignment` principle inside the trace itself.
+- Record one `variant` run end to end (`apps/agents/src/workflows/variant/index.ts`): the
+  `variant.generate_copy` step, the `variant.compliance_check` step invoking Lex, then the `gate3`
+  suspend at lines 327-388, resumed by `startVariantGateWebListener` off
+  `content_items.pending_decision` (`workflows/variant/run.ts:50-60`), through to the
+  `agent_activity` write at lines 116 and 126.
+- The Lex step is the reason this workflow was chosen — render its verdict as a first-class trace
+  step, not a tool call. `agents/compliance/index.ts:121` (`verdictToActivity`) writes
+  `status: 'pending'` on a fail and `'auto'` on a pass, with a `suggested_rewrite` proposed action;
+  that branch is worth showing.
 - The `TraceStep` union in [`fixture-and-trace-schema.md:140-149`](./fixture-and-trace-schema.md)
   assumes `channel: 'signal'` on `SuspendStep`. Widen it to `'signal' | 'web'` and render the web
   path as the `pending_decision` write plus the Realtime claim, not as a chat message.
@@ -325,7 +394,6 @@ in the demo's Vercel env. Confirm the recorder is disabled by default in `apps/a
 
 ### Deferred deliberately
 
-- The remaining ~56 pages of `apps/web`. Extract on demand, when a page joins the demo.
 - The gated live-inference path ([`demo-app-spec.md:201-209`](./demo-app-spec.md)). Ship only if
   everything above is stable.
 - The sidebar responsive collapse ([`assumptions.md:111-117`](./assumptions.md)). A real gap —
@@ -353,7 +421,9 @@ in the demo's Vercel env. Confirm the recorder is disabled by default in `apps/a
 
 | Risk | Mitigation |
 |---|---|
-| Phase 3 regresses working `apps/web` pages | Narrow scope (~10 pages), manual walk-through, commit before Phase 4 |
+| Phase 3 regresses working `apps/web` pages | One vertical at a time, each walked manually and committed before the next; the app is shippable at every commit |
+| Phase 3 stalls half-migrated | Vertical ordering puts demo surfaces first, so Phase 4 unblocks even if 3.7–3.11 slip; a partly-converted app is inconsistent but not broken |
+| ~40 tests rewritten from Supabase mocks to repository fakes | Budget it explicitly per vertical rather than discovering it late; the repository fake is a much smaller surface than `test/mocks/supabase.ts` |
 | Fixture drift blocks unrelated PRs | Accepted initially per [`demo-app-spec.md:259-263`](./demo-app-spec.md); revisit if it bites twice |
 | Mastra upgrade breaks the recorder | Schema is BTS-owned; only the recorder needs updating, and the recorded bundle keeps working |
 | A fixture entity resolves to a real business | ASIC search each name before committing |
