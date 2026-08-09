@@ -53,6 +53,43 @@ Two structural consequences follow, both handled in Phase 3:
 not a repository concern and do not move. This matches the done-condition at
 [`README.md:72`](./README.md) ("returns only the provider wiring and auth").
 
+#### A third consumer is anticipated — scope at construction, never per call
+
+A client-facing app reusing this UI is under consideration. That is the strongest case for the full
+seam: one consumer makes it overhead, three make it infrastructure. It also forces one design rule
+that must be settled **before vertical 3.1**, because it is nearly free now and expensive to
+retrofit across ~20 repositories.
+
+The demo and a client app stress the seam along different axes. The demo swaps the **data source** —
+same query, fixtures instead of Postgres. A client app swaps the **data scope** — same source,
+restricted rows. The bundle as specced only solves the first.
+
+**The rule: scoping belongs at bundle construction, never in a method signature.**
+`createSupabaseRepositories(client, principal)` returns a bundle that cannot see rows outside its
+principal. No read method ever takes a `clientId`, `tenantId` or equivalent parameter. A
+`clientId` argument would put the security boundary in ~200 call sites, any one of which can pass
+the wrong value; construction-time scoping means a caller has no way to ask the wrong question.
+
+This is a constraint to hold, not a redesign — [`repository-contract.md:317-320`](./repository-contract.md)
+already builds the bundle from a per-request client.
+
+Related: `mode` becomes `'live' | 'demo' | 'client'`. The review rule at
+[`repository-contract.md:312-315`](./repository-contract.md) — that branching on `mode` for anything
+beyond chrome means the seam has failed — gets **stricter** with a third consumer, not looser. A
+client app must differ by scope, never by branch.
+
+**Two things the seam does not give you**, flagged so they are not discovered late:
+
+- **RLS.** `CLAUDE.md` documents the current policy as "authenticated team members can read/write
+  everything (two-person team)". A client-facing app invalidates that. Real policies and roles are
+  database work; the seam surfaces the need but does not satisfy it, and defence in depth wants
+  both layers.
+- **Compliance.** [`assumptions.md:121-122`](./assumptions.md) currently rules a client app "out of
+  scope entirely, and should stay out — it is a different audience with different compliance
+  obligations". That reasoning still holds for *this* build; it now needs revisiting as a deliberate
+  decision rather than being left to drift. Phase 0 should reword it from a prohibition to a
+  deferral with the compliance question named.
+
 ### Consequence of decision 3 — the trace loses Signal
 
 `variant` is web-gated, so [`demo-app-spec.md:196-198`](./demo-app-spec.md)'s inbound Signal
