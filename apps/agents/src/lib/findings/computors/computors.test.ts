@@ -332,6 +332,12 @@ describe('staleness computor', () => {
     const gold = makeSeries('macro:gold', 'commodity', 'daily', dailyPoints(values, daysBefore(AS_OF, 3)), 'Gold');
     expect(computeStaleness(makeBundle(AS_OF, [gold]), makeConfig())).toHaveLength(0);
   });
+
+  it('gives ETF session series the same slack — Friday is the newest figure on a Monday', () => {
+    const values = noise(6, 30).map((j) => 90 + j);
+    const flow = makeSeries('etf_net_flow', 'etf_flows', 'daily', dailyPoints(values, daysBefore(AS_OF, 3)), 'ETF Net Flow');
+    expect(computeStaleness(makeBundle(AS_OF, [flow]), makeConfig())).toHaveLength(0);
+  });
 });
 
 describe('computeFindings fan-out', () => {
