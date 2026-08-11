@@ -164,6 +164,44 @@ raw body attached — on anything else, so a wrong guess surfaces via the failed
 silently storing garbage; correct the field names in `bgeometrics.ts` from the real error on first
 live run if needed.
 
+### SoSoValue — `apps/agents/.../adapters/sosovalue.ts`
+
+JSON REST, API key from `sosovalue.com` — needs `SOSOVALUE_API_KEY` set. The one provider here whose
+metrics are **not on-chain data**: US spot ETF fund flows, riding these tables for the machinery
+only (see `20260810000000_add_etf_flow_indicators.sql`). Two endpoints, both `POST` with body
+`{"type":"us-btc-spot"}` and header `x-soso-api-key`, because the two metrics are shaped differently:
+
+```
+POST https://api.sosovalue.xyz/openapi/v2/etf/historicalInflowChart   → etf_net_flow
+POST https://api.sosovalue.xyz/openapi/v2/etf/currentEtfDataMetrics   → etf_net_assets
+```
+
+- **`etf_net_flow`** ← `totalNetInflow` per session. Full history in one call (no date-range params),
+  so backfill and steady polls are identical — supersession dedupes. **Emit ÷ 1e6 as USD millions.**
+- **`etf_net_assets`** ← `totalNetAssets`. Point-in-time: one observation per poll, dated by the
+  payload's own as-at date, so this series accumulates a day at a time rather than backfilling.
+  **Emit ÷ 1e9 as USD billions.**
+- **`etf_flow_streak`** is derived in `v_etf_flow_streak` — no adapter involvement.
+
+Both scale factors come off the indicator's `unit`, per the normalisation rule above; the registry
+stores these scaled rather than in raw dollars because nothing in the stack has a compact number
+formatter. The two endpoints fail independently: a partial failure returns what landed and logs,
+rather than taking the healthy series down with it. Only a total failure is an adapter error.
+
+*Response shape not hand-verified* — same situation as BGeometrics above. Best-guess shape: a
+`{ code, data, msg }` envelope wrapping either an array of `{ date, totalNetInflow }` rows or an
+object carrying `totalNetAssets` and an as-at date, numbers possibly arriving as strings. A non-zero
+envelope `code` is treated as an API-level failure, not data (that is how a bad key arrives — HTTP
+200 with an error body). *Gotcha the parser cannot catch:* if the API already returns millions, the
+divisors make every figure 1e6 too small and still parse. Eyeball the first live poll against
+sosovalue.com. Second gotcha: this is a **trading-day** series — no weekend or US-holiday rows,
+which is why the `etf_*` keys carry the session-cadence staleness tolerance rather than the 2-day
+daily default.
+
+> Not documented here: the CoinGecko (`btc_price_aud`) and alternative.me (`fear_greed`) adapters
+> added by `20260704160000_add_bitcoin_snapshot_indicators.sql` — both keyless, both single-endpoint.
+> Read the adapter files directly.
+
 -----
 
 ## How the workflow consumes a result
