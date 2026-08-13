@@ -2,18 +2,28 @@
 
 **Scope:** every `README.md` in the repo (excluding `node_modules`), reviewed holistically
 against the current state of the code.
-**Status:** Phases 1, 2 and 5 delivered. Phases 3 (package READMEs) and 4 (`docs/` index)
-outstanding.
+**Status:** All five phases delivered.
 **Last updated:** 2026-08-11
 
-> **Delivered:** root `README.md` rewritten in place; `apps/agents/README.md` created;
-> `apps/web/README.md` rewritten; `CLAUDE.md` given the internal-agent correction, the
-> README-boundary note and two anti-drift rows; `scripts/check-doc-links.mjs` added and
-> gated in `.github/workflows/test.yml`. The link check found and fixed 8 pre-existing
-> broken links in the two indicator feature READMEs.
+> **Delivered.** Phases 1, 2 and 5: root `README.md` rewritten in place;
+> `apps/agents/README.md` created; `apps/web/README.md` rewritten; `CLAUDE.md` given the
+> internal-agent correction, the README-boundary note and two anti-drift rows;
+> `scripts/check-doc-links.mjs` added and gated in `.github/workflows/test.yml`.
 >
-> The findings below are kept as written — they are the record of what was wrong, and
-> Phases 3 and 4 still refer to them.
+> Phases 3 and 4: READMEs added for all four packages; `docs/README.md` created, indexing
+> ~70 docs by genre with an explicit "is this maintained?" column; the three scratch files
+> deleted; a README added to `docs/features/html-pdf-monitoring/`.
+>
+> **Two deliberate departures from the plan.** Item 16 (per-file "superseded" banners) was
+> not done — most feature specs are labelled *Draft* while the feature is live, so which
+> doc supersedes which is not determinable from the files, and guessing would make the
+> docs less trustworthy rather than more. `docs/README.md` states the genre convention
+> globally instead. Item 18 was applied only to `html-pdf-monitoring/`, which has two
+> documents; `linkedin-posting/` and `social-post-improve/` hold one file each, where a
+> document-map README would add a file without adding navigation — the index links them
+> directly.
+>
+> The findings below are kept as written: they are the record of what was wrong.
 
 ---
 

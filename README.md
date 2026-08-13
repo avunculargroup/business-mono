@@ -80,7 +80,7 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 │   └── voice/           # Brand-voice resolution, merging and embedding
 ├── infra/
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
-├── docs/
+├── docs/                # ~70 docs — start at docs/README.md, which sorts them by genre
 │   ├── agents/          # Per-agent specification docs
 │   ├── features/        # Per-feature spec bundles, each with its own README
 │   ├── reviews/         # Point-in-time reviews (not maintained after writing)
@@ -100,6 +100,8 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 ```
 
 **README vs CLAUDE.md.** This README explains how a human runs and understands the platform. `CLAUDE.md` carries the conventions a coding agent must follow — logging rules, import rules, which doc to read before touching what. Where the two would overlap, this file links there rather than restating, because two copies of the same table drift apart.
+
+Every app and package carries its own README, and [`docs/README.md`](./docs/README.md) indexes the rest — including which docs are maintained and which are a snapshot of a finished build.
 
 ### Package dependency graph
 
