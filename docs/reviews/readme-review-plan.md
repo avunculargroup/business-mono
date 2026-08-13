@@ -2,8 +2,18 @@
 
 **Scope:** every `README.md` in the repo (excluding `node_modules`), reviewed holistically
 against the current state of the code.
-**Status:** Proposal — no README has been changed yet.
+**Status:** Phases 1, 2 and 5 delivered. Phases 3 (package READMEs) and 4 (`docs/` index)
+outstanding.
 **Last updated:** 2026-08-11
+
+> **Delivered:** root `README.md` rewritten in place; `apps/agents/README.md` created;
+> `apps/web/README.md` rewritten; `CLAUDE.md` given the internal-agent correction, the
+> README-boundary note and two anti-drift rows; `scripts/check-doc-links.mjs` added and
+> gated in `.github/workflows/test.yml`. The link check found and fixed 8 pre-existing
+> broken links in the two indicator feature READMEs.
+>
+> The findings below are kept as written — they are the record of what was wrong, and
+> Phases 3 and 4 still refer to them.
 
 ---
 

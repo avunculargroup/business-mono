@@ -1,11 +1,18 @@
 # business-mono
 
+[![Tests](https://github.com/avunculargroup/business-mono/actions/workflows/test.yml/badge.svg)](https://github.com/avunculargroup/business-mono/actions/workflows/test.yml)
+
 Internal operations platform for Bitcoin Treasury Solutions (BTS) — a Bitcoin education, consulting, and treasury implementation company. Built on a hub-and-spoke agent architecture: a central coordinator (Simon) routes work to a roster of specialist agents, all sharing a Supabase database. A Next.js web app provides dashboards, approvals, and per-agent pages; a Mastra agent server runs the agents, workflows, and scheduled routines.
+
+Private and unlicensed — this is a two-person company's internal tooling, not a product. There is no support commitment and no public API.
+
+**Last updated:** 2026-08-11
 
 ---
 
 ## Table of Contents
 
+- [What this is](#what-this-is)
 - [Architecture overview](#architecture-overview)
 - [Monorepo structure](#monorepo-structure)
 - [Prerequisites](#prerequisites)
@@ -15,10 +22,25 @@ Internal operations platform for Bitcoin Treasury Solutions (BTS) — a Bitcoin 
 - [Database](#database)
 - [Agents](#agents)
 - [Workflows and listeners](#workflows-and-listeners)
+- [Subsystems](#subsystems)
 - [Web app](#web-app)
 - [Webhooks](#webhooks)
 - [Deployment](#deployment)
 - [Key conventions](#key-conventions)
+
+---
+
+## What this is
+
+Three ideas carry most of the design, and they are the parts worth reading the code for.
+
+**One agent talks to humans.** Directors message Simon on Signal (or through the web app); Simon decides which specialist should do the work and relays the answer back. Specialists never message a director. This keeps the conversational surface to a single voice and single memory, and it means routing quality is a testable property — `apps/agents/evals/simon-routing.eval.ts` scores it against fixtures.
+
+**Trust is earned per-operation, not granted once.** Every write starts human-confirmed, graduates to batch approval, then to autonomous-with-notification, tracked in `agent_activity.status`. Emails and published content never graduate. The audit trail is not a log that sits beside the system — it is the mechanism the system runs on.
+
+**Human gates are suspend/resume, not polling.** The newsletter and campaign workflows genuinely suspend mid-run and resume from either channel a director happens to answer on — a Signal reply or a click in `/content`. Two listeners race to resume the same run; the workflow is written so either can win.
+
+Everything else — CRM, research ingestion, transcription, indicators — feeds those three.
 
 ---
 
@@ -39,7 +61,7 @@ Simon is the only agent that talks to humans. Specialists never message director
 
 The one exception: any agent may query the Archivist's knowledge base directly for read-only lookups without going through Simon.
 
-A few agents are **internal** — invoked only inside a workflow, never on Simon's roster: the **editorial** agent (newsletter review) and **marketAnalyst** (market-report intro).
+Three agents are **internal** — invoked only inside one pipeline, never on Simon's roster and never in the `agent_activity.agent_name` CHECK, so they write no activity rows: **editorial** (newsletter review), **marketAnalyst** (market-report intro), and **newsVerifier** (fact-checks the news digest intro). All three are still model-configurable from `/settings/models`.
 
 ---
 
@@ -47,38 +69,48 @@ A few agents are **internal** — invoked only inside a workflow, never on Simon
 
 ```
 ├── apps/
-│   ├── agents/          # Mastra agent server — deployed to Railway
-│   └── web/             # Next.js frontend — deployed to Vercel
+│   ├── agents/          # Mastra agent server — deployed to Railway (see apps/agents/README.md)
+│   │   ├── evals/       # LLM-touching evals — on-demand, not in CI
+│   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   └── web/             # Next.js frontend — deployed to Vercel (see apps/web/README.md)
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
 │   ├── shared/          # Shared TypeScript types, enums, constants
-│   └── signal/          # Typed HTTP client for signal-cli REST API sidecar
+│   ├── signal/          # Typed HTTP client for signal-cli REST API sidecar
+│   └── voice/           # Brand-voice resolution, merging and embedding
 ├── infra/
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
 │   ├── agents/          # Per-agent specification docs
-│   ├── DESIGN_BRIEF.md  # UI design system — colours, typography, components, tokens
+│   ├── features/        # Per-feature spec bundles, each with its own README
+│   ├── reviews/         # Point-in-time reviews (not maintained after writing)
+│   ├── DESIGN_BRIEF.md  # Backing data for the bts-design skill — invoke the skill, don't read this
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
 │   ├── schema-changes.md
 │   └── webhooks.md
+├── scripts/
+│   └── check-doc-links.mjs  # Offline relative-link check over the entry-point docs (CI-gated)
 ├── supabase/
 │   └── migrations/      # Database migrations — execution source of truth
 ├── schema.sql           # Consolidated database schema — human-readable reference only
-├── CLAUDE.md            # Agent platform architecture, routing, conventions
+├── CLAUDE.md            # Conventions an agent must follow (see the note below)
 ├── tsconfig.base.json   # Base TypeScript config (extended by all packages)
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
 
+**README vs CLAUDE.md.** This README explains how a human runs and understands the platform. `CLAUDE.md` carries the conventions a coding agent must follow — logging rules, import rules, which doc to read before touching what. Where the two would overlap, this file links there rather than restating, because two copies of the same table drift apart.
+
 ### Package dependency graph
 
 ```
-@platform/agents  →  @platform/db     →  @platform/shared
+@platform/agents  →  @platform/db      →  @platform/shared
                   →  @platform/signal
-@platform/web     →  @platform/db     →  @platform/shared
+                  →  @platform/voice   →  @platform/db, @platform/shared
+@platform/web     →  @platform/db      →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` does NOT import `@platform/signal`.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/db` and `@platform/shared` — not `@platform/signal`, not `@platform/voice`.
 
 ---
 
@@ -86,7 +118,7 @@ A few agents are **internal** — invoked only inside a workflow, never on Simon
 
 | Tool | Version |
 |------|---------|
-| Node.js | 20+ |
+| Node.js | 20+ (CI runs 22) |
 | pnpm | 9.15.0 (enforced by `packageManager` field) |
 | Supabase CLI | latest |
 
@@ -122,57 +154,45 @@ pnpm --filter @platform/db seed:brand-voice
 # 5. Generate TypeScript types from your Supabase schema
 pnpm db:generate-types
 
-# 6. Start the agent server in dev mode
+# 6. Verify the checkout before changing anything
+pnpm typecheck && pnpm test
+
+# 7. Start the agent server in dev mode
 pnpm dev:agents
+
+# 8. In a second terminal, start the web app
+cp apps/web/.env.example apps/web/.env.local   # fill in the two Supabase values
+pnpm dev:web
 ```
+
+### Getting past the login page
+
+`apps/web` is auth-gated by `middleware.ts` — every route except `/login` and the public `/share/<id>` links redirects to a sign-in form. There is no self-serve sign-up: the login page calls `signInWithPassword` only. Create the first user in the Supabase dashboard under **Authentication → Users → Add user** (tick "Auto Confirm User"), then sign in with those credentials.
+
+RLS grants any authenticated team member read/write across the app tables, so one user is enough to see everything.
 
 ---
 
 ## Environment variables
 
-All secrets live in `apps/agents/.env`. Copy the example and fill in values:
+**The two `.env.example` files are the reference**, not this section. They are kept current and carry the rationale for each optional key — why `GITHUB_TOKEN` is "optional but effectively required in production", what degrades when `LLAMA_CLOUD_API_KEY` is unset, why there are two different web-app-URL variables read by different code paths.
 
 ```bash
-cp apps/agents/.env.example apps/agents/.env
+cp apps/agents/.env.example apps/agents/.env       # ~20 keys, heavily commented
+cp apps/web/.env.example apps/web/.env.local       # 6 keys, 2 required
 ```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SUPABASE_URL` | Yes | Your Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key (bypasses RLS — keep secret) |
-| `SUPABASE_PROJECT_ID` | Yes | Project ID for type generation |
-| `MASTRA_DB_URL` | Yes | Postgres connection string for Mastra's internal thread/memory/semantic-recall storage and the native scheduler. **Not** the Supabase JS client. Railway Postgres recommended (always IPv4); Supabase direct works only with the IPv4 add-on. `SUPABASE_DB_URL` is accepted as a fallback. |
-| `ANTHROPIC_API_KEY` | Yes* | Claude API key — default model is `anthropic/claude-sonnet-4-5` |
-| `ANTHROPIC_MODEL` | No | Model override when using Anthropic direct |
-| `OPENROUTER_API_KEY` | Yes* | Alternative to Anthropic direct — takes priority if set |
-| `OPENROUTER_MODEL` | No | Model override when using OpenRouter (default: `anthropic/claude-sonnet-4-5`) |
-| `OPENAI_API_KEY` | Yes | Used for `text-embedding-3-small` (1536 dimensions) |
-| `DEEPGRAM_API_KEY` | Yes | Transcription via Nova-3 |
-| `TELNYX_API_KEY` | Yes | Phone call recording ingestion |
-| `TELNYX_PUBLIC_KEY` | Yes | Webhook signature verification |
-| `ZOOM_WEBHOOK_SECRET_TOKEN` | Yes | Zoom webhook verification |
-| `SIGNAL_CLI_API_URL` | Yes | signal-cli REST API URL (Railway private: `http://signal-cli.railway.internal:8080`, local: `http://localhost:8080`) |
-| `SIGNAL_CLI_NUMBER` | Yes | Simon's dedicated Signal number in E.164 format |
-| `PORT` | No | Server port (defaults to 3000; set automatically on Railway) |
-| `RAILWAY_PUBLIC_DOMAIN` | Yes | Public URL used when constructing webhook callback URLs |
-| `TAVILY_API_KEY` | No** | Tavily Search API key — Researcher agent web search (free tier: 1,000/month) |
-| `FIRECRAWL_API_KEY` | No** | Firecrawl API key — Researcher agent structured crawling (free tier: 500/month) |
-| `SIGNAL_LISTENER_ENABLED` | No | Kill switch for the Signal listener. Set to `false` to skip subscribing on boot (useful locally with no registered number). |
-| `WEB_APP_URL` | No | Web app base URL, used to make the news digest's "More news" link clickable. The button is omitted when unset. |
-| `MASTRA_CLOUD_ACCESS_TOKEN` | No | Ships traces to Mastra Cloud via `CloudExporter`. Self-disables when unset (local `DefaultExporter` is always on in dev). |
+This table lists only what the agent server cannot boot without. Everything else — provider keys for research, indicators, reports and LinkedIn; listener kill switches; log level; observability — is documented inline in `apps/agents/.env.example`.
 
-**Web app** (`apps/web`, set in Vercel):
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS — keep secret) |
+| `MASTRA_DB_URL` | Postgres connection string for Mastra's thread/memory/semantic-recall storage and the native scheduler. **Not** the Supabase JS client. Railway Postgres recommended (always IPv4); Supabase direct works only with the IPv4 add-on. `SUPABASE_DB_URL` is accepted as a fallback. |
+| `ANTHROPIC_API_KEY` *or* `OPENROUTER_API_KEY` | The model provider. Set one. If both are set, OpenRouter wins. |
+| `OPENAI_API_KEY` | Embeddings — `text-embedding-3-small`, 1536 dimensions |
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `OPENROUTER_API_KEY` | No | Read server-side only to show the credits balance on the dashboard. Use a dedicated, independently revocable key. |
-| `NEXT_PUBLIC_RESEARCH_INBOUND_DOMAIN` | No | Domain for email-newsletter inbound addresses (`research+{slug}@<domain>`), shown in the `/news/sources` form. Defaults to `btreasury.com.au`. |
-
-*Set either `ANTHROPIC_API_KEY` (direct) or `OPENROUTER_API_KEY` (OpenRouter). If both are set, `OPENROUTER_API_KEY` takes priority.
-
-**Required only if the Researcher agent's `search_web` or `crawl_structured` tools are used.
+For `apps/web`, only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required; the other four keys each disable one feature when unset, and the app says so in the UI rather than failing.
 
 ---
 
@@ -189,9 +209,16 @@ cp apps/agents/.env.example apps/agents/.env
 | `pnpm lint` | Lint all packages |
 | `pnpm test` | Run the Vitest suites for both apps |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
+| `pnpm db:migrate` | Apply pending migrations (`supabase db push`) |
+| `pnpm db:diff` | Diff the local database against the migration history |
+| `pnpm db:pull` | Pull the remote schema into a new migration |
+| `pnpm db:reset` | Reset the local database and replay all migrations |
 | `pnpm --filter @platform/db seed:brand-voice` | Sync `docs/brand-voice.md` into `brand_assets` table |
+| `node scripts/check-doc-links.mjs` | Verify relative links in the entry-point docs resolve |
 
 All commands are orchestrated through Turborepo, which handles build order and caching based on the dependency graph.
+
+CI (`.github/workflows/test.yml`) runs three jobs on every PR: typecheck + lint + tests + the doc-link check, a `mastra build` of the agent server (the Railway deploy path), and a `next build` of the web app (the Vercel deploy path). The two build jobs exist because a bundler or prerender break passes typecheck and tests but fails on deploy.
 
 ### Testing
 
@@ -338,6 +365,12 @@ Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into 
 | `vectorSearch()` | Semantic similarity search over `knowledge_items` (pgvector HNSW) |
 | `graphTraverse()` | Graph traversal over `knowledge_connections` via recursive CTE |
 | `fulltextSearch()` | Postgres FTS over `knowledge_items.raw_content` |
+| `contentSearch()` | Semantic search over `content_embeddings` — the newsletter workflow's RAG store |
+| `newsSearch()` | Search over ingested `news_items` |
+| `reportSearch()` | Search over extracted report text (PDF/HTML report ingestion) |
+| `transcriptVectorSearch()` | Semantic search over podcast transcript segments |
+
+Use these wrappers rather than writing raw `.rpc()` calls.
 
 ---
 
@@ -356,15 +389,18 @@ Full specifications are in `docs/agents/`. Agent names in code use a persona (ca
 | **Researcher** (`rex`) | Workflow + Agent | Acquires, verifies, and structures web information. Handles fact verification, deep research, URL ingestion, and topic monitoring. Feeds the Archivist knowledge base. Scores ingested research (RSS/podcast/YouTube/email newsletters) against the relevance rubric for the `/news` feed. |
 | **Della (RM)** (`della`) | Agent | CRM management, customer understanding, relationship health, pipeline advice. Analyses Fastmail email via JMAP polling. |
 | **Margot (Marketer)** (`margot`) | Agent | Campaign strategist above Content Creator. Turns an objective into a structured strategy and an ordered set of scheduled beats, powering the Campaign Strategy workflow. |
-| **Lex (Compliance)** (`lex`) | Agent | Reviews advice-framed content drafts for AFSL/AR compliance. Logs verdicts; never auto-approves. Re-runs when a campaign variant's copy is edited. |
+| **Lex (Compliance)** (`lex`) | Agent | Reviews advice-framed content drafts for AFSL/AR compliance. Logs verdicts; never auto-approves. Re-runs when a campaign variant's copy is edited. Unlike the others, Lex is not one of Simon's subagents — it is triggered by the compliance listener and the variant workflow. |
 
 ### Approval philosophy
 
-Operations graduate from human-confirmed → batch approval → autonomous based on track record. The following are **always human-approved** regardless of track record:
+Operations graduate from human-confirmed → batch approval → autonomous based on track record. The following **never graduate** and are always human-approved:
 
 - Emails
 - Published content
-- CRM contact/company creation
+- Merging or deleting contacts (destructive)
+- Bulk pipeline updates (high blast radius)
+
+Creating a contact or company is *not* on that list — it graduates like any other write, starting one-at-a-time. See the approval-gate table in `docs/agents/relationship-manager.md`, which is the source of truth for Della's gates.
 
 ---
 
@@ -382,27 +418,55 @@ The agent server runs deterministic **workflows** and long-lived **listeners** a
 | `newsletter` | Multi-stage newsletter generation (RAG → story selection → drafting → editorial review) with two human approval gates |
 | `strategy` | Campaign Strategy — Margot synthesises a strategy and beat plan behind two approval gates |
 | `variant` | Expands campaign beats into per-platform post variants (Lex compliance gate) |
+| `pruneStorage` | Scheduled cleanup of aged stored artefacts |
+| `ecosystemScan` | Sweeps ecosystem watches for changes and writes the `/signals` feed |
 
-**Listeners** (`apps/agents/src/listeners/`) — Signal polling, web-directive and gate-resume realtime listeners, Fastmail CRM + research-newsletter polling, content-embedding sync, and compliance re-checks. The news pipeline (`ingestNewsItem` → Rex relevance rubric) feeds the `/news` feed from RSS, podcast, YouTube, and email-newsletter sources.
+A second family of workflow modules under `apps/agents/src/workflows/` is invoked directly by routines and listeners rather than through the Mastra registry — the news pipeline (`ingestNewsItem`, `newsCuration*`, `newsDedup`, `newsRelevance`, `newsRubric`), `podcastIntel/`, `libraryAnswer/` and `socialPost/`. They are not on the table above because they are not registered; `apps/agents/README.md` covers the distinction.
+
+**Listeners** (`apps/agents/src/listeners/`) — 19 modules. Roughly: inbound channels (`signalListener`, `fastmailListener`, `researchMailListener`), realtime web-side resumes (`webDirectives`, `newsletterGateWeb`, `strategyGateWeb`, `variantGateWeb`), agent output persistence (`contentCreatorListener`, `pmListener`, `podcastActionListener`, `socialPublishListener`, `libraryQuestionListener`), embedding sync (`contentEmbeddingListener`, `voiceEmbeddingListener`), and feedback/compliance loops (`complianceRecheck`, `feedbackDistillListener`, `marketReportFeedbackListener`). The per-listener detail lives in `apps/agents/README.md`, next to the code, so it stays current.
+
+---
+
+## Subsystems
+
+Beyond the core agent loop, the platform carries several ingestion and analysis subsystems. Each has a spec; start there before reading the code.
+
+| Subsystem | What it does | Spec |
+|---|---|---|
+| Podcast ingestion + transcript library | Subscribes to shows, resolves a transcript through a cost-ordered waterfall (publisher feed → YouTube → Deepgram), then indexes segments for RAG. `/news/podcasts` | `docs/podcast-ingestion-spec.md`, plus an unusually good UI reference at `apps/web/app/(app)/news/podcasts/README.md` |
+| Research feed | RSS, YouTube, podcast and paid email newsletters, all scored by Rex's 3-dimension relevance rubric. `/news` | `docs/news-source-email-spec.md` |
+| Newsletter generation | RAG retrieval → story selection → drafting → editorial review, behind two suspend/resume gates. `/content` | `docs/newsletter-workflow-spec.md` |
+| Social campaigns | Campaign → ordered beats → per-platform variants, each with a Lex compliance check and a human gate. `/campaigns` | `docs/social-campaigns-spec.md`, `docs/CAMPAIGNS_BUILD_ORDER.md` |
+| Report ingestion | Watches publisher pages for new PDF/HTML reports, acquires and extracts them (OCR fallback), indexes for search | `docs/features/html-pdf-monitoring/html-pdf-monitoring.md` |
+| Market reports + findings engine | Daily narrated market report over indicator data, with a hold-rather-than-guess rule. `/market-reports` | `docs/features/findings-engine-spec.md` |
+| Economic + on-chain indicators | Scheduled macro and Bitcoin-network series feeding the dashboard and the agents | `docs/features/economic-indicators/README.md`, `docs/features/onchain-indicators/README.md` |
+| Ecosystem signals | Watches the products and advisors BTS features, and surfaces what changed. `/signals` | `docs/features/ecosystem/ecosystem-signal-feature.md` |
+| Business discovery | Structured customer-discovery pipeline — personas, segments, interviews, lexicon. `/discovery`, `/crm` | `docs/business_discovery_phase1_spec.md` (phases 1–3), `docs/crm-discovery-guide.md` |
 
 ---
 
 ## Web app
 
-`apps/web` is a Next.js 15 App Router frontend (deployed to Vercel) with an authenticated shell at `app/(app)/`. Server actions live in `app/actions/`. Main areas:
+`apps/web` is a Next.js 15 App Router frontend (deployed to Vercel) with an authenticated shell at `app/(app)/`. Server actions live in `app/actions/`. See `apps/web/README.md` for the full route map and testing setup. Main areas:
 
 | Area | Purpose |
 |------|---------|
-| `dashboard` (`/`) | Overview — activity, approvals queue, credits |
+| `/` (dashboard) | Overview — activity, approvals queue, indicators, credits |
 | `activity` | The `agent_activity` audit trail and approval actions |
 | `simon` | Conversational interface to Simon |
-| `crm` / `company` | Contacts, companies, interactions |
+| `crm` / `company` | Contacts, companies, interactions, plus discovery sub-sections (personas, segments, interviews, champions, community) |
 | `projects` / `tasks` | Project and task tracking (PM) |
-| `content` / `campaigns` | Content drafts, newsletter gates, and marketing campaigns |
-| `news` | Curated research feed and source management (incl. email sources) |
+| `content` / `campaigns` | Content drafts, newsletter gates, and marketing campaigns with per-variant compliance |
+| `news` | Curated research feed, daily digest, podcasts and source management |
+| `market-reports` | Daily narrated market reports — published, held, or un-narrated |
+| `signals` | Ecosystem change feed (releases, advisories, quiet attestations) |
+| `discovery` | Customer discovery — pipeline, lexicon, templates, feedback |
+| `products` / `advisors` | Ecosystem registers (human-maintained; see `docs/features/ecosystem/README.md`) |
 | `routines` | Scheduled agent routines |
-| `advisors` / `discovery` / `decks` / `products` / `brand` / `files` / `docs` | Supporting workspace pages |
-| `settings` | Integrations (Fastmail), per-agent/per-step model selection (`/settings/models`) |
+| `brand` / `decks` / `docs` / `files` | Brand hub and supporting workspace pages |
+| `settings` | Integrations (Fastmail, LinkedIn), team, and per-agent/per-step model selection (`/settings/models`) |
+
+Public routes outside the authenticated shell: `/login`, and `/share/<id>` for file links marked public (RLS enforces the boundary).
 
 ---
 
@@ -426,11 +490,14 @@ All three feed into the Recorder workflow.
 
 `apps/agents/railway.toml` is already configured.
 
-- **Start**: `node dist/index.js`
+- **Build**: Docker, via `apps/agents/Dockerfile` — Turborepo builds the workspace packages, then `mastra build` bundles the server to `.mastra/output/`
+- **Start**: `node --max-old-space-size=512 --disable-warning=DEP0040 .mastra/output/index.mjs`
 - **Health check**: `GET /health` (30s timeout)
 - **Restart policy**: on failure, max 3 retries
 
-Set all environment variables (see above) in your Railway service settings.
+The explicit heap size is load-bearing: V8 otherwise auto-sizes to roughly 256 MB, which is where the recurring OOM crashes hit. `railway.toml` carries the full reasoning, including why it must stay below the container's memory limit.
+
+Set all environment variables (see `apps/agents/.env.example`) in your Railway service settings.
 
 ### Frontend → Vercel
 
