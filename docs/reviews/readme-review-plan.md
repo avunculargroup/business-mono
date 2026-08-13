@@ -105,12 +105,40 @@ Each item verified against the tree at `220374b`.
   month behind.
 - **`HANDOFF_README.md`** documents a bundle-copying step that has already happened.
 
-### 3.4 Two items needing an owner decision, not a fix
+### 3.4 Two ambiguities, resolved against the code
 
-- Is `newsVerifier` an internal (workflow-only) agent like `editorial` and `marketAnalyst`,
-  or a roster agent? It is absent from both README and CLAUDE.md.
-- The root README lists "CRM contact/company creation" as always-human-approved. CLAUDE.md's
-  approval section does not. One of the two is wrong.
+**`newsVerifier` is internal — a third one, alongside `editorial` and `marketAnalyst`.**
+Its own header comment says so: "Like the editor and marketAnalyst, it is internal to one
+pipeline (the `news_curation` routine): NOT registered on Simon's `agents:` roster and NOT
+in the `agent_activity` `agent_name` CHECK — it writes no activity rows." Confirmed on all
+three counts: its only caller is `workflows/newsCurationVerify.ts`; Simon's roster is
+`charlie, rex, archie, bruno, della, roger, petra, margot`; and the CHECK in `schema.sql:641`
+is `simon, roger, archie, petra, bruno, charlie, rex, della, margot, lex`. It is registered
+in `MODEL_SCOPES` as an agent scope, so it is configurable from `/settings/models` like the
+other two.
+
+*Consequence:* the README's internal-agent sentence needs a third name, and CLAUDE.md's
+equivalent sentence does too — that file names only `editorial` and `marketAnalyst`.
+
+**The root README is wrong about CRM approvals.** It lists "CRM contact/company creation"
+as always-human-approved regardless of track record. `docs/agents/relationship-manager.md`
+— the source of truth for Della — says the opposite in its Approval Gates table:
+
+| Action | Approval Level | Notes |
+|---|---|---|
+| Create new contact | Auto | Graduates from one-at-a-time |
+| Create new company | Auto | Graduates from one-at-a-time |
+| Merge or delete contacts | **Human required** | Destructive, never graduates |
+| Bulk pipeline updates | **Human required** | High blast radius |
+
+CLAUDE.md agrees with the spec, not the README: only emails and public content never
+graduate. No competing statement exists anywhere else in `docs/` or in
+`apps/web/app/actions/approvals.ts`.
+
+*Consequence:* delete "CRM contact/company creation" from the README's always-approved list
+and replace it with the two operations that genuinely never graduate — merge/delete of
+contacts, and bulk pipeline updates. This is a correctness fix, not a wording one: as
+written, the README overstates the guardrail.
 
 ---
 
@@ -128,8 +156,14 @@ Ordered by visitor impact per unit of effort. Phases are independently shippable
 2. Add a **private-repo / no-licence notice** and a CI badge for
    `.github/workflows/test.yml`.
 3. **Correct the drift** in §3.1 items 1–9: add `packages/voice` to the structure diagram,
-   dependency graph and import rules; add `newsVerifier`; add `pruneStorage` and
-   `ecosystemScan`; complete the RPC and web-area tables; add the four `db:*` scripts.
+   dependency graph and import rules; add `pruneStorage` and `ecosystemScan`; complete the
+   RPC and web-area tables; add the four `db:*` scripts.
+3a. **Name `newsVerifier` as the third internal agent** in the README's internal-agent
+   sentence, and make the same one-word fix in CLAUDE.md's equivalent sentence (§3.4).
+3b. **Fix the approval-philosophy list** (§3.4): remove "CRM contact/company creation" from
+   the always-human-approved bullets and replace it with merge/delete of contacts and bulk
+   pipeline updates, per `docs/agents/relationship-manager.md`. Correctness fix — the
+   current text claims a guardrail the platform does not enforce.
 4. **Replace the two env-var tables with a pointer** to `apps/agents/.env.example` and
    `apps/web/.env.example`, keeping only a short "the five you cannot boot without" table.
    The example files are already better and already maintained; two copies is what caused
