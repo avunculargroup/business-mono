@@ -168,6 +168,42 @@ describe('runMarketReport', () => {
     expect(onchain.items.map((i) => i.label)).toEqual(['MVRV']);
   });
 
+  it('splits etf_flows rows into their own section, ordered, with the streak chip and no flow delta', async () => {
+    setOnchain([
+      { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,
+        value: 900, observed_at: '2026-08-07', change_since_prior: 10, pct_change_since_prior: 1.1, signal: null },
+      // Deliberately out of display order — buildEtfItems re-sorts by ETF_ORDER.
+      { key: 'etf_net_assets', short_label: 'ETF Net Assets', metric_group: 'etf_flows', unit: 'usd_billion', decimals: 2,
+        value: 150.42, observed_at: '2026-08-07', change_since_prior: 0.31, pct_change_since_prior: 0.21, signal: null },
+      { key: 'etf_flow_streak', short_label: 'ETF Flow Streak', metric_group: 'etf_flows', unit: 'usd_million', decimals: 2,
+        value: 853.54, observed_at: '2026-08-07', change_since_prior: null, pct_change_since_prior: null, signal: '5 sessions inflow' },
+      { key: 'etf_net_flow', short_label: 'ETF Net Flow', metric_group: 'etf_flows', unit: 'usd_million', decimals: 2,
+        value: 98.85, observed_at: '2026-08-07', change_since_prior: -112.58, pct_change_since_prior: -53.25, signal: null },
+    ]);
+    setMacro([]);
+
+    const out = await runMarketReport(ROUTINE, new Date('2026-08-07T22:00:00Z'));
+
+    expect(out.status).toBe('success');
+    const res = out.market_report_result!;
+    expect(res.etf_count).toBe(3);
+    expect(res.onchain_count).toBe(1); // hash rate only — ETF rows excluded from On-chain
+
+    const headings = res.sections.map((s) => s.heading);
+    expect(headings).toEqual(['ETF Flows', 'On-chain']);
+    const etf = res.sections.find((s) => s.heading === 'ETF Flows')!;
+    expect(etf.items.map((i) => i.label)).toEqual(['ETF Net Flow', 'ETF Flow Streak', 'ETF Net Assets']);
+    // Scaled units read as the source quotes them.
+    expect(etf.items[0].value).toBe('98.85 USD m');
+    expect(etf.items[2].value).toBe('150.42 USD bn');
+    // A daily flow is already a change and crosses zero — no "on prior" delta.
+    expect(etf.items[0].delta).toBeNull();
+    // The run states what it IS, never what it implies.
+    expect(etf.items[1].signal).toBe('5 sessions inflow');
+    // The asset level, being a level, keeps its delta.
+    expect(etf.items[2].delta).toContain('+0.31');
+  });
+
   it('still sends (without a narration, disclaimer intact) when the narration is held', async () => {
     setOnchain([
       { key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', decimals: 2,

@@ -6,6 +6,56 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-08-10 — US spot ETF flow metrics
+
+`20260810000000_add_etf_flow_indicators.sql` adds three metrics on the existing
+`onchain_indicators` / `onchain_observations` pair: `etf_net_flow` (daily net
+flow across all US spot Bitcoin ETFs), `etf_flow_streak` (derived), and
+`etf_net_assets` (total net assets).
+
+- **New `etf_flows` metric group.** These are not on-chain metrics — they are
+  TradFi fund flows. They reuse the on-chain tables for the machinery (daily
+  poll, supersession, staleness, views), not the meaning, the same way
+  `market_snapshot` does. Like that group they are excluded from the
+  `/dashboard` on-chain panel, whose subtitle promises "what the network reports
+  about itself", and surface as the daily `market_report` email's "ETF Flows"
+  section.
+- **New provider `sosovalue`** (provider + source CHECKs widened). Two endpoints
+  off one adapter: `historicalInflowChart` for the flow series (full history in
+  one call) and `currentEtfDataMetrics` for the asset level (point-in-time, so
+  that series accumulates a day at a time rather than backfilling). Needs
+  `SOSOVALUE_API_KEY` on Railway. **The response shape is not hand-verified** —
+  no third-party network egress from the environment it was written in, same
+  situation as the bgeometrics adapter. The parsers fail loudly with the raw body
+  attached; a units mismatch is what they cannot catch, so eyeball the first live
+  poll against sosovalue.com.
+- **Stored scaled, not in raw dollars** — flows in `usd_million`, assets in
+  `usd_billion`. The report formats with a plain `toLocaleString` and a unit
+  suffix (no compact formatter anywhere in the stack), so raw dollars would print
+  as `98,850,000 USD`. Same trick `economic_indicators` already uses with
+  `usd_billion`. The adapter divides, driven by the indicator's `unit` — the
+  contract's normalisation seam.
+- **`etf_flow_streak` is derived, not stored** (`v_etf_flow_streak`, unioned into
+  `v_onchain_dashboard`): the current unbroken run of same-direction sessions,
+  summed — variable length, so five consecutive inflow days is a five-session
+  streak and one outflow day starts a new run. Run length and direction ride
+  along as the neutral signal chip ("5 sessions inflow"): what the run IS, never
+  what it implies. Honours fetched-is-stored / derived-is-computed.
+- **`finding_metric_config` row for `etf_flows`** — `vol_class` `'high'`, so the
+  findings engine treats a single loud session as a watch-item rather than a
+  verdict; `thesis_weight` 1.20. Without the row the group would have silently
+  defaulted to `'low'`.
+- **Staleness tolerance** — `etf_*` keys are session-cadence like the daily FRED
+  macro series (5 days, not 2). ETFs do not trade on weekends, so the 2-day
+  default would have raised a false "stale feed" ops finding every Monday.
+
+Known, pre-existing: derived metrics carry no observations, so each one produces
+a standing ops-only "no stored observations" staleness finding (`fee_share`,
+`realised_price`, `mvrv` already do). `etf_flow_streak` joins them. Ops-visible
+only — never narrated in the client report.
+
+---
+
 ## 2026-08-03 — Fix: `db push` silently stopped applying migrations on 30 July
 
 `.github/workflows/migrate.yml` had been failing on every push to `main` since

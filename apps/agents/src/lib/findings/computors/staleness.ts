@@ -10,11 +10,15 @@ import { findingId, UNSCORED } from './shared.js';
 
 const EMPTY_BASELINE = { mean: 0, sd: 0, p05: 0, p50: 0, p95: 0 };
 
+// Series that only print on US trading days — a Monday report's newest figure is
+// Friday's, and a long weekend pushes that to four days.
+const SESSION_CADENCE_KEYS = new Set(['etf_net_flow', 'etf_net_assets', 'etf_flow_streak']);
+
 function toleranceDays(series: MetricSeries): number {
   if (series.granularity === 'quarterly') return 120;
   if (series.granularity === 'monthly') return 45;
-  // Daily macro series (FRED) skip weekends and holidays.
-  return series.key.startsWith('macro:') ? 5 : 2;
+  // Daily macro series (FRED) skip weekends and holidays; so do ETF sessions.
+  return series.key.startsWith('macro:') || SESSION_CADENCE_KEYS.has(series.key) ? 5 : 2;
 }
 
 function ageDays(asOf: string, latest: string): number {

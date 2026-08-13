@@ -282,6 +282,9 @@ export interface MarketReportResult {
   // Price-derived trend/valuation metrics (moving averages, Mayer Multiple, 50d/200d
   // cross, RSI, realised volatility, drawdown) — derived in v_btc_trend.
   trend_count: number;
+  // US spot ETF metrics (daily net flow, current flow streak, total net assets).
+  // Fund flows, not network data — their own section, not the On-chain one.
+  etf_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
   // The findings narration included in the email, or null when it was withheld

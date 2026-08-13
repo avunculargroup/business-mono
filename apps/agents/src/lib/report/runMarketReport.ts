@@ -60,7 +60,7 @@ interface RoutineInput {
 // and can't import them). Empty string = a bare number reads best.
 const ONCHAIN_UNITS: Record<string, string> = {
   eh_s: 'EH/s', ratio: '', usd: 'USD', percent: '%', count: '', signal: '', btc: 'BTC',
-  aud: 'AUD', index: '',
+  aud: 'AUD', index: '', usd_million: 'USD m', usd_billion: 'USD bn',
 };
 const MACRO_UNITS: Record<string, string> = {
   percent: '%', usd_billion: 'USD bn', aud_billion: 'AUD bn', index: '', usd: 'USD',
@@ -99,6 +99,7 @@ export async function runMarketReport(
     macro_count: 0,
     bitcoin_count: 0,
     trend_count: 0,
+    etf_count: 0,
     emailed: false,
     narration: null,
   };
@@ -125,26 +126,36 @@ export async function runMarketReport(
   // rows (price MAs, Mayer, cross, RSI, vol, drawdown) get their own section too.
   // btc_price_usd is a trend_valuation row but is surfaced in the Bitcoin snapshot
   // section (below BTC/AUD, live-fetched) instead — drop it here so it renders once.
+  // etf_flows rows share the on-chain tables but are TradFi fund flows, not
+  // network data — they get their own section rather than rendering under the
+  // On-chain heading.
   const allOnchain = (onchainRes.data ?? []) as unknown as OnchainRow[];
   const onchainRows = allOnchain.filter(
-    (r) => r.metric_group !== 'market_snapshot' && r.metric_group !== 'trend_valuation',
+    (r) =>
+      r.metric_group !== 'market_snapshot' &&
+      r.metric_group !== 'trend_valuation' &&
+      r.metric_group !== 'etf_flows',
   );
   const trendRows = allOnchain.filter(
     (r) => r.metric_group === 'trend_valuation' && r.key !== 'btc_price_usd',
   );
+  const etfRows = allOnchain.filter((r) => r.metric_group === 'etf_flows');
   const macroRows = ((macroRes.data ?? []) as unknown as MacroRow[]);
 
   const onchainItems = buildOnchainItems(onchainRows);
   const trendItems = buildTrendItems(trendRows);
+  const etfItems = buildEtfItems(etfRows);
   const macroItems = buildMacroItems(macroRows);
   result.onchain_count = onchainItems.length;
   result.macro_count = macroItems.length;
   result.bitcoin_count = bitcoinItems.length;
   result.trend_count = trendItems.length;
+  result.etf_count = etfItems.length;
 
   const sections: MarketReportSection[] = [];
   if (bitcoinItems.length) sections.push({ heading: 'Bitcoin', items: bitcoinItems });
   if (trendItems.length) sections.push({ heading: 'Trend & Valuation', items: trendItems });
+  if (etfItems.length) sections.push({ heading: 'ETF Flows', items: etfItems });
   if (onchainItems.length) sections.push({ heading: 'On-chain', items: onchainItems });
   if (macroItems.length) sections.push({ heading: 'Macro', items: macroItems });
   result.sections = sections;
@@ -204,7 +215,7 @@ export async function runMarketReport(
         : '; narration unavailable';
   const summary =
     `Market report: ${result.bitcoin_count} bitcoin + ${result.trend_count} trend + ` +
-    `${result.onchain_count} on-chain + ${result.macro_count} macro indicators` +
+    `${result.etf_count} etf + ${result.onchain_count} on-chain + ${result.macro_count} macro indicators` +
     (delivery.configured
       ? ` — emailed to ${delivery.sent}/${delivery.attempted} team members`
       : ' — email not configured') +
@@ -264,6 +275,32 @@ function buildTrendItems(rows: OnchainRow[]): MarketReportItem[] {
       value: fmtValue(r.value, r.decimals ?? 2, ONCHAIN_UNITS[r.unit ?? ''] ?? ''),
       delta: fmtDelta(r.change_since_prior, r.pct_change_since_prior, r.decimals ?? 2),
       signal: r.signal ? CROSS_SIGNAL_LABEL[r.signal] ?? r.signal : null,
+      as_of: r.observed_at ?? null,
+    }));
+}
+
+// Display order within ETF Flows: the session's flow, the run it belongs to,
+// then the asset base it accumulates into.
+const ETF_ORDER = ['etf_net_flow', 'etf_flow_streak', 'etf_net_assets'];
+
+function buildEtfItems(rows: OnchainRow[]): MarketReportItem[] {
+  const rank = (k: string | null) => {
+    const i = ETF_ORDER.indexOf(k ?? '');
+    return i === -1 ? ETF_ORDER.length : i;
+  };
+  return [...rows]
+    .sort((a, b) => rank(a.key) - rank(b.key))
+    .map((r) => ({
+      label: r.short_label ?? r.key ?? '',
+      value: fmtValue(r.value, r.decimals ?? 2, ONCHAIN_UNITS[r.unit ?? ''] ?? ''),
+      // A daily flow is already a change, and it crosses zero — "▼ −149.20
+      // (−151%) on prior" says nothing true about a −50 → +98 session pair. The
+      // asset level, being a level, takes the normal delta.
+      delta:
+        r.key === 'etf_net_flow'
+          ? null
+          : fmtDelta(r.change_since_prior, r.pct_change_since_prior, r.decimals ?? 2),
+      signal: r.signal ?? null,
       as_of: r.observed_at ?? null,
     }));
 }
