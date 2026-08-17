@@ -398,12 +398,32 @@ swatch cards hardcode their chip fills as hex and only *label* them with the tok
 chips will not catch a changed token — their surrounding chrome will, and the token guard covers
 the values exactly.
 
-**Baselines are not yet committed.** They must be generated in the CI container image, and the
-sandbox this was built in has no Docker daemon and a mismatched Chromium build. Bootstrap with
-`pnpm test:visual:update` (which shells out to `mcr.microsoft.com/playwright:v1.62.1-noble`), then
-commit `e2e/**-snapshots/`. Until that happens the `e2e.yml` workflow will report red — it is
-advisory and blocks nothing, but it is not meaningful until bootstrapped. Alternatively run the
-workflow manually with `update_baselines: true` and commit the artifact it uploads.
+**3. `e2e/tokens-resolve.spec.ts` — computed-style assertions, no baselines needed.**
+Added when the baseline bootstrap was deferred. It closes the one gap the Vitest guard structurally
+cannot cover: a token that is correct in a file but never reaches the browser because an `@import`
+path broke. The Vitest test reads files from disk; this reads `getComputedStyle` in Chromium.
+
+That is precisely the Phase 2 risk — three import chains change at once when the tokens move into
+`@platform/ui`. Being assertion-based rather than image-based, it is deterministic across machines
+and container images, so it works today and runs as its own step in `e2e.yml`, ahead of the
+screenshots.
+
+Verified non-vacuous by deliberately breaking the `@import` in `_base.css`: all four tests fail,
+and pass again when restored. That exercise caught a real weakness — the "no token resolves to
+empty" test originally passed *while the import was broken*, because with no tokens defined the
+filter it asserts on is trivially empty. It now asserts a count floor first.
+
+**Baselines are not yet committed — tracked as a to-do.** They must be generated in the CI
+container image, and the environment this was built in has no Docker daemon and a mismatched
+Chromium build. Bootstrap with `pnpm test:visual:update` (which shells out to
+`mcr.microsoft.com/playwright:v1.62.1-noble`), then commit `e2e/**-snapshots/`. Alternatively run
+the workflow manually with `update_baselines: true` and commit the artifact it uploads.
+
+Until then the screenshot step reports red. It is advisory and blocks nothing, and the
+`tokens-resolve` step carries real signal in the meantime — but Phase 2's stated "zero diffs" pass
+condition is unavailable, so Phase 2 verifies against the token guard and the resolution spec
+instead. Those two cover token values, drift, and cascade integrity; what goes uncovered until
+bootstrap is pure visual regression — a layout shift that changes no token.
 
 **Status: complete, pending baseline bootstrap.** Token guard green in the blocking gate
 (`pnpm test`: 73 files, 502 tests). Screenshot specs verified working locally — 19 passed in 8.8s —

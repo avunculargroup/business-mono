@@ -61,9 +61,18 @@ jobs:
 
       # The specimens are static HTML read over file://, so there is nothing to build
       # and no server to start. That changes when apps/demo joins this suite.
+
+      # Runs first and separately because it is meaningful *today*: it asserts computed
+      # values rather than comparing images, so it needs no committed baselines. While
+      # the screenshot step below is still waiting on its bootstrap, this is the step
+      # carrying real signal.
+      - name: Verify tokens resolve in the browser
+        if: ${{ !inputs.update_baselines }}
+        run: npx playwright test e2e/tokens-resolve.spec.ts
+
       - name: Run visual regression
         if: ${{ !inputs.update_baselines }}
-        run: pnpm test:visual
+        run: npx playwright test e2e/design-system.spec.ts
 
       - name: Regenerate baselines
         if: ${{ inputs.update_baselines }}
