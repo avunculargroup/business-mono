@@ -341,15 +341,28 @@ export async function updateRoutine(id: string, formData: FormData) {
 
   const input = parsed.data;
   const timeOfDay = normalizeTime(input.time_of_day);
-  const nextRunAt = computeNextRunAt({
-    frequency: input.frequency,
-    timeOfDay,
-    timezone: input.timezone,
-  });
 
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
+
+  // Reschedule only when the schedule itself changed. Recomputing on every save
+  // moves next_run_at to the next slot, which silently swallows a pending "Run
+  // now" — that queues a run by setting next_run_at to the present, so any edit
+  // before the listener's next tick used to cancel it. An unchanged schedule
+  // leaves the column alone.
+  const { data: current } = await supabase
+    .from('routines')
+    .select('frequency, time_of_day, timezone')
+    .eq('id', id)
+    .maybeSingle();
+
+  const scheduleChanged =
+    !current ||
+    current.frequency !== input.frequency ||
+    normalizeTime(String(current.time_of_day)) !== timeOfDay ||
+    current.timezone !== input.timezone;
+
   const { error } = await supabase
     .from('routines')
     .update({
@@ -361,7 +374,15 @@ export async function updateRoutine(id: string, formData: FormData) {
       frequency: input.frequency,
       time_of_day: timeOfDay,
       timezone: input.timezone,
-      next_run_at: nextRunAt.toISOString(),
+      ...(scheduleChanged
+        ? {
+            next_run_at: computeNextRunAt({
+              frequency: input.frequency,
+              timeOfDay,
+              timezone: input.timezone,
+            }).toISOString(),
+          }
+        : {}),
       show_on_dashboard: input.show_on_dashboard,
       dashboard_title: input.dashboard_title || null,
       is_active: input.is_active,

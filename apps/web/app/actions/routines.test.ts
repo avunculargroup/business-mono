@@ -313,6 +313,67 @@ describe('config fields that must survive an edit', () => {
   });
 });
 
+describe('rescheduling on update', () => {
+  // "Run now" queues a run by setting next_run_at to the present. Rewriting the
+  // column on an unrelated save would push it to the next slot and cancel it.
+  function storedSchedule(overrides: Record<string, unknown> = {}) {
+    client.__setResponse('routines', {
+      data: { frequency: 'daily', time_of_day: '06:45:00', timezone: 'Australia/Melbourne', ...overrides },
+      error: null,
+    });
+  }
+
+  it('leaves next_run_at alone when the schedule is unchanged', async () => {
+    storedSchedule();
+
+    const result = await updateRoutine('r-1', podcastForm({ dashboard_title: 'Renamed tile' }));
+
+    expect(result).toEqual({ success: true });
+    expect(updateCall('routines')).not.toHaveProperty('next_run_at');
+    // The rest of the edit still lands.
+    expect(updateCall('routines')).toMatchObject({ dashboard_title: 'Renamed tile' });
+  });
+
+  it('treats HH:MM and HH:MM:SS as the same time of day', async () => {
+    storedSchedule({ time_of_day: '06:45:00' });
+
+    await updateRoutine('r-1', podcastForm({ time_of_day: '06:45' }));
+
+    expect(updateCall('routines')).not.toHaveProperty('next_run_at');
+  });
+
+  it('reschedules when the time of day changes', async () => {
+    storedSchedule();
+
+    await updateRoutine('r-1', podcastForm({ time_of_day: '09:15' }));
+
+    expect(updateCall('routines')).toHaveProperty('next_run_at');
+  });
+
+  it('reschedules when the frequency changes', async () => {
+    storedSchedule();
+
+    await updateRoutine('r-1', podcastForm({ frequency: 'weekly' }));
+
+    expect(updateCall('routines')).toHaveProperty('next_run_at');
+  });
+
+  it('reschedules when the timezone changes', async () => {
+    storedSchedule();
+
+    await updateRoutine('r-1', podcastForm({ timezone: 'Australia/Perth' }));
+
+    expect(updateCall('routines')).toHaveProperty('next_run_at');
+  });
+
+  it('reschedules when the current row cannot be read', async () => {
+    const result = await updateRoutine('r-1', podcastForm());
+
+    expect(result).toEqual({ success: true });
+    expect(updateCall('routines')).toHaveProperty('next_run_at');
+  });
+});
+
 describe('blank numeric fields', () => {
   it('falls back to the default rather than failing on 0', async () => {
     const result = await updateRoutine('r-8', podcastForm({ lookback_days: '' }));
