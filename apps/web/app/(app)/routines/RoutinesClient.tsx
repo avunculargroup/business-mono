@@ -7,7 +7,8 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { RoutineForm, type RoutineFormValues } from './RoutineForm';
+import { RoutineForm, type RoutineFormValues, type TeamMemberOption } from './RoutineForm';
+import { valuesToFormData } from './routineFormData';
 import {
   deleteRoutine,
   toggleRoutineActive,
@@ -20,6 +21,7 @@ import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
 import { useToast } from '@/providers/ToastProvider';
 import { Plus, Play, Pencil, Trash2 } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
+import { ROUTINE_ACTION_LABELS } from '@platform/shared';
 import type { RoutineFrequency, RoutineActionType } from '@platform/shared';
 import styles from './routines.module.css';
 
@@ -46,6 +48,7 @@ type RoutineRow = {
 
 interface RoutinesClientProps {
   initialRoutines: RoutineRow[];
+  teamMembers?: TeamMemberOption[];
 }
 
 function formatFrequencyLabel(row: RoutineRow): string {
@@ -55,13 +58,7 @@ function formatFrequencyLabel(row: RoutineRow): string {
 }
 
 function formatActionLabel(actionType: string): string {
-  if (actionType === 'research_digest') return 'Research digest';
-  if (actionType === 'monitor_change') return 'Monitor change';
-  if (actionType === 'news_ingest') return 'News ingest';
-  if (actionType === 'news_source_scan') return 'Source scan';
-  if (actionType === 'news_curation') return 'News curation';
-  if (actionType === 'podcast_ingest') return 'Podcast ingest';
-  return actionType;
+  return ROUTINE_ACTION_LABELS[actionType as RoutineActionType] ?? actionType;
 }
 
 function statusColor(status: string | null): 'neutral' | 'success' | 'destructive' | 'warning' {
@@ -71,7 +68,7 @@ function statusColor(status: string | null): 'neutral' | 'success' | 'destructiv
   return 'neutral';
 }
 
-export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
+export function RoutinesClient({ initialRoutines, teamMembers = [] }: RoutinesClientProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [editRoutine, setEditRoutine] = useState<RoutineRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RoutineRow | null>(null);
@@ -256,7 +253,12 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
       />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New routine" size="md">
-        <RoutineForm onSubmit={handleCreate} submitting={submitting} onCancel={() => setShowCreate(false)} />
+        <RoutineForm
+          teamMembers={teamMembers}
+          onSubmit={handleCreate}
+          submitting={submitting}
+          onCancel={() => setShowCreate(false)}
+        />
       </Modal>
 
       <Modal
@@ -268,6 +270,7 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
         {editRoutine && (
           <RoutineForm
             initialValues={initialValuesForEdit(editRoutine)}
+            teamMembers={teamMembers}
             onSubmit={handleUpdate}
             submitting={submitting}
             onCancel={() => setEditRoutine(null)}
@@ -287,45 +290,4 @@ export function RoutinesClient({ initialRoutines }: RoutinesClientProps) {
       />
     </div>
   );
-}
-
-function valuesToFormData(v: RoutineFormValues): FormData {
-  const fd = new FormData();
-  fd.set('name', v.name);
-  fd.set('description', v.description ?? '');
-  fd.set('agent_name', v.agent_name);
-  fd.set('action_type', v.action_type);
-  fd.set('frequency', v.frequency);
-  fd.set('time_of_day', v.time_of_day);
-  fd.set('timezone', v.timezone);
-  fd.set('show_on_dashboard', v.show_on_dashboard ? 'true' : 'false');
-  fd.set('dashboard_title', v.dashboard_title ?? '');
-  fd.set('is_active', v.is_active ? 'true' : 'false');
-
-  const cfg = v.action_config as Record<string, unknown>;
-  if (v.action_type === 'research_digest') {
-    fd.set('subject', String(cfg['subject'] ?? ''));
-    fd.set('context', String(cfg['context'] ?? ''));
-    fd.set('search_queries', Array.isArray(cfg['search_queries']) ? (cfg['search_queries'] as string[]).join('\n') : '');
-    fd.set('archive_sources', cfg['archive_sources'] ? 'true' : 'false');
-    fd.set('max_sources', String(cfg['max_sources'] ?? 10));
-  } else if (v.action_type === 'monitor_change') {
-    fd.set('subject', String(cfg['subject'] ?? ''));
-    fd.set('context', String(cfg['context'] ?? ''));
-    fd.set('search_queries', Array.isArray(cfg['search_queries']) ? (cfg['search_queries'] as string[]).join('\n') : '');
-    fd.set('notify_signal', cfg['notify_signal'] ? 'true' : 'false');
-    if (cfg['notify_agent']) fd.set('notify_agent', String(cfg['notify_agent']));
-  } else if (v.action_type === 'news_ingest') {
-    fd.set('category', String(cfg['category'] ?? ''));
-    fd.set('queries', JSON.stringify(Array.isArray(cfg['queries']) ? cfg['queries'] : []));
-    fd.set('max_results_per_query', String(cfg['max_results_per_query'] ?? 15));
-    fd.set('max_curated', String(cfg['max_curated'] ?? 6));
-  } else if (v.action_type === 'news_curation') {
-    fd.set('max_stories', String(cfg['max_stories'] ?? 6));
-    fd.set('lookback_hours', String(cfg['lookback_hours'] ?? 24));
-  } else if (v.action_type === 'podcast_ingest') {
-    fd.set('max_items_per_source', String(cfg['max_items_per_source'] ?? 25));
-    fd.set('lookback_days', String(cfg['lookback_days'] ?? 14));
-  }
-  return fd;
 }
