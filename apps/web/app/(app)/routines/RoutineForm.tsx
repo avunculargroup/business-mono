@@ -115,6 +115,8 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           ? { subject: '', context: '', search_queries: [], notify_signal: false, notify_agent: null }
           : action_type === RoutineActionType.NEWS_CURATION
           ? { max_stories: 6, lookback_hours: 24 }
+          : action_type === RoutineActionType.PODCAST_INGEST
+          ? { max_items_per_source: 25, lookback_days: 14 }
           : {
               category: NewsCategory.REGULATORY,
               queries: [],
@@ -163,6 +165,17 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
           max_stories: Number(cfg['max_stories'] ?? 6),
           lookback_hours: Number(cfg['lookback_hours'] ?? 24),
           more_news_url: '/news',
+        },
+      });
+      return;
+    }
+
+    if (values.action_type === RoutineActionType.PODCAST_INGEST) {
+      onSubmit({
+        ...values,
+        action_config: {
+          max_items_per_source: Number(cfg['max_items_per_source'] ?? 25),
+          lookback_days: Number(cfg['lookback_days'] ?? 14),
         },
       });
       return;
@@ -230,12 +243,13 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             <option value={RoutineActionType.MONITOR_CHANGE}>Monitor change</option>
             <option value={RoutineActionType.NEWS_INGEST}>News ingest</option>
             <option value={RoutineActionType.NEWS_CURATION}>News curation</option>
+            <option value={RoutineActionType.PODCAST_INGEST}>Podcast ingest</option>
           </select>
         </div>
       </div>
 
-      {values.action_type !== RoutineActionType.NEWS_INGEST &&
-        values.action_type !== RoutineActionType.NEWS_CURATION && (
+      {(values.action_type === RoutineActionType.RESEARCH_DIGEST ||
+        values.action_type === RoutineActionType.MONITOR_CHANGE) && (
         <>
           <div className={styles.field}>
             <label className={styles.label}>Subject</label>
@@ -378,6 +392,39 @@ export function RoutineForm({ initialValues, onSubmit, onCancel, submitting }: R
             />
             <span className={styles.hint}>
               How far back to pull news and podcast episodes from.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {values.action_type === RoutineActionType.PODCAST_INGEST && (
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label}>Items per source</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              className={styles.input}
+              value={Number(cfg['max_items_per_source'] ?? 25)}
+              onChange={(e) => updateConfig({ max_items_per_source: Number(e.target.value) })}
+            />
+            <span className={styles.hint}>
+              Feed items considered per podcast source each run.
+            </span>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Lookback (days)</label>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              className={styles.input}
+              value={Number(cfg['lookback_days'] ?? 14)}
+              onChange={(e) => updateConfig({ lookback_days: Number(e.target.value) })}
+            />
+            <span className={styles.hint}>
+              Episodes published before this are skipped. Per-feed settings live on the source.
             </span>
           </div>
         </div>
