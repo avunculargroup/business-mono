@@ -4,7 +4,7 @@ import { useState, useOptimistic, useTransition } from 'react';
 import { Button } from '@/components/ui/Button';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { approveActivity } from '@/app/actions/approvals';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from './ApprovalControls.module.css';
 
 interface ApprovalControlsProps {

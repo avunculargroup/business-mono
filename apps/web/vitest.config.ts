@@ -18,6 +18,10 @@ export default defineConfig({
     alias: {
       '@platform/db': `${here}../../packages/db/src/index.ts`,
       '@platform/shared': `${here}../../packages/shared/src/index.ts`,
+      // @platform/ui ships raw .tsx/.ts with no build step. The object form does prefix
+      // matching, so this one entry covers every subpath export — '@platform/ui/cn'
+      // resolves to packages/ui/src/cn.ts, '@platform/ui/Button' to src/Button.tsx.
+      '@platform/ui': `${here}../../packages/ui/src`,
       // Mirror the tsconfig `@/*` path alias so tests can import app modules.
       '@': here,
     },

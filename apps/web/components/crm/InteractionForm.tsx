@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { createInteraction } from '@/app/actions/interactions';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import styles from './ContactForm.module.css';
 

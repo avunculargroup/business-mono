@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { importDocxDocument } from '@/app/actions/documents';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Upload, FileText, X } from 'lucide-react';
 import styles from './DocForm.module.css';
 import importStyles from './ImportDocxForm.module.css';

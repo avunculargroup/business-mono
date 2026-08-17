@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { runNewsletter } from '@/app/actions/newsletter';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
 interface RunNewsletterModalProps {

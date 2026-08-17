@@ -32,7 +32,7 @@ const { refresh, push, toast, actions } = vi.hoisted(() => ({
   },
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }) }));
-vi.mock('@/providers/ToastProvider', () => ({ useToast: () => toast }));
+vi.mock('@platform/ui/ToastProvider', () => ({ useToast: () => toast }));
 vi.mock('@/app/actions/podcastCollections', () => actions);
 
 import { CollectionEditor } from './CollectionEditor';

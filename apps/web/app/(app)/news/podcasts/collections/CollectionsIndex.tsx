@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { FormField, FormTextarea } from '@/components/ui/FormField';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import { createCollection } from '@/app/actions/podcastCollections';
 import type { PodcastCollectionCard } from '@platform/shared';

@@ -9,7 +9,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CommunityForm } from './CommunityForm';
 import { deleteCommunityEntry, updateCommunityEntry } from '@/app/actions/community';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import {
   COMMUNITY_TYPE_LABELS,

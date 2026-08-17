@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
-import { cn, getInitials, formatDate, formatRelativeDate, isUuid, idColumn } from './utils';
+import { getInitials, formatDate, formatRelativeDate, isUuid, idColumn } from './utils';
 
 describe('getInitials', () => {
   it('takes the first letter of the first two words, uppercased', () => {
@@ -21,20 +21,6 @@ describe('getInitials', () => {
 
   it('returns an empty string for an empty name', () => {
     expect(getInitials('')).toBe('');
-  });
-});
-
-describe('cn', () => {
-  it('joins truthy class names with a space', () => {
-    expect(cn('a', 'b', 'c')).toBe('a b c');
-  });
-
-  it('drops falsy values', () => {
-    expect(cn('a', false, undefined, null, 'b')).toBe('a b');
-  });
-
-  it('returns an empty string when everything is falsy', () => {
-    expect(cn(false, null, undefined)).toBe('');
   });
 });
 

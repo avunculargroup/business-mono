@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ChampionForm } from './ChampionForm';
 import { ChampionEventLog } from './ChampionEventLog';
 import { deleteChampion } from '@/app/actions/champions';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import {
   CHAMPION_STATUS_LABELS,
   CHAMPION_ROLE_TYPE_LABELS,

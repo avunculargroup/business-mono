@@ -17,7 +17,7 @@ import {
 } from '@/app/actions/routines';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Plus, Play, Pencil, Trash2 } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
 import type { RoutineFrequency, RoutineActionType } from '@platform/shared';

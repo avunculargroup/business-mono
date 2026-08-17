@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { createDocument, updateDocument } from '@/app/actions/documents';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { X } from 'lucide-react';
 import type { DocumentRow } from './DocsList';
 import styles from './DocForm.module.css';

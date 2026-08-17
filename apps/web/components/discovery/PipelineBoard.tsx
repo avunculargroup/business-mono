@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { PipelineItemForm } from './PipelineItemForm';
 import { movePipelineItem } from '@/app/actions/pipeline';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { INSIGHT_PIPELINE_STAGE_LABELS } from '@platform/shared';
 import { Plus, GripVertical, ChevronRight, ChevronLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import styles from './PipelineBoard.module.css';

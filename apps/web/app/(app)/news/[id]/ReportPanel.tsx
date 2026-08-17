@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Download, AlertTriangle, History } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import { getReportFileUrl, saveReportCuratorNote } from './actions';
 import {

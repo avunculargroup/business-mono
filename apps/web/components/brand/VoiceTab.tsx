@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Pencil, Lock, MessageSquareQuote } from 'lucide-react';
 import { VoiceForm, VOICE_FORM_ID } from './VoiceForm';
 import { SnippetForm, SNIPPET_FORM_ID } from './SnippetForm';

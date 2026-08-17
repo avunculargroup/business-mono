@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from 'react';
 import { Lock, RotateCcw } from 'lucide-react';
 import { updateAccountVoice } from '@/app/actions/voice';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { ChipField } from './ChipField';
 import { SnippetsPanel } from './SnippetsPanel';
 import { lockedAvoidWords, hasFormatOverride } from './accountVoice';

@@ -10,7 +10,7 @@ import { CompanyRecordForm } from './CompanyRecordForm';
 import { DomainsSection } from './DomainsSection';
 import { SubscriptionsSection } from './SubscriptionsSection';
 import { deleteCompanyRecord } from '@/app/actions/company';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { useRouter } from 'next/navigation';
 import { Building2, Plus } from 'lucide-react';
 import type { CompanyRecord, CompanyRecordType, CompanyDomain, CompanySubscription } from '@platform/shared';

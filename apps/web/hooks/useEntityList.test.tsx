@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 import { useEntityList } from './useEntityList';
-import { ToastProvider } from '@/providers/ToastProvider';
+import { ToastProvider } from '@platform/ui/ToastProvider';
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({

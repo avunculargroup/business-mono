@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MediaEmbed } from '@/components/podcasts/MediaEmbed';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import {
   formatTimestamp,

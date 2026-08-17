@@ -9,7 +9,7 @@ vi.mock('@/app/actions/reportWatch', () => ({
 }));
 
 const successToast = vi.fn();
-vi.mock('@/providers/ToastProvider', () => ({
+vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: successToast, error: vi.fn() }),
 }));
 

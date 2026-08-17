@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toggleFastmailAccount, removeFastmailAccount } from '@/app/actions/fastmail';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 
 export type FastmailAccountRow = {

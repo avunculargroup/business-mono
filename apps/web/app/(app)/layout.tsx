@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { UserProvider } from '@/providers/UserProvider';
-import { ToastProvider } from '@/providers/ToastProvider';
+import { ToastProvider } from '@platform/ui/ToastProvider';
 import { AppShell } from '@/components/app-shell/AppShell';
 import { Toast } from '@/components/ui/Toast';
 

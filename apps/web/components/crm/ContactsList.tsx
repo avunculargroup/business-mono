@@ -14,7 +14,7 @@ import { useEntityList } from '@/hooks/useEntityList';
 import { formatRelativeDate } from '@/lib/utils';
 import { STAKEHOLDER_ROLE_LABELS, type StakeholderRole } from '@platform/shared';
 import { Plus, Users, Eye, Pencil, Trash2 } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from './ContactsList.module.css';
 
 type ContactRow = {

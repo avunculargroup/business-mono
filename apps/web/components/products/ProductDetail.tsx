@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { deleteProduct, removeProductKeyContact, deleteReferralAgreement } from '@/app/actions/products';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductKeyContactForm } from './ProductKeyContactForm';

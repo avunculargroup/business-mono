@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { FileIcon } from '@/components/files/FileIcon';
 import { formatBytes, isImage, isPdf, getFileExt, uploadWithProgress } from '@/lib/files';
 import type { PlatformFile } from '@/app/actions/files';

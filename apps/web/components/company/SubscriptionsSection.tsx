@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable } from '@/components/ui/DataTable';
 import { createSubscription, updateSubscription, deleteSubscription } from '@/app/actions/company';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import type { CompanySubscription, SubscriptionPaymentType } from '@platform/shared';
 import styles from './SubscriptionsSection.module.css';

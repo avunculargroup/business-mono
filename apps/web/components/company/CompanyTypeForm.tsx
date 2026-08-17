@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { createCompanyRecordType } from '@/app/actions/company';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from './CompanyTypeForm.module.css';
 
 const CATEGORIES = ['Legal', 'Identity', 'Content', 'Documents', 'Custom'];

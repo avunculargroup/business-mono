@@ -14,7 +14,7 @@ import {
   createDocumentVersion,
   approveDocumentVersion,
 } from '@/app/actions/documents';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import {
   DOCUMENT_VERSION_STATUS_LABELS,
   type DocumentVersionStatus,

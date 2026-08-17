@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from 'react';
 import { Newspaper } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Button } from '@/components/ui/Button';
 import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDisplay';

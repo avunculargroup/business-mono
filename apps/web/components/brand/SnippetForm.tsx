@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { saveVoiceSnippet } from '@/app/actions/voice';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { ChipField } from './ChipField';
 import { SNIPPET_TYPES, type VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';

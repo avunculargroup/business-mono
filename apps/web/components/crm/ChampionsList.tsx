@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ChampionForm } from './ChampionForm';
 import { deleteChampion } from '@/app/actions/champions';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import {
   CHAMPION_STATUS_LABELS,

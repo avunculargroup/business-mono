@@ -9,7 +9,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LexiconForm } from './LexiconForm';
 import { approveLexiconEntry, deprecateLexiconEntry } from '@/app/actions/lexicon';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import { LEXICON_STATUS_LABELS, type LexiconStatus } from '@platform/shared';
 import { BookOpen, Pencil, Check, Archive, Plus } from 'lucide-react';

@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable } from '@/components/ui/DataTable';
 import { createDomain, updateDomain, deleteDomain } from '@/app/actions/company';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import type { CompanyDomain } from '@platform/shared';
 import styles from './DomainsSection.module.css';

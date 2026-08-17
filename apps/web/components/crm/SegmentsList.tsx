@@ -10,7 +10,7 @@ import { SegmentForm } from './SegmentForm';
 import { deleteSegment, updateSegment } from '@/app/actions/segments';
 import { useEntityList } from '@/hooks/useEntityList';
 import { LayoutGrid, Pencil, Trash2, Plus } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import type { SegmentScorecard } from '@platform/shared';
 import styles from './SegmentsList.module.css';
 

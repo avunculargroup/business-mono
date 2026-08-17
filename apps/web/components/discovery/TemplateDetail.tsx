@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { updateTemplateVersion, createTemplateVersion } from '@/app/actions/templates';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { TEMPLATE_TYPE_LABELS, type TemplateType, TEMPLATE_VERSION_STATUS_LABELS, type TemplateVersionStatus } from '@platform/shared';
 import { formatRelativeDate } from '@/lib/utils';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';

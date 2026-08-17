@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField, FormTextarea } from '@/components/ui/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatTimestamp } from '@/lib/podcasts';
 import { formatDate } from '@/lib/utils';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';

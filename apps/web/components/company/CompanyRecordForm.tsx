@@ -11,7 +11,7 @@ import { RichTextToolbar } from '@/components/discovery/RichTextToolbar';
 import { CompanyTypeForm } from './CompanyTypeForm';
 import { createCompanyRecord, updateCompanyRecord, createCompanyUploadSignedUrl } from '@/app/actions/company';
 import { createClient } from '@/lib/supabase/browser';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import type { CompanyRecord, CompanyRecordType } from '@platform/shared';
 import styles from './CompanyRecordForm.module.css';
 

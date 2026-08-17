@@ -15,7 +15,7 @@ import {
 } from '@/app/actions/newsSources';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Plus, Pencil, Trash2, ExternalLink, Rss, Mic, Youtube, Mail, FileText } from 'lucide-react';
 import type { RowAction } from '@/components/ui/RowActionsMenu';
 import type { NewsSourceRecord, NewsSourceType } from '@platform/shared';

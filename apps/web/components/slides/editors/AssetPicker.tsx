@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createUploadSignedUrl, registerUploadedAsset, getAssets } from '@/app/actions/assets';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { createClient } from '@/lib/supabase/browser';
 import type { AssetRow } from '@/lib/decks/schema';
 

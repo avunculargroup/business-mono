@@ -14,7 +14,7 @@ import {
   createTemplateVersion,
   approveTemplateVersion,
 } from '@/app/actions/templates';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import {
   TEMPLATE_VERSION_STATUS_LABELS,
   type TemplateVersionStatus,

@@ -11,7 +11,7 @@ import {
   scheduleContent,
   postContentNow,
 } from '@/app/actions/content';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import styles from './ContentEditor.module.css';
 

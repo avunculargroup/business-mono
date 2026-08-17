@@ -1,7 +1,7 @@
 'use client';
 
 import { updateSlide } from '@/app/actions/decks';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 
 export interface InspectorBaseProps {
   deckId: string;

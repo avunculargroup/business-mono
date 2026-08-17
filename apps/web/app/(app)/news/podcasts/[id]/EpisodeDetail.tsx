@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { BtsLogo } from '@/components/app-shell/BtsLogo';
 import { YouTubeFacade } from '@/components/podcasts/YouTubeFacade';
 import { AudioPlayer } from '@/components/podcasts/AudioPlayer';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import {
   extractVideoId,

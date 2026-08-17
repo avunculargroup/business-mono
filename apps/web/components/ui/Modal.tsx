@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
-import { cn } from '@/lib/utils';
+import { cn } from '@platform/ui/cn';
 
 interface ModalProps {
   open: boolean;

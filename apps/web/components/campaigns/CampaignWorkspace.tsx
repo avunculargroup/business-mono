@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, RefreshCw, Lock, Loader, MessageSquare, ListOrdered } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import { AutoGrowTextarea } from '@/components/ui/AutoGrowTextarea';
 import { StatusChip } from '@/components/ui/StatusChip';

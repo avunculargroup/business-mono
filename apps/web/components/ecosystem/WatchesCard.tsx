@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { deleteWatch, setWatchEnabled } from '@/app/actions/ecosystem';
 import { ECOSYSTEM_WATCH_TYPE_LABELS } from '@platform/shared';
 import { formatDate } from '@/lib/utils';
