@@ -353,7 +353,7 @@ Run this whenever `docs/brand-voice.md` is updated. It parses the markdown into 
 | `requirements` | BA-structured requirements with user stories |
 | `content_items` | Content pipeline: idea → draft → review → approved → published |
 | `risk_register` | Risk tracking with severity × likelihood matrix |
-| `routines` | Scheduled agent routines — per-agent jobs (research digests, change monitors) on daily/weekly/fortnightly cadence |
+| `routines` | Scheduled agent routines on a daily/weekly/fortnightly cadence. The `action_type` column picks the handler `executeRoutine` dispatches to; `RoutineActionType` in `packages/shared/src/routines.ts` is the list, with each action's `action_config` shape documented beside it |
 | `news_sources` | Upstream research sources — RSS, podcast, YouTube, and email newsletters (`source_type` discriminator). Email rows carry `slug`/`inbound_address`/`sender_allowlist`; all carry `tier`/`relevance_threshold` for the Rex rubric |
 | `news_items` | Ingested research from every source, scored by the Rex rubric (`relevance_score`, `relevance_reasoning`, `curator_notes`, `rex_metadata`) |
 | `fastmail_accounts` | Fastmail JMAP accounts for email polling (credentials in DB; `research_folder` names the newsletter folder polled separately from CRM mail) |
