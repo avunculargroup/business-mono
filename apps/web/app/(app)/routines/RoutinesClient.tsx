@@ -59,6 +59,8 @@ function formatActionLabel(actionType: string): string {
   if (actionType === 'monitor_change') return 'Monitor change';
   if (actionType === 'news_ingest') return 'News ingest';
   if (actionType === 'news_source_scan') return 'Source scan';
+  if (actionType === 'news_curation') return 'News curation';
+  if (actionType === 'podcast_ingest') return 'Podcast ingest';
   return actionType;
 }
 
@@ -318,6 +320,12 @@ function valuesToFormData(v: RoutineFormValues): FormData {
     fd.set('queries', JSON.stringify(Array.isArray(cfg['queries']) ? cfg['queries'] : []));
     fd.set('max_results_per_query', String(cfg['max_results_per_query'] ?? 15));
     fd.set('max_curated', String(cfg['max_curated'] ?? 6));
+  } else if (v.action_type === 'news_curation') {
+    fd.set('max_stories', String(cfg['max_stories'] ?? 6));
+    fd.set('lookback_hours', String(cfg['lookback_hours'] ?? 24));
+  } else if (v.action_type === 'podcast_ingest') {
+    fd.set('max_items_per_source', String(cfg['max_items_per_source'] ?? 25));
+    fd.set('lookback_days', String(cfg['lookback_days'] ?? 14));
   }
   return fd;
 }
