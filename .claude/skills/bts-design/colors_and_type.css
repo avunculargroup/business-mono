@@ -1,6 +1,15 @@
 /* ──────────────────────────────────────────────────────────────
    BTS Design System — Colors & Type
-   Source: docs/DESIGN_BRIEF.md in avunculargroup/business-mono
+   Backing data: docs/DESIGN_BRIEF.md in avunculargroup/business-mono
+
+   The canonical token source is packages/ui/src/tokens.css. This file is a
+   deliberate copy rather than an @import: this skill's documented workflow is to
+   copy its assets OUT of the repo to build standalone artifacts, and a path
+   reaching into packages/ would break the moment that happened.
+
+   The two are held identical mechanically — apps/web/app/globals.test.ts fails if
+   the token blocks diverge by so much as a hex. If you change a token here, change
+   it in packages/ui/src/tokens.css in the same commit, and vice versa.
    ────────────────────────────────────────────────────────────── */
 
 /* Self-host webfonts (see /fonts) with Google CDN fallback */
@@ -40,6 +49,17 @@
   --color-agent-approved: #E8F4EE;
   --color-agent-rejected: #F8ECEC;
   --color-agent-pending: var(--color-surface-subtle);
+
+  /* ── Status chip tints ── */
+  --color-warning-subtle: #FEF3C7;
+
+  /* ── Focus glow ── */
+  --color-accent-glow: rgba(201, 168, 76, 0.12);
+
+  /* ── Press / tap feedback ── */
+  --color-surface-active: #E4E1D9;             /* one step darker than --color-border */
+  --tap-highlight: rgba(201, 168, 76, 0.24);   /* amber native tap flash */
+  --press-scale: 0.96;
 
   /* ── Typography stack ── */
   --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -100,6 +120,9 @@
   --z-sticky: 100;
   --z-overlay: 200;
   --z-toast: 300;
+
+  /* ── Safe area ── */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ──────────────────────────────────────────────────────────────

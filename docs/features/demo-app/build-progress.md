@@ -4,9 +4,9 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** Phases 0 and 1 complete — Phase 1 pending a one-time baseline bootstrap that needs
-Docker. All four decisions settled, all eight assumptions resolved. Phase 2 (`@platform/ui` tokens)
-is next.
+**Status:** Phases 0–2 complete, with Phase 1 pending a one-time baseline bootstrap that needs
+Docker. All four decisions settled, all eight assumptions resolved. Phase 3 (`@platform/ui`
+components) is next.
 **Last updated:** 2026-08-08
 
 ---
@@ -40,7 +40,7 @@ majority of the work in this document and none of it is user-facing. Honest sizi
 42 server-action files, and roughly 40 existing tests that mock `@/lib/supabase/server` directly
 and must be rewritten against repository fakes. Weeks, not days.
 
-Two structural consequences follow, both handled in Phase 3:
+Two structural consequences follow, both handled in Phase 4:
 
 - **It is built one domain at a time**, each vertical independently verifiable and committable, so
   there is never a long-lived branch carrying a half-migrated app.
@@ -59,7 +59,7 @@ not a repository concern and do not move. This matches the done-condition at
 
 A client-facing app reusing this UI is under consideration. That is the strongest case for the full
 seam: one consumer makes it overhead, three make it infrastructure. It also forces one design rule
-that must be settled **before vertical 3.1**, because it is nearly free now and expensive to
+that must be settled **before vertical 4.1**, because it is nearly free now and expensive to
 retrofit across ~20 repositories.
 
 The demo and a client app stress the seam along different axes. The demo swaps the **data source** —
@@ -436,18 +436,54 @@ baseline.
 ### Phase 2 — `@platform/ui`, tokens (1 day)
 
 - Create `packages/ui` with `src/tokens.css` as the single source, moved from
-  `apps/web/app/globals.css`. `globals.css` imports it and keeps only app-level resets.
-- **Point `.claude/skills/bts-design/colors_and_type.css` at the package** rather than leaving a
-  third copy. This resolves the three-way drift recorded in non-blocking correction 2; leaving it
-  deferred means every future UI task is calibrated off a stale file.
-- Repoint the specimen pages in `.claude/skills/bts-design/preview/` at the package so the Phase 1
-  baselines keep testing something real.
-- Add `@platform/ui` to `transpilePackages` in `apps/web/next.config.ts`, to `resolve.alias` in
-  `apps/web/vitest.config.ts`, and to the `--dir` list in the `lint` script.
+  `apps/web/app/globals.css`. `globals.css` keeps only app-level resets.
+- Bring `.claude/skills/bts-design/colors_and_type.css` to parity, resolving the drift recorded in
+  non-blocking correction 2. Leaving it deferred means every future UI task is calibrated off a
+  stale file.
+- Add `@platform/ui` to `transpilePackages` in `apps/web/next.config.ts`.
 
-**Verify:** Phase 1 visual suite green with **zero** diffs — that is the whole point of having taken
-baselines first. Then `pnpm --filter @platform/web build` clean, and walk `/`, `/news`, `/content`,
-`/market-reports`, `/activity`.
+#### What shipped
+
+**`packages/ui/src/tokens.css` is canonical — 75 tokens.** `apps/web/app/layout.tsx` imports it
+ahead of `globals.css`, which drops from 224 lines to 123 and now contains no `:root` block at all.
+Verified in the emitted bundle rather than by assuming: all 75 custom properties appear in
+`.next/static/css`, including both changes below.
+
+**The skill copy is a copy, not an `@import` — a deliberate deviation from the plan above.**
+`SKILL.md` documents copying the skill's assets *out* of the repo to build standalone artifacts,
+and `preview/_base.css` loads the CSS directly over `file://`. A path reaching into `packages/ui`
+would break both the moment anything left the repo. So the two files stay independent and are held
+identical *mechanically*: `apps/web/app/globals.test.ts` now asserts `sorted(skillTokens)` equals
+`sorted(uiTokens)` outright, and separately asserts the skill keeps its own Google Fonts import and
+grows no `@import` of the package. Drift is impossible without a red build, which was the actual
+goal — deduplication was only ever the means.
+
+**Two intentional value changes**, so this move is not purely inert:
+
+- `--color-agent-pending: var(--color-surface-subtle)` existed only in the skill. Rather than delete
+  it, the package adopts it, so `apps/web` gains one unused token. It pairs with the `pending`
+  value in `agent_activity.status`, so it is plausibly wanted; noted as currently unreferenced.
+- All three font tokens adopt the skill's longer fallback chains — `-apple-system`, `'Segoe UI'`,
+  `'Times New Roman'`, `'SF Mono'`, `Menlo`, `Consolas`. `apps/web` inherits better rendering when
+  a webfont fails to load. Primary families are unchanged, so this is invisible on any machine
+  where the webfonts load.
+
+**Deferred to Phase 3, deliberately.** The plan listed a `resolve.alias` entry in
+`vitest.config.ts` and a `--dir` addition to the lint script. Neither is added: the package is
+CSS-only today, so there is nothing to alias and nothing to lint, and pointing `apps/web`'s lint at
+`../../packages/ui/src` would have a package linted by its consumer rather than by itself. Both
+land in Phase 3 with the components, when they do something.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` (73 web files / 501
+tests, 138 agent files / 1200 tests) and `pnpm --filter @platform/web build` all green.
+`e2e/tokens-resolve.spec.ts` green, which is the meaningful one here: it proves the tokens still
+resolve through the specimen `@import` chain in a real browser after the move.
+
+The screenshot suite's "zero diffs" check was **not** available — baselines are still to be
+bootstrapped. So a layout shift that changes no token value would not have been caught by
+automation in this phase.
+
+**Status: complete.**
 
 ### Phase 3 — `@platform/ui`, components (2–3 days)
 

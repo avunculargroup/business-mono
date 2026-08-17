@@ -1,11 +1,15 @@
 /**
  * Design-token drift guard.
  *
- * `app/globals.css` is the canonical token source today. `.claude/skills/bts-design/
- * colors_and_type.css` is a second copy that agents read when doing design work, and
- * `docs/DESIGN_BRIEF.md` is a third in prose. They have already drifted apart once —
- * the skill named Inter as the body font while the other two said DM Sans, which
- * silently miscalibrated every UI task that consulted it.
+ * `packages/ui/src/tokens.css` is the canonical token source. `.claude/skills/bts-design/
+ * colors_and_type.css` carries the same set as a deliberate copy — that skill's documented
+ * workflow is to copy its assets out of the repo to build standalone artifacts, so an
+ * @import reaching into packages/ would break the moment that happened.
+ *
+ * They have already drifted apart once — the skill named Inter as the body font while
+ * every other source said DM Sans, which silently miscalibrated every UI task that
+ * consulted it. This file is what makes a repeat impossible: the two token blocks must
+ * be byte-identical in content, and CI fails if they are not.
  *
  * These are text-comparison tests on purpose. Token drift is a static property of the
  * files, so it needs no browser: this runs in the fast blocking gate rather than the
@@ -20,17 +24,16 @@
  * When a token legitimately changes, update the literal in the same commit. That is
  * the alarm working, not an obstacle.
  *
- * Phase 2 of the demo-app plan (docs/features/demo-app/build-progress.md) moves the
- * canonical set into `@platform/ui` and points the skill copy at it. When that lands,
- * KNOWN_DRIFT below should collapse to empty and this file should read the package
- * rather than globals.css.
+ * Phase 2 of the demo-app plan (docs/features/demo-app/build-progress.md) moved the
+ * canonical set into `@platform/ui` and brought the skill copy to parity. The drift that
+ * used to be recorded here is now asserted to be empty.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
-const GLOBALS_CSS = join(REPO_ROOT, 'apps/web/app/globals.css');
+const TOKENS_CSS = join(REPO_ROOT, 'packages/ui/src/tokens.css');
 const SKILL_CSS = join(REPO_ROOT, '.claude/skills/bts-design/colors_and_type.css');
 
 /** Collect every custom property declared in any `:root` block. */
@@ -48,7 +51,7 @@ function sorted(tokens: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(tokens).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-const globalsTokens = parseRootTokens(readFileSync(GLOBALS_CSS, 'utf8'));
+const uiTokens = parseRootTokens(readFileSync(TOKENS_CSS, 'utf8'));
 const skillTokens = parseRootTokens(readFileSync(SKILL_CSS, 'utf8'));
 
 const CANONICAL_TOKENS: Record<string, string> = {
@@ -61,6 +64,7 @@ const CANONICAL_TOKENS: Record<string, string> = {
   '--color-accent-subtle': 'var(--color-accent-light)',
   '--color-agent-approved': '#E8F4EE',
   '--color-agent-proposed': 'var(--color-accent-light)',
+  '--color-agent-pending': 'var(--color-surface-subtle)',
   '--color-agent-rejected': '#F8ECEC',
   '--color-bg': '#FAFAF8',
   '--color-border': '#E8E6E0',
@@ -86,9 +90,9 @@ const CANONICAL_TOKENS: Record<string, string> = {
   '--duration-slow': '300ms',
   '--ease-default': 'ease',
   '--ease-in-out': 'cubic-bezier(0.4, 0, 0.2, 1)',
-  '--font-body': "'DM Sans', system-ui, sans-serif",
-  '--font-display': "'Playfair Display', Georgia, serif",
-  '--font-mono': "'JetBrains Mono', monospace",
+  '--font-body': "'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  '--font-display': "'Playfair Display', Georgia, 'Times New Roman', serif",
+  '--font-mono': "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
   '--header-height': '64px',
   '--leading-normal': '1.5',
   '--leading-relaxed': '1.6',
@@ -128,103 +132,45 @@ const CANONICAL_TOKENS: Record<string, string> = {
   '--z-toast': '300',
 };
 
-/**
- * Tokens the skill copy is missing, and values on which the two sources disagree.
- * Recorded rather than forbidden — the two files are legitimately separate today.
- * Phase 2 should empty both.
- */
-const KNOWN_DRIFT = {
-  /** In globals.css, absent from the skill copy. Mostly newer interaction tokens. */
-  missingFromSkill: [
-    '--color-accent-glow',
-    '--color-surface-active',
-    '--color-warning-subtle',
-    '--press-scale',
-    '--safe-area-bottom',
-    '--tap-highlight',
-  ],
-  /** In the skill copy, absent from globals.css. */
-  onlyInSkill: ['--color-agent-pending'],
-  /**
-   * All three font tokens differ, but only in their fallback chains — the skill
-   * carries longer stacks. Primary families match, which is asserted separately.
-   */
-  differingValues: ['--font-body', '--font-display', '--font-mono'],
-};
-
 describe('design tokens', () => {
   it('parses a plausible number of tokens from each source', () => {
     // Guards the parser. If a CSS restructure stops the regex matching, every other
     // assertion here would pass vacuously.
-    expect(Object.keys(globalsTokens).length).toBeGreaterThan(50);
+    expect(Object.keys(uiTokens).length).toBeGreaterThan(50);
     expect(Object.keys(skillTokens).length).toBeGreaterThan(50);
   });
 
-  it('globals.css matches the canonical set exactly', () => {
-    expect(sorted(globalsTokens)).toEqual(sorted(CANONICAL_TOKENS));
+  it('@platform/ui matches the canonical set exactly', () => {
+    expect(sorted(uiTokens)).toEqual(sorted(CANONICAL_TOKENS));
   });
 
   it('body font is DM Sans in both sources', () => {
     // Named regression guard for the bug this file was written after: the skill's
     // SKILL.md quick reference said Inter while every other source said DM Sans.
-    expect(globalsTokens['--font-body']).toContain('DM Sans');
+    expect(uiTokens['--font-body']).toContain('DM Sans');
     expect(skillTokens['--font-body']).toContain('DM Sans');
   });
 });
 
-describe('token drift between globals.css and the bts-design skill', () => {
-  const missingFromSkill = Object.keys(globalsTokens)
-    .filter((t) => !(t in skillTokens))
-    .sort();
-  const onlyInSkill = Object.keys(skillTokens)
-    .filter((t) => !(t in globalsTokens))
-    .sort();
-  const differingValues = Object.keys(globalsTokens)
-    .filter((t) => t in skillTokens && globalsTokens[t] !== skillTokens[t])
-    .sort();
-
-  it('has not drifted beyond what is already recorded', () => {
-    expect(missingFromSkill).toEqual(KNOWN_DRIFT.missingFromSkill);
-    expect(onlyInSkill).toEqual(KNOWN_DRIFT.onlyInSkill);
-    expect(differingValues).toEqual(KNOWN_DRIFT.differingValues);
+describe('the bts-design skill copy', () => {
+  it('is identical to @platform/ui, token for token', () => {
+    // The strongest form of the guarantee, and the reason the two files are allowed to
+    // exist separately at all. Before Phase 2 this pair carried six missing tokens, one
+    // orphan, and three differing font stacks. Any reappearance of drift fails here.
+    expect(sorted(skillTokens)).toEqual(sorted(uiTokens));
   });
 
-  it('agrees exactly on core colours', () => {
-    // The drift is at the edges. If it reaches the core palette, the skill has stopped
-    // describing the same design system the app implements. Colours are compared
-    // exactly — there is no cosmetic difference in a hex.
-    for (const token of [
-      '--color-bg',
-      '--color-surface',
-      '--color-surface-subtle',
-      '--color-border',
-      '--color-text-primary',
-      '--color-text-secondary',
-      '--color-accent-base',
-      '--color-success',
-      '--color-warning',
-      '--color-destructive',
-    ]) {
-      expect(globalsTokens[token], `${token} missing from globals.css`).toBeDefined();
-      expect(skillTokens[token], `${token} missing from the bts-design skill`).toBeDefined();
-      expect(skillTokens[token], `${token} differs between sources`).toBe(globalsTokens[token]);
-    }
-  });
+  it('still declares its own Google Fonts import', () => {
+    // The copy has to stay self-contained: this skill's documented workflow is to copy
+    // its assets out of the repo, and the specimen pages in preview/ load it directly
+    // over file://. If someone "tidies" this into an @import of the package, artifacts
+    // built outside the repo lose their webfonts silently.
+    const raw = readFileSync(SKILL_CSS, 'utf8');
+    expect(raw).toContain('fonts.googleapis.com');
 
-  it('agrees on the primary family of each font token', () => {
-    // Font stacks are compared on the first family only. globals.css has
-    // `system-ui, sans-serif` where the skill has `system-ui, -apple-system,
-    // 'Segoe UI', sans-serif` — real drift, recorded above, but cosmetic: the
-    // fallback only renders if the webfont fails. The primary family is the design
-    // decision and must match.
-    const primaryFamily = (stack: string) => stack.split(',')[0].trim().replace(/['"]/g, '');
-    for (const token of ['--font-body', '--font-display', '--font-mono']) {
-      expect(globalsTokens[token], `${token} missing from globals.css`).toBeDefined();
-      expect(skillTokens[token], `${token} missing from the bts-design skill`).toBeDefined();
-      expect(
-        primaryFamily(skillTokens[token]),
-        `${token} names a different primary family in each source`,
-      ).toBe(primaryFamily(globalsTokens[token]));
-    }
+    // Checks @import statements specifically, not any mention of the path — the header
+    // comment names packages/ui deliberately, to say where the canonical copy lives.
+    const imports = [...raw.matchAll(/@import\s+[^;]+;/g)].map((m) => m[0]);
+    expect(imports.filter((i) => i.includes('packages/ui'))).toEqual([]);
   });
 });
