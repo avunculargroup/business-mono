@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@platform/ui/Button';
+import { EmptyState } from '@platform/ui/EmptyState';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { CompanyHero } from './CompanyHero';
 import { CompanyCategory } from './CompanyCategory';
 import { CompanyRecordForm } from './CompanyRecordForm';

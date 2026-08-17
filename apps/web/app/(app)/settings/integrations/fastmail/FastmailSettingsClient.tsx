@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
 import { FastmailAccountsTable, type FastmailAccountRow } from '@/components/settings/FastmailAccountsTable';
 import { FastmailExclusionsTable, type FastmailExclusionRow } from '@/components/settings/FastmailExclusionsTable';
 import { FastmailAccountForm } from '@/components/settings/FastmailAccountForm';

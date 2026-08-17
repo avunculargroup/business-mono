@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { ExternalLink, BarChart3, Bookmark, Check } from 'lucide-react';
 import { useToast } from '@platform/ui/ToastProvider';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { savePostMetrics, promotePostToSnippet } from '@/app/actions/campaigns';
 import styles from './PublishedPosts.module.css';
 

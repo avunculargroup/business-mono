@@ -3,9 +3,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { SlideOver } from '@/components/ui/SlideOver';
+import { Button } from '@platform/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { SlideOver } from '@platform/ui/SlideOver';
 import { DocForm } from './DocForm';
 import { ImportDocxForm } from './ImportDocxForm';
 import { formatRelativeDate } from '@/lib/utils';

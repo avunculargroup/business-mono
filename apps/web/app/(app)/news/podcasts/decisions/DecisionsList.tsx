@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useToast } from '@platform/ui/ToastProvider';
 import { TRANSCRIPT_STATUS_LABELS, TRANSCRIPT_STATUS_COLORS } from '@/lib/podcasts';

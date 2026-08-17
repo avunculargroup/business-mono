@@ -1,10 +1,10 @@
 'use client';
 
 import { createCompany, updateCompany } from '@/app/actions/companies';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 type CompanyRow = {
   id: string;

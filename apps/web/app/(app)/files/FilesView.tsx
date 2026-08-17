@@ -5,8 +5,8 @@ import {
   Upload, Search, X, Download, Pencil, Trash2, Eye, EyeOff,
   Tag, Files, Link2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
 import { useToast } from '@platform/ui/ToastProvider';
 import { FileIcon } from '@/components/files/FileIcon';
 import { formatBytes, isImage, isPdf, getFileExt, uploadWithProgress } from '@/lib/files';

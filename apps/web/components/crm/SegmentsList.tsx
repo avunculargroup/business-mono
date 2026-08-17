@@ -2,10 +2,10 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { SegmentForm } from './SegmentForm';
 import { deleteSegment, updateSegment } from '@/app/actions/segments';
 import { useEntityList } from '@/hooks/useEntityList';

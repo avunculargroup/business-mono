@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/Card';
+import { Card } from '@platform/ui/Card';
 import styles from './BlockHeight.module.css';
 
 async function fetchHeight(): Promise<number | null> {

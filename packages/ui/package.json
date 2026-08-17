@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./tokens.css": "./src/tokens.css",
+    "./Form.module.css": "./src/Form.module.css",
     "./*": "./src/*.tsx",
     "./cn": "./src/cn.ts",
     "./useFocusTrap": "./src/useFocusTrap.ts"

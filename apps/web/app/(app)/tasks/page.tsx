@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { TasksContent } from './TasksContent';
-import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { SkeletonLoader } from '@platform/ui/SkeletonLoader';
 
 export default function TasksPage() {
   return (

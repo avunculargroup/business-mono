@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Library } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { formatTimestamp } from '@/lib/podcasts';
 import { formatDate } from '@/lib/utils';
 import { NEWS_CATEGORY_LABELS, type EpisodeLibraryCard, type NewsCategory } from '@platform/shared';

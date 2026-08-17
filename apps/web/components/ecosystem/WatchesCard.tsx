@@ -2,10 +2,10 @@
 
 import { useCallback, useState } from 'react';
 import { Plus, X, Pause, Play } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useToast } from '@platform/ui/ToastProvider';
 import { deleteWatch, setWatchEnabled } from '@/app/actions/ecosystem';
 import { ECOSYSTEM_WATCH_TYPE_LABELS } from '@platform/shared';

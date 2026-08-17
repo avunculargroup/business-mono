@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { createWatch } from '@/app/actions/ecosystem';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
 import {
   ECOSYSTEM_CHECK_FREQUENCY_LABELS,
   ECOSYSTEM_WATCH_TYPE_LABELS,
   type EcosystemWatchType,
 } from '@platform/shared';
-import styles from '@/components/ui/Form.module.css';
+import styles from '@platform/ui/Form.module.css';
 
 export type WatchRow = {
   id: string;

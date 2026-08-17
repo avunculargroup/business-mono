@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { NewsSourceForm, type NewsSourceFormValues } from './NewsSourceForm';
 import {
   createNewsSource,
@@ -17,7 +17,7 @@ import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate } from '@/lib/utils';
 import { useToast } from '@platform/ui/ToastProvider';
 import { Plus, Pencil, Trash2, ExternalLink, Rss, Mic, Youtube, Mail, FileText } from 'lucide-react';
-import type { RowAction } from '@/components/ui/RowActionsMenu';
+import type { RowAction } from '@platform/ui/RowActionsMenu';
 import type { NewsSourceRecord, NewsSourceType } from '@platform/shared';
 import styles from './sources.module.css';
 

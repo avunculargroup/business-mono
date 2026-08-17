@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CalendarDays, Grid3x3, Flag } from 'lucide-react';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import styles from './CampaignMatrix.module.css';
 
 // The campaign matrix — every variant with its beat, account, platform, status,

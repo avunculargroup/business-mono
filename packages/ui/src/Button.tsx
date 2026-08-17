@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import styles from './Button.module.css';
-import { cn } from '@platform/ui/cn';
+import { cn } from './cn';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg';

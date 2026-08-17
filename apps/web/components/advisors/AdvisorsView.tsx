@@ -3,10 +3,10 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Handshake, Plus } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Card } from '@platform/ui/Card';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { AdvisorForm } from './AdvisorForm';
 import { getInitials } from '@/lib/utils';
 import styles from '@/app/(app)/advisors/advisors.module.css';

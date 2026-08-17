@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
 import {
   FEEDBACK_SOURCE_LABELS,
   FEEDBACK_CATEGORY_LABELS,

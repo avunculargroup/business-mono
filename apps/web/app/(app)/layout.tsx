@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { UserProvider } from '@/providers/UserProvider';
 import { ToastProvider } from '@platform/ui/ToastProvider';
 import { AppShell } from '@/components/app-shell/AppShell';
-import { Toast } from '@/components/ui/Toast';
+import { Toast } from '@platform/ui/Toast';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();

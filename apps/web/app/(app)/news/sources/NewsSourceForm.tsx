@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { Rss, Mic, Youtube, Mail, FileText, ArrowUp, ArrowDown, Check, X } from 'lucide-react';
 import type {
   NewsSourceType,

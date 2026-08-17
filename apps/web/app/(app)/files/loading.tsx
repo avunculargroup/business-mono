@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { PageSkeleton } from '@/components/ui/PageSkeleton';
+import { PageSkeleton } from '@platform/ui/PageSkeleton';
 
 export default function FilesLoading() {
   return (

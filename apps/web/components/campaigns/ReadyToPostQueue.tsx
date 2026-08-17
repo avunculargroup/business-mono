@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react';
 import { Check, ExternalLink } from 'lucide-react';
 import { useToast } from '@platform/ui/ToastProvider';
-import { Button } from '@/components/ui/Button';
-import { CopyButton } from '@/components/ui/CopyButton';
+import { Button } from '@platform/ui/Button';
+import { CopyButton } from '@platform/ui/CopyButton';
 import { markVariantPosted } from '@/app/actions/campaigns';
 import styles from './ReadyToPostQueue.module.css';
 

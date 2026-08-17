@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { EmptyState } from '@platform/ui/EmptyState';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useToast } from '@platform/ui/ToastProvider';
 import { Pencil, Lock, MessageSquareQuote } from 'lucide-react';
 import { VoiceForm, VOICE_FORM_ID } from './VoiceForm';

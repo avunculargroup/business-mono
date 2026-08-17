@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 
 import { Button } from './Button';
-import { hasLocalClass } from '@/test/cssClass';
+import { hasLocalClass } from '../test/cssClass';
 
 describe('Button', () => {
   it('renders its children', () => {

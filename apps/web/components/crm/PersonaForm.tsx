@@ -3,8 +3,8 @@
 import { createPersona, updatePersona } from '@/app/actions/personas';
 import type { Persona } from '@platform/shared';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 interface PersonaFormProps {
   onSuccess: (persona?: Persona) => void;

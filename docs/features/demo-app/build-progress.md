@@ -4,9 +4,9 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** Phases 0–2 complete, with Phase 1 pending a one-time baseline bootstrap that needs
-Docker. All four decisions settled, all eight assumptions resolved. Phase 3 (`@platform/ui`
-components) is next.
+**Status:** Phases 0–3 complete, with Phase 1 pending a one-time baseline bootstrap that needs
+Docker. All four decisions settled, all eight assumptions resolved. Phase 4 (the full seam)
+is next — the long one.
 **Last updated:** 2026-08-08
 
 ---
@@ -488,11 +488,57 @@ automation in this phase.
 ### Phase 3 — `@platform/ui`, components (2–3 days)
 
 - Move the 24 components in `apps/web/components/ui/` (each `X.tsx` + `X.module.css` + `X.test.tsx`)
-  into `packages/ui/src/`. No Supabase coupling — this is the clean part.
+  into `packages/ui/src/`.
 - Keep deep imports; add no barrel (the repo has none anywhere).
-- Give `packages/ui` its own `vitest.config.ts` mirroring `apps/web`'s node/jsdom project split.
+- Give `packages/ui` its own `vitest.config.ts`.
 
-**Verify:** visual suite green with zero diffs. `pnpm test` and `pnpm typecheck` green at root.
+#### What shipped
+
+**"No Supabase coupling — this is the clean part" was wrong.** The survey found
+`components/ui` reaching into four app-level modules, so moving the components alone would have
+left the package importing its own consumer. Split into two commits as a result.
+
+**3a — the shared primitives.** `cn` (out of `lib/utils`, which keeps its app formatting helpers),
+`useFocusTrap` (sole consumer was `SlideOver`), and `ToastProvider`. The last is the significant
+one: 80 importers, zero dependencies beyond React, and **`apps/demo` needs it** — the write-blocked
+toast naming the real table is a specced feature, so a toast system is UI infrastructure and
+belongs in the package.
+
+`packages/ui` became a real TypeScript package here: `tsconfig.json`, its own `vitest.config.ts`
+(jsdom throughout, no node/jsdom split — every component renders), and its own `test/setup.ts` kept
+as a copy rather than shared, since a package reaching into its consumer's test helpers is the
+coupling this work removes. React and `lucide-react` are peer dependencies so both apps supply one
+copy.
+
+*Caught by grepping for leftovers:* eight test files call `vi.mock('@/providers/ToastProvider')`.
+Those are mock **targets**, not imports — left unrewritten they would have silently stopped
+intercepting, and the tests would have exercised the real provider while still reporting green.
+
+**3b — the components.** All 49 files moved, intra-package imports converted to relative, and 155
+import sites rewritten from `@/components/ui/*` to `@platform/ui/*`.
+
+Two things only the real build caught, after typecheck, lint and tests were all green:
+
+- **CSS Module type declarations.** `apps/web` gets these implicitly from `next-env.d.ts`; a
+  package consumed via `transpilePackages` does not. Added `src/css-modules.d.ts`.
+- **`Form.module.css` is consumed across the package boundary** by 14 `apps/web` components — a
+  pre-existing pattern, previously `@/components/ui/Form.module.css`. The `"./*": "./src/*.tsx"`
+  export mapped it to `Form.module.css.tsx` and webpack failed on all 14. Fixed with an explicit
+  `"./Form.module.css"` export rather than a `"./*.module.css"` wildcard, so sharing a stylesheet
+  stays a deliberate interface decision instead of making every internal CSS module public.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and
+`pnpm --filter @platform/web build` (compiled, 46 pages) all green, plus
+`e2e/tokens-resolve.spec.ts`.
+
+Test accounting reconciles exactly: `apps/web` went 73 files / 498 tests → 59 / 419, and
+`@platform/ui` 1 / 3 → 15 / 82. 419 + 82 = 501, unchanged from before the move.
+
+The screenshot suite's zero-diff check was again unavailable, baselines still unbootstrapped. That
+matters more here than in Phase 2 — moving 24 components with their CSS modules is exactly the kind
+of change screenshots catch and assertions do not.
+
+**Status: complete.**
 
 ### Phase 4 — `@platform/data`, full seam (4–6 weeks)
 

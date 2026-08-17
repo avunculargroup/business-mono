@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { SlideOver } from '@/components/ui/SlideOver';
+import { Button } from '@platform/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { SlideOver } from '@platform/ui/SlideOver';
 import { PersonaForm } from './PersonaForm';
 import {
   PERSONA_MARKET_SEGMENT_LABELS,

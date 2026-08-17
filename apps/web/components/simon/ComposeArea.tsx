@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Send } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import styles from './ComposeArea.module.css';
 
 interface ComposeAreaProps {

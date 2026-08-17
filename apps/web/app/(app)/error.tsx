@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { humanizeError } from '@/lib/errors';
 
 export default function AppError({

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { StatusChip } from './StatusChip';
-import { hasLocalClass } from '@/test/cssClass';
+import { hasLocalClass } from '../test/cssClass';
 
 describe('StatusChip', () => {
   it('renders the label text', () => {

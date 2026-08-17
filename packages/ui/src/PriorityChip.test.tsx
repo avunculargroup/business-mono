@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { PriorityChip } from './PriorityChip';
-import { hasLocalClass } from '@/test/cssClass';
+import { hasLocalClass } from '../test/cssClass';
 
 describe('PriorityChip', () => {
   it.each([

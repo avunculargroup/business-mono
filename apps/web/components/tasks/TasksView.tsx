@@ -1,12 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { PriorityChip } from '@/components/ui/PriorityChip';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { PriorityChip } from '@platform/ui/PriorityChip';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
 import { useEntityList } from '@/hooks/useEntityList';

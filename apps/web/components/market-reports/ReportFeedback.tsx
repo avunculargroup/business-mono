@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { submitMarketReportFeedback } from '@/app/actions/marketReportFeedback';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';

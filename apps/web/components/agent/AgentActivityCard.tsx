@@ -1,6 +1,6 @@
 'use client';
 
-import { AgentBadge } from '@/components/ui/AgentBadge';
+import { AgentBadge } from '@platform/ui/AgentBadge';
 import { ApprovalControls } from './ApprovalControls';
 import type { Database } from '@platform/db';
 import { formatDateTime } from '@/lib/utils';

@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { Card } from '@/components/ui/Card';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
 import styles from './integrations.module.css';
 
 const staticIntegrations = [

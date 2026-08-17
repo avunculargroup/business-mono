@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { addAdvisorContact } from '@/app/actions/advisors';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { useToast } from '@platform/ui/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 

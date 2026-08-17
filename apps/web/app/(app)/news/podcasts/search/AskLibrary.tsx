@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, Play, ShieldAlert } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { askLibraryQuestion, getLibraryQuestion } from '@/app/actions/library';
 import { formatTimestamp } from '@/lib/podcasts';
 import type { LibraryCitation, LibraryQuestion } from '@platform/shared';

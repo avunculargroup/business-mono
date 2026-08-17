@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Megaphone, Plus } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import styles from '../../app/(app)/campaigns/campaigns.module.css';
 
 // Client wrapper around the campaigns list so status chips update live —

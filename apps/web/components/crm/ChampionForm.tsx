@@ -3,8 +3,8 @@
 import { createChampion, updateChampion } from '@/app/actions/champions';
 import type { ChampionRow, ContactOption, CompanyOption } from './ChampionsList';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 interface ChampionFormProps {
   champion?: ChampionRow;

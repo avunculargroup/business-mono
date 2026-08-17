@@ -5,7 +5,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { cn } from '@platform/ui/cn';
+import { cn } from './cn';
 import styles from './Form.module.css';
 
 /**

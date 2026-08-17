@@ -3,9 +3,9 @@
 import { createInterview, updateInterview } from '@/app/actions/interviews';
 import type { InterviewRow } from './InterviewsList';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import { TagInput } from '@/components/ui/TagInput';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import { TagInput } from '@platform/ui/TagInput';
+import styles from '@platform/ui/Form.module.css';
 
 interface InterviewFormProps {
   contacts: { id: string; first_name: string; last_name: string }[];

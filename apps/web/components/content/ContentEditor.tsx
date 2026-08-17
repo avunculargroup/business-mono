@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useOptimistic, useTransition } from 'react';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { CopyButton } from '@/components/ui/CopyButton';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { CopyButton } from '@platform/ui/CopyButton';
 import { DraftFeedback, type DraftFeedbackEntry } from './DraftFeedback';
 import {
   updateContentStatus,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { createCompanyRecordType } from '@/app/actions/company';
 import { useToast } from '@platform/ui/ToastProvider';
 import styles from './CompanyTypeForm.module.css';

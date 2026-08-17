@@ -1,7 +1,7 @@
 'use client';
 
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { formatDate } from '@/lib/utils';
 
 export type TeamMemberRow = {

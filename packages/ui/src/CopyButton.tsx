@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { useToast } from '@platform/ui/ToastProvider';
+import { useToast } from './ToastProvider';
 import styles from './CopyButton.module.css';
 
 export function CopyButton({ text, label }: { text: string; label: string }) {

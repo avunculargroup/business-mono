@@ -6,9 +6,9 @@ import { Check, RefreshCw, Lock, Loader, MessageSquare, ListOrdered } from 'luci
 import { createClient } from '@/lib/supabase/browser';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useToast } from '@platform/ui/ToastProvider';
-import { Button } from '@/components/ui/Button';
-import { AutoGrowTextarea } from '@/components/ui/AutoGrowTextarea';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { AutoGrowTextarea } from '@platform/ui/AutoGrowTextarea';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { submitCampaignGateDecision } from '@/app/actions/campaigns';
 import styles from './CampaignWorkspace.module.css';
 

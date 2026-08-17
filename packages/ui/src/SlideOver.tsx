@@ -2,7 +2,7 @@
 
 import { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
-import { useFocusTrap } from '@platform/ui/useFocusTrap';
+import { useFocusTrap } from './useFocusTrap';
 import styles from './SlideOver.module.css';
 
 interface SlideOverProps {

@@ -10,10 +10,10 @@ import {
   StickyNote,
   MoreHorizontal,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
 import { InteractionForm } from './InteractionForm';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { formatDateTime } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import styles from './InteractionTimeline.module.css';

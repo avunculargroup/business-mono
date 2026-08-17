@@ -1,8 +1,8 @@
 'use client';
 
-import { Card } from '@/components/ui/Card';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { RowActionsMenu } from '@/components/ui/RowActionsMenu';
+import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { RowActionsMenu } from '@platform/ui/RowActionsMenu';
 import { Pencil, Trash2 } from 'lucide-react';
 import type { CompanyRecord } from '@platform/shared';
 import { COMPANY_CONTENT_TYPE_LABELS } from '@platform/shared';

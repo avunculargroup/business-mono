@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { PipelineChip } from './PipelineChip';
-import { hasLocalClass } from '@/test/cssClass';
+import { hasLocalClass } from '../test/cssClass';
 
 describe('PipelineChip', () => {
   it.each([

@@ -5,10 +5,10 @@ import Link from 'next/link';
 import {
   Check, Pin, PinOff, X, ExternalLink, MessageSquarePlus, UserCheck, Radar,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { useToast } from '@platform/ui/ToastProvider';
 import {
   acknowledgeChange, flagClientRelevant, pinChange, setChangeStatus, setCuratorNote,

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { toggleFastmailAccount, removeFastmailAccount } from '@/app/actions/fastmail';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { useToast } from '@platform/ui/ToastProvider';

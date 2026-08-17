@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { DataTable } from '@/components/ui/DataTable';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { DataTable } from '@platform/ui/DataTable';
 import { createDomain, updateDomain, deleteDomain } from '@/app/actions/company';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';

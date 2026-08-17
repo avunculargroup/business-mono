@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { SkeletonLoader } from '@platform/ui/SkeletonLoader';
 import { SignalsContent } from './SignalsContent';
 
 export default function SignalsPage() {

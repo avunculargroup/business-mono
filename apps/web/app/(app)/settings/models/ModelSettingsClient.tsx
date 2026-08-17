@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import type { ModelOption, ModelScopeType } from '@platform/shared';
 import { upsertModelConfig, resetModelConfig } from '@/app/actions/modelConfigs';
 import { ModelCombobox } from './ModelCombobox';
