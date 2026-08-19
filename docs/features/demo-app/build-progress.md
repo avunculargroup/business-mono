@@ -4,10 +4,38 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** Phases 0–3 complete, with Phase 1 pending a one-time baseline bootstrap that needs
-Docker. All four decisions settled, all eight assumptions resolved. Phase 4 (the full seam)
-is next — the long one.
-**Last updated:** 2026-08-08
+**Status:** Phases 0–3 complete, open for review as PR #368 (not yet merged). All four decisions
+settled, all eight assumptions resolved, screenshot baselines bootstrapped. Phase 4 (the full seam)
+is next — the long one, and the one whose justification rests on the client app being real.
+**Last updated:** 2026-08-19
+
+---
+
+## Picking this up cold
+
+Everything needed to continue is in this folder. In order:
+
+1. **This file** — the decisions, the phase plan, and what each completed phase actually shipped
+   (which differs from what it was specified to ship in several places; those deltas are recorded
+   under each phase's *What shipped* heading).
+2. **[`assumptions.md`](./assumptions.md)** — all eight original assumptions with their verified
+   answers. Four were wrong, two fatally. Read before trusting anything in the other spec docs.
+3. The four spec docs — reconciled against the repo in Phase 0, so their paths and table names are
+   now real.
+
+**Before starting Phase 4**, settle the scoping rule in *Consequence of decision 2* below. It is one
+sentence now and an audit of ~20 repository signatures later.
+
+**Kill criteria matter here.** Phase 4 is 4–6 weeks with no user-facing output, justified by a
+client app that was described as under consideration rather than committed. Checkpoints at
+verticals 4.1 and 4.3 exist so that premise gets re-examined rather than assumed; they only work if
+someone actually stops and looks.
+
+**Outside this folder**, Phases 1–3 also changed: `packages/ui` (new), `apps/web/app/globals.test.ts`
+(token guard), `e2e/` + `playwright.config.ts` + `.github/workflows/e2e.yml` (visual regression),
+and `apps/web/docs/e2e-playwright-proposal.md` (marked partially implemented, with the shipped
+subset described). `CLAUDE.md` carries the package list, import rules and testing conventions for
+all of it.
 
 ---
 
@@ -548,9 +576,11 @@ Two things only the real build caught, after typecheck, lint and tests were all 
 Test accounting reconciles exactly: `apps/web` went 73 files / 498 tests → 59 / 419, and
 `@platform/ui` 1 / 3 → 15 / 82. 419 + 82 = 501, unchanged from before the move.
 
-The screenshot suite's zero-diff check was again unavailable, baselines still unbootstrapped. That
-matters more here than in Phase 2 — moving 24 components with their CSS modules is exactly the kind
-of change screenshots catch and assertions do not.
+The screenshot suite's zero-diff check was unavailable at the time, baselines being still
+unbootstrapped. That mattered more here than in Phase 2 — moving 24 components with their CSS
+modules is exactly the kind of change screenshots catch and assertions do not. The gap was closed
+by a manual walk-through of the app before the baselines were captured in `7f74567`; those
+baselines lock in the post-move state rather than proving the move was inert.
 
 **Status: complete.**
 

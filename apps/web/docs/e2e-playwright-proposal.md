@@ -1,8 +1,41 @@
 # Proposal: Playwright E2E + Visual Regression for `apps/web`
 
-**Status:** Draft for review — not yet implemented.
+**Status:** **Partially implemented.** A deliberately narrow subset shipped; most of this
+document is still unbuilt. Read the box below before acting on anything here.
 **Author:** scoped alongside the Vitest unit/component setup.
-**Decision needed from the team:** see [Open questions](#open-questions) at the end.
+
+-----
+
+## What actually shipped (2026-08-08)
+
+Phase 1 of the demo-app plan took the **visual-regression subset only** —
+`playwright.config.ts` and `e2e/` at the **repo root**, not `apps/web/e2e/` as §6 proposes,
+because the suite never tests `apps/web`: it covers the static design-system specimens in
+`.claude/skills/bts-design/preview/` today and will cover `apps/demo` later.
+
+That sidesteps this document's two hardest problems. §2 and §4 wrestle with "every page depends
+on Supabase data, so E2E needs a backend that answers", solved via `page.route` stubs mirroring
+Supabase's wire format plus auth-cookie injection. Neither was needed, so **`e2e/fixtures/auth.ts`
+and `e2e/fixtures/supabase.ts` were never written** — and should not be, unless someone
+deliberately takes on the journey testing in §3.
+
+The §10 open questions were answered as: primary goal **visuals**, not journeys; **no** Option B
+local-Supabase stack; **advisory** CI posture (`.github/workflows/e2e.yml`); **Chromium only**;
+visual scope **design-system primitives**, plus the demo's surfaces later.
+
+Two things learned that this document does not anticipate:
+
+- Blocking Google Fonts to make the suite hermetic removes the *network* dependency but deepens
+  the dependency on **host-installed fonts**, since fallback stacks resolve differently per
+  machine. Baselines are therefore container-bound more strictly than §9 implies. `pnpm test:visual`
+  runs inside the CI image for this reason; `test:visual:local` is the raw escape hatch.
+- Token *values* need no browser at all. That check lives in `apps/web/app/globals.test.ts` in the
+  fast blocking gate, which is a better home than any screenshot.
+
+**Still unbuilt from this document:** every journey test in §3 (auth gate, CRUD), Option B, the
+Storybook/Chromatic fork in §5, and cross-browser coverage.
+
+-----
 
 -----
 

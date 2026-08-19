@@ -38,7 +38,10 @@ Transform tasks into verifiable goals before implementing:
 - Also run `pnpm --filter @platform/agents typecheck` before submitting — both checks are gated by the GitHub Actions PR workflow (`.github/workflows/test.yml`), so red here = red on the PR.
 - When you add a new tool, listener helper, webhook, or pure utility, add a `*.test.ts` next to it. Reuse `test/factories.ts` and `test/mocks/supabase.ts` rather than building one-off fixtures.
 - LLM-touching evals (`pnpm --filter @platform/agents test:eval`) are NOT run in CI. Run them locally after changes to Simon's routing, specialist registrations, or any agent's system prompt.
-- `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.{ts,tsx}` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. Pure-logic `*.test.ts` run in the `node` environment; component `*.test.tsx` run in `jsdom` with React Testing Library + `@testing-library/jest-dom` matchers (registered in `test/setup.ts`). The two environments are split via `test.projects` in `vitest.config.ts` — one project per environment, each matching its own file extension and carrying `extends: true` so it inherits the root `resolve.alias`, `oxc.jsx`, and `setupFiles`. A new component test only needs the `.test.tsx` extension to land in `jsdom`. Prefer role/text/attribute queries over CSS-module class names. Server-component pages are tested by mocking `@/lib/supabase/server` with the chainable fake in `test/mocks/supabase.ts` (web-side counterpart to the agents mock) and stubbing the interactive client child via `vi.mock`, then asserting query wiring + prop hand-off (see `app/(app)/crm/companies/page.test.tsx`). Root `pnpm test` runs both apps via Turborepo, so both are gated by the PR workflow.
+- `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.{ts,tsx}` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. Pure-logic `*.test.ts` run in the `node` environment; component `*.test.tsx` run in `jsdom` with React Testing Library + `@testing-library/jest-dom` matchers (registered in `test/setup.ts`). The two environments are split via `test.projects` in `vitest.config.ts` — one project per environment, each matching its own file extension and carrying `extends: true` so it inherits the root `resolve.alias`, `oxc.jsx`, and `setupFiles`. A new component test only needs the `.test.tsx` extension to land in `jsdom`. Prefer role/text/attribute queries over CSS-module class names. Server-component pages are tested by mocking `@/lib/supabase/server` with the chainable fake in `test/mocks/supabase.ts` (web-side counterpart to the agents mock) and stubbing the interactive client child via `vi.mock`, then asserting query wiring + prop hand-off (see `app/(app)/crm/companies/page.test.tsx`). Root `pnpm test` runs every package via Turborepo — `apps/agents`, `apps/web`, `packages/ui`, `packages/voice` — so all are gated by the PR workflow.
+- `packages/ui` has its own Vitest suite (`pnpm --filter @platform/ui test`). It is jsdom throughout, with no node/jsdom project split, because every module in it renders. Shared presentational components and their `*.test.tsx` live here, **not** in `apps/web/components/` — there is no `components/ui/` in the app any more. Design tokens live in `packages/ui/src/tokens.css`; `apps/web/app/globals.css` only carries app-level base styles and defines no tokens.
+- Design tokens are guarded by `apps/web/app/globals.test.ts`, which asserts the canonical set and that `.claude/skills/bts-design/colors_and_type.css` stays identical to it. That skill file is a deliberate copy, not an `@import`, because the skill's workflow is to copy assets out of the repo — change a token in one and you must change it in the other in the same commit, or the build goes red.
+- Visual regression (`e2e/`, Playwright) is **advisory and separate** from `pnpm test`. Run it with `pnpm test:visual`, which shells out to the same container image CI uses — baselines are container-specific, so a raw local run (`test:visual:local`) diffs on text-heavy specimens and is not a regression. See `.github/workflows/e2e.yml`.
 
 -----
 
@@ -53,7 +56,10 @@ Transform tasks into verifiable goals before implementing:
 ├── packages/
 │   ├── db/              # Supabase client, types, migrations, RPC functions
 │   ├── shared/          # Shared types, constants, utilities
-│   └── signal/          # TypeScript client for signal-cli REST API sidecar
+│   ├── signal/          # TypeScript client for signal-cli REST API sidecar
+│   ├── ui/              # Design tokens + shared presentational components (consumed by apps/web)
+│   └── voice/           # Voice/transcription helpers
+├── e2e/                 # Playwright visual regression — advisory, separate from `pnpm test`
 ├── infra/
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/
@@ -75,13 +81,18 @@ Transform tasks into verifiable goals before implementing:
 - `@platform/db` — database client, generated types, migration SQL, Supabase RPC wrappers
 - `@platform/shared` — shared TypeScript types, constants, enums, utility functions
 - `@platform/signal` — typed HTTP client for signal-cli REST API sidecar
+- `@platform/ui` — design tokens (`src/tokens.css`) and shared presentational components
+- `@platform/voice` — voice/transcription helpers
 - `@platform/agents` — Mastra agent server (not consumed by other packages)
 - `@platform/web` — Next.js frontend (not consumed by other packages)
 
 ### Import rules
 
 - `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
-- `apps/web` imports from `@platform/db` and `@platform/shared` (NOT `@platform/signal`)
+- `apps/web` imports from `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
+- `packages/ui` imports from `@platform/shared` only — never from `apps/*`. It is consumed by
+  `apps/web` today and by `apps/demo` later, so any dependency on app code breaks that. React and
+  `lucide-react` are peer dependencies.
 - `packages/db` imports from `@platform/shared`
 - `packages/shared` imports from nothing (leaf package)
 - `apps/*` never import from each other
