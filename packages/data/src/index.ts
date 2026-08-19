@@ -53,6 +53,14 @@ export type {
   ThreadSegment,
 } from './repositories/content';
 export type {
+  DashboardIndicators,
+  IndicatorLatest,
+  IndicatorSeriesPoint,
+  IndicatorsRepository,
+  OnchainLatest,
+  OnchainSeriesPoint,
+} from './repositories/indicators';
+export type {
   MarketReportDetail,
   MarketReportRepository,
   MarketReportStatus,

@@ -21,7 +21,7 @@ interface IndicatorCardProps {
 
 export function IndicatorCard({ row, series }: IndicatorCardProps) {
   const decimals = row.decimals ?? 2;
-  const fresh = isFresh(row.days_since_release);
+  const fresh = isFresh(row.daysSinceRelease);
   // Daily market tickers show a day-precise "as at" (and no month period or
   // ~daily "next release" line, which would just be noise).
   const daily = isDailyGranularity(row);
@@ -30,7 +30,7 @@ export function IndicatorCard({ row, series }: IndicatorCardProps) {
     <div className={styles.card}>
       <div className={styles.top}>
         <div>
-          <div className={styles.label}>{row.short_label}</div>
+          <div className={styles.label}>{row.shortLabel}</div>
           <div className={styles.cat}>{categoryLabel(row.category)}</div>
         </div>
         {fresh && (
@@ -41,12 +41,12 @@ export function IndicatorCard({ row, series }: IndicatorCardProps) {
         )}
       </div>
 
-      {row.current_value == null ? (
+      {row.currentValue == null ? (
         <p className={styles.empty}>Awaiting first print</p>
       ) : (
         <>
           <div className={styles.valueRow}>
-            <span className={styles.value}>{formatValue(row.current_value, decimals)}</span>
+            <span className={styles.value}>{formatValue(row.currentValue, decimals)}</span>
             <span className={styles.unit}>{unitLabel(row.unit)}</span>
           </div>
 
@@ -55,24 +55,24 @@ export function IndicatorCard({ row, series }: IndicatorCardProps) {
 
           {series.length >= 2 && <Sparkline series={series} />}
 
-          {row.is_revision && row.superseded_value != null && (
-            <div className={styles.chip}>revised from {formatValue(row.superseded_value, decimals)}</div>
+          {row.isRevision && row.supersededValue != null && (
+            <div className={styles.chip}>revised from {formatValue(row.supersededValue, decimals)}</div>
           )}
 
-          {row.period_date && (
+          {row.periodDate && (
             <div className={styles.asat}>
               {daily ? (
-                formatDay(row.period_date)
+                formatDay(row.periodDate)
               ) : (
                 <>
-                  {formatPeriod(row.period_date)}
-                  {row.released_at && <> · released {formatDay(row.released_at)}</>}
+                  {formatPeriod(row.periodDate)}
+                  {row.releasedAt && <> · released {formatDay(row.releasedAt)}</>}
                 </>
               )}
             </div>
           )}
-          {!daily && row.expected_next_release && (
-            <div className={styles.next}>next release ~ {formatDay(row.expected_next_release)}</div>
+          {!daily && row.expectedNextRelease && (
+            <div className={styles.next}>next release ~ {formatDay(row.expectedNextRelease)}</div>
           )}
         </>
       )}

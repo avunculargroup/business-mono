@@ -39,7 +39,7 @@ export function OnchainIndicators({ latest, series }: OnchainIndicatorsProps) {
         <Group
           key={group}
           label={groupLabel(group)}
-          rows={latest.filter((r) => r.metric_group === group)}
+          rows={latest.filter((r) => r.metricGroup === group)}
           seriesByKey={seriesByKey}
         />
       ))}

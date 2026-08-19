@@ -738,7 +738,7 @@ commit.
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
 | 4.3 | Content and campaigns ✅ | `/content/*`, `/campaigns/*` | Content only — `/campaigns/*` is not a demo surface |
-| 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes. Split: **4.4a market reports ✅**, 4.4b indicators + onchain |
+| 4.4 | Market reports, indicators, onchain ✅ | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
 | — | *critical path ends; below is background* | | |
@@ -1200,6 +1200,44 @@ state on this page: the deterministic step ran, its output is there, and the nar
 and a malformed-blob case. The page test moved off the Supabase mock and gained one the old shape
 could not express — that the quiet-day chip appears only on a quiet day. Both routes walked
 manually, published and held.
+
+##### 4.4b — Indicators and onchain: what shipped, and 4.4 closed
+
+The four indicator views on `/`, the two formatting libraries built over them, and the four
+dashboard components. Vertical 4.4 is complete.
+
+**The contract's one compliance rule, held by construction.**
+[`repository-contract.md` § Repository interfaces](./repository-contract.md#repository-interfaces)
+says the indicators repository returns deltas as signed numbers and must not return a direction,
+colour or sentiment — an AR must not imply a recommendation, and green-up/red-down is that
+implication. The existing code already respected this carefully (`computeDelta` is commented
+"direction only, never good/bad"; `signalState` "NEVER mapped to buy/sell or a colour semantic"),
+and the seam makes it structural rather than conventional: the read model carries
+`changeSincePrior` and stops, and turning a sign into an arrow stays in
+`lib/indicators/format.ts`. There is a test asserting the read model has no `direction`, `kind`,
+`colour`, `sentiment` or `trend` property, so reintroducing one fails rather than merely reading
+oddly in review.
+
+**One method, not four.** The four views are read together, rendered together and useless apart —
+a latest row with no series has no sparkline, a series with no latest row has nothing to label it.
+`getDashboard` returns the block. It also fails as a block: if any one of the four errors the whole
+call throws, because a dashboard silently missing its on-chain half reads as "nothing happened on
+chain", which is a different claim from "we could not load it".
+
+**A workaround expired.** `isDailyGranularity` cast its row structurally —
+`(row as { period_granularity?: string | null })` — with a comment that the generated view type
+lagged the migration adding the column. The read model declares `periodGranularity` outright, so the
+cast is gone. Fourth stale-type finding of the phase, and the first that was a workaround rather
+than a blanket `as any`.
+
+**`/` is now part-converted, deliberately.** Tasks, projects, contacts and routines belong to
+verticals 4.6–4.11 and still read on the raw client alongside the repository call. Same accepted
+intermediate state as `/content`'s `team_members` read.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 142 → 149 tests. The two formatting libraries and their tests, plus
+`IndicatorCard`, `OnchainCard`, `MacroIndicators`, `OnchainIndicators` and `TrendValuation`, moved
+onto the read models — 49 columns across four views. `/` walked manually.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

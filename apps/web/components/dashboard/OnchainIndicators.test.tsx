@@ -7,15 +7,15 @@ function row(overrides: Partial<OnchainDashboardRow> = {}): OnchainDashboardRow 
   return {
     key: 'hash_rate',
     name: 'Network Hash Rate (7d)',
-    short_label: 'Hash Rate',
-    metric_group: 'network_security',
+    shortLabel: 'Hash Rate',
+    metricGroup: 'network_security',
     unit: 'eh_s',
     decimals: 1,
     value: 642,
-    observed_at: '2026-06-20',
-    change_since_prior: 1.5,
-    pct_change_since_prior: 0.23,
-    days_since_observed: 1,
+    observedAt: '2026-06-20',
+    changeSincePrior: 1.5,
+    pct_changeSincePrior: 0.23,
+    daysSinceObserved: 1,
     signal: null,
     ...overrides,
   } as OnchainDashboardRow;
@@ -23,10 +23,10 @@ function row(overrides: Partial<OnchainDashboardRow> = {}): OnchainDashboardRow 
 
 function seriesFor(key: string, values: number[]): OnchainSeriesPoint[] {
   return values.map((value, i) => ({
-    indicator_id: key,
+    indicatorId: key,
     key,
-    short_label: key,
-    observed_at: `2026-06-${10 + i}`,
+    shortLabel: key,
+    observedAt: `2026-06-${10 + i}`,
     value,
   })) as OnchainSeriesPoint[];
 }
@@ -34,11 +34,11 @@ function seriesFor(key: string, values: number[]): OnchainSeriesPoint[] {
 describe('OnchainIndicators', () => {
   it('groups metrics by metric_group and renders values + EH/s unit', () => {
     const rows = [
-      row({ key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', value: 642 }),
+      row({ key: 'hash_rate', shortLabel: 'Hash Rate', metricGroup: 'network_security', value: 642 }),
       row({
         key: 'active_addresses',
-        short_label: 'Active Addrs',
-        metric_group: 'behaviour_valuation',
+        shortLabel: 'Active Addrs',
+        metricGroup: 'behaviour_valuation',
         unit: 'count',
         decimals: 0,
         value: 920000,
@@ -57,7 +57,7 @@ describe('OnchainIndicators', () => {
   it('renders the Hash-Ribbons state as a neutral word, never a buy/sell call', () => {
     render(
       <OnchainIndicators
-        latest={[row({ key: 'hash_ribbons', short_label: 'Hash Ribbons', unit: 'signal', value: 0.5, signal: 'recovery' })]}
+        latest={[row({ key: 'hash_ribbons', shortLabel: 'Hash Ribbons', unit: 'signal', value: 0.5, signal: 'recovery' })]}
         series={[]}
       />,
     );
@@ -70,7 +70,7 @@ describe('OnchainIndicators', () => {
   it('shows the MVRV historical-range marker (context, not a colour judgement)', () => {
     render(
       <OnchainIndicators
-        latest={[row({ key: 'mvrv', short_label: 'MVRV', metric_group: 'behaviour_valuation', unit: 'ratio', decimals: 2, value: 2.1 })]}
+        latest={[row({ key: 'mvrv', shortLabel: 'MVRV', metricGroup: 'behaviour_valuation', unit: 'ratio', decimals: 2, value: 2.1 })]}
         series={seriesFor('mvrv', [1.0, 3.5, 2.1])}
       />,
     );
@@ -82,7 +82,7 @@ describe('OnchainIndicators', () => {
   it('flags top-pool concentration above the threshold', () => {
     render(
       <OnchainIndicators
-        latest={[row({ key: 'pool_concentration_top', short_label: 'Top Pool', unit: 'percent', value: 41 })]}
+        latest={[row({ key: 'pool_concentration_top', shortLabel: 'Top Pool', unit: 'percent', value: 41 })]}
         series={[]}
       />,
     );
@@ -93,14 +93,14 @@ describe('OnchainIndicators', () => {
     render(
       <OnchainIndicators
         latest={[
-          row({ days_since_observed: 1 }),
+          row({ daysSinceObserved: 1 }),
           row({
             key: 'mvrv',
-            short_label: 'MVRV',
-            metric_group: 'behaviour_valuation',
+            shortLabel: 'MVRV',
+            metricGroup: 'behaviour_valuation',
             value: null,
-            observed_at: null,
-            days_since_observed: null,
+            observedAt: null,
+            daysSinceObserved: null,
           }),
         ]}
         series={[]}

@@ -15,28 +15,28 @@ import {
 
 function row(overrides: Partial<IndicatorLatest> = {}): IndicatorLatest {
   return {
-    indicator_id: 'i1',
+    indicatorId: 'i1',
     name: 'US M2 Money Supply',
-    short_label: 'US M2',
+    shortLabel: 'US M2',
     region: 'us',
     category: 'money_supply',
     unit: 'usd_billion',
     decimals: 1,
-    period_date: '2026-05-01',
-    current_value: 21399,
-    released_at: '2026-05-27',
-    is_revision: false,
-    superseded_value: null,
-    prior_value: 21330,
-    change_since_prior: 69,
-    pct_change_since_prior: 0.32,
-    year_ago_value: 21000,
-    year_ago_period: '2025-05-01',
-    yoy_change: 399,
-    yoy_pct_change: 1.9,
-    days_since_release: 3,
-    typical_release_gap_days: 31,
-    expected_next_release: '2026-06-27',
+    periodDate: '2026-05-01',
+    currentValue: 21399,
+    releasedAt: '2026-05-27',
+    isRevision: false,
+    supersededValue: null,
+    priorValue: 21330,
+    changeSincePrior: 69,
+    pctChangeSincePrior: 0.32,
+    yearAgoValue: 21000,
+    yearAgoPeriod: '2025-05-01',
+    yoyChange: 399,
+    yoyPctChange: 1.9,
+    daysSinceRelease: 3,
+    typicalReleaseGapDays: 31,
+    expectedNextRelease: '2026-06-27',
     ...overrides,
   } as IndicatorLatest;
 }
@@ -58,8 +58,8 @@ describe('labels', () => {
 
 describe('isDailyGranularity', () => {
   it('is true only when the row is a daily series', () => {
-    expect(isDailyGranularity(row({ period_granularity: 'daily' } as Partial<IndicatorLatest>))).toBe(true);
-    expect(isDailyGranularity(row({ period_granularity: 'monthly' } as Partial<IndicatorLatest>))).toBe(false);
+    expect(isDailyGranularity(row({ periodGranularity: 'daily' } as Partial<IndicatorLatest>))).toBe(true);
+    expect(isDailyGranularity(row({ periodGranularity: 'monthly' } as Partial<IndicatorLatest>))).toBe(false);
     // Absent (pre-migration view) falls back to false — monthly presentation.
     expect(isDailyGranularity(row())).toBe(false);
   });
@@ -93,19 +93,19 @@ describe('computeDelta', () => {
     expect(computeDelta(row())).toEqual({ kind: 'up', magnitude: '+69.0', pct: '+0.32%' });
   });
   it('reports a down move with the minus sign', () => {
-    const d = computeDelta(row({ change_since_prior: -0.25, pct_change_since_prior: null, decimals: 2 }));
+    const d = computeDelta(row({ changeSincePrior: -0.25, pctChangeSincePrior: null, decimals: 2 }));
     expect(d.kind).toBe('down');
     expect(d.magnitude).toBe('−0.25');
     expect(d.pct).toBeNull();
   });
   it('is flat when unchanged or null', () => {
-    expect(computeDelta(row({ change_since_prior: 0 })).kind).toBe('flat');
-    expect(computeDelta(row({ change_since_prior: null })).kind).toBe('flat');
+    expect(computeDelta(row({ changeSincePrior: 0 })).kind).toBe('flat');
+    expect(computeDelta(row({ changeSincePrior: null })).kind).toBe('flat');
   });
   it('suppresses percent for a 0-centred activity diffusion index', () => {
     // Philly Fed: 26.7 → -0.4, a -27.1 point move that pct would render as ~ -101%.
     const d = computeDelta(
-      row({ category: 'activity', decimals: 1, change_since_prior: -27.1, pct_change_since_prior: -101.5 }),
+      row({ category: 'activity', decimals: 1, changeSincePrior: -27.1, pctChangeSincePrior: -101.5 }),
     );
     expect(d).toEqual({ kind: 'down', magnitude: '−27.1', pct: null });
   });
@@ -113,18 +113,18 @@ describe('computeDelta', () => {
 
 describe('pickYoy (category-driven)', () => {
   it('uses absolute pp for policy rates', () => {
-    const y = pickYoy(row({ category: 'policy_rate', decimals: 2, yoy_change: -0.5, yoy_pct_change: -11 }));
+    const y = pickYoy(row({ category: 'policy_rate', decimals: 2, yoyChange: -0.5, yoyPctChange: -11 }));
     expect(y).toEqual({ label: 'vs 1yr', text: '−0.50pp' });
   });
   it('uses percent for inflation / money supply', () => {
     expect(pickYoy(row({ category: 'money_supply' }))).toEqual({ label: 'YoY', text: '+1.9%' });
   });
   it('uses absolute points for an activity diffusion index', () => {
-    const y = pickYoy(row({ category: 'activity', decimals: 1, yoy_change: -5.2, yoy_pct_change: -130 }));
+    const y = pickYoy(row({ category: 'activity', decimals: 1, yoyChange: -5.2, yoyPctChange: -130 }));
     expect(y).toEqual({ label: 'vs 1yr', text: '−5.2 pts' });
   });
   it('returns null when the relevant column is null', () => {
-    expect(pickYoy(row({ category: 'money_supply', yoy_pct_change: null }))).toBeNull();
+    expect(pickYoy(row({ category: 'money_supply', yoyPctChange: null }))).toBeNull();
   });
 });
 

@@ -26,7 +26,7 @@ const ORDER = [
  */
 export function TrendValuation({ latest, series = [] }: TrendValuationProps) {
   const rows = latest
-    .filter((r) => r.metric_group === 'trend_valuation')
+    .filter((r) => r.metricGroup === 'trend_valuation')
     .sort((a, b) => {
       const ra = ORDER.indexOf(a.key ?? '');
       const rb = ORDER.indexOf(b.key ?? '');

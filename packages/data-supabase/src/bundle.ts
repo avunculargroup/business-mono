@@ -3,6 +3,7 @@ import { createAdapterContext, type PlatformSupabaseClient } from './adapterCont
 import { createAgentActivityRepository } from './repositories/agentActivity';
 import { createCampaignRepository } from './repositories/campaigns';
 import { createContentRepository } from './repositories/content';
+import { createIndicatorsRepository } from './repositories/indicators';
 import { createMarketReportRepository } from './repositories/marketReports';
 import { createResearchRepository } from './repositories/research';
 
@@ -28,6 +29,7 @@ export function createSupabaseRepositories(
     content: createContentRepository(adapter),
     campaigns: createCampaignRepository(adapter),
     marketReports: createMarketReportRepository(adapter),
+    indicators: createIndicatorsRepository(adapter),
     mode: 'live',
   };
 }
