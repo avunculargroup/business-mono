@@ -6,8 +6,9 @@ the revised session plan that follows from it. Same purpose as
 
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
-bootstrapped. Phase 4 (the full seam) is next — the long one, and the one whose justification rests
-on the client app being real.
+bootstrapped. Phase 4.0 (the `@platform/data` foundation) is complete; vertical 4.1 is next. Phase 4
+is the long one, and the part of it beyond 4.6 is the part whose justification rests on the client
+app being real.
 **Last updated:** 2026-08-19
 
 ---
@@ -659,6 +660,60 @@ once a client app has real users — the posture must change before, not during,
   client. Doing this first makes every subsequent vertical smaller.
 - Add the new packages to `transpilePackages`, the vitest `resolve.alias` map, and the lint `--dir`
   list.
+
+##### What shipped
+
+**`packages/data` is complete and `packages/data-supabase` is a real scaffold, but three of the
+listed items moved to 4.1** — the bundle factory, the `getAuthedClient` conversion, and the provider
+mount. All three need a domain to be more than a no-op: `createSupabaseRepositories` with zero
+domains returns `{ mode: 'live' }`, `getAuthedClient` would hand back that empty bundle while every
+action still used the raw client, and a mounted provider nothing calls `useRepositories()` against
+proves nothing. Shipping them empty would have been scaffolding that CI cannot exercise. They land
+with 4.1's first domain, which is the commit that makes them non-vacuous.
+
+What `data-supabase` does carry is the part that is real without a domain: `createAdapterContext`,
+which binds client and principal at construction and freezes them, and `resolveReadContext`, which
+defaults `asOf` so `apps/web` call sites can omit it. The scoping mechanism is in place before the
+first repository exists, which was the point of settling the rule early.
+
+**The scoping guard has two locks, and both were verified by breaking them.** Adding a `clientId`
+field to `ReadContext` fails `tsc` on `READ_CONTEXT_KEYS_ARE_EXHAUSTIVE`; widening
+`READ_CONTEXT_KEYS` to make `tsc` pass then fails `context.test.ts`. Checked by doing exactly that
+and watching each fire in turn — the Phase 1 lesson about a guard that passes while the thing it
+guards is broken applies here more than anywhere, since this one protects a security boundary.
+
+**A finding the contract doc does not cover: the bundle cannot cross the RSC boundary.**
+[`repository-contract.md`](./repository-contract.md) says "both apps mount the same provider with a
+different bundle", which reads as though the server layout builds the bundle and passes it down. It
+cannot — a bundle is an object of methods, and functions are not serialisable across the React
+Server Component boundary. The working shape is two layers: each app owns a thin `'use client'`
+wrapper that receives *serialisable* inputs (a `Principal`, an anchor date) from its server layout,
+constructs its bundle inside the client boundary, and mounts `@platform/data`'s provider with it.
+Server components and server actions never touch the provider at all — they call the adapter factory
+directly, per request. This is why `apps/web` needs 7 browser-client call sites converted in their
+verticals, not just the server ones. Recorded in the provider's docblock.
+
+**The React provider needed its own subpath export.** Re-exporting `provider.tsx` from
+`@platform/data`'s root index broke `tsc --noEmit` in `@platform/data-supabase`, which has no React
+and no `jsx` setting and was being handed JSX it never asked for. It is now
+`@platform/data/provider`, mirroring how `@platform/db` splits `./server` and `./browser`. Worth
+knowing before `data-fixtures`: any React-touching module in these packages needs the same
+treatment.
+
+**Two wiring details.** The vitest alias map is order-sensitive — Vite's object form does prefix
+matching, so `@platform/data-supabase` and `@platform/data/provider` must be listed *before*
+`@platform/data` or the shorter key claims them. And the lint `--dir` addition was **not** made, for
+the reason Phase 2 gave: pointing `apps/web`'s lint at `../../packages/data/src` would have a
+package linted by its consumer. Both packages lint themselves via `tsc --noEmit`, same as every
+other package.
+
+**Verify — what was actually run.** `pnpm typecheck` (13 tasks), `pnpm lint` (8 tasks), `pnpm test`
+(10 tasks) and `pnpm --filter @platform/web build` all green. New suites: `@platform/data` 4 files /
+16 tests, `@platform/data-supabase` 1 / 4. `apps/web` unchanged at 62 / 483 — nothing in the app
+imports the new packages yet, which is the honest reading of this commit: the wiring is declared and
+compiles, and 4.1 is what exercises it.
+
+**Status: complete, with the three items above carried into 4.1.**
 
 #### 4.1 onwards — One vertical at a time
 

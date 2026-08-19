@@ -113,13 +113,21 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/voice   →  @platform/db, @platform/shared
 @platform/web     →  @platform/db      →  @platform/shared
                   →  @platform/ui      →  @platform/shared
+                  →  @platform/data
+                  →  @platform/data-supabase  →  @platform/data, @platform/db
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
 
 `@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
 presentational components, and is written to be consumed by more than one app — so a dependency
 on app code would defeat the point. React and `lucide-react` are peer dependencies.
+
+`@platform/data` holds the repository interfaces both apps code against; `@platform/data-supabase`
+is the live implementation. They are separate packages rather than one with subpath exports so that
+a fixture-backed app can simply not depend on the Supabase one and have that enforced by
+`package.json` rather than by discipline. `@platform/data` never imports a database client.
+See [`docs/features/demo-app/repository-contract.md`](./docs/features/demo-app/repository-contract.md).
 
 ---
 
