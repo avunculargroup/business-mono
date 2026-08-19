@@ -2,7 +2,7 @@
 
 import { AgentBadge } from '@platform/ui/AgentBadge';
 import { ApprovalControls } from './ApprovalControls';
-import type { AgentActivityItem } from '@platform/data';
+import type { AgentActivityItem, ProposedAction } from '@platform/data';
 import { formatDateTime } from '@/lib/utils';
 import styles from './AgentActivityCard.module.css';
 
@@ -48,6 +48,29 @@ function parseAction(action: string): ParsedAction {
   return { prefix: null, message: action };
 }
 
+/** `create_task` → `Create task`. */
+function humanizeType(type: string): string {
+  const words = type.replace(/_/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * What to show for one proposed action.
+ *
+ * Until 2026-08-19 this rendered `pa.description` directly, and no producer has
+ * ever written that field — so every proposed action in this list rendered as an
+ * empty bullet. The read model now exposes the discriminator and the label
+ * separately, and this falls back through them so an entry always says
+ * something: `Create task: Follow up with Acme`, or just `Suggested rewrite`
+ * when the producer records only what kind of action it is.
+ */
+function proposedActionText(action: ProposedAction): string {
+  if (action.label) {
+    return action.type ? `${humanizeType(action.type)}: ${action.label}` : action.label;
+  }
+  return action.type ? humanizeType(action.type) : 'Proposed action';
+}
+
 const TRIGGER_LABELS: Record<string, string> = {
   call_transcript: 'Call transcript',
   signal_message: 'Signal message',
@@ -89,10 +112,7 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
         <ul className={styles.actionList}>
           {proposedActions.map((pa, i) => (
             <li key={i} className={styles.actionItem}>
-              {pa.description}
-              {pa.entityType && (
-                <span className={styles.entity}> ({pa.entityType})</span>
-              )}
+              {proposedActionText(pa)}
             </li>
           ))}
         </ul>

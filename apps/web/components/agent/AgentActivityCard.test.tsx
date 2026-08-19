@@ -12,19 +12,36 @@ vi.mock('./ApprovalControls', () => ({
 }));
 
 describe('AgentActivityCard', () => {
-  it('renders the proposed-action descriptions and their entity types', () => {
+  it('labels a proposed action with its kind and its name', () => {
+    render(
+      <AgentActivityCard
+        activity={fakeActivityItem({
+          proposedActions: [{ type: 'create_task', label: 'Follow up on the letter' }],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Create task: Follow up on the letter')).toBeInTheDocument();
+  });
+
+  it('falls back to the kind alone when the producer records no name', () => {
+    // Most producers write only a discriminator. Rendering the label field
+    // directly is what put an empty bullet on this page for every proposed
+    // action ever logged, so an entry must never render as nothing.
     render(
       <AgentActivityCard
         activity={fakeActivityItem({
           proposedActions: [
-            { description: 'Update contact', entityType: 'contacts', entityId: 'c1' },
+            { type: 'suggested_rewrite', label: null },
+            { type: null, label: null },
           ],
         })}
       />,
     );
 
-    expect(screen.getByText('Update contact')).toBeInTheDocument();
-    expect(screen.getByText('(contacts)')).toBeInTheDocument();
+    expect(screen.getByText('Suggested rewrite')).toBeInTheDocument();
+    expect(screen.getByText('Proposed action')).toBeInTheDocument();
+    expect(screen.queryAllByRole('listitem').map((li) => li.textContent)).not.toContain('');
   });
 
   it('counts proposed actions instead of listing them when compact', () => {
@@ -33,11 +50,8 @@ describe('AgentActivityCard', () => {
         compact
         activity={fakeActivityItem({
           proposedActions: [
-            // The shapes other producers write map to all-null entries. They
-            // still have to be counted — that count is all the compact card
-            // shows, and dropping them would under-report the work proposed.
-            { description: null, entityType: null, entityId: null },
-            { description: null, entityType: null, entityId: null },
+            { type: 'variant', label: null },
+            { type: 'compliance', label: null },
           ],
         })}
       />,

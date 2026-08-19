@@ -20,11 +20,25 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+/** First of `keys` that holds a non-empty string. */
+function firstString(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = readString(record[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
 /**
  * `proposed_actions` is heterogeneous JSONB — see the note on `ProposedAction`.
+ *
  * Anything that is not an array of objects reads as no proposed actions rather
- * than throwing: this column has six writers and no schema, so a malformed blob
- * must not take out the whole feed.
+ * than throwing: this column has eight writers and no schema, so a malformed
+ * blob must not take out the whole feed. Two of those writers
+ * (`app/actions/champions.ts`, `app/actions/pipeline.ts`) store a bare object
+ * rather than an array, and land here as no proposed actions — flagged, not
+ * fixed, since changing what a producer writes is a change to that producer's
+ * vertical.
  */
 function toProposedActions(value: ActivityRow['proposed_actions']): ProposedAction[] {
   if (!Array.isArray(value)) return [];
@@ -34,9 +48,8 @@ function toProposedActions(value: ActivityRow['proposed_actions']): ProposedActi
     const record = entry as Record<string, unknown>;
     return [
       {
-        description: readString(record['description']),
-        entityType: readString(record['entity_type']),
-        entityId: readString(record['entity_id']),
+        type: firstString(record, ['type', 'kind']),
+        label: firstString(record, ['description', 'title', 'name']),
       },
     ];
   });

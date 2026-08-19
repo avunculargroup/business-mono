@@ -770,15 +770,14 @@ rewrites. Expect this shape to repeat — few tables belong to exactly one verti
 of what is real:
 
 - **`ProposedAction` is not a struct.** [`repository-contract.md`](./repository-contract.md)
-  specifies `{ id, summary, targetTable, severity }`. *No producer writes that.* Six do write to the
-  column, in six shapes — `{ type: 'variant', platform, is_thread }`, `{ type: 'create_task', title,
-  due_date, assignee }`, `{ type: 'social_post', … }` and so on — and only the recorder's CRM-update
-  shape carries the `description` the UI renders. The read model types the three fields the UI reads
-  and drops the rest. **Pre-existing and not fixed here:** `/activity` renders `pa.description` for
-  every entry, so five of the six producers already render blank list items. Worth a decision, in
-  its own change.
+  specifies `{ id, summary, targetTable, severity }`. *No producer writes that.* Eight write to the
+  column, in eight shapes — `{ type: 'variant', platform, is_thread }`, `{ type: 'create_task',
+  title, due_date, assignee }`, `{ kind: 'suggested_rewrite', body }` and so on. So the read model
+  types the *conventions* they share rather than any one shape: a discriminator (`type`, or `kind`
+  for Lex's entries) and a label (`description`, `title` or `name`). See the rendering fix below,
+  which is what forced this from three guessed fields into two real ones.
 - **One read model, not summary + detail.** The list renders the same card a detail view would,
-  proposed-action descriptions and all, so a lean `AgentActivitySummary` would be re-fetched
+  proposed actions and all, so a lean `AgentActivitySummary` would be re-fetched
   immediately. There is no `/activity/[id]` route and no `getActivity` method until something needs
   one.
 - **`countPending` is a method.** The contract has no equivalent; the layout badge needs a count and
@@ -794,6 +793,26 @@ an off-by-one actually lives — are now exercised by the same
 `expectPaginationContract` the fixture adapter will use. What still cannot be checked this way is
 anything Postgres decides: ordering and filtering are asserted as *wiring* (`.order` and `.in` were
 called correctly), because faking them here would test the fake.
+
+**A bug the seam surfaced: every proposed action on `/activity` rendered as an empty bullet.**
+Typing the read model meant asking what is actually in `proposed_actions`, and the answer was that
+**no producer has ever written `description`** — the field the page rendered. Nor does any write
+`entity_type` *inside* the blob, so the `(contacts)` suffix beside each bullet never appeared
+either. The page has been showing a list of blank list items for as long as it has existed, and
+nobody noticed, because a blank `<li>` looks like a tight gap rather than a fault.
+
+Fixed by making the read model describe the conventions the producers share instead of a field they
+do not write: `type` (or `kind`, which is what Lex's suggested-rewrite entries use) and `label`
+(`description`, else `title`, else `name`). The card falls through them — `Create task: Follow up on
+the letter`, or `Suggested rewrite` when the producer records only what kind of action it is, or
+`Proposed action` when it records neither. Chosen over enumerating the eight producers' shapes in a
+component, which would break every time one changed.
+
+The adapter test now carries all eight shapes copied from their producers, so a producer changing
+shape fails there rather than on the page. Two of the eight — `app/actions/champions.ts` and
+`pipeline.ts` — store a bare object rather than an array and map to no proposed actions; **flagged,
+not fixed**, since changing what a producer writes belongs to that producer's vertical (4.6 and
+4.7).
 
 **A trap for every remaining action conversion.** Returning `actionError(err)` from a converted
 action breaks its callers. `actionError` returns a *declared* `{ error: string }`, and TypeScript

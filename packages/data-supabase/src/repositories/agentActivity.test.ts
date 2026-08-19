@@ -119,37 +119,61 @@ describe('listActivity', () => {
 });
 
 describe('the proposed_actions mapping', () => {
-  it('reads the recorder shape and counts every entry', async () => {
-    client.__setRows('agent_activity', [
-      row({
-        proposed_actions: [
-          { description: 'Update contact', entity_type: 'contacts', entity_id: 'c1' },
-          { type: 'variant', platform: 'linkedin' },
-        ],
-      }),
-    ]);
+  // These are the shapes really written today, copied from their producers. If
+  // one of them stops mapping to something a human can read, this is where it
+  // should be noticed — not on the page.
+  it.each([
+    // apps/agents/src/agents/recorder/workflow.ts — CRM entities
+    [{ type: 'company', name: 'Acme Pty Ltd', action: 'create', confidence: 0.9 },
+     { type: 'company', label: 'Acme Pty Ltd' }],
+    // apps/agents/src/agents/recorder/workflow.ts — tasks
+    [{ type: 'create_task', title: 'Follow up on the letter', due_date: null, assignee: null },
+     { type: 'create_task', label: 'Follow up on the letter' }],
+    // apps/agents/src/workflows/variant/index.ts
+    [{ type: 'variant', platform: 'linkedin', is_thread: false },
+     { type: 'variant', label: null }],
+    // apps/agents/src/workflows/socialPost/index.ts
+    [{ type: 'social_post', platform: 'x', is_thread: true, story_id: 's1' },
+     { type: 'social_post', label: null }],
+    [{ type: 'compliance', classification: 'general_advice', needs_disclaimer: true },
+     { type: 'compliance', label: null }],
+    // apps/agents/src/workflows/podcastIntel/index.ts
+    [{ type: 'episode_summary' }, { type: 'episode_summary', label: null }],
+    // apps/agents/src/agents/compliance/index.ts — note `kind`, not `type`
+    [{ kind: 'suggested_rewrite', body: 'a neutral rewording' },
+     { type: 'suggested_rewrite', label: null }],
+    // A producer that adopts `description` later gets it for free
+    [{ type: 'create_task', description: 'Chase the signature' },
+     { type: 'create_task', label: 'Chase the signature' }],
+  ])('maps %o', async (stored, expected) => {
+    client.__setRows('agent_activity', [row({ proposed_actions: [stored] })]);
 
     const [item] = (await repositories().agentActivity.listActivity(ctx)).items;
 
-    expect(item.proposedActions).toEqual([
-      { description: 'Update contact', entityType: 'contacts', entityId: 'c1' },
-      // Six producers write six shapes into this column; only the recorder's
-      // carries `description`. The entry still has to survive the mapping,
-      // because the compact card renders a count of them.
-      { description: null, entityType: null, entityId: null },
-    ]);
+    expect(item.proposedActions).toEqual([expected]);
+  });
+
+  it('keeps entries that carry neither a type nor a label, so the count stays honest', async () => {
+    client.__setRows('agent_activity', [row({ proposed_actions: [{ confidence: 0.4 }] })]);
+
+    const [item] = (await repositories().agentActivity.listActivity(ctx)).items;
+
+    expect(item.proposedActions).toEqual([{ type: null, label: null }]);
   });
 
   it('treats a malformed blob as no proposed actions instead of throwing', async () => {
     client.__setRows('agent_activity', [
       row({ proposed_actions: 'not an array' }),
       row({ id: 'a2', proposed_actions: [null, 42, ['nested']] }),
+      // app/actions/champions.ts and pipeline.ts store a bare object rather
+      // than an array. Flagged, not fixed — changing what a producer writes
+      // belongs to that producer's vertical.
+      row({ id: 'a3', proposed_actions: { agent: 'simon', message: 'relay this' } }),
     ]);
 
     const { items } = await repositories().agentActivity.listActivity(ctx);
 
-    expect(items[0].proposedActions).toEqual([]);
-    expect(items[1].proposedActions).toEqual([]);
+    expect(items.map((i) => i.proposedActions)).toEqual([[], [], []]);
   });
 });
 

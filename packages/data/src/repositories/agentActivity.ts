@@ -15,22 +15,29 @@ export type ActivityStatus =
 /**
  * One entry of the `proposed_actions` JSONB.
  *
- * Typed permissively on purpose. Six producers write six different shapes into
- * that column — `{ type: 'variant', platform, is_thread }` from the variant
- * workflow, `{ type: 'create_task', title, due_date, assignee }` from the
- * recorder, `{ type: 'social_post', … }` from socialPost, and so on — and only
- * the recorder's CRM-update shape carries `description`. Pinning a struct here
- * would be a lie about the data. The fields below are the ones the UI reads;
- * everything else in the blob is dropped by the adapter because nothing renders
- * it.
+ * There is no schema on that column and eight producers write to it, so this
+ * type describes the *conventions* they share rather than any one shape.
+ * Enumerating the shapes would put six producers' internals in a read model and
+ * break every time one changed; the two conventions below have held across all
+ * of them:
+ *
+ * - a discriminator, written as `type` by most and `kind` by Lex's
+ *   suggested-rewrite entries;
+ * - a human-readable name, written as `title` (recorder tasks), `name`
+ *   (recorder CRM entities), or `description` (nothing today, but it is the
+ *   obvious field for a producer to add and costs nothing to accept).
+ *
+ * Everything else in the blob is producer-internal — `platform`, `confidence`,
+ * `needs_disclaimer`, `story_id` — and is dropped, because nothing renders it.
  *
  * (`repository-contract.md` specifies `{ id, summary, targetTable, severity }`
  * for this type. No producer writes that shape — see build-progress.md.)
  */
 export interface ProposedAction {
-  description: string | null;
-  entityType: string | null;
-  entityId: string | null;
+  /** `type`, else `kind`. Null when the entry carries neither. */
+  type: string | null;
+  /** `description`, else `title`, else `name`. Null when the entry carries none. */
+  label: string | null;
 }
 
 /**
