@@ -413,17 +413,31 @@ and pass again when restored. That exercise caught a real weakness — the "no t
 empty" test originally passed *while the import was broken*, because with no tokens defined the
 filter it asserts on is trivially empty. It now asserts a count floor first.
 
-**Baselines are not yet committed — tracked as a to-do.** They must be generated in the CI
-container image, and the environment this was built in has no Docker daemon and a mismatched
-Chromium build. Bootstrap with `pnpm test:visual:update` (which shells out to
-`mcr.microsoft.com/playwright:v1.62.1-noble`), then commit `e2e/**-snapshots/`. Alternatively run
-the workflow manually with `update_baselines: true` and commit the artifact it uploads.
+**Baselines bootstrapped** (`7f74567`) — all 18 specimens, generated in the
+`mcr.microsoft.com/playwright:v1.62.1-noble` container so they match CI. Verified: the baseline
+filenames match the specimen set exactly, none missing and none orphaned.
 
-Until then the screenshot step reports red. It is advisory and blocks nothing, and the
-`tokens-resolve` step carries real signal in the meantime — but Phase 2's stated "zero diffs" pass
-condition is unavailable, so Phase 2 verifies against the token guard and the resolution spec
-instead. Those two cover token values, drift, and cascade integrity; what goes uncovered until
-bootstrap is pure visual regression — a layout shift that changes no token.
+They were captured *after* Phases 2 and 3 rather than before, so they cannot do the job originally
+scheduled — proving those extractions were inert. They lock in the current state, which was eyeballed
+first. From here on they serve their intended purpose.
+
+**A finding from the bootstrap: blocking webfonts trades a network dependency for a host-font one.**
+Running the suite outside the container fails on `colors-neutrals` at ~2% pixel drift. Investigated
+rather than waved off, since a 2% diff on a colour card looks like a token regression. It is not:
+the chips are hardcoded hex in the specimen HTML and cannot change from a token edit, and the diff
+image shows horizontal *displacement*, not colour.
+
+The mechanism: with Google Fonts blocked, `--font-mono` falls through `'SF Mono'`, `Menlo`,
+`Consolas` to generic monospace, and each host resolves that differently. Different glyph metrics
+shift label widths, which accumulate across a row. `colors-neutrals` has the most swatches (7) and
+the longest labels, so it drifts furthest; the three-swatch colour cards stay under threshold. Phase
+2's adoption of the skill's longer fallback chains slightly widened this, which is a fair price for
+better production rendering.
+
+No code fix — CI is one fixed container, so it is consistent there. But it is a footgun for anyone
+running the suite on a laptop and concluding they broke something, so **`pnpm test:visual` now runs
+inside the container image too**, matching `test:visual:update`. `test:visual:local` remains for a
+raw run, with the caveat documented in the spec.
 
 **Status: complete, pending baseline bootstrap.** Token guard green in the blocking gate
 (`pnpm test`: 73 files, 502 tests). Screenshot specs verified working locally — 19 passed in 8.8s —

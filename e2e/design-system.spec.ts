@@ -73,15 +73,24 @@ test.describe('design-system specimens', () => {
     test(name, async ({ page }) => {
       // colors_and_type.css @imports Google Fonts. Left alone, every test spends ~13s
       // fetching webfonts — two minutes for this file — and the suite silently depends
-      // on a third-party CDN being up. Blocking the request makes it hermetic and fast,
-      // and the specimens fall back to the system stack deterministically.
+      // on a third-party CDN being up. Blocking the request makes it hermetic and fast.
       //
       // The cost is that type specimens render in fallback rather than DM Sans, so this
       // suite does not prove the webfonts load. That is the right trade: the font
       // *decision* is asserted exactly in apps/web/app/globals.test.ts, and what these
-      // screenshots are for is layout, spacing, colour and cascade — none of which the
-      // fallback changes. It also matches the demo's own constraint of working with the
-      // network disabled.
+      // screenshots are for is layout, spacing, colour and cascade.
+      //
+      // The subtler cost, found when the baselines were first bootstrapped: blocking the
+      // webfonts removes the *network* dependency but deepens the dependency on whichever
+      // fonts the host has installed. `--font-mono` falls back through 'SF Mono', Menlo,
+      // Consolas to generic monospace, and each host resolves that differently. Different
+      // glyph metrics shift label widths, which accumulate across a row — colors-neutrals
+      // has seven swatches with the longest labels and drifts ~2% of pixels between hosts,
+      // while the three-swatch colour cards stay under threshold.
+      //
+      // Hence `pnpm test:visual` runs inside the same container image CI uses. Run
+      // `test:visual:local` instead and text-heavy specimens will diff against baselines
+      // that were never generated on your machine — that is the tooling, not a regression.
       await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
 
       await page.goto(pathToFileURL(join(PREVIEW_DIR, file)).href);
