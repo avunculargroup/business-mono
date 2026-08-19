@@ -6,6 +6,7 @@ import type {
   MarketReportDetail,
   MarketReportSummary,
   ContentDetail,
+  EcosystemWatch,
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,
@@ -30,6 +31,8 @@ export type FakeRepositories = {
   content: { [K in keyof RepositoryBundle['content']]: Mock };
   campaigns: { [K in keyof RepositoryBundle['campaigns']]: Mock };
   marketReports: { [K in keyof RepositoryBundle['marketReports']]: Mock };
+  indicators: { [K in keyof RepositoryBundle['indicators']]: Mock };
+  ecosystem: { [K in keyof RepositoryBundle['ecosystem']]: Mock };
   mode: RepositoryBundle['mode'];
 };
 
@@ -45,6 +48,8 @@ export function createFakeRepositories(
     campaignDetail?: CampaignDetail | null;
     marketReports?: MarketReportSummary[];
     marketReport?: MarketReportDetail | null;
+    /** Null means the change is gone; a null complianceClass means unclassified. */
+    promotionGate?: { complianceClass: string | null } | null;
     contentDetail?: ContentDetail | null;
   } = {},
 ): FakeRepositories {
@@ -120,6 +125,32 @@ export function createFakeRepositories(
       ),
       addReportFeedback: vi.fn(async () => true),
     },
+    indicators: {
+      getDashboard: vi.fn(async () => ({
+        macroLatest: [],
+        macroSeries: [],
+        onchainLatest: [],
+        onchainSeries: [],
+      })),
+    },
+    ecosystem: {
+      listFeed: vi.fn(async () => []),
+      listWatchHealth: vi.fn(async () => []),
+      getPromotionGate: vi.fn(async () =>
+        overrides.promotionGate === undefined
+          ? { complianceClass: 'neutral' }
+          : overrides.promotionGate,
+      ),
+      acknowledgeChange: vi.fn(async () => undefined),
+      setChangeStatus: vi.fn(async () => undefined),
+      pinChange: vi.fn(async () => undefined),
+      setCuratorNote: vi.fn(async () => undefined),
+      setClientRelevant: vi.fn(async () => undefined),
+      createWatch: vi.fn(async () => fakeWatch()),
+      updateWatch: vi.fn(async () => undefined),
+      setWatchEnabled: vi.fn(async () => undefined),
+      deleteWatch: vi.fn(async () => undefined),
+    },
     mode: 'live',
   };
 }
@@ -159,6 +190,22 @@ export function fakeMarketReport(
     isQuietDay: false,
     findings: [],
     priorFeedback: [],
+    ...overrides,
+  };
+}
+
+/** A healthy, enabled watch. */
+export function fakeWatch(overrides: Partial<EcosystemWatch> = {}): EcosystemWatch {
+  return {
+    id: 'w1',
+    watchType: 'github_release',
+    label: 'Core releases',
+    sourceUrl: null,
+    enabled: true,
+    checkFrequency: 'daily',
+    health: 'healthy',
+    lastCheckedAt: null,
+    lastChangeAt: null,
     ...overrides,
   };
 }

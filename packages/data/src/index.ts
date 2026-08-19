@@ -53,6 +53,15 @@ export type {
   ThreadSegment,
 } from './repositories/content';
 export type {
+  EcosystemChange,
+  EcosystemRepository,
+  EcosystemWatch,
+  NewWatch,
+  PromotionGate,
+  WatchEdit,
+  WatchHealth,
+} from './repositories/ecosystem';
+export type {
   DashboardIndicators,
   IndicatorLatest,
   IndicatorSeriesPoint,

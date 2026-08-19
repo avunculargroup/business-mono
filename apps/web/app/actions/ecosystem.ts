@@ -1,6 +1,7 @@
 'use server';
 
-import { getAuthedClient } from '@/lib/action';
+import { getAuthedRepositories } from '@/lib/action';
+import { resolveReadContext } from '@platform/data-supabase';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { isClientPromotable } from '@platform/shared';
@@ -66,9 +67,8 @@ export async function createWatch(formData: FormData) {
   const parsed = parseForm(watchSchema, formData);
   if (!parsed.ok) return { error: parsed.error };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
   const d = parsed.data;
 
   const productId = d.product_service_id || null;
@@ -77,26 +77,29 @@ export async function createWatch(formData: FormData) {
     return { error: 'A watch must belong to exactly one product or advisor.' };
   }
 
-  const { data: watch, error } = await supabase
-    .from('ecosystem_watches')
-    .insert({
-      product_service_id: productId,
-      advisor_partner_id: advisorId,
-      watch_type:         d.watch_type,
-      label:              d.label,
-      config:             buildWatchConfig(d.watch_type, d),
-      source_url:         d.source_url || null,
-      check_frequency:    d.check_frequency || 'daily',
-      enabled:            d.enabled === 'on',
-      centrality:         d.centrality ? parseFloat(d.centrality) : 1,
-      owner_id:           d.owner_id || null,
-      notes:              d.notes || null,
-      created_by:         d.created_by || null,
-    })
-    .select()
-    .single();
-
-  if (error) return { error: humanizeError(error) };
+  let watch;
+  try {
+    watch = await auth.repositories.ecosystem.createWatch({
+      productServiceId: productId,
+      advisorPartnerId: advisorId,
+      watchType:        d.watch_type,
+      label:            d.label,
+      // The form renders only the fields its watch_type needs and
+      // buildWatchConfig drops the rest, so a stale field left in the DOM by a
+      // type switch never lands in `config`. That is form shaping, so it stays
+      // here rather than in the adapter.
+      config:           buildWatchConfig(d.watch_type, d),
+      sourceUrl:        d.source_url || null,
+      checkFrequency:   d.check_frequency || 'daily',
+      enabled:          d.enabled === 'on',
+      centrality:       d.centrality ? parseFloat(d.centrality) : 1,
+      ownerId:          d.owner_id || null,
+      notes:            d.notes || null,
+      createdBy:        d.created_by || null,
+    });
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidateForWatch(productId, advisorId);
   return { success: true, watch };
@@ -106,98 +109,100 @@ export async function updateWatch(id: string, formData: FormData) {
   const parsed = parseForm(watchSchema, formData);
   if (!parsed.ok) return { error: parsed.error };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
   const d = parsed.data;
 
   // The parent is set at creation and never moves — a watch that changed entity
-  // would orphan its existing changes' denormalised entity_name.
-  const { error } = await supabase
-    .from('ecosystem_watches')
-    .update({
-      watch_type:      d.watch_type,
-      label:           d.label,
-      config:          buildWatchConfig(d.watch_type, d),
-      source_url:      d.source_url || null,
-      check_frequency: d.check_frequency || 'daily',
-      enabled:         d.enabled === 'on',
-      centrality:      d.centrality ? parseFloat(d.centrality) : 1,
-      owner_id:        d.owner_id || null,
-      notes:           d.notes || null,
-    })
-    .eq('id', id);
-
-  if (error) return { error: humanizeError(error) };
+  // would orphan its existing changes' denormalised entity_name. `WatchEdit`
+  // omits it, so that is now a fact about the type rather than a comment.
+  try {
+    await auth.repositories.ecosystem.updateWatch(id, {
+      watchType:      d.watch_type,
+      label:          d.label,
+      config:         buildWatchConfig(d.watch_type, d),
+      sourceUrl:      d.source_url || null,
+      checkFrequency: d.check_frequency || 'daily',
+      enabled:        d.enabled === 'on',
+      centrality:     d.centrality ? parseFloat(d.centrality) : 1,
+      ownerId:        d.owner_id || null,
+      notes:          d.notes || null,
+    });
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidateForWatch(d.product_service_id || null, d.advisor_partner_id || null);
   return { success: true };
 }
 
 export async function setWatchEnabled(id: string, enabled: boolean) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const { error } = await supabase.from('ecosystem_watches').update({ enabled }).eq('id', id);
-  if (error) return { error: humanizeError(error) };
+  try {
+    await auth.repositories.ecosystem.setWatchEnabled(id, enabled);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/signals');
   return { success: true };
 }
 
 export async function deleteWatch(id: string, productId?: string, advisorId?: string) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  // Cascades to this watch's changes — the confirm dialog says so.
-  const { error } = await supabase.from('ecosystem_watches').delete().eq('id', id);
-  if (error) return { error: humanizeError(error) };
+  try {
+    // Cascades to this watch's changes — the confirm dialog says so.
+    await auth.repositories.ecosystem.deleteWatch(id);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidateForWatch(productId || null, advisorId || null);
   return { success: true };
 }
 
 export async function acknowledgeChange(id: string) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase, user } = auth;
 
-  const { error } = await supabase
-    .from('ecosystem_changes')
-    .update({
-      status:          'acknowledged',
-      acknowledged_by: user.id,
-      acknowledged_at: new Date().toISOString(),
-    })
-    .eq('id', id);
-
-  if (error) return { error: humanizeError(error) };
+  try {
+    // Who acknowledged it comes from the bundle's principal.
+    await auth.repositories.ecosystem.acknowledgeChange(id);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/signals');
   return { success: true };
 }
 
 export async function setChangeStatus(id: string, status: string) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const { error } = await supabase.from('ecosystem_changes').update({ status }).eq('id', id);
-  if (error) return { error: humanizeError(error) };
+  try {
+    await auth.repositories.ecosystem.setChangeStatus(id, status);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/signals');
   return { success: true };
 }
 
 export async function pinChange(id: string, pinned: boolean) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const { error } = await supabase.from('ecosystem_changes').update({ pinned }).eq('id', id);
-  if (error) return { error: humanizeError(error) };
+  try {
+    await auth.repositories.ecosystem.pinChange(id, pinned);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/signals');
   return { success: true };
@@ -207,16 +212,14 @@ export async function setCuratorNote(id: string, formData: FormData) {
   const parsed = parseForm(curatorNoteSchema, formData);
   if (!parsed.ok) return { error: parsed.error };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const { error } = await supabase
-    .from('ecosystem_changes')
-    .update({ curator_note: parsed.data.note || null })
-    .eq('id', id);
-
-  if (error) return { error: humanizeError(error) };
+  try {
+    await auth.repositories.ecosystem.setCuratorNote(id, parsed.data.note || null);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/signals');
   return { success: true };
@@ -235,34 +238,30 @@ export async function setCuratorNote(id: string, formData: FormData) {
  * cannot create compliance exposure.
  */
 export async function flagClientRelevant(id: string, flag: boolean) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
+  const { ecosystem } = auth.repositories;
 
-  if (flag) {
-    const { data: change, error: readError } = await supabase
-      .from('ecosystem_changes')
-      .select('compliance_class')
-      .eq('id', id)
-      .single();
+  try {
+    if (flag) {
+      const gate = await ecosystem.getPromotionGate(resolveReadContext(), id);
+      if (!gate) return { error: 'That change no longer exists.' };
 
-    if (readError) return { error: humanizeError(readError) };
-
-    if (!isClientPromotable(change?.compliance_class)) {
-      return {
-        error: change?.compliance_class
-          ? 'This change is classified as compliance-sensitive and needs a compliance review before it can go to clients.'
-          : 'This change has not been classified for compliance yet, so it cannot be flagged for clients.',
-      };
+      // The rule lives in @platform/shared so the agents side judges it the
+      // same way; the repository supplies the fact and the refusals are copy.
+      if (!isClientPromotable(gate.complianceClass)) {
+        return {
+          error: gate.complianceClass
+            ? 'This change is classified as compliance-sensitive and needs a compliance review before it can go to clients.'
+            : 'This change has not been classified for compliance yet, so it cannot be flagged for clients.',
+        };
+      }
     }
+
+    await ecosystem.setClientRelevant(id, flag);
+  } catch (err) {
+    return { error: humanizeError(err) };
   }
-
-  const { error } = await supabase
-    .from('ecosystem_changes')
-    .update({ client_relevant: flag })
-    .eq('id', id);
-
-  if (error) return { error: humanizeError(error) };
 
   revalidatePath('/signals');
   return { success: true };

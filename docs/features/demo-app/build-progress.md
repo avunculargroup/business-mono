@@ -6,9 +6,10 @@ the revised session plan that follows from it. Same purpose as
 
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
-bootstrapped. Phase 4.0 (the `@platform/data` foundation) and vertical 4.1 (agent activity +
-approvals) are complete; 4.2 is next. Phase 4 is the long one, and the part of it beyond 4.6 is the
-part whose justification rests on the client app being real.
+bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
+4.5 are complete; 4.6 (CRM and company) is the last vertical on the critical path, and 4.2c–d are
+background. Phase 4 is the long one, and the part of it beyond 4.6 is the part whose justification
+rests on the client app being real.
 **Last updated:** 2026-08-19
 
 ---
@@ -739,7 +740,7 @@ commit.
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
 | 4.3 | Content and campaigns ✅ | `/content/*`, `/campaigns/*` | Content only — `/campaigns/*` is not a demo surface |
 | 4.4 | Market reports, indicators, onchain ✅ | `/market-reports/*`, `/` | Yes |
-| 4.5 | Ecosystem signals | `/signals` | Yes |
+| 4.5 | Ecosystem signals ✅ | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
 | — | *critical path ends; below is background* | | |
 | 4.7 | Discovery | `/discovery/*` | No |
@@ -1238,6 +1239,64 @@ intermediate state as `/content`'s `team_members` read.
 green. `@platform/data-supabase` 142 → 149 tests. The two formatting libraries and their tests, plus
 `IndicatorCard`, `OnchainCard`, `MacroIndicators`, `OnchainIndicators` and `TrendValuation`, moved
 onto the read models — 49 columns across four views. `/` walked manually.
+
+##### 4.5 — Ecosystem signals: what shipped
+
+`/signals` end to end: `EcosystemRepository` with eleven methods, its Supabase adapter over
+`v_ecosystem_feed` and `v_ecosystem_watch_health`, `SignalsContent`/`SignalsView` on the read
+models, and all nine server actions in `app/actions/ecosystem.ts` converted —
+`getAuthedClient` count on that file is now 0.
+
+**The gate this surface exists for.** `compliance-as-alignment` says the compliance step is not a
+checkpoint bolted on before publication; it is a property the record has carried since it was
+detected. Lex classifies every change at ingest, and for the internal feed that classification is
+just a label. It becomes a gate at exactly one point: `flagClientRelevant`, which queues a change
+for the client-facing app. So the repository supplies the fact (`getPromotionGate` → the change's
+`complianceClass`), the rule lives in `isClientPromotable` in `@platform/shared` so the agents side
+judges it identically, and the sentence a director reads stays in the server action. Same
+facts-vs-sentences split as the publish and campaign gates.
+
+**It fails closed, and there is a test whose only job is to say so.** A present change with a null
+`complianceClass` is *unclassified*, not *safe* — the classifier failing or not having run yet must
+never become an accidental promotion to a client. That is a different refusal from "the change is
+gone", with different copy, so the repository keeps the two apart: `getPromotionGate` returns null
+for a missing change and `{ complianceClass: null }` for an unclassified one, and it throws rather
+than returning null on a read error, because a failed read reporting "no such change" would be
+answering the promotion question by accident. Un-flagging skips the gate read entirely — withdrawing
+a change from clients creates no exposure, and making it fail when the classifier is down would mean
+the only way to retract something is for the classifier to be healthy.
+
+**No valence in the read model, again.** `EcosystemChange` carries `changeType` and `severity` and
+nothing derived: a release is an event, not good news, and `severity` is the publisher's own word
+for it, which is a fact rather than an opinion. Same rule as the indicator deltas in 4.4b, and the
+same shape of test — the adapter asserts the read model has no `direction`, `sentiment`, `colour`,
+`good` or `risk` property.
+
+**`createWatch` returns the watch it created.** The first cut returned `void` and the existing test
+caught it: `EcosystemWatchForm` hands the created row straight to its list, so a void return meant a
+new watch vanished until reload. This is the second time in the phase that a narrow grep for
+consumers missed one — worth reading the callers rather than grepping the method name.
+
+**A loose type tightened by a typed caller.** `buildWatchConfig` returned `Json`, which admits
+`null`, while `NewWatch.config` is `Record<string, unknown>`. Every branch already returned an
+object; nothing had ever needed to know that, because the old call site passed it straight into an
+untyped insert. Narrowing the signature is the whole fix. That is the seam doing what it is for —
+the looseness was invisible until something downstream had a type.
+
+**Read against write, deliberately unguarded.** `setClientRelevant` does not read the classification
+itself. Putting the gate in the repository would hide a refusal as a silent no-op and would put a
+compliance sentence in a package that has no brand voice; the adapter test asserts the write issues
+exactly one query, so a future "helpful" guard there goes red.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 149 → 169 tests; `apps/web` 537. The action test moved off the
+Supabase mock onto the repository fake and gained the three gate cases that matter (neutral
+promotes, sensitive refuses, unclassified refuses). One test-only bug found on the way: the form
+helper treated "field submitted empty" and "field never rendered" as the same thing, and zod gives
+them different messages — a browser always submits a blank `label`, so the helper now says which it
+means. `/signals` builds and its route compiles; **not** walked against live data from this
+session — the feed, acknowledge, curator note, client-relevant toggle and watch register are the
+five paths to click when someone next has the app up.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.
