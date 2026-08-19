@@ -15,6 +15,13 @@ export type {
   ProposedAction,
 } from './repositories/agentActivity';
 export type {
+  ContentCard,
+  ContentEditGuard,
+  ContentRepository,
+  NewContentItem,
+  PublishGate,
+} from './repositories/content';
+export type {
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,

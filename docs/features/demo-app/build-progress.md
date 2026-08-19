@@ -737,7 +737,7 @@ commit.
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
-| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
+| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, 4.3b content detail, 4.3c campaigns |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
@@ -958,6 +958,67 @@ green. `@platform/data-supabase` 46 → 60 tests. The page test's two source-nam
 the adapter, where that resolution now happens, and the page test gained one the old shape could not
 express: a dropped connection must not render as "not found". `/news/[id]` walked manually, with and
 without a report.
+
+##### 4.3a — Content pipeline: what shipped
+
+Converted `/content`, `ContentBoard` and all five actions in `app/actions/content.ts`. `/content/[id]`
+and `/content/[id]/copy` are 4.3b; `/campaigns/*` is 4.3c.
+
+**Where the business rules go: the facts are the repository's, the sentences are the app's.**
+`scheduleContent` enforces nine preconditions before a post can be queued, each with its own message
+to a director. Pushing those into the adapter would put brand-voice copy in the data layer and force
+the fixture adapter to reimplement them; leaving the *reads* in the action would mean three queries
+in a server action the seam is supposed to have emptied. So the read model is the gate —
+`getPublishGate` gathers the item, its account's credential and the platform's character limit in
+one call — and the rules stay in the action. This is the shape to reuse wherever a vertical has
+guarded writes, and it is the first place the read model is named after a domain concept (the
+`publish-gate` principle) rather than after a table.
+
+**The same split, drawn differently for `updateContentBody`.** Its three refusals are copy and stay
+in the action, but the compliance reset — an edit to an account- or campaign-linked draft returns it
+to pending so the recheck listener re-runs Lex — moved *into* the adapter. That one is an invariant,
+not a caller's choice: a cleared verdict must not survive an edit, and a caller that forgot the flag
+would break it silently. The adapter re-reads the link fields rather than taking a boolean.
+
+**Two latent problems the read model surfaced.**
+
+- **The board typed statuses as bare strings.** `useOptimistic`'s reducer, `handleDrop` and the
+  column keys all took `string`, so a typo'd status would have flowed to the server and been
+  rejected there, if at all. Typing them against the read model's `ContentStatus` makes an invalid
+  column key a compile error.
+- **The publish gate looked up LinkedIn's character limit by hardcoding `'linkedin'`.** It only
+  schedules LinkedIn today, so it never mattered — but a gate that always asks for one platform's
+  limit silently applies the wrong one the day it schedules another. The adapter keys the spec
+  lookup off the item's own type. Covered by a test.
+
+**A deliberate deletion, against the usual rule.** `updateContentStatus` took an
+`extras?: { published_url?; published_at? }` parameter. No caller has ever passed it, and
+`published_url` was never read even inside the function. `CLAUDE.md` says to flag pre-existing dead
+code rather than delete it — the exception here is that keeping it meant carrying a dead option into
+a brand-new repository interface, which is worse than removing it. Flagged rather than done
+silently.
+
+**`team_members` stays on the raw client** in `/content/page.tsx`, as it does in the app layout. It
+belongs to 4.11. A page holding both a bundle and a raw client is the accepted intermediate state,
+not an oversight.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 60 → 82 tests; `apps/web` 497 → 509. `content.test.ts` was rewritten
+against the repository fake: its two compliance-reset cases moved down to the adapter, and the nine
+gate rules are now one parameterised case each, so a rule that stops firing fails on its own line
+rather than inside a shared setup. Two cases the old shape could not express were added — a platform
+that declares no character limit must not block every post on it, and an already-scheduled post must
+still be re-schedulable. `/content` walked manually.
+
+**Kill-criteria checkpoint (4.3).** This is the vertical the checkpoint was set for: `campaigns.ts`
+at 18 `.from(` calls, `content.ts` at 8, and the first genuinely rule-heavy actions in the app.
+4.3a came in comfortably, and the reason is worth recording, because it is the finding that decides
+whether the remaining verticals are cheap or expensive: **the cost is concentrated in guarded
+writes, not in reads.** Reads have converted almost mechanically across three verticals now. The
+expensive part is deciding, per guarded write, which half of it is an invariant and which half is
+copy — and that decision now has a worked pattern rather than being re-derived each time. The
+full-seam assumption behind decision 2 holds. 4.3b and 4.3c will test it against 18 more `.from(`
+calls, but nothing so far contradicts it.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

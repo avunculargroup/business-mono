@@ -10,23 +10,14 @@ import { NewsletterRunStatus } from './NewsletterRunStatus';
 import { updateContentStatus } from '@/app/actions/content';
 import { Plus, Newspaper, Archive } from 'lucide-react';
 import Link from 'next/link';
+import type { ContentCard } from '@platform/data';
+import type { ContentStatus } from '@platform/shared';
 import styles from './ContentBoard.module.css';
 
-type ContentItem = {
-  id: string;
-  slug: string;
-  title: string | null;
-  type: string;
-  status: string;
-  scheduled_for: string | null;
-  publish_error: string | null;
-  created_by: string | null;
-  campaign_name: string | null;
-  account_name: string | null;
-  platform: string | null;
-};
-
-const statusColumns = [
+// Typed against the read model's status union rather than bare strings, so a
+// column key that is not a real status is a compile error. `archived` has no
+// column — archived cards render in their own strip below the board.
+const statusColumns: Array<{ key: ContentStatus; label: string }> = [
   { key: 'idea', label: 'Idea' },
   { key: 'draft', label: 'Draft' },
   { key: 'review', label: 'Review' },
@@ -45,7 +36,7 @@ const typeColors: Record<string, 'accent' | 'success' | 'warning' | 'neutral'> =
 };
 
 interface ContentBoardProps {
-  items: ContentItem[];
+  items: ContentCard[];
   teamMembers: { id: string; full_name: string }[];
 }
 
@@ -57,11 +48,11 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
   const [, startTransition] = useTransition();
   const [optimisticItems, setOptimisticStatus] = useOptimistic(
     items,
-    (currentItems, { id, status }: { id: string; status: string }) =>
+    (currentItems, { id, status }: { id: string; status: ContentStatus }) =>
       currentItems.map((item) => (item.id === id ? { ...item, status } : item))
   );
 
-  const handleDrop = (e: React.DragEvent, newStatus: string) => {
+  const handleDrop = (e: React.DragEvent, newStatus: ContentStatus) => {
     e.preventDefault();
     const itemId = e.dataTransfer.getData('text/plain');
     if (!itemId) return;
@@ -106,7 +97,7 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
     });
   };
 
-  const renderCard = (item: ContentItem, archived: boolean) => (
+  const renderCard = (item: ContentCard, archived: boolean) => (
     <Link
       key={item.id}
       href={`/content/${item.slug}`}
@@ -114,24 +105,24 @@ export function ContentBoard({ items, teamMembers }: ContentBoardProps) {
       draggable
       onDragStart={(e) => handleDragStart(e, item.id)}
     >
-      {item.campaign_name && (
-        <span className={styles.cardCampaign}>{item.campaign_name}</span>
+      {item.campaignName && (
+        <span className={styles.cardCampaign}>{item.campaignName}</span>
       )}
       <span className={styles.cardTitle}>{item.title || 'Untitled'}</span>
-      {item.publish_error && item.status === 'scheduled' && (
-        <span className={styles.cardPublishError} title={item.publish_error}>
-          {item.publish_error}
+      {item.publishError && item.status === 'scheduled' && (
+        <span className={styles.cardPublishError} title={item.publishError}>
+          {item.publishError}
         </span>
       )}
       <div className={styles.cardMeta}>
         <StatusChip label={item.type.replace('_', ' ')} color={typeColors[item.type] || 'neutral'} />
-        {item.account_name && (
+        {item.accountName && (
           <span className={styles.cardAccount}>
             {item.platform === 'twitter_x' ? 'X' : item.platform === 'linkedin' ? 'LinkedIn' : null}
-            {item.platform ? ' · ' : ''}{item.account_name}
+            {item.platform ? ' · ' : ''}{item.accountName}
           </span>
         )}
-        {!item.account_name && item.created_by && (
+        {!item.accountName && item.createdBy && (
           <span className={styles.assignee}>Assigned</span>
         )}
         {!archived && (

@@ -1,179 +1,212 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import {
+  createFakeRepositories,
+  fakePublishGate,
+  type FakeRepositories,
+} from '@/test/mocks/repositories';
 
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
-let client: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => client),
+// Converted to the seam in vertical 4.3a. The compliance-reset cases moved to
+// the adapter, where that invariant now lives. What is left here is the rules
+// and their wording — which is the half that belongs in the app, because a
+// director reads these sentences.
+let repositories: FakeRepositories;
+let authed: boolean;
+
+vi.mock('@/lib/action', () => ({
+  getAuthedRepositories: vi.fn(async () =>
+    authed
+      ? { ok: true, repositories, user: { id: 'tm-1' } }
+      : { ok: false, error: 'You need to be signed in to do that.' },
+  ),
 }));
 
-import { updateContentBody, scheduleContent, postContentNow } from './content';
-
-function approvedLinkedInItem(overrides: Record<string, unknown> = {}) {
-  return {
-    status: 'approved',
-    type: 'linkedin',
-    body: 'A cleared post.',
-    approved_by: 'tm-1',
-    compliance_status: 'cleared',
-    is_thread: false,
-    social_account_id: 'acc-1',
-    ...overrides,
-  };
-}
-
-function wireSchedule(item: Record<string, unknown>, extras?: {
-  credential?: Record<string, unknown> | null;
-  maxChars?: number;
-}) {
-  // The follow-up UPDATE only reads `error`, so one response serves both calls.
-  client.__setResponse('content_items', { data: item, error: null });
-  client.__setResponse('social_credentials', {
-    data:
-      extras?.credential === null
-        ? null
-        : { expires_at: new Date(Date.now() + 86400000).toISOString(), ...extras?.credential },
-    error: null,
-  });
-  client.__setResponse('platform_specs', { data: { max_chars: extras?.maxChars ?? 3000 }, error: null });
-}
-
-function contentUpdateCall(): Record<string, unknown> | undefined {
-  const builder = client.__buildersFor('content_items').find((b) => b.update.mock.calls.length > 0);
-  return builder?.update.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
-}
+import { updateContentBody, scheduleContent, postContentNow, updateContentStatus } from './content';
 
 beforeEach(() => {
-  client = createFakeSupabase();
-  client.__setUser({ id: 'user-1' });
+  repositories = createFakeRepositories();
+  authed = true;
   revalidatePath.mockClear();
 });
 
 describe('updateContentBody', () => {
-  it('saves the body and resets compliance for account-linked drafts', async () => {
-    client.__setResponse('content_items', {
-      data: { status: 'approved', is_thread: false, campaign_id: null, social_account_id: 'acc-1', publish_locked_at: null },
-      error: null,
-    });
-
-    const result = await updateContentBody('ci-1', { body: 'Edited body.' });
+  it('saves the edit and revalidates both surfaces', async () => {
+    const result = await updateContentBody('c1', { title: 'A title', body: 'Edited.' });
 
     expect(result).toEqual({ success: true });
-    expect(contentUpdateCall()).toMatchObject({
-      body: 'Edited body.',
-      compliance_status: 'pending',
-      compliance_checked_at: null,
+    expect(repositories.content.updateBody).toHaveBeenCalledWith('c1', {
+      title: 'A title',
+      body: 'Edited.',
     });
     expect(revalidatePath).toHaveBeenCalledWith('/content');
+    expect(revalidatePath).toHaveBeenCalledWith('/content/c1');
   });
 
-  it('does not touch compliance for unlinked items', async () => {
-    client.__setResponse('content_items', {
-      data: { status: 'draft', is_thread: false, campaign_id: null, social_account_id: null, publish_locked_at: null },
-      error: null,
+  it('says so when the item is gone', async () => {
+    repositories.content.getEditGuard.mockResolvedValueOnce(null);
+
+    expect(await updateContentBody('c1', { body: 'x' })).toEqual({
+      error: 'Content item not found.',
     });
-
-    await updateContentBody('ci-1', { body: 'New body.' });
-
-    expect(contentUpdateCall()).not.toHaveProperty('compliance_status');
+    expect(repositories.content.updateBody).not.toHaveBeenCalled();
   });
 
-  it('refuses to edit published content', async () => {
-    client.__setResponse('content_items', {
-      data: { status: 'published', is_thread: false, campaign_id: null, social_account_id: null, publish_locked_at: null },
-      error: null,
+  it.each([
+    ['published', 'Published content can no longer be edited.'],
+    ['archived', 'Published content can no longer be edited.'],
+  ])('refuses to edit %s content', async (status, message) => {
+    repositories.content.getEditGuard.mockResolvedValueOnce({
+      status,
+      isThread: false,
+      isPublishLocked: false,
     });
 
-    const result = await updateContentBody('ci-1', { body: 'Too late.' });
-
-    expect(result.error).toMatch(/published/i);
+    expect(await updateContentBody('c1', { body: 'x' })).toEqual({ error: message });
+    expect(repositories.content.updateBody).not.toHaveBeenCalled();
   });
 
   it('refuses to edit while the publisher holds the row', async () => {
-    client.__setResponse('content_items', {
-      data: { status: 'scheduled', is_thread: false, campaign_id: null, social_account_id: 'acc-1', publish_locked_at: new Date().toISOString() },
-      error: null,
+    repositories.content.getEditGuard.mockResolvedValueOnce({
+      status: 'approved',
+      isThread: false,
+      isPublishLocked: true,
     });
 
-    const result = await updateContentBody('ci-1', { body: 'Mid-publish.' });
+    expect(await updateContentBody('c1', { body: 'x' })).toEqual({
+      error: 'This post is being published right now and cannot be edited.',
+    });
+  });
 
-    expect(result.error).toMatch(/being published/i);
+  it('sends thread edits to the per-segment editor', async () => {
+    repositories.content.getEditGuard.mockResolvedValueOnce({
+      status: 'draft',
+      isThread: true,
+      isPublishLocked: false,
+    });
+
+    expect(await updateContentBody('c1', { body: 'x' })).toEqual({
+      error: 'Thread segments are edited per segment, not here.',
+    });
   });
 });
 
 describe('scheduleContent', () => {
-  it('schedules an approved, cleared, connected LinkedIn post', async () => {
-    wireSchedule(approvedLinkedInItem());
+  const when = '2026-09-01T09:00:00.000Z';
 
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
+  it('schedules an approved, cleared, connected LinkedIn post', async () => {
+    const result = await scheduleContent('c1', when);
 
     expect(result).toEqual({ success: true });
-    expect(contentUpdateCall()).toMatchObject({
-      status: 'scheduled',
-      scheduled_for: '2026-08-01T09:00:00.000Z',
-      publish_error: null,
-      publish_attempts: 0,
-      publish_locked_at: null,
+    expect(repositories.content.schedule).toHaveBeenCalledWith('c1', new Date(when));
+  });
+
+  it('refuses a date it cannot read, before touching the repository', async () => {
+    expect(await scheduleContent('c1', 'not a date')).toEqual({
+      error: 'Pick a valid date and time.',
+    });
+    expect(repositories.content.getPublishGate).not.toHaveBeenCalled();
+  });
+
+  it('says so when the item is gone', async () => {
+    repositories = createFakeRepositories({ publishGate: null });
+
+    expect(await scheduleContent('c1', when)).toEqual({ error: 'Content item not found.' });
+  });
+
+  // One case per rule, each breaking exactly one field of an otherwise valid
+  // gate — so a rule that stops firing shows up as its own failure.
+  it.each([
+    [
+      { type: 'blog' },
+      'Only LinkedIn posts can be scheduled for API publishing.',
+    ],
+    [{ status: 'draft' as const }, 'Approve the post before scheduling it.'],
+    [{ approvedBy: null }, 'Posts must be approved by a person before scheduling.'],
+    [{ complianceStatus: 'flagged' }, 'Compliance review has not cleared this post.'],
+    [{ isThread: true }, 'Threads are not supported on LinkedIn.'],
+    [{ body: '   ' }, 'The post body is empty.'],
+    [{ socialAccountId: null }, 'Link the post to a social account first.'],
+    [
+      { credentialExpiresAt: null },
+      'The LinkedIn account is not connected — connect it in Settings → Integrations.',
+    ],
+    [
+      { credentialExpiresAt: new Date(Date.now() - 1000).toISOString() },
+      'The LinkedIn token has expired — reconnect it in Settings → Integrations.',
+    ],
+  ])('refuses %o', async (broken, message) => {
+    repositories = createFakeRepositories({ publishGate: fakePublishGate(broken) });
+
+    expect(await scheduleContent('c1', when)).toEqual({ error: message });
+    expect(repositories.content.schedule).not.toHaveBeenCalled();
+  });
+
+  it('refuses an over-length body and says by how much', async () => {
+    repositories = createFakeRepositories({
+      publishGate: fakePublishGate({ body: 'x'.repeat(3001), maxChars: 3000 }),
+    });
+
+    expect(await scheduleContent('c1', when)).toEqual({
+      error: 'The post is 3001 characters — LinkedIn allows 3000.',
     });
   });
 
-  it('rejects unapproved posts', async () => {
-    wireSchedule(approvedLinkedInItem({ status: 'draft' }));
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/approve/i);
-  });
-
-  it('rejects posts without a human approver', async () => {
-    wireSchedule(approvedLinkedInItem({ approved_by: null }));
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/approved by a person/i);
-  });
-
-  it('rejects uncleared compliance', async () => {
-    wireSchedule(approvedLinkedInItem({ compliance_status: 'flagged' }));
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/compliance/i);
-  });
-
-  it('rejects non-LinkedIn types', async () => {
-    wireSchedule(approvedLinkedInItem({ type: 'newsletter' }));
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/linkedin/i);
-  });
-
-  it('rejects when the account is not connected', async () => {
-    wireSchedule(approvedLinkedInItem(), { credential: null });
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/not connected/i);
-  });
-
-  it('rejects an expired token', async () => {
-    wireSchedule(approvedLinkedInItem(), {
-      credential: { expires_at: new Date(Date.now() - 1000).toISOString() },
+  it('allows a long post when the platform publishes no limit', async () => {
+    // `max_chars` is null for a platform that does not declare one; treating
+    // that as zero would block every post on it.
+    repositories = createFakeRepositories({
+      publishGate: fakePublishGate({ body: 'x'.repeat(9000), maxChars: null }),
     });
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/expired/i);
+
+    expect(await scheduleContent('c1', when)).toEqual({ success: true });
   });
 
-  it('rejects over-length bodies', async () => {
-    wireSchedule(approvedLinkedInItem({ body: 'x'.repeat(3001) }));
-    const result = await scheduleContent('ci-1', '2026-08-01T09:00:00.000Z');
-    expect(result.error).toMatch(/3000/);
+  it('lets an already-scheduled post be re-scheduled', async () => {
+    repositories = createFakeRepositories({ publishGate: fakePublishGate({ status: 'scheduled' }) });
+
+    expect(await scheduleContent('c1', when)).toEqual({ success: true });
+  });
+
+  it('surfaces a humane error when the write fails', async () => {
+    repositories.content.schedule.mockRejectedValueOnce({
+      code: '42501',
+      message: 'new row violates row-level security policy',
+    });
+
+    expect(await scheduleContent('c1', when)).toEqual({
+      error: "You don't have permission to do that.",
+    });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
 
 describe('postContentNow', () => {
   it('schedules for now', async () => {
-    wireSchedule(approvedLinkedInItem());
     const before = Date.now();
 
-    const result = await postContentNow('ci-1');
+    expect(await postContentNow('c1')).toEqual({ success: true });
 
-    expect(result).toEqual({ success: true });
-    const scheduledFor = contentUpdateCall()?.scheduled_for as string;
-    expect(new Date(scheduledFor).getTime()).toBeGreaterThanOrEqual(before - 1000);
-    expect(new Date(scheduledFor).getTime()).toBeLessThanOrEqual(Date.now());
+    const [, when] = repositories.content.schedule.mock.calls[0] as [string, Date];
+    expect(when.getTime()).toBeGreaterThanOrEqual(before);
+    expect(when.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe('updateContentStatus', () => {
+  it('moves an item and revalidates the board', async () => {
+    expect(await updateContentStatus('c1', 'review')).toEqual({ success: true });
+    expect(repositories.content.setStatus).toHaveBeenCalledWith('c1', 'review');
+    expect(revalidatePath).toHaveBeenCalledWith('/content');
+  });
+
+  it('returns the auth error when signed out', async () => {
+    authed = false;
+
+    expect(await updateContentStatus('c1', 'review')).toEqual({
+      error: 'You need to be signed in to do that.',
+    });
+    expect(repositories.content.setStatus).not.toHaveBeenCalled();
   });
 });

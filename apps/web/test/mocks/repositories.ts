@@ -4,6 +4,7 @@ import type {
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,
+  PublishGate,
   RepositoryBundle,
 } from '@platform/data';
 
@@ -21,6 +22,7 @@ import type {
 export type FakeRepositories = {
   agentActivity: { [K in keyof RepositoryBundle['agentActivity']]: Mock };
   research: { [K in keyof RepositoryBundle['research']]: Mock };
+  content: { [K in keyof RepositoryBundle['content']]: Mock };
   mode: RepositoryBundle['mode'];
 };
 
@@ -31,6 +33,7 @@ export function createFakeRepositories(
     news?: NewsFeedItem[];
     digest?: NewsDigestItem[];
     newsItem?: NewsItemDetail;
+    publishGate?: PublishGate | null;
   } = {},
 ): FakeRepositories {
   const items = overrides.activity ?? [];
@@ -59,7 +62,38 @@ export function createFakeRepositories(
       setReportCuratorNote: vi.fn(async () => undefined),
       promoteItem: vi.fn(async () => undefined),
     },
+    content: {
+      listCards: vi.fn(async () => ({ items: [], total: 0, hasMore: false })),
+      getPublishGate: vi.fn(async () =>
+        overrides.publishGate === undefined ? fakePublishGate() : overrides.publishGate,
+      ),
+      getEditGuard: vi.fn(async () => ({
+        status: 'draft' as const,
+        isThread: false,
+        isPublishLocked: false,
+      })),
+      createItem: vi.fn(async () => undefined),
+      updateBody: vi.fn(async () => undefined),
+      setStatus: vi.fn(async () => undefined),
+      schedule: vi.fn(async () => undefined),
+    },
     mode: 'live',
+  };
+}
+
+/** A gate that passes every rule, so a test only has to break the one it means. */
+export function fakePublishGate(overrides: Partial<PublishGate> = {}): PublishGate {
+  return {
+    status: 'approved',
+    type: 'linkedin',
+    body: 'A cleared post.',
+    isThread: false,
+    approvedBy: 'tm-1',
+    complianceStatus: 'cleared',
+    socialAccountId: 'acc-1',
+    credentialExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    maxChars: 3000,
+    ...overrides,
   };
 }
 

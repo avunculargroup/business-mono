@@ -13,4 +13,5 @@ export {
   createAgentActivityRepository,
   toAgentActivityItem,
 } from './repositories/agentActivity';
+export { createContentRepository } from './repositories/content';
 export { createResearchRepository } from './repositories/research';
