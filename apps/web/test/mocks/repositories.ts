@@ -2,6 +2,7 @@ import { vi, type Mock } from 'vitest';
 import type {
   AgentActivityItem,
   CampaignGate,
+  ContentDetail,
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,
@@ -37,6 +38,7 @@ export function createFakeRepositories(
     newsItem?: NewsItemDetail;
     publishGate?: PublishGate | null;
     campaignGate?: CampaignGate | null;
+    contentDetail?: ContentDetail | null;
   } = {},
 ): FakeRepositories {
   const items = overrides.activity ?? [];
@@ -67,6 +69,8 @@ export function createFakeRepositories(
     },
     content: {
       listCards: vi.fn(async () => ({ items: [], total: 0, hasMore: false })),
+      getDetail: vi.fn(async () => overrides.contentDetail ?? fakeContentDetail()),
+      getSocialDraftCopy: vi.fn(async () => null),
       getPublishGate: vi.fn(async () =>
         overrides.publishGate === undefined ? fakePublishGate() : overrides.publishGate,
       ),
@@ -79,6 +83,7 @@ export function createFakeRepositories(
       updateBody: vi.fn(async () => undefined),
       setStatus: vi.fn(async () => undefined),
       schedule: vi.fn(async () => undefined),
+      addDraftFeedback: vi.fn(async () => true),
     },
     campaigns: {
       getGate: vi.fn(async () =>
@@ -94,6 +99,28 @@ export function createFakeRepositories(
       promoteToVoiceSnippet: vi.fn(async () => undefined),
     },
     mode: 'live',
+  };
+}
+
+/** A draft with no thread, no feedback and no platform limit. */
+export function fakeContentDetail(overrides: Partial<ContentDetail> = {}): ContentDetail {
+  return {
+    id: 'c1',
+    title: 'Why treasuries hold Bitcoin',
+    type: 'linkedin',
+    status: 'draft',
+    body: 'A draft body.',
+    isThread: false,
+    socialAccountId: null,
+    scheduledFor: null,
+    publishedAt: null,
+    publishError: null,
+    createdAt: '2026-08-19T00:00:00Z',
+    updatedAt: '2026-08-19T00:00:00Z',
+    threadSegments: [],
+    priorFeedback: [],
+    maxChars: null,
+    ...overrides,
   };
 }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { ContentEditor } from './ContentEditor';
+import { fakeContentDetail } from '@/test/mocks/repositories';
 
 const updateContentBody = vi.fn((..._args: unknown[]) => Promise.resolve({}));
 vi.mock('@/app/actions/content', () => ({
@@ -14,18 +15,18 @@ vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 
-const baseItem = {
+// Built from the shared read-model fake so a new field on ContentDetail lands
+// here with a sensible default rather than as a compile error in every case.
+const baseItem = fakeContentDetail({
   id: '1',
   title: 'Bitcoin treasuries thread',
   type: 'twitter_x',
   status: 'draft',
   body: null,
-  is_thread: true,
-  scheduled_for: null,
-  published_at: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-};
+  isThread: true,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+});
 
 describe('ContentEditor', () => {
   it('renders every segment of a thread, not just the first', () => {
@@ -49,7 +50,7 @@ describe('ContentEditor', () => {
   it('renders a plain textarea for a non-thread item', () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'A single post body.' }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body: 'A single post body.' }}
         threadSegments={[]}
       />
     );
@@ -60,7 +61,7 @@ describe('ContentEditor', () => {
   it('renders a copy button for the draft text', () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'A single post body.' }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body: 'A single post body.' }}
         threadSegments={[]}
       />
     );
@@ -71,7 +72,7 @@ describe('ContentEditor', () => {
   it('shows a Save button once the body is edited, wired to updateContentBody', async () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'Original.' }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body: 'Original.' }}
         threadSegments={[]}
       />
     );
@@ -88,7 +89,7 @@ describe('ContentEditor', () => {
   it('shows the char limit and an over-limit warning for LinkedIn drafts', () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'x'.repeat(120) }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body: 'x'.repeat(120) }}
         threadSegments={[]}
         maxChars={100}
       />
@@ -102,7 +103,7 @@ describe('ContentEditor', () => {
     const body = `**Bold claim.** ${'y'.repeat(300)}`;
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body }}
         threadSegments={[]}
         maxChars={3000}
       />
@@ -115,7 +116,7 @@ describe('ContentEditor', () => {
   it('offers Schedule and Post now for an approved LinkedIn post instead of the generic advance', () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'linkedin', is_thread: false, body: 'Post.', status: 'approved' }}
+        item={{ ...baseItem, type: 'linkedin', isThread: false, body: 'Post.', status: 'approved' }}
         threadSegments={[]}
       />
     );
@@ -128,7 +129,7 @@ describe('ContentEditor', () => {
   it('keeps the generic status flow for non-LinkedIn content', () => {
     render(
       <ContentEditor
-        item={{ ...baseItem, type: 'newsletter', is_thread: false, body: 'Post.', status: 'approved' }}
+        item={{ ...baseItem, type: 'newsletter', isThread: false, body: 'Post.', status: 'approved' }}
         threadSegments={[]}
       />
     );
@@ -143,10 +144,10 @@ describe('ContentEditor', () => {
         item={{
           ...baseItem,
           type: 'linkedin',
-          is_thread: false,
+          isThread: false,
           body: 'Post.',
           status: 'scheduled',
-          publish_error: 'LinkedIn token has expired — reconnect it in Settings',
+          publishError: 'LinkedIn token has expired — reconnect it in Settings',
         }}
         threadSegments={[]}
       />
@@ -158,7 +159,7 @@ describe('ContentEditor', () => {
   it('shows the feedback box only for drafts linked to a social account', () => {
     const { rerender } = render(
       <ContentEditor
-        item={{ ...baseItem, is_thread: false, body: 'Post.', social_account_id: 'acc-li' }}
+        item={{ ...baseItem, isThread: false, body: 'Post.', socialAccountId: 'acc-li' }}
         threadSegments={[]}
       />
     );
@@ -166,7 +167,7 @@ describe('ContentEditor', () => {
 
     rerender(
       <ContentEditor
-        item={{ ...baseItem, is_thread: false, body: 'Post.', social_account_id: null }}
+        item={{ ...baseItem, isThread: false, body: 'Post.', socialAccountId: null }}
         threadSegments={[]}
       />
     );

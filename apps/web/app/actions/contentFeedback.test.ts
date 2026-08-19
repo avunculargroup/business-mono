@@ -1,37 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import { createFakeRepositories, type FakeRepositories } from '@/test/mocks/repositories';
 
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
-let client: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => client),
+// Converted to the seam in vertical 4.3b. The denormalisation cases — platform
+// and post form copied onto the row, a thread snapshotted as its joined
+// segments — moved to the adapter, which is where that shaping now happens.
+let repositories: FakeRepositories;
+let authed: boolean;
+
+vi.mock('@/lib/action', () => ({
+  getAuthedRepositories: vi.fn(async () =>
+    authed
+      ? { ok: true, repositories, user: { id: 'director-1' } }
+      : { ok: false, error: 'You need to be signed in to do that.' },
+  ),
 }));
 
 import { submitDraftFeedback } from './contentFeedback';
 
 const ITEM_ID = '2b8f4c1a-0000-4000-8000-000000000001';
 
-const SOCIAL_ITEM = {
-  id: ITEM_ID,
-  type: 'linkedin',
-  body: 'The RBA held rates at 4.35%.',
-  is_thread: false,
-  social_account_id: 'acc-li',
-  post_form: 'teach',
-};
-
 beforeEach(() => {
-  client = createFakeSupabase();
+  repositories = createFakeRepositories();
+  authed = true;
   revalidatePath.mockClear();
 });
 
 describe('submitDraftFeedback', () => {
-  it('denormalises the draft and inserts the feedback row', async () => {
-    client.__setResponse('content_items', { data: SOCIAL_ITEM, error: null });
-    client.__setResponse('content_feedback', { data: null, error: null });
-
+  it('records the note and revalidates the draft', async () => {
     const result = await submitDraftFeedback({
       contentItemId: ITEM_ID,
       feedback: '  Too preachy.  ',
@@ -39,56 +37,46 @@ describe('submitDraftFeedback', () => {
     });
 
     expect(result).toEqual({ success: true });
-    const insert = client.__buildersFor('content_feedback')[0];
-    expect(insert.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content_item_id: ITEM_ID,
-        social_account_id: 'acc-li',
-        platform: 'linkedin',
-        post_form: 'teach',
-        verdict: 'negative',
-        feedback: 'Too preachy.',
-        draft_excerpt: 'The RBA held rates at 4.35%.',
-      }),
-    );
+    expect(repositories.content.addDraftFeedback).toHaveBeenCalledWith(ITEM_ID, {
+      feedback: 'Too preachy.',
+      verdict: 'negative',
+    });
     expect(revalidatePath).toHaveBeenCalledWith(`/content/${ITEM_ID}`);
   });
 
-  it('snapshots a thread as the joined segment bodies', async () => {
-    client.__setResponse('content_items', { data: { ...SOCIAL_ITEM, is_thread: true, body: 'Lead.' }, error: null });
-    client.__setResponse('thread_segments', { data: [{ body: 'One.' }, { body: 'Two.' }], error: null });
-    client.__setResponse('content_feedback', { data: null, error: null });
-
+  it('leaves the verdict out when none was given', async () => {
     await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: 'Good thread.' });
 
-    expect(client.__buildersFor('content_feedback')[0].insert).toHaveBeenCalledWith(
-      expect.objectContaining({ draft_excerpt: 'One. Two.', verdict: null }),
-    );
+    expect(repositories.content.addDraftFeedback).toHaveBeenCalledWith(ITEM_ID, {
+      feedback: 'Good thread.',
+      verdict: undefined,
+    });
   });
 
-  it('rejects a draft with no social account', async () => {
-    client.__setResponse('content_items', { data: { ...SOCIAL_ITEM, social_account_id: null }, error: null });
+  it('explains why a draft with no social account cannot take feedback', async () => {
+    repositories.content.addDraftFeedback.mockResolvedValueOnce(false);
 
     const result = await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: 'Note.' });
 
-    expect(result).toHaveProperty('error');
-    expect(client.__buildersFor('content_feedback')).toHaveLength(0);
+    expect(result).toEqual({
+      error: "This draft has no social account, so feedback can't improve future posts.",
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('rejects empty feedback before touching the db', async () => {
-    const result = await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: '   ' });
-
-    expect(result).toHaveProperty('error');
-    expect(client.from).not.toHaveBeenCalled();
+  it('rejects empty feedback before touching the repository', async () => {
+    expect(await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: '   ' })).toEqual({
+      error: 'Write a note first',
+    });
+    expect(repositories.content.addDraftFeedback).not.toHaveBeenCalled();
   });
 
   it('returns the auth error when signed out', async () => {
-    client.__setUser(null);
+    authed = false;
 
-    const result = await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: 'Note.' });
-
-    expect(result).toEqual({ error: 'You need to be signed in to do that.' });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(await submitDraftFeedback({ contentItemId: ITEM_ID, feedback: 'Note.' })).toEqual({
+      error: 'You need to be signed in to do that.',
+    });
+    expect(repositories.content.addDraftFeedback).not.toHaveBeenCalled();
   });
 });

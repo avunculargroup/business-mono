@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { SocialDraftCopyView } from '@/components/content/SocialDraftCopyView';
 
@@ -9,39 +10,25 @@ import { SocialDraftCopyView } from '@/components/content/SocialDraftCopyView';
 
 export default async function ContentCopyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const repositories = await getRepositories();
 
-  const { data: item } = await supabase
-    .from('content_items')
-    .select('id, title, body, type, is_thread, social_account_id, disclaimer_snippet_id')
-    .eq('id', id)
-    .in('type', ['linkedin', 'twitter_x'])
-    .maybeSingle();
-
-  if (!item) notFound();
-
-  const [{ data: account }, { data: segments }, { data: disclaimer }] = await Promise.all([
-    item.social_account_id
-      ? supabase.from('social_accounts').select('display_name').eq('id', item.social_account_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    item.is_thread
-      ? supabase.from('thread_segments').select('body').eq('content_item_id', id).order('sequence', { ascending: true })
-      : Promise.resolve({ data: null }),
-    item.disclaimer_snippet_id
-      ? supabase.from('compliance_snippets').select('body').eq('id', item.disclaimer_snippet_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const draft = await repositories.content.getSocialDraftCopy(resolveReadContext(), id);
+  if (!draft) notFound();
 
   return (
     <>
-      <PageHeader title={item.title || 'Copy draft'} backHref={`/content/${id}`} backLabel="Back to draft" />
+      <PageHeader
+        title={draft.title || 'Copy draft'}
+        backHref={`/content/${id}`}
+        backLabel="Back to draft"
+      />
       <SocialDraftCopyView
-        platform={item.type as 'linkedin' | 'twitter_x'}
-        accountName={account?.display_name ?? null}
-        body={item.body}
-        isThread={item.is_thread}
-        segments={(segments ?? []).map((s) => s.body)}
-        disclaimerText={disclaimer?.body ?? null}
+        platform={draft.platform}
+        accountName={draft.accountName}
+        body={draft.body}
+        isThread={draft.isThread}
+        segments={draft.segments}
+        disclaimerText={draft.disclaimerText}
       />
     </>
   );

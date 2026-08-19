@@ -737,7 +737,7 @@ commit.
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
-| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, **4.3c campaign writes ✅**, 4.3b content detail, 4.3d campaign pages |
+| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, **4.3b content detail ✅**, **4.3c campaign writes ✅**, 4.3d campaign pages |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
@@ -1074,6 +1074,47 @@ asks — is this an invariant or is it copy, does the guard have to ride the wri
 matter to a listener — took the time here, and all three now have worked answers to point at.
 **Decision 2 stands; no re-cut.** The remaining unknown is `company.ts` at 21 `.from(` calls in 4.6,
 which is larger but, on this evidence, not different in kind.
+
+##### 4.3b — Content detail: what shipped
+
+Converted `/content/[id]`, `/content/[id]/copy`, `ContentEditor`, `DraftFeedback` and
+`app/actions/contentFeedback.ts`.
+
+**Another page doing query planning, and a worse one.** `/content/[id]` ran four queries where three
+were conditional on what the first returned — a thread has segments, a social draft has prior
+feedback, a LinkedIn post has a character limit. `getDetail` assembles all of it, and because the
+three conditionals depend on the item and on nothing else, the adapter runs them together rather
+than in sequence. `/content/[id]/copy` was the same shape with three more.
+
+**Id-or-slug resolution moved down.** The page called `idColumn(id)` to decide which column to
+match. Which column identifies a row is a fact about the data, so `getDetail` takes an identifier
+and works it out — a board card links by slug and the social-draft email links by id, and neither
+caller needs to know that any more.
+
+**Two `as any` casts deleted, and they were already obsolete.** Both pages and the feedback action
+carried `const db = supabase as any` with an `eslint-disable no-explicit-any` and a comment saying
+`content_feedback` and `social_account_id` "are not in the generated Database types yet". They are —
+every table and column those comments name is in `database.ts` today. The types were regenerated at
+some point and nobody went back to remove the escape hatches, so three files had been running
+untyped against tables that type fine. Converting them removed the casts as a side effect; worth
+noting because a stale `as any` is invisible until something reads it.
+
+**The status flow was bare strings here too**, exactly as on the board — `statusFlow` mapped
+`Record<string, { next: string }>`, so `setOptimisticStatus(nextStep.next)` took any string. Typed
+against `ContentStatus` now. Two independent instances of the same latent bug in one vertical is
+worth remembering when the later verticals get their turn.
+
+**`DraftFeedbackEntry` moved out of the component** and into the read model, which is where the
+shape it describes now comes from. `ContentEditor.test.tsx` was rebased onto `fakeContentDetail`
+rather than keeping its own literal, so a new field on the read model lands there with a default
+instead of breaking five cases.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 104 → 114 tests. `contentFeedback.test.ts` moved off the Supabase
+mock; its denormalisation cases — platform and post form copied onto the row, a thread snapshotted
+as its joined segments — went down to the adapter, which gained a case the old test did not have:
+the 500-character excerpt cap. `/content/[id]` walked manually as a thread, a single post and a
+social draft with feedback.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

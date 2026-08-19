@@ -27,10 +27,14 @@ export type {
 } from './repositories/campaigns';
 export type {
   ContentCard,
+  ContentDetail,
   ContentEditGuard,
   ContentRepository,
+  DraftFeedbackEntry,
   NewContentItem,
   PublishGate,
+  SocialDraftCopy,
+  ThreadSegment,
 } from './repositories/content';
 export type {
   NewsDigestItem,

@@ -49,6 +49,55 @@ export interface ContentEditGuard {
   isPublishLocked: boolean;
 }
 
+export interface ThreadSegment {
+  id: string;
+  body: string;
+}
+
+export interface DraftFeedbackEntry {
+  id: string;
+  verdict: 'positive' | 'negative' | null;
+  feedback: string;
+  createdAt: string;
+}
+
+/**
+ * A draft on its own page: the item, its segments, the feedback already left on
+ * it, and the platform's character limit.
+ *
+ * Assembled in one read. The page ran four queries, three of them conditional
+ * on what the first returned — a thread has segments, a social draft has
+ * feedback, a LinkedIn post has a limit.
+ */
+export interface ContentDetail {
+  id: string;
+  title: string | null;
+  type: string;
+  status: ContentStatus;
+  body: string | null;
+  isThread: boolean;
+  socialAccountId: string | null;
+  scheduledFor: string | null;
+  publishedAt: string | null;
+  publishError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  threadSegments: ThreadSegment[];
+  priorFeedback: DraftFeedbackEntry[];
+  maxChars: number | null;
+}
+
+/** The copy-to-clipboard surface a social-draft email links to. */
+export interface SocialDraftCopy {
+  title: string | null;
+  platform: 'linkedin' | 'twitter_x';
+  accountName: string | null;
+  body: string | null;
+  isThread: boolean;
+  segments: string[];
+  disclaimerText: string | null;
+}
+
 export interface NewContentItem {
   title: string;
   type: string;
@@ -61,6 +110,17 @@ export interface NewContentItem {
 export interface ContentRepository {
   /** The pipeline board, newest first. */
   listCards(ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<ContentCard>>;
+
+  /**
+   * One draft with everything its page renders, or null.
+   *
+   * Takes an id *or* a slug: which column to match is the adapter's business,
+   * not the page's.
+   */
+  getDetail(ctx: ReadContext, idOrSlug: string): Promise<ContentDetail | null>;
+
+  /** Null when the item is gone or is not a social draft. */
+  getSocialDraftCopy(ctx: ReadContext, id: string): Promise<SocialDraftCopy | null>;
 
   /** Null when the item is gone, so the caller can say so in its own words. */
   getPublishGate(ctx: ReadContext, id: string): Promise<PublishGate | null>;
@@ -82,4 +142,19 @@ export interface ContentRepository {
 
   /** Move an approved post into the publish queue. Gates are the caller's. */
   schedule(id: string, when: Date): Promise<void>;
+
+  /**
+   * Record feedback on a generated social draft.
+   *
+   * Returns false when the draft has no social account — feedback on one
+   * cannot improve future posts, and the caller words that refusal. The
+   * denormalised platform and post form, and the snapshot of the draft text
+   * (thread segments joined), are the adapter's: they exist so the agents-side
+   * distiller needs no joins, which is a fact about the data rather than about
+   * the page. Who left the feedback comes from the bound principal.
+   */
+  addDraftFeedback(
+    contentItemId: string,
+    input: { feedback: string; verdict?: 'positive' | 'negative' },
+  ): Promise<boolean>;
 }
