@@ -7,24 +7,12 @@ import { Button } from '@platform/ui/Button';
 import { CopyButton } from '@platform/ui/CopyButton';
 import { markVariantPosted } from '@/app/actions/campaigns';
 import styles from './ReadyToPostQueue.module.css';
+import type { ReadyToPostItem } from '@platform/data';
 
 // The ready-to-post queue: each approved variant with everything a founder needs
 // to copy out and post by hand. Copy text (segment-by-segment for threads — X's
 // composer takes them one at a time), the attached disclaimer, then mark-as-posted
 // with the live URL (writes published_url + advances status to published).
-
-export interface QueueItem {
-  id: string;
-  title: string | null;
-  body: string | null;
-  type: 'linkedin' | 'twitter_x';
-  is_thread: boolean;
-  scheduled_for: string | null;
-  account_name: string | null;
-  platform: 'linkedin' | 'twitter_x';
-  profile_url: string | null;
-  disclaimer_text: string | null;
-}
 
 function formatWhen(scheduledFor: string | null): string {
   if (!scheduledFor) return 'Unscheduled';
@@ -37,7 +25,7 @@ function QueueCard({
   campaignId,
   segments,
 }: {
-  item: QueueItem;
+  item: ReadyToPostItem;
   campaignId: string;
   segments: string[];
 }) {
@@ -46,7 +34,7 @@ function QueueCard({
   const [url, setUrl] = useState('');
   const [posted, setPosted] = useState(false);
 
-  const fullText = item.is_thread
+  const fullText = item.isThread
     ? segments.map((s, i) => `${i + 1}/ ${s}`).join('\n\n')
     : (item.body ?? '');
 
@@ -66,16 +54,16 @@ function QueueCard({
     <li className={`${styles.card} ${posted ? styles.cardDone : ''}`}>
       <header className={styles.cardHead}>
         <div className={styles.meta}>
-          <span className={styles.account}>{item.account_name}</span>
+          <span className={styles.account}>{item.accountName}</span>
           <span className={styles.platform}>
             {item.platform === 'twitter_x' ? 'X' : 'LinkedIn'}
-            {item.is_thread ? ' · thread' : ''}
+            {item.isThread ? ' · thread' : ''}
           </span>
         </div>
-        <span className={styles.when}>{formatWhen(item.scheduled_for)}</span>
+        <span className={styles.when}>{formatWhen(item.scheduledFor)}</span>
       </header>
 
-      {item.is_thread ? (
+      {item.isThread ? (
         <ol className={styles.segments}>
           {segments.map((seg, i) => (
             <li key={i} className={styles.segment}>
@@ -91,17 +79,17 @@ function QueueCard({
         <p className={styles.body}>{item.body}</p>
       )}
 
-      {item.disclaimer_text && (
+      {item.disclaimerText && (
         <div className={styles.disclaimer}>
           <span className={styles.disclaimerTag}>Disclaimer</span>
-          <p className={styles.disclaimerText}>{item.disclaimer_text}</p>
+          <p className={styles.disclaimerText}>{item.disclaimerText}</p>
         </div>
       )}
 
       <div className={styles.cardActions}>
-        <CopyButton text={fullText} label={item.is_thread ? 'Copy all segments' : 'Copy text'} />
-        {item.profile_url && (
-          <a className={styles.copyBtn} href={item.profile_url} target="_blank" rel="noreferrer">
+        <CopyButton text={fullText} label={item.isThread ? 'Copy all segments' : 'Copy text'} />
+        {item.profileUrl && (
+          <a className={styles.copyBtn} href={item.profileUrl} target="_blank" rel="noreferrer">
             <ExternalLink size={14} strokeWidth={1.5} />
             Open account
           </a>
@@ -140,11 +128,9 @@ function QueueCard({
 export function ReadyToPostQueue({
   campaignId,
   items,
-  segmentsByItem,
 }: {
   campaignId: string;
-  items: QueueItem[];
-  segmentsByItem: Record<string, string[]>;
+  items: ReadyToPostItem[];
 }) {
   if (items.length === 0) {
     return (
@@ -161,7 +147,7 @@ export function ReadyToPostQueue({
           key={item.id}
           item={item}
           campaignId={campaignId}
-          segments={segmentsByItem[item.id] ?? []}
+          segments={item.segments}
         />
       ))}
     </ul>

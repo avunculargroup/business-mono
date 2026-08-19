@@ -737,7 +737,7 @@ commit.
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
-| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, **4.3b content detail ✅**, **4.3c campaign writes ✅**, 4.3d campaign pages |
+| 4.3 | Content and campaigns ✅ | `/content/*`, `/campaigns/*` | Content only — `/campaigns/*` is not a demo surface |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
@@ -1115,6 +1115,44 @@ mock; its denormalisation cases — platform and post form copied onto the row, 
 as its joined segments — went down to the adapter, which gained a case the old test did not have:
 the 500-character excerpt cap. `/content/[id]` walked manually as a thread, a single post and a
 social draft with feedback.
+
+##### 4.3d — Campaign pages: what shipped, and 4.3 closed
+
+The five `/campaigns/*` pages and the seven components behind them. No raw client remains under
+`/campaigns`, so vertical 4.3 is complete.
+
+**Worth recording for the plan: only half of 4.3 was ever a demo surface.** The re-picked surface
+table lists *Content pipeline — `/content`*. `/campaigns/*` appears nowhere in the demo's seven
+surfaces, so 4.3d is background work of the same kind as 4.7–4.11, despite sitting inside a vertical
+the table marks "Yes". The vertical table now says so. This matters for the 4.6 kill criterion: if
+the client app does not firm up, the question is not only "skip 4.7–4.11" but "which parts of
+4.1–4.6 were background too".
+
+**A third page doing query planning, and the most elaborate one.** `/campaigns/[id]` derived
+`planLocked` from the status, and only then issued three more queries — beats, matrix, published
+posts — because before plan approval the beats live transiently in `gate_state` and no variants
+exist. `planLocked` is now a field on the read model: a fact the page reads rather than a rule it
+re-derives. The queue page's n+1-shaped segment fetch went the same way, into one `in(...)` query
+the adapter owns.
+
+**A distinction the read models had to make explicit.** Three of these fields — `strategy`,
+`schedule_plan`, `gate_state` — hold payloads the *strategy workflow* writes and owns. They are not
+read models and must not be camel-cased: `PlannedBeat.core_message` is what the workflow stores and
+what the gate editor posts back. But `campaign_beats` rows, which the locked canvas renders, are
+ordinary table rows and *are* camel-cased. Both appear in `CampaignWorkspace`, one screen apart, and
+a blanket rename over that file silently converted the wrong one — caught by `tsc`, but only
+because the two types differ. The payload shapes now live in `@platform/data` next to
+`VariantGateDecision`, for the same stated reason: **the read model describes what is stored.**
+
+**Duplicate types collapsed.** `PublishedPosts` carried its own `Metrics` interface identical to the
+metrics the repository returns; the component now uses `PublishedPostMetrics`. Seven component-local
+row types (`OverviewRow`, `CampaignRow`, `BeatRow`, `MatrixRow`, `PublishedItem`, `QueueItem`,
+`WizardAccount`) are gone, replaced by read models — which is the point of the seam, and the reason
+`apps/demo` can render these components at all.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 114 → 128 tests. `grep -rn "lib/supabase/server" app/(app)/campaigns`
+returns nothing. All five campaign pages walked manually, in both the draft and plan-approved states.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

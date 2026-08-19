@@ -19,6 +19,308 @@ beforeEach(() => {
   client = createFakeSupabase();
 });
 
+describe('listOverview', () => {
+  it('camel-cases the view row', async () => {
+    client.__setResponse('v_campaign_overview', {
+      data: [
+        {
+          id: 'camp-1',
+          slug: 'q3-treasury',
+          name: 'Q3 treasury series',
+          objective: 'Educate CFOs',
+          status: 'active',
+          start_date: '2026-09-01',
+          duration_weeks: 6,
+          end_date: '2026-10-13',
+          days_remaining: 12,
+          total_variants: 24,
+          published_count: 8,
+          approved_count: 4,
+          pending_count: 10,
+          flagged_count: 2,
+        },
+      ],
+      error: null,
+    });
+
+    expect(await campaigns().listOverview(ctx)).toEqual([
+      {
+        id: 'camp-1',
+        slug: 'q3-treasury',
+        name: 'Q3 treasury series',
+        objective: 'Educate CFOs',
+        status: 'active',
+        startDate: '2026-09-01',
+        durationWeeks: 6,
+        endDate: '2026-10-13',
+        daysRemaining: 12,
+        totalVariants: 24,
+        publishedCount: 8,
+        approvedCount: 4,
+        pendingCount: 10,
+        flaggedCount: 2,
+      },
+    ]);
+  });
+});
+
+describe('listAccounts', () => {
+  it('offers only active accounts, by display name', async () => {
+    client.__setResponse('social_accounts', {
+      data: [{ id: 'acc-1', platform: 'linkedin', account_type: 'company', display_name: 'BTS' }],
+      error: null,
+    });
+
+    expect(await campaigns().listAccounts(ctx)).toEqual([
+      { id: 'acc-1', platform: 'linkedin', accountType: 'company', displayName: 'BTS' },
+    ]);
+
+    const builder = client.__buildersFor('social_accounts')[0];
+    expect(builder.eq).toHaveBeenCalledWith('is_active', true);
+    expect(builder.order).toHaveBeenCalledWith('display_name', { ascending: true });
+  });
+});
+
+describe('getDetail', () => {
+  function campaignRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'camp-1',
+      slug: 'q3-treasury',
+      name: 'Q3 treasury series',
+      objective: 'Educate CFOs',
+      status: 'draft',
+      strategy: null,
+      schedule_plan: null,
+      gate_state: { gate: 'gate1', campaignId: 'camp-1', strategy: {} },
+      pending_decision: null,
+      workflow_run_id: 'run-1',
+      ...overrides,
+    };
+  }
+
+  it('reads nothing downstream before the plan is approved', async () => {
+    // The beats live transiently in gate_state and no variants exist yet, so
+    // three of the page's four queries had nothing to return.
+    client.__setResponse('campaigns', { data: campaignRow({ status: 'draft' }), error: null });
+
+    const detail = await campaigns().getDetail(ctx, 'q3-treasury');
+
+    expect(detail).toMatchObject({ planLocked: false, beats: [], matrix: [], published: [] });
+    expect(client.__buildersFor('campaign_beats')).toHaveLength(0);
+    expect(client.__buildersFor('v_campaign_matrix')).toHaveLength(0);
+  });
+
+  it.each(['plan_approved', 'active', 'completed'])(
+    'reads the locked canvas when the status is %s',
+    async (status) => {
+      client.__setResponse('campaigns', { data: campaignRow({ status }), error: null });
+      client.__setResponse('campaign_beats', {
+        data: [
+          {
+            id: 'b1',
+            sequence: 1,
+            title: 'Custody',
+            core_message: 'Self-custody is the default.',
+            rationale: 'Leads the series.',
+            prefer_thread: true,
+          },
+        ],
+        error: null,
+      });
+      client.__setResponse('v_campaign_matrix', { data: [], error: null });
+      client.__setResponse('content_items', { data: [], error: null });
+
+      const detail = await campaigns().getDetail(ctx, 'q3-treasury');
+
+      expect(detail?.planLocked).toBe(true);
+      expect(detail?.beats).toEqual([
+        {
+          id: 'b1',
+          sequence: 1,
+          title: 'Custody',
+          coreMessage: 'Self-custody is the default.',
+          rationale: 'Leads the series.',
+          preferThread: true,
+        },
+      ]);
+    },
+  );
+
+  it('flattens the to-many post_metrics relation to one row', async () => {
+    // PostgREST returns an embedded to-many as an array even where the table
+    // has one row per content item. The page used to unwrap this.
+    client.__setResponse('campaigns', { data: campaignRow({ status: 'active' }), error: null });
+    client.__setResponse('campaign_beats', { data: [], error: null });
+    client.__setResponse('v_campaign_matrix', { data: [], error: null });
+    client.__setResponse('content_items', {
+      data: [
+        {
+          id: 'ci-1',
+          title: 'A post',
+          body: 'Body.',
+          type: 'linkedin',
+          is_thread: false,
+          published_url: 'https://li.test/p/1',
+          social_accounts: { display_name: 'BTS' },
+          post_metrics: [{ impressions: 1200, reactions: 34, comments: 2, reposts: 1, clicks: 8 }],
+        },
+      ],
+      error: null,
+    });
+
+    const [post] = (await campaigns().getDetail(ctx, 'q3-treasury'))!.published;
+
+    expect(post.metrics).toEqual({
+      impressions: 1200,
+      reactions: 34,
+      comments: 2,
+      reposts: 1,
+      clicks: 8,
+    });
+    expect(post.accountName).toBe('BTS');
+  });
+
+  it('reports no metrics for a post nobody has recorded any against', async () => {
+    client.__setResponse('campaigns', { data: campaignRow({ status: 'active' }), error: null });
+    client.__setResponse('campaign_beats', { data: [], error: null });
+    client.__setResponse('v_campaign_matrix', { data: [], error: null });
+    client.__setResponse('content_items', {
+      data: [
+        {
+          id: 'ci-1',
+          title: null,
+          body: null,
+          type: 'linkedin',
+          is_thread: false,
+          published_url: null,
+          social_accounts: null,
+          post_metrics: [],
+        },
+      ],
+      error: null,
+    });
+
+    const [post] = (await campaigns().getDetail(ctx, 'q3-treasury'))!.published;
+
+    expect(post.metrics).toBeNull();
+    expect(post.accountName).toBeNull();
+  });
+
+  it('is null for a campaign that is gone', async () => {
+    client.__setResponse('campaigns', { data: null, error: null });
+
+    expect(await campaigns().getDetail(ctx, 'nope')).toBeNull();
+  });
+});
+
+describe('getReadyToPost', () => {
+  const queueRow = {
+    id: 'ci-1',
+    slug: 'a-post',
+    title: 'A post',
+    body: 'Body.',
+    type: 'linkedin',
+    is_thread: false,
+    account_name: 'BTS',
+    platform: 'linkedin',
+    profile_url: null,
+    scheduled_for: '2026-09-01T09:00:00Z',
+    disclaimer_text: 'Not advice.',
+  };
+
+  beforeEach(() => {
+    client.__setResponse('campaigns', {
+      data: { id: 'camp-1', slug: 'q3-treasury', name: 'Q3 treasury series' },
+      error: null,
+    });
+  });
+
+  it('attaches each thread its own segments, in one query for all of them', async () => {
+    client.__setResponse('v_ready_to_post', {
+      data: [
+        { ...queueRow, id: 'ci-1', is_thread: true },
+        { ...queueRow, id: 'ci-2', is_thread: true },
+        { ...queueRow, id: 'ci-3', is_thread: false },
+      ],
+      error: null,
+    });
+    client.__setResponse('thread_segments', {
+      data: [
+        { content_item_id: 'ci-1', sequence: 1, body: 'One.' },
+        { content_item_id: 'ci-1', sequence: 2, body: 'Two.' },
+        { content_item_id: 'ci-2', sequence: 1, body: 'Only.' },
+      ],
+      error: null,
+    });
+
+    const queue = await campaigns().getReadyToPost(ctx, 'q3-treasury');
+
+    expect(queue?.items.map((item) => item.segments)).toEqual([['One.', 'Two.'], ['Only.'], []]);
+    // One query, not one per thread.
+    expect(client.__buildersFor('thread_segments')).toHaveLength(1);
+    expect(client.__buildersFor('thread_segments')[0].in).toHaveBeenCalledWith(
+      'content_item_id',
+      ['ci-1', 'ci-2'],
+    );
+  });
+
+  it('asks for no segments at all when nothing in the queue is a thread', async () => {
+    client.__setResponse('v_ready_to_post', { data: [queueRow], error: null });
+
+    await campaigns().getReadyToPost(ctx, 'q3-treasury');
+
+    expect(client.__buildersFor('thread_segments')).toHaveLength(0);
+  });
+
+  it('is null for a campaign that is gone', async () => {
+    client.__setResponse('campaigns', { data: null, error: null });
+
+    expect(await campaigns().getReadyToPost(ctx, 'nope')).toBeNull();
+  });
+});
+
+describe('getVariantReview', () => {
+  it('resolves the parent campaign slug for the back link', async () => {
+    client.__setResponse('content_items', {
+      data: {
+        id: 'ci-1',
+        status: 'review',
+        workflow_run_id: 'run-1',
+        gate_state: { gate: 'variant' },
+        campaign_id: 'camp-1',
+      },
+      error: null,
+    });
+    client.__setResponse('campaigns', { data: { slug: 'q3-treasury' }, error: null });
+
+    expect(await campaigns().getVariantReview(ctx, 'ci-1')).toEqual({
+      id: 'ci-1',
+      status: 'review',
+      gateState: { gate: 'variant' },
+      campaignSlug: 'q3-treasury',
+    });
+  });
+
+  it('leaves the slug null for a variant with no campaign', async () => {
+    // The page links up to the campaigns list instead.
+    client.__setResponse('content_items', {
+      data: {
+        id: 'ci-1',
+        status: 'review',
+        workflow_run_id: null,
+        gate_state: null,
+        campaign_id: null,
+      },
+      error: null,
+    });
+
+    const review = await campaigns().getVariantReview(ctx, 'ci-1');
+
+    expect(review?.campaignSlug).toBeNull();
+    expect(client.__buildersFor('campaigns')).toHaveLength(0);
+  });
+});
+
 describe('getGate', () => {
   it('reports the open gate from gate_state', async () => {
     client.__setResponse('campaigns', {

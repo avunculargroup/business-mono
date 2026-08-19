@@ -5,27 +5,12 @@ import Link from 'next/link';
 import { CalendarDays, Grid3x3, Flag } from 'lucide-react';
 import { StatusChip } from '@platform/ui/StatusChip';
 import styles from './CampaignMatrix.module.css';
+import type { CampaignMatrixRow } from '@platform/data';
 
 // The campaign matrix — every variant with its beat, account, platform, status,
 // and compliance state (v_campaign_matrix). Two layouts: a chronological agenda
 // (the rhythm of the campaign, default on mobile) and a coverage grid (beats ×
 // accounts — which cells are thin). Each variant links to its Gate 3 editor.
-
-export interface MatrixRow {
-  id: string;
-  slug: string;
-  beat_id: string | null;
-  beat_sequence: number | null;
-  beat_title: string | null;
-  account_id: string;
-  account_name: string | null;
-  platform: 'linkedin' | 'twitter_x';
-  is_thread: boolean;
-  status: string;
-  scheduled_for: string | null;
-  compliance_status: string | null;
-  needs_disclaimer: boolean;
-}
 
 const STATUS_COLOR: Record<string, 'neutral' | 'accent' | 'success' | 'warning'> = {
   idea: 'neutral',
@@ -43,27 +28,27 @@ function formatWhen(scheduledFor: string | null): string {
   return time ? `${date} · ${time.slice(0, 5)}` : (date ?? scheduledFor);
 }
 
-function StatusCell({ row }: { row: MatrixRow }) {
+function StatusCell({ row }: { row: CampaignMatrixRow }) {
   return (
     <Link href={`/campaigns/variants/${row.slug}`} className={styles.cellLink}>
       <StatusChip label={row.status} color={STATUS_COLOR[row.status] ?? 'neutral'} />
-      {row.compliance_status === 'flagged' && (
+      {row.complianceStatus === 'flagged' && (
         <Flag size={12} strokeWidth={1.5} className={styles.flag} aria-label="Compliance flagged" />
       )}
     </Link>
   );
 }
 
-export function CampaignMatrix({ rows }: { rows: MatrixRow[] }) {
+export function CampaignMatrix({ rows }: { rows: CampaignMatrixRow[] }) {
   const [view, setView] = useState<'agenda' | 'grid'>('agenda');
 
   const agenda = useMemo(
     () =>
       [...rows].sort((a, b) => {
-        if (a.scheduled_for && b.scheduled_for) return a.scheduled_for.localeCompare(b.scheduled_for);
-        if (a.scheduled_for) return -1;
-        if (b.scheduled_for) return 1;
-        return (a.beat_sequence ?? 0) - (b.beat_sequence ?? 0);
+        if (a.scheduledFor && b.scheduledFor) return a.scheduledFor.localeCompare(b.scheduledFor);
+        if (a.scheduledFor) return -1;
+        if (b.scheduledFor) return 1;
+        return (a.beatSequence ?? 0) - (b.beatSequence ?? 0);
       }),
     [rows],
   );
@@ -71,11 +56,11 @@ export function CampaignMatrix({ rows }: { rows: MatrixRow[] }) {
   const { beats, accounts, cell } = useMemo(() => {
     const beatMap = new Map<number, string>();
     const acctMap = new Map<string, string>();
-    const cellMap = new Map<string, MatrixRow>();
+    const cellMap = new Map<string, CampaignMatrixRow>();
     for (const r of rows) {
-      if (r.beat_sequence != null) beatMap.set(r.beat_sequence, r.beat_title ?? `Beat ${r.beat_sequence}`);
-      acctMap.set(r.account_id, r.account_name ?? 'Account');
-      if (r.beat_sequence != null) cellMap.set(`${r.beat_sequence}:${r.account_id}`, r);
+      if (r.beatSequence != null) beatMap.set(r.beatSequence, r.beatTitle ?? `Beat ${r.beatSequence}`);
+      acctMap.set(r.accountId, r.accountName ?? 'Account');
+      if (r.beatSequence != null) cellMap.set(`${r.beatSequence}:${r.accountId}`, r);
     }
     return {
       beats: [...beatMap.entries()].sort((a, b) => a[0] - b[0]),
@@ -118,15 +103,15 @@ export function CampaignMatrix({ rows }: { rows: MatrixRow[] }) {
         <ul className={styles.agenda}>
           {agenda.map((r) => (
             <li key={r.id} className={styles.agendaRow}>
-              <span className={styles.when}>{formatWhen(r.scheduled_for)}</span>
+              <span className={styles.when}>{formatWhen(r.scheduledFor)}</span>
               <span className={styles.beat}>
-                Beat {r.beat_sequence}
-                {r.beat_title ? ` — ${r.beat_title}` : ''}
+                Beat {r.beatSequence}
+                {r.beatTitle ? ` — ${r.beatTitle}` : ''}
               </span>
               <span className={styles.account}>
-                {r.account_name}
+                {r.accountName}
                 <span className={styles.platform}>{r.platform === 'twitter_x' ? 'X' : 'LinkedIn'}</span>
-                {r.is_thread && <span className={styles.platform}>thread</span>}
+                {r.isThread && <span className={styles.platform}>thread</span>}
               </span>
               <StatusCell row={r} />
             </li>

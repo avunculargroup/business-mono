@@ -7,27 +7,11 @@ import { createClient } from '@/lib/supabase/browser';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { StatusChip } from '@platform/ui/StatusChip';
 import styles from '../../app/(app)/campaigns/campaigns.module.css';
+import type { CampaignOverview } from '@platform/data';
 
 // Client wrapper around the campaigns list so status chips update live —
 // the campaigns table is already Realtime-enabled (see
 // 20260624000000_enable_realtime_campaign_gates.sql), this just subscribes.
-
-export interface OverviewRow {
-  id: string;
-  slug: string;
-  name: string;
-  objective: string | null;
-  status: string;
-  start_date: string | null;
-  duration_weeks: number | null;
-  end_date: string | null;
-  days_remaining: number | null;
-  total_variants: number;
-  published_count: number;
-  approved_count: number;
-  pending_count: number;
-  flagged_count: number;
-}
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft',
@@ -49,13 +33,13 @@ const STATUS_COLOR: Record<string, 'neutral' | 'accent' | 'success' | 'warning'>
   archived: 'neutral',
 };
 
-export function CampaignsList({ initialCampaigns }: { initialCampaigns: OverviewRow[] }) {
+export function CampaignsList({ initialCampaigns }: { initialCampaigns: CampaignOverview[] }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase.from('v_campaign_overview').select('*');
-    setCampaigns((data as OverviewRow[] | null) ?? []);
+    setCampaigns((data as CampaignOverview[] | null) ?? []);
   }, []);
 
   useRealtimeSubscription(
@@ -97,14 +81,14 @@ export function CampaignsList({ initialCampaigns }: { initialCampaigns: Overview
             </div>
             {c.objective && <p className={styles.cardObjective}>{c.objective}</p>}
             <div className={styles.cardMeta}>
-              <span>{c.total_variants} variants</span>
-              <span>{c.published_count} published</span>
-              <span>{c.approved_count} approved</span>
-              {c.flagged_count > 0 && (
-                <span className={styles.flagged}>{c.flagged_count} flagged</span>
+              <span>{c.totalVariants} variants</span>
+              <span>{c.publishedCount} published</span>
+              <span>{c.approvedCount} approved</span>
+              {c.flaggedCount > 0 && (
+                <span className={styles.flagged}>{c.flaggedCount} flagged</span>
               )}
-              {c.days_remaining != null && c.days_remaining > 0 && (
-                <span>{c.days_remaining} days left</span>
+              {c.daysRemaining != null && c.daysRemaining > 0 && (
+                <span>{c.daysRemaining} days left</span>
               )}
             </div>
           </Link>

@@ -1,6 +1,7 @@
 import { vi, type Mock } from 'vitest';
 import type {
   AgentActivityItem,
+  CampaignDetail,
   CampaignGate,
   ContentDetail,
   NewsDigestItem,
@@ -38,6 +39,7 @@ export function createFakeRepositories(
     newsItem?: NewsItemDetail;
     publishGate?: PublishGate | null;
     campaignGate?: CampaignGate | null;
+    campaignDetail?: CampaignDetail | null;
     contentDetail?: ContentDetail | null;
   } = {},
 ): FakeRepositories {
@@ -86,6 +88,11 @@ export function createFakeRepositories(
       addDraftFeedback: vi.fn(async () => true),
     },
     campaigns: {
+      listOverview: vi.fn(async () => []),
+      listAccounts: vi.fn(async () => []),
+      getDetail: vi.fn(async () => overrides.campaignDetail ?? null),
+      getReadyToPost: vi.fn(async () => null),
+      getVariantReview: vi.fn(async () => null),
       getGate: vi.fn(async () =>
         overrides.campaignGate === undefined ? fakeCampaignGate() : overrides.campaignGate,
       ),
