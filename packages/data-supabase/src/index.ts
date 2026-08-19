@@ -15,4 +15,5 @@ export {
 } from './repositories/agentActivity';
 export { createCampaignRepository } from './repositories/campaigns';
 export { createContentRepository } from './repositories/content';
+export { createMarketReportRepository } from './repositories/marketReports';
 export { createResearchRepository } from './repositories/research';

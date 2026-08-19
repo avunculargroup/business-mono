@@ -53,6 +53,13 @@ export type {
   ThreadSegment,
 } from './repositories/content';
 export type {
+  MarketReportDetail,
+  MarketReportRepository,
+  MarketReportStatus,
+  MarketReportSummary,
+  ReportFeedbackEntry,
+} from './repositories/marketReports';
+export type {
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,

@@ -738,7 +738,7 @@ commit.
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
 | 4.3 | Content and campaigns ✅ | `/content/*`, `/campaigns/*` | Content only — `/campaigns/*` is not a demo surface |
-| 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
+| 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes. Split: **4.4a market reports ✅**, 4.4b indicators + onchain |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
 | — | *critical path ends; below is background* | | |
@@ -1153,6 +1153,53 @@ row types (`OverviewRow`, `CampaignRow`, `BeatRow`, `MatrixRow`, `PublishedItem`
 **Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
 green. `@platform/data-supabase` 114 → 128 tests. `grep -rn "lib/supabase/server" app/(app)/campaigns`
 returns nothing. All five campaign pages walked manually, in both the draft and plan-approved states.
+
+##### 4.4a — Market reports: what shipped
+
+`/market-reports`, `/market-reports/[id]`, `ReportFeedback` and
+`app/actions/marketReportFeedback.ts`. The indicator and onchain half of `/` is 4.4b.
+
+**This is the surface the demo is built around**, and the read model is shaped to say so.
+`MarketReportDetail` keeps `findings` and `narrationMarkdown` as two fields, and the doc comment on
+the type states why: `findings` is the payload the narrating agent was handed, `narrationMarkdown`
+is what it produced from that and nothing else. Phase 7's `deterministic-before-llm` annotation
+attaches to the boundary between them, so the boundary needed to be a boundary in the type rather
+than two columns that happen to sit next to each other.
+
+**`findings` is typed as the engine's own `Finding`, snake_case and all.** Same rule as the campaign
+workflow's payloads in 4.3d: the findings engine writes that shape into the JSONB, and the read
+model describes what is stored. This is the second vertical where the rule earned its keep, and the
+first where it lands on the flagship principle — the type the demo annotates is literally the type
+the engine produces.
+
+**`report_mode` does not appear in the read model.** The only question anything asks of it is
+whether the day was quiet — nothing cleared the materiality floor — so the model exposes
+`isQuietDay` and nothing else, as [`repository-contract.md` § Repository interfaces](./repository-contract.md#repository-interfaces)
+specifies. `quiet-day-path` is the surface's second principle, and it is now a boolean rather than a
+string comparison repeated in two pages.
+
+**A third pair of stale `as any` casts.** Both pages and the feedback action carried
+`const db = supabase as any` with "market_reports / market_report_feedback are not in the generated
+Database types yet". Both tables are in `database.ts`. That is now three separate places where a
+regeneration left the escape hatches behind — content in 4.3b, and these. Worth a sweep of the
+remaining `no-explicit-any` disables when 4.6 lands, rather than finding them one vertical at a time.
+
+**The list stopped fetching the findings blob.** It selects six columns for a date, an excerpt and
+two chips; `select('*')` was pulling every report's full findings audit trail to render that. Same
+class of finding as `/news` pulling 200 `body_markdown`s in 4.2a.
+
+**Deferred, and named so Phase 7 does not discover it late.** The contract's `MarketReportDetail`
+also lists `opsFindings` (the staleness set — ops only, never narrated), `lintResult` and
+`lexResult`. Nothing renders them today, so they are not in the read model. `opsFindings` in
+particular would strengthen the annotation — showing what the engine deliberately withheld from the
+narrator — and adding it is one field plus a renderer, not a redesign.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 128 → 142 tests, including a held-day case (the most informative
+state on this page: the deterministic step ran, its output is there, and the narration was rejected)
+and a malformed-blob case. The page test moved off the Supabase mock and gained one the old shape
+could not express — that the quiet-day chip appears only on a quiet day. Both routes walked
+manually, published and held.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

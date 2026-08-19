@@ -4,6 +4,7 @@
 import type { AgentActivityRepository } from './repositories/agentActivity';
 import type { CampaignRepository } from './repositories/campaigns';
 import type { ContentRepository } from './repositories/content';
+import type { MarketReportRepository } from './repositories/marketReports';
 import type { ResearchRepository } from './repositories/research';
 
 /**
@@ -44,5 +45,6 @@ export interface RepositoryBundle {
   research: ResearchRepository;
   content: ContentRepository;
   campaigns: CampaignRepository;
+  marketReports: MarketReportRepository;
   mode: RepositoryMode;
 }

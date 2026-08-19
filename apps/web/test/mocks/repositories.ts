@@ -3,6 +3,8 @@ import type {
   AgentActivityItem,
   CampaignDetail,
   CampaignGate,
+  MarketReportDetail,
+  MarketReportSummary,
   ContentDetail,
   NewsDigestItem,
   NewsFeedItem,
@@ -27,6 +29,7 @@ export type FakeRepositories = {
   research: { [K in keyof RepositoryBundle['research']]: Mock };
   content: { [K in keyof RepositoryBundle['content']]: Mock };
   campaigns: { [K in keyof RepositoryBundle['campaigns']]: Mock };
+  marketReports: { [K in keyof RepositoryBundle['marketReports']]: Mock };
   mode: RepositoryBundle['mode'];
 };
 
@@ -40,6 +43,8 @@ export function createFakeRepositories(
     publishGate?: PublishGate | null;
     campaignGate?: CampaignGate | null;
     campaignDetail?: CampaignDetail | null;
+    marketReports?: MarketReportSummary[];
+    marketReport?: MarketReportDetail | null;
     contentDetail?: ContentDetail | null;
   } = {},
 ): FakeRepositories {
@@ -105,6 +110,16 @@ export function createFakeRepositories(
       savePostMetrics: vi.fn(async () => undefined),
       promoteToVoiceSnippet: vi.fn(async () => undefined),
     },
+    marketReports: {
+      listReports: vi.fn(async () => {
+        const reports = overrides.marketReports ?? [];
+        return { items: reports, total: reports.length, hasMore: false };
+      }),
+      getReport: vi.fn(async () =>
+        overrides.marketReport === undefined ? fakeMarketReport() : overrides.marketReport,
+      ),
+      addReportFeedback: vi.fn(async () => true),
+    },
     mode: 'live',
   };
 }
@@ -127,6 +142,23 @@ export function fakeContentDetail(overrides: Partial<ContentDetail> = {}): Conte
     threadSegments: [],
     priorFeedback: [],
     maxChars: null,
+    ...overrides,
+  };
+}
+
+/** A published report on a normal day, with one finding behind it. */
+export function fakeMarketReport(
+  overrides: Partial<MarketReportDetail> = {},
+): MarketReportDetail {
+  return {
+    id: 'mr-1',
+    asOf: '2026-07-18',
+    status: 'published',
+    narrationMarkdown: 'Hash rate fell 8% overnight.',
+    emailed: true,
+    isQuietDay: false,
+    findings: [],
+    priorFeedback: [],
     ...overrides,
   };
 }
