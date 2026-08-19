@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { useToast } from '@/providers/ToastProvider';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { useToast } from '@platform/ui/ToastProvider';
 import { updateAccountGuidelines } from '@/app/actions/voice';
 import { formatDate } from '@/lib/utils';
 import type { SocialAccountRow } from './voiceTypes';

@@ -1,4 +1,4 @@
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
 import type { NewsCategory } from '@platform/shared';
 

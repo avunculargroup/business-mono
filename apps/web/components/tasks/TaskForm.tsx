@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from 'react';
 import { createTask, updateTask } from '@/app/actions/tasks';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { useCurrentUser } from '@/providers/UserProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 

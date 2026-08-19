@@ -3,9 +3,9 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, AlertTriangle, Flag, RefreshCw, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
 import { submitVariantGateDecision, editVariantCopy } from '@/app/actions/campaigns';
 import styles from './VariantEditor.module.css';
 

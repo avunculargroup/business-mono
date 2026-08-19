@@ -2,19 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { PipelineChip } from '@/components/ui/PipelineChip';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { PipelineChip } from '@platform/ui/PipelineChip';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { ContactForm } from './ContactForm';
 import { deleteContact, updateContact } from '@/app/actions/contacts';
 import { useEntityList } from '@/hooks/useEntityList';
 import { formatRelativeDate } from '@/lib/utils';
 import { STAKEHOLDER_ROLE_LABELS, type StakeholderRole } from '@platform/shared';
 import { Plus, Users, Eye, Pencil, Trash2 } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from './ContactsList.module.css';
 
 type ContactRow = {

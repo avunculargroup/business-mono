@@ -2,10 +2,10 @@
 
 import { useState, useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
 import { logChampionEvent } from '@/app/actions/champions';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { CHAMPION_EVENT_TYPE_LABELS, type ChampionEventType } from '@platform/shared';
 import styles from './Champions.module.css';
 import formStyles from '@/components/discovery/DiscoveryForm.module.css';

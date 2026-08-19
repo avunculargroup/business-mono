@@ -11,7 +11,7 @@ import { SlideView } from '@/components/slides/templates/SlideView';
 import { SlideList } from './SlideList';
 import { InspectorPanel } from './InspectorPanel';
 import { TemplatePicker } from './TemplatePicker';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import type { SlideType } from '@platform/shared';
 import { SLIDE_WIDTH, SLIDE_HEIGHT } from '@/lib/decks/theme';
 import styles from './DeckShell.module.css';

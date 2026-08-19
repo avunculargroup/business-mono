@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { ChipField } from '@/components/ui/ChipField';
+import { Button } from '@platform/ui/Button';
+import { ChipField } from '@platform/ui/ChipField';
 import {
   AgentName,
   RoutineActionType,

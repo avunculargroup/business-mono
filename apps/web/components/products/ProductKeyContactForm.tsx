@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { addProductKeyContact } from '@/app/actions/products';
-import { Button } from '@/components/ui/Button';
-import { useToast } from '@/providers/ToastProvider';
+import { Button } from '@platform/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
 type KeyContact = {

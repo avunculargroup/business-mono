@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { PriorityChip } from '@/components/ui/PriorityChip';
-import { Card } from '@/components/ui/Card';
+import { PriorityChip } from '@platform/ui/PriorityChip';
+import { Card } from '@platform/ui/Card';
 import { QuickAdd } from '@/components/dashboard/QuickAdd';
 import { RoutineTile } from '@/components/dashboard/RoutineTile';
 import { FearGreedIndicator } from '@/components/dashboard/FearGreedIndicator';

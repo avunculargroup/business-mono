@@ -1,5 +1,5 @@
-import { Card } from '@/components/ui/Card';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { getBtcPrice } from '@/lib/dashboard/btcPrice';
 import { formatDay } from '@/lib/onchain/format';
 import styles from './BitcoinPriceAUD.module.css';

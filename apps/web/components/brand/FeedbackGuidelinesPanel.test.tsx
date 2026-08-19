@@ -8,7 +8,7 @@ vi.mock('@/app/actions/voice', () => ({
 }));
 
 const toast = { success: vi.fn(), error: vi.fn() };
-vi.mock('@/providers/ToastProvider', () => ({ useToast: () => toast }));
+vi.mock('@platform/ui/ToastProvider', () => ({ useToast: () => toast }));
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));

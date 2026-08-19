@@ -10,7 +10,7 @@ vi.mock('@/app/actions/content', () => ({
   scheduleContent: vi.fn(async () => ({})),
   postContentNow: vi.fn(async () => ({})),
 }));
-vi.mock('@/providers/ToastProvider', () => ({
+vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 

@@ -7,14 +7,14 @@ import { ChevronLeft } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
-import { Button } from '@/components/ui/Button';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { StatusChip } from '@platform/ui/StatusChip';
 import {
   updateTemplateVersion,
   createTemplateVersion,
   approveTemplateVersion,
 } from '@/app/actions/templates';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import {
   TEMPLATE_VERSION_STATUS_LABELS,
   type TemplateVersionStatus,

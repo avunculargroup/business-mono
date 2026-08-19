@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
 import type { NewsCategory, NewsStatus, NewsItemRecord } from '@platform/shared';
 import { CategoryChip } from './CategoryChip';

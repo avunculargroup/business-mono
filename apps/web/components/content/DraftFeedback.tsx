@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { submitDraftFeedback } from '@/app/actions/contentFeedback';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { cn } from '@platform/ui/cn';
 import styles from './DraftFeedback.module.css';
 
 export type DraftFeedbackEntry = {

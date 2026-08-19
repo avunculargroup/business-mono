@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { SLIDE_TYPE_LABELS } from '@platform/shared';
 import { updateSlide, deleteSlide, duplicateSlide } from '@/app/actions/decks';
 import type { Slide, DeckSlideRow } from '@/lib/decks/schema';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { TitleInspector } from './inspectors/TitleInspector';
 import { SectionInspector } from './inspectors/SectionInspector';
 import { AgendaInspector } from './inspectors/AgendaInspector';

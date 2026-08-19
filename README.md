@@ -77,7 +77,9 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 │   ├── db/              # Supabase client, generated types, RPC wrappers
 │   ├── shared/          # Shared TypeScript types, enums, constants
 │   ├── signal/          # Typed HTTP client for signal-cli REST API sidecar
+│   ├── ui/              # Design tokens and shared presentational components
 │   └── voice/           # Brand-voice resolution, merging and embedding
+├── e2e/                 # Playwright visual regression — advisory, separate from `pnpm test`
 ├── infra/
 │   └── signal-cli/      # Docker config for signal-cli sidecar (not in pnpm workspace)
 ├── docs/                # ~70 docs — start at docs/README.md, which sorts them by genre
@@ -110,9 +112,14 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/signal
                   →  @platform/voice   →  @platform/db, @platform/shared
 @platform/web     →  @platform/db      →  @platform/shared
+                  →  @platform/ui      →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/db` and `@platform/shared` — not `@platform/signal`, not `@platform/voice`.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
+
+`@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
+presentational components, and is written to be consumed by more than one app — so a dependency
+on app code would defeat the point. React and `lucide-react` are peer dependencies.
 
 ---
 

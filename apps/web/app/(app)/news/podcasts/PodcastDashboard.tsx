@@ -3,13 +3,13 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
 import { MediaEmbed } from '@/components/podcasts/MediaEmbed';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import {
   formatTimestamp,
@@ -27,7 +27,7 @@ import {
 import { requestEpisodeAction, ingestEpisodeBrief } from '@/app/actions/podcasts';
 import type { TranscriptStatus, TranscriptSource } from '@platform/shared';
 import { Library, FileCheck2, Loader, AlertTriangle, Plus, Database } from 'lucide-react';
-import type { RowAction } from '@/components/ui/RowActionsMenu';
+import type { RowAction } from '@platform/ui/RowActionsMenu';
 import styles from './podcasts.module.css';
 
 export interface DashboardEpisode {

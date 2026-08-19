@@ -1,8 +1,8 @@
 'use client';
 
 import { Plus, Pencil, Star, Trash2, MessageSquareQuote } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@platform/ui/Button';
+import { EmptyState } from '@platform/ui/EmptyState';
 import type { VoiceSnippetRow } from './voiceTypes';
 import styles from '@/app/(app)/brand/voice.module.css';
 

@@ -20,6 +20,7 @@
     "@hookform/resolvers": "^3.9.0",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
+    "@platform/ui": "workspace:*",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.45.0",
     "@tiptap/pm": "^2.11.5",

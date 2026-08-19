@@ -2,8 +2,8 @@
 
 import { useActionState } from 'react';
 import { createInteraction } from '@/app/actions/interactions';
-import { useToast } from '@/providers/ToastProvider';
-import { Button } from '@/components/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
+import { Button } from '@platform/ui/Button';
 import styles from './ContactForm.module.css';
 
 interface InteractionFormProps {

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { createPipelineItem, updatePipelineItem, overrideValidation } from '@/app/actions/pipeline';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { X, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 import type { PipelineItemRow, PainPointOption, TeamMember } from './PipelineBoard';
 import { INSIGHT_PIPELINE_STAGE_LABELS } from '@platform/shared';

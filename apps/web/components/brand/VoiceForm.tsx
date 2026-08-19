@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { updateBrandVoice } from '@/app/actions/voice';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { ChipField } from './ChipField';
 import {
   REGISTER_OPTIONS,

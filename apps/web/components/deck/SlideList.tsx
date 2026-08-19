@@ -21,7 +21,7 @@ import { SlideThumbnail } from './SlideThumbnail';
 import type { Slide, DeckSlideRow } from '@/lib/decks/schema';
 import { parseSlideContent } from '@/lib/decks/schema';
 import type { SlideTheme } from '@/lib/decks/theme';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from './SlideList.module.css';
 
 interface SlideListProps {

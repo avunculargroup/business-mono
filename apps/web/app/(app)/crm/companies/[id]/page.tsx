@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import Link from 'next/link';
-import { PipelineChip } from '@/components/ui/PipelineChip';
+import { PipelineChip } from '@platform/ui/PipelineChip';
 import { idColumn } from '@/lib/utils';
 import styles from './company-detail.module.css';
 

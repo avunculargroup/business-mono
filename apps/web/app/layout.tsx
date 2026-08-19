@@ -1,3 +1,5 @@
+// Tokens first: globals.css and every *.module.css consume them.
+import '@platform/ui/tokens.css';
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 

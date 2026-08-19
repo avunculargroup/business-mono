@@ -1,6 +1,6 @@
 'use client';
 
-import { CopyButton } from '@/components/ui/CopyButton';
+import { CopyButton } from '@platform/ui/CopyButton';
 import styles from './SocialDraftCopyView.module.css';
 
 export interface SocialDraftCopyViewProps {

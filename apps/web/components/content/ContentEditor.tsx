@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useOptimistic, useTransition } from 'react';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { CopyButton } from '@/components/ui/CopyButton';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { CopyButton } from '@platform/ui/CopyButton';
 import { DraftFeedback, type DraftFeedbackEntry } from './DraftFeedback';
 import {
   updateContentStatus,
@@ -11,7 +11,7 @@ import {
   scheduleContent,
   postContentNow,
 } from '@/app/actions/content';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import styles from './ContentEditor.module.css';
 

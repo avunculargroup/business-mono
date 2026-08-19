@@ -1,5 +1,5 @@
-import { Card } from '@/components/ui/Card';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
 import styles from './FearGreedIndicator.module.css';
 
 interface FngEntry {

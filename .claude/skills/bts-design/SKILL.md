@@ -14,7 +14,7 @@ If the user invokes this skill without any other guidance, ask them what they wa
 
 - **Voice:** Calm authority. Precise nouns over adjectives. Write to peers, not prospects. No emoji. No exclamation marks. Never refer to assets as "crypto." See `README.md` → Content Fundamentals.
 - **Colors:** Warm cream background (`#FAFAF8`), single amber accent (`#C9A84C`), warm greys for text. Tokens in `colors_and_type.css`. Never neon, never purple, never dark-by-default.
-- **Type:** Playfair Display (serif, for H1/H2 only), Inter (body), JetBrains Mono (data). All from Google Fonts — see `colors_and_type.css`.
+- **Type:** Playfair Display (serif, for H1/H2 only), DM Sans (body), JetBrains Mono (data). All from Google Fonts — see `colors_and_type.css`.
 - **Feel:** A highly organised colleague who has already done the prep work. Trustworthy, focused, calm, precise. Not a bloated SaaS, not crypto hype.
 
 ## Files in this skill

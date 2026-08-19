@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { ChampionForm } from './ChampionForm';
 import { ChampionEventLog } from './ChampionEventLog';
 import { deleteChampion } from '@/app/actions/champions';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import {
   CHAMPION_STATUS_LABELS,
   CHAMPION_ROLE_TYPE_LABELS,

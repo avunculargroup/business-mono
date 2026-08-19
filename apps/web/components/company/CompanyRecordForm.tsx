@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
 import { RichTextToolbar } from '@/components/discovery/RichTextToolbar';
 import { CompanyTypeForm } from './CompanyTypeForm';
 import { createCompanyRecord, updateCompanyRecord, createCompanyUploadSignedUrl } from '@/app/actions/company';
 import { createClient } from '@/lib/supabase/browser';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import type { CompanyRecord, CompanyRecordType } from '@platform/shared';
 import styles from './CompanyRecordForm.module.css';
 

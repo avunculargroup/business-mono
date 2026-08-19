@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { useToast } from '@/providers/ToastProvider';
+import { Button } from '@platform/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import { clearDetectionAlert } from '@/app/actions/reportWatch';
 import type { ReportWatchHealthRow } from '@platform/shared';

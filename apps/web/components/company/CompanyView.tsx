@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@platform/ui/Button';
+import { EmptyState } from '@platform/ui/EmptyState';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { CompanyHero } from './CompanyHero';
 import { CompanyCategory } from './CompanyCategory';
 import { CompanyRecordForm } from './CompanyRecordForm';
 import { DomainsSection } from './DomainsSection';
 import { SubscriptionsSection } from './SubscriptionsSection';
 import { deleteCompanyRecord } from '@/app/actions/company';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { useRouter } from 'next/navigation';
 import { Building2, Plus } from 'lucide-react';
 import type { CompanyRecord, CompanyRecordType, CompanyDomain, CompanySubscription } from '@platform/shared';

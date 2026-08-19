@@ -8,7 +8,7 @@ import { SimonResponse } from './SimonResponse';
 import { TypingIndicator } from './TypingIndicator';
 import { ApprovalCard } from './ApprovalCard';
 import { ComposeArea } from './ComposeArea';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { sendDirective } from '@/app/actions/simon';
 import { Bot } from 'lucide-react';

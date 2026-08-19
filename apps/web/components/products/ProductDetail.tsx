@@ -3,11 +3,11 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, Plus, X, Link as LinkIcon } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useToast } from '@/providers/ToastProvider';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { useToast } from '@platform/ui/ToastProvider';
 import { deleteProduct, removeProductKeyContact, deleteReferralAgreement } from '@/app/actions/products';
 import { ProductEditForm } from './ProductEditForm';
 import { ProductKeyContactForm } from './ProductKeyContactForm';

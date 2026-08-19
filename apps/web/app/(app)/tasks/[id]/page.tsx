@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { PriorityChip } from '@/components/ui/PriorityChip';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { PriorityChip } from '@platform/ui/PriorityChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { TaskDetailActions } from '@/components/tasks/TaskDetailActions';
 import { getTeamMemberOptions } from '@/lib/referenceData';
 import { formatDate, formatRelativeDate, idColumn } from '@/lib/utils';

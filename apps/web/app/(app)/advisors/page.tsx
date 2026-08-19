@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { AdvisorsContent } from './AdvisorsContent';
-import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { SkeletonLoader } from '@platform/ui/SkeletonLoader';
 
 export default function AdvisorsPage() {
   return (

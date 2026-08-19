@@ -1,7 +1,7 @@
 'use client';
 
-import { PipelineChip } from '@/components/ui/PipelineChip';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { PipelineChip } from '@platform/ui/PipelineChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { InteractionTimeline } from './InteractionTimeline';
 import Link from 'next/link';
 import styles from './ContactDetail.module.css';

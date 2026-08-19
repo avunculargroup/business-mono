@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@platform/ui/Card';
 import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './RoutineTile.module.css';

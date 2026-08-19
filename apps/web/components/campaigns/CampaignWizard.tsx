@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Plus, X } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
-import { Button } from '@/components/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
+import { Button } from '@platform/ui/Button';
 import { createCampaignDraft, launchCampaignStrategy } from '@/app/actions/campaigns';
 import styles from './CampaignWizard.module.css';
 

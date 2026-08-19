@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from 'react';
 import { updateAdvisor } from '@/app/actions/advisors';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
 type Advisor = {

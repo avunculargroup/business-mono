@@ -3,8 +3,8 @@
 import { createSegment, updateSegment } from '@/app/actions/segments';
 import type { SegmentScorecard } from '@platform/shared';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 interface SegmentFormProps {
   onSuccess: (segment?: SegmentScorecard) => void;

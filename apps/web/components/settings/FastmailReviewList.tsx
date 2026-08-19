@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { PipelineChip } from '@/components/ui/PipelineChip';
-import { Button } from '@/components/ui/Button';
+import { PipelineChip } from '@platform/ui/PipelineChip';
+import { Button } from '@platform/ui/Button';
 import { approveContact, rejectContact } from '@/app/actions/fastmail';
 import { formatDate } from '@/lib/utils';
 import styles from './FastmailReviewList.module.css';

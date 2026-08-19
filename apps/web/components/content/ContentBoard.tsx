@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useOptimistic, useTransition } from 'react';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
 import { ContentForm } from './ContentForm';
 import { RunNewsletterModal } from './RunNewsletterModal';
 import { NewsletterRunStatus } from './NewsletterRunStatus';

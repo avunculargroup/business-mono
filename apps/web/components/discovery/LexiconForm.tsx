@@ -3,8 +3,8 @@
 import { createLexiconEntry, updateLexiconEntry } from '@/app/actions/lexicon';
 import type { LexiconRow } from './LexiconList';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 interface LexiconFormProps {
   onSuccess: () => void;

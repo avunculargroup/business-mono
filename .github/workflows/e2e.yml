@@ -1,0 +1,97 @@
+name: Visual regression
+
+# Advisory, not blocking. Kept out of the `Tests` workflow deliberately: that gate runs
+# in ~14s and gating every PR on browser screenshots would import flake into it. Promote
+# individual specs to required only once their baselines have proven stable.
+#
+# Baselines must be generated in this same container image — font hinting and
+# antialiasing differ enough between a laptop and CI that laptop-generated baselines
+# diff on every run. Bootstrap them with `pnpm test:visual:update`, which shells out to
+# the same image, then commit e2e/**-snapshots/.
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/bts-design/**'
+      - 'apps/web/app/globals.css'
+      - 'packages/ui/**'
+      - 'apps/demo/**'
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.claude/skills/bts-design/**'
+      - 'apps/web/app/globals.css'
+      - 'packages/ui/**'
+      - 'apps/demo/**'
+      - 'e2e/**'
+      - 'playwright.config.ts'
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: 'Regenerate baselines and upload them as an artifact to commit'
+        type: boolean
+        default: false
+
+jobs:
+  visual:
+    name: Design-system screenshots
+    runs-on: ubuntu-latest
+    # Pinned to the @playwright/test version in package.json. Bump both together —
+    # a mismatch means the browser build differs and every baseline diffs at once.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The specimens are static HTML read over file://, so there is nothing to build
+      # and no server to start. That changes when apps/demo joins this suite.
+
+      # Runs first and separately because it is meaningful *today*: it asserts computed
+      # values rather than comparing images, so it needs no committed baselines. While
+      # the screenshot step below is still waiting on its bootstrap, this is the step
+      # carrying real signal.
+      - name: Verify tokens resolve in the browser
+        if: ${{ !inputs.update_baselines }}
+        run: npx playwright test e2e/tokens-resolve.spec.ts
+
+      - name: Run visual regression
+        if: ${{ !inputs.update_baselines }}
+        run: npx playwright test e2e/design-system.spec.ts
+
+      - name: Regenerate baselines
+        if: ${{ inputs.update_baselines }}
+        run: npx playwright test --update-snapshots
+
+      - name: Upload regenerated baselines
+        if: ${{ inputs.update_baselines }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: updated-baselines
+          path: e2e/**-snapshots/
+          retention-days: 7
+
+      - name: Upload report on failure
+        if: ${{ failure() && !inputs.update_baselines }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

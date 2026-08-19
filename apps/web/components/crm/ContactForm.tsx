@@ -3,9 +3,9 @@
 import { createContact, updateContact } from '@/app/actions/contacts';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
 import { PIPELINE_STAGE_LABELS } from '@platform/shared';
-import styles from '@/components/ui/Form.module.css';
+import styles from '@platform/ui/Form.module.css';
 
 type ContactRow = {
   id: string;

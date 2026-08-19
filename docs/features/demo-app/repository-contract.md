@@ -1,47 +1,69 @@
-# Adapter Contract — `packages/data`
+# Adapter Contract — `@platform/data`
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** Portfolio Demo App
-**Status:** Draft
-**Last updated:** 2026-08-07
+**Status:** Draft, reconciled against the live repo 2026-08-08
+**Last updated:** 2026-08-08
 
 ---
 
 ## Purpose
 
-The contract both `apps/hq` and `apps/demo` code against. `@bts/data-supabase` and
-`@bts/data-fixtures` each implement it. Neither app imports either implementation
-directly — both receive a `RepositoryBundle` through a provider at the app root.
+The contract both `apps/web` and `apps/demo` code against. `@platform/data-supabase` and
+`@platform/data-fixtures` each implement it. Neither app imports either implementation
+directly — both receive their repositories through a provider at the app root.
 
 This document is the only place the two apps meet. If a change is needed here, it affects
 both apps by definition, and that is the intended cost.
+
+A third consumer — a client-facing app — is anticipated. It is the reason the seam covers
+all of `apps/web` rather than only the demo surfaces, and the reason for the scoping rule
+below. It is not designed here.
 
 ---
 
 ## Design rules
 
-**Read models, not tables.** Repository methods return view-shaped types corresponding to
-the existing database views (`v_compliance_dashboard`, `v_contracts_overview`,
-`v_open_tasks`, `v_recent_interactions`, `v_contacts_overview`). Do not expose raw table
-rows. The views already encode the computed fields (`days_until_due`,
-`days_until_renewal`) and the fixture adapter should produce the same shape rather than
-recomputing.
+**Read models, not tables.** Repository methods return view-shaped types. Do not expose raw
+table rows.
 
-**Computed fields are computed by the adapter.** `days_until_due` is computed relative to
-the request date in both implementations. In Supabase this is `CURRENT_DATE` in the view.
-In fixtures it is derived from an anchor date at read time — see the relative dating rule
-in `fixture-and-trace-schema.md`. Never store a computed field as a literal in a fixture.
+Note the correction: the original draft said "the views already encode the computed fields
+… the fixture adapter should produce the same shape rather than recomputing", naming five
+views. **Only three of those exist** — `v_open_tasks`, `v_recent_interactions`,
+`v_contacts_overview`. `v_compliance_dashboard` and `v_contracts_overview` never did, and
+the surfaces they backed are dropped. Several re-picked surfaces have no view at all and
+read tables directly (`market_reports`, `news_items`, `agent_activity`, `content_items`).
+So the rule is weaker than originally stated: **return view-shaped types whether or not a
+view exists.** Where one does, mirror it. Where one does not, the read model is defined
+here and the adapter maps to it.
+
+**Computed fields are computed by the adapter.** In Supabase this is `CURRENT_DATE` in a
+view or an expression in the query. In fixtures it is derived from an anchor date at read
+time — see the relative dating rule in `fixture-and-trace-schema.md`. Never store a
+computed field as a literal in a fixture.
 
 **Filtering and sorting belong in the adapter.** If the UI sorts a list client-side, the
 demo will look correct and the real app will fall over at scale. Push it down.
 
-**Every method is async.** Even fixture reads. Otherwise the demo's loading states never
-exercise and the components diverge.
+**Every method is async.** Even fixture reads.
+
+Note the correction: the original justified this as "otherwise the demo's loading states
+never exercise". That does not hold — in a React Server Component an async fixture read
+resolves in the same tick and `loading.tsx` never paints. `apps/web` has 31 `loading.tsx`
+files, so if exercising them is genuinely wanted the fixture adapter needs a deliberate
+delay, not merely an `async` keyword. Keep every method async anyway, for the real reason:
+the signatures must be identical across adapters or the components diverge.
 
 **Writes exist in the interface.** The fixture adapter implements them by throwing
-`DemoWriteBlockedError`. Omitting them from the interface would mean the demo's
-components differ from the real app's, which is exactly what this whole structure exists
-to prevent.
+`DemoWriteBlockedError`. Omitting them would mean the demo's components differ from the real
+app's, which is exactly what this structure exists to prevent.
+
+**Scoping lives at construction, never in a signature.** No read method takes a `clientId`,
+`tenantId` or equivalent. A bundle is constructed already scoped to its principal, so a
+caller has no way to ask for data it should not see. A `clientId` parameter would put the
+security boundary in ~200 call sites, any one of which can pass the wrong value. This costs
+nothing today and is what makes a client-facing app a third adapter rather than a
+signature change across every repository.
 
 ---
 
@@ -50,24 +72,25 @@ to prevent.
 ```
 packages/data/
   src/
-    types/           Shared domain types (read models)
-    repositories/    Interface definitions
+    types/           Shared domain read models
+    repositories/    Per-domain interface definitions
     errors.ts        DemoWriteBlockedError, NotFoundError
-    context.ts       RepositoryBundle, provider, useRepositories hook
+    context.ts       ReadContext, provider, useRepositories hook
+    testing/         Contract test harness, parameterised over an adapter
     index.ts
 
 packages/data-supabase/
   src/
-    index.ts         createSupabaseRepositories(client): RepositoryBundle
+    index.ts         createSupabaseRepositories(client, principal): RepositoryBundle
 
 packages/data-fixtures/
   src/
     fixtures/        The curated data
-    index.ts         createFixtureRepositories(opts): RepositoryBundle
+    index.ts         createFixtureRepositories(opts): DemoRepositoryBundle
 ```
 
 Three packages rather than one with subpath exports, so that `apps/demo` can simply not
-depend on `@bts/data-supabase` and have that enforced by `package.json` rather than by
+depend on `@platform/data-supabase` and have that enforced by `package.json` rather than by
 discipline.
 
 ---
@@ -94,127 +117,85 @@ export interface ReadContext {
 ```
 
 `ReadContext` is the mechanism that keeps fixture dates from going stale. Discussed in
-detail in `fixture-and-trace-schema.md`.
+detail in `fixture-and-trace-schema.md`. `asOf` defaults in the Supabase adapter so
+`apps/web` call sites can omit it — the cost of this parameter falls on the real app and
+buys it nothing, so it should not also be boilerplate.
 
 ---
 
 ## Repository interfaces
 
-### `ComplianceRepository`
+Seven domains, matching the re-picked surfaces in `demo-app-spec.md`. `apps/web` will grow
+more as the remaining verticals land; those are not part of the demo contract and are not
+specified here.
+
+### `MarketReportRepository`
+
+The lead surface. Carries `deterministic-before-llm` and `quiet-day-path`.
 
 ```ts
-export type ObligationSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type ObligationStatus =
-  | 'upcoming' | 'in_progress' | 'completed' | 'overdue' | 'waived';
+export type ReportStatus = 'published' | 'held' | 'error';
+export type ReportMode = 'normal' | 'quiet';
 
-export interface ObligationSummary {
+export interface Finding {
+  metric: string;
+  materiality: number;
+  summary: string;
+}
+
+export interface MarketReportSummary {
   id: string;
-  title: string;
-  category: string;
-  severity: ObligationSeverity;
-  status: ObligationStatus;
-  dueDate: string;              // ISO date
-  daysUntilDue: number;         // computed against ReadContext.asOf
-  alertDaysBefore: number;
-  isRecurring: boolean;
-  recurrenceInterval: string | null;
-  ownerName: string | null;
-  relatedDocumentTitle: string | null;
-  relatedDocumentType: string | null;
+  asOf: string;                    // ISO date, unique per report
+  status: ReportStatus;
+  reportMode: ReportMode;
+  narrationExcerpt: string | null; // null when status = 'error'
+  emailed: boolean;
+  findingCount: number;
+  /** True when report_mode = 'quiet' — nothing cleared the materiality floor. */
+  isQuietDay: boolean;
 }
 
-export interface ObligationDetail extends ObligationSummary {
-  description: string | null;
-  regulatoryReference: string | null;
-  notes: string | null;
-  completedAt: string | null;
+export interface MarketReportDetail extends MarketReportSummary {
+  narrationMarkdown: string | null;
+  /** The selected findings. This is the payload the narrator received — nothing else. */
+  findings: Finding[];
+  /** Staleness set. Ops only, never narrated. Surfaced to make the split visible. */
+  opsFindings: Finding[];
+  lintResult: Record<string, unknown> | null;
+  lexResult: Record<string, unknown> | null;
 }
 
-export interface ComplianceRepository {
-  listObligations(
-    ctx: ReadContext,
-    filter?: { status?: ObligationStatus[]; severity?: ObligationSeverity[] },
-    opts?: QueryOptions,
-  ): Promise<Paginated<ObligationSummary>>;
-
-  getObligation(ctx: ReadContext, id: string): Promise<ObligationDetail>;
-
-  listExpiringAssets(
-    ctx: ReadContext,
-    opts?: QueryOptions,
-  ): Promise<Paginated<ExpiringAsset>>;
-
-  /** Write — throws DemoWriteBlockedError in the fixture adapter. */
-  completeObligation(id: string, completedAt: Date): Promise<void>;
+export interface MarketReportRepository {
+  listReports(ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<MarketReportSummary>>;
+  getReport(ctx: ReadContext, id: string): Promise<MarketReportDetail>;
 }
 ```
 
-`listObligations` returns rows ordered by `due_date` ascending, matching
-`v_compliance_dashboard`. The urgency band (≤7 destructive, 8–30 warning, else normal) is
-derived in `packages/ui` from `daysUntilDue`, not returned by the repository — it is a
-presentation concern and belongs with the tokens.
+Ordered by `as_of` descending. `isQuietDay` is derived from `report_mode`, not stored
+separately.
 
-### `ContractsRepository`
+The `findings` / `narrationMarkdown` split is the point of this surface and the adapter
+must preserve it exactly: `findings` is what the narrating agent was handed, and
+`narrationMarkdown` is what it produced. Attach the `deterministic-before-llm` annotation
+to the boundary between them.
 
-```ts
-export interface ContractSummary {
-  id: string;
-  title: string;
-  contractType: string;
-  status: ContractStatus;
-  counterpartyName: string;
-  companyName: string | null;
-  contactName: string | null;
-  effectiveDate: string | null;
-  expiryDate: string | null;
-  renewalDate: string | null;
-  isEvergreen: boolean;
-  noticePeriodDays: number | null;
-  alertDaysBefore: number;
-  daysUntilRenewal: number | null;
-  daysUntilExpiry: number | null;
-  /**
-   * renewalDate minus noticePeriodDays, as days from asOf.
-   * The field that makes this feature worth building — the decision deadline
-   * is earlier than the renewal date, and that is what a person needs to see.
-   */
-  daysUntilDecision: number | null;
-  contractValue: number | null;
-  monthlyValue: number | null;
-  internalOwnerName: string | null;
-}
-
-export interface ContractDetail extends ContractSummary {
-  body: string;                              // populated markdown
-  variableValues: Record<string, unknown>;
-  templateName: string | null;
-  sentAt: string | null;
-  signedAt: string | null;
-  executedAt: string | null;
-  notes: string | null;
-}
-
-export interface ContractsRepository {
-  listContracts(
-    ctx: ReadContext,
-    filter?: { status?: ContractStatus[] },
-    opts?: QueryOptions,
-  ): Promise<Paginated<ContractSummary>>;
-
-  getContract(ctx: ReadContext, id: string): Promise<ContractDetail>;
-  listTemplates(ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<TemplateSummary>>;
-}
-```
-
-`daysUntilDecision` does not exist in `v_contracts_overview` today. Add it to the view as
-part of Session 1 rather than computing it in TypeScript — it is a derived fact about the
-data, and per the deterministic-before-LLM principle these belong in the data layer where
-an agent reading the view gets them too.
+**Note:** `market_reports` is not yet in `packages/db/src/types/database.ts` — today
+`apps/web/app/(app)/market-reports/page.tsx:33` casts the client to `any` to read it. This
+interface will be the first typed contract over that table, which is a small win worth
+noticing rather than a problem to route around.
 
 ### `ResearchRepository`
 
 ```ts
-export type SourceType = 'rss' | 'podcast' | 'email' | 'report_watch';
+export type SourceType = 'rss' | 'podcast' | 'youtube' | 'email';
+
+/** Rex's rubric dimensions. Composite = material*0.5 + novelty*0.3 + citation*0.2. */
+export interface RubricScores {
+  material: number;
+  novelty: number;
+  citation: number;
+  rubricVersion: string;
+}
 
 export interface NewsItemSummary {
   id: string;
@@ -222,9 +203,27 @@ export interface NewsItemSummary {
   sourceName: string;
   sourceType: SourceType;
   publishedAt: string;
-  noveltyScore: number | null;     // Rex
-  curatorNote: string | null;
+  relevanceScore: number | null;
+  curatorNotes: string | null;
   topicTags: string[];
+  australianRelevance: boolean;
+}
+
+export interface NewsItemDetail extends NewsItemSummary {
+  summary: string | null;
+  keyPoints: string[];
+  relevanceReasoning: string | null;
+  /** Read from rex_metadata. Null for items ingested before the rubric. */
+  rubric: RubricScores | null;
+}
+
+export interface SegmentResult {
+  id: string;
+  episodeId: string;
+  segmentIndex: number;
+  startSeconds: number;
+  speaker: string | null;
+  content: string;
 }
 
 export interface ResearchRepository {
@@ -249,74 +248,183 @@ export interface ResearchRepository {
 }
 ```
 
+`sourceType` lives on `news_sources`, not `news_items`; the Supabase adapter joins it.
+`rubric` is unpacked from the `rex_metadata` JSONB rather than exposed raw — the shape is
+stable enough to type, and typing it is what lets the demo annotate the composite as
+arithmetic rather than judgement.
+
 ### `AgentActivityRepository`
 
 ```ts
+export type ActivityStatus =
+  | 'pending' | 'approved' | 'rejected' | 'auto' | 'in_progress' | 'error';
+
+export type TriggerType =
+  | 'call_transcript' | 'signal_message' | 'manual' | 'scheduled' | 'agent';
+
+export interface ProposedAction {
+  id: string;
+  summary: string;
+  targetTable: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+}
+
 export interface AgentActivitySummary {
   id: string;
   agentName: string;
   action: string;
-  status: 'pending' | 'approved' | 'rejected' | 'auto';
-  triggerType: string | null;
+  status: ActivityStatus;
+  triggerType: TriggerType | null;
   createdAt: string;
   approvedByName: string | null;
   approvedAt: string | null;
   proposedActionCount: number;
-  /** True when the run completed with no findings above the materiality floor. */
-  isQuietDay: boolean;
+  workflowRunId: string | null;
   /** Present when a recorded trace exists for this run. Demo only. */
   traceId?: string;
+}
+
+export interface AgentActivityDetail extends AgentActivitySummary {
+  proposedActions: ProposedAction[];
+  approvedActions: ProposedAction[];
+  entityType: string | null;
+  entityId: string | null;
+  notes: string | null;
 }
 
 export interface AgentActivityRepository {
   listActivity(
     ctx: ReadContext,
-    filter?: { agentName?: string[] },
+    filter?: { agentName?: string[]; status?: ActivityStatus[] },
     opts?: QueryOptions,
   ): Promise<Paginated<AgentActivitySummary>>;
 
   getActivity(ctx: ReadContext, id: string): Promise<AgentActivityDetail>;
 
-  /** Write — throws in fixtures. */
-  approveActions(id: string, actionIds: string[], approvedBy: string): Promise<void>;
+  /** Write — throws in fixtures. Mirrors apps/web/app/actions/approvals.ts. */
+  approveActivity(id: string, decision: 'approved' | 'rejected', response?: string): Promise<void>;
 }
 ```
 
-`isQuietDay` is a derived boolean, not a stored column. Compute it in the adapter as
-`proposed_actions` being empty on a `scheduled` trigger. It exists on the read model
-because the quiet-day path needs a first-class UI state rather than an empty list that
-looks like a bug.
+`status` and `triggerType` are taken from the live CHECK constraints, not from `schema.sql`
+— which is stale and omits `in_progress`. `agentName` is left as `string` rather than a
+union: the CHECK lists ten agents and changes with some frequency, and pinning it here
+would make an unrelated migration a breaking change to this contract.
 
-### `PipelineRepository` and `ContentRepository`
+The original draft specified an `isQuietDay` boolean on this repository, derived from empty
+`proposed_actions` on a `scheduled` trigger. Removed — the quiet-day path is a real,
+first-class concept on `market_reports.report_mode`, so it belongs there rather than being
+inferred here.
 
-Glance-depth surfaces. `listContacts` and `listContentItems` returning the existing view
-shapes, with detail methods omitted for now. Add them when a surface needs depth, not
-before.
+### `ContentRepository`
+
+Carries `publish-gate` and `compliance-as-alignment`.
+
+```ts
+export type ContentStatus =
+  | 'idea' | 'draft' | 'review' | 'approved' | 'scheduled' | 'published' | 'archived';
+
+export type ComplianceStatus = 'pending' | 'cleared' | 'flagged' | 'overridden';
+export type ComplianceClassification = 'educational' | 'general_advice' | 'personal_opinion';
+
+export interface ContentItemSummary {
+  id: string;
+  title: string;
+  type: string;
+  status: ContentStatus;
+  scheduledFor: string | null;
+  publishedAt: string | null;
+  complianceStatus: ComplianceStatus | null;
+  complianceClassification: ComplianceClassification | null;
+  needsDisclaimer: boolean;
+  /** True once content_embeddings rows exist. The publish gate, made visible. */
+  isEmbedded: boolean;
+}
+
+export interface ContentItemDetail extends ContentItemSummary {
+  body: string | null;
+  complianceRationale: string | null;
+  complianceCheckedAt: string | null;
+  publishedUrl: string | null;
+}
+
+export interface ContentRepository {
+  listItems(
+    ctx: ReadContext,
+    filter?: { status?: ContentStatus[] },
+    opts?: QueryOptions,
+  ): Promise<Paginated<ContentItemSummary>>;
+
+  getItem(ctx: ReadContext, id: string): Promise<ContentItemDetail>;
+}
+```
+
+`isEmbedded` is derived, not stored — the Supabase adapter checks for `content_embeddings`
+rows with `source_table = 'content_items'`. It exists on the read model because the publish
+gate needs to be visible as state rather than inferred from a status string. Drafts are
+never embedded; embeddings generate on publish via `contentEmbeddingListener`.
+
+### `IndicatorsRepository`, `EcosystemRepository`, `PipelineRepository`
+
+Glance-depth surfaces. Read models mirror the existing views —
+`v_indicator_latest` / `v_onchain_dashboard`, `v_ecosystem_feed`, and
+`v_contacts_overview` respectively. List methods only; detail methods omitted. Add them
+when a surface needs depth, not before.
+
+`EcosystemRepository` should expose `complianceClass` on its read model even at glance
+depth — it is the only glance surface carrying an annotation.
+
+`IndicatorsRepository` returns deltas as signed numbers and **must not** return a
+direction, colour or sentiment. Rendering deltas neutrally is a compliance-adjacent
+decision, not a style preference, and encoding it in the data layer is what stops a future
+component reintroducing green-up/red-down.
 
 ---
 
 ## The bundle and provider
 
+The original specified a single flat `RepositoryBundle` with every domain on it. That does
+not survive the full-seam decision: `apps/web` will carry roughly twenty repositories while
+the demo renders seven, and a flat bundle would force `@platform/data-fixtures` to
+implement domains nobody demos.
+
+Domains are therefore composed, and each app declares the slice it needs:
+
 ```ts
 export interface RepositoryBundle {
-  compliance: ComplianceRepository;
-  contracts: ContractsRepository;
+  marketReports: MarketReportRepository;
   research: ResearchRepository;
   agentActivity: AgentActivityRepository;
-  pipeline: PipelineRepository;
   content: ContentRepository;
-  /** Adapter self-identification. Drives demo chrome; never drives business logic. */
-  mode: 'live' | 'demo';
+  indicators: IndicatorsRepository;
+  ecosystem: EcosystemRepository;
+  pipeline: PipelineRepository;
+  // ...plus the apps/web-only domains as their verticals land
+  /** Adapter self-identification. Drives chrome; never drives business logic. */
+  mode: RepositoryMode;
 }
+
+export type RepositoryMode = 'live' | 'demo' | 'client';
+
+/** What apps/demo mounts. Compile error if a demo route reaches outside this. */
+export type DemoRepositoryBundle = Pick<
+  RepositoryBundle,
+  'marketReports' | 'research' | 'agentActivity' | 'content'
+  | 'indicators' | 'ecosystem' | 'pipeline' | 'mode'
+>;
 ```
 
 `mode` is deliberately narrow in purpose. If a component branches on `mode` to change
-anything other than chrome or copy, the two apps have started to diverge and the seam has
-failed. Grep for it during review.
+anything other than chrome or copy, the apps have started to diverge and the seam has
+failed. Grep for it during review. With a third consumer this rule gets **stricter**, not
+looser: a client app must differ by scope, never by branch.
 
 Server components receive the bundle from a module-level factory. Client components use
 `useRepositories()` from a React context provider mounted at the app root. Both apps mount
 the same provider with a different bundle.
+
+In `apps/web` the provider sits alongside the existing `UserProvider` and `ToastProvider`
+in `app/(app)/layout.tsx`.
 
 ---
 
@@ -325,8 +433,8 @@ the same provider with a different bundle.
 ```ts
 export class DemoWriteBlockedError extends Error {
   constructor(
-    readonly operation: string,   // e.g. 'completeObligation'
-    readonly table: string,       // e.g. 'compliance_obligations'
+    readonly operation: string,   // e.g. 'approveActivity'
+    readonly table: string,       // e.g. 'agent_activity'
   ) {
     super(`${operation} is disabled in demo mode`);
     this.name = 'DemoWriteBlockedError';
@@ -349,10 +457,16 @@ read as real rather than as a mockup.
 
 ## Verification
 
-Write one contract test suite in `packages/data` that both implementations must pass:
-shape conformance, sort order, pagination behaviour, `NotFoundError` on a missing id, and
-`DemoWriteBlockedError` from the fixture adapter on every write method. Run it against
-both in CI.
+One contract test suite in `packages/data/src/testing/`, written once and parameterised
+over an adapter, that both implementations must pass: shape conformance, sort order,
+pagination behaviour, `NotFoundError` on a missing id, and `DemoWriteBlockedError` from the
+fixture adapter on every write method. Run it against both in CI.
 
-This is the cheapest possible insurance against silent divergence, and it takes about an
-hour to write.
+Parameterising matters more than it did in the original draft — with eleven verticals each
+adding its domain's cases, a per-adapter harness would be rewritten eleven times.
+
+This is the cheapest possible insurance against silent divergence, and it is the primary
+safety net for the seam work. Playwright is largely the wrong tool there: the risk in that
+phase is data wiring — a dropped filter, a wrong `.order()`, a broken pagination boundary —
+and screenshots barely catch it. Pair the contract suite with per-vertical RSC tests
+following the existing pattern in `apps/web/app/(app)/crm/companies/page.test.tsx`.

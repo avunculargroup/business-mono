@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { StatusChip } from '@/components/ui/StatusChip';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { ECOSYSTEM_CHANGE_TYPE_LABELS } from '@platform/shared';
 import { formatRelativeDate } from '@/lib/utils';
 import styles from './WatchesCard.module.css';

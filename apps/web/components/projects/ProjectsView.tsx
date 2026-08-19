@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Card } from '@/components/ui/Card';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
+import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
 import { ProjectForm } from './ProjectForm';
 import { formatDate } from '@/lib/utils';
 import { Plus, FolderOpen } from 'lucide-react';

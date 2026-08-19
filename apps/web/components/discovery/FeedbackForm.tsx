@@ -3,9 +3,9 @@
 import { createFeedback } from '@/app/actions/feedback';
 import type { FeedbackRow, PainPointOption, ContactOption, CompanyOption } from './FeedbackList';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import { TagInput } from '@/components/ui/TagInput';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import { TagInput } from '@platform/ui/TagInput';
+import styles from '@platform/ui/Form.module.css';
 
 interface FeedbackFormProps {
   contacts: ContactOption[];

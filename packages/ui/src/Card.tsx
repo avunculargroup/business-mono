@@ -1,5 +1,5 @@
 import styles from './Card.module.css';
-import { cn } from '@/lib/utils';
+import { cn } from './cn';
 
 interface CardProps {
   children: React.ReactNode;

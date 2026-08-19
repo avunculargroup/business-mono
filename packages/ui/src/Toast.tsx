@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from './ToastProvider';
 import styles from './Toast.module.css';
 
 export function Toast() {

@@ -2,14 +2,14 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { SlideOver } from '@platform/ui/SlideOver';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { LexiconForm } from './LexiconForm';
 import { approveLexiconEntry, deprecateLexiconEntry } from '@/app/actions/lexicon';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatRelativeDate } from '@/lib/utils';
 import { LEXICON_STATUS_LABELS, type LexiconStatus } from '@platform/shared';
 import { BookOpen, Pencil, Check, Archive, Plus } from 'lucide-react';

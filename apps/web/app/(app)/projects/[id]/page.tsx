@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { PriorityChip } from '@/components/ui/PriorityChip';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { PriorityChip } from '@platform/ui/PriorityChip';
 import Link from 'next/link';
 import { formatDate, formatRelativeDate, idColumn } from '@/lib/utils';
 import styles from '../projects.module.css';

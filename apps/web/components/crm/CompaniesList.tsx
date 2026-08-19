@@ -1,10 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { CompanyForm } from './CompanyForm';
 import { deleteCompany } from '@/app/actions/companies';
 import { useEntityList } from '@/hooks/useEntityList';

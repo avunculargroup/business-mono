@@ -7,7 +7,7 @@ import type { EpisodeConnections, PodcastEpisode, TranscriptSegment } from '@pla
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
-vi.mock('@/providers/ToastProvider', () => ({
+vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 const generateEpisodeBrief = vi.fn(async () => ({ success: true }));

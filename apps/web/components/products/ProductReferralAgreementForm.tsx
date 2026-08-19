@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from 'react';
 import { createReferralAgreement } from '@/app/actions/products';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import styles from '@/components/crm/ContactForm.module.css';
 
 type Agreement = {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import { newsItemHref, newsOriginalUrl } from '@/lib/news/itemHref';

@@ -32,7 +32,7 @@ vi.mock('@/app/actions/ecosystem', () => ({
 }));
 
 const toastError = vi.fn();
-vi.mock('@/providers/ToastProvider', () => ({
+vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: toastError, info: vi.fn() }),
 }));
 

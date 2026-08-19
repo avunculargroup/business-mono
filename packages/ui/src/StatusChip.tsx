@@ -1,5 +1,5 @@
 import styles from './StatusChip.module.css';
-import { cn } from '@/lib/utils';
+import { cn } from './cn';
 
 type ChipColor = 'neutral' | 'accent' | 'success' | 'warning' | 'destructive';
 

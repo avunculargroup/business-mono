@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { submitMarketReportFeedback } from '@/app/actions/marketReportFeedback';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { cn } from '@platform/ui/cn';
 import styles from './ReportFeedback.module.css';
 
 export type ReportFeedbackEntry = {

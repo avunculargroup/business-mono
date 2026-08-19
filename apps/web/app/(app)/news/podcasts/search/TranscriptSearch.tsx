@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Search, Play } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@platform/ui/Button';
+import { EmptyState } from '@platform/ui/EmptyState';
 import { searchTranscripts, type TranscriptSearchHit } from '@/app/actions/podcastSearch';
 import { formatTimestamp } from '@/lib/podcasts';
 import { formatDate } from '@/lib/utils';

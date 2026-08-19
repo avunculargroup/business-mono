@@ -3,8 +3,8 @@
 import { createProduct } from '@/app/actions/products';
 import { useCurrentUser } from '@/providers/UserProvider';
 import { useEntityForm } from '@/hooks/useEntityForm';
-import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@/components/ui/FormField';
-import styles from '@/components/ui/Form.module.css';
+import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
+import styles from '@platform/ui/Form.module.css';
 
 type ProductRow = {
   id: string;

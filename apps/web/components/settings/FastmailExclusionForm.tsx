@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { addFastmailExclusion } from '@/app/actions/fastmail';
 import styles from './FastmailAccountForm.module.css';
 

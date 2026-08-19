@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase/browser', () => ({
     }),
   }),
 }));
-vi.mock('@/providers/ToastProvider', () => ({
+vi.mock('@platform/ui/ToastProvider', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 

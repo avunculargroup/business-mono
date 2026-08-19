@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/core';
 import { useDroppable } from '@dnd-kit/core';
 import { useDraggable } from '@dnd-kit/core';
-import { PriorityChip } from '@/components/ui/PriorityChip';
+import { PriorityChip } from '@platform/ui/PriorityChip';
 import { formatRelativeDate } from '@/lib/utils';
 import styles from './KanbanBoard.module.css';
 

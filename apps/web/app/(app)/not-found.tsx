@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FileQuestion } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from '@platform/ui/EmptyState';
 
 export default function AppNotFound() {
   const router = useRouter();

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { AgentBadge } from '@/components/ui/AgentBadge';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable, type Column } from '@platform/ui/DataTable';
+import { AgentBadge } from '@platform/ui/AgentBadge';
+import { StatusChip } from '@platform/ui/StatusChip';
+import { Button } from '@platform/ui/Button';
+import { Modal } from '@platform/ui/Modal';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { RoutineForm, type RoutineFormValues, type TeamMemberOption } from './RoutineForm';
 import { valuesToFormData } from './routineFormData';
 import {
@@ -18,9 +18,9 @@ import {
 } from '@/app/actions/routines';
 import { useOptimisticList } from '@/hooks/useOptimisticList';
 import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
-import { useToast } from '@/providers/ToastProvider';
+import { useToast } from '@platform/ui/ToastProvider';
 import { Plus, Play, Pencil, Trash2 } from 'lucide-react';
-import type { RowAction } from '@/components/ui/RowActionsMenu';
+import type { RowAction } from '@platform/ui/RowActionsMenu';
 import { ROUTINE_ACTION_LABELS } from '@platform/shared';
 import type { RoutineFrequency, RoutineActionType } from '@platform/shared';
 import styles from './routines.module.css';

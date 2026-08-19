@@ -8,7 +8,7 @@ vi.mock('@/app/actions/contentFeedback', () => ({
 }));
 
 const toast = { success: vi.fn(), error: vi.fn() };
-vi.mock('@/providers/ToastProvider', () => ({ useToast: () => toast }));
+vi.mock('@platform/ui/ToastProvider', () => ({ useToast: () => toast }));
 
 import { DraftFeedback } from './DraftFeedback';
 
