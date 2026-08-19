@@ -4,9 +4,10 @@ Reconciliation of the [`demo-app`](./README.md) spec bundle against the live rep
 the revised session plan that follows from it. Same purpose as
 [`docs/features/html-pdf-monitoring/build-progress.md`](../html-pdf-monitoring/build-progress.md).
 
-**Status:** Phases 0–3 complete, open for review as PR #368 (not yet merged). All four decisions
-settled, all eight assumptions resolved, screenshot baselines bootstrapped. Phase 4 (the full seam)
-is next — the long one, and the one whose justification rests on the client app being real.
+**Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
+decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
+bootstrapped. Phase 4 (the full seam) is next — the long one, and the one whose justification rests
+on the client app being real.
 **Last updated:** 2026-08-19
 
 ---
@@ -23,8 +24,9 @@ Everything needed to continue is in this folder. In order:
 3. The four spec docs — reconciled against the repo in Phase 0, so their paths and table names are
    now real.
 
-**Before starting Phase 4**, settle the scoping rule in *Consequence of decision 2* below. It is one
-sentence now and an audit of ~20 repository signatures later.
+**The scoping rule is settled** — see *Consequence of decision 2* below. It was one sentence to
+write now and would have been an audit of ~20 repository signatures later. Phase 4.0 implements it;
+nothing before 4.0 is affected.
 
 **Kill criteria matter here.** Phase 4 is 4–6 weeks with no user-facing output, justified by a
 client app that was described as under consideration rather than committed. Checkpoints at
@@ -83,12 +85,12 @@ Two structural consequences follow, both handled in Phase 4:
 not a repository concern and do not move. This matches the done-condition at
 [`README.md:72`](./README.md) ("returns only the provider wiring and auth").
 
-#### A third consumer is anticipated — scope at construction, never per call
+#### A third consumer is anticipated — scope at construction, never per call — **SETTLED**
 
 A client-facing app reusing this UI is under consideration. That is the strongest case for the full
-seam: one consumer makes it overhead, three make it infrastructure. It also forces one design rule
-that must be settled **before vertical 4.1**, because it is nearly free now and expensive to
-retrofit across ~20 repositories.
+seam: one consumer makes it overhead, three make it infrastructure. It also forces one design rule,
+settled here **before vertical 4.1**, because it is nearly free now and expensive to retrofit
+across ~20 repositories.
 
 The demo and a client app stress the seam along different axes. The demo swaps the **data source** —
 same query, fixtures instead of Postgres. A client app swaps the **data scope** — same source,
@@ -102,6 +104,28 @@ the wrong value; construction-time scoping means a caller has no way to ask the 
 
 This is a constraint to hold, not a redesign — [`repository-contract.md:317-320`](./repository-contract.md)
 already builds the bundle from a per-request client.
+
+**Closing the back door: `ReadContext` carries `asOf` and nothing else.** The rule as first stated
+bans a `clientId` *parameter*, which leaves an obvious way to violate it in spirit — `ReadContext`
+is already threaded through every read, so a `principal` or `clientId` field on it would put the
+boundary back in ~200 call sites by another door, while every signature still looked compliant. So
+the rule has two halves, and the second is the one that needs guarding: **no scoping data reaches a
+repository through an argument of any kind, `ReadContext` included.** A principal is a constructor
+argument or it does not exist.
+
+**How it gets audited, defined now so it is cheap later.** Two mechanical checks, both in Phase 4.0
+rather than retrofitted per vertical:
+
+- A test in `packages/data` asserting the keys of `ReadContext` are exactly `['asOf']`. One
+  assertion, and it fails the moment anyone widens the type — which is the only realistic way this
+  rule gets broken quietly.
+- A review grep for `clientId|tenantId|principal` under `packages/data/src/repositories/`, run
+  alongside the existing grep for `mode`. Signatures are declared in one directory, so the audit of
+  "~20 repository signatures" is a grep over that directory rather than a read of ~20 files.
+
+Neither catches a Supabase adapter that simply forgets to apply its principal's filter. That is a
+correctness bug in one file, caught by the contract suite; the rules above exist to stop it becoming
+a class of bug spread across every call site.
 
 Related: `mode` becomes `'live' | 'demo' | 'client'`. The review rule at
 [`repository-contract.md:312-315`](./repository-contract.md) — that branching on `mode` for anything
@@ -332,6 +356,21 @@ its estimate, the full-seam assumption behind decision 2 is wrong for this codeb
 re-cut to demo surfaces only, which is decision 2 option (a) and costs nothing already spent. If the
 client app has not firmed up by the end of 4.6, revisit whether 4.7–4.11 are worth finishing at all;
 the demo does not need them.
+
+**What actually rests on the client app — measured, because the framing above overstates it.**
+"Phase 4 is 4–6 weeks justified by a client app" reads as though the whole phase is a bet on that
+app. It is not. 4.1–4.6 are on the demo's critical path and would be built under decision 2 option
+(a) as well; only 4.7–4.11 exist because of the third consumer. Splitting the ~202 `.from(` calls in
+`app/actions/` and the 67 `page.tsx` files across the eleven verticals: 4.1–4.6 carry 114 calls and
+38 pages, 4.7–4.11 carry 88 and 29. So the client-app premise governs a little under half of Phase
+4, not the whole of it, and it does not gate starting 4.1 — the demo does.
+
+Two consequences. The premise checkpoint belongs at 4.6, where the doc already puts it, and the
+4.1/4.3 checkpoints are about *effort* — is the full-seam approach working in this codebase —
+which is a different question with a different answer. And the decision that genuinely needs the
+premise before 4.0 is narrower than the phase: composable per-domain bundles and construction-time
+scoping are there for the third consumer. Under demo-only scope `apps/web` would carry the same
+seven domains the demo renders, and a single flat bundle would do.
 
 ### Phase 0 — Reconcile the bundle and verify infra (½ day, no code)
 
@@ -606,8 +645,9 @@ once a client app has real users — the posture must change before, not during,
 - `packages/data` — `context.ts` (`ReadContext`, `QueryOptions`, `Paginated`), `errors.ts`
   (`DemoWriteBlockedError`, `NotFoundError`), the per-domain interface convention, and the
   composable provider. Interfaces only, no implementations.
-- **Settle the scoping rule before 4.1** (see decision 2): scoping lives at bundle construction,
-  never in a method signature.
+- Implement the settled scoping rule (see decision 2): scoping lives at bundle construction, never
+  in a method signature and never on `ReadContext`. Includes the `ReadContext`-keys test, so the
+  rule ships with its guard rather than as prose.
 - The contract test harness from [`repository-contract.md:350-358`](./repository-contract.md),
   written once and parameterised over an adapter, so each vertical adds its cases rather than its
   own harness.
