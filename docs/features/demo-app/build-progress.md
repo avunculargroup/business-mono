@@ -6,9 +6,9 @@ the revised session plan that follows from it. Same purpose as
 
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
-bootstrapped. Phase 4.0 (the `@platform/data` foundation) is complete; vertical 4.1 is next. Phase 4
-is the long one, and the part of it beyond 4.6 is the part whose justification rests on the client
-app being real.
+bootstrapped. Phase 4.0 (the `@platform/data` foundation) and vertical 4.1 (agent activity +
+approvals) are complete; 4.2 is next. Phase 4 is the long one, and the part of it beyond 4.6 is the
+part whose justification rests on the client app being real.
 **Last updated:** 2026-08-19
 
 ---
@@ -723,7 +723,7 @@ commit.
 
 | # | Vertical | Routes | Demo? |
 |---|---|---|---|
-| 4.1 | Agent activity + approvals | `/activity` | Yes — smallest, proves the pattern |
+| 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface |
 | 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
@@ -739,6 +739,85 @@ commit.
 **Watch items.** `app/actions/company.ts` has 21 `.from(` calls, `campaigns.ts` 17, `decks.ts` 15 —
 the heavy three, and none should be first. `hooks/useRealtimeSubscription.ts` is the one
 Supabase-coupled hook; Realtime has no fixture equivalent, so the demo will need it to no-op.
+
+##### 4.1 — Agent activity + approvals: what shipped
+
+Converted: `/activity`, `app/actions/approvals.ts`, and the pending-count query in
+`app/(app)/layout.tsx`. Plus the three 4.0 items that were waiting for a domain —
+`createSupabaseRepositories`, the `getAuthedClient` equivalent, and the provider mount.
+
+**A vertical is not a table.** `agent_activity` is read from six places: `/activity`, `/simon`,
+`/settings/integrations/fastmail`, the layout badge, and two CRM actions that insert into it. 4.1
+owns the interface, the implementation, and its own three call sites; the rest convert in 4.6 and
+4.11. What made that possible without a half-migrated app is that the *card* moved to the read model
+and the unconverted pages map at the query boundary with the adapter's exported
+`toAgentActivityItem`. Those two call sites become deletions when their verticals land rather than
+rewrites. Expect this shape to repeat — few tables belong to exactly one vertical.
+
+**The contract as specced did not survive contact with the data.** Three corrections, all in favour
+of what is real:
+
+- **`ProposedAction` is not a struct.** [`repository-contract.md`](./repository-contract.md)
+  specifies `{ id, summary, targetTable, severity }`. *No producer writes that.* Six do write to the
+  column, in six shapes — `{ type: 'variant', platform, is_thread }`, `{ type: 'create_task', title,
+  due_date, assignee }`, `{ type: 'social_post', … }` and so on — and only the recorder's CRM-update
+  shape carries the `description` the UI renders. The read model types the three fields the UI reads
+  and drops the rest. **Pre-existing and not fixed here:** `/activity` renders `pa.description` for
+  every entry, so five of the six producers already render blank list items. Worth a decision, in
+  its own change.
+- **One read model, not summary + detail.** The list renders the same card a detail view would,
+  proposed-action descriptions and all, so a lean `AgentActivitySummary` would be re-fetched
+  immediately. There is no `/activity/[id]` route and no `getActivity` method until something needs
+  one.
+- **`countPending` is a method.** The contract has no equivalent; the layout badge needs a count and
+  never reads the rows, so a `listActivity` call to take `.total` would fetch 25 rows to render a
+  number.
+
+**Contract suite reach — an honest limit, and how it was fixed.** The pagination cases cannot run
+against a Supabase adapter backed by a stub that returns one canned response whatever the range:
+they would only prove a stub returns its stub. Rather than concede the suite to the fixture adapter
+alone, the package's Supabase fake grew `__setRows`, so `.range(from, to)` really slices and the
+count reflects the whole set. The adapter's own offset arithmetic and `hasMore` calculation — where
+an off-by-one actually lives — are now exercised by the same
+`expectPaginationContract` the fixture adapter will use. What still cannot be checked this way is
+anything Postgres decides: ordering and filtering are asserted as *wiring* (`.order` and `.in` were
+called correctly), because faking them here would test the fake.
+
+**A trap for every remaining action conversion.** Returning `actionError(err)` from a converted
+action breaks its callers. `actionError` returns a *declared* `{ error: string }`, and TypeScript
+only adds the `error?: undefined` / `success?: undefined` members that make `if (result.error)`
+compile when the returns are fresh object literals. `ApprovalControls.tsx:24` stopped compiling
+until the action went back to `return { error: humanizeError(err) }`. Caught by `pnpm typecheck`,
+not by the tests.
+
+**Tests moved off the Supabase mock.** `apps/web/test/mocks/repositories.ts` is the replacement — a
+bundle of spies. `approvals.test.ts` shrank from describing a query-builder chain to asserting what
+the action does, and the SQL it used to restate is now verified once in `@platform/data-supabase`.
+`activity/page.test.tsx` is new and follows `crm/companies/page.test.tsx` one layer up. A card test
+is new too: `AgentActivityCard` had none, and it is now the read model's only renderer.
+
+**Realtime stays outside the seam**, as planned — but its payloads are raw table rows, so both
+subscriptions (`ActivityFeed`, `SimonThread`) map through the adapter's `toAgentActivityItem` rather
+than a second hand-rolled conversion that could drift from the server read.
+
+**Verify — what was actually run.** `pnpm typecheck` (13 tasks), `pnpm lint` (8), `pnpm test` (10)
+and `pnpm --filter @platform/web build` (46 pages) all green. `@platform/data-supabase` 20 tests,
+`apps/web` 64 files / 491 tests. `/activity`, `/simon` and the Fastmail settings page walked
+manually.
+
+Note on the phase-end `grep -rl "createClient"` check: it is **not** a useful running metric
+mid-phase. It reads 107 now against the 105 recorded in blocking finding 3, because the two files
+this vertical removed it from are offset by `lib/repositories.ts` and `providers/RepositoryProvider.tsx`
+— which are the provider wiring the check explicitly exempts. It only becomes meaningful at 4.11.
+
+**Kill-criteria checkpoint (4.1).** The estimate this is measured against is the 2–3 days budgeted
+for 4.0 plus a vertical the plan calls "smallest, proves the pattern". 4.0 and 4.1 together came in
+under that, so the full-seam assumption behind decision 2 is not contradicted here. Two caveats
+before reading that as a green light: this was the smallest vertical by design, and the two genuine
+surprises — the `agent_activity` fan-out across six call sites, and the contract's read models not
+matching the data — are both *pattern* costs that will recur, not one-offs. 4.3 is the checkpoint
+that matters, since `campaigns.ts` at 18 `.from(` calls is representative of the heavy verticals in
+a way `/activity` is not.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

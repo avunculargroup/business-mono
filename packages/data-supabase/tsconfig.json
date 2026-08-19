@@ -6,9 +6,10 @@
     "types": ["vitest/globals"],
     "paths": {
       "@platform/data": ["../data/src/index.ts"],
+      "@platform/data/testing": ["../data/src/testing/index.ts"],
       "@platform/db": ["../db/src/index.ts"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules"]
 }

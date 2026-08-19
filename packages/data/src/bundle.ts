@@ -1,6 +1,7 @@
 /**
  * The repository bundle: the object an app holds instead of a database client.
  */
+import type { AgentActivityRepository } from './repositories/agentActivity';
 
 /**
  * Which adapter produced this bundle.
@@ -36,5 +37,6 @@ export interface Principal {
  * compiles at every commit rather than carrying a half-migrated bundle.
  */
 export interface RepositoryBundle {
+  agentActivity: AgentActivityRepository;
   mode: RepositoryMode;
 }

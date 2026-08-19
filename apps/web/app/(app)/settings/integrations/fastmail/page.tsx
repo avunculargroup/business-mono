@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { FastmailSettingsClient } from './FastmailSettingsClient';
+import { toAgentActivityItem } from '@platform/data-supabase';
 
 export default async function FastmailSettingsPage() {
   const supabase = await createClient();
@@ -55,7 +56,7 @@ export default async function FastmailSettingsPage() {
         accounts={accounts}
         exclusions={exclusionsRes.data ?? []}
         reviewContacts={reviewRes.data ?? []}
-        recentActivity={activityRes.data ?? []}
+        recentActivity={(activityRes.data ?? []).map(toAgentActivityItem)}
       />
     </>
   );

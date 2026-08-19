@@ -2,14 +2,12 @@
 
 import { AgentBadge } from '@platform/ui/AgentBadge';
 import { ApprovalControls } from './ApprovalControls';
-import type { Database } from '@platform/db';
+import type { AgentActivityItem } from '@platform/data';
 import { formatDateTime } from '@/lib/utils';
 import styles from './AgentActivityCard.module.css';
 
-type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];
-
 interface AgentActivityCardProps {
-  activity: AgentActivity;
+  activity: AgentActivityItem;
   compact?: boolean;
 }
 
@@ -58,12 +56,11 @@ const TRIGGER_LABELS: Record<string, string> = {
 };
 
 export function AgentActivityCard({ activity, compact }: AgentActivityCardProps) {
-  const proposedActions = (activity.proposed_actions as Array<{ description: string; entity_type?: string; entity_id?: string }>) || [];
+  const proposedActions = activity.proposedActions;
   const { prefix, message } = parseAction(activity.action);
-  const approvedResponse = (activity.approved_actions as Array<{ response?: string }> | null)
-    ?.find((a) => a.response)?.response ?? null;
+  const approvedResponse = activity.approvedResponse;
 
-  const triggerLabel = activity.trigger_type ? TRIGGER_LABELS[activity.trigger_type] : null;
+  const triggerLabel = activity.triggerType ? TRIGGER_LABELS[activity.triggerType] : null;
 
   const borderClass =
     activity.status === 'pending'
@@ -77,8 +74,8 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
   return (
     <div className={`${styles.card} ${borderClass} ${compact ? styles.compact : ''}`}>
       <div className={styles.header}>
-        <AgentBadge agentName={activity.agent_name} size={compact ? 'sm' : 'md'} />
-        <span className={styles.timestamp}>{formatDateTime(activity.created_at)}</span>
+        <AgentBadge agentName={activity.agentName} size={compact ? 'sm' : 'md'} />
+        <span className={styles.timestamp}>{formatDateTime(activity.createdAt)}</span>
       </div>
 
       {prefix && <p className={styles.actionPrefix}>{prefix}</p>}
@@ -93,8 +90,8 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
           {proposedActions.map((pa, i) => (
             <li key={i} className={styles.actionItem}>
               {pa.description}
-              {pa.entity_type && (
-                <span className={styles.entity}> ({pa.entity_type})</span>
+              {pa.entityType && (
+                <span className={styles.entity}> ({pa.entityType})</span>
               )}
             </li>
           ))}
@@ -107,13 +104,13 @@ export function AgentActivityCard({ activity, compact }: AgentActivityCardProps)
         </p>
       )}
 
-      {activity.entity_type === 'content_items' && activity.entity_id && (
-        <a href={`/content/${activity.entity_id}`} className={styles.entityLink}>
+      {activity.entityType === 'content_items' && activity.entityId && (
+        <a href={`/content/${activity.entityId}`} className={styles.entityLink}>
           View draft →
         </a>
       )}
 
-      {approvedResponse && !activity.entity_id && !compact && (
+      {approvedResponse && !activity.entityId && !compact && (
         <details className={styles.responsePreview}>
           <summary>View generated content</summary>
           <pre className={styles.responseBody}>{approvedResponse}</pre>

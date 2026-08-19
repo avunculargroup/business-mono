@@ -10,7 +10,11 @@ function ModeProbe() {
 
 describe('RepositoryProvider', () => {
   it('hands its bundle to client components', () => {
-    const bundle: RepositoryBundle = { mode: 'demo' };
+    // Only `mode` is read here — the provider is context plumbing and knows
+    // nothing about domains. Asserted through a cast rather than by stubbing
+    // every repository, which would make this test grow with each vertical
+    // while testing nothing more than it does now.
+    const bundle = { mode: 'demo' } as RepositoryBundle;
 
     render(
       <RepositoryProvider bundle={bundle}>

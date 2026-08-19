@@ -9,6 +9,8 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      // Longest-prefix first — Vite's object form does prefix matching.
+      '@platform/data/testing': `${here}../data/src/testing/index.ts`,
       '@platform/data': `${here}../data/src/index.ts`,
       '@platform/db': `${here}../db/src/index.ts`,
     },

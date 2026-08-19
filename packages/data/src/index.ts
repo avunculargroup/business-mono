@@ -7,6 +7,13 @@ export {
 } from './context';
 export { DemoWriteBlockedError, NotFoundError } from './errors';
 export type { Principal, RepositoryBundle, RepositoryMode } from './bundle';
+export type {
+  ActivityStatus,
+  AgentActivityFilter,
+  AgentActivityItem,
+  AgentActivityRepository,
+  ProposedAction,
+} from './repositories/agentActivity';
 
 // The React provider is deliberately NOT re-exported here. It is a .tsx module,
 // and adapters like @platform/data-supabase have no React and no `jsx` setting —
