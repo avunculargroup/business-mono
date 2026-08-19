@@ -17,6 +17,9 @@ export type {
 export type {
   NewsDigestItem,
   NewsFeedItem,
+  NewsItemDetail,
+  NewsReport,
+  ReportFileRef,
   ResearchRepository,
 } from './repositories/research';
 

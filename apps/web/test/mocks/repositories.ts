@@ -3,6 +3,7 @@ import type {
   AgentActivityItem,
   NewsDigestItem,
   NewsFeedItem,
+  NewsItemDetail,
   RepositoryBundle,
 } from '@platform/data';
 
@@ -29,6 +30,7 @@ export function createFakeRepositories(
     pendingCount?: number;
     news?: NewsFeedItem[];
     digest?: NewsDigestItem[];
+    newsItem?: NewsItemDetail;
   } = {},
 ): FakeRepositories {
   const items = overrides.activity ?? [];
@@ -51,7 +53,10 @@ export function createFakeRepositories(
         hasMore: false,
       })),
       listTodayDigest: vi.fn(async () => overrides.digest ?? []),
+      getItem: vi.fn(async () => overrides.newsItem ?? fakeNewsItemDetail()),
+      getReportFile: vi.fn(async () => ({ storagePath: null, fileName: null })),
       setItemStatus: vi.fn(async () => undefined),
+      setReportCuratorNote: vi.fn(async () => undefined),
       promoteItem: vi.fn(async () => undefined),
     },
     mode: 'live',
@@ -72,6 +77,27 @@ export function fakeNewsFeedItem(overrides: Partial<NewsFeedItem> = {}): NewsFee
     status: 'new',
     relevanceScore: 0.8,
     curatorNotes: null,
+    ...overrides,
+  };
+}
+
+/** A news item detail with sensible defaults, including no report. */
+export function fakeNewsItemDetail(overrides: Partial<NewsItemDetail> = {}): NewsItemDetail {
+  return {
+    id: 'n1',
+    title: 'ASIC updates its digital asset guidance',
+    url: 'https://example.test/asic',
+    canonicalUrl: null,
+    sourceName: 'Regulator Watch',
+    author: null,
+    publishedAt: '2026-08-18T00:00:00Z',
+    summary: 'A one-line summary.',
+    category: 'regulatory',
+    relevanceScore: 0.8,
+    curatorNotes: null,
+    topicTags: [],
+    bodyMarkdown: null,
+    report: null,
     ...overrides,
   };
 }

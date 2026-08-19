@@ -736,7 +736,7 @@ commit.
 | # | Vertical | Routes | Demo? |
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
-| 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, 4.2b detail + reports, 4.2c podcasts, 4.2d collections + sources |
+| 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
 | 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
@@ -914,6 +914,50 @@ and `pnpm --filter @platform/web build` all green. `@platform/data-supabase` 28 
 `apps/web` 64 → 65 files and 492 → 497 tests. `NewsCard.test.tsx` moved off the Supabase mock: its
 three `source_url` cases moved to the adapter, where that choice now lives, and what is left asserts
 the card's own behaviour. `/news` and `/news/daily` walked manually.
+
+##### 4.2b — Article detail and reports: what shipped
+
+Converted `/news/[id]`, `NewsItemDetail`, `ReportPanel` and `app/(app)/news/[id]/actions.ts`.
+
+**The page was doing query planning.** It read the item, then decided from that row whether to
+resolve a source name, whether to load a report, and whether that report needed its predecessor
+looked up — four queries, three of them conditional on the first. `getItem` returns the assembled
+model in one call, and the branching lives in the adapter where it can be tested. The page is now
+twelve lines.
+
+**`ReportPanel` went camelCase**, all twenty fields. Weighed against leaving a snake_case island in
+the read model: the fixture adapter will have to author report fixtures in Phase 6, and a model that
+is camelCase everywhere except reports is the kind of seam that gets papered over with a mapper
+later. `tsc` catches every rename, so the risk was low and the churn was one file.
+
+**Two fields the panel wanted did not exist in the data.** It read `revision_of_report_id` for one
+thing only — whether to show the "the publisher changed this document" notice — and took the
+resolved predecessor separately as a prop. The read model names both intentions: `isRevision` for
+the notice, `supersededItemId` for the link. They are genuinely independent, because a revision
+whose predecessor was never surfaced as a feed item still shows the notice, without a link. Deriving
+one from the other would have dropped that case silently, so there is a test for it.
+
+**Storage is not data, and stays on the raw client.** `getReportFileUrl` mints a 60-second signed
+URL for a private bucket. That call is now split: *which* artefact a report points at is a
+repository read (`getReportFile`), and minting the URL stays on `getAuthedClient()` — for the same
+reason auth does. A fixture adapter can answer the first and has nothing to stand in for on the
+second. The contract does not mention Storage at all; this is the rule for it.
+
+**The `reports` cast is now in one place.** `reports` is absent from the generated `Database` types
+until `generate-types` runs against the migrated database, so `from('reports' as never)` appeared in
+the page and twice in the actions file. It appears once in the adapter now, next to the row type it
+justifies.
+
+**The fake grew a response queue.** `getItem` can read `reports` twice — the report, then its
+predecessor — and a single canned response per table cannot express that. `__queueResponses` gives
+successive reads their own answers, with the last entry repeating. The first attempt monkey-patched
+`client.from` inside two tests; this replaced it.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 46 → 60 tests. The page test's two source-name cases moved down to
+the adapter, where that resolution now happens, and the page test gained one the old shape could not
+express: a dropped connection must not render as "not found". `/news/[id]` walked manually, with and
+without a report.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

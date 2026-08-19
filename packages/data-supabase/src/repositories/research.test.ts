@@ -4,7 +4,7 @@ import {
   expectPaginationContract,
   testReadContext,
 } from '@platform/data/testing';
-import type { Principal } from '@platform/data';
+import { NotFoundError, type Principal } from '@platform/data';
 import { createFakeSupabase, type FakeSupabaseClient } from '../../test/mocks/supabase';
 import { createSupabaseRepositories } from '../bundle';
 import type { PlatformSupabaseClient } from '../adapterContext';
@@ -187,6 +187,237 @@ describe('listTodayDigest', () => {
       sourceName: 'Regulator Watch',
       publishedAt: '2026-08-18T00:00:00Z',
       summary: 'A one-line summary.',
+    });
+  });
+});
+
+describe('getItem', () => {
+  function detailRow(overrides: Record<string, unknown> = {}) {
+    return {
+      ...row(),
+      source_id: null,
+      author: 'A Reporter',
+      topic_tags: ['asic', 'custody'],
+      body_markdown: '# The article',
+      report_id: null,
+      ...overrides,
+    };
+  }
+
+  it('maps the row to the detail read model', async () => {
+    client.__setResponse('news_items', { data: detailRow(), error: null });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item).toMatchObject({
+      id: 'n1',
+      author: 'A Reporter',
+      topicTags: ['asic', 'custody'],
+      bodyMarkdown: '# The article',
+      report: null,
+    });
+  });
+
+  it('throws NotFoundError rather than returning null', async () => {
+    client.__setResponse('news_items', { data: null, error: null });
+
+    await expect(research().getItem(testReadContext(), 'nope')).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  it('prefers the configured source name over the denormalised column', async () => {
+    // These two cases came down from the page test: `source_name` is written at
+    // ingest and goes stale when a source is renamed.
+    client.__setResponse('news_items', {
+      data: detailRow({ source_id: 'src-1', source_name: 'Stale name' }),
+      error: null,
+    });
+    client.__setResponse('news_sources', { data: { name: 'Gromen Tree Rings' }, error: null });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.sourceName).toBe('Gromen Tree Rings');
+  });
+
+  it('falls back to the row when the item has no configured source', async () => {
+    client.__setResponse('news_items', {
+      data: detailRow({ source_id: null, source_name: 'Tavily' }),
+      error: null,
+    });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.sourceName).toBe('Tavily');
+    expect(client.__buildersFor('news_sources')).toHaveLength(0);
+  });
+
+  it('keeps the page up when the source lookup fails', async () => {
+    // The item carries a usable name of its own, so a missing source row is not
+    // a reason to fail the whole page.
+    client.__setResponse('news_items', {
+      data: detailRow({ source_id: 'src-gone', source_name: 'Tavily' }),
+      error: null,
+    });
+    client.__setResponse('news_sources', { data: null, error: { message: 'gone' } });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.sourceName).toBe('Tavily');
+  });
+
+  it('does not touch the reports table for an ordinary article', async () => {
+    client.__setResponse('news_items', { data: detailRow({ report_id: null }), error: null });
+
+    await research().getItem(testReadContext(), 'n1');
+
+    expect(client.__buildersFor('reports')).toHaveLength(0);
+  });
+});
+
+describe('the report panel', () => {
+  const reportRow = {
+    id: 'r1',
+    report_type: 'research',
+    publisher: 'A Publisher',
+    published_at: '2026-08-01T00:00:00Z',
+    published_at_source: 'pdf_metadata',
+    page_count: 212,
+    word_count: 84_000,
+    file_format: 'pdf',
+    file_size_bytes: 4_100_000,
+    content_hash: 'abc123def456ghi789',
+    extraction_method: 'pdftotext',
+    extraction_quality: 'partial',
+    ocr_used: false,
+    redistribution: 'internal_only',
+    licence_notes: null,
+    curator_note: 'Why it matters.',
+    storage_path: 'reports/r1.pdf',
+    revision_of_report_id: null,
+    created_at: '2026-08-02T00:00:00Z',
+  };
+
+  function itemWithReport() {
+    client.__setResponse('news_items', {
+      data: { ...row(), source_id: null, author: null, topic_tags: [], body_markdown: null, report_id: 'r1' },
+      error: null,
+    });
+  }
+
+  it('maps the report to the read model without fetching its body', async () => {
+    itemWithReport();
+    client.__setResponse('reports', { data: reportRow, error: null });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.report).toEqual({
+      id: 'r1',
+      reportType: 'research',
+      publisher: 'A Publisher',
+      publishedAt: '2026-08-01T00:00:00Z',
+      publishedAtSource: 'pdf_metadata',
+      pageCount: 212,
+      wordCount: 84_000,
+      fileFormat: 'pdf',
+      fileSizeBytes: 4_100_000,
+      contentHash: 'abc123def456ghi789',
+      extractionMethod: 'pdftotext',
+      extractionQuality: 'partial',
+      ocrUsed: false,
+      redistribution: 'internal_only',
+      licenceNotes: null,
+      curatorNote: 'Why it matters.',
+      storagePath: 'reports/r1.pdf',
+      createdAt: '2026-08-02T00:00:00Z',
+      isRevision: false,
+      supersededItemId: null,
+    });
+
+    // `reports.body` is the extracted text of a document that can run to 200
+    // pages, and the feed item already carries it.
+    const [columns] = client.__buildersFor('reports')[0].select.mock.calls[0];
+    expect(columns).not.toContain('body');
+  });
+
+  it('resolves the feed item a revision supersedes', async () => {
+    itemWithReport();
+    // Two reads of `reports`: the report itself, then its predecessor.
+    client.__queueResponses('reports', [
+      { data: { ...reportRow, revision_of_report_id: 'r0' }, error: null },
+      { data: { news_item_id: 'n-old' }, error: null },
+    ]);
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.report?.isRevision).toBe(true);
+    expect(item.report?.supersededItemId).toBe('n-old');
+  });
+
+  it('still flags a revision whose predecessor was never a feed item', async () => {
+    // The notice has to appear either way — only the link depends on there
+    // being something to link to.
+    itemWithReport();
+    client.__queueResponses('reports', [
+      { data: { ...reportRow, revision_of_report_id: 'r0' }, error: null },
+      { data: { news_item_id: null }, error: null },
+    ]);
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.report?.isRevision).toBe(true);
+    expect(item.report?.supersededItemId).toBeNull();
+  });
+
+  it('renders the article without a panel when the report row is unreadable', async () => {
+    itemWithReport();
+    client.__setResponse('reports', { data: null, error: { message: 'denied' } });
+
+    const item = await research().getItem(testReadContext(), 'n1');
+
+    expect(item.report).toBeNull();
+    expect(item.title).toBe('ASIC updates its digital asset guidance');
+  });
+});
+
+describe('getReportFile', () => {
+  it('returns where the artefact is stored', async () => {
+    client.__setResponse('reports', {
+      data: { storage_path: 'reports/r1.pdf', file_name: 'outlook.pdf' },
+      error: null,
+    });
+
+    expect(await research().getReportFile('r1')).toEqual({
+      storagePath: 'reports/r1.pdf',
+      fileName: 'outlook.pdf',
+    });
+  });
+
+  it('throws NotFoundError for a report that is not there', async () => {
+    client.__setResponse('reports', { data: null, error: null });
+
+    await expect(research().getReportFile('r1')).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('setReportCuratorNote', () => {
+  it('stores the trimmed note', async () => {
+    client.__setResponse('reports', { data: null, error: null });
+
+    await research().setReportCuratorNote('r1', '  Why it matters.  ');
+
+    expect(client.__buildersFor('reports')[0].update).toHaveBeenCalledWith({
+      curator_note: 'Why it matters.',
+    });
+  });
+
+  it('clears the note rather than storing an empty string', async () => {
+    client.__setResponse('reports', { data: null, error: null });
+
+    await research().setReportCuratorNote('r1', '   ');
+
+    expect(client.__buildersFor('reports')[0].update).toHaveBeenCalledWith({
+      curator_note: null,
     });
   });
 });

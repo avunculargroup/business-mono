@@ -43,6 +43,15 @@ export interface FakeSupabaseClient {
   __builders: FakeQueryBuilder[];
   __setResponse: (table: string, response: SupabaseResponse) => void;
   /**
+   * Responses for successive reads of one table, in order.
+   *
+   * A single method can read the same table twice — resolving a report's
+   * predecessor, for instance — and each read needs its own answer. The last
+   * entry keeps answering once the queue runs dry, so a test only has to
+   * describe the reads it cares about.
+   */
+  __queueResponses: (table: string, responses: SupabaseResponse[]) => void;
+  /**
    * Back a table with rows so `.range(from, to)` actually slices them and the
    * count reflects the whole set.
    *
@@ -91,11 +100,15 @@ function makeBuilder(
 export function createFakeSupabase(): FakeSupabaseClient {
   const builders: FakeQueryBuilder[] = [];
   const responses = new Map<string, SupabaseResponse>();
+  const queues = new Map<string, SupabaseResponse[]>();
   const rowsByTable = new Map<string, unknown[]>();
 
   return {
     from: vi.fn((table: string) => {
-      const response = responses.get(table) ?? { data: null, count: null, error: null };
+      const queue = queues.get(table);
+      const response = queue
+        ? (queue.length > 1 ? queue.shift()! : queue[0]!)
+        : responses.get(table) ?? { data: null, count: null, error: null };
       const builder = makeBuilder(table, response, rowsByTable.get(table));
       builders.push(builder);
       return builder;
@@ -106,6 +119,7 @@ export function createFakeSupabase(): FakeSupabaseClient {
     },
     __builders: builders,
     __setResponse: (table, response) => responses.set(table, response),
+    __queueResponses: (table, next) => queues.set(table, [...next]),
     __setRows: (table, rows) => rowsByTable.set(table, rows),
     __buildersFor: (table) => builders.filter((b) => b.table === table),
   };
