@@ -39,6 +39,15 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Relative links in the entry-point docs (root README, per-app and
+      # per-package READMEs, CLAUDE.md). Offline — nothing is fetched, so this
+      # can't flake on a slow external host. It exists because apps/web/README
+      # shipped a link to `docs/design-brief.md` (wrong case, wrong depth, and
+      # pointing at a file CLAUDE.md says to reach through the bts-design skill)
+      # and nothing caught it for months.
+      - name: Check doc links
+        run: node scripts/check-doc-links.mjs
+
   build:
     name: Build agents deploy bundle
     runs-on: ubuntu-latest

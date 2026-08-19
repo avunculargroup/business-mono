@@ -92,24 +92,33 @@ the day Coin Metrics stamps). Keep it simple and consistent: **UTC calendar date
 
 ## Per-provider mapping
 
-> Verify endpoints, field names and free-tier limits against live docs at build. mempool.space and
-> Coin Metrics community both require **no API key**. Series/metric availability for Coin Metrics
-> community must be confirmed via its catalog (`community: true` per metric) — see assumptions.
+> Verify endpoints, field names and free-tier limits against live docs at build. Four providers need
+> **no API key** — mempool.space, Coin Metrics community, CoinGecko, alternative.me; two do —
+> BGeometrics (`BGEOMETRICS_API_KEY`) and SoSoValue (`SOSOVALUE_API_KEY`). Series/metric availability
+> for Coin Metrics community must be confirmed via its catalog (`community: true` per metric) — see
+> assumptions.
 
 ### mempool.space — `apps/agents/.../adapters/mempool.ts`
 
 Free, keyless, JSON REST. Base `https://mempool.space/api`. One adapter, several endpoints by key:
 
-- **`hash_rate`** → `GET /v1/mining/hashrate/3d` (or `/1m` for context). Response carries
-  `currentHashrate` (H/s) and a `hashrates` series. **Emit `currentHashrate ÷ 1e18` as EH/s.**
+- **`hash_rate`** → `GET /v1/mining/hashrate/{period}` — `1m` on a steady poll, `3m` when backfilling.
+  Response carries `currentHashrate` (H/s) and a `hashrates` series. **Emit `÷ 1e18` as EH/s.** As
+  shipped this emits a DAILY series off `hashrates` (one point per UTC day, latest wins), not the
+  single `currentHashrate` — Hash Ribbons needs contiguous daily rows for its ROWS-based moving
+  averages. A steady run keeps only the last two days; a backfill keeps everything.
 - **`difficulty`** / **`next_difficulty_adjustment`** → `GET /v1/difficulty-adjustment`. Returns
   `difficultyChange` (the forward estimate %, → `next_difficulty_adjustment`), plus retarget date
   and remaining blocks (use for the ETA sub-line). Current difficulty is in the hashrate response.
 - **`pool_concentration_top`** → `GET /v1/mining/hashrate/pools/1m`. Returns each pool's `share`
   (fraction). Emit the max share × 100 as a percent; an `Unknown` bucket exists — handle it.
 - **`miner_revenue_total`** / **`miner_fees_total`** → `GET /v1/mining/reward-stats/[blockCount]`
-  (e.g. last ~144 blocks ≈ a day) returns `totalReward` and `totalFee` in sats. Emit both (the
-  view derives `fee_share`). Convert sats→BTC or keep sats consistently; document which.
+  (last 144 blocks ≈ a day — the shipped window) returns `totalReward` and `totalFee` in sats. Emit
+  both (the view derives `fee_share`). **Settled: sats → BTC, ÷ 1e8.** Both arrive as strings or
+  numbers; `parseFloat` either way.
+- **`block_height`** → `GET /blocks/tip/height`. Mainnet tip, point-in-time. **Returns a bare
+  integer as plain text, not JSON** — it is the one endpoint here read with `res.text()`, and
+  `res.json()` on it throws. Added by `20260704160000_add_bitcoin_snapshot_indicators.sql`.
 
 *Gotchas:* the hashrate overflow above; pool attribution drifts as pools rebrand; `reward-stats`
 is block-count-windowed, so pick a window that approximates a day and document it. mempool.space is
@@ -147,6 +156,60 @@ production data (zero observations ever, vs. ~36,000 for `SplyCur`/`AdrActCnt` o
 call). `realised_cap` has moved off this adapter onto BGeometrics below; `mvrv` and `supply` /
 `active_addresses` are unaffected. See `20260730120000_realised_cap_bgeometrics_source.sql`.
 
+### CoinGecko — `apps/agents/.../adapters/coingecko.ts`
+
+Free, keyless, JSON REST. One endpoint, one call, point-in-time (dated today):
+
+```
+GET https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=aud
+```
+
+- **`btc_price_aud`** ← `bitcoin.aud`
+- **`btc_price_usd`** ← `bitcoin.usd`
+
+Both are plain numbers in the response — no normalisation, the registry unit is the currency itself.
+The requested `vs_currencies` are assembled from the keys handed in, so one call covers whichever
+subset is due.
+
+*The rule that keeps this adapter honest:* **emission is driven by the requested keys, not by the
+response.** The response always carries every currency asked for, so mapping the payload instead
+would double-write the USD series — `btc_price_usd`'s canonical source is Coin Metrics `PriceUSD`
+(it feeds MVRV and the whole `v_btc_trend` ladder), and the on-chain poll only ever asks CoinGecko
+for `btc_price_aud`. The `market_report` routine separately reuses this adapter to live-fetch
+`btc_price_usd` for its Bitcoin snapshot section, which is display-only and stores nothing.
+
+*Gotchas:* a missing currency in the payload is a `parse` error, not a zero. Called with no configs
+at all the adapter defaults to `btc_price_aud` — defensive only; the poll always passes its configs.
+The free tier is rate-limited per IP (and CoinGecko has tightened it more than once); one daily poll
+plus one report fetch is far inside it, but it is the provider most likely to start answering 429,
+which arrives as a typed `rate_limit` error.
+
+### alternative.me — `apps/agents/.../adapters/alternativeMe.ts`
+
+Free, keyless, JSON REST. One endpoint, one metric, point-in-time (dated today):
+
+```
+GET https://api.alternative.me/fng/?limit=1
+```
+
+- **`fear_greed`** ← `data[0].value` — the Crypto Fear & Greed Index, 0–100.
+
+The value arrives as a **string**; `Number()` it, and treat a missing or non-numeric `data[0].value`
+as a `parse` error rather than a zero (0 is a meaningful reading on this scale — "Extreme Fear").
+`data[0].value_classification` ("Greed", "Extreme Fear", …) is kept in `raw` as `{ classification }`,
+falling back to `'Unknown'` rather than failing the parse — the number is the metric, the label is
+decoration. The market report reads that label off `raw` and renders it as the item's signal chip,
+but only on its LIVE path: when the live fetch fails and the report falls back to the stored
+observation, the value survives and the chip does not (`onchain_observations.raw` keeps it, nothing
+reads it back out).
+
+*Gotchas:* this adapter ignores the indicators array entirely and always emits `fear_greed` — it is
+single-metric by construction, unlike every other adapter here. The index is **market-wide crypto
+sentiment**, not Bitcoin-specific, though it is the de facto Bitcoin gauge; keep that in mind before
+any content framing leans on it. It updates once daily, so a more frequent poll would restate the
+same number under a new date. Mirrors apps/web's `FearGreedIndicator` dashboard widget, which hits
+the same endpoint — the two should agree.
+
 ### BGeometrics — `apps/agents/.../adapters/bgeometrics.ts`
 
 Free, JSON REST, self-serve API key (no card) at `portal.bgeometrics.com` — needs
@@ -163,6 +226,40 @@ shape: an array of `{ d: "YYYY-MM-DD", realizedCap: "<number>" }` rows. The pars
 raw body attached — on anything else, so a wrong guess surfaces via the failed poll rather than
 silently storing garbage; correct the field names in `bgeometrics.ts` from the real error on first
 live run if needed.
+
+### SoSoValue — `apps/agents/.../adapters/sosovalue.ts`
+
+JSON REST, API key from `sosovalue.com` — needs `SOSOVALUE_API_KEY` set. The one provider here whose
+metrics are **not on-chain data**: US spot ETF fund flows, riding these tables for the machinery
+only (see `20260810000000_add_etf_flow_indicators.sql`). Two endpoints, both `POST` with body
+`{"type":"us-btc-spot"}` and header `x-soso-api-key`, because the two metrics are shaped differently:
+
+```
+POST https://api.sosovalue.xyz/openapi/v2/etf/historicalInflowChart   → etf_net_flow
+POST https://api.sosovalue.xyz/openapi/v2/etf/currentEtfDataMetrics   → etf_net_assets
+```
+
+- **`etf_net_flow`** ← `totalNetInflow` per session. Full history in one call (no date-range params),
+  so backfill and steady polls are identical — supersession dedupes. **Emit ÷ 1e6 as USD millions.**
+- **`etf_net_assets`** ← `totalNetAssets`. Point-in-time: one observation per poll, dated by the
+  payload's own as-at date, so this series accumulates a day at a time rather than backfilling.
+  **Emit ÷ 1e9 as USD billions.**
+- **`etf_flow_streak`** is derived in `v_etf_flow_streak` — no adapter involvement.
+
+Both scale factors come off the indicator's `unit`, per the normalisation rule above; the registry
+stores these scaled rather than in raw dollars because nothing in the stack has a compact number
+formatter. The two endpoints fail independently: a partial failure returns what landed and logs,
+rather than taking the healthy series down with it. Only a total failure is an adapter error.
+
+*Response shape not hand-verified* — same situation as BGeometrics above. Best-guess shape: a
+`{ code, data, msg }` envelope wrapping either an array of `{ date, totalNetInflow }` rows or an
+object carrying `totalNetAssets` and an as-at date, numbers possibly arriving as strings. A non-zero
+envelope `code` is treated as an API-level failure, not data (that is how a bad key arrives — HTTP
+200 with an error body). *Gotcha the parser cannot catch:* if the API already returns millions, the
+divisors make every figure 1e6 too small and still parse. Eyeball the first live poll against
+sosovalue.com. Second gotcha: this is a **trading-day** series — no weekend or US-holiday rows,
+which is why the `etf_*` keys carry the session-cadence staleness tolerance rather than the 2-day
+daily default.
 
 -----
 

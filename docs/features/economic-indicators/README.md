@@ -17,12 +17,16 @@ agents (Rex citing exact figures, Charlie/Margot triggered by a fresh print).
 | [`feature-spec.md`](./feature-spec.md) | The main spec — data model, views, agent integration, UI, open questions | Start here; before Sessions 1 & 3 |
 | [`adapter-contract.md`](./adapter-contract.md) | The ingest seam — the common shape FRED / RBA / ABS each map to | Before Session 2 |
 | [`assumptions.md`](./assumptions.md) | What was inferred without full repo context — verify these before building | Before any session |
-| [`sql/seed.sql`](./sql/seed.sql) | The six v1 indicators, with FRED codes / RBA table refs and confidence notes | Session 1 |
-| [`sql/v_indicator_latest.sql`](./sql/v_indicator_latest.sql) | Canonical `v_indicator_latest` view, with year-on-year join | Session 1 |
-| [`prototype/macro-indicators-panel.html`](./prototype/macro-indicators-panel.html) | Faithful design reference for the panel (not product code) | Session 3 |
+| `sql/seed.sql` | The six v1 indicators, with FRED codes / RBA table refs and confidence notes | Session 1 |
+| `sql/v_indicator_latest.sql` | Canonical `v_indicator_latest` view, with year-on-year join | Session 1 |
+| `prototype/macro-indicators-panel.html` | Faithful design reference for the panel (not product code) | Session 3 |
+
+> The `sql/` and `prototype/` assets above were specced but never committed — the
+> rows record what Session 1 and 3 need, not files you can open. They are shown
+> unlinked for that reason.
 
 Referenced from the repo root: [`../../../CLAUDE.md`](../../../CLAUDE.md) (routing),
-[`../../../schema.sql`](../../../schema.sql), [`../../../DESIGN_BRIEF.md`](../../../DESIGN_BRIEF.md).
+[`../../../schema.sql`](../../../schema.sql), [`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md).
 
 -----
 
@@ -30,8 +34,8 @@ Referenced from the repo root: [`../../../CLAUDE.md`](../../../CLAUDE.md) (routi
 
 **Session 1 — data layer.** Add `economic_indicators` and `indicator_observations` to
 `schema.sql`, plus indexes, RLS and the `updated_at` trigger. Create `v_indicator_series`
-(in the spec) and `v_indicator_latest` (from [`sql/v_indicator_latest.sql`](./sql/v_indicator_latest.sql) —
-**not** the YoY-free snippet inline in the spec). Apply [`sql/seed.sql`](./sql/seed.sql).
+(in the spec) and `v_indicator_latest` (from `sql/v_indicator_latest.sql` —
+**not** the YoY-free snippet inline in the spec). Apply `sql/seed.sql`.
 Stop for review before any agent code.
 
 **Session 2 — ingest workflow.** Read [`adapter-contract.md`](./adapter-contract.md) first.
@@ -41,8 +45,8 @@ logging, and the content-beat proposal step. Verify Mastra signatures via the `m
 
 **Session 3 — dashboard panel.** Build the local/global card panel against
 `v_indicator_latest` and `v_indicator_series`, following
-[`../../../DESIGN_BRIEF.md`](../../../DESIGN_BRIEF.md) and the reference render in
-[`prototype/`](./prototype/macro-indicators-panel.html). The React-port contract and the
+[`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md) and the reference render in
+`prototype/`. The React-port contract and the
 neutral-delta colour rule are in the prototype's header comment.
 
 -----

@@ -61,6 +61,24 @@ export const RoutineActionType = {
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
+// Display labels for every action type. Lives here so the routines table, the
+// edit form and any future surface all name an action the same way — a routine
+// whose type is missing from a local lookup used to render as raw snake_case.
+export const ROUTINE_ACTION_LABELS: Record<RoutineActionType, string> = {
+  research_digest:       'Research digest',
+  monitor_change:        'Monitor change',
+  news_ingest:           'News ingest',
+  news_source_scan:      'News source scan',
+  newsletter:            'Newsletter',
+  podcast_ingest:        'Podcast ingest',
+  news_curation:         'News curation',
+  indicator_poll:        'Economic indicator poll',
+  onchain_poll:          'On-chain indicator poll',
+  social_post_from_news: 'Social posts from news',
+  market_report:         'Market report',
+  report_watch_scan:     'Report watch scan',
+};
+
 export const RoutineStatus = {
   SUCCESS: 'success',
   FAILED: 'failed',
@@ -96,6 +114,11 @@ export interface NewsletterConfig {
   // When true the routine only fires on the first Monday of the month and skips
   // if a newsletter run already exists for the current calendar month.
   monthly_guard?: boolean;
+  // Marks the reusable "on-demand" routine the /content page re-arms per click.
+  // The handler deactivates the routine after launching so it fires exactly once.
+  // Set by the seed, never edited from the routines form — but it must survive
+  // an edit, or the on-demand routine silently becomes a weekly one.
+  one_off?: boolean;
 }
 
 // action_config shape for a 'podcast_ingest' routine. Like news_source_scan, the
@@ -282,6 +305,9 @@ export interface MarketReportResult {
   // Price-derived trend/valuation metrics (moving averages, Mayer Multiple, 50d/200d
   // cross, RSI, realised volatility, drawdown) — derived in v_btc_trend.
   trend_count: number;
+  // US spot ETF metrics (daily net flow, current flow streak, total net assets).
+  // Fund flows, not network data — their own section, not the On-chain one.
+  etf_count: number;
   // True when the report email reached at least one recipient.
   emailed: boolean;
   // The findings narration included in the email, or null when it was withheld

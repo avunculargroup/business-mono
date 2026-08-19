@@ -5888,6 +5888,15 @@ export type Database = {
         }
         Relationships: []
       }
+      v_etf_flow_streak: {
+        Row: {
+          direction: string | null
+          observed_at: string | null
+          streak_sessions: number | null
+          streak_total: number | null
+        }
+        Relationships: []
+      }
       v_hash_ribbons: {
         Row: {
           hash_rate_eh_s: number | null

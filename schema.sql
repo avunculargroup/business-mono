@@ -2371,12 +2371,12 @@ CREATE TABLE onchain_indicators (
   key                   TEXT NOT NULL UNIQUE,          -- stable slug, e.g. 'hash_rate'
   name                  TEXT NOT NULL,
   short_label           TEXT NOT NULL,
-  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot','trend_valuation')),
+  metric_group          TEXT NOT NULL CHECK (metric_group IN ('network_security','behaviour_valuation','market_snapshot','trend_valuation','etf_flows')),
   derivation            TEXT NOT NULL DEFAULT 'fetched' CHECK (derivation IN ('fetched','derived')),
-  provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics')),  -- NULL for derived
+  provider              TEXT CHECK (provider IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics','sosovalue')),  -- NULL for derived
   provider_metric_code  TEXT,                          -- e.g. BGeometrics 'realized-cap'; NULL for derived
   derivation_spec       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- documents derived formula; NOT executed
-  unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc'
+  unit                  TEXT NOT NULL,                 -- 'eh_s','ratio','usd','percent','count','signal','btc','usd_million','usd_billion'
   decimals              INT  NOT NULL DEFAULT 2,
   poll_frequency        TEXT NOT NULL DEFAULT 'daily' CHECK (poll_frequency IN ('daily')),
   is_displayed          BOOLEAN NOT NULL DEFAULT TRUE, -- true = headline card; false = raw input
@@ -2404,7 +2404,7 @@ CREATE TABLE onchain_observations (
   is_current       BOOLEAN NOT NULL DEFAULT TRUE,   -- latest vintage for this observed_at
   is_revision      BOOLEAN NOT NULL DEFAULT FALSE,
   superseded_value NUMERIC(24,6),
-  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics')),
+  source           TEXT NOT NULL CHECK (source IN ('mempool','coinmetrics','coingecko','alternative_me','bgeometrics','sosovalue')),
   raw              JSONB NOT NULL DEFAULT '{}'::jsonb,
   ingested_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -2436,6 +2436,14 @@ CREATE TABLE onchain_observations (
 --   Bumped the onchain_poll routine's backfill_days to 2600 so the 200-week window and
 --   the drawdown high populate on first ingest. The coinmetrics adapter now sends an
 --   explicit start_time window (see adapter note) so a deep backfill returns RECENT days.
+-- Migration 20260810000000_add_etf_flow_indicators: widened provider/source CHECKs
+--   (+sosovalue) and metric_group CHECK (+etf_flows); seeded etf_net_flow (daily net
+--   flow, USD millions) and etf_net_assets (total net assets, USD billions) from
+--   SoSoValue, plus the derived etf_flow_streak. NOT on-chain data — TradFi fund flows
+--   reusing these tables for the machinery only, like market_snapshot. Stored SCALED
+--   (millions/billions, not raw dollars) so the report's plain number formatting stays
+--   readable; the adapter divides. Excluded from the /dashboard on-chain panel; they
+--   render as the market_report email's "ETF Flows" section. Needs SOSOVALUE_API_KEY.
 
 -- Views:
 --   v_onchain_series — current observations per indicator, oldest→newest (sparklines + Rex).
@@ -2452,13 +2460,18 @@ CREATE TABLE onchain_observations (
 --   v_btc_trend_metrics — latest v_btc_trend row unpivoted to one row per trend metric,
 --     shaped exactly like v_onchain_dashboard (with day-over-day deltas; the ma_cross
 --     signal is above/below/cross_up/cross_down from the latest-vs-prior transition).
+--   v_etf_flow_streak — the current unbroken run of same-direction ETF sessions ending
+--     at the latest etf_net_flow observation: observed_at, streak_sessions, direction
+--     (inflow/outflow/flat), streak_total. Reads only the rows that exist, so a weekend
+--     or market holiday neither breaks nor extends a run.
 --   v_onchain_dashboard — one row per DISPLAY metric (fetched + derived), uniform shape:
 --     key, name, short_label, metric_group, unit, decimals, value, observed_at,
 --     change_since_prior, pct_change_since_prior, days_since_observed, signal. Fetched
 --     read their latest current observation (with day-over-day deltas); derived
---     (fee_share, realised_price, hash_ribbons) are computed inline; the trend_valuation
---     rows are unioned in from v_btc_trend_metrics. Non-trend derived metrics carry NULL
---     deltas; trend metrics carry deltas.
+--     (fee_share, realised_price, hash_ribbons, etf_flow_streak) are computed inline; the
+--     trend_valuation rows are unioned in from v_btc_trend_metrics. Non-trend derived
+--     metrics carry NULL deltas; trend metrics carry deltas. etf_flow_streak's signal
+--     states the run ('5 sessions inflow') — a description, never an implication.
 
 -- ============================================================
 -- SOCIAL DRAFT FEEDBACK (migration: 20260717010000_add_content_feedback)
