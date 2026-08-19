@@ -1,6 +1,7 @@
 import type { Principal, RepositoryBundle } from '@platform/data';
 import { createAdapterContext, type PlatformSupabaseClient } from './adapterContext';
 import { createAgentActivityRepository } from './repositories/agentActivity';
+import { createResearchRepository } from './repositories/research';
 
 /**
  * Builds a bundle scoped to `principal`.
@@ -20,6 +21,7 @@ export function createSupabaseRepositories(
 
   return {
     agentActivity: createAgentActivityRepository(adapter),
+    research: createResearchRepository(adapter),
     mode: 'live',
   };
 }

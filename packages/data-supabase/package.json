@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@platform/data": "workspace:*",
-    "@platform/db": "workspace:*"
+    "@platform/db": "workspace:*",
+    "@platform/shared": "workspace:*"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.45.0"

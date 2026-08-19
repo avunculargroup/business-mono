@@ -736,7 +736,7 @@ commit.
 | # | Vertical | Routes | Demo? |
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
-| 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface |
+| 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, 4.2b detail + reports, 4.2c podcasts, 4.2d collections + sources |
 | 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
@@ -849,6 +849,71 @@ surprises — the `agent_activity` fan-out across six call sites, and the contra
 matching the data — are both *pattern* costs that will recur, not one-offs. 4.3 is the checkpoint
 that matters, since `campaigns.ts` at 18 `.from(` calls is representative of the heavy verticals in
 a way `/activity` is not.
+
+##### 4.2a — News feed: what shipped
+
+**4.2 is four commits, not one.** 12 pages over 8 tables and views is too much to verify in a
+single change, and the sub-surfaces are genuinely independent: the feed reads `news_items`, the
+detail page adds `reports` and `news_sources`, podcasts add four more tables, collections two more.
+Split as **4.2a** the feed (`/news`, `/news/daily`), **4.2b** the detail page and reports,
+**4.2c** podcasts, **4.2d** collections and sources. Only 4.2a and 4.2b are demo surfaces.
+
+**Much cleaner than 4.1's fan-out.** `news_items` is read only under `/news/*`, so there was no
+boundary-mapping shim to write. Confirmation that the six-way fan-out in 4.1 is a property of
+`agent_activity` (which every agent writes to) rather than of every table.
+
+**`@platform/data` now depends on `@platform/shared`, and the import rule in `CLAUDE.md` says so.**
+`NewsCategory` and `NewsStatus` are already defined there and used by the agents' ingestion side;
+re-declaring them in the read model would have created exactly the drift this platform keeps getting
+bitten by. The rule as written said `packages/data` "imports from nothing" — its intent was no
+database client and no app code, and `@platform/shared` is a pure leaf that is neither.
+
+**Two things the seam paid for immediately.**
+
+- `select('*')` on 200 rows became eleven named columns. `body_markdown` holds the full text of an
+  ingested newsletter, and the feed was pulling 200 of them to render headlines. Nothing forced this
+  — asking "what does the read model need?" did.
+- **The column list has to be one unbroken literal.** `supabase-js` parses it at the type level to
+  type the result, so a concatenated string is just `string` and the result degrades to
+  `GenericStringError[]` — which is why the pages this replaces cast their results through
+  `unknown`. As a literal, a typo'd column name is a compile error. Worth knowing before the wider
+  verticals: several existing pages build column lists by concatenation and cast around the
+  consequence.
+
+**A dead prop chain fell out.** `canonicalUrl` was threaded page → feed → card, and the card never
+rendered it — it existed only so `promote` could build a knowledge item's `source_url`. With
+`promoteItem(id)` reading the row itself, the prop had no consumer, so it left the card, the feed
+and the read model. `NewsFeedItem` carries what the feed renders and nothing else; the detail
+model in 4.2b will carry `canonicalUrl` because the detail page really does render it.
+
+**`ReadContext.asOf` earns its place here.** "Today's digest" was `dayBoundsInTz(DEFAULT_TIMEZONE)`
+against the server clock inside the page. It is now bounded from `ctx.asOf` inside the adapter,
+which is what will let a fixture digest stay populated instead of emptying the day after the
+fixtures were written — the first vertical where the parameter buys anything. The digest page also
+derives its heading from the same anchor, so the date shown and the rows listed can no longer
+disagree at a midnight boundary.
+
+**`promoteItem` takes only an id**, and reads the title, url and category from the row. The card
+used to build the knowledge item from its own props, so a stale card could file an article under
+another's title. It also writes to `knowledge_items` as well as `news_items` — a deliberate
+cross-domain write, because "promote this article" is one user action and splitting it across two
+repositories would put the ordering and the half-done state on the caller. Revisit when the
+knowledge vertical lands.
+
+**First real consumer of the provider.** `NewsCard` writes from the browser, so it reads its bundle
+from `useRepositories()` — the two-layer client wrapper from 4.0 doing the job it was built for.
+
+**Found, not fixed: the "Show archived" toggle cannot work.** The feed query excludes archived rows,
+so the toggle filters a set that never contains any. It only ever reveals items archived in the
+current session; after a reload they are unreachable. Preserving the behaviour exactly was the right
+call for a seam change — making the toggle work means deciding whether the feed should fetch
+archived rows at all, which is a product decision.
+
+**Verify — what was actually run.** `pnpm typecheck` (13 tasks), `pnpm lint` (8), `pnpm test` (10)
+and `pnpm --filter @platform/web build` all green. `@platform/data-supabase` 28 → 46 tests,
+`apps/web` 64 → 65 files and 492 → 497 tests. `NewsCard.test.tsx` moved off the Supabase mock: its
+three `source_url` cases moved to the adapter, where that choice now lives, and what is left asserts
+the card's own behaviour. `/news` and `/news/daily` walked manually.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

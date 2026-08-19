@@ -1,5 +1,10 @@
 import { vi, type Mock } from 'vitest';
-import type { AgentActivityItem, RepositoryBundle } from '@platform/data';
+import type {
+  AgentActivityItem,
+  NewsDigestItem,
+  NewsFeedItem,
+  RepositoryBundle,
+} from '@platform/data';
 
 /**
  * A repository bundle whose methods are plain spies.
@@ -14,13 +19,20 @@ import type { AgentActivityItem, RepositoryBundle } from '@platform/data';
  */
 export type FakeRepositories = {
   agentActivity: { [K in keyof RepositoryBundle['agentActivity']]: Mock };
+  research: { [K in keyof RepositoryBundle['research']]: Mock };
   mode: RepositoryBundle['mode'];
 };
 
 export function createFakeRepositories(
-  overrides: { activity?: AgentActivityItem[]; pendingCount?: number } = {},
+  overrides: {
+    activity?: AgentActivityItem[];
+    pendingCount?: number;
+    news?: NewsFeedItem[];
+    digest?: NewsDigestItem[];
+  } = {},
 ): FakeRepositories {
   const items = overrides.activity ?? [];
+  const news = overrides.news ?? [];
 
   return {
     agentActivity: {
@@ -32,7 +44,49 @@ export function createFakeRepositories(
       countPending: vi.fn(async () => overrides.pendingCount ?? 0),
       approveActivity: vi.fn(async () => undefined),
     },
+    research: {
+      listItems: vi.fn(async () => ({
+        items: news,
+        total: news.length,
+        hasMore: false,
+      })),
+      listTodayDigest: vi.fn(async () => overrides.digest ?? []),
+      setItemStatus: vi.fn(async () => undefined),
+      promoteItem: vi.fn(async () => undefined),
+    },
     mode: 'live',
+  };
+}
+
+/** A feed item with sensible defaults, for tests that only care about one field. */
+export function fakeNewsFeedItem(overrides: Partial<NewsFeedItem> = {}): NewsFeedItem {
+  return {
+    id: 'n1',
+    title: 'ASIC updates its digital asset guidance',
+    url: 'https://example.test/asic',
+    imageUrl: null,
+    sourceName: 'Regulator Watch',
+    publishedAt: '2026-08-18T00:00:00Z',
+    summary: 'A one-line summary.',
+    category: 'regulatory',
+    status: 'new',
+    relevanceScore: 0.8,
+    curatorNotes: null,
+    ...overrides,
+  };
+}
+
+/** A digest item with sensible defaults. */
+export function fakeNewsDigestItem(overrides: Partial<NewsDigestItem> = {}): NewsDigestItem {
+  return {
+    id: 'd1',
+    title: 'RBA holds rates',
+    url: 'https://example.test/rba',
+    category: 'macro',
+    sourceName: 'AFR',
+    publishedAt: '2026-08-19T00:00:00Z',
+    summary: null,
+    ...overrides,
   };
 }
 

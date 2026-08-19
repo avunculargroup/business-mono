@@ -14,6 +14,11 @@ export type {
   AgentActivityRepository,
   ProposedAction,
 } from './repositories/agentActivity';
+export type {
+  NewsDigestItem,
+  NewsFeedItem,
+  ResearchRepository,
+} from './repositories/research';
 
 // The React provider is deliberately NOT re-exported here. It is a .tsx module,
 // and adapters like @platform/data-supabase have no React and no `jsx` setting —

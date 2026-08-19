@@ -2,6 +2,7 @@
  * The repository bundle: the object an app holds instead of a database client.
  */
 import type { AgentActivityRepository } from './repositories/agentActivity';
+import type { ResearchRepository } from './repositories/research';
 
 /**
  * Which adapter produced this bundle.
@@ -38,5 +39,6 @@ export interface Principal {
  */
 export interface RepositoryBundle {
   agentActivity: AgentActivityRepository;
+  research: ResearchRepository;
   mode: RepositoryMode;
 }

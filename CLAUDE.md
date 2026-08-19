@@ -97,9 +97,11 @@ Transform tasks into verifiable goals before implementing:
 
 - `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
 - `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
-- `packages/data` imports from nothing — no database client, no app code. `packages/data-supabase`
-  imports from `@platform/data` and `@platform/db`. The split is what lets a fixture-backed app
-  depend on the interfaces without being able to reach a database
+- `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
+  models reuse the enums the ingestion side already defines rather than re-declaring them.
+  `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`. The
+  split is what lets a fixture-backed app depend on the interfaces without being able to reach a
+  database
 - `packages/ui` imports from `@platform/shared` only — never from `apps/*`. It is consumed by
   `apps/web` today and by `apps/demo` later, so any dependency on app code breaks that. React and
   `lucide-react` are peer dependencies.

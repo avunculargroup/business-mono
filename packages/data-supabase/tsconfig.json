@@ -7,7 +7,8 @@
     "paths": {
       "@platform/data": ["../data/src/index.ts"],
       "@platform/data/testing": ["../data/src/testing/index.ts"],
-      "@platform/db": ["../db/src/index.ts"]
+      "@platform/db": ["../db/src/index.ts"],
+      "@platform/shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src/**/*", "test/**/*"],

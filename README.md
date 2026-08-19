@@ -113,8 +113,8 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/voice   →  @platform/db, @platform/shared
 @platform/web     →  @platform/db      →  @platform/shared
                   →  @platform/ui      →  @platform/shared
-                  →  @platform/data
-                  →  @platform/data-supabase  →  @platform/data, @platform/db
+                  →  @platform/data           →  @platform/shared
+                  →  @platform/data-supabase  →  @platform/data, @platform/db, @platform/shared
 ```
 
 `apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
@@ -126,7 +126,8 @@ on app code would defeat the point. React and `lucide-react` are peer dependenci
 `@platform/data` holds the repository interfaces both apps code against; `@platform/data-supabase`
 is the live implementation. They are separate packages rather than one with subpath exports so that
 a fixture-backed app can simply not depend on the Supabase one and have that enforced by
-`package.json` rather than by discipline. `@platform/data` never imports a database client.
+`package.json` rather than by discipline. `@platform/data` imports only `@platform/shared` (for the enums the ingestion side already
+defines) and never a database client.
 See [`docs/features/demo-app/repository-contract.md`](./docs/features/demo-app/repository-contract.md).
 
 ---

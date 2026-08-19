@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import { createClient } from '@/lib/supabase/browser';
+import { useRepositories } from '@platform/data/provider';
 import { useToast } from '@platform/ui/ToastProvider';
 import { CategoryChip } from './CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
-import { newsItemHref, newsOriginalUrl } from '@/lib/news/itemHref';
+import { newsItemHref } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
 import styles from './NewsCard.module.css';
 import type { NewsCategory, NewsStatus } from '@platform/shared';
@@ -16,8 +16,6 @@ interface NewsCardProps {
   id: string;
   title: string;
   url: string;
-  /** Publisher's hosted copy, for email items whose url is synthetic. */
-  canonicalUrl?: string | null;
   /** og:image scraped from the source page. Null for email-sourced items. */
   imageUrl?: string | null;
   sourceName: string;
@@ -34,7 +32,6 @@ export function NewsCard({
   id,
   title,
   url,
-  canonicalUrl,
   imageUrl,
   sourceName,
   publishedAt,
@@ -48,19 +45,18 @@ export function NewsCard({
   const [status, setStatus] = useState<NewsStatus>(initialStatus);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
-  const supabase = createClient();
+  const { research } = useRepositories();
 
   const updateStatus = async (next: NewsStatus) => {
     if (busy) return;
     setBusy(true);
-    const { error } = await supabase
-      .from('news_items')
-      .update({ status: next })
-      .eq('id', id);
-    setBusy(false);
-    if (error) {
+    try {
+      await research.setItemStatus(id, next);
+    } catch {
       toast.error('Could not update article status.');
       return;
+    } finally {
+      setBusy(false);
     }
     setStatus(next);
     onStatusChange?.(id, next);
@@ -69,33 +65,19 @@ export function NewsCard({
   const promote = async () => {
     if (busy) return;
     setBusy(true);
-    const { data: ki, error: kiErr } = await supabase
-      .from('knowledge_items')
-      .insert({
-        title,
-        // Never the synthetic email:// url — an email item's real address is
-        // its canonical_url, and null is better than a link that opens nothing.
-        source_url: newsOriginalUrl(url, canonicalUrl),
-        source_type: 'article',
-        summary: summary ?? undefined,
-        archived_by: 'rex',
-        topic_tags: [category],
-      })
-      .select('id')
-      .single();
-
-    if (kiErr || !ki) {
-      setBusy(false);
+    try {
+      // The repository reads the article's own title, url and category from the
+      // row, so a card rendered from stale props cannot file it under the wrong
+      // heading — and the news_items update only happens if the knowledge item
+      // was really created.
+      await research.promoteItem(id);
+    } catch {
       toast.error('Could not promote to knowledge base.');
       return;
+    } finally {
+      setBusy(false);
     }
 
-    await supabase
-      .from('news_items')
-      .update({ status: 'promoted', knowledge_item_id: ki.id })
-      .eq('id', id);
-
-    setBusy(false);
     setStatus('promoted');
     onStatusChange?.(id, 'promoted');
     toast.success('Article promoted to the knowledge base.');

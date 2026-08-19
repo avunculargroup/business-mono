@@ -13,6 +13,7 @@ export default defineConfig({
       '@platform/data/testing': `${here}../data/src/testing/index.ts`,
       '@platform/data': `${here}../data/src/index.ts`,
       '@platform/db': `${here}../db/src/index.ts`,
+      '@platform/shared': `${here}../shared/src/index.ts`,
     },
   },
   test: {
