@@ -1,6 +1,7 @@
 import { vi, type Mock } from 'vitest';
 import type {
   AgentActivityItem,
+  CampaignGate,
   NewsDigestItem,
   NewsFeedItem,
   NewsItemDetail,
@@ -23,6 +24,7 @@ export type FakeRepositories = {
   agentActivity: { [K in keyof RepositoryBundle['agentActivity']]: Mock };
   research: { [K in keyof RepositoryBundle['research']]: Mock };
   content: { [K in keyof RepositoryBundle['content']]: Mock };
+  campaigns: { [K in keyof RepositoryBundle['campaigns']]: Mock };
   mode: RepositoryBundle['mode'];
 };
 
@@ -34,6 +36,7 @@ export function createFakeRepositories(
     digest?: NewsDigestItem[];
     newsItem?: NewsItemDetail;
     publishGate?: PublishGate | null;
+    campaignGate?: CampaignGate | null;
   } = {},
 ): FakeRepositories {
   const items = overrides.activity ?? [];
@@ -77,7 +80,30 @@ export function createFakeRepositories(
       setStatus: vi.fn(async () => undefined),
       schedule: vi.fn(async () => undefined),
     },
+    campaigns: {
+      getGate: vi.fn(async () =>
+        overrides.campaignGate === undefined ? fakeCampaignGate() : overrides.campaignGate,
+      ),
+      setCampaignDecision: vi.fn(async () => undefined),
+      setVariantDecision: vi.fn(async () => undefined),
+      createDraft: vi.fn(async () => 'camp-new'),
+      saveCadenceAndLaunch: vi.fn(async () => undefined),
+      markVariantPosted: vi.fn(async () => true),
+      saveVariantCopy: vi.fn(async () => true),
+      savePostMetrics: vi.fn(async () => undefined),
+      promoteToVoiceSnippet: vi.fn(async () => undefined),
+    },
     mode: 'live',
+  };
+}
+
+/** A campaign with an open gate 1, so a test only breaks the field it means. */
+export function fakeCampaignGate(overrides: Partial<CampaignGate> = {}): CampaignGate {
+  return {
+    status: 'draft',
+    workflowRunId: 'run-1',
+    openGate: 'strategy',
+    ...overrides,
   };
 }
 

@@ -737,7 +737,7 @@ commit.
 |---|---|---|---|
 | 4.1 | Agent activity + approvals ✅ | `/activity` | Yes — smallest, proves the pattern |
 | 4.2 | Research and podcasts | `/news/*` (12 pages) | Yes — largest read surface. Split: **4.2a feed ✅**, **4.2b detail + reports ✅**, 4.2c podcasts, 4.2d collections + sources |
-| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, 4.3b content detail, 4.3c campaigns |
+| 4.3 | Content and campaigns | `/content/*`, `/campaigns/*` | Yes. Split: **4.3a content board ✅**, **4.3c campaign writes ✅**, 4.3b content detail, 4.3d campaign pages |
 | 4.4 | Market reports, indicators, onchain | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals | `/signals` | Yes |
 | 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
@@ -1019,6 +1019,61 @@ expensive part is deciding, per guarded write, which half of it is an invariant 
 copy — and that decision now has a worked pattern rather than being re-derived each time. The
 full-seam assumption behind decision 2 holds. 4.3b and 4.3c will test it against 18 more `.from(`
 calls, but nothing so far contradicts it.
+
+##### 4.3c — Campaign writes: what shipped
+
+All eight actions in `app/actions/campaigns.ts` — the heaviest action file in the app after
+`company.ts`, and the one the 4.3 checkpoint was set against. 18 `.from(` calls across six tables,
+now none: 453 lines down to 360. The four campaign pages are 4.3d.
+
+**The principal finally does something.** `savePostMetrics` and `promotePostToSnippet` stamp
+`recorded_by` / `created_by` from `auth.user.id`. Those are now taken from the bundle's bound
+principal instead, so neither method has a parameter for who is acting — a caller has no way to
+record a snippet against someone else. This is the first concrete payoff of the scoping rule settled
+before 4.1: it was argued for on read scoping, and it turns out to matter just as much for the
+actor stamped on a write.
+
+**Two guards that could not move without breaking.**
+
+- `markVariantPosted` rides its precondition on the update — `.eq('status', 'approved')` on the
+  write itself, then counts returned rows — so two submits racing cannot both find the row approved
+  and both write. Read-then-write in the repository would have lost that. The method returns a
+  boolean and the action supplies the sentence.
+- `saveCadenceAndLaunch` writes the launch signal *last*, because a Realtime listener reacts to it
+  and must not see a half-built campaign. The ordering is now inside one method rather than four
+  statements a caller could reorder. **Pre-existing and not fixed:** there is no transaction, so a
+  failed account insert after the wholesale delete leaves the campaign with none. Recorded with a
+  test that at least pins the consequence — the launch is not signalled when that happens.
+
+**`editVariantCopy` was the messiest thing in the vertical, and most of it was not the action's
+business.** It patched `gate_state.preview` — reaching into a JSONB the workflow owns — counted
+codepoints, reset compliance, and replaced thread segments. All of that is now the adapter's, so the
+action is validation plus two refusals. The codepoint count went with it: `charCount` matters
+because `.length` counts an emoji twice and would overstate a post against the platform limit, and
+that is a fact about the data, not about the page.
+
+**A type I invented and had to take back.** `VariantGateDecision` was drafted as a discriminated
+union — a `request_change` carries an instruction, an `approve` does not. The Zod schema is flat and
+enforces that pairing at runtime, so the union described a payload the database never holds and the
+action could not narrow to it. Reverted to the flat shape that is actually written. Worth
+remembering: the read model should describe what is stored, not what would be tidy.
+
+**These eight actions had no test at all.** 453 lines of guarded writes, most handing a decision to
+the agents server through a JSONB column, with zero coverage. `campaigns.test.ts` is new — 26 cases
+over the validation and refusals that stayed in the app, including both halves of the strategy lock
+and the stale-queue path. Checked non-vacuous by deleting the strategy-lock guard and watching that
+case fail on its own.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 82 → 104 tests; `apps/web` 509 → 535 across 65 → 66 files.
+
+**Kill-criteria checkpoint (4.3), concluded.** The heaviest action file in the demo's half of the
+app converted without the approach bending, and the 4.3a finding held up: the cost is in guarded
+writes, and it is a thinking cost rather than a typing one. The three questions each guarded write
+asks — is this an invariant or is it copy, does the guard have to ride the write, does the ordering
+matter to a listener — took the time here, and all three now have worked answers to point at.
+**Decision 2 stands; no re-cut.** The remaining unknown is `company.ts` at 21 `.from(` calls in 4.6,
+which is larger but, on this evidence, not different in kind.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.

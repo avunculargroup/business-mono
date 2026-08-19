@@ -2,6 +2,7 @@
  * The repository bundle: the object an app holds instead of a database client.
  */
 import type { AgentActivityRepository } from './repositories/agentActivity';
+import type { CampaignRepository } from './repositories/campaigns';
 import type { ContentRepository } from './repositories/content';
 import type { ResearchRepository } from './repositories/research';
 
@@ -42,5 +43,6 @@ export interface RepositoryBundle {
   agentActivity: AgentActivityRepository;
   research: ResearchRepository;
   content: ContentRepository;
+  campaigns: CampaignRepository;
   mode: RepositoryMode;
 }

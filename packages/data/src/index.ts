@@ -15,6 +15,17 @@ export type {
   ProposedAction,
 } from './repositories/agentActivity';
 export type {
+  CampaignCadence,
+  CampaignGate,
+  CampaignGateDecision,
+  CampaignRepository,
+  NewCampaignDraft,
+  NewVoiceSnippet,
+  PostMetrics,
+  VariantCopy,
+  VariantGateDecision,
+} from './repositories/campaigns';
+export type {
   ContentCard,
   ContentEditGuard,
   ContentRepository,

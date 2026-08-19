@@ -13,5 +13,6 @@ export {
   createAgentActivityRepository,
   toAgentActivityItem,
 } from './repositories/agentActivity';
+export { createCampaignRepository } from './repositories/campaigns';
 export { createContentRepository } from './repositories/content';
 export { createResearchRepository } from './repositories/research';
