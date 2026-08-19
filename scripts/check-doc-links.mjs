@@ -10,7 +10,7 @@
 // Usage: node scripts/check-doc-links.mjs
 
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +25,11 @@ const TARGETS = [
   'infra/*/README.md',
   'docs/README.md',
   'docs/features/*/README.md',
+  // Build-progress docs cite their spec bundle heavily and are the files most
+  // likely to outlive the text they cite. They were outside this check until
+  // 2026-08-19, which is how 57 citations in the demo-app bundle went stale
+  // without anything going red.
+  'docs/features/*/build-progress.md',
 ];
 
 // The three forms that carry a path. The angle-bracket form matters here: it is
@@ -42,16 +47,82 @@ function isExternal(target) {
   );
 }
 
+/** Resolve a link target to an absolute path, or null for a pure anchor. */
+function resolvePath(fromFile, target) {
+  const path = decodeURIComponent(target.split('#')[0]);
+  if (path === '') return null; // pure anchor — same file
+  return path.startsWith('/') ? join(repoRoot, path) : resolve(dirname(fromFile), path);
+}
+
 /** Resolve a link target the way a reader clicking it in GitHub would. */
 function resolves(fromFile, target) {
-  const path = decodeURIComponent(target.split('#')[0]);
-  if (path === '') return true; // pure anchor
-  const absolute = path.startsWith('/')
-    ? join(repoRoot, path)
-    : resolve(dirname(fromFile), path);
+  const absolute = resolvePath(fromFile, target);
+  if (absolute === null) return true;
   if (!existsSync(absolute)) return false;
   // A link to a directory is fine — GitHub renders its listing (or README).
   return statSync(absolute).isFile() || statSync(absolute).isDirectory();
+}
+
+/**
+ * GitHub's heading-to-anchor slug: lowercase, drop everything that is not
+ * alphanumeric/space/hyphen/underscore, then spaces to hyphens. Repeats of the
+ * same slug in one file get `-1`, `-2`, … as GitHub does.
+ */
+function slugify(heading) {
+  return heading
+    .replace(/<[^>]*>/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} _-]/gu, '')
+    .replace(/ /g, '-');
+}
+
+const slugCache = new Map();
+
+function headingSlugs(absolutePath) {
+  const cached = slugCache.get(absolutePath);
+  if (cached) return cached;
+
+  const slugs = new Set();
+  const seen = new Map();
+  let inFence = false;
+
+  for (const line of readFileSync(absolutePath, 'utf8').split('\n')) {
+    // Headings inside a fenced code block are not headings.
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (inFence) continue;
+
+    const match = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (!match) continue;
+
+    const base = slugify(match[2]);
+    if (!base) continue;
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    slugs.add(count === 0 ? base : `${base}-${count}`);
+  }
+
+  slugCache.set(absolutePath, slugs);
+  return slugs;
+}
+
+/**
+ * A `#fragment` on a link to a markdown file has to name a real heading.
+ *
+ * This is what makes a section citation worth more than the line numbers it
+ * replaced: a line number rots silently when the target is edited, while a
+ * renamed or deleted heading turns this red. Only markdown targets are checked
+ * — a fragment on anything else is not ours to interpret.
+ */
+function anchorResolves(fromFile, target) {
+  const fragment = target.split('#').slice(1).join('#');
+  if (!fragment) return true;
+
+  const absolute = resolvePath(fromFile, target) ?? fromFile;
+  if (!absolute.endsWith('.md') || !existsSync(absolute)) return true;
+  if (!statSync(absolute).isFile()) return true;
+
+  return headingSlugs(absolute).has(decodeURIComponent(fragment).toLowerCase());
 }
 
 /**
@@ -111,6 +182,9 @@ for (const file of files) {
       if (!resolves(file, target)) {
         broken += 1;
         console.error(`${relative}:${index + 1}  broken link → ${target}`);
+      } else if (!anchorResolves(file, target)) {
+        broken += 1;
+        console.error(`${relative}:${index + 1}  no such heading → ${target}`);
       }
     }
   });

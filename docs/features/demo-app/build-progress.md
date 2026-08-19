@@ -45,7 +45,7 @@ all of it.
 ## Why this document exists
 
 The bundle in this folder was added in one commit and states its own limitation at
-[`assumptions.md:10-12`](./assumptions.md):
+[`assumptions.md`](./assumptions.md):
 
 > This bundle was written from feature specs, the design brief, and the platform schema. It
 > was not written against the live repository.
@@ -79,12 +79,13 @@ Two structural consequences follow, both handled in Phase 4:
   surfaces. A monolithic `RepositoryBundle` would force `data-fixtures` to fixture domains nobody
   demos. So `packages/data` exports per-domain interfaces, `apps/web` composes the full bundle, and
   `apps/demo` composes a partial one typed to the slice its routes actually use. This is a change
-  from [`repository-contract.md:300-311`](./repository-contract.md), which specifies a single flat
+  from [`repository-contract.md` § The bundle and provider](./repository-contract.md#the-bundle-and-provider), which specifies a single flat
   bundle.
 
 **Auth stays on the raw client.** `middleware.ts` and the auth gate in `app/(app)/layout.tsx` are
-not a repository concern and do not move. This matches the done-condition at
-[`README.md:72`](./README.md) ("returns only the provider wiring and auth").
+not a repository concern and do not move. This matches the done-condition the original
+build sequence set in [`README.md` § Build sequence](./README.md#build-sequence) — "returns
+only the provider wiring and auth".
 
 #### A third consumer is anticipated — scope at construction, never per call — **SETTLED**
 
@@ -103,7 +104,7 @@ principal. No read method ever takes a `clientId`, `tenantId` or equivalent para
 `clientId` argument would put the security boundary in ~200 call sites, any one of which can pass
 the wrong value; construction-time scoping means a caller has no way to ask the wrong question.
 
-This is a constraint to hold, not a redesign — [`repository-contract.md:317-320`](./repository-contract.md)
+This is a constraint to hold, not a redesign — [`repository-contract.md` § The bundle and provider](./repository-contract.md#the-bundle-and-provider)
 already builds the bundle from a per-request client.
 
 **Closing the back door: `ReadContext` carries `asOf` and nothing else.** The rule as first stated
@@ -129,7 +130,7 @@ correctness bug in one file, caught by the contract suite; the rules above exist
 a class of bug spread across every call site.
 
 Related: `mode` becomes `'live' | 'demo' | 'client'`. The review rule at
-[`repository-contract.md:312-315`](./repository-contract.md) — that branching on `mode` for anything
+[`repository-contract.md` § The bundle and provider](./repository-contract.md#the-bundle-and-provider) — that branching on `mode` for anything
 beyond chrome means the seam has failed — gets **stricter** with a third consumer, not looser. A
 client app must differ by scope, never by branch.
 
@@ -139,7 +140,7 @@ client app must differ by scope, never by branch.
   everything (two-person team)". A client-facing app invalidates that. Real policies and roles are
   database work; the seam surfaces the need but does not satisfy it, and defence in depth wants
   both layers.
-- **Compliance.** [`assumptions.md:121-122`](./assumptions.md) currently rules a client app "out of
+- **Compliance.** [`assumptions.md` § Explicitly deferred](./assumptions.md#explicitly-deferred) currently rules a client app "out of
   scope entirely, and should stay out — it is a different audience with different compliance
   obligations". That reasoning still holds for *this* build; it now needs revisiting as a deliberate
   decision rather than being left to drift. Phase 0 should reword it from a prohibition to a
@@ -147,7 +148,7 @@ client app must differ by scope, never by branch.
 
 ### Consequence of decision 3 — the trace loses Signal
 
-`variant` is web-gated, so [`demo-app-spec.md:196-198`](./demo-app-spec.md)'s inbound Signal
+`variant` is web-gated, so [`demo-app-spec.md` § The approval channel](./demo-app-spec.md#the-approval-channel)'s inbound Signal
 approval message is no longer what the trace shows. The replacement is better for a technical
 evaluator: the web app cannot reach the agent server over HTTP, so `/content` writes
 `content_items.pending_decision` and a Supabase Realtime listener claims it atomically before
@@ -160,7 +161,7 @@ rather than only in a static annotation, winning back some of what decision 1 re
 ### Consequence of decision 4 — deployment
 
 `robots.txt` and a `noindex` meta tag, against
-[`demo-app-spec.md:241`](./demo-app-spec.md) ("robots.txt allows indexing. Being findable is the
+[`demo-app-spec.md` § Domain and indexing](./demo-app-spec.md#domain-and-indexing) ("robots.txt allows indexing. Being findable is the
 point"). Update that line in Phase 0. Everything else in the deployment section stands: separate
 Vercel project, `demo.btreasury.com.au`, no secrets in env, Open Graph card. The OG card still
 matters — arguably more, since link-pasting is now the only distribution channel.
@@ -169,32 +170,43 @@ matters — arguably more, since link-pasting is now the only distribution chann
 
 ## Part 1 — Review
 
+**Read this part as a record of what the bundle said before Phase 0, not as a description of it
+now.** Several claims criticised below no longer appear in the docs they cite — Phase 0 corrected
+them, which is what the review was for. The citations point at the section the claim lived in, so
+they still land in the right place; the wording quoted is the original.
+
+**On citations generally:** they name a section (`file.md § Section`), not a line number. Every
+line-number citation in this document was stale by Phase 0, because that phase rewrote all five
+spec docs and nothing updated the numbers pointing into them. Section anchors are checked by
+`node scripts/check-doc-links.mjs`, which is CI-gated, so a renamed or deleted heading now goes red
+instead of rotting quietly.
+
 ### What the bundle gets right
 
 Keep these as written.
 
-- **The relative-dating rule** ([`fixture-and-trace-schema.md:12-39`](./fixture-and-trace-schema.md)).
+- **The relative-dating rule** ([`fixture-and-trace-schema.md` § The relative dating rule](./fixture-and-trace-schema.md#the-relative-dating-rule)).
   Offsets from `ReadContext.asOf` rather than absolute dates. Zero-maintenance staging.
 - **`DemoWriteBlockedError` carrying the target table**
-  ([`repository-contract.md:326-334`](./repository-contract.md)), so the toast can name
+  ([`repository-contract.md` § Errors](./repository-contract.md#errors)), so the toast can name
   `content_items`. That specificity is the difference between a demo and a mockup.
 - **The trace schema must not import `@mastra/core` types**
-  ([`fixture-and-trace-schema.md:110-118`](./fixture-and-trace-schema.md)). Correct, and more
+  ([`fixture-and-trace-schema.md` § Why a BTS-owned schema](./fixture-and-trace-schema.md#why-a-bts-owned-schema)). Correct, and more
   load-bearing than the doc knows.
 - **The DM Sans / Inter typo is real.** `.claude/skills/bts-design/SKILL.md:17` says Inter;
   `docs/DESIGN_BRIEF.md:107` and `apps/web/app/globals.css:48` both say DM Sans. Verified.
 - **The AFSL/AR compliance constraints**
-  ([`demo-app-spec.md:213-231`](./demo-app-spec.md)) — no allocation figures, no real entities,
+  ([`demo-app-spec.md` § Compliance considerations](./demo-app-spec.md#compliance-considerations)) — no allocation figures, no real entities,
   no reproduced publisher content. Correct and non-negotiable.
 - **One contract test suite both adapters must pass**
-  ([`repository-contract.md:350-358`](./repository-contract.md)). The only real defence against
+  ([`repository-contract.md` § Verification](./repository-contract.md#verification)). The only real defence against
   silent divergence.
-- **Grep for `mode` during review** ([`repository-contract.md:312-315`](./repository-contract.md)).
-- **The non-goals section** ([`README.md:125-131`](./README.md)) is disciplined. Preserve verbatim.
+- **Grep for `mode` during review** ([`repository-contract.md` § The bundle and provider](./repository-contract.md#the-bundle-and-provider)).
+- **The non-goals section** ([`README.md` § Non-goals](./README.md#non-goals)) is disciplined. Preserve verbatim.
 
 ### Blocking finding 1 — two of the four flagship surfaces do not exist
 
-[`demo-app-spec.md:55-63`](./demo-app-spec.md) names four surfaces at "Full" demonstration depth.
+[`demo-app-spec.md` § Surfaces to include](./demo-app-spec.md#surfaces-to-include) names four surfaces at "Full" demonstration depth.
 Two are not built, in any form:
 
 | Claimed | Reality |
@@ -205,19 +217,19 @@ Two are not built, in any form:
 | `v_contracts_overview` | Does not exist. |
 | `/compliance`, `/contracts` routes | Do not exist in `apps/web/app/`. |
 
-[`repository-contract.md:23-28`](./repository-contract.md) instructs "Do not expose raw table rows.
+[`repository-contract.md` § Design rules](./repository-contract.md#design-rules) instructs "Do not expose raw table rows.
 The views already encode the computed fields" — for views that do not exist.
-[`assumptions.md:47-59`](./assumptions.md) raises `v_contracts_overview` as an open question; the
-answer is no. [`repository-contract.md:209`](./repository-contract.md) says `daysUntilDecision` is
+[`assumptions.md` § Resolved (4)](./assumptions.md#resolved) raises `v_contracts_overview` as an open question; the
+answer is no. The contract as originally drafted said `daysUntilDecision` is
 missing from the view; it is a two-level gap — the view must be created, not amended.
 
 This matters because those surfaces carry the bundle's best material: the "key screen" fixture is
 the engagement-letter decision deadline
-([`fixture-and-trace-schema.md:53`](./fixture-and-trace-schema.md)), and the first required
-annotation is the compliance urgency band ([`demo-app-spec.md:170`](./demo-app-spec.md)).
+([`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging)), and the first required
+annotation is the compliance urgency band ([`demo-app-spec.md` § Required annotations](./demo-app-spec.md#required-annotations)).
 
 The bundle also rules out the obvious shortcut itself
-([`assumptions.md:57-59`](./assumptions.md)):
+([`assumptions.md` § Resolved (4)](./assumptions.md#resolved)):
 
 > Do not build a fixture for a feature that does not exist in the real app — a demo showing
 > something unbuilt is the one failure mode that is actually dishonest rather than merely awkward.
@@ -230,11 +242,11 @@ The bundle also rules out the obvious shortcut itself
 
 The two docs disagree, and both are wrong:
 
-- [`README.md:102`](./README.md): "Record one Simon run end to end: proposal, suspend, human
+- [`README.md` § Build sequence](./README.md#build-sequence): "Record one Simon run end to end: proposal, suspend, human
   approval, resume, commit to `agent_activity`." **Simon cannot suspend** —
   `apps/agents/src/agents/simon/index.ts` is a Mastra `Agent`, driven by the Signal polling loop.
   Only workflows suspend.
-- [`assumptions.md:71`](./assumptions.md): "the daily compliance workflow". **No such workflow.**
+- [`assumptions.md` § Resolved (6)](./assumptions.md#resolved): "the daily compliance workflow". **No such workflow.**
   The eight registered workflows (`apps/agents/src/mastra/index.ts:169-178`) are `recorder`, `pm`,
   `executeRoutine`, `pruneStorage`, `ecosystemScan`, `newsletter`, `variant`, `strategy`.
 
@@ -245,7 +257,7 @@ The real candidate is richer than what was specced. The **newsletter workflow**
 `persist` step (line 646) to `content_items` plus an `agent_activity` row carrying
 `workflow_run_id`.
 
-[`assumptions.md:70-76`](./assumptions.md) sends the recorder author to
+[`assumptions.md` § Resolved (6)](./assumptions.md#resolved) sends the recorder author to
 `node_modules/@mastra/core/dist/docs/`; `node_modules` is not installed in a fresh checkout, so
 that check needs `pnpm install` first. More usefully, **the hook already exists and is already in
 use**: `spanOutputProcessors` on the `Observability` config (`apps/agents/src/mastra/index.ts:103-120`),
@@ -259,7 +271,7 @@ Pinned: `@mastra/core ^1.54.0`, `@mastra/observability ^1.16.3`.
 
 ### Blocking finding 3 — Session 1 is 3.5x its own abort threshold
 
-[`assumptions.md:27-38`](./assumptions.md) sets the test: if more than ~30 files touch Supabase,
+[`assumptions.md` § Resolved (2)](./assumptions.md#resolved) sets the test: if more than ~30 files touch Supabase,
 split Session 1. Measured:
 
 | Metric | Count |
@@ -277,15 +289,15 @@ split Session 1. Measured:
 `app/actions/company.ts` alone has 21 `.from(` calls.
 
 This is a multi-week refactor of working production code with no user-facing benefit, placed first
-and gating everything ([`README.md:75`](./README.md)).
+and gating everything ([`README.md` § Build sequence](./README.md#build-sequence)).
 
 ### Non-blocking corrections
 
 1. **Every path and package name is wrong.** `apps/hq` → `apps/web`; `@bts/*` → `@platform/*`.
    Existing packages are `db`, `shared`, `signal`, `voice` — `voice` is undocumented in `CLAUDE.md`
-   too. Shell commands at [`assumptions.md:33`](./assumptions.md) and
-   [`README.md:72`](./README.md) do not run as written.
-2. **The token source claim is wrong.** [`README.md:62-63`](./README.md) names
+   too. Shell commands at [`assumptions.md` § Resolved (2)](./assumptions.md#resolved) and
+   [`README.md` § Build sequence](./README.md#build-sequence) do not run as written.
+2. **The token source claim is wrong.** [`README.md` § Architecture in one paragraph](./README.md#architecture-in-one-paragraph) names
    `.claude/skills/bts-design/` as canonical. The implementation source of truth is
    `apps/web/app/globals.css` (74 custom properties, header comment cites `docs/DESIGN_BRIEF.md`).
    The skill's `colors_and_type.css` is a third copy, already drifted. Exact figures,
@@ -299,17 +311,17 @@ and gating everything ([`README.md:75`](./README.md)).
    `apps/web` nothing, while adding a parameter to every call site. Keep it, but default it in the
    Supabase adapter so `apps/web` call sites can omit it.
 4. **"Every method is async … otherwise the demo's loading states never exercise"**
-   ([`repository-contract.md:38-40`](./repository-contract.md)) does not hold. In RSCs an async
+   ([`repository-contract.md` § Design rules](./repository-contract.md#design-rules)) does not hold. In RSCs an async
    fixture read resolves in the same tick and `loading.tsx` never paints. There are 31 `loading.tsx`
    files in `apps/web`, so if exercising loading states is wanted the fixture adapter needs a
    deliberate delay, not merely an `async` keyword.
-5. **No Tailwind.** [`assumptions.md:39-42`](./assumptions.md) offers "a Tailwind config, a CSS
+5. **No Tailwind.** [`assumptions.md` § Resolved (3)](./assumptions.md#resolved) offers "a Tailwind config, a CSS
    variables file, or both". It is CSS Modules plus CSS custom properties, no PostCSS anywhere.
-6. **No `vercel.json` in the repo**, so [`assumptions.md:78-81`](./assumptions.md) cannot be
+6. **No `vercel.json` in the repo**, so [`assumptions.md` § Resolved (7)](./assumptions.md#resolved) cannot be
    answered from the tree — deploy config is dashboard-side. `apps/web/next.config.ts` carries only
    `transpilePackages: ['@platform/db', '@platform/shared']`, the load-bearing line any new package
    must join.
-7. **CI blast radius is understated.** [`demo-app-spec.md:259-263`](./demo-app-spec.md) frames the
+7. **CI blast radius is understated.** [`demo-app-spec.md` § Open questions](./demo-app-spec.md#open-questions) frames the
    shared gate as an open question. It is not opt-in: `.github/workflows/test.yml` runs
    `pnpm typecheck`, `pnpm lint` and `pnpm test` across the workspace, so `apps/demo` joins the gate
    the moment it exists.
@@ -325,7 +337,7 @@ and gating everything ([`README.md:75`](./README.md)).
 
 ### Re-picked surfaces
 
-Seven of the eight required annotations ([`demo-app-spec.md:168-177`](./demo-app-spec.md)) have a
+Seven of the eight required annotations ([`demo-app-spec.md` § Required annotations](./demo-app-spec.md#required-annotations)) have a
 home in shipped code. Only the contracts notice-period annotation dies with contracts.
 
 | Surface | Depth | Route(s) | Principle | Backing |
@@ -376,15 +388,15 @@ seven domains the demo renders, and a single flat bundle would do.
 ### Phase 0 — Reconcile the bundle and verify infra (½ day, no code)
 
 - Rewrite all five docs against the real repo: `apps/web`, `@platform/*`, real routes and tables.
-- Replace the surface table at [`demo-app-spec.md:55-63`](./demo-app-spec.md) and the staging table
-  at [`fixture-and-trace-schema.md:47-62`](./fixture-and-trace-schema.md) with the re-picked set.
-- Correct [`README.md:102`](./README.md) and [`assumptions.md:70-76`](./assumptions.md) to the
+- Replace the surface table at [`demo-app-spec.md` § Surfaces to include](./demo-app-spec.md#surfaces-to-include) and the staging table
+  at [`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging) with the re-picked set.
+- Correct [`README.md` § Build sequence](./README.md#build-sequence) and [`assumptions.md` § Resolved (6)](./assumptions.md#resolved) to the
   `variant` workflow and the `SpanOutputProcessor` hook.
-- Flip [`demo-app-spec.md:241`](./demo-app-spec.md) from "robots.txt allows indexing" to `noindex`,
+- Flip [`demo-app-spec.md` § Domain and indexing](./demo-app-spec.md#domain-and-indexing) from "robots.txt allows indexing" to `noindex`,
   per decision 4.
-- Reword [`assumptions.md:121-122`](./assumptions.md) from "client app out of scope entirely, and
+- Reword [`assumptions.md` § Explicitly deferred](./assumptions.md#explicitly-deferred) from "client app out of scope entirely, and
   should stay out" to a deferral naming the compliance question, per decision 2.
-- Widen `SuspendStep.channel` in [`fixture-and-trace-schema.md:140-149`](./fixture-and-trace-schema.md)
+- Widen `SuspendStep.channel` in [`fixture-and-trace-schema.md` § Schema](./fixture-and-trace-schema.md#schema)
   from `'signal'` to `'signal' | 'web'`.
 - Mark each verified assumption in [`assumptions.md`](./assumptions.md) resolved, with its answer.
 - Fix `.claude/skills/bts-design/SKILL.md:17` Inter → DM Sans.
@@ -649,7 +661,7 @@ once a client app has real users — the posture must change before, not during,
 - Implement the settled scoping rule (see decision 2): scoping lives at bundle construction, never
   in a method signature and never on `ReadContext`. Includes the `ReadContext`-keys test, so the
   rule ships with its guard rather than as prose.
-- The contract test harness from [`repository-contract.md:350-358`](./repository-contract.md),
+- The contract test harness from [`repository-contract.md` § Verification](./repository-contract.md#verification),
   written once and parameterised over an adapter, so each vertical adds its cases rather than its
   own harness.
 - `packages/data-supabase` scaffold. `ReadContext.asOf` defaults to `new Date()` here so `apps/web`
@@ -850,12 +862,12 @@ suite green against both adapters. `grep -r "mode" apps/demo/` shows `mode` driv
 
 **Its own phase because it is writing, not data entry**, and because burying it inside Phase 5
 guarantees it gets done in a last afternoon.
-[`fixture-and-trace-schema.md:43-45`](./fixture-and-trace-schema.md) names the failure mode exactly:
+[`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging) names the failure mode exactly:
 "a plausible-but-flat dataset is the most common way a portfolio demo fails — everything works and
 nothing is interesting."
 
 The existing staging table at
-[`fixture-and-trace-schema.md:47-62`](./fixture-and-trace-schema.md) is **void** — every row of it
+[`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging) is **void** — every row of it
 was authored for compliance obligations and contracts, which decision 1 removed. It must be
 re-derived for the seven re-picked surfaces, which means answering design questions, not looking
 things up: what market report makes the quiet-day path legible in five seconds? What news item makes
@@ -867,28 +879,28 @@ to agree with all of it.
 Per-row obligations, none of which parallelise:
 
 - Every company and person name invented **and ASIC-searched** to confirm it does not resolve to a
-  real business ([`fixture-and-trace-schema.md:70-72`](./fixture-and-trace-schema.md))
+  real business ([`fixture-and-trace-schema.md` § Fictional entity rules](./fixture-and-trace-schema.md#fictional-entity-rules))
 - Research items: invented titles and paraphrased one-liners only. Reproducing publisher content is
   a copyright problem as well as a compliance one
-- No bitcoin allocation figure anywhere — [`demo-app-spec.md:222`](./demo-app-spec.md) calls this
+- No bitcoin allocation figure anywhere — [`demo-app-spec.md` § Compliance considerations](./demo-app-spec.md#compliance-considerations) calls this
   the single highest-risk element of the build
 - Internal consistency across the whole set. A trace naming different fictional entities than the
   lists "reads as sloppy and undermines the impression the demo exists to create"
-  ([`fixture-and-trace-schema.md:244-247`](./fixture-and-trace-schema.md))
+  ([`fixture-and-trace-schema.md` § Redaction](./fixture-and-trace-schema.md#redaction))
 - Every date an offset from the anchor, never a literal
 
 **Ownership.** The typing is delegable; the narrative decisions are not. Deciding which fixtures
 make the architecture visible needs domain judgment and carries the compliance risk. Charlie can
-draft prose against brand voice, but [`demo-app-spec.md:270-274`](./demo-app-spec.md) already flags
+draft prose against brand voice, but [`demo-app-spec.md` § Open questions](./demo-app-spec.md#open-questions) already flags
 the register problem — a company voice describing an individual's work reads oddly. Chris sets the
 staging table; an agent fills it in afterwards.
 
 **Verify:** Lex classification pass over the full set, outcome logged to `agent_activity`
-([`demo-app-spec.md:227`](./demo-app-spec.md)). ASIC search recorded for every invented entity.
+([`demo-app-spec.md` § Compliance considerations](./demo-app-spec.md#compliance-considerations)). ASIC search recorded for every invented entity.
 
 ### Phase 7 — Annotation layer (2–3 days)
 
-- Overlay per [`demo-app-spec.md:124-181`](./demo-app-spec.md): `data-annotation-id` targets,
+- Overlay per [`demo-app-spec.md` § Annotation layer](./demo-app-spec.md#annotation-layer): `data-annotation-id` targets,
   absolute positioning against a relative container, keyboard-navigable markers, Product view
   default.
 - Seven annotations (the eight required minus the contracts one), retargeted per the surface table.
@@ -909,7 +921,7 @@ Read all seven cold and check the architecture is describable from them alone.
   redaction is its first live exercise; recording a real run means real client data passes through
   it before redaction. Seeding a synthetic campaign costs an hour and means real data is never in
   scope at all. Redaction stays in the pipeline regardless — belt and braces, per
-  [`fixture-and-trace-schema.md:236-248`](./fixture-and-trace-schema.md).
+  [`fixture-and-trace-schema.md` § Redaction](./fixture-and-trace-schema.md#redaction).
 - Record one `variant` run end to end (`apps/agents/src/workflows/variant/index.ts`): the
   `variant.generate_copy` step, the `variant.compliance_check` step invoking Lex, then the `gate3`
   suspend at lines 327-388, resumed by `startVariantGateWebListener` off
@@ -921,7 +933,7 @@ Read all seven cold and check the architecture is describable from them alone.
 - `packages/agent-traces` for the schema and recorded JSON, imported statically.
 - Replayer in `apps/demo` at `/agents/run/[traceId]`, driving the same components, with the
   transport controls and compression function from
-  [`fixture-and-trace-schema.md:252-258`](./fixture-and-trace-schema.md).
+  [`fixture-and-trace-schema.md` § Timing compression](./fixture-and-trace-schema.md#timing-compression).
 
 **Verify:** replay with the network down. Step back across the gate boundary. Confirm no API key in
 the demo's Vercel env. Confirm the recorder is disabled by default in `apps/agents`.
@@ -942,7 +954,7 @@ weeks to 2026-08-03**, many hitting demo-surface tables directly (`add_content_f
 `add_findings_engine`, `add_ecosystem_signals`). CI runs `pnpm typecheck` workspace-wide, so a
 migration PR touching a demo surface will go red on fixture compile roughly every week.
 
-**Policy:** start in the shared gate, per [`demo-app-spec.md:262`](./demo-app-spec.md). The compile
+**Policy:** start in the shared gate, per [`demo-app-spec.md` § Open questions](./demo-app-spec.md#open-questions). The compile
 failure is the drift alarm and it is doing its job. Fixture updates are expected to be one-line
 additions; keep the fixture set narrow so they stay that way.
 
@@ -951,14 +963,14 @@ unrelated PR by more than ~15 minutes on three separate occasions, move `@platfo
 `@platform/data-fixtures` typecheck out of the PR gate into the nightly `e2e.yml` workflow. Drift is
 then caught within a day instead of instantly, which is the right trade once the alarm has proven
 noisy. Do **not** reach for `Partial<>` fixture types
-([`assumptions.md:98-102`](./assumptions.md)) — that trades the alarm away permanently for a
+([`assumptions.md` § Accepted risks](./assumptions.md#accepted-risks)) — that trades the alarm away permanently for a
 convenience that a nightly job provides without loss.
 
 ### Deferred deliberately
 
-- The gated live-inference path ([`demo-app-spec.md:201-209`](./demo-app-spec.md)). Ship only if
+- The gated live-inference path ([`demo-app-spec.md` § Gated live path](./demo-app-spec.md#gated-live-path-optional-ship-last)). Ship only if
   everything above is stable.
-- The sidebar responsive collapse ([`assumptions.md:111-117`](./assumptions.md)). A real gap —
+- The sidebar responsive collapse ([`assumptions.md` § Explicitly deferred](./assumptions.md#explicitly-deferred)). A real gap —
   recruiters do open links on phones — but it is `apps/web` work that should be justified on its own
   merits, not smuggled in.
 - Playwright journey tests, Option B local-Supabase, and cross-browser coverage from
