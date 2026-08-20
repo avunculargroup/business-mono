@@ -10,6 +10,7 @@ import {
   Newspaper,
   PenLine,
   Radar,
+  BookOpen,
 } from 'lucide-react';
 import styles from './Nav.module.css';
 
@@ -29,6 +30,7 @@ const ROUTES = [
   { href: '/content', label: 'Content', icon: PenLine },
   { href: '/signals', label: 'Signals', icon: Radar },
   { href: '/crm/companies', label: 'Companies', icon: Building2 },
+  { href: '/architecture', label: 'Architecture', icon: BookOpen },
 ] as const;
 
 export function Nav() {

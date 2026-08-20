@@ -106,3 +106,51 @@
   line-height: var(--leading-relaxed);
   white-space: pre-wrap;
 }
+
+/* The chrome strip that holds the view toggle. Sits between the disclosure
+   banner and the content, and is present on every route. */
+.chrome {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-3) var(--space-8) 0;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .chrome {
+    padding: var(--space-3) var(--space-4) 0;
+  }
+}
+
+/* Section headings inside a page. Sans rather than the display serif, which is
+   reserved for H1–H2 at page level. */
+.sectionHeading {
+  margin: var(--space-8) 0 var(--space-4);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* /architecture — long-form prose rather than cards. Narrower measure than the
+   content column, because this is the one page in the demo meant to be read
+   rather than scanned. */
+.principle {
+  max-width: 68ch;
+  margin-bottom: var(--space-12);
+  scroll-margin-top: var(--space-8);
+}
+
+.principleTitle {
+  margin-bottom: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.principleBody {
+  margin-bottom: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}

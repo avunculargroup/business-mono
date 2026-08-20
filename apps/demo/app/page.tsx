@@ -13,7 +13,7 @@ export default async function DashboardPage() {
       lede="Indicators the platform tracks daily. Deltas are shown as signed numbers with no direction, colour or sentiment attached — an Authorised Representative must not imply a recommendation, and green-up/red-down is that implication."
     >
       <div className={styles.grid}>
-        {[...macroLatest, ...onchainLatest].map((indicator) => (
+        {[...macroLatest, ...onchainLatest].map((indicator, index) => (
           <div key={indicator.shortLabel} className={styles.card}>
             <div className={styles.cardTitle}>{indicator.name}</div>
             <div className={styles.meta}>
@@ -21,7 +21,14 @@ export default async function DashboardPage() {
                 {'currentValue' in indicator ? indicator.currentValue : indicator.value}
                 {indicator.unit ? ` ${indicator.unit}` : ''}
               </span>
-              <span className={styles.mono}>
+              {/* Only the first: the overlay resolves a target with
+                  `querySelector`, so repeating the attribute down a list would
+                  put the marker on row one by accident rather than by
+                  decision. */}
+              <span
+                className={styles.mono}
+                data-annotation-id={index === 0 ? 'indicator-delta' : undefined}
+              >
                 change since prior {indicator.changeSincePrior}
               </span>
             </div>

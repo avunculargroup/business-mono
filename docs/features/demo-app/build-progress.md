@@ -7,10 +7,11 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 and 4.6a are complete, and **Phases 5 and 6 have shipped** — `apps/demo` builds and serves all seven
-surfaces on `@platform/data-fixtures`, with the curated fixture set behind them. **Two gates block
+4.5 and 4.6a are complete, and **Phases 5, 6 and 7 have shipped** — `apps/demo` builds and serves all seven
+surfaces on `@platform/data-fixtures`, with the curated fixture set behind them and the annotation
+layer over them. **Two gates block
 deployment: the ASIC search over the invented entity names, and the Lex classification pass over the
-fixture prose** — see Phase 6. Next is Phase 7, the annotation layer. Everything still
+fixture prose** — see Phase 6. Next is Phase 8, the trace recorder and replay. Everything still
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.
@@ -1579,11 +1580,70 @@ staging table; an agent fills it in afterwards.
 - Overlay per [`demo-app-spec.md` § Annotation layer](./demo-app-spec.md#annotation-layer): `data-annotation-id` targets,
   absolute positioning against a relative container, keyboard-navigable markers, Product view
   default.
-- Seven annotations (the eight required minus the contracts one), retargeted per the surface table.
-  Plus `/architecture` prose.
+- ~~Seven annotations (the eight required minus the contracts one).~~ **Stale.** The required table
+  has eight live rows and no contracts row. Seven ship here; the eighth targets `/agents/run/[id]`
+  and ships with Phase 8. Plus `/architecture` prose.
 
 **Verify:** toggle on every demo route with no layout shift. Tab to every marker. `jsx-a11y` clean.
 Read all seven cold and check the architecture is describable from them alone.
+
+#### What shipped
+
+The overlay, seven annotations, `/architecture`, and the two detail routes two of the annotations
+needed in order to have anything to point at.
+
+**"Seven annotations (the eight required minus the contracts one)" was stale in both halves.** The
+required table in
+[`demo-app-spec.md` § Required annotations](./demo-app-spec.md#required-annotations) was rewritten in
+Phase 0 and has eight live rows, none of them contracts. Seven is still the right number here, for a
+different reason: one row targets the trace replay at `/agents/run/[id]`, which is Phase 8. It ships
+with that route rather than pointing at nothing now. All seven principles are still covered —
+`deterministic-before-llm` carries two of the eight rows — and `/architecture` documents
+`hub-and-spoke` regardless, because someone reading the written notes should get the whole design
+rather than the part that happens to have a marker.
+
+**"No layout shift" is held by the layer not existing.** In Product view the overlay returns `null`
+— not a hidden element, nothing at all. In Architecture view it is `position: fixed` with
+`pointer-events: none`, and outlines are drawn *over* targets rather than applied as borders *to*
+them, which would shift everything after each target by two pixels. Targets are measured with
+`getBoundingClientRect` and re-measured on scroll and resize. The requirement is structural rather
+than something to check by eye after each change.
+
+**Markers are real buttons in DOM order**, so keyboard navigation needs no key handling of our own;
+the only key the overlay listens for is Escape. The visible label is a digit, which says nothing, so
+the accessible name carries the title. There is a test for tab order specifically, because absolute
+positioning makes it easy to reorder markers visually and forget that tab order follows the DOM.
+
+**A silent failure mode, now caught.** The overlay resolves targets with `document.querySelector`,
+so a renamed or misspelled `data-annotation-id` produces no marker and no error — the demo would
+quietly have fewer annotations than it claims. `annotations.test.ts` reads every `.tsx` under `app/`
+and fails if a selector appears in no source, and separately checks that each annotation's route has
+a `page.tsx` and that its principle has a section on `/architecture` to link to.
+
+**Two targets were duplicated and worked by accident.** `indicator-delta` rendered seven times and
+`relevance-score` five, once per row of a list; `querySelector` takes the first, so the marker landed
+on row one incidentally rather than by decision. Both now render on the first row only, with the
+reason in a comment.
+
+**Two routes were added because annotations needed them.** `/market-reports/[id]` hosts the
+findings/narration boundary — the annotated element is the *heading* of the findings block, because
+the claim is about what sits either side of it — and `/news/[id]` hosts the curator note. The report
+detail page also states each finding's `verdict_allowed` outright rather than leaving it to be
+inferred from the prose, so a reader can check the narration against it.
+
+**The content board now shows its compliance verdict.** It reads `getPublishGate` per card, since
+the verdict lives on the gate rather than on the card. Only the flagged one is annotated: a cleared
+verdict demonstrates nothing a reader would not assume, and the point of the surface is that the gate
+can say no.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and both builds green;
+`jsx-a11y` reports nothing in `apps/demo` (the remaining warnings are pre-existing in `apps/web`).
+`apps/demo` 3 → 31 tests, including the overlay's keyboard and panel behaviour in jsdom — the demo
+gained a node/jsdom project split for it, same shape as `apps/web`. The built demo was served: all
+ten routes returned 200, both not-found paths returned 404, every annotation target resolved exactly
+once on its route, and all seven `/architecture` anchors are present. Not done: reading the seven
+cold to check the architecture is describable from them alone — that is a judgement about someone
+else's comprehension and wants a second reader.
 
 ### Phase 8 — Trace recorder and replay (4–5 days)
 

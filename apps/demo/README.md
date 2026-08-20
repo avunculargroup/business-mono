@@ -29,6 +29,23 @@ observed:
   label a surface. A component branching on `mode` to change behaviour means the two apps
   have started to diverge and the seam has failed; grep for it during review.
 
+## The annotation layer
+
+A toggle in the chrome switches between **Product view** (the app as it really looks, and the
+default) and **Architecture view** (the same app with numbered markers). Content lives in
+`lib/annotations.ts`; `/architecture` holds the longer written notes each marker links to.
+
+Two properties worth knowing before editing it:
+
+- **The overlay renders nothing in Product view** — not a hidden layer, nothing. In Architecture
+  view it is viewport-fixed with `pointer-events: none`, and outlines are drawn *over* targets
+  rather than applied as borders *to* them. That is how "must not reflow the underlying layout" is
+  held; applying a border to a target would shift everything after it.
+- **A target is found by `document.querySelector` on its `data-annotation-id`.** A renamed or
+  misspelled selector produces no marker and no error, so `lib/annotations.test.ts` checks every
+  selector appears somewhere under `app/`. Render an id once per route — repeating it down a list
+  puts the marker on row one by accident.
+
 ## Two things that are easy to break
 
 **Relative dating.** Every fixture date is an offset from `ReadContext.asOf`, resolved at

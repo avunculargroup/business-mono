@@ -1,5 +1,6 @@
 import type { MarketReportSummary } from '@platform/data';
 import { getRepositories, demoReadContext } from '@/lib/repositories';
+import Link from 'next/link';
 import { Page } from '@/components/Page';
 import styles from '@/components/Page.module.css';
 
@@ -35,8 +36,17 @@ export default async function MarketReportsPage() {
     >
       <div className={styles.grid}>
         {items.map((report) => (
-          <article key={report.id} className={styles.card}>
-            <div className={styles.cardTitle}>{report.asOf}</div>
+          <article
+            key={report.id}
+            className={styles.card}
+            // The quiet day is the annotated one: it is the surface's whole
+            // argument, and it is the row a reader would otherwise skip past as
+            // an empty record.
+            data-annotation-id={report.isQuietDay ? 'quiet-day-report' : undefined}
+          >
+            <div className={styles.cardTitle}>
+              <Link href={`/market-reports/${report.id}`}>{report.asOf}</Link>
+            </div>
             <div className={styles.meta}>
               <span>{report.status}</span>
               <span>{outcome(report)}</span>

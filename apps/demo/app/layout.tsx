@@ -6,6 +6,9 @@ import type { Metadata, Viewport } from 'next';
 import { DisclosureBanner } from '@/components/DisclosureBanner';
 import { Nav } from '@/components/Nav';
 import { DemoRepositoryProvider } from '@/providers/DemoRepositoryProvider';
+import { AnnotationProvider } from '@/providers/AnnotationProvider';
+import { RouteAnnotations } from '@/components/RouteAnnotations';
+import { ViewToggle } from '@/components/ViewToggle';
 import styles from '@/components/Page.module.css';
 
 /**
@@ -49,13 +52,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <DemoRepositoryProvider>
-          <div className={styles.shell}>
-            <Nav />
-            <div className={styles.main}>
-              <DisclosureBanner />
-              <main className={styles.content}>{children}</main>
+          <AnnotationProvider>
+            <div className={styles.shell}>
+              <Nav />
+              <div className={styles.main}>
+                <DisclosureBanner />
+                <div className={styles.chrome}>
+                  <ViewToggle />
+                </div>
+                <main className={styles.content}>{children}</main>
+              </div>
             </div>
-          </div>
+            {/* Outside the shell: the overlay is viewport-fixed and must not be
+                inside anything that establishes a containing block for it. */}
+            <RouteAnnotations />
+          </AnnotationProvider>
         </DemoRepositoryProvider>
       </body>
     </html>
