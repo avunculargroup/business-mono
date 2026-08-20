@@ -42,7 +42,7 @@ Transform tasks into verifiable goals before implementing:
 - LLM-touching evals (`pnpm --filter @platform/agents test:eval`) are NOT run in CI. Run them locally after changes to Simon's routing, specialist registrations, or any agent's system prompt.
 - `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.{ts,tsx}` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. Pure-logic `*.test.ts` run in the `node` environment; component `*.test.tsx` run in `jsdom` with React Testing Library + `@testing-library/jest-dom` matchers (registered in `test/setup.ts`). The two environments are split via `test.projects` in `vitest.config.ts` — one project per environment, each matching its own file extension and carrying `extends: true` so it inherits the root `resolve.alias`, `oxc.jsx`, and `setupFiles`. A new component test only needs the `.test.tsx` extension to land in `jsdom`. Prefer role/text/attribute queries over CSS-module class names. Server-component pages are tested by mocking `@/lib/supabase/server` with the chainable fake in `test/mocks/supabase.ts` (web-side counterpart to the agents mock) and stubbing the interactive client child via `vi.mock`, then asserting query wiring + prop hand-off (see `app/(app)/crm/companies/page.test.tsx`). Root `pnpm test` runs every package via Turborepo — `apps/agents`, `apps/web`, `packages/ui`, `packages/voice` — so all are gated by the PR workflow.
 - `packages/ui` has its own Vitest suite (`pnpm --filter @platform/ui test`). It is jsdom throughout, with no node/jsdom project split, because every module in it renders. Shared presentational components and their `*.test.tsx` live here, **not** in `apps/web/components/` — there is no `components/ui/` in the app any more. Design tokens live in `packages/ui/src/tokens.css`; `apps/web/app/globals.css` only carries app-level base styles and defines no tokens.
-- `packages/data` and `packages/data-supabase` each have their own Vitest suite (`pnpm --filter @platform/data test`). A new repository domain adds its cases to the shared contract harness in `packages/data/src/testing/` — parameterised over an adapter and imported as `@platform/data/testing` — rather than building its own; both the live and fixture adapters must pass the same suite. Do not add fields to `ReadContext`: it is guarded at compile time and by `context.test.ts`, because scoping belongs at bundle construction and never in a method argument (see `docs/features/demo-app/repository-contract.md`).
+- `packages/data`, `packages/data-supabase` and `packages/data-fixtures` each have their own Vitest suite (`pnpm --filter @platform/data test`). A new repository domain adds its cases to the shared contract harness in `packages/data/src/testing/` — parameterised over an adapter and imported as `@platform/data/testing` — rather than building its own; both the live and fixture adapters must pass the same suite (`@platform/data-fixtures` runs it in `src/bundle.test.ts`). Do not add fields to `ReadContext`: it is guarded at compile time and by `context.test.ts`, because scoping belongs at bundle construction and never in a method argument (see `docs/features/demo-app/repository-contract.md`).
 - Design tokens are guarded by `apps/web/app/globals.test.ts`, which asserts the canonical set and that `.claude/skills/bts-design/colors_and_type.css` stays identical to it. That skill file is a deliberate copy, not an `@import`, because the skill's workflow is to copy assets out of the repo — change a token in one and you must change it in the other in the same commit, or the build goes red.
 - Visual regression (`e2e/`, Playwright) is **advisory and separate** from `pnpm test`. Run it with `pnpm test:visual`, which shells out to the same container image CI uses — baselines are container-specific, so a raw local run (`test:visual:local`) diffs on text-heavy specimens and is not a regression. See `.github/workflows/e2e.yml`.
 
@@ -58,6 +58,7 @@ Transform tasks into verifiable goals before implementing:
 │   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
 │   ├── data/            # Repository interfaces + contract test harness (no DB client)
+│   ├── data-fixtures/   # Fixture repository implementation for the demo (no DB client)
 │   ├── data-supabase/   # Live repository implementation over Supabase
 │   ├── db/              # Supabase client, types, migrations, RPC functions
 │   ├── shared/          # Shared types, constants, utilities
@@ -85,6 +86,7 @@ Transform tasks into verifiable goals before implementing:
 
 - `@platform/data` — repository interfaces, `ReadContext`/`Paginated`, the demo/live error types, the React provider (`@platform/data/provider`), and the contract test harness (`@platform/data/testing`). Imports no database client
 - `@platform/data-supabase` — the live repository implementation over Supabase
+- `@platform/data-fixtures` — the fixture repository implementation the demo runs on. Implements only the demo's seven domains (`DEMO_DOMAINS`); every write throws `DemoWriteBlockedError`. No database client, no network, no filesystem
 - `@platform/db` — database client, generated types, migration SQL, Supabase RPC wrappers
 - `@platform/shared` — shared TypeScript types, constants, enums, utility functions
 - `@platform/signal` — typed HTTP client for signal-cli REST API sidecar
@@ -99,7 +101,9 @@ Transform tasks into verifiable goals before implementing:
 - `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
 - `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
   models reuse the enums the ingestion side already defines rather than re-declaring them.
-  `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`. The
+  `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`;
+  `packages/data-fixtures` imports from `@platform/data` and `@platform/shared` only — its lack of a
+  database dependency is what makes the demo unable to reach one. The
   split is what lets a fixture-backed app depend on the interfaces without being able to reach a
   database
 - `packages/ui` imports from `@platform/shared` only — never from `apps/*`. It is consumed by

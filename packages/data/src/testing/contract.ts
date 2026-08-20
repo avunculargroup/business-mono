@@ -13,14 +13,20 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Paginated, QueryOptions, ReadContext } from '../context';
-import type { RepositoryBundle, RepositoryMode } from '../bundle';
+import type { Bundle, RepositoryDomain, RepositoryMode } from '../bundle';
 import { DemoWriteBlockedError, NotFoundError } from '../errors';
 
-export interface AdapterUnderTest {
+/**
+ * `K` is the slice the adapter implements — every domain for the live adapter,
+ * the demo seven for fixtures. The harness itself reads only `mode`, so it is
+ * generic rather than demanding a full bundle: requiring one would make the
+ * fixture adapter unable to run the suite it exists to pass.
+ */
+export interface AdapterUnderTest<K extends RepositoryDomain = RepositoryDomain> {
   /** Appears in the test name, e.g. 'supabase' or 'fixtures'. */
   name: string;
   expectedMode: RepositoryMode;
-  createBundle(): RepositoryBundle | Promise<RepositoryBundle>;
+  createBundle(): Bundle<K> | Promise<Bundle<K>>;
 }
 
 /** A `ReadContext` for tests. Fixed by default so relative dating is reproducible. */
@@ -32,7 +38,9 @@ export function testReadContext(asOf = new Date('2026-01-01T00:00:00Z')): ReadCo
  * Cases every adapter must pass whatever domains it implements. Verticals add
  * their own `describe` blocks; this one stays domain-free.
  */
-export function describeBundleContract(adapter: AdapterUnderTest): void {
+export function describeBundleContract<K extends RepositoryDomain>(
+  adapter: AdapterUnderTest<K>,
+): void {
   describe(`repository bundle contract: ${adapter.name}`, () => {
     it('reports the mode its adapter is built for', async () => {
       const bundle = await adapter.createBundle();

@@ -115,6 +115,9 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/ui      →  @platform/shared
                   →  @platform/data           →  @platform/shared
                   →  @platform/data-supabase  →  @platform/data, @platform/db, @platform/shared
+@platform/demo    →  @platform/data           →  @platform/shared
+                  →  @platform/data-fixtures  →  @platform/data, @platform/shared
+                  →  @platform/ui             →  @platform/shared
 ```
 
 `apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
@@ -127,7 +130,11 @@ on app code would defeat the point. React and `lucide-react` are peer dependenci
 is the live implementation. They are separate packages rather than one with subpath exports so that
 a fixture-backed app can simply not depend on the Supabase one and have that enforced by
 `package.json` rather than by discipline. `@platform/data` imports only `@platform/shared` (for the enums the ingestion side already
-defines) and never a database client.
+defines) and never a database client. `@platform/data-fixtures` is the demo's implementation: the
+same interfaces over static typed objects, with every write throwing `DemoWriteBlockedError` naming
+the table it would have touched. It implements only the seven domains the demo renders — the bundle
+is a slice (`Bundle<K>`), so a demo route reaching for a domain the demo does not have is a compile
+error rather than a stub that throws.
 See [`docs/features/demo-app/repository-contract.md`](./docs/features/demo-app/repository-contract.md).
 
 ---
