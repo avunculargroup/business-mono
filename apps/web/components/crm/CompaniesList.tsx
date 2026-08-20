@@ -5,24 +5,15 @@ import { DataTable, type Column } from '@platform/ui/DataTable';
 import { Button } from '@platform/ui/Button';
 import { Modal } from '@platform/ui/Modal';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import type { CompanySummary } from '@platform/data';
 import { CompanyForm } from './CompanyForm';
 import { deleteCompany } from '@/app/actions/companies';
 import { useEntityList } from '@/hooks/useEntityList';
 import { Plus, Building2, Eye, Pencil, Trash2 } from 'lucide-react';
 import styles from './ContactsList.module.css';
 
-type CompanyRow = {
-  id: string;
-  slug: string;
-  name: string;
-  industry: string | null;
-  size: string | null;
-  website: string | null;
-  created_at: string;
-};
-
 interface CompaniesListProps {
-  initialCompanies: CompanyRow[];
+  initialCompanies: CompanySummary[];
   totalCount: number;
 }
 
@@ -41,13 +32,13 @@ export function CompaniesList({ initialCompanies, totalCount: _totalCount }: Com
     setIsSubmitting,
     handleCreated,
     confirmDelete,
-  } = useEntityList<CompanyRow>({
+  } = useEntityList<CompanySummary>({
     initialItems: initialCompanies,
     entityLabel: 'Company',
     remove: deleteCompany,
   });
 
-  const columns: Column<CompanyRow>[] = [
+  const columns: Column<CompanySummary>[] = [
     {
       key: 'name',
       header: 'Company',

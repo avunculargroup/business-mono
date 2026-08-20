@@ -1,28 +1,21 @@
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import Link from 'next/link';
 import { PipelineChip } from '@platform/ui/PipelineChip';
-import { idColumn } from '@/lib/utils';
 import styles from './company-detail.module.css';
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const ctx = resolveReadContext();
+  const repositories = await getRepositories();
 
-  const { data: company } = await supabase
-    .from('companies')
-    .select('*')
-    .eq(idColumn(id), id)
-    .single();
-
+  // The route param may be a slug; the repository resolves either form.
+  const company = await repositories.companies.getCompany(ctx, id);
   if (!company) notFound();
 
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select('id, slug, first_name, last_name, pipeline_stage, email')
-    .eq('company_id', company.id)
-    .order('first_name');
+  const contacts = await repositories.companies.listCompanyContacts(ctx, company.id);
 
   return (
     <>
@@ -59,12 +52,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
         <div className={styles.main}>
           <h2 className={styles.sectionTitle}>Contacts</h2>
-          {contacts && contacts.length > 0 ? (
+          {contacts.length > 0 ? (
             <div className={styles.contactList}>
               {contacts.map((c) => (
                 <Link key={c.id} href={`/crm/contacts/${c.slug}`} className={styles.contactRow}>
-                  <span className={styles.contactName}>{c.first_name} {c.last_name}</span>
-                  <PipelineChip stage={c.pipeline_stage} />
+                  <span className={styles.contactName}>{c.firstName} {c.lastName}</span>
+                  <PipelineChip stage={c.pipelineStage} />
                   <span className={styles.contactEmail}>{c.email || ''}</span>
                 </Link>
               ))}

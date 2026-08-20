@@ -9,7 +9,7 @@ export default async function InterviewsPage() {
 
   const [interviews, companies, contactsResult] = await Promise.all([
     getInterviews(),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     supabase.from('contacts').select('id, first_name, last_name').order('last_name'),
   ]);
 

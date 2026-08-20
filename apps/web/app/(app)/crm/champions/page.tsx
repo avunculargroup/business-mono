@@ -10,7 +10,7 @@ export default async function ChampionsPage() {
   const [champions, contactsResult, companies] = await Promise.all([
     getChampions(),
     supabase.from('contacts').select('id, first_name, last_name, company_id').order('last_name'),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
   ]);
 
   return (

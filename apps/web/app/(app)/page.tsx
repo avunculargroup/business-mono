@@ -48,7 +48,7 @@ export default async function DashboardPage() {
       .order('priority', { ascending: true })
       .order('due_date', { ascending: true })
       .limit(8),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),

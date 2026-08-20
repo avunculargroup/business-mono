@@ -1,29 +1,17 @@
 'use client';
 
+import type { CompanySummary } from '@platform/data';
 import { createCompany, updateCompany } from '@/app/actions/companies';
 import { Button } from '@platform/ui/Button';
 import { useEntityForm } from '@/hooks/useEntityForm';
 import { FormField, FormRow, FormSelect, FormTextarea, FormError } from '@platform/ui/FormField';
 import styles from '@platform/ui/Form.module.css';
 
-type CompanyRow = {
-  id: string;
-  slug: string;
-  name: string;
-  industry: string | null;
-  size: string | null;
-  website: string | null;
-  created_at: string;
-  // Optional fields for edit pre-population
-  linkedin_url?: string | null;
-  notes?: string | null;
-};
-
 interface CompanyFormProps {
-  onSuccess: (company?: CompanyRow) => void;
+  onSuccess: (company?: CompanySummary) => void;
   onPendingChange?: (pending: boolean) => void;
   mode?: 'create' | 'edit';
-  defaultValues?: CompanyRow;
+  defaultValues?: CompanySummary;
 }
 
 export function CompanyForm({ onSuccess, onPendingChange, mode = 'create', defaultValues }: CompanyFormProps) {
@@ -32,7 +20,7 @@ export function CompanyForm({ onSuccess, onPendingChange, mode = 'create', defau
     entityLabel: 'Company',
     create: createCompany,
     update: (formData) => updateCompany(defaultValues!.id, formData),
-    onSuccess: (result) => onSuccess(result.company as CompanyRow | undefined),
+    onSuccess: (result) => onSuccess(result.company as CompanySummary | undefined),
     onPendingChange,
   });
 
@@ -59,7 +47,7 @@ export function CompanyForm({ onSuccess, onPendingChange, mode = 'create', defau
         name="linkedin_url"
         type="url"
         placeholder="https://linkedin.com/company/..."
-        defaultValue={defaultValues?.linkedin_url ?? ''}
+        defaultValue={defaultValues?.linkedinUrl ?? ''}
       />
 
       <FormTextarea label="Notes" name="notes" rows={3} defaultValue={defaultValues?.notes ?? ''} />

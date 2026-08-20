@@ -3,6 +3,9 @@ import type {
   AgentActivityItem,
   CampaignDetail,
   CampaignGate,
+  CompanyContact,
+  CompanyDetail,
+  CompanySummary,
   MarketReportDetail,
   MarketReportSummary,
   ContentDetail,
@@ -30,6 +33,7 @@ export type FakeRepositories = {
   research: { [K in keyof RepositoryBundle['research']]: Mock };
   content: { [K in keyof RepositoryBundle['content']]: Mock };
   campaigns: { [K in keyof RepositoryBundle['campaigns']]: Mock };
+  companies: { [K in keyof RepositoryBundle['companies']]: Mock };
   marketReports: { [K in keyof RepositoryBundle['marketReports']]: Mock };
   indicators: { [K in keyof RepositoryBundle['indicators']]: Mock };
   ecosystem: { [K in keyof RepositoryBundle['ecosystem']]: Mock };
@@ -46,6 +50,9 @@ export function createFakeRepositories(
     publishGate?: PublishGate | null;
     campaignGate?: CampaignGate | null;
     campaignDetail?: CampaignDetail | null;
+    companies?: CompanySummary[];
+    company?: CompanyDetail | null;
+    companyContacts?: CompanyContact[];
     marketReports?: MarketReportSummary[];
     marketReport?: MarketReportDetail | null;
     /** Null means the change is gone; a null complianceClass means unclassified. */
@@ -114,6 +121,20 @@ export function createFakeRepositories(
       saveVariantCopy: vi.fn(async () => true),
       savePostMetrics: vi.fn(async () => undefined),
       promoteToVoiceSnippet: vi.fn(async () => undefined),
+    },
+    companies: {
+      listCompanies: vi.fn(async () => {
+        const rows = overrides.companies ?? [];
+        return { items: rows, total: rows.length, hasMore: false };
+      }),
+      getCompany: vi.fn(async () =>
+        overrides.company === undefined ? fakeCompany() : overrides.company,
+      ),
+      listCompanyContacts: vi.fn(async () => overrides.companyContacts ?? []),
+      listCompanyOptions: vi.fn(async () => []),
+      createCompany: vi.fn(async () => fakeCompanySummary()),
+      updateCompany: vi.fn(async () => undefined),
+      deleteCompany: vi.fn(async () => undefined),
     },
     marketReports: {
       listReports: vi.fn(async () => {
@@ -190,6 +211,49 @@ export function fakeMarketReport(
     isQuietDay: false,
     findings: [],
     priorFeedback: [],
+    ...overrides,
+  };
+}
+
+/** A company as the list renders it. */
+export function fakeCompanySummary(overrides: Partial<CompanySummary> = {}): CompanySummary {
+  return {
+    id: 'co-1',
+    slug: 'acme-corp',
+    name: 'Acme Corp',
+    industry: 'Mining',
+    size: 'SME',
+    website: 'https://acme.test',
+    linkedinUrl: null,
+    notes: null,
+    createdAt: '2026-08-19T00:00:00Z',
+    ...overrides,
+  };
+}
+
+/** A company as its detail page reads it. */
+export function fakeCompany(overrides: Partial<CompanyDetail> = {}): CompanyDetail {
+  return {
+    id: 'co-1',
+    slug: 'acme-corp',
+    name: 'Acme Corp',
+    industry: 'Mining',
+    size: 'SME',
+    website: 'https://acme.test',
+    notes: null,
+    ...overrides,
+  };
+}
+
+/** A contact at a company. */
+export function fakeCompanyContact(overrides: Partial<CompanyContact> = {}): CompanyContact {
+  return {
+    id: 'ct-1',
+    slug: 'jane-doe',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    pipelineStage: 'lead',
+    email: 'jane@acme.test',
     ...overrides,
   };
 }

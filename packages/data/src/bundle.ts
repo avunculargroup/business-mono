@@ -3,6 +3,7 @@
  */
 import type { AgentActivityRepository } from './repositories/agentActivity';
 import type { CampaignRepository } from './repositories/campaigns';
+import type { CompanyRepository } from './repositories/companies';
 import type { ContentRepository } from './repositories/content';
 import type { EcosystemRepository } from './repositories/ecosystem';
 import type { IndicatorsRepository } from './repositories/indicators';
@@ -47,6 +48,7 @@ export interface RepositoryBundle {
   research: ResearchRepository;
   content: ContentRepository;
   campaigns: CampaignRepository;
+  companies: CompanyRepository;
   marketReports: MarketReportRepository;
   indicators: IndicatorsRepository;
   ecosystem: EcosystemRepository;

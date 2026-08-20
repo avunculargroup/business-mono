@@ -7,11 +7,11 @@ import {
   type FakeRepositories,
 } from '@/test/mocks/repositories';
 
-// Same shape as crm/companies/page.test.tsx, one layer up: the page now asks a
-// repository instead of building a query, so the test hands it a bundle rather
-// than a Supabase fake. What it asserts is unchanged — query wiring plus prop
-// hand-off — but the wiring it can get wrong is now a method call, and the SQL
-// is verified once in @platform/data-supabase.
+// The page asks a repository instead of building a query, so the test hands it
+// a bundle rather than a Supabase fake. What it asserts is unchanged — read
+// wiring plus prop hand-off — but the wiring it can get wrong is now a method
+// call, and the SQL is verified once in @platform/data-supabase. Every
+// converted page test has this shape; crm/companies/page.test.tsx is another.
 let repositories: FakeRepositories;
 vi.mock('@/lib/repositories', () => ({
   getRepositories: vi.fn(async () => repositories),

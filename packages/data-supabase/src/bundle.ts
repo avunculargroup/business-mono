@@ -2,6 +2,7 @@ import type { Principal, RepositoryBundle } from '@platform/data';
 import { createAdapterContext, type PlatformSupabaseClient } from './adapterContext';
 import { createAgentActivityRepository } from './repositories/agentActivity';
 import { createCampaignRepository } from './repositories/campaigns';
+import { createCompanyRepository } from './repositories/companies';
 import { createContentRepository } from './repositories/content';
 import { createEcosystemRepository } from './repositories/ecosystem';
 import { createIndicatorsRepository } from './repositories/indicators';
@@ -29,6 +30,7 @@ export function createSupabaseRepositories(
     research: createResearchRepository(adapter),
     content: createContentRepository(adapter),
     campaigns: createCampaignRepository(adapter),
+    companies: createCompanyRepository(adapter),
     marketReports: createMarketReportRepository(adapter),
     indicators: createIndicatorsRepository(adapter),
     ecosystem: createEcosystemRepository(adapter),

@@ -14,6 +14,7 @@ export {
   toAgentActivityItem,
 } from './repositories/agentActivity';
 export { createCampaignRepository } from './repositories/campaigns';
+export { createCompanyRepository } from './repositories/companies';
 export { createContentRepository } from './repositories/content';
 export { createEcosystemRepository } from './repositories/ecosystem';
 export { createIndicatorsRepository } from './repositories/indicators';

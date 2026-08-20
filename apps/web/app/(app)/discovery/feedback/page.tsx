@@ -10,7 +10,7 @@ export default async function FeedbackPage() {
   const [entries, contactsResult, companies, painPointsResult] = await Promise.all([
     getFeedback(),
     supabase.from('contacts').select('id, first_name, last_name').order('last_name'),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     supabase.from('pain_points').select('id, content, interview_id').order('created_at', { ascending: false }),
   ]);
 

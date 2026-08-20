@@ -20,7 +20,7 @@ export default async function ChampionDetailPage({ params }: Props) {
   const [events, contactsResult, companies] = await Promise.all([
     getChampionEvents(champion.id),
     supabase.from('contacts').select('id, first_name, last_name, company_id').order('last_name'),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
   ]);
 
   const contactName = `${champion.contacts.first_name} ${champion.contacts.last_name}`;

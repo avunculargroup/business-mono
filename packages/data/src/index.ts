@@ -42,6 +42,15 @@ export type {
   VariantReview,
 } from './repositories/campaigns';
 export type {
+  CompanyContact,
+  CompanyDetail,
+  CompanyEdit,
+  CompanyOption,
+  CompanyRepository,
+  CompanySummary,
+  NewCompany,
+} from './repositories/companies';
+export type {
   ContentCard,
   ContentDetail,
   ContentEditGuard,

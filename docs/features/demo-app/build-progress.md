@@ -7,9 +7,9 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 are complete; 4.6 (CRM and company) is the last vertical on the critical path, and 4.2c–d are
-background. Phase 4 is the long one, and the part of it beyond 4.6 is the part whose justification
-rests on the client app being real.
+4.5 and 4.6a are complete. **4.6a was the demo's last surface, so the critical path through Phase 4
+is done and Phase 5 is unblocked.** Everything still open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 —
+is background whose justification rests on the client app being real.
 **Last updated:** 2026-08-19
 
 ---
@@ -370,6 +370,15 @@ its estimate, the full-seam assumption behind decision 2 is wrong for this codeb
 re-cut to demo surfaces only, which is decision 2 option (a) and costs nothing already spent. If the
 client app has not firmed up by the end of 4.6, revisit whether 4.7–4.11 are worth finishing at all;
 the demo does not need them.
+
+**The premise checkpoint came due at 4.6a, not at the end of 4.6.** The demo's last surface is
+`/crm/companies`, so everything after 4.6a — 4.2c–d, 4.6b–d and 4.7–4.11 — is background, and the
+question the checkpoint asks now covers **all** of it rather than just 4.7–4.11. Restated with what
+is known: 4.1–4.6a took far less than the 4–6 week estimate for Phase 4, so the sunk cost the
+premise has to justify is small; what remains is roughly 150 `.from(` calls across eight
+sub-verticals, none of which the demo renders. The answer is a commercial fact about whether the
+client app is real, which is the directors' to supply, not this document's to assume. What the
+document can say is that stopping here costs the demo nothing.
 
 **What actually rests on the client app — measured, because the framing above overstates it.**
 "Phase 4 is 4–6 weeks justified by a client app" reads as though the whole phase is a bet on that
@@ -741,7 +750,7 @@ commit.
 | 4.3 | Content and campaigns ✅ | `/content/*`, `/campaigns/*` | Content only — `/campaigns/*` is not a demo surface |
 | 4.4 | Market reports, indicators, onchain ✅ | `/market-reports/*`, `/` | Yes |
 | 4.5 | Ecosystem signals ✅ | `/signals` | Yes |
-| 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (companies only) |
+| 4.6 | CRM and company | `/crm/*` (11 pages), `/company` | Yes (`/crm/companies` only). Split: **4.6a companies ✅**, 4.6b contacts + interactions, 4.6c company records, 4.6d champions/personas/segments/interviews/community. Only 4.6a is a demo surface |
 | — | *critical path ends; below is background* | | |
 | 4.7 | Discovery | `/discovery/*` | No |
 | 4.8 | Projects, tasks, files, docs | `/projects/*`, `/tasks/*`, `/files`, `/docs/*` | No |
@@ -1297,6 +1306,62 @@ them different messages — a browser always submits a blank `label`, so the hel
 means. `/signals` builds and its route compiles; **not** walked against live data from this
 session — the feed, acknowledge, curator note, client-relevant toggle and watch register are the
 five paths to click when someone next has the app up.
+
+##### 4.6a — Companies: what shipped, and the critical path ends here
+
+`CompanyRepository` (seven methods), its Supabase adapter, `/crm/companies` and
+`/crm/companies/[id]`, `CompaniesList` + `CompanyForm` on the read models, all three actions in
+`app/actions/companies.ts`, and `getCompanyOptions` in `lib/referenceData.ts` with its ten call
+sites. **This is the last demo surface.** Phase 5 is unblocked.
+
+**4.6 is four sub-verticals, and only the first is on the critical path.** The vertical table read
+"CRM and company — `/crm/*` (11 pages), `/company` — Yes (companies only)", which bundles a small
+critical-path surface with a large background one and puts the phase's kill criterion at the seam
+between them. [`demo-app-spec.md` § Routes](./demo-app-spec.md#routes) is unambiguous: the demo's
+CRM surface is `/crm/companies`, a glance view, and nothing else under `/crm` or `/company` appears
+in it. So the split is **4.6a** companies (this commit), **4.6b** contacts and interactions,
+**4.6c** company records/domains/subscriptions (`/company` — `app/actions/company.ts` and its 21
+`.from(` calls, the file the plan has flagged as the phase's largest since Phase 0), **4.6d**
+champions, personas, segments, interviews and community. Same shape as the 4.2 and 4.3 splits, and
+the same finding for the third time: **the vertical table's demo column is per-route, and the
+verticals are per-domain, so a vertical marked "Yes" can be mostly background.** Measured across the
+three: 4.2 was 2 demo sub-verticals of 4, 4.3 was 1 of 2, 4.6 is 1 of 4.
+
+**Addressing is the adapter's business.** Every CRM detail route accepts either a UUID or a slug,
+resolved by `idColumn()` in `lib/utils.ts` — the page picks the column. That does not survive the
+seam: a fixture adapter would have to reproduce the app's choice from outside it, and a page that
+knows which column addresses a row knows how rows are stored. `getCompany(ctx, idOrSlug)` takes the
+route param as given and the adapter decides, with a test for each form — getting it wrong turns an
+existing company into a 404. `lib/utils.ts` keeps its copy for the routes 4.6b–d have not reached;
+they converge when those land.
+
+**`getCompanyOptions` moved rather than being left behind.** It is the `companies` picklist ten
+pages share, and leaving it on the raw client would have meant one table read through two doors —
+the split-brain the 4.1 fan-out note warned about. It now takes no client at all (`getPrincipal` is
+`cache()`d, so the bundle it builds costs no extra auth round trip), which leaves `referenceData.ts`
+holding two differently-shaped helpers until `team_members` converts. Both still compose inside the
+`Promise.all` their callers already had, which is why that is tolerable and not a papered-over mess.
+
+**A test that passed when it should have failed.** `crm/companies/page.test.tsx` mocks
+`@/lib/supabase/server` and asserts `.order('name')` and `.limit(25)` on the fake — and it still
+passed unchanged after the page moved to the repository, because the fake client flowed through
+`getRepositories` into the adapter, which issues the same query. Reassuring about the conversion and
+useless as a guard: the test was asserting SQL through two layers it no longer names. Rewritten onto
+the repository fake, where it asserts the read and the prop hand-off, plus one case the old shape
+could not express — that the list gets the repository's *total* rather than the length of the page
+it received. The detail page is new and gets its own test, including the resolved-id case: contacts
+are looked up by `company.id`, never by the route param, because passing a slug to a UUID foreign
+key returns nothing and renders as a company with no contacts.
+
+**Pre-existing, not fixed.** `CompaniesList` takes `totalCount` and immediately discards it
+(`totalCount: _totalCount`), passing `companies.length` to its own pagination while `onPageChange`
+is a no-op — the list is capped at 25 with no way to reach page 2. That is a paging bug, not a seam
+bug, and the repository now returns a real `total` and `hasMore` for whoever fixes it.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and the web build all
+green. `@platform/data-supabase` 169 → 186 tests; `apps/web` 537 → 547 across 67 files. Not walked
+against live data from this session; the paths to click are the list, the create and edit modals,
+a row click through to the detail page by slug, and the same page by UUID.
 
 **Verify per vertical:** contract suite green for that domain; its tests rewritten and passing; the
 vertical's pages walked manually. Commit before the next.
