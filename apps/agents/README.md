@@ -38,7 +38,7 @@ src/
   lib/             # Non-agent logic: JMAP, feeds, email rendering, indicators, findings, logger
   config/          # Model resolution (model.ts) and memory configuration (memory.ts)
   mastra/          # The Mastra instance — agent, workflow and API-route registration
-  observability/   # Exporter wiring
+  observability/   # Exporter wiring + span processors (agent_activity mirror, trace recorder)
   seeds/           # One-off seed scripts (seed:voice)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
@@ -145,6 +145,14 @@ to `platform_capabilities` so Simon can route to it, register it in `MODEL_SCOPE
 **A workflow step that calls an LLM:** register it in `MODEL_SCOPES` with `fallbackAgent`
 set, and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')`
 so the step can override its owning agent's model.
+
+**A span processor:** implement `SpanOutputProcessor` in `src/observability/` and register it
+in the `spanOutputProcessors` array in `src/mastra/index.ts`. Two exist:
+`AgentActivitySpanProcessor` mirrors spans into the `agent_activity` audit table, and
+`TraceRecorderProcessor` records one run into a `TraceBundle` for the public demo — the latter
+off unless `TRACE_RECORDER_TRACE_ID` names the run to capture. Do **not** copy
+`VALID_AGENT_NAMES` from the activity processor into a new one: it silently drops spans whose
+agent is not in its list, `lex` included.
 
 **Anything Mastra-shaped:** verify the API against the installed version rather than from
 memory — invoke the `mastra` skill, or read `node_modules/@mastra/core/dist/docs/`.

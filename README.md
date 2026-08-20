@@ -123,7 +123,7 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/ui             →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`. `apps/demo` imports only `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui`: it has no database client anywhere in its transitive graph, which is what makes it safe to deploy publicly, and `apps/demo/lib/boundary.test.ts` keeps it that way.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`. `apps/demo` imports only `@platform/agent-traces`, `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui`: it has no database client anywhere in its transitive graph, which is what makes it safe to deploy publicly, and `apps/demo/lib/boundary.test.ts` keeps it that way.
 
 `@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
 presentational components, and is written to be consumed by more than one app — so a dependency
@@ -193,6 +193,11 @@ cp apps/web/.env.example apps/web/.env.local   # fill in the two Supabase values
 pnpm dev:web
 ```
 
+**`apps/demo` needs none of the above.** It is fixture-backed with no database, no auth and no
+environment variables, so `pnpm dev:demo` works on a fresh checkout — which makes it the
+quickest way to see the platform's surfaces without standing anything up. See
+[`apps/demo/README.md`](./apps/demo/README.md).
+
 ### Getting past the login page
 
 `apps/web` is auth-gated by `middleware.ts` — every route except `/login` and the public `/share/<id>` links redirects to a sign-in form. There is no self-serve sign-up: the login page calls `signInWithPassword` only. Create the first user in the Supabase dashboard under **Authentication → Users → Add user** (tick "Auto Confirm User"), then sign in with those credentials.
@@ -232,10 +237,13 @@ For `apps/web`, only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_K
 |---------|-------------|
 | `pnpm dev:agents` | Start agent server in watch mode |
 | `pnpm dev:web` | Start Next.js frontend in dev mode |
+| `pnpm dev:demo` | Start the public demo — no env, no database, no auth |
 | `pnpm build` | Build all packages and apps |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
-| `pnpm test` | Run the Vitest suites for both apps |
+| `pnpm test` | Run every Vitest suite — three apps and five packages |
+| `pnpm test:visual` | Playwright visual regression, in the CI container image. Advisory, not part of `pnpm test` |
+| `pnpm test:visual:update` | Regenerate screenshot baselines in that same image |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
 | `pnpm db:migrate` | Apply pending migrations (`supabase db push`) |
 | `pnpm db:diff` | Diff the local database against the migration history |
