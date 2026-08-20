@@ -1,6 +1,28 @@
+import type { MarketReportSummary } from '@platform/data';
 import { getRepositories, demoReadContext } from '@/lib/repositories';
 import { Page } from '@/components/Page';
 import styles from '@/components/Page.module.css';
+
+/**
+ * What a report's day amounted to.
+ *
+ * Four states, not two. The first cut said
+ * `isQuietDay ? 'Quiet day' : 'Findings cleared the floor'`, which labelled a
+ * held report and a failed run as though findings had cleared — the opposite of
+ * true in both cases, and wrong on the one surface whose whole claim is that
+ * the system tells these apart. The placeholder fixtures had no held or errored
+ * report in them, so nothing said so.
+ */
+function outcome(report: MarketReportSummary): string {
+  if (report.status === 'error') return 'Pipeline failed';
+  if (report.status === 'held') return 'Narration withheld';
+  return report.isQuietDay ? 'Quiet day' : 'Findings cleared the floor';
+}
+
+function fallback(report: MarketReportSummary): string {
+  if (report.status === 'error') return 'The run failed before producing a narration.';
+  return 'No narration — nothing met the materiality floor.';
+}
 
 export default async function MarketReportsPage() {
   const { marketReports } = getRepositories();
@@ -17,12 +39,13 @@ export default async function MarketReportsPage() {
             <div className={styles.cardTitle}>{report.asOf}</div>
             <div className={styles.meta}>
               <span>{report.status}</span>
-              <span>{report.isQuietDay ? 'Quiet day' : 'Findings cleared the floor'}</span>
+              <span>{outcome(report)}</span>
               <span>{report.emailed ? 'Emailed' : 'Not emailed'}</span>
             </div>
-            <p className={styles.body}>
-              {report.narrationMarkdown ?? 'No narration — nothing met the materiality floor.'}
-            </p>
+            {/* Paragraph breaks carry meaning here — the narration separates one
+                finding from the next — so the blank lines survive rather than
+                collapsing into a wall. */}
+            <p className={styles.prose}>{report.narrationMarkdown ?? fallback(report)}</p>
           </article>
         ))}
       </div>

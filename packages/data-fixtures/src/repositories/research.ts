@@ -21,7 +21,14 @@ function sameDay(iso: string | null, asOf: Date): boolean {
 export function createResearchRepository(): ResearchRepository {
   return {
     async listItems(ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<NewsFeedItem>> {
-      return paginate(newsFeed(ctx.asOf), opts);
+      // Archived items are excluded, as the interface says and the live adapter
+      // does with `.neq('status', 'archived')`. This adapter did not, and
+      // nothing noticed until a fixture set with an archived row in it existed
+      // — which is the whole argument for one contract suite over two.
+      return paginate(
+        newsFeed(ctx.asOf).filter((item) => item.status !== 'archived'),
+        opts,
+      );
     },
 
     async listTodayDigest(ctx: ReadContext, opts?: QueryOptions): Promise<NewsDigestItem[]> {
@@ -29,7 +36,7 @@ export function createResearchRepository(): ResearchRepository {
       // not empty out the day after its fixtures were written. This is the
       // relative-dating rule doing the thing it exists for.
       const today = newsFeed(ctx.asOf)
-        .filter((item) => sameDay(item.publishedAt, ctx.asOf))
+        .filter((item) => item.status !== 'archived' && sameDay(item.publishedAt, ctx.asOf))
         .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
 
       return paginate(today, opts).items.map((item) => ({

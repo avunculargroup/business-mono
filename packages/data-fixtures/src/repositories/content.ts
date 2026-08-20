@@ -11,18 +11,18 @@ import type {
 } from '@platform/data';
 import { blocked } from '../blocked';
 import { paginate } from '../paginate';
-import { contentCards, contentDetails } from '../fixtures';
+import { contentCards, contentDetails, publishGates } from '../fixtures';
 
 export function createContentRepository(): ContentRepository {
   return {
-    async listCards(_ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<ContentCard>> {
-      return paginate(contentCards(), opts);
+    async listCards(ctx: ReadContext, opts?: QueryOptions): Promise<Paginated<ContentCard>> {
+      return paginate(contentCards(ctx.asOf), opts);
     },
 
     async getDetail(ctx: ReadContext, idOrSlug: string): Promise<ContentDetail | null> {
       // Id or slug, resolved here for the same reason the live adapter resolves
       // it: how a row is addressed is the adapter's business.
-      const card = contentCards().find((row) => row.id === idOrSlug || row.slug === idOrSlug);
+      const card = contentCards(ctx.asOf).find((row) => row.id === idOrSlug || row.slug === idOrSlug);
       if (!card) return null;
 
       return contentDetails(ctx.asOf).find((row) => row.id === card.id) ?? null;
@@ -44,24 +44,13 @@ export function createContentRepository(): ContentRepository {
     },
 
     async getPublishGate(ctx: ReadContext, id: string): Promise<PublishGate | null> {
-      const detail = contentDetails(ctx.asOf).find((row) => row.id === id);
-      if (!detail) return null;
-
-      // Deliberately not a passing gate. Publishing is blocked in the demo
-      // anyway, and a fixture that reported "cleared, approved, credentials
-      // valid" would describe the `publish-gate` principle as satisfied on
-      // every row — which is the opposite of showing that the gate exists.
-      return {
-        status: detail.status,
-        type: detail.type,
-        body: detail.body,
-        isThread: detail.isThread,
-        approvedBy: null,
-        complianceStatus: 'pending',
-        socialAccountId: detail.socialAccountId,
-        credentialExpiresAt: null,
-        maxChars: detail.maxChars,
-      };
+      // Each fixture carries its own gate, because the gate is where the
+      // compliance verdict lives: `ContentCard` has a status but no
+      // `complianceStatus`, so the flagged draft looks like any other item in
+      // review until something asks to publish it. Deriving a passing gate from
+      // the row instead would describe `publish-gate` as satisfied everywhere,
+      // which is the opposite of showing that the gate exists.
+      return publishGates(ctx.asOf)[id] ?? null;
     },
 
     async getEditGuard(ctx: ReadContext, id: string): Promise<ContentEditGuard | null> {

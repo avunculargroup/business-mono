@@ -7,8 +7,10 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 and 4.6a are complete, and **Phase 5 has shipped** — `apps/demo` builds and serves all seven
-surfaces on `@platform/data-fixtures`. Next is Phase 6, the curated fixture set. Everything still
+4.5 and 4.6a are complete, and **Phases 5 and 6 have shipped** — `apps/demo` builds and serves all seven
+surfaces on `@platform/data-fixtures`, with the curated fixture set behind them. **Two gates block
+deployment: the ASIC search over the invented entity names, and the Lex classification pass over the
+fixture prose** — see Phase 6. Next is Phase 7, the annotation layer. Everything still
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.
@@ -1464,12 +1466,12 @@ guarantees it gets done in a last afternoon.
 "a plausible-but-flat dataset is the most common way a portfolio demo fails — everything works and
 nothing is interesting."
 
-The existing staging table at
-[`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging) is **void** — every row of it
-was authored for compliance obligations and contracts, which decision 1 removed. It must be
-re-derived for the seven re-picked surfaces, which means answering design questions, not looking
-things up: what market report makes the quiet-day path legible in five seconds? What news item makes
-curator notes land without explanation?
+~~The existing staging table is void and must be re-derived.~~ **Stale — it was re-derived in
+Phase 0.** The table at
+[`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging)
+says so in its own first line, and all 17 rows are against the re-picked surfaces. The design
+questions this paragraph raised — what market report makes the quiet-day path legible in five
+seconds, what news item makes curator notes land without explanation — are answered there.
 
 Roughly 60–100 rows across ten fixture files, plus transcript segments, plus a trace bundle that has
 to agree with all of it.
@@ -1487,7 +1489,83 @@ Per-row obligations, none of which parallelise:
   ([`fixture-and-trace-schema.md` § Redaction](./fixture-and-trace-schema.md#redaction))
 - Every date an offset from the anchor, never a literal
 
-**Ownership.** The typing is delegable; the narrative decisions are not. Deciding which fixtures
+#### What shipped
+
+The set is authored: ~40 rows across seven fixture files plus a cast module, replacing the Phase 5
+placeholders. Every staging row the current read models can express is implemented, and the rules
+the set is written under are now tests rather than prose someone has to have read.
+
+**The staging table was not void.** This section said it was, and that every row had to be
+re-derived. It had already been re-derived in Phase 0 — the table in
+[`fixture-and-trace-schema.md` § Narrative staging](./fixture-and-trace-schema.md#narrative-staging)
+says so in its own first line, and its 17 rows are all against the re-picked surfaces. The stale
+claim mattered: it reads as a blocking design task owned by a director, and it was already done.
+
+**Six of the 17 rows cannot be built yet, and none of them are blocked on writing.** They need
+fields no read model carries: `opsFindings` on a market report (deferred in 4.4a with a named Phase 7
+consequence), the three-dimension `rubric` on a research item, `complianceStatus` on a `ContentCard`
+rather than only on `PublishGate`, a last-interaction date on `CompanySummary`, and podcast items
+with transcript segments (vertical 4.2c, background). Each is a small widening of one read model, but
+widening a read model to feed a demo is the tail wagging the dog — the right sequence is to widen it
+when a surface in `apps/web` needs it. Recorded here so Phase 7 does not annotate a claim the data
+cannot support:
+
+| Staging row | Needs | Where it belongs |
+|---|---|---|
+| Market report with ops findings | `opsFindings` on `MarketReportDetail` | 4.4a follow-up |
+| Research item with full rubric | `rubric` on `NewsItemDetail` | 4.2 follow-up |
+| Podcast item with segments | The podcast domain | 4.2c |
+| Content item, Lex flagged *(half)* | `complianceStatus` on `ContentCard` | 4.3 follow-up |
+| Stalled CRM company *(half)* | `lastInteractionAt` on `CompanySummary` | 4.6b |
+
+The two half-rows do render: the flagged draft shows as `review` on the board and reveals the
+verdict when the publish gate is asked, and the stalled company reads as stalled from its note. What
+is missing in both cases is the machine-readable field, not the story.
+
+**The compliance rules are now executable.** `content.test.ts` walks every string the set puts on a
+screen and asserts: no bitcoin allocation figure, percentage or amount anywhere; none of
+`brand-voice.md`'s banned terminology; no exclamation marks; no emoji; every email on `example.com`;
+every link on an example domain; every entity name sourced from `entities.ts`; and no absolute date
+in any prose. It also asserts the staging claims themselves — that the quiet day scored a finding and
+still said nothing, that a finding exists whose `verdict_allowed` is false *and* that the narration
+visibly respects it, that a change is unclassified so the promotion gate's fail-closed path has a
+row, that indicator deltas carry both signs and a zero. Those last ones matter because the most
+common way this set degrades is not a compliance breach; it is someone editing a fixture into
+blandness and nothing noticing.
+
+**One rule that is easy to get backwards, now enforced.** The entity rules are about invented names
+not resolving to real businesses. The larger risk is the inverse: an invented headline attributed to
+a *real* regulator or publisher is a fabricated record of an institution that exists, which is worse
+than a name collision. So research sources are invented mastheads, items concerning a regulator say
+"a regulator", and a test fails on any real institution appearing anywhere in the prose.
+
+**The set found two bugs the placeholders had hidden.** The fixture adapter did not exclude archived
+items from the research feed, which the interface requires and the live adapter does with
+`.neq('status', 'archived')` — invisible until a fixture set contained an archived row. And the
+demo's market-reports page labelled every report `isQuietDay ? 'Quiet day' : 'Findings cleared the
+floor'`, so a held report and a failed run both claimed findings had cleared — on the one surface
+whose entire claim is that the system tells those apart. Both fixed, both with a regression test.
+
+**⚠️ Two verification gates are NOT met, and this must not deploy until they are.**
+
+1. **The ASIC search has not been done.** Every company name in `entities.ts` was chosen to be
+   implausible as a real business, which is not the same as verified. No test can substitute — the
+   check is a search against a register. `entities.ts` carries the warning at the top of the file.
+2. **The Lex pass has not been run.** The spec requires a classification pass over the full set with
+   the outcome recorded in `agent_activity` on the live platform, and that needs the agents server
+   against the real database. The market report narration is the highest-risk prose in the set and
+   is exactly what the pass is for; a `flagged` verdict on any of it is a signal to rewrite rather
+   than override. The one deliberately non-compliant string in the set — the flagged content draft,
+   written to fail so the gate has something real to point at — will and should trip it.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and both app builds
+green. `@platform/data-fixtures` 27 → 55 tests. The built demo was served and all seven routes
+returned 200; `/market-reports` rendered all four pipeline states with distinct labels, `/news`
+showed the curator note, the rejected item and the email-sourced item, and `/signals` showed the
+neutral, refused and unclassified changes.
+
+**Ownership.** The typing is delegable; the narrative decisions are not — but they were made in
+Phase 0, in the staging table, which is what left this phase delegable after all. Deciding which fixtures
 make the architecture visible needs domain judgment and carries the compliance risk. Charlie can
 draft prose against brand voice, but [`demo-app-spec.md` § Open questions](./demo-app-spec.md#open-questions) already flags
 the register problem — a company voice describing an individual's work reads oddly. Chris sets the

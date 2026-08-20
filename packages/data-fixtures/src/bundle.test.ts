@@ -10,6 +10,7 @@ import {
 import type { DemoDomain } from '@platform/data';
 import { DEMO_DOMAINS } from '@platform/data';
 import { createFixtureRepositories } from './bundle';
+import { agentActivity, companies, marketReports, newsFeed } from './fixtures';
 
 const ctx = testReadContext();
 
@@ -72,11 +73,13 @@ describe('reads resolve against the anchor, not against literals', () => {
 
 describe('pagination', () => {
   it('holds the contract on the activity feed', async () => {
-    const { agentActivity } = createFixtureRepositories();
+    const { agentActivity: repo } = createFixtureRepositories();
 
     await expectPaginationContract(
-      (readCtx, opts) => agentActivity.listActivity(readCtx, undefined, opts),
-      { total: 3 },
+      (readCtx, opts) => repo.listActivity(readCtx, undefined, opts),
+      // Read off the fixture set rather than retyped: adding a row to the
+      // staging set should not break a test that is not about counts.
+      { total: agentActivity(ctx.asOf).length },
     );
   });
 
@@ -84,15 +87,17 @@ describe('pagination', () => {
     const { research } = createFixtureRepositories();
 
     await expectPaginationContract((readCtx, opts) => research.listItems(readCtx, opts), {
-      total: 3,
+      // The visible set, not the fixture set: the feed excludes archived items,
+      // so a total counting them would be describing a page nobody sees.
+      total: newsFeed(ctx.asOf).filter((item) => item.status !== 'archived').length,
     });
   });
 
   it('holds the contract on market reports', async () => {
-    const { marketReports } = createFixtureRepositories();
+    const { marketReports: reports } = createFixtureRepositories();
 
-    await expectPaginationContract((readCtx, opts) => marketReports.listReports(readCtx, opts), {
-      total: 3,
+    await expectPaginationContract((readCtx, opts) => reports.listReports(readCtx, opts), {
+      total: marketReports(ctx.asOf).length,
     });
   });
 });
@@ -118,19 +123,23 @@ describe('filtering happens in the adapter', () => {
     // Pushed into the adapter, not done by the caller: a page that fetched
     // everything and filtered in the component would work against three
     // fixtures and fall over against the real table.
-    const { agentActivity } = createFixtureRepositories();
+    const { agentActivity: repo } = createFixtureRepositories();
 
-    const pending = await agentActivity.listActivity(ctx, { status: ['pending'] });
+    const pending = await repo.listActivity(ctx, { status: ['pending'] });
 
-    expect(pending.items).toHaveLength(1);
-    expect(pending.total).toBe(1);
-    expect(pending.items[0].status).toBe('pending');
+    expect(pending.items.length).toBeGreaterThan(0);
+    expect(pending.total).toBe(pending.items.length);
+    expect(pending.items.every((row) => row.status === 'pending')).toBe(true);
+    // And it is a filter, not the whole list.
+    expect(pending.total).toBeLessThan(agentActivity(ctx.asOf).length);
   });
 
   it('counts pending without listing it', async () => {
-    const { agentActivity } = createFixtureRepositories();
+    const { agentActivity: repo } = createFixtureRepositories();
 
-    expect(await agentActivity.countPending(ctx)).toBe(1);
+    expect(await repo.countPending(ctx)).toBe(
+      agentActivity(ctx.asOf).filter((row) => row.status === 'pending').length,
+    );
   });
 });
 
@@ -145,23 +154,28 @@ describe('lookups', () => {
   });
 
   it('resolves a company by slug or by id', async () => {
-    const { companies } = createFixtureRepositories();
+    const { companies: repo } = createFixtureRepositories();
 
-    const bySlug = await companies.getCompany(ctx, 'placeholder-holdings');
-    const byId = await companies.getCompany(ctx, 'co-1');
+    const [first] = companies(ctx.asOf);
+    const bySlug = await repo.getCompany(ctx, first.slug);
+    const byId = await repo.getCompany(ctx, first.id);
 
     expect(bySlug).toEqual(byId);
-    expect(await companies.getCompany(ctx, 'nope')).toBeNull();
+    expect(await repo.getCompany(ctx, 'nope')).toBeNull();
   });
 
   it('reports an unclassified change as present rather than gone', async () => {
-    // The distinction the promotion gate turns on. Both fixture changes are
-    // classified, so what this pins is the other half: a missing change is
-    // null, a present one is a gate object.
+    // The distinction the promotion gate turns on, and the reason the fixture
+    // set carries an unclassified change: a missing change is null, a present
+    // but unclassified one is a gate whose class is null. The caller refuses
+    // both, for different reasons and in different words.
     const { ecosystem } = createFixtureRepositories();
 
-    expect(await ecosystem.getPromotionGate(ctx, 'ch-2')).toEqual({
+    expect(await ecosystem.getPromotionGate(ctx, 'ch-fees')).toEqual({
       complianceClass: 'general_advice',
+    });
+    expect(await ecosystem.getPromotionGate(ctx, 'ch-unclassified')).toEqual({
+      complianceClass: null,
     });
     expect(await ecosystem.getPromotionGate(ctx, 'gone')).toBeNull();
   });
@@ -181,7 +195,7 @@ describe('writes are blocked and say what they would have touched', () => {
   });
 
   it('blocks a research status change', async () => {
-    await expectWriteBlocked(() => repositories.research.setItemStatus('news-1', 'archived'), {
+    await expectWriteBlocked(() => repositories.research.setItemStatus('news-consultation', 'archived'), {
       operation: 'setItemStatus',
       table: 'news_items',
     });
@@ -190,7 +204,7 @@ describe('writes are blocked and say what they would have touched', () => {
   it('blocks a promotion, naming the knowledge table rather than the feed', async () => {
     // promoteItem writes to two tables; it names the one the user did not ask
     // about, which is the more informative half of what the action does.
-    await expectWriteBlocked(() => repositories.research.promoteItem('news-1'), {
+    await expectWriteBlocked(() => repositories.research.promoteItem('news-consultation'), {
       operation: 'promoteItem',
       table: 'knowledge_items',
     });
@@ -198,20 +212,20 @@ describe('writes are blocked and say what they would have touched', () => {
 
   it('blocks a content edit', async () => {
     await expectWriteBlocked(
-      () => repositories.content.updateBody('cnt-1', { body: 'edited' }),
+      () => repositories.content.updateBody('cnt-custody-draft', { body: 'edited' }),
       { operation: 'updateBody', table: 'content_items' },
     );
   });
 
   it('blocks a company delete', async () => {
-    await expectWriteBlocked(() => repositories.companies.deleteCompany('co-1'), {
+    await expectWriteBlocked(() => repositories.companies.deleteCompany('co-kestrel'), {
       operation: 'deleteCompany',
       table: 'companies',
     });
   });
 
   it('blocks flagging a change for clients', async () => {
-    await expectWriteBlocked(() => repositories.ecosystem.setClientRelevant('ch-1', true), {
+    await expectWriteBlocked(() => repositories.ecosystem.setClientRelevant('ch-release', true), {
       operation: 'setClientRelevant',
       table: 'ecosystem_changes',
     });
@@ -219,7 +233,7 @@ describe('writes are blocked and say what they would have touched', () => {
 
   it('blocks report feedback', async () => {
     await expectWriteBlocked(
-      () => repositories.marketReports.addReportFeedback('mr-1', { feedback: 'good' }),
+      () => repositories.marketReports.addReportFeedback('mr-normal', { feedback: 'good' }),
       { operation: 'addReportFeedback', table: 'market_report_feedback' },
     );
   });
@@ -269,5 +283,35 @@ describe('the surfaces the demo exists to show', () => {
 
     expect(statuses).toContain('draft');
     expect(statuses).toContain('published');
+  });
+});
+
+describe('contract details the placeholder set could not exercise', () => {
+  it('excludes archived items from the feed and the digest', async () => {
+    // The interface says archived items are excluded and the live adapter does
+    // it with `.neq('status', 'archived')`. This adapter did not, and nothing
+    // caught it until the fixture set had an archived row — the argument for
+    // one contract suite over two, made concretely.
+    const { research } = createFixtureRepositories();
+    const archived = newsFeed(ctx.asOf).filter((item) => item.status === 'archived');
+    // A filter with nothing to filter passes for the wrong reason.
+    expect(archived.length).toBeGreaterThan(0);
+
+    const { items } = await research.listItems(ctx);
+    const digest = await research.listTodayDigest(ctx);
+
+    for (const item of archived) {
+      expect(items.map((row) => row.id)).not.toContain(item.id);
+      expect(digest.map((row) => row.id)).not.toContain(item.id);
+    }
+  });
+
+  it('still surfaces the items the scorer rejected', async () => {
+    // Excluding archived must not quietly exclude "low scoring" with it — the
+    // rejected item is the reason the feed shows a score at all.
+    const { research } = createFixtureRepositories();
+    const { items } = await research.listItems(ctx);
+
+    expect(items.some((item) => (item.relevanceScore ?? 1) < 0.2)).toBe(true);
   });
 });

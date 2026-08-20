@@ -96,3 +96,13 @@
     padding: var(--space-4);
   }
 }
+
+/* Narration and draft bodies: authored markdown whose paragraph breaks carry
+   meaning. Wrapped rather than collapsed, so the blank lines survive. */
+.prose {
+  margin-top: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  white-space: pre-wrap;
+}
