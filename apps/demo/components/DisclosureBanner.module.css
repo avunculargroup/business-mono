@@ -1,0 +1,29 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-8);
+  background: var(--color-accent-subtle);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-accent-dark);
+  font-size: var(--text-sm);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.text {
+  margin: 0;
+}
+
+.text strong {
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .banner {
+    padding: var(--space-2) var(--space-4);
+    align-items: flex-start;
+  }
+}

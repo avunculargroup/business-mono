@@ -1,0 +1,44 @@
+/* ── Demo-level base styles ──
+
+   Design tokens live in @platform/ui (packages/ui/src/tokens.css) and are imported
+   ahead of this file in app/layout.tsx, exactly as apps/web does. Nothing here
+   defines a token: the demo must look like the platform because it *is* the
+   platform's design system, not a copy of it.
+   ── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

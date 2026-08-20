@@ -55,6 +55,7 @@ Transform tasks into verifiable goals before implementing:
 │   ├── agents/          # Mastra AI agents server (Railway)
 │   │   ├── evals/       # LLM-touching evals (runEvals + scorers) — `pnpm test:eval`
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   ├── demo/            # Public fixture-backed demo (Next.js) — no DB client, no auth, read-only
 │   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
 │   ├── data/            # Repository interfaces + contract test harness (no DB client)
@@ -93,12 +94,14 @@ Transform tasks into verifiable goals before implementing:
 - `@platform/ui` — design tokens (`src/tokens.css`) and shared presentational components
 - `@platform/voice` — voice/transcription helpers
 - `@platform/agents` — Mastra agent server (not consumed by other packages)
+- `@platform/demo` — the public demo app (not consumed by other packages)
 - `@platform/web` — Next.js frontend (not consumed by other packages)
 
 ### Import rules
 
 - `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
 - `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
+- `apps/demo` imports from `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui` — and nothing else. It must never gain a dependency that can open a database connection; `apps/demo/lib/boundary.test.ts` asserts the whole transitive graph, so adding one goes red
 - `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
   models reuse the enums the ingestion side already defines rather than re-declaring them.
   `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`;

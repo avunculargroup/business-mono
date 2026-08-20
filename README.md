@@ -72,6 +72,7 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 │   ├── agents/          # Mastra agent server — deployed to Railway (see apps/agents/README.md)
 │   │   ├── evals/       # LLM-touching evals — on-demand, not in CI
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   ├── demo/            # Public fixture-backed demo — no database, no auth, read-only
 │   └── web/             # Next.js frontend — deployed to Vercel (see apps/web/README.md)
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
@@ -120,7 +121,7 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
                   →  @platform/ui             →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`. `apps/demo` imports only `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui`: it has no database client anywhere in its transitive graph, which is what makes it safe to deploy publicly, and `apps/demo/lib/boundary.test.ts` keeps it that way.
 
 `@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
 presentational components, and is written to be consumed by more than one app — so a dependency

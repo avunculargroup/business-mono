@@ -7,10 +7,12 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 and 4.6a are complete. **4.6a was the demo's last surface, so the critical path through Phase 4
-is done and Phase 5 is unblocked.** Everything still open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 —
-is background whose justification rests on the client app being real.
-**Last updated:** 2026-08-19
+4.5 and 4.6a are complete, and **Phase 5 has shipped** — `apps/demo` builds and serves all seven
+surfaces on `@platform/data-fixtures`. Next is Phase 6, the curated fixture set. Everything still
+open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
+app being real; the directors have it as not yet real but expected, so it is deferred rather than
+cut.
+**Last updated:** 2026-08-20
 
 ---
 
@@ -1389,6 +1391,70 @@ below.
 
 **Verify:** `pnpm --filter @platform/demo build && start` with the network interface down. Contract
 suite green against both adapters. `grep -r "mode" apps/demo/` shows `mode` driving only chrome.
+
+#### What shipped
+
+All three parts, as **5a** the splittable bundle, **5b** `@platform/data-fixtures`, **5c**
+`apps/demo`. The demo builds, serves all seven routes, and renders dates relative to the day it is
+opened.
+
+**5a — the bundle was not splittable, and nothing had noticed.** Decision 2 says `apps/demo`
+composes "a partial one typed to the slice its routes actually use", but `RepositoryBundle` was a
+total interface with eight required domains: a fixture adapter implementing seven could not satisfy
+the type. The symptom had been visible since 4.1 and read as a test quirk — the provider test needed
+`{ mode: 'demo' } as RepositoryBundle` to compile. `Bundle<K>` now picks a slice, `RepositoryBundle`
+is the full one, `DemoBundle` is the demo's seven, and `campaigns` is absent from the demo slice
+rather than stubbed. `useRepositories` takes its slice as a type argument with no default, so a
+client component names its data dependencies in its own source and a component shared between the
+two apps states what both bundles must carry. **This is the finding that justified doing Phase 5
+before the rest of Phase 4:** the gap was one domain wide at 4.6a and would have been seven wide
+after 4.7–4.11, and every one of those domains would have been written against an interface shape
+that had to change.
+
+**The contract harness had the same defect.** `AdapterUnderTest.createBundle()` returned
+`RepositoryBundle`, so the fixture adapter could not run the suite it exists to pass. Now generic
+over the slice.
+
+**5b — `asOf` had never been exercised, and it was wrong on first use.** `ReadContext` carries
+`asOf` for exactly one reason: fixture adapters date relative to an anchor. Phase 5 is the first
+thing to use it, and the first run of the contract suite failed — no fixture was dated *today*, so
+`listTodayDigest`, which bands by the calendar day of `asOf`, returned nothing. The demo's research
+digest would have been permanently empty. The fix is a `todayAt()` helper that cannot drift out of
+the anchor's own day, plus a test that reads the digest at two arbitrary anchors years apart. Worth
+noting what kind of bug this is: not a crash, not a wrong number — a surface that renders correctly
+and is empty, which is the failure mode a screenshot test also misses.
+
+**5c — static prerendering silently freezes the anchor.** Next prerendered all seven routes as
+static, which evaluates `new Date()` once at build time and bakes it into HTML. A demo built in
+August would still be calling August "today" in December, and the digest would be empty again for
+the same reason. `export const dynamic = 'force-dynamic'` in the demo's layout, with the reasoning
+in a comment, because the failure is silent — the pages render, they are just quietly wrong. The
+cost is nil: there is no database to hit.
+
+**The demo cannot reach a database, and that is asserted rather than observed.** It depends on
+`@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui`, and nothing
+else. `apps/demo/lib/boundary.test.ts` walks the whole runtime dependency closure and fails on any
+Supabase package, `@platform/db`, or `@platform/data-supabase` — transitively, so adding a client to
+`@platform/ui` would go red without the demo's own manifest changing. The absence *is* the security
+model, and an absence is exactly the kind of property that disappears in one `pnpm add` without
+anything failing.
+
+**`mode` is read in exactly one place.** `DemoChip` takes its label from the bundle's mode rather
+than hardcoding "Demo data" — the sanctioned use, and it means a surface mounted against a live
+bundle would stop claiming to be a demo instead of mislabelling real data as invented.
+
+**Fixtures are placeholders and say so.** Every string is marked as one. The curated set, the staged
+narrative and the Lex pass are Phase 6 — separating them was the plan's call and it held up: Phase 5
+touched the wiring in seven places and none of those edits would have been safe to make against
+prose someone had already reviewed.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and both app builds
+green. `@platform/data-fixtures` 27 tests, `apps/demo` 3, `@platform/data` 16 → 21. The built demo
+was served and all seven routes returned 200 with the disclosure banner and the demo chip present on
+each; `/market-reports` rendered dates one, two and three days before the day it was served, which
+is relative dating working end to end. Not run: the network-down check the plan asks for — the
+dependency-closure test is the stronger version of that claim, but it is not the same claim, and a
+human should still pull the interface once.
 
 ### Phase 6 — Fixture authoring (2–3 days, plus a Lex pass)
 
