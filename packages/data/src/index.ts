@@ -6,7 +6,17 @@ export {
   type ReadContext,
 } from './context';
 export { DemoWriteBlockedError, NotFoundError } from './errors';
-export type { Principal, RepositoryBundle, RepositoryMode } from './bundle';
+export { DEMO_DOMAINS } from './bundle';
+export type {
+  Bundle,
+  DemoBundle,
+  DemoDomain,
+  Principal,
+  RepositoryBundle,
+  RepositoryDomain,
+  RepositoryDomains,
+  RepositoryMode,
+} from './bundle';
 export type {
   ActivityStatus,
   AgentActivityFilter,

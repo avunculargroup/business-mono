@@ -38,12 +38,14 @@ export interface Principal {
 }
 
 /**
- * Domains are added here one vertical at a time, alongside their
- * implementation in `@platform/data-supabase` and their conversion in
- * `apps/web`. Keeping the interface in step with the adapters means the app
- * compiles at every commit rather than carrying a half-migrated bundle.
+ * Every domain the seam knows about.
+ *
+ * Domains are added here one vertical at a time, alongside their implementation
+ * in `@platform/data-supabase` and their conversion in `apps/web`. Keeping the
+ * interface in step with the adapters means the app compiles at every commit
+ * rather than carrying a half-migrated bundle.
  */
-export interface RepositoryBundle {
+export interface RepositoryDomains {
   agentActivity: AgentActivityRepository;
   research: ResearchRepository;
   content: ContentRepository;
@@ -52,5 +54,50 @@ export interface RepositoryBundle {
   marketReports: MarketReportRepository;
   indicators: IndicatorsRepository;
   ecosystem: EcosystemRepository;
-  mode: RepositoryMode;
 }
+
+export type RepositoryDomain = keyof RepositoryDomains;
+
+/**
+ * A bundle carrying some subset of the domains.
+ *
+ * This is the splittable bundle decision 2 requires: `apps/web` will have ~20
+ * repositories and the demo renders 7 surfaces, so a flat bundle would force
+ * `@platform/data-fixtures` to fixture domains nobody demos. Naming the slice
+ * in the type is what makes that a compile error rather than a stub that throws
+ * — a demo route reaching for `campaigns` does not typecheck, because the
+ * demo's bundle type does not have the key.
+ *
+ * `mode` is on the base, not on a domain, because every bundle has exactly one
+ * regardless of which slice it carries.
+ */
+export type Bundle<K extends RepositoryDomain> = Pick<RepositoryDomains, K> & {
+  mode: RepositoryMode;
+};
+
+/** The full bundle — every domain. What `apps/web` composes. */
+export type RepositoryBundle = Bundle<RepositoryDomain>;
+
+/**
+ * The domains the demo renders, and the only ones `@platform/data-fixtures`
+ * implements.
+ *
+ * Derived from [`demo-app-spec.md` § Routes](../../../docs/features/demo-app/demo-app-spec.md):
+ * seven surfaces, seven domains. `campaigns` is deliberately absent — it is
+ * behind the seam in `apps/web` but `/campaigns/*` is not a demo route, and the
+ * point of the slice is that nothing has to pretend otherwise.
+ */
+export const DEMO_DOMAINS = [
+  'agentActivity',
+  'research',
+  'content',
+  'companies',
+  'marketReports',
+  'indicators',
+  'ecosystem',
+] as const satisfies readonly RepositoryDomain[];
+
+export type DemoDomain = (typeof DEMO_DOMAINS)[number];
+
+/** The partial bundle `apps/demo` composes. */
+export type DemoBundle = Bundle<DemoDomain>;

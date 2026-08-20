@@ -45,7 +45,7 @@ export function NewsCard({
   const [status, setStatus] = useState<NewsStatus>(initialStatus);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
-  const { research } = useRepositories();
+  const { research } = useRepositories<'research'>();
 
   const updateStatus = async (next: NewsStatus) => {
     if (busy) return;
