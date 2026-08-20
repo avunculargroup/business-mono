@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@platform/agent-traces": "workspace:*",
     "@platform/data": "workspace:*",
     "@platform/data-fixtures": "workspace:*",
     "@platform/shared": "workspace:*",

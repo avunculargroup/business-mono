@@ -25,6 +25,7 @@
     "@mastra/memory": "^1.24.0",
     "@mastra/observability": "^1.16.3",
     "@mastra/pg": "^1.18.0",
+    "@platform/agent-traces": "workspace:*",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/signal": "workspace:*",

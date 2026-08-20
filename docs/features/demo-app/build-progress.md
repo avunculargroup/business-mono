@@ -7,11 +7,12 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 and 4.6a are complete, and **Phases 5, 6 and 7 have shipped** — `apps/demo` builds and serves all seven
+4.5 and 4.6a are complete, and **Phases 5 through 8 have shipped** — `apps/demo` builds and serves all seven
 surfaces on `@platform/data-fixtures`, with the curated fixture set behind them and the annotation
 layer over them. **Two gates block
 deployment: the ASIC search over the invented entity names, and the Lex classification pass over the
-fixture prose** — see Phase 6. Next is Phase 8, the trace recorder and replay. Everything still
+fixture prose** (Phase 6), and **the trace bundle is authored rather than recorded** (Phase 8).
+Next is Phase 9, the demo E2E pass. Everything still
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.
@@ -1673,6 +1674,72 @@ else's comprehension and wants a second reader.
 
 **Verify:** replay with the network down. Step back across the gate boundary. Confirm no API key in
 the demo's Vercel env. Confirm the recorder is disabled by default in `apps/agents`.
+
+#### What shipped, and the half that could not
+
+`packages/agent-traces` (schema, timing, one bundle), the recorder in `apps/agents`, the replayer at
+`/agents/run/[traceId]`, and the four annotations the route finally made possible — including
+`hub-and-spoke`, the last principle without a target.
+
+**⚠️ The bundle is authored, not recorded.** Recording a real run needs the agents server, a
+database and live model credentials, none of which are reachable from a build session. The bundle
+was written against the workflow source instead — real step ids (`resolve_context`, `generate_copy`,
+`compliance_check`, `persist`, `gate3`), real payload shapes (`charlieVariantSchema`,
+`lexVerdictSchema`), the real `agent_activity` writes (`variant_generated`, `compliance_checked`).
+
+Rather than leave that implicit, the schema carries a `provenance: 'recorded' | 'authored'` field and
+the replay states which on screen. The reasoning is the same one this project applied to fixtures:
+the entire value of a trace over a mockup is that it is a real run, and a bundle that let a reader
+assume it was recorded would take that value dishonestly. **Running the recorder against a seeded
+synthetic campaign and replacing the bundle is outstanding work**, and the file says so at the top.
+
+That field caught a bug immediately. The sidebar reported zero redactions as "recorded against a
+synthetic campaign, so no client data was in scope" — a true and useful sentence about a recorded
+run, and a false one here. Zero redactions means two different things depending on provenance, and
+the copy now distinguishes them.
+
+**The recorder is off unless a trace id names the run to capture.** `TraceRecorderProcessor.fromEnv()`
+returns `null` rather than a no-op processor, so the disabled case is visible at the registration
+site in `mastra/index.ts` — a reader can see whether the list has one processor or two. There is no
+"record everything" mode: a recorder that is on by default eventually records something it should
+not. It writes on `shutdown` rather than needing a caller to remember to flush.
+
+**It does not copy `VALID_AGENT_NAMES`**, as the plan warned. That filter silently drops spans whose
+agent is not in its list, `lex` included, and would have produced a trace that looked complete while
+missing the compliance verdict — the step the trace mostly exists for.
+
+**Redaction runs on the way in.** `redact()` recurses into nested objects and arrays, because the
+payloads crossing between workflow steps are nested and a top-level pass would miss every
+interesting case while looking like it worked. It records what it removed and from which step. A
+cleanup pass was never an option: it means real data exists in a file on disk at some point, and
+files on disk get committed.
+
+**The schema imports nothing, and a test enforces it.** Not `@mastra/core`, not anything — the
+package has no `dependencies` key at all. A public demo that breaks on an unrelated framework upgrade
+fails silently at the moment someone is looking at it, so the recorder translates and the bundle
+survives. The test scans the package's own sources, excluding its test file, which named the
+forbidden import in its own regex and matched itself on the first run.
+
+**Position is a step index, not a timer offset.** Every control moves the index and the timer only
+advances it, so stepping back across the gate boundary is the same operation as stepping forward and
+there is no separate seek path that can disagree with playback. That is the phase's named verify
+item and it has a test.
+
+**A tension in the spec, surfaced rather than papered over.** The compression rules cap a gap at
+1200ms, and the target total replay is ~45 seconds — but 12 steps × 1200ms is 14.4s, so a
+twelve-step trace cannot reach the target however it is timed. This one replays in about 7 seconds.
+Padding the offsets to fill the budget would be inventing latencies, so the timings stand and the UI
+says what playback is for: "Play gives you the shape of the run in a few seconds. Step through it to
+read what actually crossed between the steps." A recorded run with more steps will land closer to
+the target on its own.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` and both builds green.
+`@platform/agent-traces` 18 tests, `apps/demo` 31 → 44, `apps/agents` 1226 → 1236. The route serves,
+an unknown trace id 404s, and all four trace annotation targets resolve exactly once. **Not done:**
+recording a real run (see above); the network-down replay (the package has no runtime fetch and the
+demo has no network dependency in its graph, which is the structural version of that claim but not
+the same test); and confirming the demo's Vercel env has no API key, which needs the Vercel
+project.
 
 ### Phase 9 — Demo E2E (1 day)
 

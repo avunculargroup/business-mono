@@ -5,6 +5,7 @@ import type { NextConfig } from 'next';
 // here and in package.json is the enforcement, not a runtime guard.
 const nextConfig: NextConfig = {
   transpilePackages: [
+    '@platform/agent-traces',
     '@platform/data',
     '@platform/data-fixtures',
     '@platform/shared',

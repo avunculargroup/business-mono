@@ -11,6 +11,7 @@ import {
   PenLine,
   Radar,
   BookOpen,
+  Footprints,
 } from 'lucide-react';
 import styles from './Nav.module.css';
 
@@ -27,6 +28,8 @@ const ROUTES = [
   { href: '/market-reports', label: 'Market reports', icon: FileText },
   { href: '/news', label: 'Research', icon: Newspaper },
   { href: '/activity', label: 'Agent activity', icon: Activity },
+  // The centrepiece. Assume a reader clicks exactly one thing.
+  { href: '/agents/run/variant-gate-web', label: 'Trace replay', icon: Footprints },
   { href: '/content', label: 'Content', icon: PenLine },
   { href: '/signals', label: 'Signals', icon: Radar },
   { href: '/crm/companies', label: 'Companies', icon: Building2 },

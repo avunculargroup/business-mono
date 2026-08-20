@@ -58,6 +58,7 @@ Transform tasks into verifiable goals before implementing:
 │   ├── demo/            # Public fixture-backed demo (Next.js) — no DB client, no auth, read-only
 │   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
+│   ├── agent-traces/    # Recorded workflow traces + the BTS-owned trace schema (no deps at all)
 │   ├── data/            # Repository interfaces + contract test harness (no DB client)
 │   ├── data-fixtures/   # Fixture repository implementation for the demo (no DB client)
 │   ├── data-supabase/   # Live repository implementation over Supabase
@@ -85,6 +86,7 @@ Transform tasks into verifiable goals before implementing:
 
 ### Package naming
 
+- `@platform/agent-traces` — the trace schema for the demo's replay, plus recorded bundles. Depends on **nothing**, and must never import from `@mastra/core`: the recorder translates spans into this schema so a Mastra upgrade breaks the recorder, not the already-recorded demo
 - `@platform/data` — repository interfaces, `ReadContext`/`Paginated`, the demo/live error types, the React provider (`@platform/data/provider`), and the contract test harness (`@platform/data/testing`). Imports no database client
 - `@platform/data-supabase` — the live repository implementation over Supabase
 - `@platform/data-fixtures` — the fixture repository implementation the demo runs on. Implements only the demo's seven domains (`DEMO_DOMAINS`); every write throws `DemoWriteBlockedError`. No database client, no network, no filesystem
@@ -99,9 +101,9 @@ Transform tasks into verifiable goals before implementing:
 
 ### Import rules
 
-- `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
+- `apps/agents` imports from `@platform/agent-traces`, `@platform/db`, `@platform/shared`, and `@platform/signal`
 - `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
-- `apps/demo` imports from `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui` — and nothing else. It must never gain a dependency that can open a database connection; `apps/demo/lib/boundary.test.ts` asserts the whole transitive graph, so adding one goes red
+- `apps/demo` imports from `@platform/agent-traces`, `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui` — and nothing else. It must never gain a dependency that can open a database connection; `apps/demo/lib/boundary.test.ts` asserts the whole transitive graph, so adding one goes red
 - `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
   models reuse the enums the ingestion side already defines rather than re-declaring them.
   `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`;
@@ -317,6 +319,7 @@ Read the relevant docs BEFORE writing code.
 |Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing.eval.ts` + `apps/agents/evals/simon-routing/fixtures.json`|Add a fixture row, then run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy (real LLM) before merging|
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 |New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|
+|Trace recording, or the demo's replay surface             |`apps/agents/src/observability/traceRecorderProcessor.ts` + `packages/agent-traces/src/schema.ts`|The recorder is a second `SpanOutputProcessor`, off unless `TRACE_RECORDER_TRACE_ID` is set. Do NOT copy `VALID_AGENT_NAMES` from `agentActivityProcessor.ts` — it drops `lex` spans, and the compliance verdict is what the trace exists to show. Redaction runs on the way in, never as a cleanup pass|
 |Logging / console output in `apps/agents`                |`apps/agents/src/lib/logger.ts`                              |Use `createLogger('<component>')` + `log.error({ err }, 'msg')` — never `console.*`. Single-line JSON to stdout so Railway parses each event as one entry (see Coding Behavior → Logging)|
 |Adding an agent, workflow, listener or workspace package |`apps/agents/README.md` (agents/workflows/listeners), `apps/web/README.md` (routes), root `README.md` (packages, subsystems)|**Update the README in the same PR.** These inventories drift within weeks otherwise — a README review in Aug 2026 found 3 undocumented agents, 2 unregistered workflows, 8 missing listeners and a whole workspace package (`@platform/voice`) absent from every doc. Keep inventories next to the code they describe: per-app READMEs own their own lists, the root README links to them|
 |Adding or moving a doc that others link to             |`node scripts/check-doc-links.mjs`                           |Relative links **and their `#section` anchors** in the entry-point and build-progress docs are CI-gated. Run the checker locally before pushing — it is offline and takes under a second|

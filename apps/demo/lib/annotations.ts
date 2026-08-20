@@ -36,13 +36,13 @@ export interface Annotation {
 }
 
 /**
- * The eight required annotations, minus the one that has no target yet.
+ * The required annotations, all of them, now that the trace replay exists.
  *
  * [`demo-app-spec.md` § Required annotations](../../../docs/features/demo-app/demo-app-spec.md#required-annotations)
- * lists eight, one of which targets the trace replay at `/agents/run/[id]`.
- * That route is Phase 8 and does not exist, so its annotation ships with it
- * rather than pointing at nothing here. All seven principles are still covered:
- * `deterministic-before-llm` carries two of the eight rows.
+ * lists eight. Three of them land on the replay route: the spec names the
+ * suspend point for `hub-and-spoke`, and the other two are here because the
+ * trace is the only surface where the deterministic boundary and the resume
+ * mechanism can be *watched* rather than described.
  */
 export const ANNOTATIONS: Annotation[] = [
   {
@@ -157,6 +157,67 @@ export const ANNOTATIONS: Annotation[] = [
     ].join(' '),
     principle: 'compliance-as-alignment',
     order: 7,
+  },
+  {
+    id: 'trace-boundary',
+    targetSelector: 'trace-boundary',
+    route: '/agents/run/[traceId]',
+    title: 'The last moment the payload is ours',
+    body: [
+      'Everything up to this step was computed and written down. The agent below receives exactly',
+      'this object and has no database tool and no retrieval tool in this workflow, so there is no',
+      'path by which anything outside it could reach the draft.',
+      'That is the difference between a constraint and an instruction: not "stick to the facts" in a',
+      'prompt, but no route to anything else.',
+      'Step back one and forward one across this line — the payload is the only thing that moves.',
+    ].join(' '),
+    principle: 'deterministic-before-llm',
+    order: 1,
+  },
+  {
+    id: 'trace-lex-verdict',
+    targetSelector: 'trace-lex-verdict',
+    route: '/agents/run/[traceId]',
+    title: 'The verdict is a step, not a checkbox',
+    body: [
+      'Compliance review appears here as a first-class step with a classification and a stated',
+      'reason, because that is what it is in the workflow — not a flag set at the end.',
+      'The agent can clear or flag and never approves. On a flag it writes a suggested rewrite as a',
+      'proposed action and the run continues to the gate with the flag attached, so a person decides',
+      'what happens with the objection in front of them.',
+    ].join(' '),
+    principle: 'compliance-as-alignment',
+    order: 2,
+  },
+  {
+    id: 'trace-suspend',
+    targetSelector: 'trace-suspend',
+    route: '/agents/run/[traceId]',
+    title: 'The machine stopped and waited',
+    body: [
+      'The workflow suspends here and holds its state. No agent messages a person: the decision is',
+      'written to a database column by the web app and claimed by a listener, because the agent',
+      'server is not reachable over HTTP from the browser.',
+      'That constraint is why the boundary is real rather than conventional — there is no path from',
+      'a specialist to a human that does not go through a stored, auditable decision.',
+      'This pause is the one gap in the replay that is not compressed; it lasted four hours.',
+    ].join(' '),
+    principle: 'hub-and-spoke',
+    order: 3,
+  },
+  {
+    id: 'trace-resume',
+    targetSelector: 'trace-resume',
+    route: '/agents/run/[traceId]',
+    title: 'Claimed once, then resumed',
+    body: [
+      'A Realtime listener claims the pending decision atomically before resuming the run, so two',
+      'listeners racing the same row cannot both act on it.',
+      'The approved action is carried forward and the rejected one is recorded as not taken rather',
+      'than discarded — the audit trail says what was offered, not only what happened.',
+    ].join(' '),
+    principle: 'hub-and-spoke',
+    order: 4,
   },
 ];
 

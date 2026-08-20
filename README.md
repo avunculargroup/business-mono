@@ -109,14 +109,16 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
 ### Package dependency graph
 
 ```
-@platform/agents  →  @platform/db      →  @platform/shared
+@platform/agents  →  @platform/agent-traces
+                  →  @platform/db      →  @platform/shared
                   →  @platform/signal
                   →  @platform/voice   →  @platform/db, @platform/shared
 @platform/web     →  @platform/db      →  @platform/shared
                   →  @platform/ui      →  @platform/shared
                   →  @platform/data           →  @platform/shared
                   →  @platform/data-supabase  →  @platform/data, @platform/db, @platform/shared
-@platform/demo    →  @platform/data           →  @platform/shared
+@platform/demo    →  @platform/agent-traces
+                  →  @platform/data           →  @platform/shared
                   →  @platform/data-fixtures  →  @platform/data, @platform/shared
                   →  @platform/ui             →  @platform/shared
 ```

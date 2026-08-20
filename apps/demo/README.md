@@ -46,6 +46,19 @@ Two properties worth knowing before editing it:
   selector appears somewhere under `app/`. Render an id once per route — repeating it down a list
   puts the marker on row one by accident.
 
+## The trace replay
+
+`/agents/run/[traceId]` replays one run of the `variant` workflow step by step, from a bundle in
+`@platform/agent-traces`. It is the surface an evaluator is most likely to click, and the one that
+shows the deterministic boundary and the human gate as things that *happen* rather than things the
+architecture page claims.
+
+**The shipped bundle is authored, not recorded** (`provenance: 'authored'`, stated on screen).
+Recording the real thing needs the agents server, a database and model credentials; the recorder
+that produces it is `apps/agents/src/observability/traceRecorderProcessor.ts`, off unless
+`TRACE_RECORDER_TRACE_ID` names a run. Replace the bundle once a real run has been captured against
+a seeded synthetic campaign.
+
 ## Two things that are easy to break
 
 **Relative dating.** Every fixture date is an offset from `ReadContext.asOf`, resolved at

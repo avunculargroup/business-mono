@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const alias = {
+  '@platform/agent-traces': `${here}../../packages/agent-traces/src/index.ts`,
   '@platform/data/provider': `${here}../../packages/data/src/provider.tsx`,
   '@platform/data': `${here}../../packages/data/src/index.ts`,
   '@platform/data-fixtures': `${here}../../packages/data-fixtures/src/index.ts`,

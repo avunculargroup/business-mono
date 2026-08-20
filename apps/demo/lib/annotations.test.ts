@@ -6,17 +6,36 @@ import { matchesRoute, annotationsFor } from './routeMatch';
 
 const APP_DIR = fileURLToPath(new URL('../app', import.meta.url));
 
-/** Every `.tsx` under app/, so a target can be looked for wherever it lives. */
-function appSources(dir = APP_DIR): string[] {
+/**
+ * Every place a `data-annotation-id` value can come from.
+ *
+ * Not just `app/`: the replay route sets its targets from the trace bundle
+ * (`data-annotation-id={step.annotationId}`), so those ids are literals in
+ * `@platform/agent-traces` rather than in any page. A scan that only looked at
+ * pages would report the trace annotations as pointing at nothing.
+ */
+const TARGET_DIRS = [
+  APP_DIR,
+  fileURLToPath(new URL('../components', import.meta.url)),
+  fileURLToPath(new URL('../../../packages/agent-traces/src', import.meta.url)),
+];
+
+function sourcesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = `${dir}/${entry.name}`;
-    if (entry.isDirectory()) return appSources(path);
-    return entry.name.endsWith('.tsx') ? [readFileSync(path, 'utf8')] : [];
+    if (entry.isDirectory()) return sourcesUnder(path);
+    return /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.')
+      ? [readFileSync(path, 'utf8')]
+      : [];
   });
 }
 
+function appSources(): string[] {
+  return TARGET_DIRS.flatMap(sourcesUnder);
+}
+
 describe('every annotation points at something', () => {
-  it('has a target element rendered somewhere under app/', () => {
+  it('has a target rendered somewhere the demo can reach', () => {
     // The failure this catches is silent: the overlay finds targets with
     // `document.querySelector`, so a renamed or misspelled selector produces
     // no marker and no error. The demo would just quietly have fewer
@@ -49,11 +68,10 @@ describe('every annotation points at something', () => {
 });
 
 describe('coverage of the required set', () => {
-  it('covers every principle that has a buildable target', () => {
+  it('covers all seven principles', () => {
     // demo-app-spec.md § Required annotations lists eight rows over seven
-    // principles. `hub-and-spoke` targets the trace replay at
-    // /agents/run/[id], which is Phase 8 and does not exist — so it ships with
-    // that route rather than pointing at nothing here.
+    // principles. `hub-and-spoke` was the one with no target until the trace
+    // replay existed; it now has two.
     const covered = new Set(ANNOTATIONS.map((annotation) => annotation.principle));
     const expected: PrincipleKey[] = [
       'deterministic-before-llm',
@@ -62,15 +80,15 @@ describe('coverage of the required set', () => {
       'quiet-day-path',
       'neutral-delta-colour',
       'compliance-as-alignment',
+      'hub-and-spoke',
     ];
 
     for (const principle of expected) {
       expect([...covered]).toContain(principle);
     }
-    expect([...covered]).not.toContain('hub-and-spoke');
   });
 
-  it('documents every principle on /architecture, including the unbuilt one', () => {
+  it('documents every principle on /architecture', () => {
     // The written notes are not gated on a route existing. Someone reading the
     // architecture page should get the whole design, not the part that happens
     // to have a marker.
