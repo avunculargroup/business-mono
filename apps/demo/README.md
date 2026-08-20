@@ -59,6 +59,20 @@ that produces it is `apps/agents/src/observability/traceRecorderProcessor.ts`, o
 `TRACE_RECORDER_TRACE_ID` names a run. Replace the bundle once a real run has been captured against
 a seeded synthetic campaign.
 
+## Fonts are self-hosted
+
+`next/font` downloads Playfair Display, DM Sans and JetBrains Mono at build time and serves them
+from the demo's own origin, and `app/globals.css` points the `--font-*` tokens at the generated
+variables. **The running app makes no external request at all** — `e2e/demo-surfaces.spec.ts`
+asserts it, with no exception list.
+
+`apps/web` links the Google Fonts CDN stylesheet instead. The divergence is deliberate: a stylesheet
+in `<head>` gates `DOMContentLoaded`, so on a machine that cannot reach fonts.googleapis.com this
+app was slow to become interactive rather than merely unstyled — which contradicts the claim it is
+built around. `apps/web` is internal and authed and nobody is evaluating it offline.
+
+The trade: this app needs network at build time and none at run time.
+
 ## Two things that are easy to break
 
 **Relative dating.** Every fixture date is an offset from `ReadContext.asOf`, resolved at

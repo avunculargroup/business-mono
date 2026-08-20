@@ -44,7 +44,12 @@ export default async function MarketReportsPage() {
             // an empty record.
             data-annotation-id={report.isQuietDay ? 'quiet-day-report' : undefined}
           >
-            <div className={styles.cardTitle}>
+            {/* `data-volatile` marks text that moves with the clock. Every
+                fixture date is an offset from today, so this string differs on
+                every run — a visual-regression baseline containing it would
+                diff daily and train everyone to ignore the suite. The E2E specs
+                mask these; nothing in the app reads the attribute. */}
+            <div className={styles.cardTitle} data-volatile="date">
               <Link href={`/market-reports/${report.id}`}>{report.asOf}</Link>
             </div>
             <div className={styles.meta}>

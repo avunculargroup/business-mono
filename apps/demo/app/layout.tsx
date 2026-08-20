@@ -3,6 +3,7 @@
 import '@platform/ui/tokens.css';
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { DM_Sans, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import { DisclosureBanner } from '@/components/DisclosureBanner';
 import { Nav } from '@/components/Nav';
 import { DemoRepositoryProvider } from '@/providers/DemoRepositoryProvider';
@@ -27,6 +28,45 @@ import styles from '@/components/Page.module.css';
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * Fonts are self-hosted, not linked from Google.
+ *
+ * `apps/web` links the CDN stylesheet, and copying that here was the obvious
+ * thing to do — but it made the demo's only external request, and a stylesheet
+ * in `<head>` gates `DOMContentLoaded`. On a machine that cannot reach
+ * fonts.googleapis.com the page was slow to become interactive, not merely
+ * unstyled, which quietly contradicts the claim this app is built around.
+ *
+ * `next/font` downloads the faces at build time and serves them from the
+ * demo's own origin, so the running app makes no external request at all.
+ * `display: 'swap'` keeps the fallback stacks in `tokens.css` doing their job
+ * while a face is still arriving.
+ *
+ * The divergence from `apps/web` is deliberate: that app is internal and
+ * authed, and nobody is evaluating whether it works with the network down.
+ */
+const display = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+  variable: '--font-display-loaded',
+});
+
+const body = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-body-loaded',
+});
+
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  variable: '--font-mono-loaded',
+});
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -43,13 +83,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-        />
-      </head>
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${mono.variable}`}
+    >
       <body>
         <DemoRepositoryProvider>
           <AnnotationProvider>

@@ -42,3 +42,16 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Self-hosted font faces ──
+
+   `next/font` hashes each family into a CSS variable at build time; the design
+   tokens name the families literally. Pointing the token stacks at the loaded
+   variables keeps every `var(--font-*)` in @platform/ui working unchanged while
+   the demo serves the faces from its own origin. The literal family names stay
+   in the fallback chain so nothing breaks if a variable is ever missing. */
+:root {
+  --font-display: var(--font-display-loaded), 'Playfair Display', Georgia, serif;
+  --font-body: var(--font-body-loaded), 'DM Sans', system-ui, sans-serif;
+  --font-mono: var(--font-mono-loaded), 'JetBrains Mono', Menlo, monospace;
+}

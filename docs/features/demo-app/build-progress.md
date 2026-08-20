@@ -7,12 +7,13 @@ the revised session plan that follows from it. Same purpose as
 **Status:** Phases 0–3 complete and merged to `main` (PR #368, `476878b`, 2026-08-19). All four
 decisions settled, the scoping rule settled, all eight assumptions resolved, screenshot baselines
 bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2a–b, 4.3, 4.4 and
-4.5 and 4.6a are complete, and **Phases 5 through 8 have shipped** — `apps/demo` builds and serves all seven
+4.5 and 4.6a are complete, and **Phases 5 through 9 have shipped** — the plan is complete through
+its last numbered phase — `apps/demo` builds and serves all seven
 surfaces on `@platform/data-fixtures`, with the curated fixture set behind them and the annotation
 layer over them. **Two gates block
 deployment: the ASIC search over the invented entity names, and the Lex classification pass over the
 fixture prose** (Phase 6), and **the trace bundle is authored rather than recorded** (Phase 8).
-Next is Phase 9, the demo E2E pass. Everything still
+**and the screenshot baselines need bootstrapping in the CI container** (Phase 9). Everything still
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.
@@ -1748,6 +1749,63 @@ project.
   adapter makes this the easy case.
 - Promote the demo specs from advisory to blocking once baselines have settled. The demo is a public
   artefact; a silent visual break there is worse than a red build.
+
+#### What shipped
+
+Three specs — `demo-surfaces`, `demo-annotations`, `demo-trace` — wired into `e2e.yml`, plus a
+`webServer` in the Playwright config. **33 behavioural assertions pass; the 9 screenshot specs are
+awaiting their baseline bootstrap.**
+
+**The easy case the seam was built to produce.** No auth fixture, no request interception, no
+Supabase stub: `goto` and assert. `e2e/fixtures/auth.ts` and `e2e/fixtures/supabase.ts` — the two
+hardest files in the original E2E proposal — are still never written.
+
+**What needed a browser, and what did not.** The jsdom component tests cover the overlay's state
+machine, but jsdom has no layout engine: every `getBoundingClientRect` there returns zero, so a
+marker positioned by measurement is untested until something lays the page out. Likewise "does Play
+actually advance on its own" is a question about a real event loop. So the browser specs assert
+exactly the claims jsdom cannot: markers land on their targets, turning the layer on moves nothing
+underneath it (measured — every target's rect before and after, and the page's scroll height), and
+playback advances and pauses on a real timer.
+
+**Baselines would have diffed daily.** Every fixture date is an offset from today, so
+`/market-reports` renders different text on every run. A suite that fails every morning is one
+everyone learns to ignore, which is worse than not having it. Volatile text now carries
+`data-volatile` in the demo's markup and is masked in screenshots — one attribute, one route, and
+the mask is a fixed-size block over an ISO date so layout is still covered. The trace replay is
+deliberately *not* masked: its `recordedAt` is a real fixed instant, the one exception to relative
+dating, so it renders identically every run.
+
+**The Google Fonts link was costing far more than it looked.** The layout copied `apps/web`'s CDN
+stylesheet, and a stylesheet in `<head>` gates `DOMContentLoaded` — so every navigation in this
+environment took about twelve seconds, and the nine-route walk timed out. Writing the exception into
+the no-external-requests test (`except fonts`) is what made it obvious the request should not exist
+at all. The demo now self-hosts its faces through `next/font`, and the numbers moved accordingly:
+**the chrome suite went from 1.4 minutes to 7 seconds**, and the test has no exception list.
+
+That is not a test-only win. "Works with the network down" is the claim this app is built around,
+and a page whose `DOMContentLoaded` waited on fonts.googleapis.com was slow to become interactive
+offline rather than merely unstyled. The trade is that the demo now needs network at *build* time to
+fetch the faces, and none at *run* time — the right way round for a public artefact. `apps/web`
+keeps the CDN link deliberately: it is internal and authed, and nobody is evaluating whether it
+works offline.
+
+**⚠️ Screenshot baselines are not committed, and the screenshot step will be red until they are.**
+They must be generated inside `mcr.microsoft.com/playwright:v1.62.1-noble` — font hinting differs
+enough elsewhere that baselines from another machine diff on every CI run — and no Docker daemon was
+reachable from this session. Bootstrap them with the workflow's existing
+`workflow_dispatch: update_baselines` input, or `pnpm test:visual:update` on a machine with Docker,
+then commit `e2e/**-snapshots/`. This is the same state the design-system specs shipped in, and the
+workflow orders the steps so the signal-carrying ones run first.
+
+**Not promoted to blocking**, per the plan's own condition: baselines have not settled because they
+do not exist yet. The behavioural specs are the ones worth promoting first — they need no baselines
+and cannot flake on antialiasing.
+
+**Verify — what was actually run.** `pnpm typecheck`, `pnpm lint`, `pnpm test` green;
+`apps/demo` builds. 33 of 42 Playwright specs pass against the built demo, the 9 failures all being
+`A snapshot doesn't exist`. The demo makes zero requests off its own origin, asserted rather than
+assumed.
 
 ### Fixture drift policy
 
