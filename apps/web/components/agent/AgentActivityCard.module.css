@@ -76,11 +76,6 @@
   border-radius: var(--radius-sm);
 }
 
-.entity {
-  color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
-}
-
 .actionCount {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);

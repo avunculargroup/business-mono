@@ -1,20 +1,17 @@
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ActivityFeed } from '@/components/agent/ActivityFeed';
 
 export default async function ActivityPage() {
-  const supabase = await createClient();
+  const repositories = await getRepositories();
 
-  const { data: activities, count } = await supabase
-    .from('agent_activity')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .limit(25);
+  const { items, total } = await repositories.agentActivity.listActivity(resolveReadContext());
 
   return (
     <>
       <PageHeader title="Agent Activity" />
-      <ActivityFeed initialActivities={activities || []} totalCount={count || 0} />
+      <ActivityFeed initialActivities={items} totalCount={total} />
     </>
   );
 }

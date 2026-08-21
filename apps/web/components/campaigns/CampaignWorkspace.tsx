@@ -11,78 +11,21 @@ import { AutoGrowTextarea } from '@platform/ui/AutoGrowTextarea';
 import { StatusChip } from '@platform/ui/StatusChip';
 import { submitCampaignGateDecision } from '@/app/actions/campaigns';
 import styles from './CampaignWorkspace.module.css';
+import type {
+  CampaignBeat,
+  CampaignDetail,
+  CampaignStrategy,
+  PlannedBeat,
+  SchedulePlan,
+} from '@platform/data';
 
 // The campaign canvas + the two review gates. When the strategy workflow is
 // suspended on this campaign, gate_state names which gate is open; the founder
 // reviews (and may edit), then approves or requests a change. The decision is
-// written to campaigns.pending_decision; the strategyGateWeb listener resumes
+// written to campaigns.pendingDecision; the strategyGateWeb listener resumes
 // the run. After plan approval the canvas is read-only (strategy locked).
 
-interface Strategy {
-  content_pillars: string[];
-  key_messages: string[];
-  audience_summary: string;
-  tone_guidance: string;
-  hooks: string[];
-  hashtags: string[];
-  do_not_say: string[];
-  success_signals: string[];
-}
-
-interface PlannedBeat {
-  title: string;
-  core_message: string;
-  rationale: string;
-  prefer_thread: boolean;
-}
-
-interface ScheduleEntry {
-  beat_sequence: number;
-  beat_title: string | null;
-  social_account_id: string;
-  slot_label: string | null;
-  scheduled_for: string | null;
-}
-
-interface SchedulePlan {
-  entries: ScheduleEntry[];
-}
-
-interface Gate1State {
-  gate: 'gate1';
-  campaignId: string;
-  strategy: Strategy;
-}
-
-interface Gate2State {
-  gate: 'gate2';
-  campaignId: string;
-  beats: PlannedBeat[];
-  schedule: SchedulePlan;
-}
-
-export interface CampaignRow {
-  id: string;
-  name: string;
-  objective: string | null;
-  status: string;
-  strategy: Strategy | null;
-  schedule_plan: SchedulePlan | null;
-  gate_state: Gate1State | Gate2State | null;
-  pending_decision: unknown;
-  workflow_run_id: string | null;
-}
-
-export interface BeatRow {
-  id: string;
-  sequence: number;
-  title: string | null;
-  core_message: string;
-  rationale: string | null;
-  prefer_thread: boolean;
-}
-
-const EMPTY_STRATEGY: Strategy = {
+const EMPTY_STRATEGY: CampaignStrategy = {
   content_pillars: [],
   key_messages: [],
   audience_summary: '',
@@ -105,14 +48,14 @@ function formatSlot(scheduledFor: string | null): string {
   return time ? `${date} · ${time.slice(0, 5)}` : (date ?? scheduledFor);
 }
 
-export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; beats: BeatRow[] }) {
+export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignDetail; beats: CampaignBeat[] }) {
   const router = useRouter();
   const { error, success } = useToast();
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
 
-  const gate = campaign.gate_state;
-  const hasOpenGate = Boolean(campaign.workflow_run_id && gate?.gate);
+  const gate = campaign.gateState;
+  const hasOpenGate = Boolean(campaign.workflowRunId && gate?.gate);
   const isLocked = ['plan_approved', 'active', 'completed', 'archived'].includes(campaign.status);
 
   // The campaign row is server-fetched props; on a Realtime change, re-pull the
@@ -126,7 +69,7 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
     `id=eq.${campaign.id}`,
   );
 
-  const runId = campaign.workflow_run_id;
+  const runId = campaign.workflowRunId;
   const [stepLabel, setStepLabel] = useState<string | null>(null);
 
   const refreshProgress = useCallback(async () => {
@@ -210,7 +153,7 @@ export function CampaignWorkspace({ campaign, beats }: { campaign: CampaignRow; 
         />
       )}
 
-      {isLocked && <LockedCanvas strategy={campaign.strategy} beats={beats} schedule={campaign.schedule_plan} />}
+      {isLocked && <LockedCanvas strategy={campaign.strategy} beats={beats} schedule={campaign.schedulePlan} />}
     </div>
   );
 }
@@ -223,7 +166,7 @@ function Gate1Panel({
   submitted,
   onSubmit,
 }: {
-  strategy: Strategy;
+  strategy: CampaignStrategy;
   isPending: boolean;
   submitted: boolean;
   onSubmit: (decision: unknown, confirmation: string) => void;
@@ -425,8 +368,8 @@ function LockedCanvas({
   beats,
   schedule,
 }: {
-  strategy: Strategy | null;
-  beats: BeatRow[];
+  strategy: CampaignStrategy | null;
+  beats: CampaignBeat[];
   schedule: SchedulePlan | null;
 }) {
   const s = strategy ? { ...EMPTY_STRATEGY, ...strategy } : null;
@@ -457,8 +400,8 @@ function LockedCanvas({
                 <div className={styles.beatNo}>{b.sequence}</div>
                 <div className={styles.beatBody}>
                   {b.title && <span className={styles.beatReadTitle}>{b.title}</span>}
-                  <p className={styles.beatReadMessage}>{b.core_message}</p>
-                  {b.prefer_thread && <StatusChip label="X thread" color="neutral" />}
+                  <p className={styles.beatReadMessage}>{b.coreMessage}</p>
+                  {b.preferThread && <StatusChip label="X thread" color="neutral" />}
                 </div>
               </li>
             ))}

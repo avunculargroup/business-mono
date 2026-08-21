@@ -46,7 +46,7 @@ export default async function AdvisorDetailPage({ params }: { params: Promise<{ 
       .not('status', 'in', '("dismissed","archived")')
       .order('detected_at', { ascending: false })
       .limit(10),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),
   ]);

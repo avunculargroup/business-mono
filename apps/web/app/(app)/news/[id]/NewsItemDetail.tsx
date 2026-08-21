@@ -6,33 +6,29 @@ import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDispla
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import { newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
-import { ReportPanel, type ReportPanelRecord } from './ReportPanel';
+import { ReportPanel } from './ReportPanel';
 import styles from './detail.module.css';
-import type { NewsItemRecord } from '@platform/shared';
+import type { NewsItemDetail as NewsItem } from '@platform/data';
 
 interface NewsItemDetailProps {
-  item: NewsItemRecord;
-  sourceName: string;
-  /** Set only for report_watch items. */
-  report?: ReportPanelRecord | null;
-  supersededItemId?: string | null;
+  item: NewsItem;
 }
 
-export function NewsItemDetail({ item, sourceName, report, supersededItemId }: NewsItemDetailProps) {
-  const original = newsOriginalUrl(item.url, item.canonical_url);
+export function NewsItemDetail({ item }: NewsItemDetailProps) {
+  const original = newsOriginalUrl(item.url, item.canonicalUrl);
 
   return (
     <div className={styles.container}>
       <div className={styles.meta}>
         <CategoryChip category={item.category} />
-        <span className={styles.sourceChip}>{sourceName}</span>
+        <span className={styles.sourceChip}>{item.sourceName}</span>
         {item.author && <span className={styles.muted}>{item.author}</span>}
-        {item.published_at && (
-          <span className={`${styles.muted} ${styles.mono}`}>{formatDate(item.published_at)}</span>
+        {item.publishedAt && (
+          <span className={`${styles.muted} ${styles.mono}`}>{formatDate(item.publishedAt)}</span>
         )}
-        {item.relevance_score != null && (
+        {item.relevanceScore != null && (
           <span className={styles.score} title="Rex relevance score">
-            {item.relevance_score.toFixed(2)}
+            {item.relevanceScore.toFixed(2)}
           </span>
         )}
       </div>
@@ -48,18 +44,18 @@ export function NewsItemDetail({ item, sourceName, report, supersededItemId }: N
 
       {item.summary && <p className={styles.summary}>{item.summary}</p>}
 
-      {report && <ReportPanel report={report} supersededItemId={supersededItemId} />}
+      {item.report && <ReportPanel report={item.report} />}
 
-      {item.curator_notes && (
+      {item.curatorNotes && (
         <div className={styles.curatorNote}>
           <span className={styles.curatorNoteLabel}>Why this matters</span>
-          <span className={styles.curatorNoteBody}>{item.curator_notes}</span>
+          <span className={styles.curatorNoteBody}>{item.curatorNotes}</span>
         </div>
       )}
 
-      {item.topic_tags.length > 0 && (
+      {item.topicTags.length > 0 && (
         <div className={styles.tags}>
-          {item.topic_tags.map((tag) => (
+          {item.topicTags.map((tag) => (
             <span key={tag} className={styles.tag}>
               {tag}
             </span>
@@ -67,13 +63,13 @@ export function NewsItemDetail({ item, sourceName, report, supersededItemId }: N
         </div>
       )}
 
-      {item.body_markdown ? (
+      {item.bodyMarkdown ? (
         <div className={styles.body}>
-          <MarkdownRecordDisplay content={item.body_markdown} />
+          <MarkdownRecordDisplay content={item.bodyMarkdown} />
         </div>
       ) : (
         <p className={styles.muted}>
-          {report
+          {item.report
             ? 'No readable text was extracted from this report. Download the original above.'
             : 'No full text was stored for this item. Use the original link above to read it.'}
         </p>

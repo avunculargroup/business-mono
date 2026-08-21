@@ -42,6 +42,7 @@ Transform tasks into verifiable goals before implementing:
 - LLM-touching evals (`pnpm --filter @platform/agents test:eval`) are NOT run in CI. Run them locally after changes to Simon's routing, specialist registrations, or any agent's system prompt.
 - `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.{ts,tsx}` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. Pure-logic `*.test.ts` run in the `node` environment; component `*.test.tsx` run in `jsdom` with React Testing Library + `@testing-library/jest-dom` matchers (registered in `test/setup.ts`). The two environments are split via `test.projects` in `vitest.config.ts` — one project per environment, each matching its own file extension and carrying `extends: true` so it inherits the root `resolve.alias`, `oxc.jsx`, and `setupFiles`. A new component test only needs the `.test.tsx` extension to land in `jsdom`. Prefer role/text/attribute queries over CSS-module class names. Server-component pages are tested by mocking `@/lib/supabase/server` with the chainable fake in `test/mocks/supabase.ts` (web-side counterpart to the agents mock) and stubbing the interactive client child via `vi.mock`, then asserting query wiring + prop hand-off (see `app/(app)/crm/companies/page.test.tsx`). Root `pnpm test` runs every package via Turborepo — `apps/agents`, `apps/web`, `packages/ui`, `packages/voice` — so all are gated by the PR workflow.
 - `packages/ui` has its own Vitest suite (`pnpm --filter @platform/ui test`). It is jsdom throughout, with no node/jsdom project split, because every module in it renders. Shared presentational components and their `*.test.tsx` live here, **not** in `apps/web/components/` — there is no `components/ui/` in the app any more. Design tokens live in `packages/ui/src/tokens.css`; `apps/web/app/globals.css` only carries app-level base styles and defines no tokens.
+- `packages/data`, `packages/data-supabase` and `packages/data-fixtures` each have their own Vitest suite (`pnpm --filter @platform/data test`). A new repository domain adds its cases to the shared contract harness in `packages/data/src/testing/` — parameterised over an adapter and imported as `@platform/data/testing` — rather than building its own; both the live and fixture adapters must pass the same suite (`@platform/data-fixtures` runs it in `src/bundle.test.ts`). Do not add fields to `ReadContext`: it is guarded at compile time and by `context.test.ts`, because scoping belongs at bundle construction and never in a method argument (see `docs/features/demo-app/repository-contract.md`).
 - Design tokens are guarded by `apps/web/app/globals.test.ts`, which asserts the canonical set and that `.claude/skills/bts-design/colors_and_type.css` stays identical to it. That skill file is a deliberate copy, not an `@import`, because the skill's workflow is to copy assets out of the repo — change a token in one and you must change it in the other in the same commit, or the build goes red.
 - Visual regression (`e2e/`, Playwright) is **advisory and separate** from `pnpm test`. Run it with `pnpm test:visual`, which shells out to the same container image CI uses — baselines are container-specific, so a raw local run (`test:visual:local`) diffs on text-heavy specimens and is not a regression. See `.github/workflows/e2e.yml`.
 
@@ -54,8 +55,13 @@ Transform tasks into verifiable goals before implementing:
 │   ├── agents/          # Mastra AI agents server (Railway)
 │   │   ├── evals/       # LLM-touching evals (runEvals + scorers) — `pnpm test:eval`
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   ├── demo/            # Public fixture-backed demo (Next.js) — no DB client, no auth, read-only
 │   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
+│   ├── agent-traces/    # Recorded workflow traces + the BTS-owned trace schema (no deps at all)
+│   ├── data/            # Repository interfaces + contract test harness (no DB client)
+│   ├── data-fixtures/   # Fixture repository implementation for the demo (no DB client)
+│   ├── data-supabase/   # Live repository implementation over Supabase
 │   ├── db/              # Supabase client, types, migrations, RPC functions
 │   ├── shared/          # Shared types, constants, utilities
 │   ├── signal/          # TypeScript client for signal-cli REST API sidecar
@@ -80,18 +86,31 @@ Transform tasks into verifiable goals before implementing:
 
 ### Package naming
 
+- `@platform/agent-traces` — the trace schema for the demo's replay, plus recorded bundles. Depends on **nothing**, and must never import from `@mastra/core`: the recorder translates spans into this schema so a Mastra upgrade breaks the recorder, not the already-recorded demo
+- `@platform/data` — repository interfaces, `ReadContext`/`Paginated`, the demo/live error types, the React provider (`@platform/data/provider`), and the contract test harness (`@platform/data/testing`). Imports no database client
+- `@platform/data-supabase` — the live repository implementation over Supabase
+- `@platform/data-fixtures` — the fixture repository implementation the demo runs on. Implements only the demo's seven domains (`DEMO_DOMAINS`); every write throws `DemoWriteBlockedError`. No database client, no network, no filesystem
 - `@platform/db` — database client, generated types, migration SQL, Supabase RPC wrappers
 - `@platform/shared` — shared TypeScript types, constants, enums, utility functions
 - `@platform/signal` — typed HTTP client for signal-cli REST API sidecar
 - `@platform/ui` — design tokens (`src/tokens.css`) and shared presentational components
 - `@platform/voice` — voice/transcription helpers
 - `@platform/agents` — Mastra agent server (not consumed by other packages)
+- `@platform/demo` — the public demo app (not consumed by other packages)
 - `@platform/web` — Next.js frontend (not consumed by other packages)
 
 ### Import rules
 
-- `apps/agents` imports from `@platform/db`, `@platform/shared`, and `@platform/signal`
-- `apps/web` imports from `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
+- `apps/agents` imports from `@platform/agent-traces`, `@platform/db`, `@platform/shared`, and `@platform/signal`
+- `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
+- `apps/demo` imports from `@platform/agent-traces`, `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui` — and nothing else. It must never gain a dependency that can open a database connection; `apps/demo/lib/boundary.test.ts` asserts the whole transitive graph, so adding one goes red
+- `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
+  models reuse the enums the ingestion side already defines rather than re-declaring them.
+  `packages/data-supabase` imports from `@platform/data`, `@platform/db` and `@platform/shared`;
+  `packages/data-fixtures` imports from `@platform/data` and `@platform/shared` only — its lack of a
+  database dependency is what makes the demo unable to reach one. The
+  split is what lets a fixture-backed app depend on the interfaces without being able to reach a
+  database
 - `packages/ui` imports from `@platform/shared` only — never from `apps/*`. It is consumed by
   `apps/web` today and by `apps/demo` later, so any dependency on app code breaks that. React and
   `lucide-react` are peer dependencies.
@@ -289,6 +308,7 @@ Read the relevant docs BEFORE writing code.
 |Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth                        |
 |Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
 |Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
+|Repository interfaces, a new data domain, `apps/web` data wiring|`docs/features/demo-app/repository-contract.md` + `docs/features/demo-app/build-progress.md`|Read models not tables, filtering pushed into the adapter, scoping at construction never in a signature, one contract suite both adapters pass|
 |Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit                                     |
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 |Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
@@ -299,9 +319,11 @@ Read the relevant docs BEFORE writing code.
 |Simon's routing logic or specialist registrations        |`apps/agents/evals/simon-routing.eval.ts` + `apps/agents/evals/simon-routing/fixtures.json`|Add a fixture row, then run `pnpm --filter @platform/agents test:eval` to spot-check routing accuracy (real LLM) before merging|
 |Scheduled routines (cron-driven jobs)                    |`apps/agents/src/workflows/executeRoutineWorkflow.ts` + `routines` table|Routines run via Mastra's native scheduler — `executeRoutine` workflow is triggered per row in the `routines` table at the configured cron|
 |New workflow step that calls an LLM                      |`packages/shared/src/modelScopes.ts` + `apps/agents/src/config/model.ts`|Register the step in `MODEL_SCOPES` (with `fallbackAgent` set) and wrap the `agent.generate(...)` call with `stepRequestContext('<workflow>.<step>')` so the step shows up in `/settings/models` and can override its owning agent|
+|Trace recording, or the demo's replay surface             |`apps/agents/src/observability/traceRecorderProcessor.ts` + `packages/agent-traces/src/schema.ts`|The recorder is a second `SpanOutputProcessor`, off unless `TRACE_RECORDER_TRACE_ID` is set. Do NOT copy `VALID_AGENT_NAMES` from `agentActivityProcessor.ts` — it drops `lex` spans, and the compliance verdict is what the trace exists to show. Redaction runs on the way in, never as a cleanup pass|
 |Logging / console output in `apps/agents`                |`apps/agents/src/lib/logger.ts`                              |Use `createLogger('<component>')` + `log.error({ err }, 'msg')` — never `console.*`. Single-line JSON to stdout so Railway parses each event as one entry (see Coding Behavior → Logging)|
 |Adding an agent, workflow, listener or workspace package |`apps/agents/README.md` (agents/workflows/listeners), `apps/web/README.md` (routes), root `README.md` (packages, subsystems)|**Update the README in the same PR.** These inventories drift within weeks otherwise — a README review in Aug 2026 found 3 undocumented agents, 2 unregistered workflows, 8 missing listeners and a whole workspace package (`@platform/voice`) absent from every doc. Keep inventories next to the code they describe: per-app READMEs own their own lists, the root README links to them|
-|Adding or moving a doc that others link to             |`node scripts/check-doc-links.mjs`                           |Relative links in the entry-point docs are CI-gated. Run the checker locally before pushing — it is offline and takes under a second|
+|Adding or moving a doc that others link to             |`node scripts/check-doc-links.mjs`                           |Relative links **and their `#section` anchors** in the entry-point and build-progress docs are CI-gated. Run the checker locally before pushing — it is offline and takes under a second|
+|Citing another doc from a doc                          |`node scripts/check-doc-links.mjs`                           |Link to a section anchor (`./file.md#the-section-heading`), never a line number. Line numbers rot silently and cannot be checked; a renamed or deleted heading goes red. See `docs/features/demo-app/build-progress.md` for the house style|
 
 **If in doubt, read `docs/brand-voice.md`.** It's the most commonly needed reference after this file.
 

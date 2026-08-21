@@ -1,14 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import {
+  createFakeRepositories,
+  fakeCompanySummary,
+  type FakeRepositories,
+} from '@/test/mocks/repositories';
 
-// `createClient` is async in the server module; hand it our fake. The `fake`
-// binding is reassigned per-test in beforeEach and only dereferenced when the
-// page calls createClient(), so the hoisted factory closing over it is safe.
-let fake: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => fake),
+// Converted to the seam in vertical 4.6a. The page asks a repository instead of
+// building a query, so the test hands it a bundle rather than a Supabase fake.
+// What it asserts is unchanged — the read it makes and what it hands the list —
+// but the query itself is verified once, in @platform/data-supabase.
+let repositories: FakeRepositories;
+vi.mock('@/lib/repositories', () => ({
+  getRepositories: vi.fn(async () => repositories),
 }));
 
 // Stub the client child so the test stays a unit on the page's data wiring,
@@ -33,18 +38,16 @@ vi.mock('@/components/crm/CompaniesList', () => ({
 import CompaniesPage from './page';
 
 beforeEach(() => {
-  fake = createFakeSupabase();
+  repositories = createFakeRepositories();
 });
 
 describe('CompaniesPage', () => {
-  it('renders the page header and the fetched companies', async () => {
-    fake.__setResponse('companies', {
-      data: [
-        { id: '1', name: 'Acme Corp' },
-        { id: '2', name: 'Globex' },
+  it('renders the page header and the companies the repository returned', async () => {
+    repositories = createFakeRepositories({
+      companies: [
+        fakeCompanySummary({ id: '1', name: 'Acme Corp' }),
+        fakeCompanySummary({ id: '2', name: 'Globex', slug: 'globex' }),
       ],
-      count: 2,
-      error: null,
     });
 
     render(await CompaniesPage());
@@ -55,18 +58,21 @@ describe('CompaniesPage', () => {
     expect(screen.getByTestId('companies-list')).toHaveAttribute('data-total', '2');
   });
 
-  it('queries the companies table ordered by name with a 25-row cap', async () => {
+  it('hands the list the repository total, not the page it received', async () => {
+    // The two differ as soon as there are more companies than one page holds,
+    // and the count is what tells the user so.
+    repositories.companies.listCompanies.mockResolvedValueOnce({
+      items: [fakeCompanySummary()],
+      total: 40,
+      hasMore: true,
+    });
+
     render(await CompaniesPage());
 
-    expect(fake.from).toHaveBeenCalledWith('companies');
-    const [builder] = fake.__buildersFor('companies');
-    expect(builder.order).toHaveBeenCalledWith('name');
-    expect(builder.limit).toHaveBeenCalledWith(25);
+    expect(screen.getByTestId('companies-list')).toHaveAttribute('data-total', '40');
   });
 
-  it('falls back to an empty list and zero count when the query returns nothing', async () => {
-    fake.__setResponse('companies', { data: null, count: null, error: null });
-
+  it('renders an empty list rather than failing when there are no companies', async () => {
     render(await CompaniesPage());
 
     const list = screen.getByTestId('companies-list');

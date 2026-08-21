@@ -120,8 +120,10 @@ unusually complete and are the best worked examples of the house page pattern.
 ### Portfolio demo (not built)
 
 [`features/demo-app/`](./features/demo-app/README.md) specs a public, fixture-backed demo of
-this platform for technical evaluators. `apps/demo` does not exist — this is a plan, not a
-description.
+this platform for technical evaluators. **`apps/demo` now exists and builds** — phases 0–9 of
+the plan have shipped. [`build-progress.md`](./features/demo-app/build-progress.md) records what
+each phase actually shipped and what is still outstanding before it can be deployed; the other
+documents in the folder are the specs it was built against, not a description of the result.
 
 ## Build logs and handoffs
 

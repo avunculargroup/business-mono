@@ -1,7 +1,10 @@
-import type { Database } from '@platform/db';
+// Formatters over the repository's read models, rather than over generated view
+// rows: the page is fed by a repository now, and these shape what it returns
+// for display. The deltas stay here on purpose — the read model carries signed
+// numbers and no direction, and turning a sign into an arrow is presentation.
+import type { IndicatorLatest, IndicatorSeriesPoint } from '@platform/data';
 
-export type IndicatorLatest = Database['public']['Views']['v_indicator_latest']['Row'];
-export type IndicatorSeriesPoint = Database['public']['Views']['v_indicator_series']['Row'];
+export type { IndicatorLatest, IndicatorSeriesPoint };
 
 /** A print released within this many days gets the gold freshness marker. */
 export const FRESH_DAYS = 7;
@@ -39,7 +42,7 @@ export function categoryLabel(category: string | null): string {
  *  view type lags the migration that added period_granularity — the value is
  *  absent (→ false) until the view ships, which is the correct fallback. */
 export function isDailyGranularity(row: IndicatorLatest): boolean {
-  return (row as { period_granularity?: string | null }).period_granularity === 'daily';
+  return row.periodGranularity === 'daily';
 }
 
 export function formatValue(value: number, decimals: number): string {
@@ -77,7 +80,7 @@ export interface Delta {
 
 /** Change since the prior period — direction only, never good/bad. */
 export function computeDelta(row: IndicatorLatest): Delta {
-  const c = row.change_since_prior;
+  const c = row.changeSincePrior;
   if (c == null || c === 0) return { kind: 'flat', magnitude: '', pct: null };
   const up = c > 0;
   const decimals = row.decimals ?? 2;
@@ -86,8 +89,8 @@ export function computeDelta(row: IndicatorLatest): Delta {
   // A 0-centred diffusion index (activity) can cross zero, so a percent change is
   // meaningless (−0.4 from 26.7 is not "−101%"). Absolute points only.
   const pct =
-    row.category !== 'activity' && row.pct_change_since_prior != null
-      ? `${sign}${Math.abs(row.pct_change_since_prior).toFixed(2)}%`
+    row.category !== 'activity' && row.pctChangeSincePrior != null
+      ? `${sign}${Math.abs(row.pctChangeSincePrior).toFixed(2)}%`
       : null;
   return { kind: up ? 'up' : 'down', magnitude, pct };
 }
@@ -106,19 +109,19 @@ export interface YoyStat {
  */
 export function pickYoy(row: IndicatorLatest): YoyStat | null {
   if (row.category === 'policy_rate') {
-    if (row.yoy_change == null) return null;
-    const sign = row.yoy_change >= 0 ? '+' : '−';
-    return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoy_change).toFixed(row.decimals ?? 2)}pp` };
+    if (row.yoyChange == null) return null;
+    const sign = row.yoyChange >= 0 ? '+' : '−';
+    return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoyChange).toFixed(row.decimals ?? 2)}pp` };
   }
   // Activity is a 0-centred diffusion index — YoY as absolute points, not percent.
   if (row.category === 'activity') {
-    if (row.yoy_change == null) return null;
-    const sign = row.yoy_change >= 0 ? '+' : '−';
-    return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoy_change).toFixed(row.decimals ?? 1)} pts` };
+    if (row.yoyChange == null) return null;
+    const sign = row.yoyChange >= 0 ? '+' : '−';
+    return { label: 'vs 1yr', text: `${sign}${Math.abs(row.yoyChange).toFixed(row.decimals ?? 1)} pts` };
   }
-  if (row.yoy_pct_change == null) return null;
-  const sign = row.yoy_pct_change >= 0 ? '+' : '−';
-  return { label: 'YoY', text: `${sign}${Math.abs(row.yoy_pct_change).toFixed(1)}%` };
+  if (row.yoyPctChange == null) return null;
+  const sign = row.yoyPctChange >= 0 ? '+' : '−';
+  return { label: 'YoY', text: `${sign}${Math.abs(row.yoyPctChange).toFixed(1)}%` };
 }
 
 export interface Spark {

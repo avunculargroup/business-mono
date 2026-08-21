@@ -1,39 +1,26 @@
 import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ContentBoard } from '@/components/content/ContentBoard';
 
 export default async function ContentPage() {
+  const repositories = await getRepositories();
+
+  // `team_members` belongs to the settings vertical (4.11) and is still read on
+  // the raw client here, as it is in the app layout. A page holding both is the
+  // accepted intermediate state while the app is part-converted.
   const supabase = await createClient();
 
-  const { data: items } = await supabase
-    .from('content_items')
-    .select(
-      'id, slug, title, type, status, scheduled_for, publish_error, created_by, campaign_id, social_account_id, campaigns(name), social_accounts(display_name, platform)'
-    )
-    .order('created_at', { ascending: false });
-
-  const { data: teamMembers } = await supabase
-    .from('team_members')
-    .select('id, full_name');
-
-  const cards = (items || []).map((item) => ({
-    id: item.id,
-    slug: item.slug,
-    title: item.title,
-    type: item.type,
-    status: item.status,
-    scheduled_for: item.scheduled_for,
-    publish_error: item.publish_error,
-    created_by: item.created_by,
-    campaign_name: item.campaigns?.name ?? null,
-    account_name: item.social_accounts?.display_name ?? null,
-    platform: item.social_accounts?.platform ?? null,
-  }));
+  const [cards, { data: teamMembers }] = await Promise.all([
+    repositories.content.listCards(resolveReadContext()),
+    supabase.from('team_members').select('id, full_name'),
+  ]);
 
   return (
     <>
       <PageHeader title="Content Pipeline" />
-      <ContentBoard items={cards} teamMembers={teamMembers || []} />
+      <ContentBoard items={cards.items} teamMembers={teamMembers || []} />
     </>
   );
 }

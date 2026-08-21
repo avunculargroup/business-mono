@@ -1,61 +1,76 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import { createFakeRepositories, type FakeRepositories } from '@/test/mocks/repositories';
 
-let fake: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => fake),
+// Converted to the seam in vertical 4.4. The newest-first / 30-row assertions
+// moved to the adapter, where the query now lives.
+let repositories: FakeRepositories;
+vi.mock('@/lib/repositories', () => ({
+  getRepositories: vi.fn(async () => repositories),
 }));
 
-// Imported after the mocks above are registered (vi.mock is hoisted).
 import MarketReportsPage from './page';
 
 beforeEach(() => {
-  fake = createFakeSupabase();
+  repositories = createFakeRepositories();
 });
 
 describe('MarketReportsPage', () => {
   it('renders the header and one row per report with status/mode chips', async () => {
-    fake.__setResponse('market_reports', {
-      data: [
+    repositories = createFakeRepositories({
+      marketReports: [
         {
           id: 'mr-1',
-          as_of: '2026-07-18',
+          asOf: '2026-07-18',
           status: 'published',
-          report_mode: 'normal',
-          narration_markdown: 'Hash rate fell 8% overnight.',
+          narrationMarkdown: 'Hash rate fell 8% overnight.',
           emailed: true,
+          isQuietDay: false,
         },
         {
           id: 'mr-2',
-          as_of: '2026-07-17',
+          asOf: '2026-07-17',
           status: 'held',
-          report_mode: 'quiet',
-          narration_markdown: 'On-chain was quiet.',
+          narrationMarkdown: 'On-chain was quiet.',
           emailed: true,
+          isQuietDay: true,
         },
       ],
-      error: null,
     });
 
     render(await MarketReportsPage());
 
     expect(screen.getByRole('heading', { name: 'Market reports' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /18 July 2026/ })).toHaveAttribute('href', '/market-reports/mr-1');
+    expect(screen.getByRole('link', { name: /18 July 2026/ })).toHaveAttribute(
+      'href',
+      '/market-reports/mr-1',
+    );
     expect(screen.getByText('Published')).toBeInTheDocument();
     expect(screen.getByText('Held')).toBeInTheDocument();
     expect(screen.getByText('Quiet day')).toBeInTheDocument();
     expect(screen.getByText('Hash rate fell 8% overnight.')).toBeInTheDocument();
   });
 
-  it('queries market_reports newest-first with a 30-row cap', async () => {
+  it('marks only the quiet day, not every report', async () => {
+    // The quiet-day path is one of the two principles this surface carries, so
+    // the chip appearing on a normal day would misrepresent the engine.
+    repositories = createFakeRepositories({
+      marketReports: [
+        {
+          id: 'mr-1',
+          asOf: '2026-07-18',
+          status: 'published',
+          narrationMarkdown: 'Something moved.',
+          emailed: true,
+          isQuietDay: false,
+        },
+      ],
+    });
+
     render(await MarketReportsPage());
 
-    expect(fake.from).toHaveBeenCalledWith('market_reports');
-    const [builder] = fake.__buildersFor('market_reports');
-    expect(builder.order).toHaveBeenCalledWith('as_of', { ascending: false });
-    expect(builder.limit).toHaveBeenCalledWith(30);
+    expect(screen.queryByText('Quiet day')).not.toBeInTheDocument();
   });
 
   it('shows the empty state when no reports exist', async () => {

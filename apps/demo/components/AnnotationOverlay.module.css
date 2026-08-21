@@ -1,0 +1,119 @@
+/* The overlay never participates in layout.
+
+   Fixed to the viewport and pointer-events: none, so nothing under it moves and
+   nothing under it stops being clickable. Only the markers themselves take
+   pointer events back. This is the "must not reflow the underlying layout"
+   requirement, held structurally rather than by careful measurement. */
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* Drawn on the layer, positioned over the target — not around it, which would
+   mean giving the target a border and shifting everything after it. */
+.outline {
+  position: absolute;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-glow);
+}
+
+.marker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-accent-dark);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 150ms ease;
+}
+
+.marker:hover,
+.markerActive {
+  background: var(--color-accent-dark);
+  color: var(--color-bg);
+}
+
+.marker:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The panel is in the layer too, so opening it never reflows the page. */
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(400px, 100vw);
+  height: 100%;
+  padding: var(--space-6);
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+.panelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+}
+
+.close {
+  flex-shrink: 0;
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.panelBody {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.panelLink {
+  display: inline-block;
+  margin-top: var(--space-4);
+  color: var(--color-accent-dark);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker {
+    transition: none;
+  }
+}

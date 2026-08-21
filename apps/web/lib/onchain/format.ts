@@ -1,4 +1,3 @@
-import type { Database } from '@platform/db';
 // Reuse the pure, generic formatters from the macro layer — value formatting and
 // the sparkline path are identical here. Onchain-specific labels, deltas, the
 // signal chip, and the MVRV range marker live below.
@@ -7,8 +6,12 @@ import { formatValue, sparklinePath, type Spark } from '@/lib/indicators/format'
 export { formatValue, sparklinePath };
 export type { Spark };
 
-export type OnchainDashboardRow = Database['public']['Views']['v_onchain_dashboard']['Row'];
-export type OnchainSeriesPoint = Database['public']['Views']['v_onchain_series']['Row'];
+// Read models rather than generated view rows — see the note in
+// lib/indicators/format.ts.
+import type { OnchainLatest, OnchainSeriesPoint } from '@platform/data';
+
+export type OnchainDashboardRow = OnchainLatest;
+export type { OnchainSeriesPoint };
 
 /** An observation this recent gets the gold freshness marker. On-chain data is
  *  daily, so the window is tight. */
@@ -65,15 +68,15 @@ export interface Delta {
 /** Change since the prior observation — direction only, never good/bad. Derived
  *  metrics carry NULL deltas in v1; those render as 'flat' and the card hides them. */
 export function computeDelta(row: OnchainDashboardRow): Delta {
-  const c = row.change_since_prior;
+  const c = row.changeSincePrior;
   if (c == null || c === 0) return { kind: 'flat', magnitude: '', pct: null };
   const up = c > 0;
   const decimals = row.decimals ?? 2;
   const sign = up ? '+' : '−'; // − minus sign
   const magnitude = `${sign}${formatValue(Math.abs(c), decimals)}`;
   const pct =
-    row.pct_change_since_prior != null
-      ? `${sign}${Math.abs(row.pct_change_since_prior).toFixed(2)}%`
+    row.pctChangeSincePrior != null
+      ? `${sign}${Math.abs(row.pctChangeSincePrior).toFixed(2)}%`
       : null;
   return { kind: up ? 'up' : 'down', magnitude, pct };
 }

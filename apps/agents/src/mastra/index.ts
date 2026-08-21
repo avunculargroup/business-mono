@@ -42,6 +42,7 @@ import { startLibraryQuestionListener } from '../listeners/libraryQuestionListen
 import { startFeedbackDistillListener } from '../listeners/feedbackDistillListener.js';
 import { startMarketReportFeedbackListener } from '../listeners/marketReportFeedbackListener.js';
 import { AgentActivitySpanProcessor } from '../observability/agentActivityProcessor.js';
+import { TraceRecorderProcessor } from '../observability/traceRecorderProcessor.js';
 
 // Railway containers have no IPv6 outbound routing. Force Node.js to prefer
 // IPv4 when a hostname resolves to both A and AAAA records (e.g. Supabase
@@ -108,13 +109,21 @@ const exporters = enableLocalTraceExport
   ? [new DefaultExporter(), new CloudExporter()]
   : [new CloudExporter()];
 
+const traceRecorder = TraceRecorderProcessor.fromEnv();
+
 const observability = new Observability({
   configs: {
     default: {
       serviceName: 'bts-agents',
       sampling: { type: SamplingStrategyType.ALWAYS },
       exporters,
-      spanOutputProcessors: [new AgentActivitySpanProcessor()],
+      // The recorder is a second processor and is off unless
+      // TRACE_RECORDER_TRACE_ID names a run to capture. `fromEnv` returns null
+      // rather than a no-op so the disabled case is visible right here.
+      spanOutputProcessors: [
+        new AgentActivitySpanProcessor(),
+        ...(traceRecorder ? [traceRecorder] : []),
+      ],
     },
   },
 });

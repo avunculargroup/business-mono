@@ -7,19 +7,13 @@ import { useToast } from '@platform/ui/ToastProvider';
 import { Button } from '@platform/ui/Button';
 import { createCampaignDraft, launchCampaignStrategy } from '@/app/actions/campaigns';
 import styles from './CampaignWizard.module.css';
+import type { CampaignAccount } from '@platform/data';
 
 // The creation wizard: objective & audience (creates a draft) → accounts &
 // cadence (saves config and launches the strategy workflow). Strategy review
 // (Gate 1) and plan review (Gate 2) happen on the campaign detail page once the
 // agents server has run Margot and suspended. Mobile-friendly: the wizard is
 // linear and stacks naturally.
-
-export interface WizardAccount {
-  id: string;
-  platform: 'linkedin' | 'twitter_x';
-  account_type: string | null;
-  display_name: string | null;
-}
 
 const DAYS: Array<{ code: string; label: string }> = [
   { code: 'MO', label: 'Mon' },
@@ -48,7 +42,7 @@ function csvToArray(value: string): string[] {
     .filter(Boolean);
 }
 
-export function CampaignWizard({ accounts }: { accounts: WizardAccount[] }) {
+export function CampaignWizard({ accounts }: { accounts: CampaignAccount[] }) {
   const router = useRouter();
   const { error } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -233,10 +227,10 @@ export function CampaignWizard({ accounts }: { accounts: WizardAccount[] }) {
                       onClick={() => toggleAccount(a.id)}
                       aria-pressed={checked}
                     >
-                      <span className={styles.accountName}>{a.display_name ?? 'Account'}</span>
+                      <span className={styles.accountName}>{a.displayName ?? 'Account'}</span>
                       <span className={styles.accountPlatform}>
                         {a.platform === 'twitter_x' ? 'X' : 'LinkedIn'}
-                        {a.account_type ? ` · ${a.account_type}` : ''}
+                        {a.accountType ? ` · ${a.accountType}` : ''}
                       </span>
                     </button>
                   );

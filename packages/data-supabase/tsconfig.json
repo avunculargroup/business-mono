@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["vitest/globals"],
+    "paths": {
+      "@platform/data": ["../data/src/index.ts"],
+      "@platform/data/testing": ["../data/src/testing/index.ts"],
+      "@platform/db": ["../db/src/index.ts"],
+      "@platform/shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["node_modules"]
+}

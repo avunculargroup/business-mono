@@ -18,6 +18,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^3.9.0",
+    "@platform/data": "workspace:*",
+    "@platform/data-supabase": "workspace:*",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/ui": "workspace:*",

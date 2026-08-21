@@ -1,13 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { SimonThread } from '@/components/simon/SimonThread';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import type { Database } from '@platform/db';
-
-type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];
+import { toAgentActivityItem } from '@platform/data-supabase';
+import type { AgentActivityItem } from '@platform/data';
 
 export type ThreadItem =
   | { type: 'message'; data: { role: 'director' | 'simon'; content: string; source?: string; timestamp: string } }
-  | { type: 'approval'; data: AgentActivity };
+  | { type: 'approval'; data: AgentActivityItem };
 
 export default async function SimonPage() {
   const supabase = await createClient();
@@ -56,15 +55,16 @@ export default async function SimonPage() {
       if (/^Web directive:/i.test(activity.action)) continue;
       threadItems.push({
         type: 'approval',
-        data: activity,
+        // Converted in vertical 4.11; mapped at the boundary until then.
+        data: toAgentActivityItem(activity),
       });
     }
   }
 
   // Sort by timestamp (newest last)
   threadItems.sort((a, b) => {
-    const aTime = a.type === 'message' ? a.data.timestamp : a.data.created_at;
-    const bTime = b.type === 'message' ? b.data.timestamp : b.data.created_at;
+    const aTime = a.type === 'message' ? a.data.timestamp : a.data.createdAt;
+    const bTime = b.type === 'message' ? b.data.timestamp : b.data.createdAt;
     return new Date(aTime).getTime() - new Date(bTime).getTime();
   });
 

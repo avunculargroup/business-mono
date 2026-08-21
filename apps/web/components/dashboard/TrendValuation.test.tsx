@@ -7,15 +7,15 @@ function row(overrides: Partial<OnchainDashboardRow> = {}): OnchainDashboardRow 
   return {
     key: 'ma_200d',
     name: 'Two-Hundred-Day Moving Average',
-    short_label: '200-Day MA',
-    metric_group: 'trend_valuation',
+    shortLabel: '200-Day MA',
+    metricGroup: 'trend_valuation',
     unit: 'usd',
     decimals: 0,
     value: 92000,
-    observed_at: '2026-07-03',
-    change_since_prior: 300,
-    pct_change_since_prior: 0.33,
-    days_since_observed: 1,
+    observedAt: '2026-07-03',
+    changeSincePrior: 300,
+    pct_changeSincePrior: 0.33,
+    daysSinceObserved: 1,
     signal: null,
     ...overrides,
   } as OnchainDashboardRow;
@@ -27,10 +27,10 @@ describe('TrendValuation', () => {
       <TrendValuation
         latest={[
           // Out of order + a non-trend row that must be ignored.
-          row({ key: 'mayer_multiple', short_label: 'Mayer Multiple', unit: 'ratio', decimals: 2, value: 1.15 }),
-          row({ key: 'ma_50d', short_label: '50-Day MA', value: 95000 }),
-          row({ key: 'ma_200d', short_label: '200-Day MA', value: 92000 }),
-          row({ key: 'hash_rate', short_label: 'Hash Rate', metric_group: 'network_security', unit: 'eh_s', value: 642 }),
+          row({ key: 'mayer_multiple', shortLabel: 'Mayer Multiple', unit: 'ratio', decimals: 2, value: 1.15 }),
+          row({ key: 'ma_50d', shortLabel: '50-Day MA', value: 95000 }),
+          row({ key: 'ma_200d', shortLabel: '200-Day MA', value: 92000 }),
+          row({ key: 'hash_rate', shortLabel: 'Hash Rate', metricGroup: 'network_security', unit: 'eh_s', value: 642 }),
         ]}
       />,
     );
@@ -48,7 +48,7 @@ describe('TrendValuation', () => {
     render(
       <TrendValuation
         latest={[
-          row({ key: 'ma_cross', short_label: '50d vs 200d', unit: 'signal', decimals: 2, value: 4.2, signal: 'cross_up' }),
+          row({ key: 'ma_cross', shortLabel: '50d vs 200d', unit: 'signal', decimals: 2, value: 4.2, signal: 'cross_up' }),
         ]}
       />,
     );
@@ -61,8 +61,8 @@ describe('TrendValuation', () => {
     const { container } = render(
       <TrendValuation
         latest={[
-          row({ key: 'ma_50d', short_label: '50-Day MA', value: 95000 }),
-          row({ key: 'btc_price_usd', short_label: 'BTC/USD', value: 94000 }),
+          row({ key: 'ma_50d', shortLabel: '50-Day MA', value: 95000 }),
+          row({ key: 'btc_price_usd', shortLabel: 'BTC/USD', value: 94000 }),
         ]}
         series={[
           { key: 'btc_price_usd', value: 90000 } as never,
@@ -83,7 +83,7 @@ describe('TrendValuation', () => {
 
   it('renders nothing when there are no trend rows', () => {
     const { container } = render(
-      <TrendValuation latest={[row({ key: 'hash_rate', metric_group: 'network_security' })]} />,
+      <TrendValuation latest={[row({ key: 'hash_rate', metricGroup: 'network_security' })]} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

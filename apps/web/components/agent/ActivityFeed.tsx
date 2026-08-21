@@ -3,28 +3,34 @@
 import { useState, useCallback } from 'react';
 import { AgentActivityCard } from './AgentActivityCard';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { toAgentActivityItem } from '@platform/data-supabase';
+import type { AgentActivityItem } from '@platform/data';
 import type { Database } from '@platform/db';
 import styles from './ActivityFeed.module.css';
 
-type AgentActivity = Database['public']['Tables']['agent_activity']['Row'];
+type AgentActivityRow = Database['public']['Tables']['agent_activity']['Row'];
 
 interface ActivityFeedProps {
-  initialActivities: AgentActivity[];
+  initialActivities: AgentActivityItem[];
   totalCount: number;
 }
 
 export function ActivityFeed({ initialActivities }: ActivityFeedProps) {
   const [activities, setActivities] = useState(initialActivities);
 
-  // Real-time subscription for new items
+  // Real-time subscription for new items. Realtime delivers raw table rows, not
+  // read models, so payloads go through the adapter's mapper — the same one the
+  // server read used — rather than a second hand-rolled conversion that could
+  // drift from it. Realtime itself stays outside the seam: it has no fixture
+  // equivalent, and the demo no-ops it.
   useRealtimeSubscription(
     'agent_activity',
     useCallback((payload) => {
       if (payload.eventType === 'INSERT') {
-        const newActivity = payload.new as AgentActivity;
+        const newActivity = toAgentActivityItem(payload.new as AgentActivityRow);
         setActivities((prev) => [newActivity, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
-        const updated = payload.new as AgentActivity;
+        const updated = toAgentActivityItem(payload.new as AgentActivityRow);
         setActivities((prev) =>
           prev.map((a) => (a.id === updated.id ? updated : a))
         );

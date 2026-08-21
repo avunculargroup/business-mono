@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FeedChange, WatchHealthRow } from './SignalsView';
+import type { EcosystemChange, WatchHealth } from '@platform/data';
 
 // jsdom doesn't implement the <dialog> methods the Modal effect calls on mount;
 // stub them so rendering (with the note modal closed) doesn't throw. Same stub
@@ -38,46 +38,46 @@ vi.mock('@platform/ui/ToastProvider', () => ({
 
 const { SignalsView } = await import('./SignalsView');
 
-function change(overrides: Partial<FeedChange> = {}): FeedChange {
+function change(overrides: Partial<EcosystemChange> = {}): EcosystemChange {
   return {
     id: 'ch1',
-    change_type: 'release',
+    changeType: 'release',
     title: 'firmware v6.3.4',
     summary: 'Coldcard released firmware 6.3.4 on 12 July 2026.',
     severity: 'medium',
     materiality: 40,
-    compliance_class: 'neutral',
+    complianceClass: 'neutral',
     status: 'new',
     pinned: false,
-    client_relevant: false,
-    curator_note: null,
-    occurred_at: '2026-07-12T02:00:00Z',
-    detected_at: '2026-07-12T03:00:00Z',
-    external_url: 'https://example.invalid/r',
-    entity_name: 'Coldcard',
-    product_service_id: 'p1',
-    advisor_partner_id: null,
-    product_slug: 'coldcard',
-    advisor_slug: null,
-    watch_label: 'Coldcard firmware',
-    watch_type: 'github_release',
+    clientRelevant: false,
+    curatorNote: null,
+    occurredAt: '2026-07-12T02:00:00Z',
+    detectedAt: '2026-07-12T03:00:00Z',
+    externalUrl: 'https://example.invalid/r',
+    entityName: 'Coldcard',
+    productServiceId: 'p1',
+    advisorPartnerId: null,
+    productSlug: 'coldcard',
+    advisorSlug: null,
+    watchLabel: 'Coldcard firmware',
+    watchType: 'github_release',
     ...overrides,
   };
 }
 
-const health: WatchHealthRow[] = [
+const health: WatchHealth[] = [
   {
     id: 'w1',
     label: 'Coldcard firmware',
-    watch_type: 'github_release',
+    watchType: 'github_release',
     health: 'failing',
-    check_frequency: 'daily',
-    consecutive_failures: 6,
-    last_checked_at: '2026-07-12T03:00:00Z',
-    last_change_at: null,
-    days_since_check: 3,
-    entity_name: 'Coldcard',
-    owner_name: 'Chris',
+    checkFrequency: 'daily',
+    consecutiveFailures: 6,
+    lastCheckedAt: '2026-07-12T03:00:00Z',
+    lastChangeAt: null,
+    daysSinceCheck: 3,
+    entityName: 'Coldcard',
+    ownerName: 'Chris',
   },
 ];
 
@@ -105,7 +105,7 @@ describe('SignalsView', () => {
   it('shows the curator note inline', () => {
     render(
       <SignalsView
-        changes={[change({ curator_note: 'Only affects the Mk3; most clients are on the Q.' })]}
+        changes={[change({ curatorNote: 'Only affects the Mk3; most clients are on the Q.' })]}
         watchHealth={[]}
       />,
     );
@@ -118,8 +118,8 @@ describe('SignalsView', () => {
     render(
       <SignalsView
         changes={[
-          change({ id: 'ch1', entity_name: 'Coldcard', title: 'firmware v6.3.4' }),
-          change({ id: 'ch2', entity_name: 'Acme Legal', title: 'Terms updated' }),
+          change({ id: 'ch1', entityName: 'Coldcard', title: 'firmware v6.3.4' }),
+          change({ id: 'ch2', entityName: 'Acme Legal', title: 'Terms updated' }),
         ]}
         watchHealth={[]}
       />,
@@ -140,7 +140,7 @@ describe('SignalsView', () => {
       <SignalsView
         changes={[
           change({ id: 'ch1', title: 'firmware v6.3.4' }),
-          change({ id: 'ch2', entity_name: 'Acme Legal', title: 'Terms updated', summary: null }),
+          change({ id: 'ch2', entityName: 'Acme Legal', title: 'Terms updated', summary: null }),
         ]}
         watchHealth={[]}
       />,
@@ -186,7 +186,7 @@ describe('SignalsView', () => {
     flagClientRelevant.mockResolvedValue({
       error: 'This change has not been classified for compliance yet, so it cannot be flagged for clients.',
     });
-    render(<SignalsView changes={[change({ compliance_class: null })]} watchHealth={[]} />);
+    render(<SignalsView changes={[change({ complianceClass: null })]} watchHealth={[]} />);
 
     await user.click(screen.getByLabelText('Flag firmware v6.3.4 for clients'));
 

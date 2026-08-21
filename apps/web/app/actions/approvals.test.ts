@@ -1,63 +1,75 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import { createFakeRepositories, type FakeRepositories } from '@/test/mocks/repositories';
 
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
-let client: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => client),
+// Converted to the seam in vertical 4.1: the action no longer builds a query, so
+// the test no longer describes one. It mocks the auth helper that hands back a
+// bundle and asserts what the action does with it.
+let repositories: FakeRepositories;
+let authed: boolean;
+
+vi.mock('@/lib/action', () => ({
+  getAuthedRepositories: vi.fn(async () =>
+    authed
+      ? { ok: true, repositories, user: { id: 'director-1' } }
+      : { ok: false, error: 'You need to be signed in to do that.' },
+  ),
 }));
 
 import { approveActivity } from './approvals';
 
 beforeEach(() => {
-  client = createFakeSupabase();
+  repositories = createFakeRepositories();
+  authed = true;
   revalidatePath.mockClear();
 });
 
 describe('approveActivity', () => {
-  it('writes the decision to the activity row and revalidates the surfaces', async () => {
-    client.__setResponse('agent_activity', { data: null, error: null });
-
+  it('records the decision and revalidates the surfaces that show it', async () => {
     const result = await approveActivity('a1', 'approved', 'looks good');
 
     expect(result).toEqual({ success: true });
-    const builder = client.__buildersFor('agent_activity')[0];
-    expect(builder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'approved', notes: 'looks good' }),
+    expect(repositories.agentActivity.approveActivity).toHaveBeenCalledWith(
+      'a1',
+      'approved',
+      'looks good',
     );
-    expect(builder.eq).toHaveBeenCalledWith('id', 'a1');
     expect(revalidatePath).toHaveBeenCalledWith('/simon');
     expect(revalidatePath).toHaveBeenCalledWith('/activity');
+    expect(revalidatePath).toHaveBeenCalledWith('/');
   });
 
-  it('stores null notes when no response is given', async () => {
-    client.__setResponse('agent_activity', { data: null, error: null });
-
+  it('passes no response through when none is given', async () => {
     await approveActivity('a1', 'rejected');
 
-    expect(client.__buildersFor('agent_activity')[0].update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'rejected', notes: null }),
+    expect(repositories.agentActivity.approveActivity).toHaveBeenCalledWith(
+      'a1',
+      'rejected',
+      undefined,
     );
   });
 
-  it('returns the auth error when signed out', async () => {
-    client.__setUser(null);
+  it('returns the auth error when signed out, without touching the repository', async () => {
+    authed = false;
 
     const result = await approveActivity('a1', 'approved');
 
     expect(result).toEqual({ error: 'You need to be signed in to do that.' });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(repositories.agentActivity.approveActivity).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('surfaces a humane error and does not revalidate when the update fails', async () => {
-    client.__setResponse('agent_activity', { data: null, error: { message: 'nope' } });
+  it('surfaces a humane error and does not revalidate when the write throws', async () => {
+    repositories.agentActivity.approveActivity.mockRejectedValueOnce({
+      code: '42501',
+      message: 'new row violates row-level security policy',
+    });
 
     const result = await approveActivity('a1', 'approved');
 
-    expect(result).toHaveProperty('error');
+    expect(result).toEqual({ error: "You don't have permission to do that." });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 });

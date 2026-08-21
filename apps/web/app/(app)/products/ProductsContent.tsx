@@ -10,7 +10,7 @@ export async function ProductsContent() {
       .from('products_services')
       .select('id, slug, name, business_name, category, australian_owned, logo_url, company_id, key_relationship_id, companies(name), team_members!products_services_key_relationship_id_fkey(full_name)')
       .order('created_at', { ascending: false }),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
   ]);
 

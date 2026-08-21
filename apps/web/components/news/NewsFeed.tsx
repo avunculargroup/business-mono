@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { NEWS_CATEGORY_LABELS } from '@platform/shared';
-import type { NewsCategory, NewsStatus, NewsItemRecord } from '@platform/shared';
+import type { NewsCategory, NewsStatus } from '@platform/shared';
+import type { NewsDigestItem, NewsFeedItem } from '@platform/data';
 import { CategoryChip } from './CategoryChip';
 import { NewsCard } from './NewsCard';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
@@ -18,20 +19,13 @@ const CATEGORIES: Array<NewsCategory | 'all'> = [
 
 const PAGE_SIZE = 7;
 
-interface DigestItem {
-  id: string;
-  title: string;
-  url: string;
-  category: NewsCategory;
-}
-
 interface NewsFeedProps {
-  initialItems: NewsItemRecord[];
-  todayDigest: DigestItem[];
+  initialItems: NewsFeedItem[];
+  todayDigest: NewsDigestItem[];
 }
 
 export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
-  const [items, setItems] = useState<NewsItemRecord[]>(initialItems);
+  const [items, setItems] = useState<NewsFeedItem[]>(initialItems);
   const [activeCategory, setActiveCategory] = useState<NewsCategory | 'all'>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [page, setPage] = useState(0);
@@ -58,7 +52,7 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
 
   // Sidebar: group today's digest by category
   const digestByCat = useMemo(() => {
-    const grouped: Partial<Record<NewsCategory, DigestItem[]>> = {};
+    const grouped: Partial<Record<NewsCategory, NewsDigestItem[]>> = {};
     for (const item of todayDigest) {
       if (!grouped[item.category]) grouped[item.category] = [];
       grouped[item.category]!.push(item);
@@ -111,15 +105,14 @@ export function NewsFeed({ initialItems, todayDigest }: NewsFeedProps) {
                 id={item.id}
                 title={item.title}
                 url={item.url}
-                canonicalUrl={item.canonical_url}
-                imageUrl={item.image_url}
-                sourceName={item.source_name}
-                publishedAt={item.published_at}
+                imageUrl={item.imageUrl}
+                sourceName={item.sourceName}
+                publishedAt={item.publishedAt}
                 summary={item.summary}
                 category={item.category}
                 status={item.status}
-                relevanceScore={item.relevance_score}
-                curatorNotes={item.curator_notes}
+                relevanceScore={item.relevanceScore}
+                curatorNotes={item.curatorNotes}
                 onStatusChange={handleStatusChange}
               />
             ))}

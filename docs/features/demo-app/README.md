@@ -2,8 +2,10 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** `apps/demo` — public, fixture-backed demonstration of the internal platform
-**Status:** Draft, reconciled against the live repo 2026-08-08
-**Last updated:** 2026-08-08
+**Status:** Built. Phases 0–9 have shipped; `apps/demo` exists and builds. The specs below are
+what it was built *against* — where the build diverged, [`build-progress.md`](./build-progress.md)
+records the divergence and why, and is the document to trust.
+**Last updated:** 2026-08-20
 
 ---
 

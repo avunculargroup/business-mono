@@ -1,20 +1,16 @@
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CompaniesList } from '@/components/crm/CompaniesList';
 
 export default async function CompaniesPage() {
-  const supabase = await createClient();
-
-  const { data: companies, count } = await supabase
-    .from('companies')
-    .select('*', { count: 'exact' })
-    .order('name')
-    .limit(25);
+  const { companies } = await getRepositories();
+  const { items, total } = await companies.listCompanies(resolveReadContext());
 
   return (
     <>
       <PageHeader title="Companies" />
-      <CompaniesList initialCompanies={companies || []} totalCount={count || 0} />
+      <CompaniesList initialCompanies={items} totalCount={total} />
     </>
   );
 }

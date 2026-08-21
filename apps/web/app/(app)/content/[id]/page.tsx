@@ -1,58 +1,27 @@
-import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ContentEditor } from '@/components/content/ContentEditor';
-import type { DraftFeedbackEntry } from '@/components/content/DraftFeedback';
-import { idColumn } from '@/lib/utils';
 
 export default async function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const repositories = await getRepositories();
 
-  // social_account_id and content_feedback are not in the generated Database
-  // types yet — cast to bypass typing (same pattern as the campaign pages).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
-  const { data: item } = await db
-    .from('content_items')
-    .select('*')
-    .eq(idColumn(id), id)
-    .single();
-
+  // One read. The page used to run four, three of them conditional on what the
+  // first returned — a thread has segments, a social draft has feedback, a
+  // LinkedIn post has a character limit.
+  const item = await repositories.content.getDetail(resolveReadContext(), id);
   if (!item) notFound();
-
-  const { data: threadSegments } = item.is_thread
-    ? await db
-        .from('thread_segments')
-        .select('id, body')
-        .eq('content_item_id', item.id)
-        .order('sequence', { ascending: true })
-    : { data: null };
-
-  // Prior feedback on this draft (social drafts only — the box needs an account).
-  const { data: priorFeedback } = item.social_account_id
-    ? await db
-        .from('content_feedback')
-        .select('id, verdict, feedback, created_at')
-        .eq('content_item_id', item.id)
-        .order('created_at', { ascending: false })
-    : { data: null };
-
-  // Platform char limit for the LinkedIn format preview + schedule guard.
-  const { data: spec } =
-    item.type === 'linkedin'
-      ? await db.from('platform_specs').select('max_chars').eq('platform', 'linkedin').maybeSingle()
-      : { data: null };
 
   return (
     <>
       <PageHeader title={item.title || 'Untitled'} backHref="/content" />
       <ContentEditor
         item={item}
-        threadSegments={threadSegments ?? []}
-        priorFeedback={(priorFeedback ?? []) as DraftFeedbackEntry[]}
-        maxChars={spec?.max_chars ?? null}
+        threadSegments={item.threadSegments}
+        priorFeedback={item.priorFeedback}
+        maxChars={item.maxChars}
       />
     </>
   );

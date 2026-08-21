@@ -28,11 +28,11 @@ const baseCard: Card = {
   title: 'Why treasuries hold Bitcoin',
   type: 'linkedin',
   status: 'draft',
-  scheduled_for: null,
-  publish_error: null,
-  created_by: null,
-  campaign_name: null,
-  account_name: null,
+  scheduledFor: null,
+  publishError: null,
+  createdBy: null,
+  campaignName: null,
+  accountName: null,
   platform: null,
 };
 
@@ -45,8 +45,8 @@ describe('ContentBoard card descriptors', () => {
     renderBoard([
       {
         ...baseCard,
-        campaign_name: 'Q3 Education Push',
-        account_name: 'BTS Company',
+        campaignName: 'Q3 Education Push',
+        accountName: 'BTS Company',
         platform: 'linkedin',
       },
     ]);
@@ -58,8 +58,8 @@ describe('ContentBoard card descriptors', () => {
 
   it('distinguishes two variants that share a title by their social account', () => {
     renderBoard([
-      { ...baseCard, id: 'a', account_name: 'BTS Company', platform: 'linkedin' },
-      { ...baseCard, id: 'b', account_name: 'Chris Pollard', platform: 'twitter_x' },
+      { ...baseCard, id: 'a', accountName: 'BTS Company', platform: 'linkedin' },
+      { ...baseCard, id: 'b', accountName: 'Chris Pollard', platform: 'twitter_x' },
     ]);
 
     expect(screen.getByText('LinkedIn · BTS Company')).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('ContentBoard card descriptors', () => {
   });
 
   it('falls back to the assignment label for non-campaign items', () => {
-    renderBoard([{ ...baseCard, created_by: 'member-1' }]);
+    renderBoard([{ ...baseCard, createdBy: 'member-1' }]);
 
     expect(screen.getByText('Assigned')).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe('ContentBoard LinkedIn publishing', () => {
 
   it('shows the publish error on a held scheduled card', () => {
     renderBoard([
-      { ...baseCard, status: 'scheduled', publish_error: 'LinkedIn token has expired' },
+      { ...baseCard, status: 'scheduled', publishError: 'LinkedIn token has expired' },
     ]);
 
     expect(screen.getByText('LinkedIn token has expired')).toBeInTheDocument();
