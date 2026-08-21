@@ -1790,13 +1790,21 @@ fetch the faces, and none at *run* time — the right way round for a public art
 keeps the CDN link deliberately: it is internal and authed, and nobody is evaluating whether it
 works offline.
 
-**⚠️ Screenshot baselines are not committed, and the screenshot step will be red until they are.**
-They must be generated inside `mcr.microsoft.com/playwright:v1.62.1-noble` — font hinting differs
-enough elsewhere that baselines from another machine diff on every CI run — and no Docker daemon was
-reachable from this session. Bootstrap them with the workflow's existing
-`workflow_dispatch: update_baselines` input, or `pnpm test:visual:update` on a machine with Docker,
-then commit `e2e/**-snapshots/`. This is the same state the design-system specs shipped in, and the
-workflow orders the steps so the signal-carrying ones run first.
+**⚠️ Screenshot baselines are not committed.** They must be generated inside
+`mcr.microsoft.com/playwright:v1.62.1-noble` — font hinting differs enough elsewhere that baselines
+from another machine diff on every CI run — and no Docker daemon was reachable from this session.
+Bootstrap them with the workflow's `workflow_dispatch: update_baselines` input, or
+`pnpm test:visual:update` on a machine with Docker, then commit `e2e/**-snapshots/`.
+
+Until then the screenshot cases **skip**, guarded on the snapshot directory's existence. The first
+CI run failed nine of them on `A snapshot doesn't exist`, each retried twice by a `retries: 2` that
+could not possibly help — noise standing in front of the steps that do carry signal, and a
+permanently red advisory workflow is the thing that teaches everyone to ignore it. That is the same
+argument as the one against baselines that diff daily.
+
+The guard is the whole directory, not the individual file, so once baselines exist a *missing* one
+fails loudly again — at that point it means someone added a route without regenerating. Verified
+non-vacuous by creating the directory and watching the case run and fail properly.
 
 **Not promoted to blocking**, per the plan's own condition: baselines have not settled because they
 do not exist yet. The behavioural specs are the ones worth promoting first — they need no baselines

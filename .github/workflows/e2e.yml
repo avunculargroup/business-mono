@@ -89,10 +89,11 @@ jobs:
         if: ${{ !inputs.update_baselines }}
         run: npx playwright test e2e/demo-annotations.spec.ts e2e/demo-trace.spec.ts
 
-      # Screenshots last, and expected to fail until the baselines are bootstrapped
-      # with `workflow_dispatch: update_baselines`. They cannot be generated outside
-      # this container image: font hinting differs enough elsewhere that every shot
-      # would diff on the first CI run.
+      # Screenshots last. Until the baselines are bootstrapped with
+      # `workflow_dispatch: update_baselines` these cases **skip** rather than fail —
+      # they cannot be generated outside this container image, and a permanently red
+      # advisory workflow trains everyone to ignore it. The spec re-arms itself the
+      # moment `e2e/demo-surfaces.spec.ts-snapshots/` is committed.
       - name: Demo screenshots
         if: ${{ !inputs.update_baselines }}
         run: npx playwright test e2e/demo-surfaces.spec.ts

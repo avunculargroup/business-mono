@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -11,6 +13,24 @@ import { expect, test } from '@playwright/test';
  *
  * Fonts are self-hosted by `next/font`, so a run makes no external request and
  * the first screenshot is not racing a CDN.
+ *
+ * ## Before the baselines exist
+ *
+ * Screenshot baselines can only be generated inside the CI container image —
+ * font hinting differs enough elsewhere that foreign ones diff on every run —
+ * so there is a window between these specs landing and someone running
+ * `workflow_dispatch: update_baselines`. In that window the screenshot cases
+ * **skip** rather than fail.
+ *
+ * That is not softening the check. A permanently red advisory workflow trains
+ * everyone to ignore it, which is exactly the argument against baselines that
+ * diff daily — and nine `A snapshot doesn't exist` errors, each retried twice
+ * by a `retries: 2` that cannot possibly help, is noise standing in front of
+ * the steps that do carry signal.
+ *
+ * The guard is the whole directory, not the individual file. Once baselines
+ * exist, a *missing* one fails loudly again — because at that point it means
+ * someone added a route and did not regenerate, which is a real problem.
  *
  * ## Why anything is masked
  *
@@ -38,9 +58,35 @@ const ROUTES = [
   { path: '/agents/run/variant-gate-web', name: 'trace-replay' },
 ] as const;
 
+/**
+ * Playwright writes baselines beside the spec, in `<spec>-snapshots/`. Its
+ * absence means "not bootstrapped yet"; its presence means every route in it
+ * should have one.
+ */
+const E2E_DIR = join(process.cwd(), 'e2e');
+
+// Resolved from cwd rather than import.meta — the root package.json has no
+// `"type": "module"`, so Playwright's loader treats this file as CJS. Guarded
+// loudly, because the failure mode of a wrong cwd here is *silently skipping
+// every screenshot*, which looks exactly like a healthy run.
+if (!existsSync(E2E_DIR)) {
+  throw new Error(
+    `e2e/ not found at ${E2E_DIR}. Run from the repo root via \`pnpm test:visual\`.`,
+  );
+}
+
+const BOOTSTRAPPED = existsSync(join(E2E_DIR, 'demo-surfaces.spec.ts-snapshots'));
+
 test.describe('demo surfaces', () => {
   for (const { path, name } of ROUTES) {
     test(`${name} renders`, async ({ page }) => {
+      test.skip(
+        !BOOTSTRAPPED,
+        'No baselines yet. Generate them in the CI container image — run the ' +
+          'Visual regression workflow with update_baselines, or `pnpm test:visual:update` ' +
+          'on a machine with Docker — then commit e2e/**-snapshots/.',
+      );
+
       await page.goto(path);
       // Self-hosted and same-origin, so this resolves promptly. Still waited
       // on: without it the first screenshot of a run captures the fallback
