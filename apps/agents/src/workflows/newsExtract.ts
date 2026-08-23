@@ -22,8 +22,14 @@ const log = createLogger('news-ingest');
 export const newsExtractionSchema = z.object({
   category: z.enum(['regulatory', 'corporate', 'macro', 'international'])
     .describe('The single best-fit category: "regulatory" (ASIC/ATO/APRA/government policy), "corporate" (ASX/company treasury announcements), "macro" (RBA rates, AUD, inflation), or "international" (US/EU/global developments with AU implications).'),
-  summary: z.string().min(40).max(500)
-    .describe('A neutral 2–3 sentence summary of the article. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
+  // Length is steered in the description rather than capped, matching the
+  // summary in newsRubric.ts — which is the one actually stored (ingestNewsItem
+  // prefers the rubric summary and keeps this only as a fallback). A hard cap
+  // here rejected otherwise-good extractions a few characters over, costing the
+  // article its key_points and topic_tags for nothing: news_items.summary is
+  // TEXT with no length constraint.
+  summary: z.string().min(40)
+    .describe('A neutral 2–3 sentence summary of the article, up to about 500 characters. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
   key_points: z.array(z.string()).min(2).max(7)
     .describe('2–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
   topic_tags: z.array(z.string()).min(2).max(8)
@@ -79,7 +85,7 @@ export async function extractNewsMetadata(input: {
     `Title: ${input.title}\n` +
     `Source: ${input.source}\n\n` +
     `Article:\n${input.content}\n\n` +
-    `Extract: category (best-fit of the four values), summary (2–3 sentences, 40–500 chars), ` +
+    `Extract: category (best-fit of the four values), summary (2–3 sentences, at least 40 characters, up to about 500), ` +
     `key_points (2–7 factual bullets), ` +
     `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
     `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
@@ -88,10 +94,14 @@ export async function extractNewsMetadata(input: {
   // 'strict' throws on validation failure; we catch and retry once with a nudge.
   let lastError: string | null = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    // The retry has to name the constraint that failed. A bare "did not satisfy
+    // the schema" leaves the model guessing, so it reproduces the same output —
+    // a summary three characters over its cap comes back the same length — and
+    // the second call is wasted. lastError carries Mastra's per-field message.
     const prompt = attempt === 1
       ? basePrompt
-      : `${basePrompt}\n\nYour previous response did not satisfy the schema. ` +
-        `Return ONLY a valid object matching the schema now — no prose, no code fences.`;
+      : `${basePrompt}\n\nYour previous response was rejected: ${lastError}\n` +
+        `Correct exactly that problem and return ONLY a valid object matching the schema — no prose, no code fences.`;
 
     try {
       const response = await getNewsExtractor().generate(
