@@ -17,6 +17,8 @@ fixture prose** (Phase 6), and **the trace bundle is authored rather than record
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.
+**What is left before it can be deployed:** [`deploy-checklist.md`](./deploy-checklist.md).
+This file records what each phase shipped; that one records what remains.
 **Last updated:** 2026-08-20
 
 ---

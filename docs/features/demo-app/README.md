@@ -40,6 +40,7 @@ the reference material it builds from.**
 | Document | Purpose | Read before |
 |---|---|---|
 | `build-progress.md` | **Review of this bundle against the repo, the settled decisions, and the ten-phase plan** | Everything |
+| `deploy-checklist.md` | **What is left before the demo can be deployed** — the source of record for that list | Getting it live |
 | `README.md` | This file — purpose, architecture, non-goals | Everything |
 | `demo-app-spec.md` | Feature spec: scope, routes, annotation layer, deployment | Phases 5–9 |
 | `repository-contract.md` | The adapter contract — interfaces both apps implement | Phase 4 |
