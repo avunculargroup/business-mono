@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "vitest/globals",
+      "node"
+    ],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/**/*",
+    "traces/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

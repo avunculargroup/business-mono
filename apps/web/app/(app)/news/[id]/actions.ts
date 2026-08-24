@@ -1,6 +1,6 @@
 'use server';
 
-import { getAuthedClient } from '@/lib/action';
+import { getAuthedClient, getAuthedRepositories } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 import { revalidatePath } from 'next/cache';
 
@@ -13,41 +13,40 @@ import { revalidatePath } from 'next/cache';
  * whole feature is built around: `reports.body` is the convenience surface, the
  * stored artefact is the source of record, and the source of record is never
  * exposed by an unguarded link.
+ *
+ * Two halves, deliberately: which artefact a report points at is data and comes
+ * from the repository, while minting the URL is a Storage call and stays on the
+ * raw client — for the same reason auth does. Storage is not data, and there is
+ * nothing for a fixture adapter to stand in for.
  */
 export async function getReportFileUrl(reportId: string) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { success: false as const, error: auth.error };
 
-  // `reports` is absent from the generated Database types until
-  // `pnpm --filter @platform/db generate-types` runs against the migrated
-  // database. Cast at the boundary; the row shape is asserted explicitly.
-  const { data: report, error: lookupError } = await auth.supabase
-    .from('reports' as never)
-    .select('storage_path, file_name')
-    .eq('id', reportId)
-    .single();
-
-  if (lookupError || !report) {
-    return { success: false as const, error: humanizeError(lookupError) };
+  let storagePath: string | null;
+  let fileName: string | null;
+  try {
+    ({ storagePath, fileName } = await auth.repositories.research.getReportFile(reportId));
+  } catch (err) {
+    return { success: false as const, error: humanizeError(err) };
   }
 
-  const { storage_path, file_name } = report as unknown as {
-    storage_path: string | null;
-    file_name: string | null;
-  };
-  if (!storage_path) {
+  if (!storagePath) {
     return { success: false as const, error: 'No original file was stored for this report.' };
   }
 
-  const { data, error } = await auth.supabase.storage
+  const client = await getAuthedClient();
+  if (!client.ok) return { success: false as const, error: client.error };
+
+  const { data, error } = await client.supabase.storage
     .from('reports')
-    .createSignedUrl(storage_path, 60);
+    .createSignedUrl(storagePath, 60);
 
   if (error || !data) {
     return { success: false as const, error: humanizeError(error) };
   }
 
-  return { success: true as const, url: data.signedUrl, fileName: file_name ?? 'report' };
+  return { success: true as const, url: data.signedUrl, fileName: fileName ?? 'report' };
 }
 
 /**
@@ -57,15 +56,17 @@ export async function getReportFileUrl(reportId: string) {
  * not the document, and this is where that judgement lives.
  */
 export async function saveReportCuratorNote(reportId: string, note: string) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
 
-  const { error } = await auth.supabase
-    .from('reports' as never)
-    .update({ curator_note: note.trim() || null } as never)
-    .eq('id', reportId);
+  try {
+    await auth.repositories.research.setReportCuratorNote(reportId, note);
+  } catch (err) {
+    // An inline literal, not `actionError(err)` — see the note in
+    // app/actions/approvals.ts about how that breaks callers' narrowing.
+    return { error: humanizeError(err) };
+  }
 
-  if (error) return { error: humanizeError(error) };
   revalidatePath('/news');
   return { success: true };
 }

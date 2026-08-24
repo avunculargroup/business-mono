@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { ReportFeedback, type ReportFeedbackEntry } from '@/components/market-reports/ReportFeedback';
+import { ReportFeedback } from '@/components/market-reports/ReportFeedback';
 import styles from '../market-reports.module.css';
 
 // One day's market report: the narration (or why it was withheld), the
@@ -14,16 +15,6 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'No narration was produced',
 };
 
-type FindingRow = {
-  id: string;
-  finding_type: string;
-  metric_key: string;
-  observed: number;
-  materiality: number;
-  compliance_class: string;
-  narration_hint?: { means?: string };
-};
-
 function formatAsOf(asOf: string): string {
   return new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
     new Date(`${asOf}T00:00:00Z`),
@@ -32,32 +23,24 @@ function formatAsOf(asOf: string): string {
 
 export default async function MarketReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  // market_reports / market_report_feedback are not in the generated Database
-  // types yet — cast to bypass typing (same pattern as the content pages).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const repositories = await getRepositories();
 
-  const { data: report } = await db.from('market_reports').select('*').eq('id', id).single();
+  const report = await repositories.marketReports.getReport(resolveReadContext(), id);
   if (!report) notFound();
 
-  const { data: priorFeedback } = await db
-    .from('market_report_feedback')
-    .select('id, verdict, feedback, created_at')
-    .eq('market_report_id', report.id)
-    .order('created_at', { ascending: false });
-
-  const findings = (Array.isArray(report.findings) ? report.findings : []) as FindingRow[];
-  const paragraphs: string[] = report.narration_markdown
-    ? String(report.narration_markdown).split(/\n{2,}/).filter((p: string) => p.trim())
+  // The findings the narrator was handed, and the narration it produced from
+  // them. The split is the point of this page.
+  const { findings } = report;
+  const paragraphs = report.narrationMarkdown
+    ? report.narrationMarkdown.split(/\n{2,}/).filter((p) => p.trim())
     : [];
 
   return (
     <>
-      <PageHeader title={`Market report — ${formatAsOf(report.as_of)}`} backHref="/market-reports" />
+      <PageHeader title={`Market report — ${formatAsOf(report.asOf)}`} backHref="/market-reports" />
       <div className={styles.detail}>
         <div className={styles.meta}>
-          {report.report_mode === 'quiet' && <span className={styles.chip}>Quiet day</span>}
+          {report.isQuietDay && <span className={styles.chip}>Quiet day</span>}
           <span className={styles.chip} data-status={report.status}>
             {STATUS_LABEL[report.status] ?? report.status}
           </span>
@@ -101,10 +84,7 @@ export default async function MarketReportDetailPage({ params }: { params: Promi
           </div>
         )}
 
-        <ReportFeedback
-          marketReportId={report.id}
-          priorFeedback={(priorFeedback ?? []) as ReportFeedbackEntry[]}
-        />
+        <ReportFeedback marketReportId={report.id} priorFeedback={report.priorFeedback} />
 
         <p className={styles.disclaimer}>
           General information only. It is not financial advice and does not consider your objectives, financial

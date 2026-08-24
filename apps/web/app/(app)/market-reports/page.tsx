@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import styles from './market-reports.module.css';
 
@@ -12,15 +13,6 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'No narration',
 };
 
-type ReportRow = {
-  id: string;
-  as_of: string;
-  status: string;
-  report_mode: string;
-  narration_markdown: string | null;
-  emailed: boolean;
-};
-
 function formatAsOf(asOf: string): string {
   return new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
     new Date(`${asOf}T00:00:00Z`),
@@ -28,18 +20,8 @@ function formatAsOf(asOf: string): string {
 }
 
 export default async function MarketReportsPage() {
-  const supabase = await createClient();
-  // market_reports is not in the generated Database types yet — cast to bypass
-  // typing (same pattern as the content pages).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
-  const { data } = await db
-    .from('market_reports')
-    .select('id, as_of, status, report_mode, narration_markdown, emailed')
-    .order('as_of', { ascending: false })
-    .limit(30);
-  const reports = (data ?? []) as ReportRow[];
+  const repositories = await getRepositories();
+  const { items: reports } = await repositories.marketReports.listReports(resolveReadContext());
 
   return (
     <>
@@ -52,13 +34,13 @@ export default async function MarketReportsPage() {
             <li key={report.id}>
               <Link href={`/market-reports/${report.id}`} className={styles.row}>
                 <div className={styles.rowMain}>
-                  <span className={styles.rowDate}>{formatAsOf(report.as_of)}</span>
-                  {report.narration_markdown && (
-                    <span className={styles.rowExcerpt}>{report.narration_markdown}</span>
+                  <span className={styles.rowDate}>{formatAsOf(report.asOf)}</span>
+                  {report.narrationMarkdown && (
+                    <span className={styles.rowExcerpt}>{report.narrationMarkdown}</span>
                   )}
                 </div>
                 <span className={styles.chips}>
-                  {report.report_mode === 'quiet' && <span className={styles.chip}>Quiet day</span>}
+                  {report.isQuietDay && <span className={styles.chip}>Quiet day</span>}
                   <span className={styles.chip} data-status={report.status}>
                     {STATUS_LABEL[report.status] ?? report.status}
                   </span>

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { PriorityChip } from '@platform/ui/PriorityChip';
@@ -24,7 +26,11 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Parallel data fetching
+  const repositories = await getRepositories();
+
+  // Parallel data fetching. Tasks, projects, contacts and routines belong to
+  // verticals 4.6-4.11 and are still read on the raw client; the indicator
+  // block comes through the repository as one call.
   const [
     { data: openTasks },
     companies,
@@ -32,10 +38,7 @@ export default async function DashboardPage() {
     { data: activeProjects },
     { data: allContacts },
     { data: dashboardRoutines },
-    { data: indicatorLatest },
-    { data: indicatorSeries },
-    { data: onchainLatest },
-    { data: onchainSeries },
+    indicators,
   ] = await Promise.all([
     supabase
       .from('tasks')
@@ -45,7 +48,7 @@ export default async function DashboardPage() {
       .order('priority', { ascending: true })
       .order('due_date', { ascending: true })
       .limit(8),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
     supabase.from('projects').select('id, name').eq('status', 'active'),
     supabase.from('contacts').select('id, first_name, last_name').order('first_name').limit(100),
@@ -56,10 +59,7 @@ export default async function DashboardPage() {
       .eq('is_active', true)
       .not('last_result', 'is', null)
       .order('last_run_at', { ascending: false }),
-    supabase.from('v_indicator_latest').select('*'),
-    supabase.from('v_indicator_series').select('*'),
-    supabase.from('v_onchain_dashboard').select('*'),
-    supabase.from('v_onchain_series').select('*'),
+    repositories.indicators.getDashboard(resolveReadContext()),
   ]);
 
   return (
@@ -72,9 +72,9 @@ export default async function DashboardPage() {
         <BlockHeight />
         <OpenRouterCredits />
       </div>
-      <TrendValuation latest={onchainLatest ?? []} series={onchainSeries ?? []} />
-      <MacroIndicators latest={indicatorLatest ?? []} series={indicatorSeries ?? []} />
-      <OnchainIndicators latest={onchainLatest ?? []} series={onchainSeries ?? []} />
+      <TrendValuation latest={indicators.onchainLatest} series={indicators.onchainSeries} />
+      <MacroIndicators latest={indicators.macroLatest} series={indicators.macroSeries} />
+      <OnchainIndicators latest={indicators.onchainLatest} series={indicators.onchainSeries} />
       <div className={styles.grid}>
         {/* Left column */}
         <div className={styles.left}>

@@ -1,7 +1,7 @@
 'use server';
 
-import type { Json } from '@platform/db';
-import { getAuthedClient } from '@/lib/action';
+import { getAuthedRepositories } from '@/lib/action';
+import { resolveReadContext } from '@platform/data-supabase';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
@@ -35,14 +35,14 @@ export async function submitVariantGateDecision(
     return { error: 'Tell Charlie what to change before requesting a revision.' };
   }
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
-  const { error } = await supabase
-    .from('content_items')
-    .update({ pending_decision: parsed.data })
-    .eq('id', contentItemId);
-  if (error) return { error: humanizeError(error) };
+
+  try {
+    await auth.repositories.campaigns.setVariantDecision(contentItemId, parsed.data);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath(`/campaigns/variants/${contentItemId}`);
   return { success: true };
@@ -71,24 +71,23 @@ export async function createCampaignDraft(
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid campaign' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
-  const { data, error } = await supabase
-    .from('campaigns')
-    .insert({
+
+  let id: string;
+  try {
+    id = await auth.repositories.campaigns.createDraft({
       name: parsed.data.name,
       objective: parsed.data.objective,
-      audience_filter: parsed.data.audienceFilter,
-      audience_persona: parsed.data.audiencePersona ?? null,
-      status: 'draft',
-    })
-    .select('id')
-    .single();
-  if (error) return { error: humanizeError(error) };
+      audienceFilter: parsed.data.audienceFilter,
+      audiencePersona: parsed.data.audiencePersona ?? null,
+    });
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath('/campaigns');
-  return { id: (data as { id: string }).id };
+  return { id };
 }
 
 const slotSchema = z.object({
@@ -115,44 +114,21 @@ export async function launchCampaignStrategy(
   const parsed = cadenceSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid cadence' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
+  const { campaigns } = auth.repositories;
 
-  const { data: campaign } = await supabase
-    .from('campaigns')
-    .select('status')
-    .eq('id', campaignId)
-    .maybeSingle();
-  if (!campaign) return { error: 'Campaign not found.' };
-  if ((campaign as { status: string }).status !== 'draft') {
-    return { error: 'This campaign has already started — cadence is locked.' };
+  try {
+    const gate = await campaigns.getGate(resolveReadContext(), campaignId);
+    if (!gate) return { error: 'Campaign not found.' };
+    if (gate.status !== 'draft') {
+      return { error: 'This campaign has already started — cadence is locked.' };
+    }
+
+    await campaigns.saveCadenceAndLaunch(campaignId, parsed.data);
+  } catch (err) {
+    return { error: humanizeError(err) };
   }
-
-  const { error: updateErr } = await supabase
-    .from('campaigns')
-    .update({
-      posts_per_week: parsed.data.postsPerWeek,
-      post_slots: { slots: parsed.data.slots },
-      duration_weeks: parsed.data.durationWeeks,
-      start_date: parsed.data.startDate,
-    })
-    .eq('id', campaignId);
-  if (updateErr) return { error: humanizeError(updateErr) };
-
-  // Replace the participating-accounts join wholesale.
-  await supabase.from('campaign_accounts').delete().eq('campaign_id', campaignId);
-  const { error: accErr } = await supabase
-    .from('campaign_accounts')
-    .insert(parsed.data.accountIds.map((id) => ({ campaign_id: campaignId, social_account_id: id })));
-  if (accErr) return { error: humanizeError(accErr) };
-
-  // Launch: the strategyGateWeb listener reacts to this pending_decision.
-  const { error: startErr } = await supabase
-    .from('campaigns')
-    .update({ pending_decision: { decision: 'start' } })
-    .eq('id', campaignId);
-  if (startErr) return { error: humanizeError(startErr) };
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -202,31 +178,26 @@ export async function submitCampaignGateDecision(
   const parsed = gateDecisionSchema.safeParse(decision);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid decision' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
-  const { data: campaign } = await supabase
-    .from('campaigns')
-    .select('status, gate_state, workflow_run_id')
-    .eq('id', campaignId)
-    .maybeSingle();
-  if (!campaign) return { error: 'Campaign not found.' };
+  const { campaigns } = auth.repositories;
 
-  const c = campaign as { status: string; gate_state: { gate?: string } | null; workflow_run_id: string | null };
-  if (!c.workflow_run_id || !c.gate_state?.gate) {
-    return { error: 'No review is open for this campaign right now.' };
-  }
-  // Strategy lock: only draft (gate 1) and strategy_approved (gate 2) campaigns
-  // have an open gate. plan_approved or later is locked.
-  if (c.status !== 'draft' && c.status !== 'strategy_approved') {
-    return { error: 'This campaign is locked — its plan has been approved.' };
-  }
+  try {
+    const gate = await campaigns.getGate(resolveReadContext(), campaignId);
+    if (!gate) return { error: 'Campaign not found.' };
+    if (!gate.workflowRunId || !gate.openGate) {
+      return { error: 'No review is open for this campaign right now.' };
+    }
+    // Strategy lock: only draft (gate 1) and strategy_approved (gate 2)
+    // campaigns have an open gate. plan_approved or later is locked.
+    if (gate.status !== 'draft' && gate.status !== 'strategy_approved') {
+      return { error: 'This campaign is locked — its plan has been approved.' };
+    }
 
-  const { error } = await supabase
-    .from('campaigns')
-    .update({ pending_decision: parsed.data })
-    .eq('id', campaignId);
-  if (error) return { error: humanizeError(error) };
+    await campaigns.setCampaignDecision(campaignId, parsed.data);
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -249,22 +220,19 @@ export async function markVariantPosted(
   const parsed = markPostedSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid URL' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
-  const { data, error } = await supabase
-    .from('content_items')
-    .update({
-      published_url: parsed.data.url,
-      published_at: new Date().toISOString(),
-      status: 'published',
-    })
-    .eq('id', contentItemId)
-    .eq('status', 'approved')
-    .select('id');
-  if (error) return { error: humanizeError(error) };
-  if (!data || data.length === 0) {
-    return { error: 'This variant is no longer ready to post — refresh the queue.' };
+
+  try {
+    const applied = await auth.repositories.campaigns.markVariantPosted(
+      contentItemId,
+      parsed.data.url,
+    );
+    if (!applied) {
+      return { error: 'This variant is no longer ready to post — refresh the queue.' };
+    }
+  } catch (err) {
+    return { error: humanizeError(err) };
   }
 
   revalidatePath(`/campaigns/${campaignId}/queue`);
@@ -273,11 +241,6 @@ export async function markVariantPosted(
 }
 
 // ── Loops & polish (Step 9) ───────────────────────────────────────────────────
-
-/** Codepoint count — closer to how platforms count than UTF-16 .length. */
-function charCount(text: string): number {
-  return Array.from(text).length;
-}
 
 const editCopySchema = z.object({
   isThread: z.boolean(),
@@ -301,59 +264,18 @@ export async function editVariantCopy(
   if (isThread && segments.length === 0) return { error: 'A thread needs at least one segment.' };
   if (!isThread && !body) return { error: 'The post body cannot be empty.' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const { data: existing } = await supabase
-    .from('content_items')
-    .select('gate_state')
-    .eq('id', contentItemId)
-    .maybeSingle();
-  if (!existing) return { error: 'Variant not found.' };
-
-  // Patch the suspended preview's copy so the editor reflects the edit at once.
-  const gateState = (existing as { gate_state: { preview?: Record<string, Json> } | null }).gate_state;
-  const patchedGate =
-    gateState?.preview != null
-      ? {
-          ...gateState,
-          preview: {
-            ...gateState.preview,
-            isThread,
-            body,
-            segments,
-            charCount: isThread
-              ? charCount(segments.map((s, i) => `${i + 1}/ ${s}`).join('\n\n'))
-              : charCount(body),
-          },
-        }
-      : gateState;
-
-  const { error } = await supabase
-    .from('content_items')
-    .update({
-      body: body || null,
-      is_thread: isThread,
-      char_count: isThread ? null : charCount(body),
-      compliance_status: 'pending',
-      compliance_checked_at: null,
-      gate_state: patchedGate,
-    })
-    .eq('id', contentItemId);
-  if (error) return { error: humanizeError(error) };
-
-  // Replace thread segments wholesale.
-  await supabase.from('thread_segments').delete().eq('content_item_id', contentItemId);
-  if (isThread && segments.length > 0) {
-    const rows = segments.map((b, i) => ({
-      content_item_id: contentItemId,
-      sequence: i + 1,
-      body: b,
-      char_count: charCount(b),
-    }));
-    const { error: segErr } = await supabase.from('thread_segments').insert(rows);
-    if (segErr) return { error: humanizeError(segErr) };
+  try {
+    const saved = await auth.repositories.campaigns.saveVariantCopy(contentItemId, {
+      isThread,
+      body,
+      segments,
+    });
+    if (!saved) return { error: 'Variant not found.' };
+  } catch (err) {
+    return { error: humanizeError(err) };
   }
 
   revalidatePath(`/campaigns/variants/${contentItemId}`);
@@ -379,25 +301,21 @@ export async function savePostMetrics(
   const parsed = metricsSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid metrics' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase, user } = auth;
 
-  const { error } = await supabase.from('post_metrics').upsert(
-    {
-      content_item_id: contentItemId,
-      platform,
+  try {
+    // Who recorded these is the bundle's principal, not an argument.
+    await auth.repositories.campaigns.savePostMetrics(contentItemId, platform, {
       impressions: parsed.data.impressions ?? null,
       reactions: parsed.data.reactions ?? null,
       comments: parsed.data.comments ?? null,
       reposts: parsed.data.reposts ?? null,
       clicks: parsed.data.clicks ?? null,
-      recorded_at: new Date().toISOString(),
-      recorded_by: user.id,
-    },
-    { onConflict: 'content_item_id' },
-  );
-  if (error) return { error: humanizeError(error) };
+    });
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };
@@ -423,30 +341,19 @@ export async function promotePostToSnippet(
   const parsed = promoteSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid snippet' };
 
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase, user } = auth;
 
-  // The post's account + platform anchor the snippet to that voice.
-  const { data: item } = await supabase
-    .from('content_items')
-    .select('social_account_id, type')
-    .eq('id', contentItemId)
-    .maybeSingle();
-  const account = item as { social_account_id: string | null; type: string | null } | null;
-
-  const { error } = await supabase.from('voice_snippets').insert({
-    social_account_id: account?.social_account_id ?? null,
-    snippet_type: parsed.data.snippet_type,
-    body: parsed.data.body,
-    curator_note: parsed.data.curator_note,
-    platform: account?.type === 'linkedin' || account?.type === 'twitter_x' ? account.type : null,
-    topic_tags: parsed.data.topic_tags,
-    source: 'promoted_from_post',
-    source_content_item_id: contentItemId,
-    created_by: user.id,
-  });
-  if (error) return { error: humanizeError(error) };
+  try {
+    await auth.repositories.campaigns.promoteToVoiceSnippet(contentItemId, {
+      body: parsed.data.body,
+      curatorNote: parsed.data.curator_note,
+      snippetType: parsed.data.snippet_type,
+      topicTags: parsed.data.topic_tags,
+    });
+  } catch (err) {
+    return { error: humanizeError(err) };
+  }
 
   revalidatePath(`/campaigns/${campaignId}`);
   return { success: true };

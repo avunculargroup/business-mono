@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getAuthedClient } from '@/lib/action';
+import { getAuthedRepositories } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 export async function approveActivity(
@@ -9,22 +9,18 @@ export async function approveActivity(
   action: 'approved' | 'rejected',
   response?: string
 ) {
-  const auth = await getAuthedClient();
+  const auth = await getAuthedRepositories();
   if (!auth.ok) return { error: auth.error };
-  const { supabase } = auth;
 
-  const updateData = {
-    status: action,
-    notes: response || null,
-    updated_at: new Date().toISOString(),
-  };
-  const { error } = await supabase
-    .from('agent_activity')
-    .update(updateData)
-    .eq('id', activityId);
-
-  if (error) {
-    return { error: humanizeError(error) };
+  try {
+    await auth.repositories.agentActivity.approveActivity(activityId, action, response);
+  } catch (err) {
+    // Deliberately an inline literal rather than `actionError(err)`: returning a
+    // declared `{ error: string }` type instead of a fresh object literal stops
+    // TypeScript adding the `error?: undefined` / `success?: undefined` members
+    // it uses to normalise a union of return literals, and callers doing
+    // `if (result.error)` then stop compiling. See ApprovalControls.tsx:24.
+    return { error: humanizeError(err) };
   }
 
   revalidatePath('/simon');

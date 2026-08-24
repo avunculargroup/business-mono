@@ -6,14 +6,8 @@ import { submitMarketReportFeedback } from '@/app/actions/marketReportFeedback';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@platform/ui/cn';
+import type { ReportFeedbackEntry } from '@platform/data';
 import styles from './ReportFeedback.module.css';
-
-export type ReportFeedbackEntry = {
-  id: string;
-  verdict: string | null;
-  feedback: string;
-  created_at: string;
-};
 
 type Verdict = 'positive' | 'negative';
 
@@ -48,7 +42,7 @@ export function ReportFeedback({ marketReportId, priorFeedback }: ReportFeedback
       } else {
         success('Feedback saved — future reports will use it');
         setEntries((prev) => [
-          { id: `local-${Date.now()}`, verdict, feedback, created_at: new Date().toISOString() },
+          { id: `local-${Date.now()}`, verdict, feedback, createdAt: new Date().toISOString() },
           ...prev,
         ]);
         setNote('');
@@ -104,7 +98,7 @@ export function ReportFeedback({ marketReportId, priorFeedback }: ReportFeedback
             <li key={entry.id} className={styles.entry}>
               <span className={styles.entryMeta}>
                 {entry.verdict === 'positive' ? 'Good · ' : entry.verdict === 'negative' ? 'Needs work · ' : ''}
-                {formatDate(entry.created_at)}
+                {formatDate(entry.createdAt)}
               </span>
               <p className={styles.entryBody}>{entry.feedback}</p>
             </li>

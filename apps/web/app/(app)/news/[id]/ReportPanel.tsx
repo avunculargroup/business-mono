@@ -7,37 +7,9 @@ import { Button } from '@platform/ui/Button';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import { getReportFileUrl, saveReportCuratorNote } from './actions';
-import {
-  REPORT_REDISTRIBUTION_LABELS,
-  REPORT_TYPE_LABELS,
-  type ReportRecord,
-} from '@platform/shared';
+import { REPORT_REDISTRIBUTION_LABELS, REPORT_TYPE_LABELS } from '@platform/shared';
+import type { NewsReport } from '@platform/data';
 import styles from './detail.module.css';
-
-/** The columns the detail page reads. Narrower than the full row. */
-export type ReportPanelRecord = Pick<
-  ReportRecord,
-  | 'id'
-  | 'report_type'
-  | 'publisher'
-  | 'published_at'
-  | 'published_at_source'
-  | 'page_count'
-  | 'word_count'
-  | 'file_format'
-  | 'file_size_bytes'
-  | 'content_hash'
-  | 'extraction_method'
-  | 'extraction_quality'
-  | 'ocr_used'
-  | 'redistribution'
-  | 'licence_notes'
-  | 'curator_note'
-  | 'status'
-  | 'storage_path'
-  | 'revision_of_report_id'
-  | 'created_at'
->;
 
 const DATE_SOURCE_LABELS: Record<string, string> = {
   pdf_metadata: 'from the PDF metadata',
@@ -59,13 +31,11 @@ function formatBytes(bytes: number | null): string | null {
 }
 
 interface Props {
-  report: ReportPanelRecord;
-  /** The superseded predecessor, when this row is a revision. */
-  supersededItemId?: string | null;
+  report: NewsReport;
 }
 
-export function ReportPanel({ report, supersededItemId }: Props) {
-  const [note, setNote] = useState(report.curator_note ?? '');
+export function ReportPanel({ report }: Props) {
+  const [note, setNote] = useState(report.curatorNote ?? '');
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const { success, error } = useToast();
@@ -86,14 +56,14 @@ export function ReportPanel({ report, supersededItemId }: Props) {
     success('Note saved');
   };
 
-  const qualityNote = report.extraction_quality ? QUALITY_NOTES[report.extraction_quality] : undefined;
-  const size = formatBytes(report.file_size_bytes);
+  const qualityNote = report.extractionQuality ? QUALITY_NOTES[report.extractionQuality] : undefined;
+  const size = formatBytes(report.fileSizeBytes);
 
   return (
     <section className={styles.reportPanel} aria-label="Report details">
       <div className={styles.reportBadges}>
-        <span className={styles.formatBadge}>{report.file_format.toUpperCase()}</span>
-        <span className={styles.reportTypeChip}>{REPORT_TYPE_LABELS[report.report_type]}</span>
+        <span className={styles.formatBadge}>{report.fileFormat.toUpperCase()}</span>
+        <span className={styles.reportTypeChip}>{REPORT_TYPE_LABELS[report.reportType]}</span>
         <span
           className={
             report.redistribution === 'internal_only'
@@ -103,11 +73,11 @@ export function ReportPanel({ report, supersededItemId }: Props) {
         >
           {REPORT_REDISTRIBUTION_LABELS[report.redistribution]}
         </span>
-        {report.page_count != null && (
-          <span className={styles.mono}>{report.page_count} pp</span>
+        {report.pageCount != null && (
+          <span className={styles.mono}>{report.pageCount} pp</span>
         )}
-        {report.word_count != null && (
-          <span className={styles.mono}>{report.word_count.toLocaleString()} words</span>
+        {report.wordCount != null && (
+          <span className={styles.mono}>{report.wordCount.toLocaleString()} words</span>
         )}
       </div>
 
@@ -118,14 +88,14 @@ export function ReportPanel({ report, supersededItemId }: Props) {
         </p>
       )}
 
-      {report.revision_of_report_id && (
+      {report.isRevision && (
         <p className={styles.revisionNotice}>
           <History size={14} strokeWidth={1.5} aria-hidden="true" />
           The publisher changed this document after we first stored it. The earlier version is kept
-          {supersededItemId ? (
+          {report.supersededItemId ? (
             <>
               {' '}
-              and is still readable <Link href={`/news/${supersededItemId}`}>here</Link>.
+              and is still readable <Link href={`/news/${report.supersededItemId}`}>here</Link>.
             </>
           ) : (
             ' in the archive.'
@@ -142,29 +112,29 @@ export function ReportPanel({ report, supersededItemId }: Props) {
         )}
         <dt>Published</dt>
         <dd>
-          {report.published_at ? formatDate(report.published_at) : 'Unknown'}
-          {report.published_at_source && (
-            <span className={styles.muted}> — {DATE_SOURCE_LABELS[report.published_at_source]}</span>
+          {report.publishedAt ? formatDate(report.publishedAt) : 'Unknown'}
+          {report.publishedAtSource && (
+            <span className={styles.muted}> — {DATE_SOURCE_LABELS[report.publishedAtSource]}</span>
           )}
         </dd>
         <dt>Acquired</dt>
         <dd>
-          {formatDate(report.created_at)}
+          {formatDate(report.createdAt)}
           {size && <span className={styles.muted}> — {size}</span>}
         </dd>
         <dt>Extraction</dt>
         <dd>
-          {report.extraction_method ?? 'none'}
-          {report.ocr_used && <span className={styles.muted}> — OCR used</span>}
+          {report.extractionMethod ?? 'none'}
+          {report.ocrUsed && <span className={styles.muted}> — OCR used</span>}
         </dd>
         <dt>Content hash</dt>
-        <dd className={styles.mono} title={report.content_hash}>
-          {report.content_hash.slice(0, 16)}…
+        <dd className={styles.mono} title={report.contentHash}>
+          {report.contentHash.slice(0, 16)}…
         </dd>
-        {report.licence_notes && (
+        {report.licenceNotes && (
           <>
             <dt>Licence</dt>
-            <dd>{report.licence_notes}</dd>
+            <dd>{report.licenceNotes}</dd>
           </>
         )}
       </dl>
@@ -189,11 +159,11 @@ export function ReportPanel({ report, supersededItemId }: Props) {
             variant="secondary"
             onClick={handleSaveNote}
             loading={saving}
-            disabled={note === (report.curator_note ?? '')}
+            disabled={note === (report.curatorNote ?? '')}
           >
             Save note
           </Button>
-          {report.storage_path && (
+          {report.storagePath && (
             <Button type="button" onClick={handleDownload} loading={downloading}>
               <Download size={15} strokeWidth={1.5} />
               Download original

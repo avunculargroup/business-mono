@@ -4,7 +4,7 @@ import { useState, useOptimistic, useTransition } from 'react';
 import { StatusChip } from '@platform/ui/StatusChip';
 import { Button } from '@platform/ui/Button';
 import { CopyButton } from '@platform/ui/CopyButton';
-import { DraftFeedback, type DraftFeedbackEntry } from './DraftFeedback';
+import { DraftFeedback } from './DraftFeedback';
 import {
   updateContentStatus,
   updateContentBody,
@@ -13,29 +13,11 @@ import {
 } from '@/app/actions/content';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
+import type { ContentDetail, DraftFeedbackEntry, ThreadSegment } from '@platform/data';
+import type { ContentStatus } from '@platform/shared';
 import styles from './ContentEditor.module.css';
 
-type ContentItem = {
-  id: string;
-  title: string | null;
-  type: string;
-  status: string;
-  body: string | null;
-  is_thread: boolean;
-  social_account_id?: string | null;
-  scheduled_for: string | null;
-  published_at: string | null;
-  publish_error?: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type ThreadSegment = {
-  id: string;
-  body: string;
-};
-
-const statusFlow: Record<string, { next: string; label: string }> = {
+const statusFlow: Record<string, { next: ContentStatus; label: string }> = {
   idea: { next: 'draft', label: 'Start draft' },
   draft: { next: 'review', label: 'Submit for review' },
   review: { next: 'approved', label: 'Approve' },
@@ -60,7 +42,7 @@ function toDatetimeLocal(iso: string | null): string {
 }
 
 interface ContentEditorProps {
-  item: ContentItem;
+  item: ContentDetail;
   threadSegments: ThreadSegment[];
   priorFeedback?: DraftFeedbackEntry[];
   maxChars?: number | null;
@@ -69,23 +51,23 @@ interface ContentEditorProps {
 export function ContentEditor({ item, threadSegments, priorFeedback = [], maxChars = null }: ContentEditorProps) {
   const [body, setBody] = useState(item.body || '');
   const [savedBody, setSavedBody] = useState(item.body || '');
-  const [scheduleAt, setScheduleAt] = useState(toDatetimeLocal(item.scheduled_for));
+  const [scheduleAt, setScheduleAt] = useState(toDatetimeLocal(item.scheduledFor));
   const [isPending, startTransition] = useTransition();
   const [optimisticStatus, setOptimisticStatus] = useOptimistic(item.status);
   const { success, error } = useToast();
 
-  const fullText = item.is_thread ? threadSegments.map((s) => s.body).join(' ') : body;
+  const fullText = item.isThread ? threadSegments.map((s) => s.body).join(' ') : body;
   const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
   const charCount = fullText.length;
-  const copyText = item.is_thread
+  const copyText = item.isThread
     ? threadSegments.map((s, i) => `${i + 1}/ ${s.body}`).join('\n\n')
     : body;
 
   const isLinkedIn = item.type === 'linkedin';
-  const isDirty = !item.is_thread && body !== savedBody;
-  const isEditable = !item.is_thread && EDITABLE_STATUSES.has(optimisticStatus);
-  const overLimit = maxChars !== null && !item.is_thread && body.length > maxChars;
-  const hasMarkdown = isLinkedIn && !item.is_thread && MARKDOWN_PATTERN.test(body);
+  const isDirty = !item.isThread && body !== savedBody;
+  const isEditable = !item.isThread && EDITABLE_STATUSES.has(optimisticStatus);
+  const overLimit = maxChars !== null && !item.isThread && body.length > maxChars;
+  const hasMarkdown = isLinkedIn && !item.isThread && MARKDOWN_PATTERN.test(body);
 
   // LinkedIn posts move approved → scheduled → published through the schedule
   // panel + publish poller, not the generic advance button.
@@ -151,7 +133,7 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
   return (
     <div className={styles.layout}>
       <div className={styles.editor}>
-        {item.is_thread ? (
+        {item.isThread ? (
           <ol className={styles.segments}>
             {threadSegments.map((segment, i) => (
               <li key={segment.id} className={styles.segment}>
@@ -172,8 +154,8 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
         <div className={styles.counts}>
           <span className={overLimit ? styles.overLimit : undefined}>
             {wordCount} words / {charCount}
-            {maxChars !== null && !item.is_thread ? ` of ${maxChars}` : ''} characters
-            {item.is_thread ? ` / ${threadSegments.length} posts` : ''}
+            {maxChars !== null && !item.isThread ? ` of ${maxChars}` : ''} characters
+            {item.isThread ? ` / ${threadSegments.length} posts` : ''}
           </span>
           <span className={styles.countActions}>
             {isDirty && (
@@ -184,7 +166,7 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
             <CopyButton text={copyText} label="Copy text" />
           </span>
         </div>
-        {isLinkedIn && !item.is_thread && (hasMarkdown || overLimit || body.length > LINKEDIN_FOLD_CHARS) && (
+        {isLinkedIn && !item.isThread && (hasMarkdown || overLimit || body.length > LINKEDIN_FOLD_CHARS) && (
           <div className={styles.formatNotes}>
             {overLimit && (
               <p className={styles.formatWarning}>
@@ -218,27 +200,27 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
           <StatusChip label={optimisticStatus} color="neutral" />
         </div>
 
-        {item.scheduled_for && (
+        {item.scheduledFor && (
           <div className={styles.field}>
             <span className={styles.label}>Scheduled</span>
-            <span>{formatDate(item.scheduled_for)}</span>
+            <span>{formatDate(item.scheduledFor)}</span>
           </div>
         )}
 
         <div className={styles.field}>
           <span className={styles.label}>Created</span>
-          <span className={styles.dateValue}>{formatDate(item.created_at)}</span>
+          <span className={styles.dateValue}>{formatDate(item.createdAt)}</span>
         </div>
 
         <div className={styles.field}>
           <span className={styles.label}>Updated</span>
-          <span className={styles.dateValue}>{formatDate(item.updated_at)}</span>
+          <span className={styles.dateValue}>{formatDate(item.updatedAt)}</span>
         </div>
 
-        {item.publish_error && optimisticStatus !== 'published' && (
+        {item.publishError && optimisticStatus !== 'published' && (
           <div className={styles.field}>
             <span className={styles.label}>Publish error</span>
-            <span className={styles.publishError}>{item.publish_error}</span>
+            <span className={styles.publishError}>{item.publishError}</span>
           </div>
         )}
 
@@ -270,7 +252,7 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
           </div>
         )}
 
-        {item.social_account_id && (
+        {item.socialAccountId && (
           <DraftFeedback contentItemId={item.id} priorFeedback={priorFeedback} />
         )}
       </aside>

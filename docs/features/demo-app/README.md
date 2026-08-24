@@ -2,8 +2,10 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** `apps/demo` — public, fixture-backed demonstration of the internal platform
-**Status:** Draft, reconciled against the live repo 2026-08-08
-**Last updated:** 2026-08-08
+**Status:** Built. Phases 0–9 have shipped; `apps/demo` exists and builds. The specs below are
+what it was built *against* — where the build diverged, [`build-progress.md`](./build-progress.md)
+records the divergence and why, and is the document to trust.
+**Last updated:** 2026-08-20
 
 ---
 
@@ -38,6 +40,7 @@ the reference material it builds from.**
 | Document | Purpose | Read before |
 |---|---|---|
 | `build-progress.md` | **Review of this bundle against the repo, the settled decisions, and the ten-phase plan** | Everything |
+| `deploy-checklist.md` | **What is left before the demo can be deployed** — the source of record for that list | Getting it live |
 | `README.md` | This file — purpose, architecture, non-goals | Everything |
 | `demo-app-spec.md` | Feature spec: scope, routes, annotation layer, deployment | Phases 5–9 |
 | `repository-contract.md` | The adapter contract — interfaces both apps implement | Phase 4 |

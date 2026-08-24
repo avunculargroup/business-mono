@@ -16,6 +16,13 @@ export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
+      // Longest-prefix first: the object form does prefix matching, so
+      // '@platform/data-supabase' must be listed before '@platform/data' or the
+      // shorter entry would claim it and resolve to the wrong package.
+      '@platform/data-supabase': `${here}../../packages/data-supabase/src/index.ts`,
+      '@platform/data/provider': `${here}../../packages/data/src/provider.tsx`,
+      '@platform/data/testing': `${here}../../packages/data/src/testing/index.ts`,
+      '@platform/data': `${here}../../packages/data/src/index.ts`,
       '@platform/db': `${here}../../packages/db/src/index.ts`,
       '@platform/shared': `${here}../../packages/shared/src/index.ts`,
       // @platform/ui ships raw .tsx/.ts with no build step. The object form does prefix

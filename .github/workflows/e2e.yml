@@ -16,6 +16,8 @@ on:
       - 'apps/web/app/globals.css'
       - 'packages/ui/**'
       - 'apps/demo/**'
+      - 'packages/agent-traces/**'
+      - 'packages/data-fixtures/**'
       - 'e2e/**'
       - 'playwright.config.ts'
       - '.github/workflows/e2e.yml'
@@ -26,6 +28,8 @@ on:
       - 'apps/web/app/globals.css'
       - 'packages/ui/**'
       - 'apps/demo/**'
+      - 'packages/agent-traces/**'
+      - 'packages/data-fixtures/**'
       - 'e2e/**'
       - 'playwright.config.ts'
   workflow_dispatch:
@@ -59,8 +63,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The specimens are static HTML read over file://, so there is nothing to build
-      # and no server to start. That changes when apps/demo joins this suite.
+      # The specimens are static HTML read over file://. apps/demo is not: it is
+      # `force-dynamic`, so Playwright's `webServer` builds and serves it. The build
+      # is part of that command rather than a step here, so a local run behaves the
+      # same way as CI.
 
       # Runs first and separately because it is meaningful *today*: it asserts computed
       # values rather than comparing images, so it needs no committed baselines. While
@@ -73,6 +79,24 @@ jobs:
       - name: Run visual regression
         if: ${{ !inputs.update_baselines }}
         run: npx playwright test e2e/design-system.spec.ts
+
+      # Behavioural, not visual: these assert what the demo does — the annotation
+      # overlay measuring real layout, the replay transport advancing on a real
+      # timer, and the app issuing no request off its own origin. None of it needs a
+      # committed baseline, so it carries signal from the first run, the way
+      # tokens-resolve does above. Run before the screenshots for that reason.
+      - name: Walk the demo
+        if: ${{ !inputs.update_baselines }}
+        run: npx playwright test e2e/demo-annotations.spec.ts e2e/demo-trace.spec.ts
+
+      # Screenshots last. Until the baselines are bootstrapped with
+      # `workflow_dispatch: update_baselines` these cases **skip** rather than fail —
+      # they cannot be generated outside this container image, and a permanently red
+      # advisory workflow trains everyone to ignore it. The spec re-arms itself the
+      # moment `e2e/demo-surfaces.spec.ts-snapshots/` is committed.
+      - name: Demo screenshots
+        if: ${{ !inputs.update_baselines }}
+        run: npx playwright test e2e/demo-surfaces.spec.ts
 
       - name: Regenerate baselines
         if: ${{ inputs.update_baselines }}

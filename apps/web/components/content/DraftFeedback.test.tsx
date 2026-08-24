@@ -72,7 +72,7 @@ describe('DraftFeedback', () => {
       <DraftFeedback
         contentItemId="ci-1"
         priorFeedback={[
-          { id: 'fb-1', verdict: 'positive', feedback: 'More like this.', created_at: '2026-07-16T00:00:00Z' },
+          { id: 'fb-1', verdict: 'positive', feedback: 'More like this.', createdAt: '2026-07-16T00:00:00Z' },
         ]}
       />,
     );

@@ -20,14 +20,14 @@ interface OnchainCardProps {
 }
 
 export function OnchainCard({ row, series }: OnchainCardProps) {
-  const fresh = isFresh(row.days_since_observed);
+  const fresh = isFresh(row.daysSinceObserved);
   const isSignal = row.unit === 'signal';
   const isMvrv = row.key === 'mvrv';
 
   return (
     <div className={styles.card}>
       <div className={styles.top}>
-        <div className={styles.label}>{row.short_label}</div>
+        <div className={styles.label}>{row.shortLabel}</div>
         {fresh && (
           <span className={styles.fresh}>
             <span className={styles.dot} aria-hidden="true" />
@@ -62,8 +62,8 @@ export function OnchainCard({ row, series }: OnchainCardProps) {
         </>
       )}
 
-      {row.observed_at && (
-        <div className={styles.asat}>as at {formatDay(row.observed_at)}</div>
+      {row.observedAt && (
+        <div className={styles.asat}>as at {formatDay(row.observedAt)}</div>
       )}
     </div>
   );

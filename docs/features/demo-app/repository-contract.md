@@ -65,6 +65,13 @@ security boundary in ~200 call sites, any one of which can pass the wrong value.
 nothing today and is what makes a client-facing app a third adapter rather than a
 signature change across every repository.
 
+This extends to `ReadContext`, which is threaded through every read and is therefore the
+one place the rule could be violated while every signature still looked compliant. It
+carries `asOf` and nothing else: **no scoping data reaches a repository through an argument
+of any kind.** A principal is a constructor argument or it does not exist. Guarded by a
+test asserting `ReadContext`'s keys are exactly `['asOf']`, and by a review grep for
+`clientId|tenantId|principal` under `repositories/` alongside the existing grep for `mode`.
+
 ---
 
 ## Package layout
@@ -109,7 +116,10 @@ export interface Paginated<T> {
   hasMore: boolean;
 }
 
-/** Passed to every read so fixtures can date relative to a fixed anchor. */
+/**
+ * Passed to every read so fixtures can date relative to a fixed anchor.
+ * Do not add fields. Scoping belongs on the constructor — see Design rules.
+ */
 export interface ReadContext {
   /** Defaults to new Date() in Supabase; the demo anchor date in fixtures. */
   asOf: Date;

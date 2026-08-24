@@ -13,10 +13,10 @@ export function MacroIndicators({ latest, series }: MacroIndicatorsProps) {
   // v_indicator_series is already ordered (indicator_id, period_date ASC).
   const seriesByIndicator = new Map<string, number[]>();
   for (const point of series) {
-    if (!point.indicator_id || point.value == null) continue;
-    const arr = seriesByIndicator.get(point.indicator_id) ?? [];
+    if (!point.indicatorId || point.value == null) continue;
+    const arr = seriesByIndicator.get(point.indicatorId) ?? [];
     arr.push(point.value);
-    seriesByIndicator.set(point.indicator_id, arr);
+    seriesByIndicator.set(point.indicatorId, arr);
   }
 
   const local = latest.filter((r) => r.region === 'au');
@@ -56,9 +56,9 @@ function Group({
       <div className={styles.grid}>
         {rows.map((row) => (
           <IndicatorCard
-            key={row.indicator_id}
+            key={row.indicatorId}
             row={row}
-            series={seriesByIndicator.get(row.indicator_id ?? '') ?? []}
+            series={seriesByIndicator.get(row.indicatorId ?? '') ?? []}
           />
         ))}
       </div>

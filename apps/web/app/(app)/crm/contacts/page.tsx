@@ -13,7 +13,7 @@ export default async function ContactsPage() {
     .limit(25);
 
   const [companies, teamMembers] = await Promise.all([
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
   ]);
 

@@ -6,14 +6,8 @@ import { submitDraftFeedback } from '@/app/actions/contentFeedback';
 import { useToast } from '@platform/ui/ToastProvider';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@platform/ui/cn';
+import type { DraftFeedbackEntry } from '@platform/data';
 import styles from './DraftFeedback.module.css';
-
-export type DraftFeedbackEntry = {
-  id: string;
-  verdict: string | null;
-  feedback: string;
-  created_at: string;
-};
 
 type Verdict = 'positive' | 'negative';
 
@@ -48,7 +42,7 @@ export function DraftFeedback({ contentItemId, priorFeedback }: DraftFeedbackPro
       } else {
         success('Feedback saved — future drafts will use it');
         setEntries((prev) => [
-          { id: `local-${Date.now()}`, verdict, feedback, created_at: new Date().toISOString() },
+          { id: `local-${Date.now()}`, verdict, feedback, createdAt: new Date().toISOString() },
           ...prev,
         ]);
         setNote('');
@@ -104,7 +98,7 @@ export function DraftFeedback({ contentItemId, priorFeedback }: DraftFeedbackPro
             <li key={entry.id} className={styles.entry}>
               <span className={styles.entryMeta}>
                 {entry.verdict === 'positive' ? 'Good · ' : entry.verdict === 'negative' ? 'Needs work · ' : ''}
-                {formatDate(entry.created_at)}
+                {formatDate(entry.createdAt)}
               </span>
               <p className={styles.entryBody}>{entry.feedback}</p>
             </li>

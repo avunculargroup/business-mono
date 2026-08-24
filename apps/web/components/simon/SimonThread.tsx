@@ -13,6 +13,7 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { sendDirective } from '@/app/actions/simon';
 import { Bot } from 'lucide-react';
 import styles from './SimonThread.module.css';
+import { toAgentActivityItem } from '@platform/data-supabase';
 
 interface SimonThreadProps {
   initialItems: ThreadItem[];
@@ -39,8 +40,8 @@ function parseConversationMessages(messages: unknown): ThreadItem[] {
 
 function sortItems(items: ThreadItem[]): ThreadItem[] {
   return [...items].sort((a, b) => {
-    const aTime = a.type === 'message' ? a.data.timestamp : (a.data.created_at ?? '');
-    const bTime = b.type === 'message' ? b.data.timestamp : (b.data.created_at ?? '');
+    const aTime = a.type === 'message' ? a.data.timestamp : (a.data.createdAt ?? '');
+    const bTime = b.type === 'message' ? b.data.timestamp : (b.data.createdAt ?? '');
     return new Date(aTime).getTime() - new Date(bTime).getTime();
   });
 }
@@ -89,9 +90,12 @@ export function SimonThread({ initialItems }: SimonThreadProps) {
     'agent_activity',
     useCallback((payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        const activity = payload.new as Database['public']['Tables']['agent_activity']['Row'];
-        if (activity && activity.agent_name === 'simon') {
-          if (/^Web directive:/i.test(activity.action ?? '')) return;
+        const row = payload.new as Database['public']['Tables']['agent_activity']['Row'];
+        if (row && row.agent_name === 'simon') {
+          if (/^Web directive:/i.test(row.action ?? '')) return;
+          // Realtime delivers table rows; map through the adapter's mapper so
+          // this path and the server read cannot drift apart.
+          const activity = toAgentActivityItem(row);
           setApprovalItems((prev) => {
             const filtered = prev.filter(
               (item) => !(item.type === 'approval' && item.data.id === activity.id)

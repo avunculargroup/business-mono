@@ -31,8 +31,30 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : [['list']],
 
+  /**
+   * The demo needs a server; the design-system specimens do not.
+   *
+   * `apps/demo` is `force-dynamic` (its dates resolve at request time), so there
+   * is no static export to read over file:// — it has to be built and served.
+   * `reuseExistingServer` keeps a local `pnpm --filter @platform/demo start`
+   * from being killed and restarted on every run.
+   */
+  webServer: {
+    // Build first, always. `next start` on a stale or missing `.next` fails,
+    // and it would take the design-system specs down with it even though they
+    // read file:// paths and need no server at all. A warm rebuild is a few
+    // seconds; a confusing failure in an unrelated suite is not.
+    command:
+      'pnpm --filter @platform/demo build && pnpm --filter @platform/demo start --port 4321',
+    url: 'http://127.0.0.1:4321',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+
   use: {
-    // No baseURL — specs address file:// paths directly.
+    // The design-system specs address file:// paths directly and ignore this;
+    // the demo specs navigate relative to it.
+    baseURL: 'http://127.0.0.1:4321',
     trace: 'on-first-retry',
     // Escape hatch for environments that ship a preinstalled Chromium whose build
     // number does not match this @playwright/test version — some container images and

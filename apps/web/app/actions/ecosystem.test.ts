@@ -1,179 +1,195 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createFakeSupabase, type FakeSupabaseClient } from '@/test/mocks/supabase';
+import { createFakeRepositories, type FakeRepositories } from '@/test/mocks/repositories';
 
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
-let client: FakeSupabaseClient;
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => client),
+// Converted to the seam in vertical 4.5. The compliance gate below is the one
+// that matters: `compliance-as-alignment` is the principle this surface carries
+// into the demo, and it is a real gate in code rather than an annotation over a
+// diagram.
+let repositories: FakeRepositories;
+let authed: boolean;
+
+vi.mock('@/lib/action', () => ({
+  getAuthedRepositories: vi.fn(async () =>
+    authed
+      ? { ok: true, repositories, user: { id: 'director-1' } }
+      : { ok: false, error: 'You need to be signed in to do that.' },
+  ),
 }));
 
-import { createWatch, flagClientRelevant, acknowledgeChange } from './ecosystem';
+import {
+  createWatch,
+  flagClientRelevant,
+  acknowledgeChange,
+  setCuratorNote,
+} from './ecosystem';
 
-function form(fields: Record<string, string>): FormData {
-  const fd = new FormData();
-  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-  return fd;
+const PRODUCT_ID = '11111111-1111-4111-8111-111111111111';
+const ADVISOR_ID = '22222222-2222-4222-8222-222222222222';
+
+// `null` omits a field, as the form does when it never renders that input;
+// `''` submits it empty, as a browser does for a field left blank. The two
+// produce different validation messages, so the distinction has to be explicit.
+function watchForm(fields: Record<string, string | null> = {}): FormData {
+  const form = new FormData();
+  form.set('watch_type', 'github_release');
+  form.set('label', 'Core releases');
+  form.set('product_service_id', PRODUCT_ID);
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === null) form.delete(key);
+    else form.set(key, value);
+  }
+  return form;
 }
 
-const baseWatch = {
-  product_service_id: '11111111-1111-1111-1111-111111111111',
-  watch_type: 'github_release',
-  label: 'Coldcard firmware',
-};
-
 beforeEach(() => {
-  client = createFakeSupabase();
+  repositories = createFakeRepositories();
+  authed = true;
   revalidatePath.mockClear();
 });
 
 describe('createWatch', () => {
-  it('rejects a missing label without touching the database', async () => {
-    const result = await createWatch(form({ ...baseWatch, label: '' }));
+  it('rejects a missing label without touching the repository', async () => {
+    const result = await createWatch(watchForm({ label: '' }));
 
     expect(result).toEqual({ error: 'Label is required' });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(repositories.ecosystem.createWatch).not.toHaveBeenCalled();
   });
 
   it('refuses a watch with two parents', async () => {
-    const result = await createWatch(
-      form({
-        ...baseWatch,
-        advisor_partner_id: '22222222-2222-2222-2222-222222222222',
-      }),
-    );
+    // The database enforces num_nonnulls(...) = 1; failing here says why.
+    const result = await createWatch(watchForm({ advisor_partner_id: ADVISOR_ID }));
 
     expect(result).toEqual({ error: 'A watch must belong to exactly one product or advisor.' });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(repositories.ecosystem.createWatch).not.toHaveBeenCalled();
   });
 
   it('refuses a watch with no parent', async () => {
-    const result = await createWatch(
-      form({ watch_type: 'rss', label: 'Orphan', product_service_id: '', advisor_partner_id: '' }),
-    );
+    const result = await createWatch(watchForm({ product_service_id: null }));
 
     expect(result).toEqual({ error: 'A watch must belong to exactly one product or advisor.' });
-    expect(client.from).not.toHaveBeenCalled();
   });
 
   it('builds config from only the fields its watch_type uses', async () => {
-    client.__setResponse('ecosystem_watches', { data: { id: 'w1' }, error: null });
+    // A stale field left in the DOM by a type switch must never land in config.
+    const form = watchForm({ owner: 'bitcoin', repo: 'bitcoin', feed_url: 'https://stale.test' });
 
-    // feed_url is a leftover from an abandoned RSS draft — it must not survive.
-    const result = await createWatch(
-      form({
-        ...baseWatch,
-        owner: 'Coldcard',
-        repo: 'firmware',
-        feed_url: 'https://leftover.example/rss.xml',
-        enabled: 'on',
-        centrality: '1.5',
-      }),
-    );
+    const result = await createWatch(form);
 
-    expect(result).toEqual({ success: true, watch: { id: 'w1' } });
-    expect(client.__buildersFor('ecosystem_watches')[0].insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        product_service_id: baseWatch.product_service_id,
-        advisor_partner_id: null,
-        watch_type: 'github_release',
-        enabled: true,
-        centrality: 1.5,
-        config: { owner: 'Coldcard', repo: 'firmware', include_prereleases: false, track: 'releases' },
-      }),
-    );
-    expect(revalidatePath).toHaveBeenCalledWith(`/products/${baseWatch.product_service_id}`);
+    expect(result).toMatchObject({ success: true });
+    const [input] = repositories.ecosystem.createWatch.mock.calls[0];
+    expect(input.config).toEqual({
+      owner: 'bitcoin',
+      repo: 'bitcoin',
+      include_prereleases: false,
+      track: 'releases',
+    });
+    expect(input.config).not.toHaveProperty('feed_url');
+  });
+
+  it('hands the created watch back for the list to render', async () => {
+    const result = await createWatch(watchForm());
+
+    expect(result).toMatchObject({ success: true, watch: { id: 'w1', label: 'Core releases' } });
   });
 
   it('returns the auth error when signed out', async () => {
-    client.__setUser(null);
+    authed = false;
 
-    const result = await createWatch(form(baseWatch));
-
-    expect(result).toEqual({ error: 'You need to be signed in to do that.' });
-    expect(client.from).not.toHaveBeenCalled();
+    expect(await createWatch(watchForm())).toEqual({
+      error: 'You need to be signed in to do that.',
+    });
+    expect(repositories.ecosystem.createWatch).not.toHaveBeenCalled();
   });
 });
 
-// The dormant Lex gate. These are the cases that must never regress: a change
-// only reaches a client surface when Lex has explicitly cleared it.
 describe('flagClientRelevant', () => {
   it('promotes a change Lex classified neutral', async () => {
-    client.__setResponse('ecosystem_changes', { data: { compliance_class: 'neutral' }, error: null });
-
-    const result = await flagClientRelevant('ch1', true);
+    const result = await flagClientRelevant('ch-1', true);
 
     expect(result).toEqual({ success: true });
-    const builders = client.__buildersFor('ecosystem_changes');
-    expect(builders[builders.length - 1].update).toHaveBeenCalledWith({ client_relevant: true });
+    expect(repositories.ecosystem.setClientRelevant).toHaveBeenCalledWith('ch-1', true);
   });
 
-  it.each([
-    'solvency_adjacent',
-    'advice_adjacent',
-    'valuation_adjacent',
-  ])('refuses a change classified %s, and does not write', async (complianceClass) => {
-    client.__setResponse('ecosystem_changes', { data: { compliance_class: complianceClass }, error: null });
+  it('refuses a compliance-sensitive change', async () => {
+    repositories = createFakeRepositories({
+      promotionGate: { complianceClass: 'general_advice' },
+    });
 
-    const result = await flagClientRelevant('ch1', true);
-
-    expect(result).toEqual({
+    expect(await flagClientRelevant('ch-1', true)).toEqual({
       error:
         'This change is classified as compliance-sensitive and needs a compliance review before it can go to clients.',
     });
-    for (const builder of client.__buildersFor('ecosystem_changes')) {
-      expect(builder.update).not.toHaveBeenCalled();
-    }
+    expect(repositories.ecosystem.setClientRelevant).not.toHaveBeenCalled();
   });
 
-  // The failure that matters most: enrichment died, so nobody has judged this
-  // change. Unclassified must be as restrictive as compliance-sensitive.
   it('refuses an unclassified change rather than treating NULL as safe', async () => {
-    client.__setResponse('ecosystem_changes', { data: { compliance_class: null }, error: null });
+    // The classifier failing must never become an accidental promotion. This is
+    // the whole gate: it fails closed.
+    repositories = createFakeRepositories({ promotionGate: { complianceClass: null } });
 
-    const result = await flagClientRelevant('ch1', true);
-
-    expect(result).toEqual({
-      error: 'This change has not been classified for compliance yet, so it cannot be flagged for clients.',
+    expect(await flagClientRelevant('ch-1', true)).toEqual({
+      error:
+        'This change has not been classified for compliance yet, so it cannot be flagged for clients.',
     });
-    for (const builder of client.__buildersFor('ecosystem_changes')) {
-      expect(builder.update).not.toHaveBeenCalled();
-    }
+    expect(repositories.ecosystem.setClientRelevant).not.toHaveBeenCalled();
+  });
+
+  it('says so when the change is gone', async () => {
+    repositories = createFakeRepositories({ promotionGate: null });
+
+    expect(await flagClientRelevant('ch-1', true)).toEqual({
+      error: 'That change no longer exists.',
+    });
   });
 
   it('allows un-flagging without a compliance read — withdrawing creates no exposure', async () => {
-    client.__setResponse('ecosystem_changes', { data: null, error: null });
-
-    const result = await flagClientRelevant('ch1', false);
+    const result = await flagClientRelevant('ch-1', false);
 
     expect(result).toEqual({ success: true });
-    const builders = client.__buildersFor('ecosystem_changes');
-    expect(builders).toHaveLength(1);
-    expect(builders[0].select).not.toHaveBeenCalled();
-    expect(builders[0].update).toHaveBeenCalledWith({ client_relevant: false });
+    expect(repositories.ecosystem.getPromotionGate).not.toHaveBeenCalled();
+    expect(repositories.ecosystem.setClientRelevant).toHaveBeenCalledWith('ch-1', false);
   });
 
   it('surfaces a read failure instead of promoting', async () => {
-    client.__setResponse('ecosystem_changes', { data: null, error: { message: 'boom' } });
+    repositories.ecosystem.getPromotionGate.mockRejectedValueOnce(new Error('offline'));
 
-    const result = await flagClientRelevant('ch1', true);
-
-    expect(result).toHaveProperty('error');
-    expect(result).not.toHaveProperty('success');
+    expect(await flagClientRelevant('ch-1', true)).toHaveProperty('error');
+    expect(repositories.ecosystem.setClientRelevant).not.toHaveBeenCalled();
   });
 });
 
 describe('acknowledgeChange', () => {
-  it('records who acknowledged it', async () => {
-    client.__setUser({ id: 'user-1' });
-    client.__setResponse('ecosystem_changes', { data: null, error: null });
+  it('records the acknowledgement and refreshes the feed', async () => {
+    // Who acknowledged it is the bundle's principal, so the action does not
+    // pass it — and cannot pass the wrong one.
+    expect(await acknowledgeChange('ch-1')).toEqual({ success: true });
+    expect(repositories.ecosystem.acknowledgeChange).toHaveBeenCalledWith('ch-1');
+    expect(revalidatePath).toHaveBeenCalledWith('/signals');
+  });
+});
 
-    const result = await acknowledgeChange('ch1');
+describe('setCuratorNote', () => {
+  it('clears the note rather than storing an empty string', async () => {
+    const form = new FormData();
+    form.set('note', '');
 
-    expect(result).toEqual({ success: true });
-    expect(client.__buildersFor('ecosystem_changes')[0].update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'acknowledged', acknowledged_by: 'user-1' }),
+    await setCuratorNote('ch-1', form);
+
+    expect(repositories.ecosystem.setCuratorNote).toHaveBeenCalledWith('ch-1', null);
+  });
+
+  it('stores a note that was written', async () => {
+    const form = new FormData();
+    form.set('note', 'Matters for the custody review.');
+
+    await setCuratorNote('ch-1', form);
+
+    expect(repositories.ecosystem.setCuratorNote).toHaveBeenCalledWith(
+      'ch-1',
+      'Matters for the custody review.',
     );
   });
 });

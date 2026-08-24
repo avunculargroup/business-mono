@@ -72,6 +72,7 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 │   ├── agents/          # Mastra agent server — deployed to Railway (see apps/agents/README.md)
 │   │   ├── evals/       # LLM-touching evals — on-demand, not in CI
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   ├── demo/            # Public fixture-backed demo — no database, no auth, read-only
 │   └── web/             # Next.js frontend — deployed to Vercel (see apps/web/README.md)
 ├── packages/
 │   ├── db/              # Supabase client, generated types, RPC wrappers
@@ -108,18 +109,36 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
 ### Package dependency graph
 
 ```
-@platform/agents  →  @platform/db      →  @platform/shared
+@platform/agents  →  @platform/agent-traces
+                  →  @platform/db      →  @platform/shared
                   →  @platform/signal
                   →  @platform/voice   →  @platform/db, @platform/shared
 @platform/web     →  @platform/db      →  @platform/shared
                   →  @platform/ui      →  @platform/shared
+                  →  @platform/data           →  @platform/shared
+                  →  @platform/data-supabase  →  @platform/data, @platform/db, @platform/shared
+@platform/demo    →  @platform/agent-traces
+                  →  @platform/data           →  @platform/shared
+                  →  @platform/data-fixtures  →  @platform/data, @platform/shared
+                  →  @platform/ui             →  @platform/shared
 ```
 
-`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`.
+`apps/*` never import from each other. `@platform/shared` has no internal dependencies. `apps/web` imports only `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` — not `@platform/signal`, not `@platform/voice`. `apps/demo` imports only `@platform/agent-traces`, `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui`: it has no database client anywhere in its transitive graph, which is what makes it safe to deploy publicly, and `apps/demo/lib/boundary.test.ts` keeps it that way.
 
 `@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
 presentational components, and is written to be consumed by more than one app — so a dependency
 on app code would defeat the point. React and `lucide-react` are peer dependencies.
+
+`@platform/data` holds the repository interfaces both apps code against; `@platform/data-supabase`
+is the live implementation. They are separate packages rather than one with subpath exports so that
+a fixture-backed app can simply not depend on the Supabase one and have that enforced by
+`package.json` rather than by discipline. `@platform/data` imports only `@platform/shared` (for the enums the ingestion side already
+defines) and never a database client. `@platform/data-fixtures` is the demo's implementation: the
+same interfaces over static typed objects, with every write throwing `DemoWriteBlockedError` naming
+the table it would have touched. It implements only the seven domains the demo renders — the bundle
+is a slice (`Bundle<K>`), so a demo route reaching for a domain the demo does not have is a compile
+error rather than a stub that throws.
+See [`docs/features/demo-app/repository-contract.md`](./docs/features/demo-app/repository-contract.md).
 
 ---
 
@@ -174,6 +193,11 @@ cp apps/web/.env.example apps/web/.env.local   # fill in the two Supabase values
 pnpm dev:web
 ```
 
+**`apps/demo` needs none of the above.** It is fixture-backed with no database, no auth and no
+environment variables, so `pnpm dev:demo` works on a fresh checkout — which makes it the
+quickest way to see the platform's surfaces without standing anything up. See
+[`apps/demo/README.md`](./apps/demo/README.md).
+
 ### Getting past the login page
 
 `apps/web` is auth-gated by `middleware.ts` — every route except `/login` and the public `/share/<id>` links redirects to a sign-in form. There is no self-serve sign-up: the login page calls `signInWithPassword` only. Create the first user in the Supabase dashboard under **Authentication → Users → Add user** (tick "Auto Confirm User"), then sign in with those credentials.
@@ -213,10 +237,13 @@ For `apps/web`, only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_K
 |---------|-------------|
 | `pnpm dev:agents` | Start agent server in watch mode |
 | `pnpm dev:web` | Start Next.js frontend in dev mode |
+| `pnpm dev:demo` | Start the public demo — no env, no database, no auth |
 | `pnpm build` | Build all packages and apps |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm lint` | Lint all packages |
-| `pnpm test` | Run the Vitest suites for both apps |
+| `pnpm test` | Run every Vitest suite — three apps and five packages |
+| `pnpm test:visual` | Playwright visual regression, in the CI container image. Advisory, not part of `pnpm test` |
+| `pnpm test:visual:update` | Regenerate screenshot baselines in that same image |
 | `pnpm db:generate-types` | Regenerate Supabase TypeScript types |
 | `pnpm db:migrate` | Apply pending migrations (`supabase db push`) |
 | `pnpm db:diff` | Diff the local database against the migration history |

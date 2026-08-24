@@ -4,6 +4,7 @@
   "scripts": {
     "dev:agents": "turbo run dev --filter=@platform/agents",
     "dev:web": "turbo run dev --filter=@platform/web",
+    "dev:demo": "turbo run dev --filter=@platform/demo",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

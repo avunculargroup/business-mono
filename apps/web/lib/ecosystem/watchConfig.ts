@@ -8,11 +8,15 @@
 // Blank optional fields are omitted rather than written as empty strings —
 // adapters check for presence, and `{ match: '' }` is not the same as no match.
 
-// The return type is `Json`, not one of the `EcosystemWatchConfig` members: what
-// this builds is whatever the director typed, and a config can also be edited
-// directly in the DB. Every adapter validates its own config at run time and
-// degrades the watch rather than trusting the shape. The typed configs in
-// @platform/shared are what the adapters narrow to once they have.
+// The return type is an untyped object, not one of the `EcosystemWatchConfig`
+// members: what this builds is whatever the director typed, and a config can
+// also be edited directly in the DB. Every adapter validates its own config at
+// run time and degrades the watch rather than trusting the shape. The typed
+// configs in @platform/shared are what the adapters narrow to once they have.
+//
+// It is an *object* though — every branch returns one — where the signature
+// used to say `Json`, which also admits null and a bare string. That looseness
+// was invisible until a caller needed to pass the result somewhere typed.
 
 import type { Json } from '@platform/db';
 
@@ -40,11 +44,16 @@ function terms(value: string | undefined): string[] | undefined {
 }
 
 /** Drop undefined values so they never serialise into the JSONB as nulls. */
-function compact(obj: Record<string, unknown>): Json {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Json;
+function compact(obj: Record<string, unknown>): Record<string, Json> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined),
+  ) as Record<string, Json>;
 }
 
-export function buildWatchConfig(watchType: string, fields: WatchConfigFields): Json {
+export function buildWatchConfig(
+  watchType: string,
+  fields: WatchConfigFields,
+): Record<string, Json> {
   switch (watchType) {
     case 'github_release':
       return compact({

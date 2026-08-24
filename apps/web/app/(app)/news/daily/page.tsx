@@ -1,36 +1,36 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CategoryChip } from '@/components/news/CategoryChip';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import { newsItemHref } from '@/lib/news/itemHref';
-import type { NewsCategory, NewsItemRecord } from '@platform/shared';
+import type { NewsCategory } from '@platform/shared';
+import type { NewsDigestItem } from '@platform/data';
 import { NEWS_CATEGORY_LABELS, DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
 import styles from './DailyDigest.module.css';
 
 const ORDERED_CATEGORIES: NewsCategory[] = ['regulatory', 'corporate', 'macro', 'international'];
 
 export default async function DailyDigestPage() {
-  const supabase = await createClient();
+  const repositories = await getRepositories();
+  const ctx = resolveReadContext();
 
-  const { start, end } = dayBoundsInTz(DEFAULT_TIMEZONE);
+  const items = await repositories.research.listTodayDigest(ctx);
 
-  const { data } = await supabase
-    .from('news_items')
-    .select('id, title, url, source_name, published_at, summary, category, relevance_score')
-    .gte('fetched_at', start.toISOString())
-    .lt('fetched_at', end.toISOString())
-    .neq('status', 'archived')
-    .order('relevance_score', { ascending: false, nullsFirst: false })
-    .order('published_at', { ascending: false, nullsFirst: false })
-    .limit(100);
+  // The day this page is showing. The repository bounds the query from the same
+  // anchor, so the heading and the rows can never disagree about which day it is.
+  const { start } = dayBoundsInTz(DEFAULT_TIMEZONE, ctx.asOf);
 
-  const byCategory: Record<string, NewsItemRecord[]> = {};
-  for (const item of data ?? []) {
+  // Top five per category. Left here rather than pushed into the adapter: it is
+  // presentation over an already-bounded set, and doing it in SQL needs a window
+  // function for no benefit at this size.
+  const byCategory: Record<string, NewsDigestItem[]> = {};
+  for (const item of items) {
     const cat = item.category as string;
     if (!byCategory[cat]) byCategory[cat] = [];
     if ((byCategory[cat]?.length ?? 0) < 5) {
-      byCategory[cat]!.push(item as unknown as NewsItemRecord);
+      byCategory[cat]!.push(item);
     }
   }
 
@@ -71,12 +71,12 @@ export default async function DailyDigestPage() {
                   return (
                   <article key={item.id} className={styles.item}>
                     <div className={styles.itemMeta}>
-                      {item.source_name && (
-                        <span className={styles.source}>{item.source_name}</span>
+                      {item.sourceName && (
+                        <span className={styles.source}>{item.sourceName}</span>
                       )}
-                      {item.published_at && (
+                      {item.publishedAt && (
                         <span className={styles.date}>
-                          {new Date(item.published_at).toLocaleDateString('en-AU', {
+                          {new Date(item.publishedAt).toLocaleDateString('en-AU', {
                             timeZone: DEFAULT_TIMEZONE,
                             day: 'numeric',
                             month: 'short',

@@ -132,10 +132,20 @@ Two conventions worth following:
 
 ## Workspace dependencies
 
+- `@platform/data` — repository interfaces and read models; no database client of its own
+- `@platform/data-supabase` — the live implementation of those interfaces, which is how pages
+  and server actions read and write
 - `@platform/db` — Supabase client, generated types, RPC wrappers
 - `@platform/shared` — shared types, constants, enums
+- `@platform/ui` — design tokens and shared presentational components
 
-It does **not** import `@platform/signal` or `@platform/voice` — both are agent-server only.
+It does **not** import `@platform/signal` or `@platform/voice` — both are agent-server only —
+and never `@platform/data-fixtures`, which exists for `apps/demo`.
+
+Pages converted to the repository seam call `getRepositories()` (`lib/repositories.ts`); server
+actions call `getAuthedRepositories()` (`lib/action.ts`). Surfaces not yet converted still use
+`@/lib/supabase/server` directly — see the vertical table in
+[`build-progress.md`](../../docs/features/demo-app/build-progress.md) for which is which.
 
 ## Design references
 

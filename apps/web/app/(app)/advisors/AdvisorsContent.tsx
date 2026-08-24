@@ -10,7 +10,7 @@ export async function AdvisorsContent() {
       .from('advisors_partners')
       .select('id, slug, name, type, specialization, active, logo_url, company_id, key_relationship_id, companies(name), team_members!advisors_partners_key_relationship_id_fkey(full_name)')
       .order('created_at', { ascending: false }),
-    getCompanyOptions(supabase),
+    getCompanyOptions(),
     getTeamMemberOptions(supabase),
   ]);
 

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
+import { getRepositories } from '@/lib/repositories';
+import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
-import { CampaignsList, type OverviewRow } from '@/components/campaigns/CampaignsList';
+import { CampaignsList } from '@/components/campaigns/CampaignsList';
 import styles from './campaigns.module.css';
 
 // Campaigns list — progress + timeline per campaign, from v_campaign_overview.
@@ -10,9 +11,8 @@ import styles from './campaigns.module.css';
 // status updates are handled by the client CampaignsList wrapper.
 
 export default async function CampaignsPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.from('v_campaign_overview').select('*');
-  const campaigns = (data ?? []) as OverviewRow[];
+  const repositories = await getRepositories();
+  const campaigns = await repositories.campaigns.listOverview(resolveReadContext());
 
   return (
     <>

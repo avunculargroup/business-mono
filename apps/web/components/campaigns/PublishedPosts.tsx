@@ -6,43 +6,24 @@ import { useToast } from '@platform/ui/ToastProvider';
 import { Button } from '@platform/ui/Button';
 import { savePostMetrics, promotePostToSnippet } from '@/app/actions/campaigns';
 import styles from './PublishedPosts.module.css';
+import type { PublishedPost, PublishedPostMetrics } from '@platform/data';
 
 // Published variants: their live link, inline platform-aware metrics entry
 // (published posts visibly carry their numbers), and "Save to voice snippets" —
 // promoting a strong post into the exemplar library (source = promoted_from_post,
 // founder writes the curator note). Step 9's learning loop.
 
-export interface Metrics {
-  impressions: number | null;
-  reactions: number | null;
-  comments: number | null;
-  reposts: number | null;
-  clicks: number | null;
-}
-
-export interface PublishedItem {
-  id: string;
-  title: string | null;
-  body: string | null;
-  type: 'linkedin' | 'twitter_x';
-  is_thread: boolean;
-  published_url: string | null;
-  account_name: string | null;
-  metrics: Metrics | null;
-}
-
-// Platform-aware labels over the fixed post_metrics columns.
-const FIELD_LABELS: Record<'twitter_x' | 'linkedin', Record<keyof Metrics, string>> = {
+const FIELD_LABELS: Record<'twitter_x' | 'linkedin', Record<keyof PublishedPostMetrics, string>> = {
   twitter_x: { impressions: 'Impressions', reactions: 'Likes', comments: 'Replies', reposts: 'Reposts', clicks: 'Clicks' },
   linkedin: { impressions: 'Impressions', reactions: 'Reactions', comments: 'Comments', reposts: 'Reposts', clicks: 'Clicks' },
 };
 
-const FIELDS: Array<keyof Metrics> = ['impressions', 'reactions', 'comments', 'reposts', 'clicks'];
+const FIELDS: Array<keyof PublishedPostMetrics> = ['impressions', 'reactions', 'comments', 'reposts', 'clicks'];
 
-function MetricsRow({ item, campaignId }: { item: PublishedItem; campaignId: string }) {
+function MetricsRow({ item, campaignId }: { item: PublishedPost; campaignId: string }) {
   const { success, error } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [values, setValues] = useState<Record<keyof Metrics, string>>(() => {
+  const [values, setValues] = useState<Record<keyof PublishedPostMetrics, string>>(() => {
     const m = item.metrics;
     return {
       impressions: m?.impressions?.toString() ?? '',
@@ -100,7 +81,7 @@ function MetricsRow({ item, campaignId }: { item: PublishedItem; campaignId: str
   );
 }
 
-function PromotePanel({ item, campaignId }: { item: PublishedItem; campaignId: string }) {
+function PromotePanel({ item, campaignId }: { item: PublishedPost; campaignId: string }) {
   const { success, error } = useToast();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -163,7 +144,7 @@ function PromotePanel({ item, campaignId }: { item: PublishedItem; campaignId: s
   );
 }
 
-export function PublishedPosts({ items, campaignId }: { items: PublishedItem[]; campaignId: string }) {
+export function PublishedPosts({ items, campaignId }: { items: PublishedPost[]; campaignId: string }) {
   if (items.length === 0) return null;
   return (
     <section className={styles.wrap} aria-label="Published posts">
@@ -173,11 +154,11 @@ export function PublishedPosts({ items, campaignId }: { items: PublishedItem[]; 
           <li key={item.id} className={styles.card}>
             <header className={styles.cardHead}>
               <div className={styles.meta}>
-                <span className={styles.account}>{item.account_name}</span>
+                <span className={styles.account}>{item.accountName}</span>
                 <span className={styles.platform}>{item.type === 'twitter_x' ? 'X' : 'LinkedIn'}</span>
               </div>
-              {item.published_url && (
-                <a className={styles.liveLink} href={item.published_url} target="_blank" rel="noreferrer">
+              {item.publishedUrl && (
+                <a className={styles.liveLink} href={item.publishedUrl} target="_blank" rel="noreferrer">
                   <ExternalLink size={14} strokeWidth={1.5} />
                   View live
                 </a>
