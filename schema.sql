@@ -2414,6 +2414,9 @@ CREATE TABLE onchain_observations (
 --          idx_onchain_obs_observed (indicator_id, observed_at DESC);
 --          idx_onchain_obs_current (indicator_id, is_current) WHERE is_current;
 --          uq_onchain_obs_vintage UNIQUE (indicator_id, observed_at, ingested_at);
+--          uq_onchain_obs_current UNIQUE (indicator_id, observed_at) WHERE is_current
+--            — one current vintage per day; the views join the series on observed_at
+--            and duplicates multiply through them (migration 20260824110000);
 --          idx_onchain_indicators_group (metric_group);
 --          idx_onchain_indicators_active (is_active) WHERE is_active;
 --          idx_onchain_indicators_displayed (is_displayed) WHERE is_displayed.

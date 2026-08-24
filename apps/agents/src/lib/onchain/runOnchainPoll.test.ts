@@ -123,6 +123,33 @@ describe('runOnchainPoll — supersession', () => {
     expect(obsInsertCount()).toBe(0);
   });
 
+  it('pages past PostgREST max-rows so a day beyond the first page is not re-inserted', async () => {
+    // The regression behind the GET / 500: an unbounded select returns at most
+    // max-rows (1000) current rows, every day past that looks unobserved, and
+    // the poll inserts a second row for it and marks that current too.
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      id: `o${i}`,
+      observed_at: `2026-06-${String((i % 28) + 1).padStart(2, '0')}`,
+      value: 100 + i,
+    }));
+    setIndicators([hashRate()]);
+    fakeSupabase.__setResponses('onchain_observations', [
+      { data: [{ indicator_id: 'i-hr' }], error: null },                                  // has-history probe
+      { data: page1, error: null },                                                       // current rows, page 1 (full)
+      { data: [{ id: 'o-last', observed_at: '2026-06-20', value: 642 }], error: null },   // page 2
+    ]);
+    adapterResult = { ok: true, observations: [obs('2026-06-20', 642)] };
+
+    const out = await runOnchainPoll(ROUTINE, NOW);
+
+    expect(out.onchain_poll_result).toMatchObject({ no_op: 1, observations_inserted: 0 });
+    expect(obsInsertCount()).toBe(0);
+    const ranges = fakeSupabase
+      .__buildersFor('onchain_observations')
+      .flatMap((b) => b.range.mock.calls.map((c) => [c[0], c[1]]));
+    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
+  });
+
   it('a failing provider is recorded and the sweep still succeeds', async () => {
     setIndicators([hashRate()]);
     setObservations([]);

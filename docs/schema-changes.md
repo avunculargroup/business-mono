@@ -6,6 +6,39 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-08-24 — One current vintage per on-chain observation day
+
+`20260824110000_onchain_one_current_vintage_per_day.sql` demotes duplicate
+current rows on `onchain_observations` and adds
+`uq_onchain_obs_current UNIQUE (indicator_id, observed_at) WHERE is_current`.
+
+- **What went wrong.** The poll loaded an indicator's current rows with an
+  unbounded PostgREST select, which truncates at max-rows (1000). Every day
+  outside that window read as "no observation yet", so each run inserted a
+  second row for the day and marked it current too — about 1,640 duplicates per
+  run for `btc_price_usd` alone. 2,643 days of price history had accumulated
+  77,144 current rows.
+- **Why it surfaced as a 500 on `GET /`.** `v_btc_mvrv` joins the price, supply
+  and realised-cap series on `observed_at`, so 29 current rows per day on each
+  side multiplied into a 15.8M-row join. `v_onchain_dashboard` took 27s against
+  the `authenticated` role's 8s `statement_timeout`; PostgREST returned 500. The
+  dashboard had always issued that query and always discarded its error, so the
+  panel just rendered empty. Moving the read behind
+  `IndicatorsRepository.getDashboard`, which throws on a failed read, turned the
+  same long-standing failure into a 500 on the page.
+- **The invariant, now enforced.** The views have always assumed one current
+  vintage per (indicator, day); nothing said so in the schema. The partial
+  unique index does. A genuine revision still passes it — the poll demotes the
+  prior vintage before inserting the replacement — while a truncated read that
+  re-inserts a day now fails loudly instead of corrupting the series.
+- **Nothing is deleted.** Superseded rows stay on the table as history, the
+  same as a real revision.
+- **Reader fix.** `apps/agents/src/lib/onchain/runOnchainPoll.ts` now pages the
+  current-observation read and probes for existing history per indicator rather
+  than in one unbounded select.
+
+---
+
 ## 2026-08-10 — US spot ETF flow metrics
 
 `20260810000000_add_etf_flow_indicators.sql` adds three metrics on the existing
