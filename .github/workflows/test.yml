@@ -118,3 +118,39 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+  build-demo:
+    name: Build demo app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Same exposure as build-web, on a second Vercel project: a demo build
+      # break — bad import, prerender failure, config regression — passes CI and
+      # fails on Vercel instead. The demo's unit suite covers the dependency
+      # boundary and the annotation layer, not build-time errors.
+      #
+      # Must be the turbo `...` form for the same reason as build-web: the
+      # workspace packages it imports from resolve to ./dist and have to be
+      # compiled first.
+      #
+      # No `env:` block, deliberately — not even placeholders. The demo reads no
+      # environment variable, and step 6 of the deploy checklist makes "zero
+      # environment variables, not an empty Supabase key" the deployment
+      # guarantee. Setting one here to make CI look like the web job would
+      # contradict the thing the app claims.
+      - name: Build demo
+        run: pnpm exec turbo run build --filter=@platform/demo...
