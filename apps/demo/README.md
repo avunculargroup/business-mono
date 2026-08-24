@@ -5,12 +5,33 @@ the architecture — the approval loop, the deterministic-before-LLM boundary, t
 gate — to people who cannot be shown the real thing, because the real thing contains
 clients.
 
-Deployed public and `noindex`. No auth, no database, no writes.
+No auth, no database, no writes, and no environment variables — it runs on a fresh checkout.
+Intended to be deployed public and `noindex`; **not deployed yet**, and
+[`deploy-checklist.md`](../../docs/features/demo-app/deploy-checklist.md) is what stands in
+the way.
 
 ```bash
-pnpm --filter @platform/demo dev     # http://localhost:3000
+pnpm dev:demo                        # http://localhost:3000, no setup
 pnpm --filter @platform/demo build
+pnpm --filter @platform/demo test
 ```
+
+## Routes
+
+| Route | What it is for |
+|---|---|
+| `/` | Indicator dashboard — carries the neutral-delta rule |
+| `/market-reports`, `/[id]` | The quiet-day path, and the findings/narration boundary |
+| `/news`, `/[id]` | The scoring rubric, and curator notes |
+| `/activity` | The approval wall |
+| `/content` | The publish gate and a compliance verdict |
+| `/signals` | Ecosystem changes, classified at detection |
+| `/crm/companies` | The CRM glance view |
+| `/agents/run/[traceId]` | **The centrepiece.** One workflow run, replayed step by step |
+| `/architecture` | The written notes each annotation links to |
+
+The nav lists exactly these. A dead link on a page whose whole job is to be trustworthy costs
+more than a missing section.
 
 ## How it differs from `apps/web`
 
@@ -87,20 +108,31 @@ it:
 2. **An absolute date in a fixture.** See
    [`fixture-and-trace-schema.md` § The relative dating rule](../../docs/features/demo-app/fixture-and-trace-schema.md#the-relative-dating-rule).
 
-**Routes without fixtures.** The nav lists exactly the surfaces that have data behind them.
-A dead link on a page whose whole job is to be trustworthy costs more than a missing
-section.
+**Indexing.** Two layers, and they are not redundant: `app/robots.ts` disallows crawling, and
+`app/layout.tsx` sets a `noindex` meta. A meta tag is only seen by a crawler that has already
+fetched the page. The failure this closes has teeth — a client or counterparty searching for
+BTS and landing on fabricated, client-shaped records under BTS branding.
 
 ## What is here and what is not
 
-Phase 5 shipped the scaffolding and the plumbing: the seven routes, the shell, the fixture
-adapter and the wiring between them. The fixtures themselves are **placeholders** — enough
-rows to prove pagination has a boundary and every surface renders. The curated set, the
-staged narrative and every word of prose are Phase 6, and go past Lex before they ship.
+**The fixture set is curated, not placeholder.** Every row exists to make one architectural
+claim legible in a few seconds, and `packages/data-fixtures/src/fixtures/content.test.ts`
+asserts those claims still hold — that the quiet day scored a finding and still said nothing,
+that a change is unclassified so the promotion gate's fail-closed path has a row, that
+indicator deltas carry both signs and a zero. The likeliest way this set degrades is not a
+compliance breach; it is someone editing a fixture into blandness and nothing noticing.
 
-The routes render with local markup rather than the platform's own components, which still
-live in `apps/web`. They move into `@platform/ui` in Phase 7, which is when the two apps
-start sharing them for real.
+**Two things about it are still open**, both on the checklist: the ASIC search over the
+invented company names, and the Lex classification pass over the prose. Neither can be done by
+a test, and the set should not go public without them.
+
+**The routes render with local markup**, not the platform's own components. `@platform/ui`
+holds the shared presentational components and the design tokens — the demo uses the tokens
+today and none of the components. Moving them is real work with a real payoff and is not
+scheduled; nothing in the plan currently covers it.
+
+**The trace bundle is authored, not recorded** — see above.
 
 See [`docs/features/demo-app/build-progress.md`](../../docs/features/demo-app/build-progress.md)
-for the plan and what each phase actually shipped.
+for what each phase shipped, and
+[`deploy-checklist.md`](../../docs/features/demo-app/deploy-checklist.md) for what is left.
