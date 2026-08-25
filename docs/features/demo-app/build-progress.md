@@ -10,10 +10,7 @@ bootstrapped. Phase 4.0 (the `@platform/data` foundation) and verticals 4.1, 4.2
 4.5 and 4.6a are complete, and **Phases 5 through 9 have shipped** — the plan is complete through
 its last numbered phase — `apps/demo` builds and serves all seven
 surfaces on `@platform/data-fixtures`, with the curated fixture set behind them and the annotation
-layer over them. **Two gates block
-deployment: the ASIC search over the invented entity names, and the Lex classification pass over the
-fixture prose** (Phase 6), and **the trace bundle is authored rather than recorded** (Phase 8).
-**and the screenshot baselines need bootstrapping in the CI container** (Phase 9). Everything still
+layer over them. It is **not deployable yet**. Everything still
 open in Phase 4 — 4.2c–d, 4.6b–d, 4.7–4.11 — is background whose justification rests on the client
 app being real; the directors have it as not yet real but expected, so it is deferred rather than
 cut.

@@ -23,7 +23,7 @@ import styles from './Nav.module.css';
  * trustworthy. `/architecture` is demo-only — it is where the written notes the
  * annotations link to will live.
  */
-const ROUTES = [
+export const ROUTES = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/market-reports', label: 'Market reports', icon: FileText },
   { href: '/news', label: 'Research', icon: Newspaper },
