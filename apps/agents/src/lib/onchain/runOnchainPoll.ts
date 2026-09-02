@@ -30,6 +30,7 @@ import type { RoutineOutcome } from '../../workflows/executeRoutineWorkflow.js';
 const DEFAULT_BACKFILL_DAYS = 90; // Hash Ribbons needs 60 days of hash rate.
 const BEAT_DEDUPE_DAYS = 7;
 const OBS_SCALE = 1e6; // NUMERIC(24,6) — round to the column scale before compare/insert.
+const CURRENT_PAGE_SIZE = 1000; // PostgREST max-rows: read current observations a page at a time.
 
 interface RoutineInput {
   id: string;
@@ -92,12 +93,17 @@ export async function runOnchainPoll(
   // observations yet (first ingest), so the views aren't empty on day one.
   const fetchedIds = fetched.map((i) => i.id);
   const withData = new Set<string>();
-  if (fetchedIds.length > 0) {
+  for (const id of fetchedIds) {
+    // One bounded existence probe per indicator, not one unbounded select over
+    // the whole table: PostgREST caps an unbounded select at max-rows, and the
+    // first page can be entirely one indicator's rows — which reads as "every
+    // other indicator is empty" and triggers a full backfill on every run.
     const { data: existing } = await supabase
       .from('onchain_observations')
       .select('indicator_id')
-      .in('indicator_id', fetchedIds);
-    for (const r of (existing ?? []) as { indicator_id: string }[]) withData.add(r.indicator_id);
+      .eq('indicator_id', id)
+      .limit(1);
+    if (((existing ?? []) as unknown[]).length > 0) withData.add(id);
   }
 
   // Group fetched indicators by provider and poll each provider once.
@@ -176,16 +182,13 @@ async function processIndicator(
   obsList: RawObservation[],
   acc: OnchainPollResult,
 ): Promise<void> {
-  const { data: currentRows } = await supabase
-    .from('onchain_observations')
-    .select('id, observed_at, value')
-    .eq('indicator_id', indicator.id)
-    .eq('is_current', true);
-  const byDate = new Map<string, CurrentObs>(
-    ((currentRows ?? []) as CurrentObs[]).map((o) => [o.observed_at, { ...o, value: Number(o.value) }]),
-  );
-
   const sorted = [...obsList].sort((a, b) => a.observedAt.localeCompare(b.observedAt));
+  if (sorted.length === 0) return;
+  const byDate = await loadCurrentByDate(
+    indicator.id,
+    sorted[0].observedAt,
+    sorted[sorted.length - 1].observedAt,
+  );
   for (const obs of sorted) {
     const value = round6(obs.value);
     const existing = byDate.get(obs.observedAt);
@@ -221,6 +224,45 @@ async function processIndicator(
       acc.observations_superseded += 1;
       byDate.set(obs.observedAt, { ...existing, value });
     }
+  }
+}
+
+/**
+ * Current observations for one indicator over the fetched batch's date range,
+ * keyed by day.
+ *
+ * Paged, and never unbounded. PostgREST truncates an unbounded select at its
+ * max-rows setting, and a truncated map is indistinguishable here from "that
+ * day has no observation yet" — so the poll inserts a second row for the day
+ * and marks it current too. That is how 2,643 days of price history grew to
+ * 77,144 current rows, which multiplied through v_btc_mvrv's date joins until
+ * v_onchain_dashboard exceeded the statement timeout. Migration
+ * 20260824110000 cleans up the rows and adds the unique index that would have
+ * caught it.
+ */
+async function loadCurrentByDate(
+  indicatorId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Map<string, CurrentObs>> {
+  const byDate = new Map<string, CurrentObs>();
+
+  for (let offset = 0; ; offset += CURRENT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('onchain_observations')
+      .select('id, observed_at, value')
+      .eq('indicator_id', indicatorId)
+      .eq('is_current', true)
+      .gte('observed_at', fromDate)
+      .lte('observed_at', toDate)
+      .order('observed_at', { ascending: true })
+      .range(offset, offset + CURRENT_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+
+    const rows = (data ?? []) as CurrentObs[];
+    for (const o of rows) byDate.set(o.observed_at, { ...o, value: Number(o.value) });
+    if (rows.length < CURRENT_PAGE_SIZE) return byDate;
   }
 }
 

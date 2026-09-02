@@ -32,6 +32,7 @@ export interface FakeQueryBuilder {
   gte: Mock;
   order: Mock;
   limit: Mock;
+  range: Mock;
   single: Mock;
   maybeSingle: Mock;
   then: (onFulfilled: (value: SupabaseResponse) => unknown) => Promise<unknown>;
@@ -99,6 +100,7 @@ function makeBuilder(table: string, response: SupabaseResponse): FakeQueryBuilde
   builder.gte = passthrough('gte');
   builder.order = passthrough('order');
   builder.limit = passthrough('limit');
+  builder.range = passthrough('range');
   builder.single = terminal('single');
   builder.maybeSingle = terminal('maybeSingle');
 
