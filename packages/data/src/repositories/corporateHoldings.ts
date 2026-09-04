@@ -226,6 +226,32 @@ export interface StructuralAbsence {
   provenance: Provenance;
 }
 
+/**
+ * One qualitative field — custody, mandate, accounting treatment, covenants —
+ * with the document that establishes it and, where two documents disagreed, the
+ * claim that lost.
+ *
+ * `conflicting` is the panel the register exists to be able to draw. A
+ * company's marketing page claiming self-custody with no counterparty risk
+ * while its offer document names a third-party custodian and lists custodian
+ * insolvency as a key risk is not a data-quality problem to resolve out of
+ * sight: it is the finding, and the reader has to see both halves of it.
+ */
+export interface CompanyFact {
+  id: string;
+  fieldKey: string;
+  label: string;
+  /** Markdown. */
+  value: string;
+  asOf: string | null;
+  provenance: Provenance;
+  /** Non-null only where a weaker source claimed otherwise. */
+  conflicting: {
+    value: string;
+    provenance: Pick<Provenance, 'documentTitle' | 'sourceClass' | 'sourceUrl'>;
+  } | null;
+}
+
 export interface RegisterFilter {
   tier?: ResearchTier;
   archetype?: ResearchArchetype;
@@ -293,6 +319,16 @@ export interface CorporateHoldingsRepository {
   ): Promise<JurisdictionNote[]>;
 
   getFreshness(ctx: ReadContext, companyId: string): Promise<FreshnessRow>;
+
+  /**
+   * The qualitative panel, superseded claims already resolved.
+   *
+   * The adapter returns the winning fact with the losing one attached, rather
+   * than both as peers — deciding which document wins is the source hierarchy's
+   * job, and a page that had to rank source classes itself would be a page that
+   * could get it wrong.
+   */
+  getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]>;
 
   /** Facts the register states because they are absent. Empty is a valid answer. */
   getStructuralAbsences(ctx: ReadContext, companyId: string): Promise<StructuralAbsence[]>;

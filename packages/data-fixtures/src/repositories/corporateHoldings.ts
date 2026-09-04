@@ -1,5 +1,6 @@
 import type {
   CompanyDossier,
+  CompanyFact,
   CorporateHoldingsRepository,
   FreshnessRow,
   JurisdictionNote,
@@ -19,6 +20,7 @@ import {
   researchAbsences,
   researchCompanies,
   researchCompanyDocuments,
+  researchFacts,
   researchJurisdictionNotes,
   researchLedger,
   researchPositions,
@@ -149,6 +151,11 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
         // for yet, which reads differently and is a different job to do.
         isStale: days !== null && days > staleAfterDays,
       };
+    },
+
+    async getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]> {
+      const found = company(ctx.asOf, companyId);
+      return found ? (researchFacts(ctx.asOf)[found.id] ?? []) : [];
     },
 
     async getStructuralAbsences(

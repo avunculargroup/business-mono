@@ -76,6 +76,7 @@ export {
 } from './repositories/corporateHoldings';
 export type {
   CompanyDossier,
+  CompanyFact,
   CompanyListing,
   CorporateHoldingsRepository,
   FormerName,

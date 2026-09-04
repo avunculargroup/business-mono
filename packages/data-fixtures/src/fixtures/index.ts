@@ -23,6 +23,7 @@ export {
   researchCompanies,
   researchCompanyDocuments,
   researchDocuments,
+  researchFacts,
   researchJurisdictionNotes,
   researchLedger,
   researchPositions,

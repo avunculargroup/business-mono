@@ -477,26 +477,80 @@ CREATE INDEX IF NOT EXISTS idx_rf_company ON research_findings(company_id, occur
 
 
 -- ------------------------------------------------------------
--- 8. TRIGGER — SOURCE CLASS GATE
+-- 7c. COMPANY FACTS
 --
--- Rule 2, enforced. The field key is a trigger argument so one
--- function serves every gated table.
+-- The qualitative fields — custody, mandate, accounting treatment,
+-- covenants, operating metrics — each with the document that
+-- establishes it.
+--
+-- A table rather than columns on research_companies for two reasons.
+-- Every one of these fields is gated by field_source_minimums, and a
+-- gate needs a source_document_id per fact rather than per row; and
+-- the same field can be *claimed* by two documents that disagree,
+-- which is the case the register exists to surface. A company's About
+-- page claiming self-custody with no counterparty risk while its offer
+-- document names a third-party custodian and lists custodian
+-- insolvency as a key risk is not a data-quality problem to resolve
+-- silently — it is the finding.
+--
+-- So the losing claim is stored too, with is_superseded set and
+-- superseded_by pointing at the fact that beat it. Deleting it would
+-- destroy the evidence that the gate did anything.
 -- ------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION enforce_source_minimum()
-RETURNS TRIGGER AS $$
+CREATE TABLE IF NOT EXISTS research_company_facts (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id         UUID NOT NULL REFERENCES research_companies(id) ON DELETE CASCADE,
+
+  -- Must match a field_source_minimums row; the trigger below reads the
+  -- minimum rank from it, so an unknown key raises rather than passing.
+  field_key          TEXT NOT NULL REFERENCES field_source_minimums(field_key),
+  label              TEXT NOT NULL,
+  value              TEXT NOT NULL,             -- markdown
+  as_of              DATE,
+
+  source_document_id UUID NOT NULL REFERENCES research_documents(id),
+
+  -- A claim that lost to a better-sourced one. Kept, not deleted.
+  is_superseded      BOOLEAN NOT NULL DEFAULT FALSE,
+  superseded_by      UUID REFERENCES research_company_facts(id) ON DELETE SET NULL,
+
+  natural_key        TEXT NOT NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (company_id, natural_key)
+);
+
+DROP TRIGGER IF EXISTS research_company_facts_updated_at ON research_company_facts;
+CREATE TRIGGER research_company_facts_updated_at
+  BEFORE UPDATE ON research_company_facts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_rcf_company ON research_company_facts(company_id, field_key);
+
+
+-- ------------------------------------------------------------
+-- 8. TRIGGER — SOURCE CLASS GATE
+--
+-- Rule 2, enforced. The ledger tables name their field key as a
+-- trigger argument; research_company_facts carries a different key per
+-- row, so it reads NEW.field_key instead. Both go through the same
+-- assertion.
+-- ------------------------------------------------------------
+
+-- The assertion itself, shared by both trigger functions. Raising here
+-- rather than in each one means the two paths cannot drift into
+-- disagreeing about what "below the minimum" means.
+CREATE OR REPLACE FUNCTION assert_source_minimum(doc_id UUID, target_field TEXT)
+RETURNS VOID AS $$
 DECLARE
-  -- Named `target_field` rather than `field_key`: a local sharing a
-  -- column name shadows it inside the lookup below, and the failure is
-  -- a confusing "missing FROM-clause entry" at write time.
-  target_field TEXT := TG_ARGV[0];
-  doc_rank     INT;
-  min_rank     INT;
+  doc_rank INT;
+  min_rank INT;
 BEGIN
   SELECT sc.rank INTO doc_rank
     FROM research_documents d
     JOIN source_classes sc ON sc.code = d.source_class
-   WHERE d.id = NEW.source_document_id;
+   WHERE d.id = doc_id;
 
   SELECT fsm.min_source_rank INTO min_rank
     FROM field_source_minimums fsm
@@ -511,7 +565,24 @@ BEGIN
       'Source class rank % is below the minimum % required for field %',
       doc_rank, min_rank, target_field;
   END IF;
+END;
+$$ LANGUAGE plpgsql;
 
+-- For the ledger tables, whose field key is fixed per table and passed
+-- as TG_ARGV[0].
+CREATE OR REPLACE FUNCTION enforce_source_minimum()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM assert_source_minimum(NEW.source_document_id, TG_ARGV[0]);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- For research_company_facts, whose field key varies per row.
+CREATE OR REPLACE FUNCTION enforce_source_minimum_for_row()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM assert_source_minimum(NEW.source_document_id, NEW.field_key);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -525,6 +596,14 @@ DROP TRIGGER IF EXISTS holdings_source_gate ON treasury_holdings_snapshots;
 CREATE TRIGGER holdings_source_gate
   BEFORE INSERT OR UPDATE ON treasury_holdings_snapshots
   FOR EACH ROW EXECUTE FUNCTION enforce_source_minimum('ledger_event');
+
+-- A superseded fact is evidence of the gate working, so it is exempt:
+-- the About page claim has to be storable in order to be shown losing.
+DROP TRIGGER IF EXISTS company_facts_source_gate ON research_company_facts;
+CREATE TRIGGER company_facts_source_gate
+  BEFORE INSERT OR UPDATE ON research_company_facts
+  FOR EACH ROW WHEN (NEW.is_superseded = FALSE)
+  EXECUTE FUNCTION enforce_source_minimum_for_row();
 
 
 -- ------------------------------------------------------------
@@ -690,6 +769,40 @@ CREATE OR REPLACE VIEW v_research_absences AS
     AND f.is_suppressed = FALSE;
 
 
+-- The qualitative panel, with the losing claim attached to the fact
+-- that beat it. `conflicting_*` is non-null exactly where two documents
+-- disagreed, which is what the custody panel renders.
+CREATE OR REPLACE VIEW v_company_facts AS
+  SELECT
+    f.id,
+    f.company_id,
+    c.slug,
+    f.field_key,
+    f.label,
+    f.value,
+    f.as_of,
+    d.id           AS source_document_id,
+    d.title        AS source_title,
+    d.source_class,
+    sc.rank        AS source_rank,
+    d.pdf_url      AS source_url,
+    d.published_at AS source_published_at,
+    d.is_audited   AS source_is_audited,
+    lost.value          AS conflicting_value,
+    lost_doc.title      AS conflicting_source_title,
+    lost_doc.source_class AS conflicting_source_class,
+    lost_doc.pdf_url    AS conflicting_source_url
+  FROM research_company_facts f
+  JOIN research_companies c  ON c.id = f.company_id
+  JOIN research_documents d  ON d.id = f.source_document_id
+  JOIN source_classes sc     ON sc.code = d.source_class
+  LEFT JOIN research_company_facts lost
+         ON lost.superseded_by = f.id AND lost.is_superseded
+  LEFT JOIN research_documents lost_doc
+         ON lost_doc.id = lost.source_document_id
+  WHERE f.is_superseded = FALSE;
+
+
 -- ------------------------------------------------------------
 -- 10. RLS
 --
@@ -707,7 +820,7 @@ BEGIN
     'research_companies','company_former_names','company_listings',
     'research_documents','document_chunks','treasury_events',
     'treasury_holdings_snapshots','fx_rates','jurisdiction_notes',
-    'research_classifications','research_findings'
+    'research_classifications','research_findings','research_company_facts'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_all', t);
@@ -817,3 +930,224 @@ VALUES
     NULL, FALSE
   )
 ON CONFLICT (note_key) DO NOTHING;
+
+
+-- ------------------------------------------------------------
+-- 12. PERSIST — one transaction
+--
+-- The ingest workflow's `persist` step. It exists as an RPC because
+-- PostgREST has no transactions: four sequential inserts from the
+-- agent server can half-succeed, leaving events committed with the
+-- classifications that gate them missing — which fails open, since an
+-- unclassified field is internal but a *missing* classification on a
+-- published company is a row nobody reviewed.
+--
+-- Every write is an upsert on the natural key, so re-ingesting the same
+-- documents updates in place. The return value separates inserted from
+-- updated (via the `xmax = 0` test, which is 0 only for a freshly
+-- inserted tuple) because "commits zero new rows on a re-run" is the
+-- acceptance criterion and "wrote nothing at all" is not the same
+-- claim.
+-- ------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION commit_research_ingest(payload JSONB)
+RETURNS JSONB AS $$
+DECLARE
+  company            UUID := (payload->>'company_id')::UUID;
+  events_inserted    INT  := 0;
+  events_updated     INT  := 0;
+  snapshots_inserted INT  := 0;
+  snapshots_updated  INT  := 0;
+  findings_inserted  INT  := 0;
+  findings_updated   INT  := 0;
+  classes_inserted   INT  := 0;
+  classes_updated    INT  := 0;
+  item               JSONB;
+  was_insert         BOOLEAN;
+  subject            UUID;
+BEGIN
+  IF company IS NULL THEN
+    RAISE EXCEPTION 'commit_research_ingest: payload.company_id is required';
+  END IF;
+
+  FOR item IN SELECT * FROM jsonb_array_elements(COALESCE(payload->'events', '[]'::jsonb))
+  LOOP
+    INSERT INTO treasury_events (
+      company_id, event_type, asset_class, event_date, quantity,
+      consideration_native, native_currency, fees_included, headline, detail,
+      disclosure_venue, filing_entity, basis, source_document_id, natural_key
+    ) VALUES (
+      company,
+      item->>'event_type',
+      COALESCE(item->>'asset_class', 'btc'),
+      (item->>'event_date')::DATE,
+      NULLIF(item->>'quantity', '')::NUMERIC,
+      NULLIF(item->>'consideration_native', '')::NUMERIC,
+      item->>'native_currency',
+      NULLIF(item->>'fees_included', '')::BOOLEAN,
+      item->>'headline',
+      item->>'detail',
+      item->>'disclosure_venue',
+      item->>'filing_entity',
+      item->>'basis',
+      (item->>'source_document_id')::UUID,
+      item->>'natural_key'
+    )
+    ON CONFLICT (company_id, natural_key) DO UPDATE SET
+      event_type           = EXCLUDED.event_type,
+      asset_class          = EXCLUDED.asset_class,
+      event_date           = EXCLUDED.event_date,
+      quantity             = EXCLUDED.quantity,
+      consideration_native = EXCLUDED.consideration_native,
+      native_currency      = EXCLUDED.native_currency,
+      fees_included        = EXCLUDED.fees_included,
+      headline             = EXCLUDED.headline,
+      detail               = EXCLUDED.detail,
+      disclosure_venue     = EXCLUDED.disclosure_venue,
+      filing_entity        = EXCLUDED.filing_entity,
+      basis                = EXCLUDED.basis,
+      source_document_id   = EXCLUDED.source_document_id
+    RETURNING (xmax = 0) INTO was_insert;
+
+    IF was_insert THEN events_inserted := events_inserted + 1;
+    ELSE events_updated := events_updated + 1;
+    END IF;
+  END LOOP;
+
+  FOR item IN SELECT * FROM jsonb_array_elements(COALESCE(payload->'snapshots', '[]'::jsonb))
+  LOOP
+    INSERT INTO treasury_holdings_snapshots (
+      company_id, as_of_date, asset, instrument_type, quantity, basis,
+      look_through_btc_equivalent, is_related_party_vehicle,
+      includes_customer_assets, value_native, native_currency,
+      source_document_id, natural_key
+    ) VALUES (
+      company,
+      (item->>'as_of_date')::DATE,
+      COALESCE(item->>'asset', 'btc'),
+      COALESCE(item->>'instrument_type', 'spot'),
+      (item->>'quantity')::NUMERIC,
+      item->>'basis',
+      NULLIF(item->>'look_through_btc_equivalent', '')::NUMERIC,
+      COALESCE(NULLIF(item->>'is_related_party_vehicle', '')::BOOLEAN, FALSE),
+      COALESCE(NULLIF(item->>'includes_customer_assets', '')::BOOLEAN, FALSE),
+      NULLIF(item->>'value_native', '')::NUMERIC,
+      item->>'native_currency',
+      (item->>'source_document_id')::UUID,
+      item->>'natural_key'
+    )
+    ON CONFLICT (company_id, natural_key) DO UPDATE SET
+      as_of_date                  = EXCLUDED.as_of_date,
+      asset                       = EXCLUDED.asset,
+      instrument_type             = EXCLUDED.instrument_type,
+      quantity                    = EXCLUDED.quantity,
+      basis                       = EXCLUDED.basis,
+      look_through_btc_equivalent = EXCLUDED.look_through_btc_equivalent,
+      is_related_party_vehicle    = EXCLUDED.is_related_party_vehicle,
+      includes_customer_assets    = EXCLUDED.includes_customer_assets,
+      value_native                = EXCLUDED.value_native,
+      native_currency             = EXCLUDED.native_currency,
+      source_document_id          = EXCLUDED.source_document_id
+    RETURNING (xmax = 0) INTO was_insert;
+
+    IF was_insert THEN snapshots_inserted := snapshots_inserted + 1;
+    ELSE snapshots_updated := snapshots_updated + 1;
+    END IF;
+  END LOOP;
+
+  FOR item IN SELECT * FROM jsonb_array_elements(COALESCE(payload->'findings', '[]'::jsonb))
+  LOOP
+    -- A finding may point at an event this same call just wrote, so the
+    -- event is addressed by its natural key rather than by an id the
+    -- caller could not have known.
+    subject := NULL;
+    IF item ? 'event_natural_key' THEN
+      SELECT e.id INTO subject FROM treasury_events e
+       WHERE e.company_id = company AND e.natural_key = item->>'event_natural_key';
+    END IF;
+
+    INSERT INTO research_findings (
+      company_id, finding_type, is_absence, subject, occurred_on, headline,
+      detail, materiality, is_suppressed, suppressed_reason, event_id,
+      source_document_id, natural_key
+    ) VALUES (
+      company,
+      item->>'finding_type',
+      COALESCE(NULLIF(item->>'is_absence', '')::BOOLEAN, FALSE),
+      item->>'subject',
+      NULLIF(item->>'occurred_on', '')::DATE,
+      item->>'headline',
+      item->>'detail',
+      NULLIF(item->>'materiality', '')::NUMERIC,
+      COALESCE(NULLIF(item->>'is_suppressed', '')::BOOLEAN, FALSE),
+      item->>'suppressed_reason',
+      subject,
+      NULLIF(item->>'source_document_id', '')::UUID,
+      item->>'natural_key'
+    )
+    ON CONFLICT (company_id, natural_key) DO UPDATE SET
+      finding_type       = EXCLUDED.finding_type,
+      is_absence         = EXCLUDED.is_absence,
+      subject            = EXCLUDED.subject,
+      occurred_on        = EXCLUDED.occurred_on,
+      headline           = EXCLUDED.headline,
+      detail             = EXCLUDED.detail,
+      materiality        = EXCLUDED.materiality,
+      is_suppressed      = EXCLUDED.is_suppressed,
+      suppressed_reason  = EXCLUDED.suppressed_reason,
+      event_id           = EXCLUDED.event_id,
+      source_document_id = EXCLUDED.source_document_id
+    RETURNING (xmax = 0) INTO was_insert;
+
+    IF was_insert THEN findings_inserted := findings_inserted + 1;
+    ELSE findings_updated := findings_updated + 1;
+    END IF;
+  END LOOP;
+
+  FOR item IN SELECT * FROM jsonb_array_elements(COALESCE(payload->'classifications', '[]'::jsonb))
+  LOOP
+    subject := NULLIF(item->>'subject_id', '')::UUID;
+    IF subject IS NULL AND item ? 'event_natural_key' THEN
+      SELECT e.id INTO subject FROM treasury_events e
+       WHERE e.company_id = company AND e.natural_key = item->>'event_natural_key';
+    END IF;
+    IF subject IS NULL THEN
+      RAISE EXCEPTION
+        'commit_research_ingest: classification for field % names no resolvable subject',
+        item->>'field_key';
+    END IF;
+
+    INSERT INTO research_classifications (
+      subject_table, subject_id, field_key, classification, reason, classified_by
+    ) VALUES (
+      COALESCE(item->>'subject_table', 'treasury_events'),
+      subject,
+      item->>'field_key',
+      COALESCE(item->>'classification', 'internal'),
+      item->>'reason',
+      COALESCE(item->>'classified_by', 'lex')
+    )
+    ON CONFLICT (subject_table, subject_id, field_key) DO UPDATE SET
+      classification = EXCLUDED.classification,
+      reason         = EXCLUDED.reason,
+      classified_by  = EXCLUDED.classified_by,
+      classified_at  = NOW(),
+      -- A re-classification drops any prior approval: a director
+      -- approved the old wording, not this one.
+      approved_by    = NULL,
+      approved_at    = NULL
+    RETURNING (xmax = 0) INTO was_insert;
+
+    IF was_insert THEN classes_inserted := classes_inserted + 1;
+    ELSE classes_updated := classes_updated + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'events',          jsonb_build_object('inserted', events_inserted,    'updated', events_updated),
+    'snapshots',       jsonb_build_object('inserted', snapshots_inserted, 'updated', snapshots_updated),
+    'findings',        jsonb_build_object('inserted', findings_inserted,  'updated', findings_updated),
+    'classifications', jsonb_build_object('inserted', classes_inserted,   'updated', classes_updated)
+  );
+END;
+$$ LANGUAGE plpgsql;

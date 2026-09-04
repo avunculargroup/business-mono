@@ -312,6 +312,37 @@ const ABSENCES = [
   },
 ];
 
+// Meridian's About page against its offer document. The view has already
+// picked the winner and attached the loser, which is what these rows are.
+const FACTS = [
+  {
+    id: 'fact-mfg-custody',
+    company_id: 'rc-meridian',
+    field_key: 'custody',
+    label: 'Custody',
+    value: 'Held with an institutional custodian, in segregated accounts, uninsured.',
+    as_of: '2025-11-03',
+    ...source('doc-mfg-offer', 'Offer document', 'regulated_disclosure', true),
+    conflicting_value: 'The About page states self-custody with no counterparty risk.',
+    conflicting_source_title: 'About us',
+    conflicting_source_class: 'company_web',
+    conflicting_source_url: '/fixtures/docs/mfg-about.html',
+  },
+  {
+    id: 'fact-vrdm-custody',
+    company_id: 'rc-verrall',
+    field_key: 'custody',
+    label: 'Custody',
+    value: 'Not disclosed for the balance sheet.',
+    as_of: '2026-06-12',
+    ...source('doc-vrdm-4c', 'Quarterly cash flow report', 'exchange_announcement'),
+    conflicting_value: null,
+    conflicting_source_title: null,
+    conflicting_source_class: null,
+    conflicting_source_url: null,
+  },
+];
+
 const NOTES = [
   {
     id: 'jn-revaluation',
@@ -356,6 +387,7 @@ function seed(): FakeSupabaseClient {
   client.__setDataset('v_company_position', POSITIONS);
   client.__setDataset('v_research_freshness', FRESHNESS);
   client.__setDataset('v_research_absences', ABSENCES);
+  client.__setDataset('v_company_facts', FACTS);
   client.__setDataset('jurisdiction_notes', NOTES);
   return client;
 }
@@ -371,6 +403,7 @@ describeCorporateHoldingsContract<RepositoryDomain>({
   staleSlug: 'demo-calder-capital',
   quietSlug: 'demo-tarra-holdings',
   mixedClassificationSlug: 'demo-meridian-freight',
+  sourceConflictSlug: 'demo-meridian-freight',
 });
 
 let client: FakeSupabaseClient;

@@ -3028,10 +3028,27 @@ CREATE TABLE report_segments (
 --   materiality is nullable because the deterministic payload commits before
 --   any narration runs.
 
--- Trigger: enforce_source_minimum() takes the field key as TG_ARGV[0] and
---   raises when the source document's rank is below the field's minimum.
---   Attached as treasury_events_source_gate and holdings_source_gate, both
---   for 'ledger_event'.
+-- research_company_facts — the qualitative fields (custody, mandate,
+--   accounting_treatment, covenants, operating_metric), each with the document
+--   that establishes it. A table rather than columns because every one of them
+--   is gated per fact, and because the same field can be CLAIMED by two
+--   documents that disagree. The losing claim is stored with is_superseded and
+--   superseded_by rather than deleted: a marketing page claiming self-custody
+--   against an offer document naming a third-party custodian is the finding,
+--   not a data-quality problem to resolve silently.
+
+-- Triggers: assert_source_minimum(doc_id, field) is the shared assertion.
+--   enforce_source_minimum() passes TG_ARGV[0] and is attached to
+--   treasury_events and treasury_holdings_snapshots for 'ledger_event';
+--   enforce_source_minimum_for_row() reads NEW.field_key and is attached to
+--   research_company_facts, skipped WHEN is_superseded (a superseded claim is
+--   evidence of the gate working and has to be storable).
+
+-- RPC: commit_research_ingest(payload JSONB) — the ingest workflow's persist
+--   step, in one transaction. Upserts events, snapshots, findings and
+--   classifications on their natural keys; a classification names its event by
+--   natural key because the workflow cannot know an id the same call is
+--   inserting. Returns inserted/updated counts per collection.
 
 -- Views:
 --   v_research_ledger — the ledger with computed consideration_aud (NULL, not
@@ -3046,9 +3063,15 @@ CREATE TABLE report_segments (
 --     not report silence where silence is normal.
 --   v_research_absences — absences with their citation. An empty covenant
 --     panel and a company with no debt look identical on screen.
+--   v_company_facts — the qualitative panel, with the losing claim attached to
+--     the fact that beat it. conflicting_* is non-null exactly where two
+--     documents disagreed.
 --   v_research_publishable — the only view a client-facing surface may read.
 --     Both gates: the company is published AND the field is publishable.
 
--- RLS: "<table>_all" FOR ALL to authenticated + service_role on all fourteen
+-- Seed: 20260904010000_seed_locate_technologies.sql hand-enters the first real
+--   record from its discovery dossier. is_published FALSE, nothing approved.
+
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on all fifteen
 --   tables. A client-facing surface is a NEW, NARROWER policy over
 --   v_research_publishable — never a loosening of these.

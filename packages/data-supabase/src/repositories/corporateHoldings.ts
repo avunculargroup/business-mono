@@ -1,5 +1,6 @@
 import type {
   CompanyDossier,
+  CompanyFact,
   CompanyListing,
   CorporateHoldingsRepository,
   FormerName,
@@ -53,6 +54,7 @@ const POSITION_VIEW = 'v_company_position' as never;
 const FRESHNESS_VIEW = 'v_research_freshness' as never;
 const ABSENCES_VIEW = 'v_research_absences' as never;
 const NOTES_TABLE = 'jurisdiction_notes' as never;
+const FACTS_VIEW = 'v_company_facts' as never;
 
 /** The page size the register list uses. The register is under twenty records. */
 const LIST_LIMIT = 50;
@@ -186,6 +188,24 @@ type AbsenceRow = {
   source_url: string | null;
   source_published_at: string | null;
   source_is_audited: boolean;
+};
+
+type FactRow = {
+  id: string;
+  field_key: string;
+  label: string;
+  value: string;
+  as_of: string | null;
+  source_document_id: string;
+  source_title: string;
+  source_class: SourceClass;
+  source_url: string | null;
+  source_published_at: string | null;
+  source_is_audited: boolean;
+  conflicting_value: string | null;
+  conflicting_source_title: string | null;
+  conflicting_source_class: SourceClass | null;
+  conflicting_source_url: string | null;
 };
 
 type NoteRow = {
@@ -510,6 +530,41 @@ export function createCorporateHoldingsRepository(
         staleAfterDays: row.stale_after_days,
         isStale: row.is_stale,
       };
+    },
+
+    async getCompanyFacts(_ctx: ReadContext, companyId: string): Promise<CompanyFact[]> {
+      // The view has already resolved which document wins and attached the
+      // claim that lost, so the adapter maps rather than ranks. Ranking here
+      // would put the source hierarchy in two places.
+      const { data, error } = await client
+        .from(FACTS_VIEW)
+        .select(
+          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url',
+        )
+        .eq('company_id', companyId)
+        .order('field_key');
+
+      if (error) throw error;
+
+      return ((data ?? []) as unknown as FactRow[]).map((row) => ({
+        id: row.id,
+        fieldKey: row.field_key,
+        label: row.label,
+        value: row.value,
+        asOf: row.as_of,
+        provenance: toProvenance(row),
+        conflicting:
+          row.conflicting_value === null
+            ? null
+            : {
+                value: row.conflicting_value,
+                provenance: {
+                  documentTitle: row.conflicting_source_title ?? '',
+                  sourceClass: row.conflicting_source_class ?? 'secondary',
+                  sourceUrl: row.conflicting_source_url,
+                },
+              },
+      }));
     },
 
     async getStructuralAbsences(

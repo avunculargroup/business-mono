@@ -1,5 +1,6 @@
 import type {
   CompanyDossier,
+  CompanyFact,
   JurisdictionNote,
   LedgerEntry,
   PositionRow,
@@ -888,6 +889,77 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
         provenance: d.calderMonthly,
+      },
+    ],
+  };
+}
+
+// ── Qualitative facts ──────────────────────────────────────────────────────
+
+/**
+ * The panel that carries the source-class rule.
+ *
+ * Meridian's About page and its offer document disagree about custody. The
+ * offer document wins because it is a regulated disclosure and the About page
+ * is marketing copy, and the losing claim is rendered beside the winning one
+ * rather than deleted — a register that resolved the conflict silently would be
+ * teaching the opposite of the lesson.
+ */
+export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
+  const d = documents(anchor);
+
+  return {
+    [E.meridian.id]: [
+      {
+        id: 'fact-mfg-custody',
+        fieldKey: 'custody',
+        label: 'Custody',
+        value:
+          'Held with an institutional custodian. Transferred on settlement and not '
+          + 'retained with brokers for storage; holdings sit in segregated accounts. '
+          + 'No insurance is in place. Reliance on third-party custodians is listed as a '
+          + 'key risk, naming custodian insolvency among the causes of loss.',
+        asOf: onDate(anchor, -300),
+        provenance: d.meridianOffer,
+        conflicting: {
+          value:
+            'The About page states that self-custody means the company controls its '
+            + 'treasury directly with no counterparty risk, and no reliance on banks or '
+            + 'intermediaries.',
+          provenance: {
+            documentTitle: d.meridianAbout.documentTitle,
+            sourceClass: d.meridianAbout.sourceClass,
+            sourceUrl: d.meridianAbout.sourceUrl,
+          },
+        },
+      },
+      {
+        id: 'fact-mfg-mandate',
+        fieldKey: 'mandate',
+        label: 'Mandate and authority',
+        value:
+          'Bitcoin only. Acquisition permitted where forecast cash meets operational '
+          + 'obligations and lender covenants with a buffer above both. Transactions '
+          + 'above a prescribed limit require prior board approval; all require dual '
+          + 'authorisation by at least two directors or senior executives.',
+        asOf: onDate(anchor, -300),
+        provenance: d.meridianOffer,
+        conflicting: null,
+      },
+    ],
+    [E.verrall.id]: [
+      {
+        id: 'fact-vrdm-custody',
+        fieldKey: 'custody',
+        label: 'Custody',
+        value:
+          'Not disclosed for the balance sheet. The company describes institutional-'
+          + 'grade custody in general terms and names no custodian for its own holdings. '
+          + 'A funds manager discloses its product custody and its treasury custody '
+          + 'barely at all.',
+        asOf: onDate(anchor, -42),
+        provenance: d.verrallQuarterly,
+        conflicting: null,
       },
     ],
   };

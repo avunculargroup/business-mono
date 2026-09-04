@@ -19,6 +19,7 @@ describeCorporateHoldingsContract<DemoDomain>({
   staleSlug: RESEARCH_ENTITIES.calder.slug,
   quietSlug: RESEARCH_ENTITIES.tarra.slug,
   mixedClassificationSlug: RESEARCH_ENTITIES.meridian.slug,
+  sourceConflictSlug: RESEARCH_ENTITIES.meridian.slug,
 });
 
 const ctx = testReadContext();

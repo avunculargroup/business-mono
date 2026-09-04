@@ -43,6 +43,8 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
   quietSlug: string;
   /** A company carrying both a publishable and a non-publishable ledger row. */
   mixedClassificationSlug: string;
+  /** A company whose About page and offer document disagree about custody. */
+  sourceConflictSlug: string;
 }
 
 export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
@@ -119,6 +121,41 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       for (const row of position.excluded) {
         expect(position.rows.map((r) => r.id)).toContain(row.id);
       }
+    });
+
+    it('resolves a source conflict in favour of the stronger document', async () => {
+      const company = await bySlug(scenario.sourceConflictSlug);
+      const facts = await (await repo()).getCompanyFacts(ctx, company.id);
+
+      const custody = facts.find((fact) => fact.fieldKey === 'custody');
+      expect(custody).toBeDefined();
+      // Marketing copy cannot populate a controls field. The rule was written
+      // after a research record got custody wrong by trusting a website.
+      expect(['regulated_disclosure', 'exchange_announcement', 'audited_accounts']).toContain(
+        custody?.provenance.sourceClass,
+      );
+    });
+
+    it('renders the losing claim rather than deleting it', async () => {
+      // The conflict is the finding. A register that resolved it out of sight
+      // would teach the opposite of the lesson it exists to teach.
+      const company = await bySlug(scenario.sourceConflictSlug);
+      const facts = await (await repo()).getCompanyFacts(ctx, company.id);
+      const custody = facts.find((fact) => fact.fieldKey === 'custody');
+
+      expect(custody?.conflicting).not.toBeNull();
+      expect(custody?.conflicting?.value).toBeTruthy();
+      expect(custody?.conflicting?.provenance.sourceClass).toBe('company_web');
+    });
+
+    it('carries no conflict on a fact nothing disputed', async () => {
+      // Without this the two cases above pass for an adapter that reports every
+      // fact as contested.
+      const company = await bySlug(scenario.noDebtSlug);
+      const facts = await (await repo()).getCompanyFacts(ctx, company.id);
+
+      expect(facts.length).toBeGreaterThan(0);
+      expect(facts.every((fact) => fact.conflicting === null)).toBe(true);
     });
 
     it('returns structural absence, not empty, for a company with no debt', async () => {
