@@ -2947,3 +2947,108 @@ CREATE TABLE report_segments (
 --
 -- Storage: bucket 'reports', PRIVATE, 50MB cap. Access via short-lived signed
 --   URLs minted server-side — never a public URL in rendered HTML.
+
+
+-- ============================================================
+-- CORPORATE HOLDINGS (migration: 20260904000000_add_corporate_holdings)
+-- ============================================================
+-- The corporate research register: companies holding bitcoin on their balance
+-- sheet, written for Australian CFOs. It states what was disclosed and where it
+-- came from, and never what it was worth.
+-- Spec: docs/features/corporate-holdings/corporate-research-spec.md
+-- Acceptance: supabase/tests/corporate_holdings_acceptance.sql
+--
+-- Three rules are enforced by the schema rather than by convention:
+--   1. No basis, no comparison. holding_bases.comparable decides what may
+--      enter an aggregate, and the views apply it.
+--   2. Source class is an ingest-time gate — a BEFORE INSERT OR UPDATE trigger
+--      on every ledger table, not a validation the writer remembers.
+--   3. Ticker is never a key. Resolution runs on legal entity plus
+--      registration number; company_former_names and company_listings are the
+--      lookup paths.
+
+-- Lookups. Open vocabularies live in tables, not CHECKs, so adding a value is
+-- an INSERT: three research records produced four `basis` values, each found
+-- empirically, and a fifth is expected.
+--   holding_bases(code PK, label, description, comparable BOOLEAN)
+--     seeded: direct_spot (comparable), look_through, includes_customer_assets,
+--     stated_unreconciled
+--   source_classes(code PK, rank UNIQUE, label, is_audited) — rank 1 strongest
+--     seeded: regulated_disclosure 1, exchange_announcement 2, audited_accounts 3,
+--     investor_presentation 4, company_web 5, secondary 6
+--   field_source_minimums(field_key PK, min_source_rank → source_classes.rank,
+--     rationale) — custody/accounting_treatment/mandate/covenants/ledger_event
+--     require rank ≤ 2; operating_metric ≤ 4; identity ≤ 5
+
+-- research_companies — slug UNIQUE, legal_name, acn/abn/arbn/isin/lei,
+--   jurisdiction, primary_archetype and self_described_archetype (kept apart:
+--   the divergence is the case study), reporting_standard,
+--   functional/presentation currency, tier, expected_disclosure_cadence,
+--   market_cap_band + funding_source (the peer-shape matching inputs, columns
+--   so the criteria stay visible), curator_notes, is_published.
+--   Partial unique indexes on acn/abn/arbn/isin WHERE NOT NULL, so the many
+--   NULLs do not collide.
+-- company_former_names(company_id, name, used_from, used_to) — a table, not
+--   JSONB, because it is a lookup path during ingest.
+-- company_listings(company_id, venue, ticker, listing_type, filing_entity,
+--   listed_from, listed_to) — listing_type gates regional-register membership
+--   rather than annotating it; a cdi_foreign_exempt quotation is exempt from
+--   most listing rules.
+
+-- research_documents — every fact traces here by a NOT NULL FK. document_type,
+--   source_class → source_classes, announcement_id (resolves to the PDF URL),
+--   content_sha256 UNIQUE WHERE NOT NULL for re-fetch dedupe, and
+--   retrieval_error: a failed fetch is recorded, never discarded.
+-- document_chunks(document_id, chunk_index, page_from/to, content,
+--   embedding VECTOR(1536), HNSW vector_cosine_ops) — whole-document chunks,
+--   never section-keyed.
+
+-- treasury_events — event_type, asset_class (not bitcoin-only), event_date,
+--   quantity, consideration_native + native_currency + fees_included,
+--   headline/detail, basis → holding_bases, source_document_id NOT NULL, and
+--   natural_key with UNIQUE (company_id, natural_key) for idempotent re-ingest.
+-- treasury_holdings_snapshots — same shape plus instrument_type,
+--   look_through_btc_equivalent, is_related_party_vehicle,
+--   includes_customer_assets. basis is NOT NULL here, unlike on events: a
+--   holdings row without a basis is the bug rule 1 exists to prevent, while an
+--   event with no quantity legitimately has no basis to state.
+-- fx_rates(rate_date, base_currency, quote_currency, rate, source) — AUD is
+--   computed in a view, never stored on the event.
+
+-- jurisdiction_notes — keyed on standard, venue and listing type, never on
+--   company. Seeded with aasb_138_revaluation, us_gaap_asc_350_60 and
+--   asx_lr_12_3, all is_published = FALSE: v1 is internal only.
+-- research_classifications(subject_table, subject_id, field_key,
+--   classification, reason, approved_by/at) — Lex classifies per field, not
+--   per record.
+-- research_findings — the corporate-research findings, separate from the
+--   market-report findings engine (finding_metric_config et al), which is keyed
+--   on metric series and has no subject columns. is_absence + subject carry
+--   structural absence, which is a stated fact rather than an empty panel;
+--   materiality is nullable because the deterministic payload commits before
+--   any narration runs.
+
+-- Trigger: enforce_source_minimum() takes the field key as TG_ARGV[0] and
+--   raises when the source document's rank is below the field's minimum.
+--   Attached as treasury_events_source_gate and holdings_source_gate, both
+--   for 'ledger_event'.
+
+-- Views:
+--   v_research_ledger — the ledger with computed consideration_aud (NULL, not
+--     wrong, when no FX rate exists for the day), the rate that made it, full
+--     provenance, and COALESCE(classification, 'internal') so an unreviewed
+--     field never defaults to publishable.
+--   v_company_position — the latest snapshot per company with basis_comparable
+--     joined on. Nothing here sums: a caller wanting a total has to say which
+--     rows it accepted.
+--   v_research_freshness — staleness against the issuer's own cadence
+--     (monthly 45d, quarterly 135d, episodic 240d), so the quiet-day path does
+--     not report silence where silence is normal.
+--   v_research_absences — absences with their citation. An empty covenant
+--     panel and a company with no debt look identical on screen.
+--   v_research_publishable — the only view a client-facing surface may read.
+--     Both gates: the company is published AND the field is publishable.
+
+-- RLS: "<table>_all" FOR ALL to authenticated + service_role on all fourteen
+--   tables. A client-facing surface is a NEW, NARROWER policy over
+--   v_research_publishable — never a loosening of these.

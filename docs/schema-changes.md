@@ -6,6 +6,54 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-04 — Corporate holdings register
+
+`20260904000000_add_corporate_holdings.sql` adds the fourteen tables, one
+trigger and five views behind the corporate research register — companies
+holding bitcoin on their balance sheet, read by Australian CFOs deciding
+whether and how to do the same. Spec:
+[`corporate-research-spec.md`](./features/corporate-holdings/corporate-research-spec.md).
+
+- **Three rules are enforced in the schema, not in code comments.**
+  `holding_bases.comparable` decides what may enter an aggregate;
+  `enforce_source_minimum()` rejects a ledger row sourced from below the field's
+  minimum source class at write time; and no table keys on a ticker —
+  `company_former_names` and `company_listings` are the lookup paths, because
+  three research records produced six identifier changes between them.
+- **Open vocabularies are tables, not CHECKs.** `holding_bases`,
+  `source_classes` and `field_source_minimums` are seeded lookups, so adding a
+  fifth basis is an INSERT rather than a migration. Four bases were discovered
+  empirically across three records; assume a fifth exists.
+- **AUD is computed, never stored.** `fx_rates` plus a join in
+  `v_research_ledger`. `consideration_aud` comes back NULL where no rate exists
+  for the event date — a missing rate is a gap to fill, not a number to invent —
+  and every converted figure carries the rate that made it.
+- **`research_findings` is a new table rather than a widening of the findings
+  engine.** The spec left this open, assuming the existing engine took a
+  polymorphic subject. It does not: `finding_metric_config`,
+  `finding_thresholds` and `finding_watch` are keyed on metric series for the
+  daily market report and carry no subject columns. Both engines keep the same
+  rule — the deterministic payload commits before any narration, so `summary`
+  and `materiality` are nullable.
+- **Two corrections to the reference DDL shipped with the spec.** The
+  `enforce_source_minimum()` trigger declared a local named `field_key`, which
+  shadows the `field_source_minimums` column of the same name and fails at write
+  time with a "missing FROM-clause entry" rather than the intended error; the
+  local is now `target_field`. And `document_chunks.embedding` is indexed with
+  HNSW to match every other embedding index in this schema, rather than ivfflat
+  with `lists = 100`, which would have been built against an empty table.
+- **Nothing is published.** All three seeded `jurisdiction_notes` land with
+  `is_published = FALSE`. v1 is internal only, and
+  `v_research_publishable` requires both gates — the company published AND the
+  field classified publishable by Lex — so an unreviewed field defaults to
+  internal rather than leaking.
+- **Acceptance.** `supabase/tests/corporate_holdings_acceptance.sql` runs the
+  three session-1 criteria inside a transaction that rolls back. It hand-enters
+  a fictional record end to end and keeps it out of the register, which is the
+  same requirement seen twice.
+
+---
+
 ## 2026-08-24 — One current vintage per on-chain observation day
 
 `20260824110000_onchain_one_current_vintage_per_day.sql` demotes duplicate

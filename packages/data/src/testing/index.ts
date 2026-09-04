@@ -7,3 +7,7 @@ export {
   testReadContext,
   type AdapterUnderTest,
 } from './contract';
+export {
+  describeCorporateHoldingsContract,
+  type CorporateHoldingsScenario,
+} from './corporateHoldings';

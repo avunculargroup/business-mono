@@ -4,6 +4,7 @@ import { createAgentActivityRepository } from './repositories/agentActivity';
 import { createCampaignRepository } from './repositories/campaigns';
 import { createCompanyRepository } from './repositories/companies';
 import { createContentRepository } from './repositories/content';
+import { createCorporateHoldingsRepository } from './repositories/corporateHoldings';
 import { createEcosystemRepository } from './repositories/ecosystem';
 import { createIndicatorsRepository } from './repositories/indicators';
 import { createMarketReportRepository } from './repositories/marketReports';
@@ -31,6 +32,7 @@ export function createSupabaseRepositories(
     content: createContentRepository(adapter),
     campaigns: createCampaignRepository(adapter),
     companies: createCompanyRepository(adapter),
+    corporateHoldings: createCorporateHoldingsRepository(adapter),
     marketReports: createMarketReportRepository(adapter),
     indicators: createIndicatorsRepository(adapter),
     ecosystem: createEcosystemRepository(adapter),

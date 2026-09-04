@@ -10,4 +10,5 @@ export * from './library.js';
 export * from './modelScopes.js';
 export * from './findings.js';
 export * from './ecosystem.js';
+export * from './corporateHoldings.js';
 export * from './reportWatch.js';

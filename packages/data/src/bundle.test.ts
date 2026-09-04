@@ -18,6 +18,7 @@ describe('the demo slice', () => {
       'content',
       'campaigns',
       'companies',
+      'corporateHoldings',
       'marketReports',
       'indicators',
       'ecosystem',
@@ -36,9 +37,12 @@ describe('the demo slice', () => {
   });
 
   it('names one domain per demo surface', () => {
-    // Seven surfaces in demo-app-spec.md § Routes, seven domains. A surface
-    // added without a domain is a fixture nobody can read.
-    expect(DEMO_DOMAINS).toHaveLength(7);
+    // One domain per demo surface. A surface added without a domain is a
+    // fixture nobody can read. Eight since corporate holdings landed: the
+    // seven in demo-app-spec.md § Routes plus `/research`, whose surfaces are
+    // specified in
+    // docs/features/corporate-holdings/demo-app-requirements.md.
+    expect(DEMO_DOMAINS).toHaveLength(8);
   });
 });
 
