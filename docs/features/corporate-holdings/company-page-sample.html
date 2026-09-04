@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Locate Technologies — Corporate Research — BTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MOBILE FIRST. Base styles target ~360px.
+   Breakpoints: 600px (two-up facts), 720px (tabular ledger),
+   960px (two-column page).
+   ============================================================ */
+:root{
+  --bg:#FAFAF8; --surface:#FFFFFF; --subtle:#F4F4F1; --border:#E8E6E0;
+  --t1:#1A1915; --t2:#6B6860; --t3:#9E9C96;
+  --gold:#C9A84C; --gold-light:#F0E4C0; --gold-dark:#9A7A2E;
+  --destructive:#B04040;
+  --f-display:'Playfair Display',Georgia,serif;
+  --f-body:'DM Sans',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  --r-sm:4px; --r-md:6px; --r-lg:8px; --r-xl:12px;
+  --sh-sm:0 1px 3px rgba(26,25,21,.06),0 1px 2px rgba(26,25,21,.04);
+  --pad:16px;
+}
+@media (min-width:600px){ :root{ --pad:24px } }
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--t1);
+  font-family:var(--f-body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-wrap:break-word;
+}
+:focus-visible{outline:2px solid var(--gold-dark);outline-offset:2px;border-radius:2px}
+.mono{font-family:var(--f-mono)}
+
+.wrap{max-width:1200px;margin:0 auto;padding-left:var(--pad);padding-right:var(--pad)}
+
+/* ---------- top bar ---------- */
+.topbar{border-bottom:1px solid var(--border);background:var(--surface)}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;min-height:56px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+.brand{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:-.01em}
+.brand span{display:block;font-family:var(--f-body);font-weight:500;font-size:11px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--t2);margin-top:1px}
+.crumb{font-size:12.5px;color:var(--t2)}
+@media (min-width:600px){
+  .brand{font-size:17px}
+  .brand span{display:inline;margin-left:10px;font-size:12px}
+}
+
+/* ---------- masthead ---------- */
+.mast{padding:32px 0 26px;border-bottom:1px solid var(--border)}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--t2);margin:0 0 10px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,7vw,44px);
+  line-height:1.14;letter-spacing:-.015em;margin:0 0 8px}
+.former{font-size:13.5px;color:var(--t2);margin:0 0 20px;line-height:1.7}
+.former code{font-family:var(--f-mono);font-size:12px;background:var(--subtle);
+  padding:2px 5px;border-radius:var(--r-sm);white-space:nowrap}
+@media (min-width:960px){ .mast{padding:48px 0 32px} }
+
+.facts{display:grid;grid-template-columns:1fr;gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+@media (min-width:600px){ .facts{grid-template-columns:1fr 1fr} }
+@media (min-width:960px){ .facts{grid-template-columns:repeat(5,1fr)} }
+.fact{background:var(--surface);padding:14px 16px}
+.fact dt{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t2);margin:0 0 5px}
+.fact dd{margin:0;font-size:14.5px;font-weight:500;line-height:1.35}
+.fact dd em{font-style:normal;color:var(--t2);font-weight:400;display:block;
+  font-size:12.5px;margin-top:3px;line-height:1.45}
+
+/* freshness — the ONLY gold on this page */
+.fresh{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;margin:16px 0 0;
+  padding:12px 14px;background:var(--gold-light);border:1px solid var(--gold);
+  border-radius:var(--r-lg);font-size:13px;line-height:1.5}
+.fresh .dot{width:7px;height:7px;border-radius:50%;background:var(--gold-dark);
+  flex:none;align-self:center}
+.fresh time{font-family:var(--f-mono);font-size:12.5px;font-weight:500;white-space:nowrap}
+.fresh .sep{color:var(--gold-dark);opacity:.45;display:none}
+@media (min-width:600px){ .fresh .sep{display:inline} }
+
+/* ---------- provenance control ---------- */
+.provbar{position:sticky;top:0;z-index:20;background:rgba(250,250,248,.95);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border)}
+.provbar .wrap{display:flex;align-items:center;gap:16px;
+  padding-top:10px;padding-bottom:10px}
+.provbar p{display:none;margin:0;font-size:13px;color:var(--t2);max-width:62ch}
+@media (min-width:720px){
+  .provbar .wrap{justify-content:space-between}
+  .provbar p{display:block}
+}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;min-height:44px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:8px 14px;font-family:var(--f-body);font-size:14px;font-weight:500;color:var(--t1);
+  transition:background 150ms ease}
+@media (min-width:720px){ .toggle{width:auto;flex:none} }
+.toggle:hover{background:var(--subtle)}
+.switch{width:36px;height:20px;border-radius:10px;background:var(--border);
+  position:relative;flex:none;transition:background 180ms ease}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:var(--surface);box-shadow:var(--sh-sm);
+  transition:transform 180ms ease}
+body.prov .switch{background:var(--t1)}
+body.prov .switch::after{transform:translateX(16px)}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:1fr;gap:8px;padding:28px 0 56px}
+@media (min-width:960px){
+  .cols{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:40px;
+    align-items:start;padding:36px 0 72px}
+}
+section{margin-bottom:32px}
+h2{font-family:var(--f-display);font-weight:600;font-size:21px;letter-spacing:-.01em;margin:0 0 4px}
+@media (min-width:600px){ h2{font-size:23px} }
+.sublede{font-size:13.5px;color:var(--t2);margin:0 0 16px;max-width:60ch}
+h3{font-family:var(--f-body);font-weight:600;font-size:15px;margin:0 0 6px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:18px 18px;box-shadow:var(--sh-sm);margin-bottom:14px}
+@media (min-width:600px){ .card{padding:22px 24px} }
+.card p{margin:0 0 12px;font-size:14.5px}
+.card p:last-child{margin-bottom:0}
+.card ul{margin:0;padding-left:18px;font-size:14.5px}
+.card li{margin-bottom:8px}
+
+/* ---------- ledger: stacked on mobile, tabular from 720px ---------- */
+.ledger{border:1px solid var(--border);border-radius:var(--r-xl);
+  overflow:hidden;background:var(--surface)}
+.lhead{display:none}
+.row{display:block;padding:16px var(--pad);border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:0}
+.row:nth-child(even){background:#FCFCFB}
+
+.date{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.02em;color:var(--t2);
+  text-transform:uppercase;margin-bottom:6px}
+.what b{display:block;font-weight:600;font-size:15px;line-height:1.35;margin-bottom:5px}
+.what p{margin:0;font-size:13.5px;color:var(--t2);line-height:1.55}
+.qty{font-family:var(--f-mono);font-size:15px;font-weight:600;margin-top:10px;
+  padding-top:9px;border-top:1px solid var(--border)}
+.qty em{font-style:normal;font-size:12px;color:var(--t2);font-weight:400;
+  margin-left:8px;font-family:var(--f-body)}
+.qty .nil{color:var(--t3);font-weight:400}
+.row:nth-child(even) .qty{border-top-color:#EFEEE9}
+
+@media (min-width:720px){
+  .lhead{display:grid;grid-template-columns:88px minmax(0,1fr) 116px;gap:16px;
+    padding:11px var(--pad);background:var(--subtle);border-bottom:1px solid var(--border);
+    font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--t2)}
+  .lhead span:last-child{text-align:right}
+  .row{display:grid;grid-template-columns:88px minmax(0,1fr) 116px;gap:16px;
+    padding:15px var(--pad)}
+  .date{margin-bottom:0;padding-top:2px;text-transform:none;line-height:1.45}
+  .what b{font-size:14.5px}
+  .qty{margin-top:0;padding-top:1px;border-top:0;text-align:right;
+    font-size:14px;font-weight:500;white-space:nowrap}
+  .row:nth-child(even) .qty{border-top:0}
+  .qty em{display:block;margin-left:0;margin-top:3px;font-size:11.5px}
+}
+
+/* tags — no hue encoding, per the neutral delta rule */
+.tag{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:500;
+  letter-spacing:.02em;padding:3px 8px;border-radius:var(--r-sm);
+  background:var(--subtle);color:var(--t2);border:1px solid var(--border);margin:8px 6px 0 0}
+.tag.direct{border-color:#BFBCB2;color:var(--t1)}
+
+/* ---------- provenance chips ---------- */
+.src{display:none}
+body.prov .src{display:inline-block;font-family:var(--f-mono);font-size:10.5px;
+  padding:3px 8px;border-radius:var(--r-sm);margin:8px 6px 0 0;line-height:1.4;
+  border:1px solid var(--t3);color:var(--t1);background:var(--surface)}
+body.prov .src.s1{border-color:var(--t1);border-width:1.5px;font-weight:600}
+body.prov .src.s2{border-color:#8A8780}
+body.prov .src.s4{border-style:dashed;color:var(--t2)}
+body.prov .src.s5{border-style:dashed;color:var(--t2);background:var(--subtle)}
+body.prov .flagged{outline:1.5px dashed var(--destructive);outline-offset:3px}
+@media (min-width:600px){ body.prov .flagged{outline-offset:5px} }
+.provkey{display:none}
+body.prov .provkey{display:block}
+.provkey .src{display:inline-block}
+
+/* ---------- responsive table ---------- */
+.jtable{width:100%;border-collapse:collapse;font-size:13.5px}
+.jtable caption{text-align:left;font-size:12.5px;color:var(--t2);padding-bottom:10px}
+.jtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.jtable tr{display:block;border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:14px 16px;margin-bottom:10px;background:var(--surface)}
+.jtable tr.here{background:var(--subtle)}
+.jtable td{display:block;padding:0 0 10px;border:0}
+.jtable td:last-child{padding-bottom:0}
+.jtable td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:500;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:3px}
+.jtable td:first-child::before{display:none}
+.jtable td:first-child{font-size:15px;font-weight:600;padding-bottom:8px;
+  margin-bottom:8px;border-bottom:1px solid var(--border)}
+.jtable .venue{display:block;font-size:12.5px;font-weight:400;color:var(--t2);margin-top:2px}
+
+@media (min-width:720px){
+  .jtable thead{position:static;width:auto;height:auto;clip:auto}
+  .jtable tr{display:table-row;border:0;border-radius:0;padding:0;margin:0;background:none}
+  .jtable tr.here{background:var(--subtle)}
+  .jtable th,.jtable td{display:table-cell;text-align:left;padding:11px 12px;
+    border-bottom:1px solid var(--border);vertical-align:top}
+  .jtable th{font-size:10.5px;font-weight:500;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--t2)}
+  .jtable td::before{display:none}
+  .jtable td:first-child{font-size:13.5px;border-bottom:1px solid var(--border);
+    margin-bottom:0;padding-bottom:11px}
+  .jtable tbody tr:last-child td{border-bottom:0}
+}
+
+/* ---------- restricted ---------- */
+.restricted{border:1px solid var(--border);border-left:3px solid var(--t1);
+  border-radius:var(--r-md);background:var(--surface);padding:18px}
+@media (min-width:600px){ .restricted{padding:20px 22px} }
+.restricted h3{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;line-height:1.4}
+.lock{width:15px;height:15px;flex:none;margin-top:3px;stroke:var(--t1);fill:none;
+  stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.restricted ul{list-style:none;padding:0;margin:0;font-size:13.5px;color:var(--t2)}
+.restricted li{padding:5px 0 5px 18px;position:relative;line-height:1.5}
+.restricted li::before{content:"—";position:absolute;left:0;color:var(--t3)}
+.restricted footer{margin-top:14px;padding-top:13px;border-top:1px solid var(--border);
+  font-size:13px;color:var(--t2)}
+
+.gap{border:1px dashed var(--border);border-radius:var(--r-md);padding:14px 16px;
+  font-size:13.5px;color:var(--t2);margin-bottom:10px}
+.gap:last-child{margin-bottom:0}
+.gap b{color:var(--t1);font-weight:600}
+
+footer.page{border-top:1px solid var(--border);padding:24px 0 40px;
+  font-size:12.5px;color:var(--t3);line-height:1.6}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="brand">Bitcoin Treasury Solutions<span>Corporate Research</span></div>
+  <div class="crumb">Regional register · AU / NZ / SG</div>
+</div></div>
+
+<div class="wrap">
+  <div class="mast">
+    <p class="eyebrow">Regional register · Record 1 of 3</p>
+    <h1>Locate Technologies Limited</h1>
+    <p class="former">Formerly Zoom2u Technologies Limited to May 2025 ·
+      <code>ASX:Z2U</code> → <code>ASX:LOC</code> → <code>NZX:LOC</code></p>
+
+    <dl class="facts">
+      <div class="fact"><dt>Archetype</dt><dd>Treasury allocation<em>Self-described: bitcoin treasury company</em></dd></div>
+      <div class="fact"><dt>Listing</dt><dd>NZX Main Board<em>Primary · delisted ASX 17 Dec 2025</em></dd></div>
+      <div class="fact"><dt>Reporting standard</dt><dd>NZ IAS 38<em>AASB 138 prior to migration</em></dd></div>
+      <div class="fact"><dt>Currency</dt><dd>AUD operating<em>NZD presentation</em></dd></div>
+      <div class="fact"><dt>Direct holdings</dt><dd class="mono">12.3 BTC<em>Basis: direct spot · 31 Mar 2026</em></dd></div>
+    </dl>
+
+    <p class="fresh">
+      <span class="dot" aria-hidden="true"></span>
+      <span>Last verified <time datetime="2026-08-12">12 Aug 2026</time></span>
+      <span class="sep">·</span>
+      <span>Latest primary document <time datetime="2026-07-07">7 Jul 2026</time></span>
+      <span class="sep">·</span>
+      <span>One quarter unreviewed</span>
+    </p>
+  </div>
+</div>
+
+<div class="provbar"><div class="wrap">
+  <p>Every figure on this page carries a source and an as-of date. Turn on the provenance rail to see the document class behind each one.</p>
+  <button class="toggle" id="provToggle" aria-pressed="false">
+    Provenance rail <span class="switch" aria-hidden="true"></span>
+  </button>
+</div></div>
+
+<div class="wrap">
+  <div class="card provkey" style="margin-top:20px">
+    <h3>Source classes, ranked</h3>
+    <p style="color:var(--t2);font-size:13.5px">Fields refuse to populate below their minimum class. Dashed borders sit below the minimum for the field they annotate; a dashed red outline marks a value held on trust.</p>
+    <span class="src s1">regulated_disclosure</span>
+    <span class="src s2">exchange_announcement</span>
+    <span class="src">audited_accounts</span>
+    <span class="src s4">investor_presentation</span>
+    <span class="src s5">company_web</span>
+  </div>
+
+  <div class="cols">
+
+  <!-- ============ LEFT: LEDGER ============ -->
+  <main>
+    <section>
+      <h2>Position ledger</h2>
+      <p class="sublede">One row per disclosed event. Quantities and consideration as reported, currency as reported, no conversion applied.</p>
+
+      <div class="ledger">
+        <div class="lhead"><span>Date</span><span>Event</span><span>Quantity</span></div>
+
+        <div class="row">
+          <div class="date">Jan 2025</div>
+          <div class="what"><b>Treasury Management Policy adopted</b>
+            <p>Bitcoin only. Acquisition permitted where forecast cash meets operational obligations and lender covenants, plus a buffer. Dual authorisation by at least two directors or senior executives.</p>
+            <span class="src s1">PDS p.12 · regulated_disclosure</span></div>
+          <div class="qty"><span class="nil">No holdings change</span></div>
+        </div>
+
+        <div class="row">
+          <div class="date">29 May 2025</div>
+          <div class="what"><b>Placement and ATM facility established</b>
+            <p>A$1.45m at A$0.07 per share to wholesale investors. A$2m at-the-market facility with Novus Capital.</p>
+            <span class="src s2">ASX announcement · exchange_announcement</span></div>
+          <div class="qty">A$1,450,000<em>raised</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">4 Jun 2025</div>
+          <div class="what"><b>First acquisition</b>
+            <p>A$164,227 average per bitcoin (~US$106,110), inclusive of fees and expenses.</p>
+            <span class="tag direct">basis: direct_spot</span>
+            <span class="src s2">ASX Media Release · exchange_announcement</span></div>
+          <div class="qty">6.08914 BTC<em>A$1,000,000</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">26 Jun – 1 Jul 2025</div>
+          <div class="what"><b>ATM issuance</b>
+            <p>1,825,322 shares at A$0.185 to A$0.240, average A$0.215.</p>
+            <span class="src s2">ASX announcement · exchange_announcement</span></div>
+          <div class="qty">A$392,564<em>raised</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">30 Jun 2025</div>
+          <div class="what"><b>Position at year end</b>
+            <p>Treasury of A$3.4m — A$1.8m cash and A$1.6m bitcoin. A 64% increase in treasury assets on 30 June 2024.</p>
+            <span class="tag direct">basis: direct_spot</span>
+            <span class="src s1">PDS p.12 · regulated_disclosure</span></div>
+          <div class="qty">10.1 BTC<em>cumulative</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">30 Jul 2025</div>
+          <div class="what"><b>Accumulation complete for the period</b>
+            <p>Funded by the May placement together with ATM issuances of approximately A$1.4m through mid-July.</p>
+            <span class="tag direct">basis: direct_spot</span>
+            <span class="src s1">PDS p.12 · regulated_disclosure</span></div>
+          <div class="qty">12.3 BTC<em>cumulative</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">14 Aug 2025</div>
+          <div class="what"><b>Covenant amended to admit bitcoin</b>
+            <p>The cash balance covenant under the Pure Asset Management facility was formally adjusted. The replacement requires a minimum bitcoin balance of A$500,000, with aggregate cash and bitcoin of at least A$1.35m. The offer document states the change was made in recognition of the adoption of bitcoin as a treasury reserve asset.</p>
+            <span class="tag">event: covenant_change</span>
+            <span class="src s1">PDS p.16 · regulated_disclosure</span></div>
+          <div class="qty"><span class="nil">No holdings change</span></div>
+        </div>
+
+        <div class="row">
+          <div class="date">17 Dec 2025</div>
+          <div class="what"><b>Listing migration complete</b>
+            <p>Top-hat scheme of arrangement under s411 of the Corporations Act. Conditional on shareholder approval, court approval, an independent expert's best-interests conclusion, and an ATO class ruling confirming scrip-for-scrip rollover relief. Operations remained in New South Wales.</p>
+            <span class="tag">event: listing_change</span>
+            <span class="src s1">PDS · regulated_disclosure</span></div>
+          <div class="qty"><span class="nil">No holdings change</span></div>
+        </div>
+
+        <div class="row">
+          <div class="date">31 Mar 2026</div>
+          <div class="what"><b>Holdings unchanged, ATM undrawn</b>
+            <p>No ATM capital drawn during the quarter. Cash NZ$1.1m. First positive group EBITDA quarter at NZ$167k.</p>
+            <span class="tag direct">basis: direct_spot</span>
+            <span class="src s2">NZX 471376 · exchange_announcement</span></div>
+          <div class="qty">12.3 BTC<em>unchanged</em></div>
+        </div>
+
+        <div class="row">
+          <div class="date">20 Apr 2026</div>
+          <div class="what"><b>On-market buyback announced</b>
+            <p>Up to 12 months from the notice date, subject to caps, operating only during Permitted Periods under the Securities Trading Policy, terminable at will.</p>
+            <span class="tag">event: capital_posture_change</span>
+            <span class="src s4">Q3 FY26 presentation · investor_presentation</span></div>
+          <div class="qty"><span class="nil">No holdings change</span></div>
+        </div>
+
+        <div class="row">
+          <div class="date">1 – 7 Jul 2026</div>
+          <div class="what"><b>Royalty buyout settled in scrip</b>
+            <p>10,000,000 shares issued to Pure Asset Management in settlement of the buyout of the Locate2u revenue royalty. Notice re-issued 7 July correcting shares on issue from 307,378,078 to 307,287,539 — the difference being buyback shares not yet cancelled on the register.</p>
+            <span class="tag">reconciliation delta 0.03% · below floor</span>
+            <span class="src s2">NZX 475783 · exchange_announcement</span></div>
+          <div class="qty">307,287,539<em>shares on issue</em></div>
+        </div>
+
+      </div>
+    </section>
+
+    <section>
+      <h2>Jurisdiction delta</h2>
+      <p class="sublede">Identical economic exposure, three reporting standards, three different earnings outcomes. Two of these companies are quoted on the ASX.</p>
+
+      <div class="card">
+        <table class="jtable">
+          <caption>Bitcoin measurement, as disclosed by each issuer</caption>
+          <thead><tr><th>Issuer</th><th>Standard and model</th><th>Gains</th><th>Losses</th></tr></thead>
+          <tbody>
+            <tr class="here">
+              <td>Locate <span class="venue">NZX · this record</span></td>
+              <td data-label="Standard and model">AASB 138 → NZ IAS 38, indefinite-life intangible, <b>revaluation model</b></td>
+              <td data-label="Gains">Other Comprehensive Income — no profit unless reversing prior losses</td>
+              <td data-label="Losses">Profit or loss, once the revaluation reserve is exhausted</td>
+            </tr>
+            <tr>
+              <td>DigitalX <span class="venue">ASX</span></td>
+              <td data-label="Standard and model">AASB, intangible asset method, fair value, held as current assets</td>
+              <td data-label="Gains">Fair value movement</td>
+              <td data-label="Losses">Fair value movement</td>
+            </tr>
+            <tr>
+              <td>Block <span class="venue">ASX foreign exempt CDI · NYSE</span></td>
+              <td data-label="Standard and model">US GAAP ASC 350-60 (ASU 2023-08, adopted early for FY2023)</td>
+              <td data-label="Gains"><b>Net income</b></td>
+              <td data-label="Losses"><b>Net income</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <p><b>What this means for an Australian CFO.</b> Under the revaluation model a rising bitcoin price produces no reported profit. Under the US model it produces reported profit directly. Commentary about bitcoin treasury companies marking to market describes a regime that does not apply here, even when the company describing it is quoted on the ASX.</p>
+        <p>Locate's own disclosure names the consequence: the treatment may produce periods where statutory earnings do not reflect the long-term strategy, and significant downward revaluations could create compliance pressure against debt covenants.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ RIGHT: QUALITATIVE ============ -->
+  <aside>
+    <section>
+      <h2>Mandate</h2>
+      <div class="card">
+        <ul>
+          <li><b>Permitted assets</b> — bitcoin only. No other digital asset class. <span class="src s1">PDS · regulated_disclosure</span></li>
+          <li><b>Liquidity gate</b> — cash reserves must at all times exceed the forecast cash required to meet covenant requirements by more than 20%, per management's most recent monthly cashflow forecast.</li>
+          <li><b>Authority</b> — transactions above a prescribed limit require prior Board approval; below it, senior executives may authorise provided liquidity buffers remain intact.</li>
+          <li><b>Dual control</b> — all transactions authorised by at least two directors or senior executives. Settlement funds released only under dual authorisation.</li>
+          <li><b>Disposal</b> — not anticipated other than to maintain liquidity buffers or comply with covenants.</li>
+        </ul>
+      </div>
+      <p class="sublede" style="margin:0">The most transferable artefact on this page. An unlisted Australian company can lift the structure without lifting the thesis.</p>
+    </section>
+
+    <section>
+      <h2>Custody</h2>
+      <div class="card">
+        <p>Held with <b>Zodia</b>, an institutional custodian whose shareholders include Standard Chartered Bank, SBI Group, Northern Trust and National Australia Bank. Transferred to the custodian immediately on settlement and not retained with brokers. Segregated accounts. Uncapped liability against the custodian for fraud or wilful misconduct.
+          <span class="src s1">PDS pp.12–13 · regulated_disclosure</span></p>
+        <p><b>No insurance in place.</b> The company was engaging brokers about bitcoin insurance but had arranged none as at the offer date.</p>
+        <p>Intends independent quarterly reviews reconciling custodian statements against blockchain records, and consideration of SOC 2 Type II or ISAE 3402 reports where custodians make them available.</p>
+      </div>
+      <div class="gap flagged">
+        <b>Source conflict, resolved against the regulated document.</b> The company's About page states it self-custodies with no counterparty risk and no reliance on intermediaries. The offer document names a third-party custodian and lists custodian insolvency as a key risk. The website claim is recorded as marketing copy and is barred from populating this field.
+        <span class="src s5">locatetech.nz/about-us · company_web · below minimum class</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Capital mechanism</h2>
+      <div class="card">
+        <h3>Accumulation, Jan – Dec 2025</h3>
+        <p>Funded entirely by newly issued equity — a wholesale placement, an at-the-market facility with the broker retaining control of timing, volume and minimum price, and the NZX offer. Not from operating cash flow.</p>
+      </div>
+      <div class="card">
+        <h3>Posture change, Jan – Jul 2026</h3>
+        <p>The issuance facility sat undrawn for a full quarter while an on-market buyback ran, with a royalty obligation settled in scrip. The accumulation flywheel and the buyback point in opposite directions on the share register.</p>
+        <p style="color:var(--t2);font-size:13.5px">Stated as mechanism. Any reading of what it implies about management's view of the share price is restricted.</p>
+      </div>
+      <div class="card">
+        <h3>Debt</h3>
+        <p>A$4,000,000 outstanding to Pure Asset Management at 30 June 2025, secured over all present and after-acquired property of the group. EBITDA covenant hurdles missed for four disclosed quarters; all waived. The offer document assesses the likelihood of further breaches as moderate to high.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Withheld</h2>
+      <div class="restricted">
+        <h3>
+          <svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Computable from this page, not published
+        </h3>
+        <ul>
+          <li>Unrealised position against cost basis</li>
+          <li>mNAV, premium or discount to bitcoin NAV, bitcoin per share</li>
+          <li>Share price movement attributed to any treasury announcement</li>
+          <li>Dilution narration from issuance, accretion narration from the buyback</li>
+          <li>Any inference about management's view of price from the buyback</li>
+          <li>Comparison of shareholder outcome against holding bitcoin directly</li>
+          <li>Characterisation of the covenant waivers as a credit-quality signal</li>
+        </ul>
+        <footer>Bitcoin at approximately 13% of market capitalisation as at 23 September 2025 is a company-disclosed statistic and is citable with its date. Recomputing it at today's price is a valuation exercise and is not.</footer>
+      </div>
+    </section>
+
+    <section>
+      <h2>Open gaps</h2>
+      <div class="gap"><b>Treasury Management Policy verbatim</b> — located at the company's document path, not yet parsed.</div>
+      <div class="gap"><b>Whether a bitcoin revaluation sits in the H1 FY26 result</b> — the loss after tax widened to NZ$2,000,318 from NZ$934,471. Contributors named are migration costs and non-cash ESOP expense. The revaluation reserve line would settle it.</div>
+      <div class="gap"><b>FY26 full-year result</b> — year ends 30 June. Due or just past.</div>
+    </section>
+  </aside>
+
+  </div>
+</div>
+
+<footer class="page"><div class="wrap">
+  Internal record · not Lex-classified · not client-facing. Bitcoin denotes the network, bitcoin the unit.
+  Figures as disclosed by the issuer; no valuation, forecast or recommendation is expressed or implied.
+</div></footer>
+
+<script>
+  var btn = document.getElementById('provToggle');
+  btn.addEventListener('click', function () {
+    var on = document.body.classList.toggle('prov');
+    btn.setAttribute('aria-pressed', String(on));
+  });
+</script>
+</body>
+</html>
