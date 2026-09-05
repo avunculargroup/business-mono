@@ -158,6 +158,18 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       expect(facts.every((fact) => fact.conflicting === null)).toBe(true);
     });
 
+    it('renders the withheld list rather than silently omitting it', async () => {
+      // Compliance as architecture. A page that quietly drops the unrealised
+      // position looks identical to one that never computed it.
+      const company = await bySlug(scenario.mixedClassificationSlug);
+      const withheld = await (await repo()).getWithheldFields(ctx, company.id);
+
+      expect(withheld.length).toBeGreaterThan(0);
+      expect(withheld.some((field) => field.classification === 'restricted')).toBe(true);
+      // A withheld field with no reason is a redaction, not a disclosure.
+      expect(withheld.every((field) => field.reason.length > 0)).toBe(true);
+    });
+
     it('returns structural absence, not empty, for a company with no debt', async () => {
       const company = await bySlug(scenario.noDebtSlug);
       const absences = await (await repo()).getStructuralAbsences(ctx, company.id);

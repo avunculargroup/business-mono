@@ -4,8 +4,8 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** Sessions 1 (data layer) and 2 (ingest workflow) complete. Session 3 (pages) not
-started.
+**Status:** All three sessions complete. Two things remain, both needing network access to
+real filings: the ingest run against Locate's own documents, and the recorded trace bundle.
 **Last updated:** 2026-09-04
 
 ---
@@ -213,26 +213,58 @@ three agent steps are in `MODEL_SCOPES` and configurable from `/settings/models`
 
 ## Session 3 — pages
 
-Not started. `/research`, `/research/[slug]` and `/research/jurisdictions` in **`apps/web`**
-(not `apps/hq`), with the components in `packages/ui` — where every shared presentational
-component lives, and where `apps/demo` can reach them. Invoke the `bts-design` skill before
-writing any of it, and read `company-page-sample.html` in this folder as the visual
-reference.
+**Shipped.** Components in `packages/ui`, pages in **`apps/web`** and `apps/demo` sharing
+them. Written against the `bts-design` skill and `company-page-sample.html`.
 
-The data layer is complete for it. Every read the pages need exists on
-`CorporateHoldingsRepository` and both adapters pass the same suite:
-`listCompanies`, `getCompany`, `getLedger`, `getPosition`, `getCompanyFacts` (the custody
-conflict panel), `getJurisdictionNotes`, `getFreshness`, `getStructuralAbsences` and
-`compareCompanies`, which throws `ArchetypeMismatchError` rather than returning a flag —
-`packages/ui` catches it and renders the explanatory panel.
+Components (`packages/ui`):
 
-Still open from the spec, and all three are session 3 questions:
+- `ProvenanceRail` — `ProvenanceProvider`, `ProvenanceToggle`, `Cited`, `SourceBadge`. The
+  citation travels with the fact rather than living in a bibliography, and `Cited` takes a
+  non-optional source, so a page cannot render a figure without one and still typecheck.
+  With the rail collapsed the citation is condensed, never removed — it stays in the
+  accessibility tree.
+- `BasisChip` — comparability read from the row, not inferred from the basis name. A fifth
+  basis is expected.
+- `ResearchLedger` — not a table. One DOM that stacks at 360px and becomes column-aligned at
+  720px through grid template columns, so nothing is duplicated between the two layouts.
+- `ResearchPanels` — `PositionPanel`, `FactPanel` (the custody conflict), `AbsencePanel`,
+  `WithheldPanel`, `FreshnessStamp`.
+- `ArchetypeComparison` — renders the explanation when the repository refuses, and a table
+  when it does not.
 
-- **Scale control.** The register spans five orders of magnitude. Anything that ranks or
-  charts across records without one renders the small Australian companies as rounding
-  errors.
-- **Peer-shaped matching.** `market_cap_band` + `funding_source` + `primary_archetype` is a
-  first guess and wants testing against a fourth and fifth record.
+Routes: `/research`, `/research/[slug]` and `/research/jurisdictions` in `apps/web`;
+`/research` and `/research/[slug]` in `apps/demo` over fixtures, with five annotations and
+two new principles in the architecture view.
+
+**Verified.**
+
+- **All three acceptance criteria.** The 360px criterion is checked in a real browser by
+  `e2e/research-narrow.spec.ts` — arithmetically rather than by screenshot, so it needs no
+  baseline and names the offending element when it fails. It asserts two things: the page
+  does not scroll sideways, and no element escapes the viewport except inside a deliberate
+  scroll container. Six cases, passing.
+- The provenance rail and the archetype refusal are asserted in the component suites, and
+  the register page's own test asserts that no bitcoin quantity appears anywhere on it.
+- `pnpm test`, `turbo typecheck` and `turbo lint` green.
+
+**One bug the screenshots caught that the tests did not.** `PositionPanel` labelled every
+row in the asset's symbol, so a holding of 889,367 fund units rendered as "889,367 BTC" —
+three orders of magnitude above the 194.85 the issuer states as its equivalent, and the
+exact overstatement this feature exists to prevent, printed on the page that exists to
+prevent it. The unit now comes from the instrument. There is a test for it now; there was
+not one before, because every fixture the suite exercised happened to be spot.
+
+**Still open from the spec.**
+
+- **Scale control.** The register spans five orders of magnitude. Nothing ranks or charts
+  across records yet, so the problem has not bitten — but the first element that does will
+  render the small Australian companies as rounding errors unless it carries one.
+- **Peer-shaped matching.** `market_cap_band` + `funding_source` + `primary_archetype` is
+  still a first guess and wants testing against a fourth and fifth record.
 - **The `is_fixture` guard.** The demo requirements call for the Supabase adapter's insert
-  path to reject a fixture row. There is no insert path on this domain yet — it is read-only
-  — so the guard has nothing to attach to. Add it with the first write method, not before.
+  path to reject a fixture row. This domain has no insert path — it is read-only — so the
+  guard has nothing to attach to. Add it with the first write method, not before.
+- **Screenshot baselines.** `e2e/demo-surfaces.spec.ts` now lists the two research routes;
+  their baselines need generating in the CI container image via
+  `workflow_dispatch: update_baselines`. Until then those two cases skip, like every other
+  one in that file.

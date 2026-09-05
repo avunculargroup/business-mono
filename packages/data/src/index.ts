@@ -89,6 +89,7 @@ export type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  WithheldField,
 } from './repositories/corporateHoldings';
 export type {
   EcosystemChange,

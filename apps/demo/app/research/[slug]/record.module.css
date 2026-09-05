@@ -1,0 +1,13 @@
+.record {
+  display: block;
+  min-width: 0;
+}
+
+.freshness {
+  margin-bottom: var(--space-6);
+}
+
+.section {
+  margin-bottom: var(--space-6);
+  min-width: 0;
+}

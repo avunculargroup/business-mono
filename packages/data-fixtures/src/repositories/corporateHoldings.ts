@@ -12,6 +12,7 @@ import type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  WithheldField,
 } from '@platform/data';
 import { ArchetypeMismatchError } from '@platform/data';
 import { STALE_AFTER_DAYS } from '@platform/shared';
@@ -25,6 +26,7 @@ import {
   researchLedger,
   researchPositions,
   researchRegister,
+  researchWithheld,
 } from '../fixtures';
 
 const MS_PER_DAY = 86_400_000;
@@ -156,6 +158,12 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
     async getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]> {
       const found = company(ctx.asOf, companyId);
       return found ? (researchFacts(ctx.asOf)[found.id] ?? []) : [];
+    },
+
+    async getWithheldFields(ctx: ReadContext, companyId: string): Promise<WithheldField[]> {
+      // Every record carries the same list: these are categories of claim, not
+      // facts about one company.
+      return company(ctx.asOf, companyId) ? researchWithheld() : [];
     },
 
     async getStructuralAbsences(

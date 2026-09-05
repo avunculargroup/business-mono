@@ -343,6 +343,35 @@ const FACTS = [
   },
 ];
 
+const WITHHELD = [
+  {
+    company_id: 'rc-meridian',
+    subject_table: 'research_companies',
+    subject_id: 'rc-meridian',
+    field_key: 'unrealised_position',
+    classification: 'restricted',
+    reason: 'Position against cost basis is a valuation output.',
+  },
+  {
+    company_id: 'rc-meridian',
+    subject_table: 'research_companies',
+    subject_id: 'rc-meridian',
+    field_key: 'curator_notes',
+    classification: 'internal',
+    reason: 'Working material, not a client-facing claim.',
+  },
+  // A company-disclosed statistic, citable with its date. On the table so the
+  // `in` filter has something to exclude.
+  {
+    company_id: 'rc-meridian',
+    subject_table: 'research_companies',
+    subject_id: 'rc-meridian',
+    field_key: 'disclosed_market_cap_proportion',
+    classification: 'publishable',
+    reason: 'A company-disclosed statistic is citable with its date.',
+  },
+];
+
 const NOTES = [
   {
     id: 'jn-revaluation',
@@ -388,6 +417,7 @@ function seed(): FakeSupabaseClient {
   client.__setDataset('v_research_freshness', FRESHNESS);
   client.__setDataset('v_research_absences', ABSENCES);
   client.__setDataset('v_company_facts', FACTS);
+  client.__setDataset('research_classifications', WITHHELD);
   client.__setDataset('jurisdiction_notes', NOTES);
   return client;
 }
@@ -473,6 +503,16 @@ describe('query wiring', () => {
     });
 
     expect(notes).toHaveLength(0);
+  });
+
+  it('leaves a publishable company-level field off the withheld list', async () => {
+    // The panel names what was withheld. A publishable field on it would be a
+    // page claiming to have declined something it published.
+    const withheld = await corporateHoldings().getWithheldFields(ctx, 'rc-meridian');
+
+    expect(withheld.map((field) => field.fieldKey)).not.toContain(
+      'disclosed_market_cap_proportion',
+    );
   });
 
   it('keeps a second asset out of the bitcoin aggregate', async () => {

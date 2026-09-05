@@ -1,0 +1,147 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* 44px: the rail toggle is the one control a reader reaches for on a phone. */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.toggle:hover {
+  background: var(--color-surface-subtle);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--color-border);
+  transition: background 180ms ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 180ms ease;
+}
+
+.switchOn {
+  background: var(--color-text-primary);
+}
+
+.switchOn::after {
+  transform: translateX(16px);
+}
+
+.cited {
+  display: block;
+}
+
+.fact {
+  display: block;
+}
+
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  /* Condensed, never removed: the citation stays in the accessibility tree
+     whether or not the rail is expanded. */
+  overflow: hidden;
+  transition: max-height 200ms ease, opacity 150ms ease, margin 200ms ease;
+}
+
+.railOpen {
+  max-height: 12rem;
+  opacity: 1;
+  margin-top: var(--space-1);
+}
+
+.railClosed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail,
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.badgeStrong {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+
+/* Below the class the ledger accepts. Marked, not hidden — a reader has to be
+   able to see a weak source losing. */
+.badgeWeak {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.doc {
+  color: var(--color-text-secondary);
+}
+
+a.doc {
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a.doc:hover {
+  color: var(--color-text-primary);
+}
+
+.when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.detail {
+  color: var(--color-text-tertiary);
+}
+
+.weak {
+  color: var(--color-warning);
+  font-weight: 500;
+}

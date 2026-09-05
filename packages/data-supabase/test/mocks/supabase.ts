@@ -133,6 +133,10 @@ function makeDatasetBuilder(table: string, rows: Record<string, unknown>[]): Fak
     filters.push((row) => row[column] === value);
     return builder;
   });
+  bag['in'] = vi.fn((column: string, values: unknown[]) => {
+    filters.push((row) => values.includes(row[column]));
+    return builder;
+  });
   bag['or'] = vi.fn((expression: string) => {
     const clauses = expression.split(',').map(parseOrClause);
     filters.push((row) => clauses.some((clause) => clause(row)));

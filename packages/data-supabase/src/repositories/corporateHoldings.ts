@@ -16,6 +16,7 @@ import type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  WithheldField,
 } from '@platform/data';
 import { ArchetypeMismatchError } from '@platform/data';
 import type {
@@ -55,6 +56,7 @@ const FRESHNESS_VIEW = 'v_research_freshness' as never;
 const ABSENCES_VIEW = 'v_research_absences' as never;
 const NOTES_TABLE = 'jurisdiction_notes' as never;
 const FACTS_VIEW = 'v_company_facts' as never;
+const CLASSIFICATIONS_TABLE = 'research_classifications' as never;
 
 /** The page size the register list uses. The register is under twenty records. */
 const LIST_LIMIT = 50;
@@ -564,6 +566,31 @@ export function createCorporateHoldingsRepository(
                   sourceUrl: row.conflicting_source_url,
                 },
               },
+      }));
+    },
+
+    async getWithheldFields(_ctx: ReadContext, companyId: string): Promise<WithheldField[]> {
+      // Company-scoped classifications only. The per-event ones gate the ledger
+      // rows themselves and are already applied by the publishable view; these
+      // are the categories of claim the page declines to make at all.
+      const { data, error } = await client
+        .from(CLASSIFICATIONS_TABLE)
+        .select('field_key, classification, reason')
+        .eq('subject_table', 'research_companies')
+        .eq('subject_id', companyId)
+        .in('classification', ['internal', 'restricted'])
+        .order('field_key');
+
+      if (error) throw error;
+
+      return ((data ?? []) as unknown as Array<{
+        field_key: string;
+        classification: 'internal' | 'restricted';
+        reason: string;
+      }>).map((row) => ({
+        fieldKey: row.field_key,
+        classification: row.classification,
+        reason: row.reason,
       }));
     },
 

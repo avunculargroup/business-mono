@@ -127,7 +127,10 @@ Every app and package carries its own README, and [`docs/README.md`](./docs/READ
 
 `@platform/ui` never imports from `apps/*`. It holds the design tokens and the shared
 presentational components, and is written to be consumed by more than one app — so a dependency
-on app code would defeat the point. React and `lucide-react` are peer dependencies.
+on app code would defeat the point. React and `lucide-react` are peer dependencies. The corporate
+research components (`ProvenanceRail`, `BasisChip`, `ResearchLedger`, `ResearchPanels`,
+`ArchetypeComparison`) are the first set actually rendered by both `apps/web` and `apps/demo`,
+which is what that rule was written for.
 
 `@platform/data` holds the repository interfaces both apps code against; `@platform/data-supabase`
 is the live implementation. They are separate packages rather than one with subpath exports so that

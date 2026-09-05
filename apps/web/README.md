@@ -69,6 +69,9 @@ Everything under `app/(app)/` sits inside the authenticated shell (sidebar + hea
 | `/campaigns` | Campaign strategy, beats, and per-platform variants with compliance state |
 | `/news` | Research feed, `daily` digest, `sources` management, and `podcasts` (see below) |
 | `/market-reports` | Daily narrated market reports — published, held, or un-narrated |
+| `/research` | Corporate research register — companies holding bitcoin, by tier. No holdings figure on this page by design |
+| `/research/[slug]` | One company's record — position, ledger, qualitative facts, stated absences, withheld list |
+| `/research/jurisdictions` | Accounting and listing-rule notes, keyed on standard and venue rather than on company |
 | `/signals` | Ecosystem change feed |
 | `/discovery` | `pipeline`, `lexicon`, `templates`, `feedback` |
 | `/products`, `/advisors` | Ecosystem registers — human-maintained, no agent writes |

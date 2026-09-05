@@ -7,6 +7,7 @@ import type {
   Provenance,
   RegisterEntry,
   StructuralAbsence,
+  WithheldField,
 } from '@platform/data';
 import { onDate } from './anchor';
 import { RESEARCH_ENTITIES } from './entities';
@@ -1009,6 +1010,69 @@ export function researchAbsences(anchor: Date): Record<string, StructuralAbsence
       },
     ],
   };
+}
+
+// ── Withheld ───────────────────────────────────────────────────────────────
+
+/**
+ * What Lex declined to publish, rendered rather than silently omitted.
+ *
+ * The same list for every record, because these are categories of claim rather
+ * than facts about a particular company. A page that quietly dropped them would
+ * look identical to one that never computed them.
+ */
+export function researchWithheld(): WithheldField[] {
+  return [
+    {
+      fieldKey: 'unrealised_position',
+      classification: 'restricted',
+      reason:
+        'Position against cost basis is a valuation output. The register states what was '
+        + 'disclosed, never what it is worth.',
+    },
+    {
+      fieldKey: 'nav_premium',
+      classification: 'restricted',
+      reason:
+        'Premium or discount to net asset value, and holdings per share, are valuation '
+        + 'measures of a listed security.',
+    },
+    {
+      fieldKey: 'share_price_attribution',
+      classification: 'restricted',
+      reason:
+        'Attributing a share price movement to a treasury announcement is a statement '
+        + 'about the security.',
+    },
+    {
+      fieldKey: 'dilution_narration',
+      classification: 'restricted',
+      reason:
+        'Narrating dilution from issuance, or accretion from a buyback, is a view on '
+        + 'shareholder outcomes.',
+    },
+    {
+      fieldKey: 'shareholder_outcome_comparison',
+      classification: 'restricted',
+      reason:
+        'Comparing the shareholder outcome against holding the asset directly compares '
+        + 'two investments.',
+    },
+    {
+      fieldKey: 'covenant_credit_signal',
+      classification: 'restricted',
+      reason:
+        'Characterising a covenant waiver as a credit-quality signal is a credit view on '
+        + 'a listed borrower.',
+    },
+    {
+      fieldKey: 'curator_notes',
+      classification: 'internal',
+      reason:
+        'Curator notes record retrieval traps and provenance. Working material, not a '
+        + 'client-facing claim.',
+    },
+  ];
 }
 
 // ── Jurisdiction notes ─────────────────────────────────────────────────────

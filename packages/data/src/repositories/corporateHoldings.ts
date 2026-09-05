@@ -252,6 +252,20 @@ export interface CompanyFact {
   } | null;
 }
 
+/**
+ * A field Lex has withheld, and why.
+ *
+ * Rendered rather than silently omitted. A page that quietly drops the
+ * unrealised position looks identical to one that never computed it, and the
+ * whole claim of this feature is that the withholding is deliberate — so the
+ * list of what is not here is part of what is here.
+ */
+export interface WithheldField {
+  fieldKey: string;
+  classification: 'internal' | 'restricted';
+  reason: string;
+}
+
 export interface RegisterFilter {
   tier?: ResearchTier;
   archetype?: ResearchArchetype;
@@ -329,6 +343,15 @@ export interface CorporateHoldingsRepository {
    * could get it wrong.
    */
   getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]>;
+
+  /**
+   * What Lex withheld at the company level, for the panel that shows it.
+   *
+   * Company-scoped, not per event: the restricted list is about categories of
+   * claim — unrealised position, premium to NAV, share price attribution — that
+   * are restricted whatever row they would have been attached to.
+   */
+  getWithheldFields(ctx: ReadContext, companyId: string): Promise<WithheldField[]>;
 
   /** Facts the register states because they are absent. Empty is a valid answer. */
   getStructuralAbsences(ctx: ReadContext, companyId: string): Promise<StructuralAbsence[]>;
