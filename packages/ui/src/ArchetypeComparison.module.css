@@ -1,0 +1,115 @@
+.wrap {
+  display: block;
+}
+
+.archetypeNote {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary);
+}
+
+.scroller {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--color-border);
+}
+
+.table thead th {
+  border-top: none;
+  background: var(--color-surface-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.table tbody th {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.same {
+  color: var(--color-text-tertiary);
+}
+
+.diverges {
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
+/* The refusal. Deliberately a full panel rather than an inline warning — it is
+   an explanation the reader is meant to finish, not a validation message. */
+.refusal {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-xl);
+}
+
+.refusalHead {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.refusalBody {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
+.definitions {
+  margin: 0 0 var(--space-4);
+}
+
+.definitions div {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.definitions div:first-child {
+  border-top: none;
+}
+
+.definitions dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.definitions dd {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary);
+}
+
+.refusalWhy {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary);
+}

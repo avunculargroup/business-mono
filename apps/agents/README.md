@@ -55,7 +55,7 @@ kinds live here, and the difference trips people up:
 
 - *Registered* workflows are on the Mastra instance in `src/mastra/index.ts` and can be
   triggered by the scheduler or by a tool: `recorder`, `pm`, `executeRoutine`,
-  `pruneStorage`, `ecosystemScan`, `newsletter`, `strategy`, `variant`.
+  `pruneStorage`, `ecosystemScan`, `newsletter`, `researchIngest`, `strategy`, `variant`.
 - *Unregistered* workflow modules are plain functions that routines and listeners call
   directly — the news pipeline (`ingestNewsItem`, `newsCuration*`, `newsDedup`,
   `newsRelevance`, `newsRubric`), `podcastIntel/`, `libraryAnswer/`, `socialPost/`. They
@@ -64,6 +64,35 @@ kinds live here, and the difference trips people up:
 
 **Listener** — a long-lived loop started at boot. Either a poll (Signal, JMAP) or a
 Supabase Realtime subscription.
+
+### `researchIngest` — the corporate research pipeline
+
+`src/workflows/researchIngest/`. Ten steps over the corporate holdings register:
+resolve → fetch → chunk and embed → **extract (Rex)** → validate → reconcile →
+**score (Rex)** → **classify (Lex)** → persist → approval gate. Spec:
+[`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md).
+
+Four things about it are load-bearing and easy to undo by accident:
+
+- **`validateNumerics` is not a model call and must not become one.** Every figure an
+  extraction claims is re-located in the source text arithmetically, and the whole event
+  is held back if any figure is missing. A validator that can hallucinate is not a
+  validator, and this step is the reason the rest of the pipeline can be trusted.
+- **Deterministic before LLM.** Facts commit before anything narrates them, so a model
+  being slow, down, or wrong costs a narration rather than a ledger. All three agent steps
+  fall back to "nothing" rather than throwing.
+- **The gate is at publication, not ingest.** Ingest runs unattended; only
+  `promoteToPublished` suspends. A pipeline that stops for approval on every quarterly
+  stops running.
+- **Persist goes through the `commit_research_ingest` RPC.** PostgREST has no
+  transactions, and four sequential inserts can half-succeed — leaving events committed
+  with the classifications that gate them missing.
+
+It resolves registered documents to URLs; it does **not** discover them. Documents are
+registered in `research_documents` by the hand-curation pass. No venue announcement-URL
+templates ship: set `RESEARCH_PDF_BASE_<VENUE>` (with `{id}` for the announcement id) to
+configure one, and a venue without a configured base resolves as unresolved rather than
+being sent to a guessed address.
 
 | Listener | Kind | What it does |
 |---|---|---|

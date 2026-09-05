@@ -66,7 +66,107 @@ export interface FakeSupabaseClient {
    * faking it here would test the fake.
    */
   __setRows: (table: string, rows: unknown[]) => void;
+  /**
+   * Back a table with rows that the builder actually queries.
+   *
+   * Where `__setRows` only slices, this one honours `eq`, `is`, a two-clause
+   * `or`, `order` and `range`, so a repository's filtering and ordering are
+   * exercised rather than assumed. It exists because the corporate holdings
+   * domain has to pass the *same* conformance suite as the fixture adapter —
+   * a suite that reads five companies by slug and expects five different
+   * answers, which one canned response per table cannot give. A suite that can
+   * only pass against fixtures is not a contract.
+   *
+   * Deliberately not a Postgres: no joins, no nested selects, no `not`. A
+   * repository needing more than this should be tested against a real database
+   * rather than a better fake.
+   */
+  __setDataset: (table: string, rows: Record<string, unknown>[]) => void;
   __buildersFor: (table: string) => FakeQueryBuilder[];
+}
+
+type Filter = (row: Record<string, unknown>) => boolean;
+
+/** `column.is.null` or `column.eq.value` — the two forms the adapters use. */
+function parseOrClause(clause: string): Filter {
+  const [column, operator, value] = clause.split('.');
+  if (operator === 'is' && value === 'null') return (row) => row[column] === null;
+  if (operator === 'eq') return (row) => String(row[column]) === value;
+  throw new Error(`fake supabase: unsupported or() clause "${clause}"`);
+}
+
+function makeDatasetBuilder(table: string, rows: Record<string, unknown>[]): FakeQueryBuilder {
+  const builder = { table } as FakeQueryBuilder;
+  const bag = builder as unknown as Record<string, unknown>;
+  const filters: Filter[] = [];
+  let sort: { column: string; ascending: boolean } | null = null;
+  let slice: { from: number; to: number } | null = null;
+
+  const matched = (): Record<string, unknown>[] => {
+    const kept = rows.filter((row) => filters.every((filter) => filter(row)));
+    if (sort) {
+      const { column, ascending } = sort;
+      kept.sort((a, b) => {
+        const left = String(a[column] ?? '');
+        const right = String(b[column] ?? '');
+        return ascending ? left.localeCompare(right) : right.localeCompare(left);
+      });
+    }
+    return kept;
+  };
+
+  const response = (): SupabaseResponse => {
+    const kept = matched();
+    const page = slice ? kept.slice(slice.from, slice.to + 1) : kept;
+    return { data: page, count: kept.length, error: null };
+  };
+
+  PASSTHROUGH_METHODS.forEach((name) => {
+    bag[name] = vi.fn(() => builder);
+  });
+
+  bag['eq'] = vi.fn((column: string, value: unknown) => {
+    filters.push((row) => row[column] === value);
+    return builder;
+  });
+  bag['is'] = vi.fn((column: string, value: unknown) => {
+    filters.push((row) => row[column] === value);
+    return builder;
+  });
+  bag['in'] = vi.fn((column: string, values: unknown[]) => {
+    filters.push((row) => values.includes(row[column]));
+    return builder;
+  });
+  bag['or'] = vi.fn((expression: string) => {
+    const clauses = expression.split(',').map(parseOrClause);
+    filters.push((row) => clauses.some((clause) => clause(row)));
+    return builder;
+  });
+  bag['order'] = vi.fn((column: string, opts?: { ascending?: boolean }) => {
+    sort = { column, ascending: opts?.ascending !== false };
+    return builder;
+  });
+  bag['range'] = vi.fn((from: number, to: number) => {
+    slice = { from, to };
+    return builder;
+  });
+  bag['maybeSingle'] = vi.fn(() => {
+    const kept = matched();
+    return Promise.resolve({ data: kept[0] ?? null, count: kept.length, error: null });
+  });
+  bag['single'] = vi.fn(() => {
+    const kept = matched();
+    return Promise.resolve(
+      kept.length === 1
+        ? { data: kept[0], count: 1, error: null }
+        : { data: null, count: kept.length, error: { message: 'no rows' } },
+    );
+  });
+
+  Object.defineProperty(builder, '__response', { get: response });
+  builder.then = (onFulfilled) => Promise.resolve(response()).then(onFulfilled);
+
+  return builder;
 }
 
 function makeBuilder(
@@ -102,9 +202,17 @@ export function createFakeSupabase(): FakeSupabaseClient {
   const responses = new Map<string, SupabaseResponse>();
   const queues = new Map<string, SupabaseResponse[]>();
   const rowsByTable = new Map<string, unknown[]>();
+  const datasets = new Map<string, Record<string, unknown>[]>();
 
   return {
     from: vi.fn((table: string) => {
+      const dataset = datasets.get(table);
+      if (dataset) {
+        const built = makeDatasetBuilder(table, dataset);
+        builders.push(built);
+        return built;
+      }
+
       const queue = queues.get(table);
       const response = queue
         ? (queue.length > 1 ? queue.shift()! : queue[0]!)
@@ -121,6 +229,7 @@ export function createFakeSupabase(): FakeSupabaseClient {
     __setResponse: (table, response) => responses.set(table, response),
     __queueResponses: (table, next) => queues.set(table, [...next]),
     __setRows: (table, rows) => rowsByTable.set(table, rows),
+    __setDataset: (table, rows) => datasets.set(table, rows),
     __buildersFor: (table) => builders.filter((b) => b.table === table),
   };
 }

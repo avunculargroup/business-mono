@@ -71,6 +71,26 @@ export type {
   SocialDraftCopy,
   ThreadSegment,
 } from './repositories/content';
+export {
+  ArchetypeMismatchError,
+} from './repositories/corporateHoldings';
+export type {
+  CompanyDossier,
+  CompanyFact,
+  CompanyListing,
+  CorporateHoldingsRepository,
+  FormerName,
+  FreshnessRow,
+  JurisdictionNote,
+  LedgerEntry,
+  PositionRow,
+  PositionSummary,
+  Provenance,
+  RegisterEntry,
+  RegisterFilter,
+  StructuralAbsence,
+  WithheldField,
+} from './repositories/corporateHoldings';
 export type {
   EcosystemChange,
   EcosystemRepository,

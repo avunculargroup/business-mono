@@ -6,6 +6,100 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-04 — Corporate holdings register
+
+`20260904000000_add_corporate_holdings.sql` adds the fourteen tables, one
+trigger and five views behind the corporate research register — companies
+holding bitcoin on their balance sheet, read by Australian CFOs deciding
+whether and how to do the same. Spec:
+[`corporate-research-spec.md`](./features/corporate-holdings/corporate-research-spec.md).
+
+- **Three rules are enforced in the schema, not in code comments.**
+  `holding_bases.comparable` decides what may enter an aggregate;
+  `enforce_source_minimum()` rejects a ledger row sourced from below the field's
+  minimum source class at write time; and no table keys on a ticker —
+  `company_former_names` and `company_listings` are the lookup paths, because
+  three research records produced six identifier changes between them.
+- **Open vocabularies are tables, not CHECKs.** `holding_bases`,
+  `source_classes` and `field_source_minimums` are seeded lookups, so adding a
+  fifth basis is an INSERT rather than a migration. Four bases were discovered
+  empirically across three records; assume a fifth exists.
+- **AUD is computed, never stored.** `fx_rates` plus a join in
+  `v_research_ledger`. `consideration_aud` comes back NULL where no rate exists
+  for the event date — a missing rate is a gap to fill, not a number to invent —
+  and every converted figure carries the rate that made it.
+- **`research_findings` is a new table rather than a widening of the findings
+  engine.** The spec left this open, assuming the existing engine took a
+  polymorphic subject. It does not: `finding_metric_config`,
+  `finding_thresholds` and `finding_watch` are keyed on metric series for the
+  daily market report and carry no subject columns. Both engines keep the same
+  rule — the deterministic payload commits before any narration, so `summary`
+  and `materiality` are nullable.
+- **Two corrections to the reference DDL shipped with the spec.** The
+  `enforce_source_minimum()` trigger declared a local named `field_key`, which
+  shadows the `field_source_minimums` column of the same name and fails at write
+  time with a "missing FROM-clause entry" rather than the intended error; the
+  local is now `target_field`. And `document_chunks.embedding` is indexed with
+  HNSW to match every other embedding index in this schema, rather than ivfflat
+  with `lists = 100`, which would have been built against an empty table.
+- **Nothing is published.** All three seeded `jurisdiction_notes` land with
+  `is_published = FALSE`. v1 is internal only, and
+  `v_research_publishable` requires both gates — the company published AND the
+  field classified publishable by Lex — so an unreviewed field defaults to
+  internal rather than leaking.
+- **`research_company_facts` closes a gap in the reference DDL.** The spec seeds
+  `field_source_minimums` with `custody`, `accounting_treatment`, `mandate`,
+  `covenants` and `operating_metric`, and gives none of them a column to live
+  in — so five of the seven gated fields were unenforceable. Facts now carry
+  their own source document and their own field key, gated by a second trigger
+  reading `NEW.field_key`. A superseded claim is exempt from the gate and kept:
+  the About page's self-custody claim has to be storable in order to be shown
+  losing, and `v_company_facts` attaches it to the fact that beat it.
+- **`commit_research_ingest` is the ingest workflow's persist step.** PostgREST
+  has no transactions, and four sequential inserts from the agent server can
+  half-succeed — leaving events committed while the classifications that gate
+  them are missing, which fails in the one direction that matters. Everything is
+  upserted on the natural key and the result separates inserted from updated,
+  because "zero new rows on a re-run" is an acceptance criterion and "wrote
+  nothing" is a different claim.
+- **Acceptance.** `supabase/tests/corporate_holdings_acceptance.sql` runs the
+  three session-1 criteria inside a transaction that rolls back. It hand-enters
+  a fictional record end to end and keeps it out of the register, which is the
+  same requirement seen twice.
+  `supabase/tests/research_ingest_persist.sql` does the same for the RPC,
+  including that a gated payload rolls back whole rather than committing the
+  rows before the rejection.
+
+---
+
+## 2026-09-04 — The Locate Technologies record, hand-entered
+
+`20260904010000_seed_locate_technologies.sql` seeds the first real record in the
+corporate holdings register from
+[the discovery dossier](./features/corporate-holdings/locate-technologies-dossier.md):
+one company, three listings, one former name, ten documents, nine ledger events,
+five holdings snapshots, six qualitative facts and eighteen classifications.
+
+- **The regional register is seeded by hand, deliberately.** Discovery
+  automation costs more than the manual pass, and the manual pass produces the
+  ground truth the ingest workflow is diffed against.
+- **Three things the source-class gate changed.** The 31 December 2025 holdings
+  figure is absent, because its only source is an investor presentation — rank 4
+  against a required rank 2. The website's custody claim is stored only as a
+  superseded fact. And the Treasury Management Policy PDF is registered as a
+  document that populates nothing: it is a company-directory file, so it could
+  not populate the mandate field even once parsed, and the mandate comes from
+  the offer document where its terms were actually read.
+- **Dates are recorded no more precisely than the sources give them.** Where a
+  document gives a month, the note says so; where a source gives no date,
+  `published_at` is NULL rather than a plausible guess. A register built on
+  provenance cannot invent a date and stay one.
+- **Nothing is published.** `is_published` is FALSE, no classification is
+  approved, and `v_research_publishable` requires both — so the record returns
+  zero rows to any client-facing read.
+
+---
+
 ## 2026-08-24 — One current vintage per on-chain observation day
 
 `20260824110000_onchain_one_current_vintage_per_day.sql` demotes duplicate

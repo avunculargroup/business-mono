@@ -27,6 +27,7 @@ pnpm --filter @platform/demo test
 | `/content` | The publish gate and a compliance verdict |
 | `/signals` | Ecosystem changes, classified at detection |
 | `/crm/companies` | The CRM glance view |
+| `/research`, `/[slug]` | The corporate register — no basis, no comparison; source class as a gate; the withheld list |
 | `/agents/run/[traceId]` | **The centrepiece.** One workflow run, replayed step by step |
 | `/architecture` | The written notes each annotation links to |
 

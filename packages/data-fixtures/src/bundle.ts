@@ -2,6 +2,7 @@ import type { DemoBundle } from '@platform/data';
 import { createAgentActivityRepository } from './repositories/agentActivity';
 import { createCompanyRepository } from './repositories/companies';
 import { createContentRepository } from './repositories/content';
+import { createCorporateHoldingsRepository } from './repositories/corporateHoldings';
 import { createEcosystemRepository } from './repositories/ecosystem';
 import { createIndicatorsRepository } from './repositories/indicators';
 import { createMarketReportRepository } from './repositories/marketReports';
@@ -26,6 +27,7 @@ export function createFixtureRepositories(): DemoBundle {
     research: createResearchRepository(),
     content: createContentRepository(),
     companies: createCompanyRepository(),
+    corporateHoldings: createCorporateHoldingsRepository(),
     marketReports: createMarketReportRepository(),
     indicators: createIndicatorsRepository(),
     ecosystem: createEcosystemRepository(),

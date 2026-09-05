@@ -21,6 +21,7 @@ import {
   Clock,
   Presentation,
   Rss,
+  Landmark,
   LineChart,
   Globe,
   HardDrive,
@@ -62,6 +63,10 @@ const workNav = [
     { href: '/news/sources',  label: 'Sources'       },
   ]},
   { href: '/market-reports', label: 'Market reports', icon: LineChart },
+  { href: '/research', label: 'Corporate research', icon: Landmark, children: [
+    { href: '/research',               label: 'Register'           },
+    { href: '/research/jurisdictions', label: 'Jurisdiction notes' },
+  ]},
   { href: '/discovery', label: 'Discovery', icon: Search, children: [
     { href: '/crm/interviews', label: 'Interviews'  },
     { href: '/crm/segments',   label: 'Segments'    },
@@ -126,6 +131,10 @@ const moreNav: MoreNavSection[] = [
         { href: '/news/sources',  label: 'Sources'      },
       ]},
       { href: '/market-reports', label: 'Market reports', icon: LineChart },
+      { href: '/research', label: 'Corporate research', icon: Landmark, children: [
+        { href: '/research',               label: 'Register'           },
+        { href: '/research/jurisdictions', label: 'Jurisdiction notes' },
+      ]},
       { href: '/discovery', label: 'Discovery', icon: Search, children: [
         { href: '/crm/interviews',        label: 'Interviews' },
         { href: '/crm/segments',          label: 'Segments'   },

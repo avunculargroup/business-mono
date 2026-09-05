@@ -1,0 +1,75 @@
+.tier {
+  margin-bottom: var(--space-8);
+}
+
+.tierTitle {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.records {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.record {
+  border-top: 1px solid var(--color-border);
+}
+
+.record:first-child {
+  border-top: none;
+}
+
+.recordLink {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.recordLink:hover {
+  background: var(--color-surface-subtle);
+}
+
+@media (min-width: 768px) {
+  .recordLink {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: baseline;
+  }
+}
+
+.name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.diverges {
+  color: var(--color-warning);
+}
+
+.jurisdiction {
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+}

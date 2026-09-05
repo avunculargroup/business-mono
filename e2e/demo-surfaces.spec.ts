@@ -54,6 +54,8 @@ const ROUTES = [
   { path: '/content', name: 'content' },
   { path: '/signals', name: 'signals' },
   { path: '/crm/companies', name: 'companies' },
+  { path: '/research', name: 'research-register' },
+  { path: '/research/demo-meridian-freight', name: 'research-record' },
   { path: '/architecture', name: 'architecture' },
   { path: '/agents/run/variant-gate-web', name: 'trace-replay' },
 ] as const;

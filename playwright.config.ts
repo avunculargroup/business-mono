@@ -44,8 +44,17 @@ export default defineConfig({
     // and it would take the design-system specs down with it even though they
     // read file:// paths and need no server at all. A warm rebuild is a few
     // seconds; a confusing failure in an unrelated suite is not.
+    //
+    // Through Turborepo, not `pnpm --filter`, because the demo's build depends
+    // on `@platform/shared` being built: that package resolves its `import`
+    // condition to `dist/`, so a *value* imported from it — as opposed to a
+    // type, which is erased — cannot be bundled until `tsc` has run there.
+    // `--filter=@platform/demo` plus `dependsOn: ["^build"]` builds it first.
+    // A plain `pnpm --filter` build passes on any machine that happens to have
+    // a stale `dist/` lying around and fails on a clean checkout, which is
+    // exactly how this reached CI.
     command:
-      'pnpm --filter @platform/demo build && pnpm --filter @platform/demo start --port 4321',
+      'pnpm turbo build --filter=@platform/demo && pnpm --filter @platform/demo start --port 4321',
     url: 'http://127.0.0.1:4321',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

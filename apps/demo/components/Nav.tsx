@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Activity,
   Building2,
+  Landmark,
   FileText,
   LayoutDashboard,
   Newspaper,
@@ -33,6 +34,7 @@ const ROUTES = [
   { href: '/content', label: 'Content', icon: PenLine },
   { href: '/signals', label: 'Signals', icon: Radar },
   { href: '/crm/companies', label: 'Companies', icon: Building2 },
+  { href: '/research', label: 'Corporate research', icon: Landmark },
   { href: '/architecture', label: 'Architecture', icon: BookOpen },
 ] as const;
 

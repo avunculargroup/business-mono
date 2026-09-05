@@ -5,6 +5,8 @@ import type {
   CampaignGate,
   CompanyContact,
   CompanyDetail,
+  CompanyDossier,
+  CompanyFact,
   CompanySummary,
   MarketReportDetail,
   MarketReportSummary,
@@ -12,8 +14,12 @@ import type {
   EcosystemWatch,
   NewsDigestItem,
   NewsFeedItem,
+  FreshnessRow,
+  LedgerEntry,
   NewsItemDetail,
+  PositionSummary,
   PublishGate,
+  RegisterEntry,
   RepositoryBundle,
 } from '@platform/data';
 
@@ -34,6 +40,7 @@ export type FakeRepositories = {
   content: { [K in keyof RepositoryBundle['content']]: Mock };
   campaigns: { [K in keyof RepositoryBundle['campaigns']]: Mock };
   companies: { [K in keyof RepositoryBundle['companies']]: Mock };
+  corporateHoldings: { [K in keyof RepositoryBundle['corporateHoldings']]: Mock };
   marketReports: { [K in keyof RepositoryBundle['marketReports']]: Mock };
   indicators: { [K in keyof RepositoryBundle['indicators']]: Mock };
   ecosystem: { [K in keyof RepositoryBundle['ecosystem']]: Mock };
@@ -51,6 +58,11 @@ export function createFakeRepositories(
     campaignGate?: CampaignGate | null;
     campaignDetail?: CampaignDetail | null;
     companies?: CompanySummary[];
+    register?: RegisterEntry[];
+    dossier?: CompanyDossier | null;
+    ledger?: LedgerEntry[];
+    position?: PositionSummary;
+    facts?: CompanyFact[];
     company?: CompanyDetail | null;
     companyContacts?: CompanyContact[];
     marketReports?: MarketReportSummary[];
@@ -121,6 +133,35 @@ export function createFakeRepositories(
       saveVariantCopy: vi.fn(async () => true),
       savePostMetrics: vi.fn(async () => undefined),
       promoteToVoiceSnippet: vi.fn(async () => undefined),
+    },
+    corporateHoldings: {
+      listCompanies: vi.fn(async () => {
+        const register = overrides.register ?? [];
+        return { items: register, total: register.length, hasMore: false };
+      }),
+      getCompany: vi.fn(async () =>
+        overrides.dossier === undefined ? fakeCompanyDossier() : overrides.dossier,
+      ),
+      getLedger: vi.fn(async () => {
+        const rows = overrides.ledger ?? [];
+        return { items: rows, total: rows.length, hasMore: false };
+      }),
+      getPosition: vi.fn(
+        async () =>
+          overrides.position ?? {
+            companyId: 'rc-1',
+            asset: 'btc',
+            comparableTotal: 0,
+            rows: [],
+            excluded: [],
+          },
+      ),
+      getCompanyFacts: vi.fn(async () => overrides.facts ?? []),
+      getJurisdictionNotes: vi.fn(async () => []),
+      getFreshness: vi.fn(async () => fakeFreshness()),
+      getWithheldFields: vi.fn(async () => []),
+      getStructuralAbsences: vi.fn(async () => []),
+      compareCompanies: vi.fn(async () => []),
     },
     companies: {
       listCompanies: vi.fn(async () => {
@@ -216,6 +257,62 @@ export function fakeMarketReport(
 }
 
 /** A company as the list renders it. */
+/**
+ * A register record. The fields a page reads, and no more.
+ *
+ * `formerNames` and `listingHistory` default to empty rather than absent: a
+ * page that has to guard for undefined would be a page that could forget, and
+ * an empty history is a real state — plenty of records have never renamed.
+ */
+export function fakeCompanyDossier(overrides: Partial<CompanyDossier> = {}): CompanyDossier {
+  return {
+    id: 'rc-1',
+    slug: 'demo-meridian-freight',
+    legalName: 'Meridian Freight Group Limited',
+    jurisdiction: 'NZ',
+    tier: 'regional',
+    primaryArchetype: 'treasury_allocation',
+    selfDescribedArchetype: 'treasury_company',
+    reportingStandard: 'nz_ifrs',
+    expectedDisclosureCadence: 'episodic',
+    listings: [],
+    listingHistory: [],
+    formerNames: [],
+    acn: null,
+    abn: null,
+    arbn: null,
+    isin: null,
+    operationalHq: null,
+    functionalCurrency: 'AUD',
+    presentationCurrency: 'NZD',
+    financialYearEnd: null,
+    marketCapBand: null,
+    fundingSource: null,
+    curatorNotes: null,
+    lastVerifiedAt: null,
+    isPublished: false,
+    ...overrides,
+  };
+}
+
+export function fakeRegisterEntry(overrides: Partial<RegisterEntry> = {}): RegisterEntry {
+  const { listingHistory: _h, formerNames: _n, ...entry } = fakeCompanyDossier();
+  return { ...entry, ...overrides } as RegisterEntry;
+}
+
+export function fakeFreshness(overrides: Partial<FreshnessRow> = {}): FreshnessRow {
+  return {
+    companyId: 'rc-1',
+    slug: 'demo-meridian-freight',
+    expectedDisclosureCadence: 'episodic',
+    latestDocumentAt: '2026-04-22',
+    daysSinceDocument: 61,
+    staleAfterDays: 240,
+    isStale: false,
+    ...overrides,
+  };
+}
+
 export function fakeCompanySummary(overrides: Partial<CompanySummary> = {}): CompanySummary {
   return {
     id: 'co-1',

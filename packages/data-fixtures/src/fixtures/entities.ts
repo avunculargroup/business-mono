@@ -142,3 +142,100 @@ export const WATCHED = {
   signingProject: { id: 'ps-signing', slug: 'orrery-signer', name: 'Orrery Signer' },
   custodyProvider: { id: 'ps-custody', slug: 'lachlan-vault', name: 'Lachlan Vault' },
 } as const;
+
+/**
+ * The corporate research register's subjects.
+ *
+ * Separate from `COMPANIES` because these are not clients — they are the
+ * public companies the register reports on, and the demo renders them on a
+ * different surface entirely.
+ *
+ * They also bend one rule above, deliberately. "Operating businesses, never
+ * funds or advisers" was written for invented clients, where a fund manager is
+ * the entity most likely to read as a real one. The register cannot follow it:
+ * the funds-manager shape is what carries the look-through pathology — a
+ * company holding units in a vehicle it manages itself — and dropping it would
+ * drop the second of the three mechanisms by which a stated bitcoin figure
+ * overstates a corporate position. The identifier discipline below is what
+ * makes the trade acceptable.
+ *
+ * ## Identifier discipline
+ *
+ * Every identifier here is constructed to be incapable of resolving to a real
+ * entity, and to fail validation if it ever leaks into production ingest:
+ *
+ * - **ACN / ABN** — correct length, deliberately failing check digits.
+ * - **ISIN** — the reserved `XX` country prefix, which no real security uses.
+ * - **Tickers** — four letters. ASX and NZX codes are three.
+ * - **Slugs** — prefixed `demo-`.
+ * - **Documents** — local static paths, never an external host.
+ *
+ * ## ⚠️ Unverified: ASIC and companies-register search
+ *
+ * As with `COMPANIES` above, these names have **not** been searched against a
+ * companies register. They were chosen to be implausible, which is not the same
+ * thing. Search each one before this demo is publicly deployed.
+ */
+export interface FixtureResearchEntity {
+  id: string;
+  slug: string;
+  legalName: string;
+  /** Four letters. Never three, which is what a real AU or NZ code is. */
+  ticker: string;
+  acn: string | null;
+  abn: string | null;
+  isin: string;
+}
+
+export const RESEARCH_ENTITIES = {
+  meridian: {
+    id: 'rc-meridian',
+    slug: 'demo-meridian-freight',
+    legalName: 'Meridian Freight Group Limited',
+    ticker: 'MFGX',
+    acn: '000 000 001',
+    abn: '00 000 000 001',
+    isin: 'XX0000000001',
+  },
+  // Named Verrall rather than the roster's suggested name, which collided with
+  // `COMPANIES.kestrel` — two unrelated fictional entities sharing a name in
+  // one demo is the "reads as sloppy" failure this module exists to prevent.
+  verrall: {
+    id: 'rc-verrall',
+    slug: 'demo-verrall-dam',
+    legalName: 'Verrall Digital Asset Management Limited',
+    ticker: 'VRDM',
+    acn: '000 000 002',
+    abn: '00 000 000 002',
+    isin: 'XX0000000002',
+  },
+  nyala: {
+    id: 'rc-nyala',
+    slug: 'demo-nyala-payments',
+    legalName: 'Nyala Payments Inc.',
+    ticker: 'NYLA',
+    acn: null,
+    abn: null,
+    isin: 'XX0000000003',
+  },
+  tarra: {
+    id: 'rc-tarra',
+    slug: 'demo-tarra-holdings',
+    legalName: 'Tarra Holdings Limited',
+    ticker: 'TARH',
+    acn: '000 000 004',
+    abn: '00 000 000 004',
+    isin: 'XX0000000004',
+  },
+  // Calder rather than the roster's suggested name, which collided with
+  // `WATCHED.signingProject`.
+  calder: {
+    id: 'rc-calder',
+    slug: 'demo-calder-capital',
+    legalName: 'Calder Capital Limited',
+    ticker: 'CLDR',
+    acn: '000 000 005',
+    abn: '00 000 000 005',
+    isin: 'XX0000000005',
+  },
+} as const satisfies Record<string, FixtureResearchEntity>;

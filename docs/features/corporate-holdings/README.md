@@ -2,7 +2,7 @@
 
 Feature documentation for the Corporate Research section of the BTS internal platform: a register of companies holding bitcoin on their balance sheet, written for Australian CFOs evaluating whether and how to do the same.
 
-**Status:** ready for implementation
+**Status:** session 1 (data layer) shipped — see `build-progress.md`
 **Owner:** Chris
 **Last updated:** 2026-09-04
 
@@ -16,6 +16,7 @@ Feature documentation for the Corporate Research section of the BTS internal pla
 | 2 | `corporate-research-schema.sql` | DDL, enforcement triggers, views, RLS, lookup seeds | Before writing the migration |
 | 3 | `demo-app-requirements.md` | `apps/demo` requirements and the fixture roster | Before defining fixture types |
 | 4 | `research-fixtures.ts` | Typed fixture starter — fictional entities, real pathologies | Alongside 3 |
+| 5 | `build-progress.md` | Reconciliation against the live repo, and what each session shipped | **Before session 2 or 3.** Several names and two pieces of DDL in the files above are wrong against the real repository; this one records what moved and why. |
 
 Reference material, read on demand rather than up front:
 
@@ -127,7 +128,7 @@ supabase/migrations/              ← the migration from the SQL above
 
 ## Known open items
 
-- **Findings Engine integration.** The spec assumes findings write to the existing engine via subject polymorphism. The existing DDL was not to hand when the spec was written — confirm the subject columns before session 2 rather than creating a parallel table.
+- ~~**Findings Engine integration.**~~ **Resolved in session 1, and the assumption was wrong.** The existing engine is keyed on metric series for the daily market report and has no subject columns to hang a company finding from, so `research_findings` is its own table. See `build-progress.md`.
 - **Peer-shaped matching criteria.** `market_cap_band` + `funding_source` + `primary_archetype` is a first guess. Test against a fourth and fifth record before fixing it in the schema.
 - **Scale control.** The register spans five orders of magnitude. Any element that ranks or charts across records without a scale control renders the small Australian companies — the ones the audience cares about — as rounding errors.
 - **One ledger event to verify.** A capital raise by the record-2 company, with a large portion earmarked for treasury expansion, was found in secondary coverage only. Do not enter it until the announcement is sighted.

@@ -18,6 +18,18 @@
 export { agentActivity } from './agent-activity';
 export { companies, companyContacts } from './companies';
 export { contentCards, contentDetails, publishGates } from './content-items';
+export {
+  researchAbsences,
+  researchCompanies,
+  researchCompanyDocuments,
+  researchDocuments,
+  researchFacts,
+  researchJurisdictionNotes,
+  researchLedger,
+  researchPositions,
+  researchRegister,
+  researchWithheld,
+} from './corporate-holdings';
 export { ecosystemChanges, watchHealth } from './ecosystem-changes';
 export { indicators } from './indicators';
 export { marketReports } from './market-reports';

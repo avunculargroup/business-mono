@@ -20,7 +20,9 @@ export type PrincipleKey =
   | 'quiet-day-path'
   | 'neutral-delta-colour'
   | 'hub-and-spoke'
-  | 'compliance-as-alignment';
+  | 'compliance-as-alignment'
+  | 'no-comparison-without-basis'
+  | 'source-class-as-a-gate';
 
 export interface Annotation {
   id: string;
@@ -219,6 +221,61 @@ export const ANNOTATIONS: Annotation[] = [
     principle: 'hub-and-spoke',
     order: 4,
   },
+
+  // ── Corporate research ────────────────────────────────────────────────────
+  // Each of these ties a visible element to the research record that produced
+  // it. None of them describes what the element does — an evaluator can see
+  // that.
+  {
+    id: 'no-headline-figure',
+    targetSelector: 'no-headline-figure',
+    route: '/research',
+    title: 'No holdings number on this page',
+    body:
+      'Three research records produced three unrelated mechanisms by which a stated bitcoin figure overstates a corporate position: secondary sources wrong on the consideration by about half, exposure counted through a fund the company manages itself, and customer assets custodied alongside treasury. A figure that arrives without its basis and its source is worse than no figure, so the register carries none. Totals appear on a record page, where both can travel with them.',
+    principle: 'no-comparison-without-basis',
+    order: 20,
+  },
+  {
+    id: 'holding-basis',
+    targetSelector: 'holding-basis',
+    route: '/research/[slug]',
+    title: 'Why every row carries a basis',
+    body:
+      'The basis says what a quantity is a quantity of, and a lookup column decides whether it may enter an aggregate. Fund units and customer assets are excluded from the total and still rendered at full weight, because a reader who cannot see that the issuer stated a larger number is worse off than one who can. A fifth basis is assumed to exist, so it is a table rather than a list in code.',
+    principle: 'no-comparison-without-basis',
+    order: 21,
+  },
+  {
+    id: 'source-conflict',
+    targetSelector: 'source-conflict',
+    route: '/research/[slug]',
+    title: 'Marketing copy cannot populate a controls field',
+    body:
+      'This rule was written after getting it wrong. An earlier revision of the research recorded self-custody with no counterparty risk, on the strength of a company About page; the same company\u2019s offer document named a third-party custodian and listed custodian insolvency as a key risk. A database trigger now refuses a weaker source on a gated field at write time. The losing claim is kept and shown, because the conflict is the finding.',
+    principle: 'source-class-as-a-gate',
+    order: 22,
+  },
+  {
+    id: 'withheld-panel',
+    targetSelector: 'withheld-panel',
+    route: '/research/[slug]',
+    title: 'What is not here, and why',
+    body:
+      'The withheld list is rendered rather than silently omitted. A page that quietly dropped the unrealised position would look identical to one that had never computed it, and the claim this feature makes is that the omission is deliberate. Each entry names the reason, and a compliance agent classifies per field rather than per record.',
+    principle: 'compliance-as-alignment',
+    order: 23,
+  },
+  {
+    id: 'archetype-pair',
+    targetSelector: 'archetype-pair',
+    route: '/research',
+    title: 'Two archetype fields, not one',
+    body:
+      'What a company is and what it calls itself are stored separately, because the divergence is the case study rather than a labelling problem. Archetype also gates comparison: asking to compare a funds manager against an operating business returns an error from the data layer, and the interface renders an explanation instead of a table. A funds manager has no treasury policy to lift and no covenant story.',
+    principle: 'no-comparison-without-basis',
+    order: 24,
+  },
 ];
 
 export function annotationsForRoute(route: string): Annotation[] {
@@ -302,3 +359,26 @@ export const PRINCIPLES: {
     ],
   },
 ];
+
+// ── Principles added by the corporate research surfaces ─────────────────────
+
+PRINCIPLES.push(
+  {
+    key: 'no-comparison-without-basis',
+    title: 'No basis, no comparison',
+    body: [
+      'Every holdings row records what its quantity is a quantity of — held directly, seen through a fund, or aggregated with assets custodied for someone else — and a lookup table decides which of those may enter a total. The rule lives in the data, not in a convention, so a third component rendering a position cannot quietly break it.',
+      'Rows that cannot be aggregated are still rendered, at the same weight as the rows that can. Hiding them would leave a reader unable to see that the issuer had stated a larger number, which is the failure this is guarding against in the first place.',
+      'The same rule gates comparison across companies. Archetype decides whether two records may appear in one table, and the repository throws rather than returning a flag a caller could ignore.',
+    ],
+  },
+  {
+    key: 'source-class-as-a-gate',
+    title: 'Source class is a gate, not a label',
+    body: [
+      'Documents are ranked — regulated disclosure, exchange announcement, audited accounts, investor presentation, company website, secondary — and each field declares the weakest class it will accept. Custody, mandate, accounting treatment, covenants and every ledger row require an exchange announcement or better.',
+      'A database trigger enforces it at write time. An attempt to record a purchase from a marketing page raises, rather than committing a row that a later review might catch.',
+      'Where two documents disagree, the stronger wins and the weaker claim is stored as superseded rather than deleted. Deleting it would destroy the evidence that the gate did anything.',
+    ],
+  },
+);

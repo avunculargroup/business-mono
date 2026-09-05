@@ -5,6 +5,7 @@ import type { AgentActivityRepository } from './repositories/agentActivity';
 import type { CampaignRepository } from './repositories/campaigns';
 import type { CompanyRepository } from './repositories/companies';
 import type { ContentRepository } from './repositories/content';
+import type { CorporateHoldingsRepository } from './repositories/corporateHoldings';
 import type { EcosystemRepository } from './repositories/ecosystem';
 import type { IndicatorsRepository } from './repositories/indicators';
 import type { MarketReportRepository } from './repositories/marketReports';
@@ -51,6 +52,7 @@ export interface RepositoryDomains {
   content: ContentRepository;
   campaigns: CampaignRepository;
   companies: CompanyRepository;
+  corporateHoldings: CorporateHoldingsRepository;
   marketReports: MarketReportRepository;
   indicators: IndicatorsRepository;
   ecosystem: EcosystemRepository;
@@ -92,6 +94,7 @@ export const DEMO_DOMAINS = [
   'research',
   'content',
   'companies',
+  'corporateHoldings',
   'marketReports',
   'indicators',
   'ecosystem',

@@ -242,6 +242,35 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'editor',
   },
 
+  // ── Corporate research ingest workflow steps ──────────────────────────────
+  {
+    key: 'researchIngest.extract_events',
+    type: 'workflow_step',
+    label: 'Extract treasury events',
+    description:
+      'Rex reads treasury events out of a filing. Every figure it emits is re-located in the source text by a deterministic validator before anything commits',
+    workflow: 'researchIngest',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'researchIngest.score',
+    type: 'workflow_step',
+    label: 'Score findings',
+    description:
+      'Rex scores what changed for novelty, working from reconciled rows rather than from the documents',
+    workflow: 'researchIngest',
+    fallbackAgent: 'rex',
+  },
+  {
+    key: 'researchIngest.classify',
+    type: 'workflow_step',
+    label: 'Classify for publication',
+    description:
+      'Lex classifies each register event publishable, internal or restricted, per field',
+    workflow: 'researchIngest',
+    fallbackAgent: 'lex',
+  },
+
   // ── Variant generation workflow steps ─────────────────────────────────────
   {
     key: 'variant.generate_copy',

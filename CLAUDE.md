@@ -115,7 +115,13 @@ Transform tasks into verifiable goals before implementing:
   `apps/web` today and by `apps/demo` later, so any dependency on app code breaks that. React and
   `lucide-react` are peer dependencies.
 - `packages/db` imports from `@platform/shared`
-- `packages/shared` imports from nothing (leaf package)
+- `packages/shared` imports from nothing (leaf package). Its `exports.import` condition
+  resolves to `dist/`, not to source, so a **value** imported from it (a constant, a `const`
+  object) needs `tsc` to have run there first, while a `import type` is erased and needs
+  nothing. Build through Turborepo — `pnpm turbo build --filter=<app>` — never
+  `pnpm --filter <app> build`, which passes on a machine with a stale `dist/` lying around
+  and fails on a clean checkout. That is how a `Module not found: '@platform/shared'`
+  reached CI once already.
 - `apps/*` never import from each other
 
 -----
@@ -308,6 +314,7 @@ Read the relevant docs BEFORE writing code.
 |Database changes, new tables, migrations                 |`packages/db/MIGRATIONS.md` + `docs/schema-changes.md`       |Migrations in `supabase/migrations/` are the execution source of truth                        |
 |Shared types or enums                                    |`packages/shared/src/types.ts`                               |Check if type already exists before creating                                                  |
 |Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
+|Corporate research — the register, the ingest workflow, the pages|`docs/features/corporate-holdings/build-progress.md` first, then `corporate-research-spec.md`|The spec bundle was written without the repo to hand; build-progress records every name that moved and two pieces of its reference DDL that would have failed at run time. Three rules are enforced in the schema and must not be re-implemented in code: `holding_bases.comparable` gates aggregates, a trigger gates source class at write time, and no lookup keys on a ticker|
 |Repository interfaces, a new data domain, `apps/web` data wiring|`docs/features/demo-app/repository-contract.md` + `docs/features/demo-app/build-progress.md`|Read models not tables, filtering pushed into the adapter, scoping at construction never in a signature, one contract suite both adapters pass|
 |Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit                                     |
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
