@@ -4,9 +4,10 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** All three sessions complete. Two things remain, both needing network access to
-real filings: the ingest run against Locate's own documents, and the recorded trace bundle.
-**Last updated:** 2026-09-04
+**Status:** All three sessions complete, plus one production fix (session 4). Two things
+remain, both needing network access to real filings: the ingest run against Locate's own
+documents, and the recorded trace bundle.
+**Last updated:** 2026-09-05
 
 ---
 
@@ -268,3 +269,36 @@ not one before, because every fixture the suite exercised happened to be spot.
   their baselines need generating in the CI container image via
   `workflow_dispatch: update_baselines`. Until then those two cases skip, like every other
   one in that file.
+
+---
+
+## Session 4 — the company page error
+
+`GET /research/<slug>` returned 200 and rendered "This page hit a snag". The 200 is why it
+read as a mystery rather than as an error: `apps/web/app/(app)/error.tsx` catches a throw in
+a server component, so Next streams the boundary rather than a 500 and the Vercel log shows
+a successful request.
+
+`v_company_position` was the only one of the four provenance views that did not project
+`source_document_id`. It joins `research_documents d ON d.id = s.source_document_id` and then
+never selects `d.id`, while `v_research_ledger`, `v_company_facts` and `v_research_absences`
+all carry `d.id AS source_document_id` at the head of their provenance block. The adapter
+maps all four through the same `toProvenance`, so `getPosition` asked Postgres for a column
+that was not there and got 42703. Every company page was affected; the register was not,
+because it reads the table.
+
+**Shipped.** `supabase/migrations/20260905000000_position_view_source_document_id.sql` — the
+view replaced rather than `CREATE OR REPLACE`d, because that form can only append columns and
+the id belongs at the head of the provenance block like its three siblings.
+
+**Why no test caught it.** The adapter's suite runs on `createFakeSupabase`, and
+`__setDataset` accepts whatever columns a fixture invents — the position fixture spread the
+same `source(...)` helper as the ledger one, so it supplied a column the real view does not
+have. No mock can see a view definition, which makes this a class of bug the suite is
+structurally blind to rather than an oversight in one case.
+`packages/data-supabase/src/repositories/corporateHoldings.views.test.ts` closes it against
+the only offline description of the real views there is: it reads `supabase/migrations/`,
+takes each provenance view's last definition, and asserts the projection list carries every
+column `toProvenance` maps. It is red on the unfixed schema and green on the fixed one.
+
+**Verified.** `pnpm test` (13 packages, 2,355 tests) and `turbo typecheck` green.
