@@ -916,6 +916,113 @@ export type Database = {
         }
         Relationships: []
       }
+      company_former_names: {
+        Row: {
+          company_id: string
+          id: string
+          name: string
+          note: string | null
+          used_from: string | null
+          used_to: string | null
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          name: string
+          note?: string | null
+          used_from?: string | null
+          used_to?: string | null
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          name?: string
+          note?: string | null
+          used_from?: string | null
+          used_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_former_names_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_former_names_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "company_former_names_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_listings: {
+        Row: {
+          company_id: string
+          filing_entity: string | null
+          id: string
+          listed_from: string | null
+          listed_to: string | null
+          listing_type: string
+          note: string | null
+          ticker: string
+          venue: string
+        }
+        Insert: {
+          company_id: string
+          filing_entity?: string | null
+          id?: string
+          listed_from?: string | null
+          listed_to?: string | null
+          listing_type: string
+          note?: string | null
+          ticker: string
+          venue: string
+        }
+        Update: {
+          company_id?: string
+          filing_entity?: string | null
+          id?: string
+          listed_from?: string | null
+          listed_to?: string | null
+          listing_type?: string
+          note?: string | null
+          ticker?: string
+          venue?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_listings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_listings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "company_listings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_record_types: {
         Row: {
           category: string
@@ -1802,6 +1909,72 @@ export type Database = {
           },
         ]
       }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          document_id: string
+          embedding: string | null
+          id: string
+          page_from: number | null
+          page_to: number | null
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          document_id: string
+          embedding?: string | null
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+        ]
+      }
       document_versions: {
         Row: {
           approved_by: string | null
@@ -2374,6 +2547,53 @@ export type Database = {
           },
         ]
       }
+      field_source_minimums: {
+        Row: {
+          field_key: string
+          min_source_rank: number
+          rationale: string | null
+        }
+        Insert: {
+          field_key: string
+          min_source_rank: number
+          rationale?: string | null
+        }
+        Update: {
+          field_key?: string
+          min_source_rank?: number
+          rationale?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
+            columns: ["min_source_rank"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["rank"]
+          },
+          {
+            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
+            columns: ["min_source_rank"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_rank"]
+          },
+          {
+            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
+            columns: ["min_source_rank"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_rank"]
+          },
+          {
+            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
+            columns: ["min_source_rank"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_rank"]
+          },
+        ]
+      }
       finding_divergence_pairs: {
         Row: {
           active: boolean
@@ -2595,6 +2815,51 @@ export type Database = {
           },
         ]
       }
+      fx_rates: {
+        Row: {
+          base_currency: string
+          quote_currency: string
+          rate: number
+          rate_date: string
+          source: string
+        }
+        Insert: {
+          base_currency: string
+          quote_currency?: string
+          rate: number
+          rate_date: string
+          source: string
+        }
+        Update: {
+          base_currency?: string
+          quote_currency?: string
+          rate?: number
+          rate_date?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      holding_bases: {
+        Row: {
+          code: string
+          comparable: boolean
+          description: string
+          label: string
+        }
+        Insert: {
+          code: string
+          comparable?: boolean
+          description: string
+          label: string
+        }
+        Update: {
+          code?: string
+          comparable?: boolean
+          description?: string
+          label?: string
+        }
+        Relationships: []
+      }
       indicator_observations: {
         Row: {
           created_at: string
@@ -2734,6 +2999,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      jurisdiction_notes: {
+        Row: {
+          applies_to_listing_type: string | null
+          applies_to_standard: string | null
+          applies_to_venue: string | null
+          body: string
+          created_at: string
+          id: string
+          is_published: boolean
+          note_key: string
+          primary_source_url: string | null
+          rule_reference: string | null
+          title: string
+          topic: string
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          applies_to_listing_type?: string | null
+          applies_to_standard?: string | null
+          applies_to_venue?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          note_key: string
+          primary_source_url?: string | null
+          rule_reference?: string | null
+          title: string
+          topic: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          applies_to_listing_type?: string | null
+          applies_to_standard?: string | null
+          applies_to_venue?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          note_key?: string
+          primary_source_url?: string | null
+          rule_reference?: string | null
+          title?: string
+          topic?: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: []
       }
       knowledge_connections: {
         Row: {
@@ -4956,6 +5272,492 @@ export type Database = {
           },
         ]
       }
+      research_classifications: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          classification: string
+          classified_at: string
+          classified_by: string
+          field_key: string
+          id: string
+          reason: string
+          subject_id: string
+          subject_table: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          classification?: string
+          classified_at?: string
+          classified_by?: string
+          field_key: string
+          id?: string
+          reason: string
+          subject_id: string
+          subject_table: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          classification?: string
+          classified_at?: string
+          classified_by?: string
+          field_key?: string
+          id?: string
+          reason?: string
+          subject_id?: string
+          subject_table?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_classifications_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_companies: {
+        Row: {
+          abn: string | null
+          acn: string | null
+          arbn: string | null
+          created_at: string
+          created_by: string | null
+          curator_notes: string | null
+          expected_disclosure_cadence: string
+          financial_year_end: string | null
+          functional_currency: string | null
+          funding_source: string | null
+          id: string
+          is_published: boolean
+          isin: string | null
+          jurisdiction: string
+          last_verified_at: string | null
+          legal_name: string
+          lei: string | null
+          market_cap_band: string | null
+          operational_hq: string | null
+          presentation_currency: string | null
+          primary_archetype: string
+          reporting_standard: string | null
+          self_described_archetype: string | null
+          slug: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          abn?: string | null
+          acn?: string | null
+          arbn?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_notes?: string | null
+          expected_disclosure_cadence?: string
+          financial_year_end?: string | null
+          functional_currency?: string | null
+          funding_source?: string | null
+          id?: string
+          is_published?: boolean
+          isin?: string | null
+          jurisdiction: string
+          last_verified_at?: string | null
+          legal_name: string
+          lei?: string | null
+          market_cap_band?: string | null
+          operational_hq?: string | null
+          presentation_currency?: string | null
+          primary_archetype: string
+          reporting_standard?: string | null
+          self_described_archetype?: string | null
+          slug: string
+          tier?: string
+          updated_at?: string
+        }
+        Update: {
+          abn?: string | null
+          acn?: string | null
+          arbn?: string | null
+          created_at?: string
+          created_by?: string | null
+          curator_notes?: string | null
+          expected_disclosure_cadence?: string
+          financial_year_end?: string | null
+          functional_currency?: string | null
+          funding_source?: string | null
+          id?: string
+          is_published?: boolean
+          isin?: string | null
+          jurisdiction?: string
+          last_verified_at?: string | null
+          legal_name?: string
+          lei?: string | null
+          market_cap_band?: string | null
+          operational_hq?: string | null
+          presentation_currency?: string | null
+          primary_archetype?: string
+          reporting_standard?: string | null
+          self_described_archetype?: string | null
+          slug?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_companies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_company_facts: {
+        Row: {
+          as_of: string | null
+          company_id: string
+          created_at: string
+          field_key: string
+          id: string
+          is_superseded: boolean
+          label: string
+          natural_key: string
+          source_document_id: string
+          superseded_by: string | null
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          as_of?: string | null
+          company_id: string
+          created_at?: string
+          field_key: string
+          id?: string
+          is_superseded?: boolean
+          label: string
+          natural_key: string
+          source_document_id: string
+          superseded_by?: string | null
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          as_of?: string | null
+          company_id?: string
+          created_at?: string
+          field_key?: string
+          id?: string
+          is_superseded?: boolean
+          label?: string
+          natural_key?: string
+          source_document_id?: string
+          superseded_by?: string | null
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_field_key_fkey"
+            columns: ["field_key"]
+            isOneToOne: false
+            referencedRelation: "field_source_minimums"
+            referencedColumns: ["field_key"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "research_company_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_documents: {
+        Row: {
+          announcement_id: string | null
+          company_id: string
+          content_sha256: string | null
+          created_at: string
+          document_type: string
+          filing_entity: string | null
+          full_text: string | null
+          id: string
+          is_audited: boolean
+          page_count: number | null
+          pdf_url: string | null
+          published_at: string | null
+          retrieval_error: string | null
+          retrieved_at: string | null
+          source_class: string
+          title: string
+          venue: string | null
+        }
+        Insert: {
+          announcement_id?: string | null
+          company_id: string
+          content_sha256?: string | null
+          created_at?: string
+          document_type: string
+          filing_entity?: string | null
+          full_text?: string | null
+          id?: string
+          is_audited?: boolean
+          page_count?: number | null
+          pdf_url?: string | null
+          published_at?: string | null
+          retrieval_error?: string | null
+          retrieved_at?: string | null
+          source_class: string
+          title: string
+          venue?: string | null
+        }
+        Update: {
+          announcement_id?: string | null
+          company_id?: string
+          content_sha256?: string | null
+          created_at?: string
+          document_type?: string
+          filing_entity?: string | null
+          full_text?: string | null
+          id?: string
+          is_audited?: boolean
+          page_count?: number | null
+          pdf_url?: string | null
+          published_at?: string | null
+          retrieval_error?: string | null
+          retrieved_at?: string | null
+          source_class?: string
+          title?: string
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      research_findings: {
+        Row: {
+          company_id: string
+          created_at: string
+          detail: string | null
+          event_id: string | null
+          finding_type: string
+          headline: string
+          id: string
+          is_absence: boolean
+          is_suppressed: boolean
+          materiality: number | null
+          natural_key: string
+          occurred_on: string | null
+          source_document_id: string | null
+          subject: string | null
+          suppressed_reason: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          detail?: string | null
+          event_id?: string | null
+          finding_type: string
+          headline: string
+          id?: string
+          is_absence?: boolean
+          is_suppressed?: boolean
+          materiality?: number | null
+          natural_key: string
+          occurred_on?: string | null
+          source_document_id?: string | null
+          subject?: string | null
+          suppressed_reason?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          detail?: string | null
+          event_id?: string | null
+          finding_type?: string
+          headline?: string
+          id?: string
+          is_absence?: boolean
+          is_suppressed?: boolean
+          materiality?: number | null
+          natural_key?: string
+          occurred_on?: string | null
+          source_document_id?: string | null
+          subject?: string | null
+          suppressed_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "treasury_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+        ]
+      }
       risk_register: {
         Row: {
           created_at: string
@@ -5252,6 +6054,27 @@ export type Database = {
           },
         ]
       }
+      source_classes: {
+        Row: {
+          code: string
+          is_audited: boolean
+          label: string
+          rank: number
+        }
+        Insert: {
+          code: string
+          is_audited?: boolean
+          label: string
+          rank: number
+        }
+        Update: {
+          code?: string
+          is_audited?: boolean
+          label?: string
+          rank?: number
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -5536,6 +6359,251 @@ export type Database = {
           },
         ]
       }
+      treasury_events: {
+        Row: {
+          asset_class: string
+          basis: string | null
+          company_id: string
+          consideration_native: number | null
+          created_at: string
+          detail: string | null
+          disclosure_venue: string | null
+          event_date: string
+          event_type: string
+          fees_included: boolean | null
+          filing_entity: string | null
+          headline: string
+          id: string
+          native_currency: string | null
+          natural_key: string
+          quantity: number | null
+          source_document_id: string
+          updated_at: string
+        }
+        Insert: {
+          asset_class?: string
+          basis?: string | null
+          company_id: string
+          consideration_native?: number | null
+          created_at?: string
+          detail?: string | null
+          disclosure_venue?: string | null
+          event_date: string
+          event_type: string
+          fees_included?: boolean | null
+          filing_entity?: string | null
+          headline: string
+          id?: string
+          native_currency?: string | null
+          natural_key: string
+          quantity?: number | null
+          source_document_id: string
+          updated_at?: string
+        }
+        Update: {
+          asset_class?: string
+          basis?: string | null
+          company_id?: string
+          consideration_native?: number | null
+          created_at?: string
+          detail?: string | null
+          disclosure_venue?: string | null
+          event_date?: string
+          event_type?: string
+          fees_included?: boolean | null
+          filing_entity?: string | null
+          headline?: string
+          id?: string
+          native_currency?: string | null
+          natural_key?: string
+          quantity?: number | null
+          source_document_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_events_basis_fkey"
+            columns: ["basis"]
+            isOneToOne: false
+            referencedRelation: "holding_bases"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+        ]
+      }
+      treasury_holdings_snapshots: {
+        Row: {
+          as_of_date: string
+          asset: string
+          basis: string
+          company_id: string
+          created_at: string
+          id: string
+          includes_customer_assets: boolean
+          instrument_type: string
+          is_related_party_vehicle: boolean
+          look_through_btc_equivalent: number | null
+          native_currency: string | null
+          natural_key: string
+          quantity: number
+          source_document_id: string
+          value_native: number | null
+        }
+        Insert: {
+          as_of_date: string
+          asset?: string
+          basis: string
+          company_id: string
+          created_at?: string
+          id?: string
+          includes_customer_assets?: boolean
+          instrument_type?: string
+          is_related_party_vehicle?: boolean
+          look_through_btc_equivalent?: number | null
+          native_currency?: string | null
+          natural_key: string
+          quantity: number
+          source_document_id: string
+          value_native?: number | null
+        }
+        Update: {
+          as_of_date?: string
+          asset?: string
+          basis?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          includes_customer_assets?: boolean
+          instrument_type?: string
+          is_related_party_vehicle?: boolean
+          look_through_btc_equivalent?: number | null
+          native_currency?: string | null
+          natural_key?: string
+          quantity?: number
+          source_document_id?: string
+          value_native?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_holdings_snapshots_basis_fkey"
+            columns: ["basis"]
+            isOneToOne: false
+            referencedRelation: "holding_bases"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+        ]
+      }
       voice_snippets: {
         Row: {
           body: string
@@ -5779,6 +6847,110 @@ export type Database = {
           total_variants: number | null
         }
         Relationships: []
+      }
+      v_company_facts: {
+        Row: {
+          as_of: string | null
+          company_id: string | null
+          conflicting_source_class: string | null
+          conflicting_source_title: string | null
+          conflicting_source_url: string | null
+          conflicting_value: string | null
+          field_key: string | null
+          id: string | null
+          label: string | null
+          slug: string | null
+          source_class: string | null
+          source_document_id: string | null
+          source_is_audited: boolean | null
+          source_published_at: string | null
+          source_rank: number | null
+          source_title: string | null
+          source_url: string | null
+          value: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_field_key_fkey"
+            columns: ["field_key"]
+            isOneToOne: false
+            referencedRelation: "field_source_minimums"
+            referencedColumns: ["field_key"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["conflicting_source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      v_company_position: {
+        Row: {
+          as_of_date: string | null
+          asset: string | null
+          basis: string | null
+          basis_comparable: boolean | null
+          company_id: string | null
+          includes_customer_assets: boolean | null
+          instrument_type: string | null
+          is_related_party_vehicle: boolean | null
+          legal_name: string | null
+          look_through_btc_equivalent: number | null
+          primary_archetype: string | null
+          quantity: number | null
+          slug: string | null
+          snapshot_id: string | null
+          source_class: string | null
+          source_published_at: string | null
+          source_title: string | null
+          source_url: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_basis_fkey"
+            columns: ["basis"]
+            isOneToOne: false
+            referencedRelation: "holding_bases"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       v_contacts_overview: {
         Row: {
@@ -6168,6 +7340,206 @@ export type Database = {
         }
         Relationships: []
       }
+      v_research_absences: {
+        Row: {
+          company_id: string | null
+          detail: string | null
+          headline: string | null
+          id: string | null
+          occurred_on: string | null
+          slug: string | null
+          source_class: string | null
+          source_document_id: string | null
+          source_is_audited: boolean | null
+          source_published_at: string | null
+          source_title: string | null
+          source_url: string | null
+          subject: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_research_freshness: {
+        Row: {
+          days_since_document: number | null
+          expected_disclosure_cadence: string | null
+          id: string | null
+          is_stale: boolean | null
+          last_verified_at: string | null
+          latest_document_at: string | null
+          legal_name: string | null
+          slug: string | null
+          stale_after_days: number | null
+          tier: string | null
+        }
+        Relationships: []
+      }
+      v_research_ledger: {
+        Row: {
+          asset_class: string | null
+          basis: string | null
+          basis_comparable: boolean | null
+          classification: string | null
+          company_id: string | null
+          consideration_aud: number | null
+          consideration_native: number | null
+          detail: string | null
+          disclosure_venue: string | null
+          event_date: string | null
+          event_type: string | null
+          fees_included: boolean | null
+          filing_entity: string | null
+          fx_rate_date: string | null
+          fx_rate_used: number | null
+          headline: string | null
+          id: string | null
+          legal_name: string | null
+          native_currency: string | null
+          quantity: number | null
+          slug: string | null
+          source_class: string | null
+          source_document_id: string | null
+          source_is_audited: boolean | null
+          source_published_at: string | null
+          source_rank: number | null
+          source_title: string | null
+          source_url: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_events_basis_fkey"
+            columns: ["basis"]
+            isOneToOne: false
+            referencedRelation: "holding_bases"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_research_publishable: {
+        Row: {
+          asset_class: string | null
+          basis: string | null
+          basis_comparable: boolean | null
+          classification: string | null
+          company_id: string | null
+          consideration_aud: number | null
+          consideration_native: number | null
+          detail: string | null
+          disclosure_venue: string | null
+          event_date: string | null
+          event_type: string | null
+          fees_included: boolean | null
+          filing_entity: string | null
+          fx_rate_date: string | null
+          fx_rate_used: number | null
+          headline: string | null
+          id: string | null
+          legal_name: string | null
+          native_currency: string | null
+          quantity: number | null
+          slug: string | null
+          source_class: string | null
+          source_document_id: string | null
+          source_is_audited: boolean | null
+          source_published_at: string | null
+          source_rank: number | null
+          source_title: string | null
+          source_url: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_events_basis_fkey"
+            columns: ["basis"]
+            isOneToOne: false
+            referencedRelation: "holding_bases"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_unresolved_capacity_gaps: {
         Row: {
           created_at: string | null
@@ -6197,6 +7569,11 @@ export type Database = {
       }
     }
     Functions: {
+      assert_source_minimum: {
+        Args: { doc_id: string; target_field: string }
+        Returns: undefined
+      }
+      commit_research_ingest: { Args: { payload: Json }; Returns: Json }
       compute_pipeline_validation: {
         Args: { pain_point_uuid: string }
         Returns: {
@@ -6372,12 +7749,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6401,11 +7778,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6426,11 +7803,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6451,11 +7828,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6468,11 +7845,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
