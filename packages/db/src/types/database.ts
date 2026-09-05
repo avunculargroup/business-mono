@@ -1956,6 +1956,13 @@ export type Database = {
             foreignKeyName: "document_chunks_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
             referencedRelation: "v_research_absences"
             referencedColumns: ["source_document_id"]
           },
@@ -5504,6 +5511,13 @@ export type Database = {
             foreignKeyName: "research_company_facts_source_document_id_fkey"
             columns: ["source_document_id"]
             isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
             referencedRelation: "v_research_absences"
             referencedColumns: ["source_document_id"]
           },
@@ -5733,6 +5747,13 @@ export type Database = {
             columns: ["source_document_id"]
             isOneToOne: false
             referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_findings_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
             referencedColumns: ["source_document_id"]
           },
           {
@@ -6467,6 +6488,13 @@ export type Database = {
             foreignKeyName: "treasury_events_source_document_id_fkey"
             columns: ["source_document_id"]
             isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
             referencedRelation: "v_research_absences"
             referencedColumns: ["source_document_id"]
           },
@@ -6579,6 +6607,13 @@ export type Database = {
             columns: ["source_document_id"]
             isOneToOne: false
             referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
             referencedColumns: ["source_document_id"]
           },
           {
@@ -6931,6 +6966,7 @@ export type Database = {
           slug: string | null
           snapshot_id: string | null
           source_class: string | null
+          source_document_id: string | null
           source_published_at: string | null
           source_title: string | null
           source_url: string | null
