@@ -115,7 +115,13 @@ Transform tasks into verifiable goals before implementing:
   `apps/web` today and by `apps/demo` later, so any dependency on app code breaks that. React and
   `lucide-react` are peer dependencies.
 - `packages/db` imports from `@platform/shared`
-- `packages/shared` imports from nothing (leaf package)
+- `packages/shared` imports from nothing (leaf package). Its `exports.import` condition
+  resolves to `dist/`, not to source, so a **value** imported from it (a constant, a `const`
+  object) needs `tsc` to have run there first, while a `import type` is erased and needs
+  nothing. Build through Turborepo — `pnpm turbo build --filter=<app>` — never
+  `pnpm --filter <app> build`, which passes on a machine with a stale `dist/` lying around
+  and fails on a clean checkout. That is how a `Module not found: '@platform/shared'`
+  reached CI once already.
 - `apps/*` never import from each other
 
 -----
