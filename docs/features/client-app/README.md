@@ -3,19 +3,20 @@
 **Product:** Minute, by Bitcoin Treasury Solutions
 **Codebase:** `apps/client` in `business-mono`
 **Feature:** Invite-only paid subscription app for CFOs and SMSF trustees
-**Status:** Reconciled against the live repository and database. The four spec documents below
-are what the app is built *against*; where the build diverged,
-[`build-progress.md`](./build-progress.md) records the divergence and why, and is the document
-to trust.
-**Last updated:** 2026-09-11
+**Status:** Bundle 0.4.0, reconciled against the live repository and database. The spec
+documents below are what the app is built *against*; where the build diverged,
+[`build-progress.md`](./build-progress.md) records the divergence and why, and is the
+document to trust.
+**Bundle version:** 0.4.0
+**Last updated:** 2026-09-09
 
 ---
 
 ## Naming
 
 The product is **Minute**. It sits under BTS as a product, not as a replacement brand — the
-AR relationship attaches to the licensed entity, so the FSG never has to explain a name
-nobody has heard of. Written out: *Minute, by Bitcoin Treasury Solutions*.
+company keeps the relationships and the reputation, and the product gets to be named plainly.
+Written out: *Minute, by Bitcoin Treasury Solutions*.
 
 Both personas already say the verb. A board minutes a decision; a trustee minutes a
 resolution. It is governance-native, has no hype available to it, and passes the test that
@@ -62,13 +63,14 @@ Read in this order.
 | File | What it is |
 |---|---|
 | `README.md` | This file. Start here. |
-| [`build-progress.md`](./build-progress.md) | **Read second.** The verification pass against the live database. Three of the twelve assumptions were wrong, one of them by an order of magnitude. Read before trusting anything below. |
-| [`assumptions.md`](./assumptions.md) | Twelve assumptions, ordered by blast radius, each now carrying its verified answer. |
-| [`client-app-mvp-spec.md`](./client-app-mvp-spec.md) | The main spec. Personas, compliance architecture, the security finding, data model, eight routes, architecture. |
+| [`build-progress.md`](./build-progress.md) | **Read second.** The verification pass against the live database, and what building it changed. Several of the bundle's assumptions were wrong, one by an order of magnitude. |
+| [`changelog.md`](./changelog.md) | What changed in this bundle and why. Amendments are recorded here rather than made silently. |
+| [`assumptions.md`](./assumptions.md) | Twelve assumptions, ordered by blast radius, each carrying its verified answer. |
+| [`client-app-mvp-spec.md`](./client-app-mvp-spec.md) | The main spec. Personas, product architecture, the security finding, data model, eight routes. |
 | [`prepare-feature-spec.md`](./prepare-feature-spec.md) | `/prepare` in full — the differentiator. Template format, fact injection contract, six artefact outlines, local-only storage model. |
-| [`sessions.md`](./sessions.md) | Three-session build plan with definitions of done. What Claude Code works from. |
-| [`../../../supabase/migrations/`](../../../supabase/migrations/) | The migrations. Execution source of truth, applied on push to `main` — see [`packages/db/MIGRATIONS.md`](../../../packages/db/MIGRATIONS.md). The bundle shipped four reference `schema/*.sql` files; they were rewritten against the real schema and are listed in [`build-progress.md`](./build-progress.md). |
-| [`.claude/skills/bts-design/references/naming.md`](../../../.claude/skills/bts-design/references/naming.md) | Naming rules. Moved into the design skill, which is where the `bts-design` skill now points at it. |
+| [`sessions.md`](./sessions.md) | Three-session build plan with definitions of done. |
+| [`../../../supabase/migrations/`](../../../supabase/migrations/) | The migrations. Execution source of truth, applied on push to `main` — see [`packages/db/MIGRATIONS.md`](../../../packages/db/MIGRATIONS.md). The bundle's reference `schema/*.sql` files were rewritten against the real schema; the result is listed in [`build-progress.md`](./build-progress.md). |
+| [`.claude/skills/bts-design/references/naming.md`](../../../.claude/skills/bts-design/references/naming.md) | Naming rules, now in the design skill where the `bts-design` skill points at them. |
 | [`../../../packages/data/src/repositories/client.ts`](../../../packages/data/src/repositories/client.ts) | `@platform/data` interfaces. Read-only by construction, with the conformance suite beside them. |
 
 ---
@@ -83,41 +85,41 @@ correct when "authenticated" and "founder" were the same two people.
 **The moment a subscriber authenticates against this Supabase project, they can read the CRM,
 the agent activity log, the compliance library and the contract library.**
 
-The audit has now been run against the live database, and the number is not eleven.
+The audit has been run against the live database, and the number is not eleven.
 
-**114 permissive policies across 107 tables**, in two classes: 100 carry the
+**114 permissive policies across 107 tables**, in two classes: 100 carrying the
 `auth.role() = 'authenticated'` pattern, and a further 14 granting `USING (true)` to
 `authenticated` — a class the bundle's own audit query does not detect, because it greps for
 `auth.role()`. Fixing eleven and shipping a client login would have left ~98 tables readable.
 
 The hardening migration covers all 114 and preserves the two policies that are deliberately
-open: `form_submissions_insert` (public website form posts, insert-only) and
-`platform_files_public_select` (anon read where `is_public`). Details in
-[`build-progress.md`](./build-progress.md).
+open. Details in [`build-progress.md`](./build-progress.md).
 
 This migration is worth applying whether or not this app ever ships.
 
-### The general advice boundary is enforced by absence
+### The not-advice boundary is enforced by absence
 
 `client_accounts` has no column capable of holding a subscriber's financial position. No fund
 balance, no member details, no risk profile, no holdings.
 
-That absence *is* the compliance control. It is not a disclaimer, not a UI rule, not something
-anyone has to remember. Adding such a column is the single change that would convert every
-retail subscriber into a person owed a Statement of Advice.
+BTS does not give financial advice and holds no AFS authorisation. Personal circumstances are
+the ingredient that turns information into advice, so a service that cannot receive them
+cannot give it. "We have no facility for you to tell us" is a true statement about the schema
+rather than a promise about behaviour.
 
 The same principle runs through `/prepare`: subscriber-authored prose lives in IndexedDB on
 their device and is never transmitted, so the boundary becomes a fact about where bytes live.
 
-### SMSF trustees are retail, and there is no way around it
+### The register is precedent research, not securities analysis
 
-Section 761G(6) requires a super fund to hold $10 million in net assets before it is
-wholesale, and s761G(7)'s asset and income tests expressly do not apply where the service
-relates to a superannuation product. A trustee with extensive experience and $8m in the fund
-is retail. AFCA reaffirmed this in March 2026.
+`/register` exists for learning and for building your own treasury case. **Implementation
+facts, not outcome facts.** Accounting treatment, custody model, board or deed authority,
+disclosure wording and timing — all in. Current holding value, unrealised gain, share price
+since announcement — all out.
 
-The trustee segment is retail with a rounding error's worth of exceptions. The app builds to
-the retail bar throughout and never segments in the direction of less protection.
+**Cite in a pack** on every fact row carries it into a `/prepare` precedent section with its
+provenance attached. That action is what makes the purpose legible from the interface rather
+than from a disclaimer.
 
 ### No referral revenue, and it is a database constraint
 
@@ -128,9 +130,9 @@ objective and published, nobody can buy in or buy placement.
 referrals" is a sentence someone forgets in eighteen months and a CHECK constraint is not.
 
 The reasoning is recorded in the main spec so the question does not get reopened every quarter
-by someone who has not read it. Short version: DAPs and TCPs became financial products in
-April 2026, SMSF trustees are retail, ASIC INFO 269 treats payment as making advice more
-likely, and an AR cannot add a revenue line without the licensee.
+by someone who has not read it. Short version: independence is the inventory, and ASIC INFO
+269 treats a paid service commenting on financial products as more likely to be advising about
+them — which matters more when there is no authorisation underneath.
 
 ### No client-facing agent
 
@@ -181,12 +183,13 @@ These are not restated in every document. They apply everywhere.
 
 ## First three actions
 
-1. Read the AR appointment deed. Confirm what BTS is authorised to do. **Still outstanding.**
-2. ~~Run the audit query.~~ **Done** — 114 policies, 107 tables. The hardening migration covers
-   all of them and is written but **not applied**; applying it is a deliberate act, not a
-   side effect of merging. See [`build-progress.md`](./build-progress.md).
-3. Confirm the active FSG covers a subscription information service. **There is no FSG, and no
-   `compliance_documents` table to hold one.** Both now exist as schema; the document itself is
-   a drafting job with a lead time and it blocks the disclosure gate.
+1. ~~Run the audit query.~~ **Done** — 114 policies over 107 tables. The hardening migration
+   covers all of them and is written but **not applied**; applying it is a deliberate act, not
+   a side effect of merging. See [`build-progress.md`](./build-progress.md).
+2. **Write the Service Statement.** Outstanding, and it is the single thing blocking first
+   login: the gate serves it, and with none published nobody can pass.
+3. **Confirm the not-advice position was assessed against Minute specifically** — a narrated
+   brief, a register of named entities, monitoring of custody providers — rather than against
+   the education and consulting business. Outstanding.
 
-None of the three is code. All three are on the critical path.
+Only the first was code, and it is done.

@@ -4,8 +4,8 @@ import type { Fact } from '@platform/data';
  * The local store. Everything the subscriber writes lives here and nowhere
  * else.
  *
- * This module is the general advice boundary expressed as a fact about where
- * bytes live. There is no server mirror, no sync, no best-effort backup, and
+ * This module is the not-advice boundary expressed as a fact about where bytes
+ * live. There is no server mirror, no sync, no best-effort backup, and
  * no fetch anywhere in this file — a reviewer can establish that by reading it,
  * which is the point. `prose.test.ts` asserts it over the built source.
  *
@@ -15,11 +15,12 @@ import type { Fact } from '@platform/data';
  */
 
 const DB_NAME = 'bts-prepare';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const PACKS = 'packs';
 const RESPONSES = 'responses';
 const SNAPSHOTS = 'snapshots';
+const CITATIONS = 'citations';
 
 export interface StoredPack {
   id: string;
@@ -29,6 +30,18 @@ export interface StoredPack {
   /** Subscriber-editable. Defaults to the template title. */
   title: string;
   status: 'in_progress' | 'complete';
+  /**
+   * Whether this pack's template has a precedent section.
+   *
+   * Copied from the template at creation so `/register` can answer "which of my
+   * packs can take this citation" without loading templates it has no other
+   * reason to fetch. A pack whose template has no precedent section is not
+   * offered, rather than accepting a citation that would then render nowhere.
+   *
+   * Optional because packs created before Cite in a pack existed do not carry
+   * it; absent reads as false.
+   */
+  acceptsCitations?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,10 +65,19 @@ export interface StoredFactSnapshot {
 
 /** A pack and everything belonging to it, for export and import. */
 export interface WorkingCopy {
-  formatVersion: 1;
+  /**
+   * 2 on export, 1 or 2 on import.
+   *
+   * Version 1 predates Cite in a pack and carries no `citations`. It still
+   * imports, because a hand-off that stops working after an upgrade is a
+   * hand-off nobody trusts — the missing field reads as an empty list.
+   */
+  formatVersion: 1 | 2;
   pack: StoredPack;
   responses: StoredResponse[];
   snapshot: StoredFactSnapshot | null;
+  /** Added at format version 2. A hand-off without them loses the precedents. */
+  citations?: StoredCitation[];
   exportedAt: string;
 }
 
@@ -74,6 +96,12 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(SNAPSHOTS)) {
         db.createObjectStore(SNAPSHOTS, { keyPath: 'packId' });
+      }
+      // Added at version 2, for Cite in a pack. The guard means an existing
+      // device upgrades without losing the packs already on it.
+      if (!db.objectStoreNames.contains(CITATIONS)) {
+        const store = db.createObjectStore(CITATIONS, { keyPath: 'id' });
+        store.createIndex('packId', 'packId', { unique: false });
       }
     };
 
@@ -157,19 +185,21 @@ export async function saveSnapshot(snapshot: StoredFactSnapshot): Promise<void> 
  * better than the alternative of putting their prose on a server.
  */
 export async function exportWorkingCopy(packId: string): Promise<WorkingCopy> {
-  const [pack, responses, snapshot] = await Promise.all([
+  const [pack, responses, snapshot, citations] = await Promise.all([
     getPack(packId),
     listResponses(packId),
     getSnapshot(packId),
+    listCitations(packId),
   ]);
 
   if (!pack) throw new Error(`No pack ${packId} on this device`);
 
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     pack,
     responses,
     snapshot: snapshot ?? null,
+    citations,
     exportedAt: new Date().toISOString(),
   };
 }
@@ -182,7 +212,7 @@ export async function exportWorkingCopy(packId: string): Promise<WorkingCopy> {
  * two packs side by side is a problem the subscriber can see and solve.
  */
 export async function importWorkingCopy(copy: WorkingCopy, newId: string): Promise<string> {
-  if (copy.formatVersion !== 1) {
+  if (copy.formatVersion !== 1 && copy.formatVersion !== 2) {
     throw new Error('This working copy was written by a different version of Minute');
   }
 
@@ -200,7 +230,74 @@ export async function importWorkingCopy(copy: WorkingCopy, newId: string): Promi
     ),
   );
 
+  await Promise.all(
+    (copy.citations ?? []).map((citation) =>
+      saveCitation({
+        ...citation,
+        id: citationKey(newId, citation.fact.key),
+        packId: newId,
+      }),
+    ),
+  );
+
   if (copy.snapshot) await saveSnapshot({ ...copy.snapshot, packId: newId });
 
   return newId;
+}
+
+// ============================================================
+// Citations — Cite in a pack
+// ============================================================
+
+/**
+ * A fact carried over from `/register` into a pack.
+ *
+ * The register and `/prepare` are the same feature at two stages: gathering
+ * evidence, and assembling it. Before this store existed they did not know
+ * about each other, and the register read like a list of holdings to browse.
+ * With it, someone using the register is visibly building a case — which is
+ * what makes its purpose legible from the interface rather than from a
+ * disclaimer.
+ *
+ * Citations live here rather than on the server for the same reason responses
+ * do: which precedents a subscriber chose to gather is a fact about the
+ * argument they are constructing, and that is theirs.
+ */
+export interface StoredCitation {
+  /** `${packId}:${factKey}` — one citation per fact per pack. */
+  id: string;
+  packId: string;
+  /**
+   * Deliberately no section id.
+   *
+   * A citation is made from `/register`, which has never seen the pack's
+   * template and so cannot know its sections. Recording a section here would
+   * mean guessing one — and freezing a decision the template is allowed to
+   * change when it is next versioned. The precedent section is resolved when
+   * the pack renders, from whichever section declared `accepts_citations`.
+   */
+  /** The register entry it came from, so the pack can say where. */
+  entitySlug: string;
+  entityName: string;
+  /** Same `Fact` shape as a bound fact, provenance and all. */
+  fact: Fact;
+  citedAt: string;
+}
+
+export function citationKey(packId: string, factKey: string): string {
+  return `${packId}:${factKey}`;
+}
+
+export function listCitations(packId: string): Promise<StoredCitation[]> {
+  return run<StoredCitation[]>(CITATIONS, 'readonly', (store) =>
+    store.index('packId').getAll(packId),
+  );
+}
+
+export async function saveCitation(citation: StoredCitation): Promise<void> {
+  await run(CITATIONS, 'readwrite', (store) => store.put(citation));
+}
+
+export async function removeCitation(id: string): Promise<void> {
+  await run(CITATIONS, 'readwrite', (store) => store.delete(id));
 }

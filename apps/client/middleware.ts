@@ -61,27 +61,27 @@ export async function middleware(request: NextRequest) {
     isSubscriber = clientUser?.status === 'active';
 
     if (isSubscriber) {
-      // The active FSG is the document the gate is about, and a new version
-      // re-triggers it for everyone: the acknowledgement is recorded against a
-      // version, so bumping the version means nobody has acknowledged the
-      // current one yet.
+      // The active Service Statement is the document the gate is about, and a
+      // new version re-triggers it for everyone: the acknowledgement is
+      // recorded against a version, so bumping the version means nobody has
+      // acknowledged the current one yet.
       //
-      // No active FSG means nobody passes. That is correct while one has not
-      // been drafted — see docs/features/client-app/build-progress.md on A4 —
-      // and it fails closed rather than open.
-      const { data: fsg } = await supabase
+      // None active means nobody passes. That is correct while one has not been
+      // written — see docs/features/client-app/build-progress.md on A4 — and it
+      // fails closed rather than open.
+      const { data: statement } = await supabase
         .from('compliance_documents')
         .select('version')
-        .eq('doc_type', 'fsg')
+        .eq('doc_type', 'service_statement')
         .eq('status', 'active')
         .maybeSingle();
 
-      if (fsg?.version) {
+      if (statement?.version) {
         const { data: ack } = await supabase
           .from('client_disclosures')
           .select('id')
           .eq('client_user_id', user.id)
-          .eq('document_version', fsg.version)
+          .eq('document_version', statement.version)
           .maybeSingle();
 
         disclosureCurrent = ack !== null;

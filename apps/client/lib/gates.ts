@@ -15,8 +15,8 @@ export const PUBLIC_PREFIXES = ['/login', '/invite', '/auth'] as const;
  * The only route a signed-in but un-acknowledged session may reach.
  *
  * `/logout` is on the list because a subscriber who does not want to accept the
- * FSG must be able to leave. A gate with no exit is a trap, and a trap is worse
- * compliance than no gate: it produces a support call rather than a decision.
+ * Service Statement must be able to leave. A gate with no exit is a trap, and a
+ * trap produces a support call rather than a decision.
  */
 export const DISCLOSURE_PREFIXES = ['/disclosure', '/logout'] as const;
 

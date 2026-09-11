@@ -1,12 +1,12 @@
 /* Quiet, permanent, and not dismissible. Not a banner that demands attention —
    it is chrome, and chrome that shouts stops being read within a week. */
-.warning {
+.notice {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-subtle);
   padding: var(--space-4) var(--space-6);
 }
 
-.warning p {
+.notice p {
   max-width: 72ch;
   margin: 0 auto;
   font-size: var(--text-xs);

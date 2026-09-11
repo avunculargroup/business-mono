@@ -265,3 +265,19 @@
     resize: none;
   }
 }
+
+/* Cited precedent, in the section that declared accepts_citations. Set apart
+   from the bound fact block above it, because it got here a different way: the
+   subscriber chose it from the register rather than the template binding it. */
+.citations {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.citationsEmpty {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary);
+}

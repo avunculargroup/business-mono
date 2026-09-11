@@ -1,6 +1,7 @@
 # Naming and Nomenclature
 
-**Referenced from:** `SKILL.md`, under *Files in this skill*.
+**Destination:** `.claude/skills/bts-design/references/naming.md`
+**Referenced from:** `SKILL.md` — add a line under the design tokens section pointing here.
 **Last updated:** 2026-09-09
 
 Applies to every surface: `apps/web`, `apps/demo`, `apps/client`, generated documents,
@@ -33,14 +34,12 @@ Pick by audience and by whether the artefact is a regulatory one.
 
 ### Legal — `Bitcoin Treasury Solutions Pty Ltd`
 
-Source: `company_profile.legal_name`, with `abn`, `licence_number` and `licence_holder`
-where the context requires them.
+Source: `company_profile.legal_name`, with `abn` and `acn` where the context requires them.
 
-Use in: the FSG and every compliance document, contracts and contract templates, generated
-`/prepare` exports (front matter), anything lodged with or potentially read by ASIC, AFCA or
-an auditor.
+Use in: the Service Statement, contracts and contract templates, generated `/prepare` exports
+(front matter), and anything that may be read by an auditor or a regulator.
 
-These documents can end up in front of a regulator. An acronym there is a small unforced
+These documents can end up in front of someone official. An acronym there is a small unforced
 error, and the ABN is often the only thing that makes the entity identifiable.
 
 ### Trading — `Bitcoin Treasury Solutions`
@@ -101,9 +100,9 @@ byline is an author credit on an article, and using that word here causes confus
 ### Endorsement line rules
 
 - Always the **trading** name. "Minute, by BTS" fails at the one job the line exists to do,
-  which is attaching the product to a licensed entity a reader can look up.
-- Legal name plus ABN wherever the document is a regulatory artefact — every `/prepare`
-  export front matter, the disclosure gate, the FSG.
+  which is attaching the product to a real entity a reader can look up.
+- Legal name plus ABN wherever the document may be read by an auditor — every `/prepare`
+  export front matter, and the Service Statement.
 - **Variant 4 only where context already supplies the rest.** Cold and alone, "Minute" is
   briefly ambiguous in pronunciation — some readers land on my-NOOT before correcting. The
   endorsement line resolves it, so anywhere the name meets someone for the first time, use
@@ -134,12 +133,14 @@ word of the content.
 ## Words to avoid
 
 **Restricted by law.** "Financial adviser" and "financial planner" are restricted terms under
-s923C of the Corporations Act. Never use them of BTS, the product, or any agent.
+s923C of the Corporations Act, reserved for people on the Financial Advisers Register. Never
+use them of BTS, the product, or any agent. BTS does not give financial advice and holds no
+AFS authorisation, so nothing in this family is available.
 
-**Wrong for an AR positioned on independence.** Advice, recommend, should, best, top,
-leading, optimal, guarantee, proven, edge, alpha, outperform, signal-as-a-verb. These imply
-either a recommendation or a claim about outcomes, and the entire product is built on making
-neither.
+**Wrong because they imply advice or outcomes.** Advice, advise, recommend, should, best, top,
+leading, optimal, guarantee, proven, edge, alpha, outperform, signal-as-a-verb. The entire
+product is built on stating facts and asking questions, and these words undo that in one
+move.
 
 **Wrong for the audience.** Crypto, coin, HODL, moon, degen, ape, stack-sats framing, rocket
 metaphors. The design brief already rules out the aesthetic; the vocabulary is the same rule

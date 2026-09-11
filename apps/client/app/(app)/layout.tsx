@@ -1,12 +1,12 @@
 import { Nav } from '@/components/Nav';
-import { GeneralAdviceWarning } from '@/components/GeneralAdviceWarning';
+import { InformationNotice } from '@/components/InformationNotice';
 import styles from './shell.module.css';
 
 /**
  * The authenticated shell.
  *
- * The general advice warning lives here and nowhere else. Rule 3: a warning
- * added per route is a warning eventually forgotten on a route, so adding a
+ * The information-only notice lives here and nowhere else. Rule 3: a notice
+ * added per route is a notice eventually forgotten on a route, so adding a
  * ninth route cannot omit it — there is nothing to remember to add.
  *
  * Everything inside this group is already past both gates. `middleware.ts`
@@ -19,7 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className={styles.shell}>
       <Nav />
       <main className={styles.content}>{children}</main>
-      <GeneralAdviceWarning />
+      <InformationNotice />
     </div>
   );
 }

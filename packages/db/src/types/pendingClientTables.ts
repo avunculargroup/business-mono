@@ -32,10 +32,6 @@ export type PendingClientTables = {
       id: string;
       display_name: string;
       client_type: string;
-      client_classification: string;
-      classification_evidence: string | null;
-      classification_set_by: string | null;
-      classification_set_at: string | null;
       subscription_status: string;
       subscription_started_at: string | null;
       subscription_renews_at: string | null;
@@ -46,7 +42,6 @@ export type PendingClientTables = {
     Insert: Partial<PendingClientTables['client_accounts']['Row']> & {
       display_name: string;
       client_type: string;
-      client_classification: string;
     };
     Update: Partial<PendingClientTables['client_accounts']['Row']>;
     Relationships: [];
@@ -147,9 +142,7 @@ export type PendingClientTables = {
       legal_name: string;
       trading_name: string;
       abn: string | null;
-      ar_number: string | null;
-      licence_holder: string | null;
-      licence_number: string | null;
+      acn: string | null;
       contact_email: string | null;
       website: string | null;
     };
@@ -311,6 +304,14 @@ export type PendingColumnAdditions = {
     client_cleared: boolean;
     client_cleared_by: string | null;
     client_cleared_at: string | null;
+  };
+  field_source_minimums: {
+    /**
+     * Implementation facts reach `/register`; outcome facts never do. NULL is
+     * unclassified, and unclassified is invisible to subscribers — the safe
+     * direction for a key the research pipeline coins later.
+     */
+    client_fact_class: 'implementation' | 'outcome' | null;
   };
 };
 

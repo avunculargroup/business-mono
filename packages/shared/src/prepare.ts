@@ -24,6 +24,16 @@ export interface ParsedSection {
   facts: string[];
   optional: boolean;
   regulatoryReference?: string;
+  /**
+   * Where facts cited from `/register` land.
+   *
+   * The register and `/prepare` are the same feature at two stages — gathering
+   * evidence and assembling it — and **Cite in a pack** is the join. A cited
+   * fact has to land somewhere specific, and an explicit key is better than a
+   * magic section id: a template author decides which of their sections is the
+   * precedent one, and the validator can check there is exactly one.
+   */
+  acceptsCitations: boolean;
 }
 
 export interface ParsedTemplate {
@@ -177,6 +187,7 @@ export function parseTemplate(body: string): ParsedTemplate {
       why: asString(fields['why']),
       facts: asList(fields['facts']),
       optional: asString(fields['optional']).toLowerCase() === 'true',
+      acceptsCitations: asString(fields['accepts_citations']).toLowerCase() === 'true',
       ...(fields['regulatory_reference']
         ? { regulatoryReference: asString(fields['regulatory_reference']) }
         : {}),
@@ -227,6 +238,19 @@ export function validateTemplate(
         message: `facts_required names '${key}', which no fact source provides`,
       });
     }
+  }
+
+  // At most one. A cited fact has to land somewhere definite, and two
+  // candidate sections would make "the precedent section" a coin toss that
+  // differs between the register's cite action and the export.
+  const citationSections = parsed.sections.filter((section) => section.acceptsCitations);
+  if (citationSections.length > 1) {
+    problems.push({
+      where: citationSections.map((section) => section.id).join(', '),
+      message:
+        'more than one section sets accepts_citations — a fact cited from the register would '
+        + 'have no definite home',
+    });
   }
 
   const seen = new Set<string>();

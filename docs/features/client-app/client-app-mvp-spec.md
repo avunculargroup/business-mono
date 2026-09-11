@@ -2,8 +2,9 @@
 
 **Product:** Minute, by Bitcoin Treasury Solutions
 **Codebase:** `apps/client` — invite-only paid subscription app for CFOs and SMSF trustees
-**Status:** Draft, reconciled against the live database on 2026-09-11. Where this document and
-[`build-progress.md`](./build-progress.md) disagree, that one was checked and this one was not.
+**Status:** Draft (bundle 0.4.0), reconciled against the live database on 2026-09-11.
+Where this document and [`build-progress.md`](./build-progress.md) disagree, that one was
+checked and this one was not.
 **Last updated:** 2026-09-08
 
 ---
@@ -39,17 +40,17 @@ They read the same data and sit under materially different law.
 
 | | **CFO / corporate treasury** | **SMSF trustee** |
 |---|---|---|
-| Client classification | Often wholesale (s761G tests can clear) | Retail in practice, almost always |
-| Is the subject matter a financial product? | Bitcoin held on a corporate balance sheet: generally not | The superannuation interest is. Advice touching fund investment is financial product advice |
 | Governing framework | Corporations Act, AASB, board treasury policy | SIS Act, sole purpose test, trust deed, annual audit |
 | The room they must convince | Board, audit committee, external auditor | Co-trustee, SMSF auditor, accountant |
 | The artefact they need | Board paper | Trustee minute and auditor evidence pack |
 | Recurring deadline | Half-year and annual reporting | 30 June market valuation, annual audit |
 
-The asymmetry that matters most: **a CFO asking whether the company should hold bitcoin is
-mostly outside the financial advice regime; a trustee asking whether the fund should is
-inside it.** The MVP therefore builds to the retail bar throughout and never distinguishes
-in the direction of less protection.
+The asymmetry that matters most: **a CFO's obligations are largely self-imposed through board
+policy, while a trustee's are statutory.** A board can decide what its treasury policy says. A
+trustee cannot decide what SIS Reg 4.09 requires them to have regard to, and an auditor will
+check. That makes the SMSF artefacts more prescriptive and, not coincidentally, more valuable
+— there is a right shape for a trustee minute and the trustee is on the hook for producing
+it.
 
 ### MVP scope decision
 
@@ -60,12 +61,19 @@ product gain.
 
 ---
 
-## Compliance architecture
+## Product architecture — how the not-advice line is held
 
-Consistent with the platform principle that compliance is architecture rather than a banner:
-the constraints below are enforced in the schema and the repository layer, not in copy.
+BTS does not give financial advice, holds no AFS authorisation, and has never needed one.
+Bitcoin is not a financial product. That is the position, and the constraints below are what
+make it structurally true rather than merely asserted — enforced in the schema and the
+repository layer, not in copy.
 
-### Rule 1 — General advice only. Enforced by absence.
+Two parts of the product surface do touch financial products, independent of bitcoin's
+status: listed securities in `/register`, and digital asset platforms in `/directory` since
+the April 2026 amendments. Neither is a problem. Both are why the rules below are worth
+having in writing.
+
+### Rule 1 — No personal circumstances. Enforced by absence.
 
 The app never captures a subscriber's personal circumstances. Not fund balance, not age, not
 member details, not risk tolerance, not existing holdings, not entity financials.
@@ -75,8 +83,9 @@ inputs must hold them in component state and never persist them, and the reposit
 interface must expose no write path that could accept them. `apps/client` gets a boundary
 test in the shape of `apps/demo/lib/boundary.test.ts` asserting the write surface is empty.
 
-The moment personal circumstances enter the system, every retail subscriber needs a
-Statement of Advice. The cheapest way to never need one is to never be able to.
+Personal circumstances are the ingredient that turns information into advice. A service that
+cannot receive them cannot give it, and "we have no facility for you to tell us" is a true
+statement about the schema rather than a promise about behaviour.
 
 ### Rule 2 — Lex classifies at ingest; the client app reads only what cleared
 
@@ -85,27 +94,50 @@ reads only rows already carrying a client-safe classification and a published st
 has not cleared it, `apps/client` cannot see it, and the reason it cannot see it is a `WHERE`
 clause, not a component.
 
-### Rule 3 — Disclosure is a blocking gate, not a footer
+### Rule 3 — The Service Statement is a blocking gate, not a footer
 
-First login presents the FSG and the general advice warning as a blocking acknowledgement.
-The acknowledgement is recorded with a timestamp and the document version. A new FSG version
-re-triggers the gate. Every page carries the standing general advice warning in the shell,
-so it cannot be removed by forgetting to add it to a new route.
+First login presents the **Service Statement** as a blocking acknowledgement: what the service
+is, what it is not, that it provides factual information and not financial advice, that BTS
+holds no client assets, that BTS has no facility to consider the subscriber's circumstances,
+and that BTS is paid by the subscriber and by nobody else.
 
-### Rule 4 — The register is dated, sourced and framed as fact
+This is not a regulatory document — no FSG is required, and publishing one would wrongly imply
+a licence BTS does not hold and has never held. It is a plain statement of position, and it is
+the artefact that evidences that position if anyone ever asks.
 
-The corporate research register carries real named securities. Invite-only distribution to
-paying subscribers removes the advertising problem but not the advice one. Existing register
-rules hold and are not relaxed here: no basis, no comparison, no ranking, no implied merit.
-Every fact carries its provenance rail and its as-at date. Absences are stated explicitly
-rather than left blank, which is already how the internal register behaves.
+The acknowledgement is recorded with a timestamp and the document version. A new version
+re-triggers the gate. Every page carries a standing information-only notice in the shell, so
+it cannot be removed by forgetting to add it to a new route.
+
+### Rule 4 — The register is precedent research, not securities analysis
+
+`/register` exists for learning and for building your own treasury case. It answers "how did
+an Australian entity actually do this" — which accounting standard, which custody model, what
+board authority, how it was disclosed and when. It never answers "how did it go for them".
+
+The practical line: **implementation facts, not outcome facts.** Accounting treatment, custody
+model, deed or board authority, disclosure wording and timing, auditor questions — all in.
+Current holding value, unrealised gain, share price since announcement — all out. The moment
+outcome facts appear the page stops being precedent and starts being performance, which is a
+different question about a different asset.
+
+> **How it is enforced.** `field_source_minimums.client_fact_class` classifies each field key
+> as `implementation` or `outcome`, and the RLS policy on `research_company_facts` admits only
+> the first. A key nobody has classified has no row and is therefore invisible — silent
+> exclusion is the safe direction, because a missing implementation fact is a gap while a
+> leaked outcome fact is the product changing shape. The seven live keys are classified in the
+> migration; `operating_metric` — funding runway, operating context — is the one marked
+> `outcome`.
+
+No basis, no comparison, no ranking, no implied merit. Every fact carries its provenance rail
+and its as-at date. Absences are stated explicitly rather than left blank.
 
 ### Rule 5 — Neutral delta colour
 
 Unchanged from the platform rule. No green-up, red-down on any metric. Gold reserved for
 freshness. This is not a stylistic preference: colouring a rising indicator as good is an
-implied view, and an implied view served to a retail subscriber for a fee is exactly the
-thing the rest of this document is trying to avoid.
+implied view, and an implied view served to a paying subscriber is exactly the thing the rest
+of this document is trying to avoid.
 
 ### Rule 6 — Every commercial relationship is recorded, including the ones worth nothing
 
@@ -113,8 +145,8 @@ Any entity appearing on a client surface must have a `commercial_relationships` 
 verifiably none. Reciprocal referral arrangements with no money in them are still conflicts
 and still get disclosed. "No fee changed hands" is an explanation, not an exemption.
 
-Disclosure appears in three places, and all three are required: the FSG conflicts section,
-a standing line in the directory shell, and a badge on the individual card. A subscriber
+Disclosure appears in three places, and all three are required: the Service Statement, a
+standing line in the directory shell, and a badge on the individual card. A subscriber
 should never have to leave the screen they are on to find out whether BTS has an interest in
 what they are reading.
 
@@ -123,9 +155,9 @@ what they are reading.
 ## Security finding — must be resolved before any client logs in
 
 > **Corrected by the verification pass.** It is not eleven. The live database carries **114
-> permissive policies across 107 tables**, and 14 of those are a class this section's audit query
-> cannot see (`USING (true)` for `authenticated`, which no grep for `auth.role()` will return).
-> Option B was taken and applied to all 114. See
+> permissive policies across 107 tables**, and 14 of those are a class this section's audit
+> query cannot see (`USING (true)` for `authenticated`, which no grep for `auth.role()` will
+> return). Option B was taken and applied to all 114. See
 > [`build-progress.md`](./build-progress.md#a2--the-rls-hole-is-roughly-ten-times-the-stated-size).
 
 `schema.sql` carries eleven RLS policies and every one of them is:
@@ -172,33 +204,30 @@ vendors, take a referral fee. **Decision: no referral revenue, in either directi
 point in this MVP.** The subscription is the business model. This section records why, so the
 question does not get reopened every quarter by someone who has not read the reasoning.
 
-### The legal position, briefly
-
-The Corporations Amendment (Digital Assets Framework) Act 2026 added digital asset platforms
-and tokenised custody platforms to the financial products listed in s764A(1), with Royal
-Assent on 8 April 2026. A DAP is a facility whose operator holds digital tokens on behalf of
-clients, which captures exchanges, brokers and custodial wallet providers.
-
-So an outbound paid referral to a custodian is a paid referral to a financial product,
-bringing conflicted remuneration (SMSF trustees are retail), DDO distributor obligations, and
-the question of whether the AR appointment authorises dealing by arranging at all.
-
-The retail question is not escapable by segmentation. Section 761G(6) requires a super fund to
-hold $10 million in net assets before it is wholesale, and s761G(7)'s assets and income tests
-expressly do not apply where the service relates to a superannuation product. A trustee with
-extensive experience and $8m in the fund is retail. AFCA reaffirmed this position in March
-2026. The entire trustee segment is retail with a rounding error's worth of exceptions.
-
-### The product position, which matters more
-
-ASIC's Info Sheet 269 takes the view that a referrer receiving payment for comments about
-financial products is more likely to be giving financial product advice. Payment is the thing
-that converts a description into a recommendation.
+### The product reason, which is the main one
 
 A register showing live regulatory status of Australian bitcoin service providers is worth a
 subscription *because* the providers being tracked are not paying for the privilege. Taking
 their money would make the asset worth less than the money. Independence is not a constraint
 being worked around here; it is the inventory.
+
+### The structural reason
+
+The Corporations Amendment (Digital Assets Framework) Act 2026 added digital asset platforms
+and tokenised custody platforms to the financial products listed in s764A(1), with Royal
+Assent on 8 April 2026. A DAP is a facility whose operator holds digital tokens on behalf of
+clients: exchanges, brokers, custodial wallet providers. Bitcoin itself is unaffected and
+remains outside the definition.
+
+BTS reports factual changes about these providers — a registration lapsed, an attestation
+went stale, a price moved. Reporting a fact about a provider is a long way from recommending
+one, and the distance is maintained structurally: no ranking, no score, no call to action on
+any card where `is_financial_product` is true.
+
+Taking a fee from a provider would collapse that distance in a single step. ASIC's Info Sheet
+269 makes the point directly — a paid service commenting on financial products is more likely
+to be giving advice about them. Free listing keeps the directory factual by construction
+rather than by restraint.
 
 ### What this means for the build
 
@@ -211,9 +240,8 @@ being worked around here; it is the inventory.
 - A DB constraint enforces the no-fee rule so it cannot be relaxed by an afternoon's
   enthusiasm. Relaxing it is a reviewable migration, not a config change.
 
-If the position is ever revisited, the first action is not a build. The AFSL holder has to see
-it, because an AR cannot add a revenue line unilaterally — the licensee wears the AR's
-conduct.
+If the position is ever revisited, the first action is not a build. It is legal advice on
+whether taking payment from providers you report on changes what the service is.
 
 ---
 
@@ -230,10 +258,6 @@ One row per subscribing organisation or fund.
 | `id` | UUID | PK |
 | `display_name` | TEXT | e.g. `Meridian Capital Group`, `The Hale Superannuation Fund` |
 | `client_type` | TEXT | `corporate`, `smsf` — shapes framing and exports |
-| `client_classification` | TEXT | `retail`, `wholesale` — set by a founder at onboarding, never by the client |
-| `classification_evidence` | TEXT | How the wholesale test was satisfied, if it was. Audit trail. |
-| `classification_set_by` | UUID | FK → `team_members` |
-| `classification_set_at` | TIMESTAMPTZ | |
 | `subscription_status` | TEXT | `invited`, `active`, `paused`, `lapsed`, `cancelled` |
 | `subscription_started_at` | DATE | |
 | `subscription_renews_at` | DATE | Watched by Simon, reusing the existing expiry pattern |
@@ -268,17 +292,18 @@ The blocking gate's audit trail.
 |---|---|---|
 | `id` | UUID | PK |
 | `client_user_id` | UUID | FK → `client_users` |
-| `document_id` | UUID | FK → `compliance_documents` — the FSG version served |
+| `document_id` | UUID | FK → `compliance_documents` — the Service Statement version served |
 | `document_version` | TEXT | Denormalised, because versions get superseded |
 | `acknowledged_at` | TIMESTAMPTZ | |
 | `ip_address` | TEXT | |
 
 Reuses the existing `compliance_documents` library rather than introducing a second copy of
-the FSG. This is the point of having built that feature.
+the Service Statement. This is the point of having built that feature.
 
-> **Corrected.** `compliance_documents` did not exist, in `schema.sql` or in the live database,
-> and neither did `contracts`, `company_profile` or `compliance_obligations`. The first two have
-> been created minimally so the gate can be built; the `contracts` FK was dropped. See
+> **Corrected.** `compliance_documents` did not exist, in `schema.sql` or in the live
+> database, and neither did `contracts`, `company_profile` or `compliance_obligations`. The
+> first two have been created minimally so the gate can be built; the `contracts` FK was
+> dropped. `doc_type` rejects `fsg` outright. See
 > [`build-progress.md`](./build-progress.md#a4--there-is-no-fsg-and-no-library-to-hold-one).
 
 ### Additions to existing ecosystem tables
@@ -293,7 +318,7 @@ Three columns, all additive.
 
 The internal `curator_note` is written for a director and is allowed to editorialise, because
 directors are allowed to have views. `client_note` is not, and promoting one into the other
-through a filter would eventually leak the sentence that ends the AR appointment.
+through a filter would eventually leak the sentence that should never have left the building.
 
 ### `commercial_relationships`
 
@@ -325,8 +350,8 @@ ALTER TABLE commercial_relationships ADD CONSTRAINT no_fees_mvp
 ```
 
 The constraint is the point. It means "no referral revenue" is not a thing anyone has to
-remember, and revisiting it is a reviewable migration with the licensee's name attached
-rather than an afternoon's enthusiasm. Zero-fee relationships still get rows, because a
+remember, and revisiting it is a reviewable migration with legal advice behind it rather than
+an afternoon's enthusiasm. Zero-fee relationships still get rows, because a
 reciprocal arrangement with no money in it is still a conflict and still gets disclosed.
 
 ### RLS for the new tables
@@ -424,6 +449,10 @@ The corporate research register, scoped to what Lex cleared for client distribut
 
 - List by tier, no holdings figure on the list page, consistent with `/research`
 - Detail view: position, ledger, qualitative facts, stated absences, withheld list
+- **Cite in a pack** action on every fact row: drops the fact plus its provenance into the
+  precedent section of a `/prepare` pack the subscriber is drafting. This is what makes the
+  register's purpose legible from the interface rather than from a disclaimer — someone using
+  it is visibly building a case, not browsing holdings.
 - `ProvenanceRail`, `BasisChip` and `ResearchLedger` come from `@platform/ui` unchanged.
   These components already render in both `apps/web` and `apps/demo`, which is precisely
   the reuse case `@platform/ui` was factored for.
@@ -482,7 +511,7 @@ Constraints that keep this on the correct side of the line:
 
 1. Templates state considerations and questions. They never state conclusions.
 2. No template output contains a recommendation, an allocation percentage or a target.
-3. Every generated pack carries the general advice warning and the as-at date on page one.
+3. Every generated pack carries the information-only notice and the as-at date on page one.
 4. Nothing the subscriber types is persisted. The pack is generated and downloaded; the
    inputs die with the browser tab.
 
@@ -492,7 +521,8 @@ inventing a second templating approach.
 
 ### `/account`
 
-Seats, subscription status, FSG and disclosure history, contact route to BTS. Deliberately
+Seats, subscription status, Service Statement and acknowledgement history, contact route to
+BTS. Deliberately
 thin. Billing is manual for the MVP: invite-only means every account is onboarded by hand,
 so a payments integration would be the most expensive way to save the least work.
 
@@ -506,8 +536,8 @@ in the MVP.
 A trustee typing "should my fund hold 5% bitcoin" into a chat box has just asked for personal
 advice, and any answer fluent enough to be useful is close enough to advice to be a problem.
 The platform's own principle applies with unusual force here: fluent prose about a false
-positive is more dangerous than clumsy prose about a real one — and a retail subscriber
-paying a fee is the worst possible audience for a confident wrong answer.
+positive is more dangerous than clumsy prose about a real one — and a paying subscriber acting
+on it is the worst possible audience for a confident wrong answer.
 
 There is a defensible v2 shape: retrieval-only question answering, scoped strictly to
 `/library` and `/register`, that returns *passages with citations* rather than a composed
@@ -577,7 +607,7 @@ Three sessions, matching the house pattern of data layer → workflow → surfac
 1. `apps/client` scaffold, boundary test, dependency graph assertions
 2. Invite flow, login, middleware
 3. Blocking disclosure gate and `client_disclosures` recording
-4. App shell with the standing general advice warning
+4. App shell with the standing information-only notice
 5. Activate the dormant Lex client-promotion gate — suspend/resume on `advice_adjacent` and
    `solvency_adjacent`, and the internal approval queue in `apps/web` to work it
 
@@ -594,10 +624,6 @@ Three sessions, matching the house pattern of data layer → workflow → surfac
 
 ## Open questions
 
-- **Wholesale classification evidence.** `classification_evidence` is free text. If more than
-  a handful of accounts clear the wholesale test, a structured record of which limb was
-  satisfied and which accountant certified it is worth having. Defer until the third
-  wholesale account.
 - **Library review cadence.** Every entry needs a review interval, but a single annual cycle
   will be wrong in both directions — the SIS content moves rarely, the accounting content
   moves with each AASB update. Suggest per-entry `review_due_date` seeded by section.
@@ -613,7 +639,7 @@ Three sessions, matching the house pattern of data layer → workflow → surfac
 - **Directory inclusion criteria.** Objective and published is the requirement; what they
   actually say is undecided. Suggest: operating in Australia, AUSTRAC registered where
   applicable, current AFSL or lodged application where applicable, and a verifiable
-  Australian support channel. Needs the licensee's eye before publication.
+  Australian support channel.
 - **Revisiting referral revenue.** Out of scope and constrained at the DB level. If it is ever
-  reopened, the sequence is: licensee conversation, then AR authorisation question, then a
-  migration relaxing `no_fees_mvp`. Not the other order.
+  reopened, the sequence is: legal advice on whether payment changes what the service is, then
+  a migration relaxing `no_fees_mvp`. Not the other order.

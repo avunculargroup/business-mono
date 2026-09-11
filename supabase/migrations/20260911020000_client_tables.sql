@@ -9,11 +9,18 @@
 -- member details, no risk profile, no holdings, no entity
 -- financials.
 --
--- That absence is the general advice boundary. It is not enforced
--- by UI copy or by anyone remembering a rule; it is enforced by
--- there being nowhere to put the data. Adding such a column is
--- the single change that would convert every retail subscriber
--- into someone owed a Statement of Advice.
+-- Personal circumstances are the ingredient that turns information
+-- into advice. That absence is not enforced by UI copy or by anyone
+-- remembering a rule; it is enforced by there being nowhere to put
+-- the data, which makes "we have no facility for you to tell us" a
+-- true statement about the schema rather than a promise about
+-- behaviour.
+--
+-- BTS does not give financial advice and holds no AFS
+-- authorisation, so there is no retail/wholesale classification
+-- here either: that distinction only does work inside a regime this
+-- service is not in, and a column recording it would imply
+-- otherwise.
 -- ============================================================
 
 
@@ -27,13 +34,6 @@ CREATE TABLE client_accounts (
 
   client_type             TEXT NOT NULL
                           CHECK (client_type IN ('corporate', 'smsf')),
-
-  -- Set by a founder at onboarding. Never by the client, never by an agent.
-  client_classification   TEXT NOT NULL
-                          CHECK (client_classification IN ('retail', 'wholesale')),
-  classification_evidence TEXT,
-  classification_set_by   UUID REFERENCES team_members(id),
-  classification_set_at   TIMESTAMPTZ,
 
   subscription_status     TEXT NOT NULL DEFAULT 'invited'
                           CHECK (subscription_status IN
@@ -57,18 +57,8 @@ CREATE TRIGGER client_accounts_updated_at
 CREATE INDEX idx_client_accounts_status ON client_accounts(subscription_status);
 CREATE INDEX idx_client_accounts_renews ON client_accounts(subscription_renews_at);
 
--- An SMSF is retail unless the FUND holds $10m net assets (s761G(6)),
--- and s761G(7)'s asset and income tests expressly do not apply where
--- the service relates to a superannuation product. A wholesale SMSF is
--- rare enough that it should require someone to have written down why.
-ALTER TABLE client_accounts ADD CONSTRAINT smsf_wholesale_needs_evidence
-  CHECK (
-    NOT (client_type = 'smsf' AND client_classification = 'wholesale')
-    OR (classification_evidence IS NOT NULL AND classification_set_by IS NOT NULL)
-  );
-
-COMMENT ON COLUMN client_accounts.client_classification IS
-  'Retail or wholesale. SMSF: s761G(6) requires $10m fund net assets; s761G(7) does not apply.';
+COMMENT ON TABLE client_accounts IS
+  'Subscribing organisation or fund. Deliberately holds no financial position data: BTS does not give financial advice, and a service that cannot receive personal circumstances cannot give it.';
 
 
 -- ------------------------------------------------------------
@@ -177,13 +167,13 @@ COMMENT ON FUNCTION current_client_account_id() IS
 
 
 -- ------------------------------------------------------------
--- client_disclosures — the blocking gate's audit trail
+-- client_disclosures — the Service Statement gate's audit trail
 -- ------------------------------------------------------------
 
 CREATE TABLE client_disclosures (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_user_id   UUID NOT NULL REFERENCES client_users(id) ON DELETE CASCADE,
-  document_id      UUID REFERENCES compliance_documents(id),
+  document_id      UUID REFERENCES compliance_documents(id),  -- the Service Statement
   document_version TEXT NOT NULL,        -- denormalised; versions get superseded
   acknowledged_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ip_address       TEXT
@@ -279,7 +269,7 @@ CREATE POLICY "client_invites_team" ON client_invites
 -- current_client_account_id(), which is defined above.
 --
 -- Active documents only. A subscriber acknowledging a superseded
--- FSG would satisfy the gate against the wrong document.
+-- Service Statement would satisfy the gate against the wrong one.
 -- ------------------------------------------------------------
 
 CREATE POLICY "compliance_documents_client_read" ON compliance_documents
@@ -301,7 +291,6 @@ CREATE VIEW v_client_subscriptions AS
     a.id,
     a.display_name,
     a.client_type,
-    a.client_classification,
     a.subscription_status,
     a.subscription_renews_at,
     (a.subscription_renews_at - CURRENT_DATE) AS days_until_renewal,

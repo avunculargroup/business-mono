@@ -57,8 +57,8 @@ describe('gate two — disclosure current', () => {
   });
 
   it('lets that session sign out', () => {
-    // A gate with no exit is a trap. A subscriber who will not accept the FSG
-    // has to be able to leave.
+    // A gate with no exit is a trap. A subscriber who will not accept the
+    // Service Statement has to be able to leave.
     expect(gate({ pathname: '/logout', disclosureCurrent: false })).toEqual({
       kind: 'allow',
     });
@@ -92,8 +92,8 @@ describe('a signed-in non-subscriber', () => {
   });
 
   it('is caught before the disclosure gate, not after', () => {
-    // Otherwise a founder who signed in here would be asked to acknowledge an
-    // FSG that is not addressed to them.
+    // Otherwise a founder who signed in here would be asked to acknowledge a
+    // Service Statement that is not addressed to them.
     expect(
       gate({ pathname: '/', isSubscriber: false, disclosureCurrent: false }),
     ).toEqual({ kind: 'redirect', to: '/no-access' });

@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Straight to the disclosure gate, which the middleware enforces anyway. Sent
-  // here explicitly so the first thing a new subscriber sees is the FSG rather
+  // here explicitly so the first thing a new subscriber sees is the Service
+  // Statement rather
   // than a redirect from a page they never asked for.
   return NextResponse.redirect(new URL('/', origin));
 }

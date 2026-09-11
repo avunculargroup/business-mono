@@ -27,7 +27,7 @@ export interface ClientAdapterContext {
   readonly client: ClientSupabaseClient;
   readonly principal: Extract<Principal, { kind: 'client' }>;
   /**
-   * Whether this session has acknowledged the current FSG.
+   * Whether this session has acknowledged the current Service Statement.
    *
    * Memoised per bundle, and a bundle is per request, so the gate costs one
    * query however many surfaces the page touches. Without the memo a single
@@ -37,7 +37,8 @@ export interface ClientAdapterContext {
 }
 
 /**
- * Thrown by every read when the session has not acknowledged the current FSG.
+ * Thrown by every read when the session has not acknowledged the current
+ * Service Statement.
  *
  * A distinct error type rather than an empty result, because empty is
  * indistinguishable from a quiet day and the two mean opposite things. The
@@ -58,23 +59,23 @@ export function createClientAdapterContext(
   let pending: Promise<boolean> | null = null;
 
   const resolve = async (): Promise<boolean> => {
-    // The active FSG is the document the gate is about. No active FSG means
-    // nobody can pass, which is the correct behaviour while one has not been
-    // drafted — see docs/features/client-app/build-progress.md on A4.
-    const { data: fsg } = await client
+    // The Service Statement is the document the gate is about. None active
+    // means nobody can pass, which is the correct behaviour while one has not
+    // been written — see docs/features/client-app/build-progress.md on A4.
+    const { data: statement } = await client
       .from('compliance_documents')
       .select('version')
-      .eq('doc_type', 'fsg')
+      .eq('doc_type', 'service_statement')
       .eq('status', 'active')
       .maybeSingle();
 
-    if (!fsg?.version) return false;
+    if (!statement?.version) return false;
 
     const { data: ack } = await client
       .from('client_disclosures')
       .select('id')
       .eq('client_user_id', principal.userId)
-      .eq('document_version', fsg.version)
+      .eq('document_version', statement.version)
       .maybeSingle();
 
     return ack !== null;

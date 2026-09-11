@@ -3,28 +3,38 @@
 Everything in this bundle that was inferred rather than verified. Ordered by how much damage
 a wrong assumption does. Work down from A1; do not start session 1 with A1–A4 unresolved.
 
-**A2, A3 and A4 were verified against the live database on 2026-09-11** and carry their answers
-below. A2 was wrong by roughly an order of magnitude and A4 was wrong outright. The full record
-is in [`build-progress.md`](./build-progress.md).
+**A2, A3 and A4 were verified against the live database on 2026-09-11** and carry their
+answers below. A2 was wrong by roughly an order of magnitude and A4 was wrong outright. The
+full record is in [`build-progress.md`](./build-progress.md).
 
 ---
 
-## A1 — The AR authorisation scope is unknown
+## A1 — The not-advice position is settled, and its scope is not documented here
 
-**Assumed:** BTS's Authorised Representative appointment authorises general advice, and does
-not authorise dealing by arranging.
+**Stated:** BTS has never held an AFS authorisation and has never needed one. It does not give
+financial advice, and bitcoin is not a financial product.
 
-**Why it matters:** the entire compliance architecture is built on general-advice-only, and
-the no-referral decision follows from the assumption that arranging is not authorised. If the
-appointment is broader than assumed, some constraints are unnecessarily tight. If it is
-narrower — general advice on a limited product set, or personal advice excluded in terms that
-also catch something here — parts of this design are outside authorisation.
+**Why it still appears at the top of this list:** every structural rule in the bundle exists to
+keep that true as the product grows — no personal circumstances, no conclusions in templates,
+no rankings, no characterisation of a named security. Those rules are load-bearing rather than
+prudent, because the fallback of "it was only general advice" is not available.
 
-**How to resolve:** read the AR appointment deed. It is a document, it is short, and BTS
-holds it. Do this before session 1.
+**Two surfaces touch financial products regardless of bitcoin's status,** and both are already
+handled structurally rather than needing new work:
 
-> **Status: outstanding.** Not a code task. Nothing built so far depends on the answer in a way
-> that could not be relaxed — `no_fees_mvp` is the only constraint that would need a migration.
+- `/register` covers listed securities. Handled by implementation-facts-not-outcome-facts.
+- `/directory` covers DAPs and TCPs, financial products since April 2026. Handled by
+  `is_financial_product` stripping the call to action.
+
+**Worth confirming once:** that whoever advised on the position saw the Minute product
+specifically — a narrated daily brief, a register of named entities, monitoring of custody
+providers — rather than the education and consulting business. Advice is only as good as the
+description it was given.
+
+> **Status: outstanding, and not a code task.** Nothing built depends on the answer in a way
+> that could not be relaxed. What the build did add is a second structural handle on the
+> `/register` half: `field_source_minimums.client_fact_class` splits implementation facts from
+> outcome facts, and an unclassified key is invisible to subscribers rather than visible.
 
 ---
 
@@ -40,12 +50,12 @@ client login exposes the other nineteen.
 **How to resolve:** run the audit query at the end of `001-rls-hardening.sql`. Every row it
 returns is a table a subscriber could read. Fix all of them.
 
-> **Status: resolved, and the assumption was understated.** Not forty tables — **114 permissive
-> policies across 107 tables**. Worse, the audit query itself misses a whole class: 14 policies
-> read `USING (true)` for `authenticated`, which is more permissive than the pattern being
-> hunted and returns nothing from a grep for `auth.role()`. The hardening migration covers all
-> 114, preserves the two deliberately open policies, and adds a regression guard so the next one
-> fails a test instead of waiting to be noticed.
+> **Status: resolved, and the assumption was understated.** Not forty tables — **114
+> permissive policies across 107 tables**. Worse, the audit query itself misses a whole class:
+> 14 policies read `USING (true)` for `authenticated`, which is more permissive than the
+> pattern being hunted and returns nothing from a grep for `auth.role()`. The hardening
+> migration covers all 114, preserves the two deliberately open policies, and adds a
+> regression guard so the next one fails a test instead of waiting to be noticed.
 
 ---
 
@@ -75,37 +85,41 @@ ORDER BY table_name, ordinal_position;
 > **Status: resolved, and the assumption held.** `ecosystem_changes.client_relevant`,
 > `.compliance_class` and `.curator_note` all exist with the assumed types;
 > `products_services.australian_owned` and `.slug` exist; `advisors_partners` exists. The
-> `update_updated_at()` trigger function exists under that name. The one thing the bundle got
-> right that reads like an oversight: `client_relevant` is `NOT NULL`, so the promotion
-> constraint is correctly written `IS NOT TRUE` rather than anything three-valued.
+> `update_updated_at()` trigger function exists under that name.
 >
-> **`compliance_documents` and `contracts` do not exist** — that half of A3 belongs to A4 and
-> was wrong.
+> **`compliance_documents` and `contracts` do not exist** — that half belongs to A4 and was
+> wrong.
 
 ---
 
-## A4 — An FSG exists and is current
+## A4 — The Service Statement needs writing
 
-**Assumed:** `compliance_documents` holds an FSG with `status = 'active'`, suitable for
-serving to a retail subscriber, and it covers a subscription information service.
+**Assumed:** `compliance_documents` will hold a Service Statement with `status = 'active'`
+before session 2 completes.
 
-**Why it matters:** the blocking disclosure gate has nothing to serve without it, and session
-2 cannot complete. An FSG drafted for a consulting engagement may not describe this service at
-all.
+**What it is:** a plain statement of what the service is and is not — factual information
+rather than financial advice, no client assets held, no facility to consider the subscriber's
+circumstances, paid by the subscriber and by nobody else.
 
-**How to resolve:** check the library. If the FSG predates the subscription product, it needs
-revision before launch, and that is a lead time rather than a task.
+**What it is not:** an FSG. No FSG is required, and publishing one would wrongly imply an
+authorisation BTS does not hold and has never held.
 
-> **Status: resolved, and the assumption was wrong outright.** There is no FSG, because there is
-> no library: `compliance_documents` does not exist, and neither do `contracts`,
-> `company_profile` or `compliance_obligations`. The spec's "this is the point of having built
-> that feature" describes a feature that was never built.
+**Why it matters:** the blocking gate has nothing to serve without it, and session 2 cannot
+complete. It is also the artefact that evidences the not-advice position if anyone ever asks,
+which makes it worth writing carefully rather than quickly.
+
+> **Status: the table now exists; the document does not.** `compliance_documents` was not in
+> the live database at all — nor `contracts`, `company_profile` or `compliance_obligations`,
+> all four of which the bundle assumed. Two have been created minimally, because the gate
+> blocks every route and cannot be built against a table that does not exist; the `contracts`
+> FK was dropped instead, since nothing is blocked by its absence.
 >
-> `compliance_documents` and `company_profile` have been created minimally, because the
-> disclosure gate blocks every route and cannot be built against a table that does not exist.
-> The `contracts` FK was dropped instead — nothing is blocked by its absence. Neither new table
-> is seeded: a placeholder ABN would ship, whereas an empty table fails loudly at the gate.
-> **Drafting the FSG is now the single thing blocking first login.**
+> `doc_type` admits `service_statement` and `information_notice` and **rejects `fsg`** — the
+> CHECK constraint is the structural half of "no FSG is required, and publishing one would
+> imply an authorisation BTS does not hold".
+>
+> Nothing is seeded. **Writing the Service Statement is the single thing blocking first
+> login.**
 
 ---
 

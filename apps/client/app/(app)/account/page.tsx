@@ -89,14 +89,14 @@ export default async function AccountPage() {
       )}
 
       <section className={page.section}>
-        <h2 className={page.sectionTitle}>Disclosures acknowledged</h2>
+        <h2 className={page.sectionTitle}>Service Statement acknowledged</h2>
         {acknowledgements.length === 0 ? (
           <p className={styles.note}>No acknowledgement is recorded against this seat.</p>
         ) : (
           <ul className={styles.seats}>
             {acknowledgements.map((ack) => (
               <li key={ack.documentVersion} className={styles.seat}>
-                <span className={styles.seatName}>Financial Services Guide</span>
+                <span className={styles.seatName}>Service Statement</span>
                 <span className={styles.seatEmail}>version {ack.documentVersion}</span>
                 <span className={styles.seatEmail}>{ack.acknowledgedAt.slice(0, 10)}</span>
               </li>
@@ -104,9 +104,9 @@ export default async function AccountPage() {
           </ul>
         )}
         <p className={styles.note}>
-          When a new version of the Financial Services Guide is published, you will be asked to
-          read it before continuing. Each acknowledgement is recorded against the version you
-          were shown.
+          When a new version of the Service Statement is published, you will be asked to read
+          it before continuing. Each acknowledgement is recorded against the version you were
+          shown.
         </p>
       </section>
 

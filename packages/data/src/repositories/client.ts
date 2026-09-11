@@ -3,8 +3,8 @@
  *
  * Every interface here is read-only by construction. There is no method
  * anywhere in this file that writes subscriber content, and that is the
- * enforcement mechanism for the general advice boundary rather than a
- * convention anyone has to remember.
+ * enforcement mechanism for the not-advice boundary rather than a convention
+ * anyone has to remember.
  *
  * Two exceptions exist in the whole app, both narrow, both at the bottom of
  * this file: acknowledging a disclosure, and recording that a document pack was
@@ -23,7 +23,16 @@ import type { ReadContext } from '../context';
 // ============================================================
 
 export type ClientType = 'corporate' | 'smsf';
-export type ClientClassification = 'retail' | 'wholesale';
+
+/**
+ * There is deliberately no `ClientClassification`.
+ *
+ * Retail and wholesale are distinctions inside a regime this service is not in:
+ * BTS does not give financial advice and holds no AFS authorisation. A type
+ * recording the distinction would imply the app had a reason to care, and the
+ * next question after that is which behaviour changes — to which the answer
+ * must always be none.
+ */
 
 export type ComplianceClass =
   | 'neutral'
@@ -89,9 +98,8 @@ export interface ClientSession {
   userId: string;
   accountId: string;
   clientType: ClientType;
-  classification: ClientClassification;
   displayName: string;
-  /** False blocks every route except the disclosure gate. */
+  /** False blocks every route except the Service Statement gate. */
   disclosureCurrent: boolean;
 }
 
@@ -215,6 +223,27 @@ export interface ClientIndicatorRepository {
 // Register
 // ============================================================
 
+/**
+ * One entry in the register.
+ *
+ * **Implementation facts, not outcome facts.** The register exists for learning
+ * and for building your own treasury case: which accounting standard, which
+ * custody model, what board or deed authority, how it was disclosed and when.
+ * It never answers how it went for them.
+ *
+ * In: accounting treatment, custody model, mandate, financing terms, identity,
+ * what was done and when. Out: current holding value, unrealised gain, share
+ * price since announcement.
+ *
+ * The moment outcome facts appear the page stops being precedent and starts
+ * being performance, which is a different question about a different asset —
+ * and performance figures about named listed securities, served to a paying
+ * subscriber, is the one shape this product must not take.
+ *
+ * The rule is enforced by `field_source_minimums.client_fact_class` and the RLS
+ * policy that reads it, not by this comment. The comment is here so an
+ * implementer adding a field knows which way the decision goes.
+ */
 export interface ClientRegisterEntry {
   slug: string;
   entityName: string;
@@ -268,7 +297,7 @@ export interface CommercialDisclosure {
   entityName: string;
   relationshipType: string;
   direction: string;
-  /** Widen only when the licensee says so. `no_fees_mvp` enforces it in the DB. */
+  /** Widen only with legal advice behind it. `no_fees_mvp` enforces it in the DB. */
   feeBasis: 'none';
   disclosureText: string;
   startedAt: string | null;
@@ -327,6 +356,14 @@ export interface TemplateSection {
   facts: string[];
   optional: boolean;
   regulatoryReference?: string;
+  /**
+   * The precedent section: where facts cited from `/register` land.
+   *
+   * At most one per template, checked by the validator. The register and
+   * `/prepare` are the same feature at two stages — gathering evidence and
+   * assembling it — and this is the join between them.
+   */
+  acceptsCitations: boolean;
 }
 
 export interface PrepareTemplate {
@@ -361,23 +398,35 @@ export interface ClientPrepareRepository {
 /**
  * Read from `company_profile`, which is a singleton.
  *
- * Every `/prepare` export is potentially a regulatory artefact, so the front
- * matter carries the legal name and ABN rather than the trading name — see
+ * A `/prepare` export may be read by an auditor, so the front matter carries
+ * the legal name and ABN rather than the trading name — see
  * `.claude/skills/bts-design/references/naming.md` on the three registers.
+ *
+ * No AR number and no licensee. BTS holds no AFS authorisation, so a field for
+ * one could only ever be empty, and an empty licence line on an export invites
+ * the reader to wonder which kind of empty it is.
  */
 export interface CompanyIdentity {
   legalName: string;
   tradingName: string;
   abn: string | null;
-  arNumber: string | null;
-  licenceHolder: string | null;
-  licenceNumber: string | null;
+  acn: string | null;
 }
 
-/** A compliance document served verbatim — the FSG, the general advice warning. */
+/**
+ * A statement of position, served verbatim.
+ *
+ * `service_statement` is the blocking gate's document: what the service is and
+ * is not. Deliberately not an FSG — none is required, and publishing one would
+ * wrongly imply an authorisation BTS does not hold.
+ *
+ * `information_notice` is the standing notice in the app shell and in every
+ * `/prepare` export. Not a "general advice warning": that phrase implies
+ * licensed general advice, which is a different thing from factual information.
+ */
 export interface ComplianceDocument {
   id: string;
-  docType: 'fsg' | 'general_advice_warning' | 'privacy_policy' | 'terms';
+  docType: 'service_statement' | 'information_notice' | 'privacy_policy' | 'terms';
   title: string;
   version: string;
   body: string;
@@ -429,8 +478,8 @@ export interface ClientAccountRepository {
 /**
  * Both are deliberately narrow, and neither accepts free text.
  *
- * If a third write appears here, that is the moment to ask whether the general
- * advice boundary is still enforced by architecture or has quietly become a
+ * If a third write appears here, that is the moment to ask whether the
+ * not-advice boundary is still enforced by architecture or has quietly become a
  * thing people remember.
  */
 export interface ClientWriteRepository {

@@ -11,8 +11,8 @@ import styles from './prepare.module.css';
  *
  * A client component because it has to be: the packs live in IndexedDB and the
  * server has never seen one. That is not a rendering inconvenience, it is the
- * general advice boundary — if this list could be server-rendered, the prose
- * would be on a server.
+ * not-advice boundary — if this list could be server-rendered, the prose would
+ * be on a server.
  */
 export function LocalPacks() {
   const [packs, setPacks] = useState<StoredPack[] | null>(null);

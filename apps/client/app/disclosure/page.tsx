@@ -9,14 +9,20 @@ import styles from './disclosure.module.css';
 export const metadata: Metadata = { title: 'Before you start' };
 
 /**
- * The blocking gate.
+ * The blocking gate. It serves the **Service Statement**.
+ *
+ * Not a Financial Services Guide. No FSG is required — BTS does not give
+ * financial advice and holds no AFS authorisation — and publishing one would
+ * wrongly imply an authorisation it has never held. What this is instead is a
+ * plain statement of what the service is and is not, and it is the artefact
+ * that evidences that position if anyone ever asks.
  *
  * Outside the authenticated shell on purpose: there is no nav, because there is
  * nowhere to go. A gate with the rest of the app visible around it is a gate
  * people click through.
  *
  * The document comes from `compliance_documents` rather than from a constant,
- * so a new FSG version re-triggers this for everyone without a deploy — the
+ * so a new version re-triggers this for everyone without a deploy — the
  * acknowledgement is recorded against a version, and bumping the version means
  * nobody has acknowledged the current one yet.
  */
@@ -25,7 +31,7 @@ export default async function DisclosurePage() {
   if (!repositories) redirect('/login');
 
   const ctx = readContext();
-  const fsg = await repositories.compliance.activeDocument(ctx, 'fsg');
+  const statement = await repositories.compliance.activeDocument(ctx, 'service_statement');
 
   return (
     <div className={styles.page}>
@@ -34,17 +40,18 @@ export default async function DisclosurePage() {
           <Lockup variant="gold-rule" />
         </header>
 
-        {fsg === null ? (
-          /* Absence is a fact, and this one is load-bearing. No active FSG
-             means nobody can pass the gate, which is correct rather than
-             broken — but it must say which it is, because a subscriber staring
-             at a blank page cannot tell a compliance state from an outage. */
+        {statement === null ? (
+          /* Absence is a fact, and this one is load-bearing. No active Service
+             Statement means nobody can pass the gate, which is correct rather
+             than broken — but it must say which it is, because a subscriber
+             staring at a blank page cannot tell a deliberate state from an
+             outage. */
           <section className={styles.unavailable}>
-            <h1>The disclosure document is not available</h1>
+            <h1>The Service Statement is not available</h1>
             <p>
-              Minute cannot be opened until the Financial Services Guide has been published.
-              This is a state on our side, not a problem with your account, and nobody can use
-              the service until it is resolved.
+              Minute cannot be opened until the Service Statement has been published. This is a
+              state on our side, not a problem with your account, and nobody can use the
+              service until it is resolved.
             </p>
             <p>
               Please contact Bitcoin Treasury Solutions. If you were given a start date, it has
@@ -56,33 +63,34 @@ export default async function DisclosurePage() {
             <section className={styles.intro}>
               <h1>Before you start</h1>
               <p>
-                Minute provides general information only. Please read the Financial Services
-                Guide below. You will be asked to confirm that you have, and we record that
-                confirmation against the version you were shown.
+                Minute provides factual information and does not provide financial advice.
+                Please read the Service Statement below — it sets out what the service is and
+                what it is not. You will be asked to confirm that you have read it, and we
+                record that confirmation against the version you were shown.
               </p>
             </section>
 
-            <section className={styles.document} aria-label={fsg.title}>
+            <section className={styles.document} aria-label={statement.title}>
               <div className={styles.documentMeta}>
-                <span className={styles.documentTitle}>{fsg.title}</span>
+                <span className={styles.documentTitle}>{statement.title}</span>
                 <span className={styles.version}>
-                  Version <span className="mono">{fsg.version}</span>
-                  {fsg.effectiveFrom ? (
+                  Version <span className="mono">{statement.version}</span>
+                  {statement.effectiveFrom ? (
                     <>
                       {' · effective '}
-                      <span className="mono">{fsg.effectiveFrom}</span>
+                      <span className="mono">{statement.effectiveFrom}</span>
                     </>
                   ) : null}
                 </span>
               </div>
-              <Markdown>{fsg.body}</Markdown>
+              <Markdown>{statement.body}</Markdown>
             </section>
 
             <form action={acknowledgeDisclosure} className={styles.form}>
-              <input type="hidden" name="documentId" value={fsg.id} />
-              <input type="hidden" name="documentVersion" value={fsg.version} />
+              <input type="hidden" name="documentId" value={statement.id} />
+              <input type="hidden" name="documentVersion" value={statement.version} />
               <button type="submit" className={styles.submit}>
-                I have read the Financial Services Guide
+                I have read the Service Statement
               </button>
               <p className={styles.note}>
                 We record the date, the version shown above, and the network address this

@@ -7,8 +7,8 @@ import type { ClientAdapterContext } from './context';
  *
  * Two methods. Neither accepts free text, and neither can be given any: the
  * tables behind them have no column a sentence could land in. That is the
- * general advice boundary expressed as a schema rather than as a rule anyone
- * has to remember.
+ * not-advice boundary expressed as a schema rather than as a rule anyone has to
+ * remember.
  *
  * If a third method appears here, the question to ask is not "is this write
  * safe" but "is the boundary still architectural". It stops being architectural

@@ -17,15 +17,16 @@
 -- Two of the four are created here and two are not, on one test:
 -- does the client app stop without it?
 --
---   compliance_documents  The disclosure gate blocks every route
---                         and serves the FSG from here. It is the
---                         thing that makes the app lawful to show
---                         anyone. Created.
+--   compliance_documents  The blocking gate serves the Service
+--                         Statement from here — the plain statement
+--                         of what Minute is and is not, which every
+--                         subscriber acknowledges before they see
+--                         anything. Created.
 --
 --   company_profile       Every /prepare export carries a legal
 --                         identity block in its front matter, and
---                         an export naming no licensed entity is
---                         worse than no export. Created.
+--                         an export naming no identifiable entity
+--                         is worse than no export. Created.
 --
 --   contracts             Only a nullable FK on
 --                         commercial_relationships points at it.
@@ -37,26 +38,36 @@
 --                         the column and the review view exist
 --                         and the calendar does not. Deferred.
 --
--- NOTHING HERE IS SEEDED. There is no FSG row and no ABN,
--- because both are documents to be drafted rather than data to be
--- invented. An empty table fails loudly at the disclosure gate; a
--- placeholder ABN ships to a regulator.
+-- NOTHING HERE IS SEEDED. There is no Service Statement row and no
+-- ABN, because both are documents to be drafted rather than data to
+-- be invented. An empty table fails loudly at the gate; a
+-- placeholder ABN ships to whoever reads the export.
 -- ============================================================
 
 
 -- ------------------------------------------------------------
 -- compliance_documents
 -- ------------------------------------------------------------
--- Deliberately small. This is the minimum the disclosure gate and
--- the /prepare front matter need, not a document management
--- system. Widen it when something needs it to be wider.
+-- Deliberately small. This is the minimum the Service Statement
+-- gate and the /prepare front matter need, not a document
+-- management system. Widen it when something needs it to be wider.
 -- ------------------------------------------------------------
 
 CREATE TABLE compliance_documents (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+  -- 'service_statement' is the blocking gate's document: what the
+  -- service is and is not. Deliberately NOT 'fsg' — no Financial
+  -- Services Guide is required, and publishing one would wrongly
+  -- imply an AFS authorisation BTS does not hold and has never held.
+  --
+  -- 'information_notice' is the standing notice carried in the app
+  -- shell and embedded in every /prepare export. Not a "general
+  -- advice warning": that phrase implies licensed general advice,
+  -- which is a different thing from factual information.
   doc_type       TEXT NOT NULL
-                 CHECK (doc_type IN ('fsg', 'general_advice_warning', 'privacy_policy', 'terms')),
+                 CHECK (doc_type IN ('service_statement', 'information_notice',
+                                     'privacy_policy', 'terms')),
 
   title          TEXT NOT NULL,
   version        TEXT NOT NULL,
@@ -84,16 +95,16 @@ CREATE TRIGGER compliance_documents_updated_at
 CREATE UNIQUE INDEX idx_compliance_documents_type_version
   ON compliance_documents(doc_type, version);
 
--- One active version per type. The gate asks for "the active FSG"
--- and has to get exactly one answer; two would mean half the
--- subscriber base acknowledged a different document and nobody
--- would notice until it mattered.
+-- One active version per type. The gate asks for "the active
+-- Service Statement" and has to get exactly one answer; two would
+-- mean half the subscriber base acknowledged a different document
+-- and nobody would notice until it mattered.
 CREATE UNIQUE INDEX idx_compliance_documents_one_active
   ON compliance_documents(doc_type)
   WHERE status = 'active';
 
 COMMENT ON TABLE compliance_documents IS
-  'Client-facing compliance documents. The disclosure gate serves the active fsg row; every /prepare export embeds the active general_advice_warning row verbatim.';
+  'Client-facing statements of position. The blocking gate serves the active service_statement row; the app shell and every /prepare export carry the active information_notice row verbatim. Neither is a regulatory document — BTS holds no AFS authorisation and none is required.';
 
 
 -- ------------------------------------------------------------
@@ -104,6 +115,12 @@ COMMENT ON TABLE compliance_documents IS
 -- already cites company_profile.legal_name and .trading_name as
 -- though this existed.
 --
+-- No licence_number, no licence_holder, no ar_number. BTS holds no
+-- AFS authorisation and has never needed one, so columns for those
+-- would be columns that can only ever be empty or wrong — and an
+-- empty licence field on an export invites the reader to wonder
+-- which it is.
+--
 -- The singleton is enforced rather than assumed: a second row
 -- would give two /prepare exports two different ABNs.
 -- ------------------------------------------------------------
@@ -113,14 +130,12 @@ CREATE TABLE company_profile (
 
   legal_name     TEXT NOT NULL,   -- 'Bitcoin Treasury Solutions Pty Ltd'
   trading_name   TEXT NOT NULL,   -- 'Bitcoin Treasury Solutions'
-  abn            TEXT,
 
-  -- The AR relationship attaches to the licensed entity, which is
-  -- why the endorsement line names the trading name and the
-  -- regulatory artefacts name all of this.
-  ar_number      TEXT,
-  licence_holder TEXT,
-  licence_number TEXT,
+  -- What identifies the entity to an auditor or a regulator reading
+  -- a /prepare export. The ABN is often the only thing that makes a
+  -- company name unambiguous.
+  abn            TEXT,
+  acn            TEXT,
 
   contact_email  TEXT,
   website        TEXT,
@@ -134,7 +149,7 @@ CREATE TRIGGER company_profile_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 COMMENT ON TABLE company_profile IS
-  'Singleton. Legal identity for regulatory artefacts: /prepare export front matter, the disclosure gate, the FSG. Unseeded on purpose — a placeholder ABN would ship.';
+  'Singleton. Legal identity for anything an auditor may read: /prepare export front matter and the Service Statement. Unseeded on purpose — a placeholder ABN would ship.';
 
 
 -- ------------------------------------------------------------
@@ -166,7 +181,12 @@ CREATE POLICY "company_profile_team" ON company_profile
 -- Verification
 -- ------------------------------------------------------------
 -- Should fail on idx_compliance_documents_one_active:
---   two fsg rows, both status = 'active'.
+--   two service_statement rows, both status = 'active'.
+--
+-- Should fail on the doc_type CHECK, because no FSG is required and
+-- publishing one would imply an authorisation BTS does not hold:
+--   INSERT INTO compliance_documents (doc_type, title, version, body)
+--   VALUES ('fsg', 'x', '1.0', 'x');
 --
 -- Should fail on the id CHECK:
 --   INSERT INTO company_profile (id, legal_name, trading_name)

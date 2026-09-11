@@ -157,16 +157,24 @@ COMMENT ON COLUMN commercial_relationships.related_contract_id IS
 --
 -- Why a constraint rather than a policy: because "we decided not
 -- to do referrals" is a sentence someone forgets in eighteen
--- months, and a CHECK constraint is not. Revisiting this is a
--- reviewable migration with the licensee's sign-off attached,
--- which is the correct amount of friction for a decision that
--- touches the AR appointment.
+-- months, and a CHECK constraint is not.
 --
--- Relevant if it is ever reopened:
---   - DAPs and TCPs are financial products (April 2026)
---   - SMSF trustees are retail below $10m fund net assets, s761G(6)
---   - ASIC INFO 269: payment for comments makes advice more likely
---   - An AR cannot add a revenue line without the licensee
+-- Relevant if it is ever reopened, product reason first:
+--   - Independence is the inventory. A register of provider status
+--     is worth a subscription precisely because the providers being
+--     tracked are not paying for it, and taking their money would
+--     make the asset worth less than the money.
+--   - DAPs and TCPs became financial products in April 2026.
+--     Bitcoin itself is not one and was unaffected.
+--   - ASIC INFO 269: a paid service commenting on financial
+--     products is more likely to be giving advice about them. BTS
+--     does not give financial advice and holds no AFS
+--     authorisation, so this is the sentence here that matters
+--     most.
+--
+-- Reopening it starts with legal advice on whether taking payment
+-- from providers you report on changes what the service is. Not
+-- with a migration.
 -- ------------------------------------------------------------
 
 ALTER TABLE commercial_relationships ADD CONSTRAINT no_fees_mvp
@@ -202,10 +210,10 @@ CREATE POLICY "commercial_relationships_client_read" ON commercial_relationships
 -- next to the entry.
 --
 -- Distinct from is_published, which is already on this table.
--- Published means the internal register shows it;
--- client_cleared means a paying retail subscriber may. Those are
--- different questions with different answers, and collapsing them
--- would make the second one unaskable. Both are required by the
+-- Published means the internal register shows it; client_cleared
+-- means a paying subscriber may. Those are different questions
+-- with different answers, and collapsing them would make the
+-- second one unaskable. Both are required by the
 -- read policy above.
 --
 -- No default of true. A register entry reaches a subscriber
@@ -224,7 +232,7 @@ ALTER TABLE research_companies ADD CONSTRAINT client_clearance_needs_approver
   );
 
 COMMENT ON COLUMN research_companies.client_cleared IS
-  'Cleared for distribution to a paying retail subscriber. Distinct from is_published, which gates the internal register: same row, different question.';
+  'Cleared for distribution to a paying subscriber. Distinct from is_published, which gates the internal register: same row, different question.';
 
 
 -- ------------------------------------------------------------
@@ -308,6 +316,57 @@ CREATE POLICY "research_companies_client_read" ON research_companies
     AND client_cleared = TRUE
   );
 
+-- ------------------------------------------------------------
+-- Implementation facts, not outcome facts
+-- ------------------------------------------------------------
+-- /register exists for learning and for building your own treasury
+-- case. It answers "how did an Australian entity actually do this"
+-- — which accounting standard, which custody model, what board
+-- authority, how it was disclosed and when. It never answers "how
+-- did it go for them".
+--
+-- The moment outcome facts appear, the page stops being precedent
+-- and starts being performance, which is a different question about
+-- a different asset — and a paying subscriber reading performance
+-- figures about named listed securities is the one shape this
+-- product must not take.
+--
+-- So the split is a column on the field-key lookup rather than a
+-- list in a WHERE clause or, worse, in a component. A new field key
+-- coined by the research pipeline has no row here and is therefore
+-- invisible to subscribers until someone classifies it. Silent
+-- exclusion is the safe direction: a missing implementation fact is
+-- a gap, a leaked outcome fact is the product changing shape.
+-- ------------------------------------------------------------
+
+ALTER TABLE field_source_minimums
+  ADD COLUMN client_fact_class TEXT
+    CHECK (client_fact_class IN ('implementation', 'outcome'));
+
+COMMENT ON COLUMN field_source_minimums.client_fact_class IS
+  'Whether a field key is an implementation fact (how it was done — reaches /register) or an outcome fact (how it went — never does). NULL means unclassified, and unclassified is invisible to subscribers.';
+
+-- Classified against the seven keys in the live catalogue as at
+-- 2026-09-11. Each one is a judgement and each is recorded here
+-- rather than in code, so changing one is a reviewable migration.
+UPDATE field_source_minimums SET client_fact_class = 'implementation'
+ WHERE field_key IN (
+   'accounting_treatment',  -- which standard, and how measured
+   'custody',               -- who holds the keys, under what arrangement
+   'mandate',               -- the board or deed authority relied on
+   'covenants',             -- how the position was financed, and on what terms
+   'identity',              -- ABN, registered office, listing venue
+   'ledger_event'           -- what was done and when it was disclosed
+ );
+
+-- "Funding runway" and "operating context" describe how an entity is
+-- faring, not how it implemented anything. That is performance.
+UPDATE field_source_minimums SET client_fact_class = 'outcome'
+ WHERE field_key = 'operating_metric';
+
+CREATE POLICY "field_source_minimums_client_read" ON field_source_minimums
+  FOR SELECT USING (current_client_account_id() IS NOT NULL);
+
 CREATE POLICY "research_company_facts_client_read" ON research_company_facts
   FOR SELECT USING (
     current_client_account_id() IS NOT NULL
@@ -316,6 +375,13 @@ CREATE POLICY "research_company_facts_client_read" ON research_company_facts
       WHERE rc.id = research_company_facts.company_id
         AND rc.is_published = TRUE
         AND rc.client_cleared = TRUE
+    )
+    -- Implementation facts only. An unclassified key has no row and
+    -- fails this test, which is the intended direction.
+    AND EXISTS (
+      SELECT 1 FROM field_source_minimums f
+      WHERE f.field_key = research_company_facts.field_key
+        AND f.client_fact_class = 'implementation'
     )
   );
 
@@ -369,4 +435,9 @@ CREATE POLICY "source_classes_client_read" ON source_classes
 --   UPDATE research_companies SET client_cleared = TRUE
 --   WHERE id = '<any>';
 -- should fail with client_clearance_needs_approver.
+--
+-- As a subscriber, an outcome fact must not come back even for a
+-- cleared company — expect zero rows:
+--   SELECT count(*) FROM research_company_facts
+--    WHERE field_key = 'operating_metric';
 -- ------------------------------------------------------------

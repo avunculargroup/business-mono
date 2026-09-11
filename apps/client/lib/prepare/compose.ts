@@ -5,7 +5,7 @@ import type {
   PrepareTemplate,
   TemplateSection,
 } from '@platform/data';
-import type { StoredPack, StoredResponse } from './store';
+import type { StoredCitation, StoredPack, StoredResponse } from './store';
 
 /**
  * Composing a pack into markdown.
@@ -32,8 +32,10 @@ export interface ComposeInput {
   facts: Fact[];
   absent: AbsentFact[];
   identity: CompanyIdentity | null;
-  generalAdviceWarning: string;
+  informationNotice: string;
   factsFetchedAt: string;
+  /** Facts carried over from `/register` by Cite in a pack. */
+  citations: StoredCitation[];
   now: Date;
 }
 
@@ -45,10 +47,14 @@ function isoDate(value: Date | string): string {
 /**
  * The identity block.
  *
- * Legal name and ABN, not the trading name: every export is potentially a
- * regulatory artefact, and an acronym in front of a regulator is a small
- * unforced error while the ABN is often the only thing that makes the entity
- * identifiable. See `references/naming.md` on the three registers.
+ * Legal name and ABN, not the trading name: an export may be read by an
+ * auditor, an acronym in front of one is a small unforced error, and the ABN is
+ * often the only thing that makes the entity identifiable. See
+ * `references/naming.md` on the three registers.
+ *
+ * No AR number and no licensee line. BTS holds no AFS authorisation, so a
+ * licence field could only ever be empty — and an empty one on a document
+ * headed for an auditor invites the reader to wonder which kind of empty.
  *
  * When `company_profile` is empty the block says so rather than inventing a
  * name. An export with a plausible-looking wrong ABN is worse than one that
@@ -64,14 +70,12 @@ function identityLines(identity: CompanyIdentity | null): string[] {
 
   const lines = [`prepared_by: ${identity.legalName}`];
   if (identity.abn) lines.push(`abn: ${identity.abn}`);
-  if (identity.arNumber) lines.push(`authorised_representative_number: ${identity.arNumber}`);
-  if (identity.licenceHolder) lines.push(`licensee: ${identity.licenceHolder}`);
-  if (identity.licenceNumber) lines.push(`afsl: ${identity.licenceNumber}`);
+  if (identity.acn) lines.push(`acn: ${identity.acn}`);
   return lines;
 }
 
 function frontMatter(input: ComposeInput): string {
-  const { pack, template, identity, generalAdviceWarning, now } = input;
+  const { pack, template, identity, informationNotice, now } = input;
 
   return [
     '---',
@@ -91,8 +95,8 @@ function frontMatter(input: ComposeInput): string {
     '',
     `# ${pack.title}`,
     '',
-    '> **General advice warning**',
-    ...generalAdviceWarning
+    '> **Information only**',
+    ...informationNotice
       .split('\n')
       .map((line) => `> ${line.trim()}`)
       .filter((line) => line !== '>' || true),
@@ -137,20 +141,46 @@ function factBlock(facts: Fact[], absent: AbsentFact[]): string {
   ].join('\n');
 }
 
+function citationBlock(citations: StoredCitation[]): string {
+  if (citations.length === 0) return '';
+
+  return [
+    '',
+    '**Precedent, cited from the register.** Implementation facts about how other',
+    'entities did this — never how it went for them.',
+    '',
+    '| Entity | Fact | Value | As at | Source |',
+    '|---|---|---|---|---|',
+    ...citations.map(
+      (citation) =>
+        `| ${citation.entityName} | ${citation.fact.label} | ${citation.fact.value}`
+        + `${citation.fact.unit ? ` ${citation.fact.unit}` : ''} | ${citation.fact.asAt}`
+        + ` | ${citation.fact.sourceName} |`,
+    ),
+    '',
+  ].join('\n');
+}
+
 function sectionBody(
   section: TemplateSection,
   response: StoredResponse | undefined,
   facts: Fact[],
   absent: AbsentFact[],
+  citations: StoredCitation[],
 ): string {
   const bound = facts.filter((fact) => section.facts.includes(fact.key));
   const boundAbsent = absent.filter((fact) => section.facts.includes(fact.key));
+  // Every citation lands in the one section that declared accepts_citations.
+  // The validator guarantees there is at most one, so no citation can appear
+  // twice and none can go missing.
+  const cited = section.acceptsCitations ? citations : [];
 
   const parts = [
     `## ${section.prompt.replace(/\?$/, '')}`,
     '',
     ...(section.regulatoryReference ? [`*${section.regulatoryReference}*`, ''] : []),
     factBlock(bound, boundAbsent),
+    citationBlock(cited),
   ];
 
   if (response?.skipped) {
@@ -168,7 +198,7 @@ function sectionBody(
 }
 
 function provenanceAppendix(input: ComposeInput): string {
-  const { facts, absent, factsFetchedAt, now } = input;
+  const { facts, absent, citations, factsFetchedAt, now } = input;
 
   const lines = [
     '---',
@@ -211,6 +241,38 @@ function provenanceAppendix(input: ComposeInput): string {
     lines.push('');
   }
 
+  if (citations.length > 0) {
+    // Cited facts are listed apart from bound ones, because they got here a
+    // different way: the subscriber chose them from the register rather than
+    // the template binding them. A reader checking the argument should be able
+    // to tell which evidence was selected and which was supplied.
+    lines.push(
+      '### Cited from the register',
+      '',
+      'These facts were selected by the author from the corporate register rather than',
+      'bound by the template. Each is an implementation fact about how another entity',
+      'did something, and none is a statement about how it went for them.',
+      '',
+      '| Entity | Fact | Value | As at | Source | Basis | Cited |',
+      '|---|---|---|---|---|---|---|',
+      ...citations.map(
+        (citation) =>
+          `| ${citation.entityName} | ${citation.fact.label} | ${citation.fact.value}`
+          + `${citation.fact.unit ? ` ${citation.fact.unit}` : ''} | ${citation.fact.asAt}`
+          + ` | ${citation.fact.sourceName} | ${citation.fact.basis}`
+          + ` | ${isoDate(citation.citedAt)} |`,
+      ),
+      '',
+      // The open question in the spec, stated in the document rather than only
+      // in the spec: refresh surfaces a changed value, and nothing detects that
+      // the sentence written against the old one no longer follows.
+      'A cited fact carries the date it was cited as well as the date it was true. Where',
+      'those differ, the prose around it was written against the value as at the citation',
+      'date.',
+      '',
+    );
+  }
+
   if (absent.length > 0) {
     lines.push(
       '### Requested and unavailable',
@@ -230,7 +292,7 @@ export function composePack(input: ComposeInput): string {
   return [
     frontMatter(input),
     ...template.sections.map((section) =>
-      sectionBody(section, responses.get(section.id), facts, absent),
+      sectionBody(section, responses.get(section.id), facts, absent, input.citations),
     ),
     provenanceAppendix(input),
   ].join('\n');

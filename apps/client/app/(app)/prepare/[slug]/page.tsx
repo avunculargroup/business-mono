@@ -32,10 +32,10 @@ export default async function PackPage({
   const template = await repositories.prepare.template(ctx, slug);
   if (!template) notFound();
 
-  const [resolved, identity, warning] = await Promise.all([
+  const [resolved, identity, notice] = await Promise.all([
     repositories.prepare.resolveFacts(ctx, template.factsRequired),
     repositories.compliance.identity(ctx),
-    repositories.compliance.activeDocument(ctx, 'general_advice_warning'),
+    repositories.compliance.activeDocument(ctx, 'information_notice'),
   ]);
 
   return (
@@ -59,14 +59,14 @@ export default async function PackPage({
         absent={resolved.absent}
         factsFetchedAt={resolved.resolvedAt}
         identity={identity}
-        generalAdviceWarning={
-          warning?.body
-          // The export must carry a warning even when the library has none
+        informationNotice={
+          notice?.body
+          // The export must carry a notice even when the library has none
           // loaded yet. A pack circulated without one is the failure this
           // fallback exists to prevent.
-          ?? 'This document contains general information only. It does not take account of '
-            + 'the objectives, financial situation or needs of any person, and it is not a '
-            + 'recommendation to acquire, hold or dispose of any product.'
+          ?? 'This document contains factual information only. It is not financial advice, '
+            + 'does not take account of the objectives, financial situation or needs of any '
+            + 'person, and is not a recommendation to acquire, hold or dispose of anything.'
         }
         {...(pack ? { initialPackId: pack } : {})}
       />

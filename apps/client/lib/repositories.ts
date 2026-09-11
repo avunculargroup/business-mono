@@ -10,7 +10,7 @@ import { createClient } from './supabase/server';
  * `cache()` scopes it to one render pass, which is exactly the lifetime the
  * adapter wants: its disclosure check is memoised on the context, so a bundle
  * living longer than a request would keep answering "acknowledged" after a new
- * FSG version went active and the gate would stop re-triggering.
+ * Service Statement version went active, and the gate would stop re-triggering.
  *
  * Returns null rather than throwing when there is no session, so a public route
  * can ask without handling an exception.

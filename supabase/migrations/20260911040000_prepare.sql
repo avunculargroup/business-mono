@@ -9,7 +9,7 @@
 -- and are never transmitted. The server holds templates and an
 -- audit trail of which facts it served.
 --
--- The general advice boundary stops being a policy anyone has to
+-- The not-advice boundary stops being a policy anyone has to
 -- remember and becomes a fact about where bytes live.
 -- ============================================================
 

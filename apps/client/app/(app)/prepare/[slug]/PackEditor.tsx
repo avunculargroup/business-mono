@@ -14,11 +14,14 @@ import {
   getPack,
   getSnapshot,
   importWorkingCopy,
+  listCitations,
   listResponses,
+  removeCitation,
   responseKey,
   savePack,
   saveResponse,
   saveSnapshot,
+  type StoredCitation,
   type StoredPack,
   type StoredResponse,
   type WorkingCopy,
@@ -45,7 +48,7 @@ export function PackEditor({
   absent,
   factsFetchedAt,
   identity,
-  generalAdviceWarning,
+  informationNotice,
   initialPackId,
 }: {
   template: PrepareTemplate;
@@ -53,11 +56,12 @@ export function PackEditor({
   absent: AbsentFact[];
   factsFetchedAt: string;
   identity: CompanyIdentity | null;
-  generalAdviceWarning: string;
+  informationNotice: string;
   initialPackId?: string;
 }) {
   const [pack, setPack] = useState<StoredPack | null>(null);
   const [responses, setResponses] = useState<Map<string, StoredResponse>>(new Map());
+  const [citations, setCitations] = useState<StoredCitation[]>([]);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   // Open the named pack, or start one. Creating on open rather than on first
@@ -78,6 +82,9 @@ export function PackEditor({
         artefactType: template.artefactType,
         title: template.title,
         status: 'in_progress',
+        // Copied from the template so /register can offer this pack — or not —
+        // without loading templates.
+        acceptsCitations: template.sections.some((section) => section.acceptsCitations),
         createdAt: now,
         updatedAt: now,
       };
@@ -86,6 +93,7 @@ export function PackEditor({
 
       const stored = await listResponses(opened.id);
       const snapshot = await getSnapshot(opened.id);
+      const cited = await listCitations(opened.id);
 
       // Snapshot the facts the first time a pack is opened, so a refresh later
       // has something to diff against. Facts refresh; prose persists.
@@ -96,6 +104,7 @@ export function PackEditor({
       if (cancelled) return;
       setPack(opened);
       setResponses(new Map(stored.map((response) => [response.sectionId, response])));
+      setCitations(cited);
     }
 
     open().catch(() => {
@@ -158,8 +167,15 @@ export function PackEditor({
           section={section}
           facts={facts.filter((fact) => section.facts.includes(fact.key))}
           absent={absent.filter((fact) => section.facts.includes(fact.key))}
+          // Every citation lands in the one section that declared
+          // accepts_citations. The validator guarantees there is at most one.
+          citations={section.acceptsCitations ? citations : []}
           response={responses.get(section.id)}
           onPersist={persist}
+          onUncite={async (id) => {
+            await removeCitation(id);
+            setCitations((current) => current.filter((citation) => citation.id !== id));
+          }}
         />
       ))}
 
@@ -171,7 +187,8 @@ export function PackEditor({
         absent={absent}
         factsFetchedAt={factsFetchedAt}
         identity={identity}
-        generalAdviceWarning={generalAdviceWarning}
+        informationNotice={informationNotice}
+        citations={citations}
       />
     </>
   );
@@ -181,14 +198,18 @@ function Enquiry({
   section,
   facts,
   absent,
+  citations,
   response,
   onPersist,
+  onUncite,
 }: {
   section: TemplateSection;
   facts: Fact[];
   absent: AbsentFact[];
+  citations: StoredCitation[];
   response: StoredResponse | undefined;
   onPersist: (sectionId: string, body: string, skipped: boolean) => Promise<void>;
+  onUncite: (id: string) => Promise<void>;
 }) {
   const [body, setBody] = useState(response?.body ?? '');
   const [skipped, setSkipped] = useState(response?.skipped ?? false);
@@ -254,6 +275,40 @@ function Enquiry({
         </div>
       ) : null}
 
+      {section.acceptsCitations ? (
+        <div className={styles.citations}>
+          <p className={styles.enquiryLabel}>
+            Precedent cited from the register ({citations.length})
+          </p>
+          {citations.length === 0 ? (
+            <p className={styles.citationsEmpty}>
+              Nothing cited yet. On a register entry, use <strong>Cite in a pack</strong> on any
+              fact to bring it here with its source attached.
+            </p>
+          ) : (
+            citations.map((citation) => (
+              <div key={citation.id} className={styles.factRow}>
+                <span className={styles.factLabel}>
+                  {citation.entityName} — {citation.fact.label}
+                </span>
+                <span className={styles.factValue}>
+                  {citation.fact.value}
+                  {citation.fact.unit ? ` ${citation.fact.unit}` : ''}
+                </span>
+                <Freshness asAt={citation.fact.asAt} />
+                <button
+                  type="button"
+                  className={styles.skip}
+                  onClick={() => void onUncite(citation.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+
       {/* The prompt above is the label, so the field carries it via aria-label
           rather than being wrapped in a second, visually-empty one. */}
       <textarea
@@ -295,7 +350,8 @@ function Toolbar({
   absent,
   factsFetchedAt,
   identity,
-  generalAdviceWarning,
+  informationNotice,
+  citations,
 }: {
   pack: StoredPack;
   template: PrepareTemplate;
@@ -304,7 +360,8 @@ function Toolbar({
   absent: AbsentFact[];
   factsFetchedAt: string;
   identity: CompanyIdentity | null;
-  generalAdviceWarning: string;
+  informationNotice: string;
+  citations: StoredCitation[];
 }) {
   function download(filename: string, contents: string, type: string) {
     // A blob and an object URL. The bytes never leave the browser — there is
@@ -325,8 +382,9 @@ function Toolbar({
       facts,
       absent,
       identity,
-      generalAdviceWarning,
+      informationNotice,
       factsFetchedAt,
+      citations,
       now: new Date(),
     });
 

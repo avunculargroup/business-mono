@@ -84,6 +84,52 @@ describe('seeded prepare templates', () => {
     },
   );
 
+  it('has at least one template with a precedent section', () => {
+    // Otherwise Cite in a pack is a mechanism with nowhere to put a fact: the
+    // register offers no pack, the action never fires, and the feature that
+    // makes the register's purpose legible is dead.
+    const withPrecedent = templates.filter((t) =>
+      parseTemplate(t.body).sections.some((section) => section.acceptsCitations),
+    );
+
+    expect(withPrecedent.length).toBeGreaterThan(0);
+  });
+
+  it.each(templates.map((t) => [t.file, t.body] as const))(
+    '%s declares at most one precedent section',
+    (_file, body) => {
+      // The validator checks this too. Asserted separately because a second one
+      // would make "the precedent section" a coin toss that could differ
+      // between the register's cite action and the export.
+      const precedent = parseTemplate(body).sections.filter((s) => s.acceptsCitations);
+
+      expect(precedent.length).toBeLessThanOrEqual(1);
+    },
+  );
+
+  it.each(templates.map((t) => [t.file, t.body] as const))(
+    '%s asks nothing about how a precedent performed',
+    (_file, body) => {
+      // Implementation facts, not outcome facts — the rule the register is
+      // built on, applied to the templates that consume it. A prompt asking how
+      // an entity's holding performed would invite an answer the register
+      // cannot source and the product should not carry.
+      const prompts = parseTemplate(body)
+        .sections.map((section) => section.prompt.toLowerCase())
+        .join(' ');
+
+      for (const phrase of [
+        'share price',
+        'unrealised',
+        'how did it perform',
+        'return since',
+        'current value of their',
+      ]) {
+        expect(prompts).not.toContain(phrase);
+      }
+    },
+  );
+
   it.each(templates.map((t) => [t.file, t.body] as const))(
     '%s suggests no allocation, percentage or target',
     (_file, body) => {

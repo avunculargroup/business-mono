@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Fact, PrepareTemplate } from '@platform/data';
 import { composePack, packProgress, type ComposeInput } from './compose';
-import type { StoredPack, StoredResponse } from './store';
+import type { StoredCitation, StoredPack, StoredResponse } from './store';
 
 const NOW = new Date('2026-09-11T00:00:00Z');
 
@@ -21,6 +21,7 @@ const TEMPLATE: PrepareTemplate = {
       why: 'A minute that does not name the matter records nothing.',
       facts: [],
       optional: false,
+      acceptsCitations: false,
     },
     {
       id: 'valuation',
@@ -28,6 +29,7 @@ const TEMPLATE: PrepareTemplate = {
       why: 'The auditor will ask, and the answer has to be the trustee’s own.',
       facts: ['btc_spot_aud', 'au_dap_licensing_status'],
       optional: false,
+      acceptsCitations: false,
       regulatoryReference: 'SIS Reg 8.02B',
     },
     {
@@ -36,6 +38,8 @@ const TEMPLATE: PrepareTemplate = {
       why: 'The resolution is the operative part of the minute.',
       facts: [],
       optional: false,
+      // The precedent section: where Cite in a pack lands.
+      acceptsCitations: true,
     },
   ],
 };
@@ -97,12 +101,11 @@ function input(overrides: Partial<ComposeInput> = {}): ComposeInput {
       legalName: 'Bitcoin Treasury Solutions Pty Ltd',
       tradingName: 'Bitcoin Treasury Solutions',
       abn: '00 000 000 000',
-      arNumber: 'AR-123456',
-      licenceHolder: 'Example Licensee Pty Ltd',
-      licenceNumber: '000000',
+      acn: '000 000 000',
     },
-    generalAdviceWarning: 'This document contains general information only.',
+    informationNotice: 'This document contains factual information only. It is not financial advice.',
     factsFetchedAt: '2026-09-11T00:00:00Z',
+    citations: [],
     now: NOW,
     ...overrides,
   };
@@ -110,17 +113,39 @@ function input(overrides: Partial<ComposeInput> = {}): ComposeInput {
 
 describe('front matter', () => {
   it('names the legal entity and its ABN, not the trading name', () => {
-    // Every export is potentially a regulatory artefact, and the ABN is often
-    // the only thing that makes the entity identifiable.
+    // An export may be read by an auditor, and the ABN is often the only thing
+    // that makes the entity identifiable.
     const markdown = composePack(input());
 
     expect(markdown).toContain('prepared_by: Bitcoin Treasury Solutions Pty Ltd');
     expect(markdown).toContain('abn: 00 000 000 000');
-    expect(markdown).toContain('authorised_representative_number: AR-123456');
+    expect(markdown).toContain('acn: 000 000 000');
   });
 
-  it('carries the general advice warning verbatim', () => {
-    expect(composePack(input())).toContain('This document contains general information only.');
+  it('claims no licence, because BTS holds none', () => {
+    // An AFSL or AR number on an export would assert an authorisation BTS does
+    // not have. There is no field for one, and this is the assertion that keeps
+    // it that way if someone adds one back to CompanyIdentity.
+    const markdown = composePack(input()).toLowerCase();
+
+    for (const claim of ['afsl', 'licence', 'license', 'authorised representative']) {
+      expect(markdown).not.toContain(claim);
+    }
+  });
+
+  it('carries the information-only notice verbatim', () => {
+    expect(composePack(input())).toContain(
+      'This document contains factual information only. It is not financial advice.',
+    );
+  });
+
+  it('heads the notice as information only, not as a general advice warning', () => {
+    // "General advice warning" implies licensed general advice. Factual
+    // information is a different thing, and the heading has to say which.
+    const markdown = composePack(input());
+
+    expect(markdown).toContain('> **Information only**');
+    expect(markdown).not.toContain('General advice warning');
   });
 
   it('carries the template slug and version', () => {
@@ -241,6 +266,77 @@ describe('the composed document as a whole', () => {
 
   it('renders a section regulatory reference inline', () => {
     expect(composePack(input())).toContain('*SIS Reg 8.02B*');
+  });
+});
+
+describe('cited precedent', () => {
+  const CITATION: StoredCitation = {
+    id: 'p1:register:an-entity:0',
+    packId: 'p1',
+    entitySlug: 'an-entity',
+    entityName: 'An Entity Ltd',
+    fact: {
+      key: 'register:an-entity:0',
+      label: 'Custody',
+      value: 'Third-party qualified custodian',
+      asAt: '2026-06-30',
+      sourceName: 'Annual report 2026',
+      basis: 'reported',
+      complianceClass: 'neutral',
+    },
+    citedAt: '2026-09-01T00:00:00Z',
+  };
+
+  it('lands only in the section that accepts citations', () => {
+    const markdown = composePack(input({ citations: [CITATION] }));
+
+    const beforeResolution = markdown.slice(0, markdown.indexOf('## What was resolved'));
+    expect(beforeResolution).not.toContain('An Entity Ltd');
+    expect(markdown).toContain('An Entity Ltd');
+  });
+
+  it('carries the entity, the value, the date and the source', () => {
+    const markdown = composePack(input({ citations: [CITATION] }));
+
+    expect(markdown).toContain(
+      '| An Entity Ltd | Custody | Third-party qualified custodian | 2026-06-30 | Annual report 2026 |',
+    );
+  });
+
+  it('says the precedent is implementation, never outcome', () => {
+    // The pack has to carry the distinction, not just the register page. A
+    // reader of the exported document never saw the interface.
+    const markdown = composePack(input({ citations: [CITATION] }));
+
+    expect(markdown).toContain('never how it went for them');
+  });
+
+  it('lists cited facts apart from bound ones in the appendix', () => {
+    const markdown = composePack(input({ citations: [CITATION] }));
+    const appendix = markdown.slice(markdown.indexOf('## Provenance appendix'));
+
+    expect(appendix).toContain('### Cited from the register');
+    // A reader checking the argument should be able to tell which evidence the
+    // author selected and which the template supplied.
+    expect(appendix).toContain('selected by the author');
+  });
+
+  it('records the citation date as well as the as-at date', () => {
+    // The open question made visible: refresh surfaces a changed value, and
+    // nothing detects that the sentence written against the old one no longer
+    // follows. The dates are what lets a reader notice.
+    const appendix = composePack(input({ citations: [CITATION] }));
+
+    expect(appendix).toContain('| 2026-06-30 |');
+    expect(appendix).toContain('| 2026-09-01 |');
+    expect(appendix).toContain('written against the value as at the citation');
+  });
+
+  it('adds no precedent block at all when nothing is cited', () => {
+    const markdown = composePack(input({ citations: [] }));
+
+    expect(markdown).not.toContain('Precedent, cited from the register');
+    expect(markdown).not.toContain('### Cited from the register');
   });
 });
 

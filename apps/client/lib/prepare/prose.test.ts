@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
  *
  * > Open the network tab, complete a full board paper, export it. If any
  * > request body contains a sentence the subscriber typed, the two-layer model
- * > has leaked and the general advice boundary is no longer architectural.
+ * > has leaked and the not-advice boundary is no longer architectural.
  *
  * A network tab is a thing someone has to remember to open. This is the same
  * check made structural: the modules that hold subscriber prose are asserted to

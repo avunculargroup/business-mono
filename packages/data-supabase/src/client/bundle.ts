@@ -19,7 +19,8 @@ import { createClientWriteRepository } from './writes';
  *
  * Per request rather than per session, because the disclosure check is memoised
  * on the adapter context — a long-lived bundle would keep answering "yes" after
- * a new FSG version went active, and the gate would stop re-triggering.
+ * a new Service Statement version went active, and the gate would stop
+ * re-triggering.
  *
  * The principal is bound here and nowhere else. No method on any repository
  * takes an `accountId`, so a caller holding this object cannot ask about

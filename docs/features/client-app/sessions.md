@@ -3,24 +3,27 @@
 Three sessions, following the house pattern: data layer → auth and gates → surfaces. Each has
 an explicit definition of done. Do not begin a session with the previous one's checks unmet.
 
-**Before session 1:** resolve A1–A4 in [`assumptions.md`](./assumptions.md). Two of the four are
-documents to read rather than code to write, and both have lead times.
+**Before session 1:** resolve A1–A4 in [`assumptions.md`](./assumptions.md). A4 is a document
+to write, and it has a lead time.
 
 **A2, A3 and A4 have been run** — see [`build-progress.md`](./build-progress.md). A2 was
-understated by roughly ten times and A4 was wrong outright. A1 is still outstanding.
-The bundle's `schema/00N-*.sql` files were reference drafts; the applied migrations live in
-[`supabase/migrations/`](../../../supabase/migrations/) and are listed in the build-progress doc.
+understated by roughly ten times and A4 was wrong outright. The bundle's `schema/00N-*.sql`
+files were reference drafts; the applied migrations live in
+[`supabase/migrations/`](../../../supabase/migrations/) and are listed in the build-progress
+doc.
 
 ---
 
 ## Session 0 — Not code
 
-Neither of these is optional and neither is a build task.
-
-1. **Read the AR appointment deed.** Confirm what BTS is authorised to do. Everything in the
-   compliance architecture assumes general advice only.
-2. **Confirm the FSG covers a subscription information service.** If it was drafted for
-   consulting engagements it needs revision, and that is a lead time.
+1. **Write the Service Statement.** What the service is and is not: factual information rather
+   than financial advice, no client assets held, no facility to consider the subscriber's
+   circumstances, paid by the subscriber and nobody else. It goes in `compliance_documents`
+   and the blocking gate has nothing to serve without it. This is the artefact that evidences
+   the not-advice position, so write it carefully.
+2. **Confirm the not-advice position was assessed against Minute specifically** — a narrated
+   brief, a register of named entities, monitoring of custody providers — rather than against
+   the education and consulting business.
 
 ---
 
@@ -72,10 +75,10 @@ Neither of these is optional and neither is a build task.
    time-limited, creates the `client_users` row on acceptance.
 4. **`middleware.ts`** — two gates in sequence. Authenticated, then disclosure-current. A
    session failing the second reaches only `/disclosure`.
-5. **Disclosure gate.** Serves the active FSG from `compliance_documents`, blocks, records to
-   `client_disclosures` on acknowledgement. A new FSG version re-triggers it.
-6. **App shell.** Standing general advice warning in the layout, not per-route — a warning
-   added per route is a warning eventually forgotten on a route.
+5. **Service Statement gate.** Serves the active Service Statement from `compliance_documents`,
+   blocks, records to `client_disclosures` on acknowledgement. A new version re-triggers it.
+6. **App shell.** Standing information-only notice in the layout, not per-route — a notice
+   added per route is a notice eventually forgotten on a route.
 7. **Activate the Lex client-promotion gate.** Suspend/resume on `advice_adjacent` and
    `solvency_adjacent`. Neutral and valuation-adjacent promote on a director's flag.
 8. **Build the approval queue in `apps/web`.** This is the human interface to the gate and it
@@ -87,7 +90,7 @@ Neither of these is optional and neither is a build task.
 - Boundary test passes
 - A subscriber cannot reach any route before acknowledging
 - Acknowledgement is recorded with document version and timestamp
-- Bumping the FSG version re-blocks an existing session
+- Bumping the Service Statement version re-blocks an existing session
 - A `solvency_adjacent` change cannot become `client_relevant` without passing the queue
 - The approval queue is usable by a founder on a phone, because that is where it will be used
 
@@ -113,7 +116,9 @@ everything else reuses.
 3. **`/signals`.** Promoted feed, `client_note` never `curator_note`, absence signals rendered
    as first-class items.
 4. **`/register`.** Reuse `ProvenanceRail`, `BasisChip`, `ResearchLedger` from `@platform/ui`
-   unchanged. If a component needs a variant, the variant belongs in the package.
+   unchanged. If a component needs a variant, the variant belongs in the package. Implementation
+   facts only — no current value, no unrealised gain, no share price. Build **Cite in a pack**
+   here even though `/prepare` comes later; the register's purpose is illegible without it.
 5. **Backfill `is_financial_product`,** then set `NOT NULL`.
 6. **`/directory`** and `/directory/how-we-make-money`, the latter generated from
    `commercial_relationships`.
@@ -141,14 +146,14 @@ Its own spec is `prepare-feature-spec.md`. Build in this order:
 - No green-up or red-down appears anywhere, on any metric, in any diff
 - Gold appears only on freshness indicators
 - A directory card with `isFinancialProduct === true` emits no anchor and no contact action
-- A generated pack carries front matter, general advice warning and provenance appendix
+- A generated pack carries front matter, information-only notice and provenance appendix
 - No composed subscriber prose exists in any server log, database row, or network request
 
 ### The last check
 
 Open the network tab, complete a full board paper, export it. If any request body contains a
-sentence the subscriber typed, the two-layer model has leaked and the general advice boundary
-is no longer architectural.
+sentence the subscriber typed, the two-layer model has leaked and the not-advice boundary is
+no longer architectural.
 
 ---
 

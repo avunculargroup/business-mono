@@ -91,7 +91,7 @@ export function createClientSessionRepository(
 
       const { data: account } = await adapter.client
         .from('client_accounts')
-        .select('display_name, client_type, client_classification')
+        .select('display_name, client_type')
         .eq('id', data.account_id)
         .maybeSingle();
 
@@ -101,7 +101,6 @@ export function createClientSessionRepository(
         userId: data.id,
         accountId: data.account_id,
         clientType: account.client_type as ClientType,
-        classification: account.client_classification as ClientSession['classification'],
         displayName: account.display_name,
         disclosureCurrent: await adapter.disclosureCurrent(),
       };
@@ -440,6 +439,27 @@ const REGISTER_COLUMNS =
   'slug, legal_name, jurisdiction, tier, company_listings(ticker), research_company_facts(field_key, label, value, as_of, is_superseded), treasury_events(event_date, headline, detail, basis, disclosure_venue)';
 
 /**
+ * Field keys whose facts describe how an entity implemented something.
+ *
+ * Read from `field_source_minimums.client_fact_class`, which the RLS policy
+ * also reads — so an outcome fact does not reach this process at all, and this
+ * filter is the second of two locks rather than the only one.
+ *
+ * Fetched once per bundle and memoised, because it is a seven-row lookup that
+ * every register read would otherwise repeat.
+ */
+async function implementationFactKeys(
+  adapter: ClientAdapterContext,
+): Promise<Set<string>> {
+  const { data } = await adapter.client
+    .from('field_source_minimums')
+    .select('field_key, client_fact_class')
+    .eq('client_fact_class', 'implementation');
+
+  return new Set((data ?? []).map((row) => row.field_key));
+}
+
+/**
  * Facts a register entry is expected to state, so a missing one can be named.
  *
  * Absence is a fact: a reader who cannot see whether an entity has disclosed
@@ -452,8 +472,17 @@ const EXPECTED_FIELDS: ReadonlyArray<[string, string]> = [
   ['auditor', 'Auditor'],
 ];
 
-function toRegisterEntry(row: RegisterRow): ClientRegisterEntry {
-  const facts = (row.research_company_facts ?? []).filter((f) => !f.is_superseded);
+function toRegisterEntry(
+  row: RegisterRow,
+  implementationKeys: Set<string>,
+): ClientRegisterEntry {
+  const facts = (row.research_company_facts ?? [])
+    .filter((f) => !f.is_superseded)
+    // Implementation facts only. "How did they do it" is precedent; "how did it
+    // go for them" is performance, and performance figures about named listed
+    // securities is the one shape this product must not take. An unclassified
+    // key fails this test, which is the intended direction.
+    .filter((f) => f.field_key !== null && implementationKeys.has(f.field_key));
 
   const position = facts
     .filter((f) => f.value !== null)
@@ -507,28 +536,34 @@ export function createClientRegisterRepository(
     async list(_ctx: ReadContext): Promise<ClientRegisterEntry[]> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
-        .from('research_companies')
-        .select(REGISTER_COLUMNS)
-        .eq('is_published', true)
-        .eq('client_cleared', true)
-        .order('legal_name');
+      const [{ data }, implementationKeys] = await Promise.all([
+        adapter.client
+          .from('research_companies')
+          .select(REGISTER_COLUMNS)
+          .eq('is_published', true)
+          .eq('client_cleared', true)
+          .order('legal_name'),
+        implementationFactKeys(adapter),
+      ]);
 
-      return (data ?? []).map((row) => toRegisterEntry(row as RegisterRow));
+      return (data ?? []).map((row) => toRegisterEntry(row as RegisterRow, implementationKeys));
     },
 
     async bySlug(_ctx: ReadContext, slug: string): Promise<ClientRegisterEntry | null> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
-        .from('research_companies')
-        .select(REGISTER_COLUMNS)
-        .eq('is_published', true)
-        .eq('client_cleared', true)
-        .eq('slug', slug)
-        .maybeSingle();
+      const [{ data }, implementationKeys] = await Promise.all([
+        adapter.client
+          .from('research_companies')
+          .select(REGISTER_COLUMNS)
+          .eq('is_published', true)
+          .eq('client_cleared', true)
+          .eq('slug', slug)
+          .maybeSingle(),
+        implementationFactKeys(adapter),
+      ]);
 
-      return data ? toRegisterEntry(data as RegisterRow) : null;
+      return data ? toRegisterEntry(data as RegisterRow, implementationKeys) : null;
     },
   };
 }
@@ -542,11 +577,12 @@ export function createClientRegisterRepository(
  *
  * On the page, not in a help doc — the spec is explicit about that, and the
  * reason is that criteria nobody can see are indistinguishable from no criteria.
- * Held here rather than in a table because they are not data: changing them is
- * a decision the licensee should see, and a code review is where that shows up.
+ * Held here rather than in a table because they are not data: changing who gets
+ * listed changes what the directory is, and a code review is where a change
+ * like that should surface.
  *
- * Still an open question in the spec bundle — these need the licensee's eye
- * before publication.
+ * Still an open question in the spec bundle: objective and published is the
+ * requirement, and what they actually say is undecided.
  */
 const INCLUSION_CRITERIA: readonly string[] = Object.freeze([
   'Operating in Australia and serving Australian clients.',
@@ -829,7 +865,7 @@ export function createClientComplianceRepository(
 
       const { data } = await adapter.client
         .from('company_profile')
-        .select('legal_name, trading_name, abn, ar_number, licence_holder, licence_number')
+        .select('legal_name, trading_name, abn, acn')
         .maybeSingle();
 
       if (!data) return null;
@@ -838,16 +874,14 @@ export function createClientComplianceRepository(
         legalName: data.legal_name,
         tradingName: data.trading_name,
         abn: data.abn,
-        arNumber: data.ar_number,
-        licenceHolder: data.licence_holder,
-        licenceNumber: data.licence_number,
+        acn: data.acn,
       };
     },
 
     /**
      * Not gated. This is the one read a blocked session must be able to make —
      * otherwise the gate is a wall, and a subscriber is asked to acknowledge a
-     * document the app will not show them.
+     * Service Statement the app will not show them.
      */
     async activeDocument(
       _ctx: ReadContext,

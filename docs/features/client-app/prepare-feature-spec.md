@@ -3,8 +3,9 @@
 **Product:** Minute, by Bitcoin Treasury Solutions
 **App:** `apps/client`
 **Feature:** Document preparation — board papers, trustee minutes, auditor evidence packs
-**Status:** Draft, reconciled against the live database on 2026-09-11. Where this document and
-[`build-progress.md`](./build-progress.md) disagree, that one was checked and this one was not.
+**Status:** Draft (bundle 0.4.0), reconciled against the live database on 2026-09-11.
+Where this document and [`build-progress.md`](./build-progress.md) disagree, that one was
+checked and this one was not.
 **Last updated:** 2026-09-09
 **Parent spec:** `client-app-mvp-spec.md`
 
@@ -31,6 +32,9 @@ eleven questions a board should be able to answer before deciding, with the curr
 every relevant fact attached and sourced, is not. BTS supplies the scaffolding and the
 evidence. The client supplies the judgement.
 
+BTS does not give financial advice and holds no AFS authorisation. This rule is what makes
+that structurally true in the one place where the product comes closest to the line.
+
 This is a compliance constraint and it is also just a better product. A board paper visibly
 generated from an outside template gets identified in roughly four seconds and carries no
 weight. One where the CFO has worked through the reasoning is theirs, survives questioning,
@@ -50,6 +54,7 @@ and is worth what they paid for it.
 **Out of scope**
 
 - Any LLM composition at generation time — see [Why no model runs here](#why-no-model-runs-here)
+- Any conclusion, recommendation, allocation figure or target, in any template
 - Server-side storage of subscriber-authored content
 - Collaborative editing between two users on one account
 - e-signature on trustee minutes
@@ -75,7 +80,7 @@ March and tabled in May pulls current evidence without the CFO rewriting a word 
 reasoning. That only works if the layers were separate from the first commit, which is why
 this section comes before the data model rather than after it.
 
-The second consequence: BTS's servers never hold the composed document. The general advice
+The second consequence: BTS's servers never hold the composed document. The not-advice
 boundary stops being a policy anyone has to remember and becomes a fact about where bytes
 live.
 
@@ -312,7 +317,8 @@ Section lists below are the outline, not the copy. Each becomes a template file.
 2. Why this is on the agenda now
 3. What the asset is, and what it is not *(facts)*
 4. Current market context and the period being considered *(facts)*
-5. Precedent — what other listed entities have disclosed *(facts, no comparison, no ranking)*
+5. Precedent — how other Australian entities implemented this *(facts from `/register`;
+   implementation only, never outcome; no comparison, no ranking)*
 6. Accounting treatment and its effect on reported results *(facts: AASB position)*
 7. Custody model under consideration and the operational risk it carries
 8. Australian regulatory position and provider licensing status *(facts, as-at critical)*
@@ -431,6 +437,12 @@ Each step is a **line of enquiry** and shows four things:
 3. The bound facts, as labelled blocks with provenance rails
 4. A text field
 
+Facts arrive in a section two ways: bound by the template via `facts`, or pushed in by the
+subscriber from `/register` using **Cite in a pack**. Cited facts carry the same `Fact` shape
+and the same provenance rail, and land in the precedent section of the open pack. A section
+records which of its facts were cited rather than bound, so the provenance appendix can say
+so.
+
 It should feel like being interviewed by someone competent, not like being handed a template.
 That is Carri's thesis expressed as an interaction pattern rather than a paragraph of copy.
 
@@ -476,8 +488,8 @@ produces better typography than most PDF libraries manage.
 
 - Document title, artefact type, and the date prepared
 - Template slug and version
-- General advice warning, verbatim from `compliance_documents`
-- BTS identity block from `company_profile` — legal name, ABN, AR number, licensee
+- Information-only notice, verbatim from `compliance_documents`
+- BTS identity block from `company_profile` — legal name, ABN, ACN
 - A line stating that the facts are as at their individual dates, listed in the appendix
 
 **Provenance appendix, on every export:**
@@ -535,6 +547,11 @@ than quietly.
 
 ## Open questions
 
+- **Cited-fact staleness.** A fact cited from `/register` in March and refreshed in May may
+  have a newer as-at date but also a changed value, and the subscriber's prose was written
+  against the old one. Refresh surfaces the diff, but nothing detects that the surrounding
+  sentence no longer follows. Probably unsolvable; worth stating so nobody assumes it is
+  handled.
 - **Two trustees, one pack.** An SMSF commonly has two individual trustees who both need to
   contribute to a minute. Local-only makes co-editing impossible. The working-copy JSON is a
   usable hand-off for the MVP, but it is a workaround and it will be the first thing anyone

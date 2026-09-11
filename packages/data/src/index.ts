@@ -58,7 +58,6 @@ export type {
   Brief,
   ClientAccountRepository,
   ClientBriefRepository,
-  ClientClassification,
   ClientComplianceRepository,
   ClientDataContext,
   ClientDirectoryRepository,

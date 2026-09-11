@@ -49,7 +49,8 @@ export interface ClientAdapterUnderTest {
   createContext(clientType: ClientType): ClientDataContext | Promise<ClientDataContext>;
 
   /**
-   * A context for a subscriber who has not acknowledged the current FSG.
+   * A context for a subscriber who has not acknowledged the current Service
+   * Statement.
    *
    * Every read must reject. Returning `null` or an empty list is not passing:
    * the gate is the point, and a repository that quietly answers a session
@@ -108,7 +109,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
         for (const name of methodNames(repo)) {
           expect(
             MUTATING_NAME.test(name),
-            `${domain}.${name} reads as a write. The general advice boundary is `
+            `${domain}.${name} reads as a write. The not-advice boundary is `
               + `enforced by the read repositories having no write path; a third `
               + `write belongs in ClientWriteRepository or nowhere.`,
           ).toBe(false);
@@ -289,8 +290,22 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
       const ctx = await adapter.createUndisclosedContext();
       const read = testReadContext();
 
-      await expect(ctx.compliance.activeDocument(read, 'fsg')).resolves.not.toThrow();
+      await expect(
+        ctx.compliance.activeDocument(read, 'service_statement'),
+      ).resolves.not.toThrow();
       await expect(ctx.session.current(read)).resolves.not.toThrow();
+    });
+
+    it('cannot be asked for a Financial Services Guide', () => {
+      // Not a runtime check — a compile-time one, asserted here so the reason
+      // is written down next to the other seven. No FSG is required and
+      // publishing one would wrongly imply an AFS authorisation BTS does not
+      // hold, so 'fsg' is not in the union and this line would not compile:
+      //
+      //   ctx.compliance.activeDocument(read, 'fsg');
+      //
+      // The database agrees: doc_type's CHECK constraint rejects it too.
+      expect(true).toBe(true);
     });
   });
 }

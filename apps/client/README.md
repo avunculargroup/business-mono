@@ -11,7 +11,13 @@ titles and exports; role name in paths, table names and imports.
 
 Spec bundle: [`docs/features/client-app/`](../../docs/features/client-app/). Read
 [`build-progress.md`](../../docs/features/client-app/build-progress.md) first — three of the
-bundle's assumptions were wrong, one by an order of magnitude.
+bundle's assumptions were wrong, one by an order of magnitude, and bundle 0.4.0 later removed
+the licensing premise the first build rested on.
+
+**BTS does not give financial advice and holds no AFS authorisation.** Every structural rule
+below exists to keep that true as the product grows. With an authorisation these rules would
+keep you inside a lane you are allowed to drive in; without one, they are the position
+itself.
 
 ---
 
@@ -20,15 +26,18 @@ bundle's assumptions were wrong, one by an order of magnitude.
 Sessions 1–3 are built. **Every migration is written and not applied**, and the two things
 blocking first login are documents rather than code:
 
-- **No FSG exists**, and `compliance_documents` did not exist either until this work created it.
-  The disclosure gate blocks every route and serves the active FSG, so until one is drafted and
-  loaded, nobody can pass. That is the correct failure and the gate says which it is.
-- **The AR appointment deed has not been read** (assumption A1). The whole compliance
-  architecture assumes general-advice-only.
+- **No Service Statement exists**, and `compliance_documents` did not exist either until this
+  work created it. The gate blocks every route and serves the active Service Statement, so
+  until one is written and loaded, nobody can pass. That is the correct failure, and the gate
+  says which it is rather than showing a blank page.
+- **The not-advice position has not been confirmed against Minute specifically** (assumption
+  A1) — a narrated brief, a register of named entities, monitoring of custody providers, rather
+  than the education and consulting business.
 
-Also outstanding: the `is_financial_product` backfill (24 rows, human judgement each), the Lex
-approval queue in `apps/web`, print fidelity in Safari, and five of the six `/prepare`
-templates.
+Also outstanding: publishing the two seeded templates (they ship as drafts and need a Lex
+reviewer named against each), the `is_financial_product` backfill (24 rows, human judgement
+each), the Lex approval queue in `apps/web`, print fidelity in Safari, and four of the six
+`/prepare` templates.
 
 ---
 
@@ -41,7 +50,7 @@ Eight authenticated, four outside the shell. Anything not listed is out of MVP s
 | `/` | The Brief. Narrated findings; three states, not two — see below |
 | `/signals` | What changed at the vendors and registers that matter |
 | `/indicators` | Macro and on-chain series, as reference data |
-| `/register` · `/register/[slug]` | Corporate bitcoin holders, cleared entries only |
+| `/register` · `/register/[slug]` | Precedent research. Implementation facts only, each row citable into a pack |
 | `/directory` | Service providers, free listing, no call to action on a financial product |
 | `/directory/how-we-make-money` | Generated from `commercial_relationships`, never hand-maintained |
 | `/library` | Reference layer, sectioned by `client_type` |
@@ -55,7 +64,7 @@ Outside the authenticated shell, because neither gate applies yet:
 | `/login` | Magic link. No password, no sign-up form |
 | `/invite/[token]` | Accepting an invitation |
 | `/auth/callback` | Where a magic link lands; redeems an invitation if one rode along |
-| `/disclosure` | The blocking gate |
+| `/disclosure` | The blocking gate. Serves the Service Statement |
 | `/no-access` | Signed in, but not an active seat |
 | `/logout` | Reachable from the gate — a gate with no exit is a trap |
 
@@ -63,15 +72,16 @@ Outside the authenticated shell, because neither gate applies yet:
 
 ## The three things that are not obvious
 
-### The write surface is two methods, and that is the compliance control
+### The write surface is two methods, and that is the control
 
 Minute never captures a subscriber's personal circumstances — not fund balance, not age, not
 member details, not risk tolerance, not holdings. This is enforced by there being **no columns
 to put them in**, and by `ClientWriteRepository` having exactly two methods, neither of which
 accepts free text: acknowledging a disclosure, and recording that a pack was generated.
 
-The moment personal circumstances enter the system, every retail subscriber needs a Statement of
-Advice. The cheapest way never to need one is to never be able to.
+Personal circumstances are the ingredient that turns information into advice. A service that
+cannot receive them cannot give it, and "we have no facility for you to tell us" is a true
+statement about the schema rather than a promise about behaviour.
 
 `lib/boundary.test.ts` asserts no source file writes to a table directly.
 
@@ -80,15 +90,15 @@ Advice. The cheapest way never to need one is to never be able to.
 `/prepare` splits everything into **facts** (BTS's, fetched, snapshotted, regenerable) and
 **prose** (the subscriber's, in IndexedDB, never transmitted). Facts refresh; prose persists.
 
-The consequence that matters: BTS's servers never hold the composed document, so the general
-advice boundary stops being a policy anyone has to remember and becomes a fact about where
+The consequence that matters: BTS's servers never hold the composed document, so the
+not-advice boundary stops being a policy anyone has to remember and becomes a fact about where
 bytes live.
 
 `lib/prepare/prose.test.ts` asserts the modules holding prose contain no `fetch`, no
 `sendBeacon`, no server action — there is no request body for a sentence to end up in. It is the
 spec's manual network-tab check, made automatic.
 
-### Three layers hold the disclosure gate, not one
+### Three layers hold the Service Statement gate, not one
 
 1. `middleware.ts` redirects an un-acknowledged session to `/disclosure`
 2. every repository read throws `DisclosureRequiredError`
@@ -105,7 +115,7 @@ exercise.
 
 ```
 app/
-  (app)/              # the authenticated shell — nav, and the standing general advice warning
+  (app)/              # the authenticated shell — nav, and the standing information-only notice
   actions/            # server actions: auth, invite, disclosure
   auth/callback/      # magic-link landing, invitation redemption
   disclosure/         # the blocking gate
@@ -127,8 +137,11 @@ middleware.ts
 Not restated per route. They apply everywhere, and several are asserted by tests.
 
 - **Neutral delta colour.** No green-up, no red-down, on any metric, in any diff. Colouring a
-  rising indicator as good is an implied view, and an implied view served to a retail subscriber
-  for a fee is the thing the whole design avoids.
+  rising indicator as good is an implied view, and an implied view served to a paying
+  subscriber is the thing the whole design avoids.
+- **Implementation facts, not outcome facts.** `/register` answers how an entity did this, never
+  how it went for them. Enforced by `field_source_minimums.client_fact_class` and the RLS
+  policy that reads it; an unclassified field key is invisible rather than visible.
 - **Gold is freshness only.** It appears in `Freshness` and nowhere else. A colour that also
   means "good" means neither.
 - **Absence is a fact.** State what is missing rather than leaving a gap — a stated absence on

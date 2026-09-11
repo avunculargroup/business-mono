@@ -11,7 +11,7 @@ const principal: Extract<Principal, { kind: 'client' }> = {
   accountId: 'account-1',
 };
 
-const FSG = { version: '2.1' };
+const SERVICE_STATEMENT = { version: '2.1' };
 
 const ONCHAIN_ROWS = [
   {
@@ -109,6 +109,22 @@ const SIGNAL_ROWS = [
   },
 ];
 
+/**
+ * The implementation-fact keys, as the lookup would answer.
+ *
+ * `operating_metric` is deliberately absent: "funding runway" is how an entity
+ * is faring, not how it implemented anything, and outcome facts never reach
+ * `/register`.
+ */
+const IMPLEMENTATION_KEYS = [
+  'accounting_treatment',
+  'covenants',
+  'custody',
+  'identity',
+  'ledger_event',
+  'mandate',
+];
+
 const TEMPLATE_ROWS = [
   {
     id: 't-corp',
@@ -151,7 +167,7 @@ function seed(
   acknowledged: boolean,
   clientType: 'corporate' | 'smsf' = 'corporate',
 ): void {
-  client.__setResponse('compliance_documents', { data: FSG, error: null });
+  client.__setResponse('compliance_documents', { data: SERVICE_STATEMENT, error: null });
   client.__setResponse('client_disclosures', {
     data: acknowledged ? { id: 'ack-1' } : null,
     error: null,
@@ -169,6 +185,13 @@ function seed(
     error: null,
   });
   client.__setResponse('research_companies', { data: [], error: null });
+  client.__setResponse('field_source_minimums', {
+    data: IMPLEMENTATION_KEYS.map((field_key) => ({
+      field_key,
+      client_fact_class: 'implementation',
+    })),
+    error: null,
+  });
   client.__setResponse('products_services', { data: [], error: null });
   client.__setResponse('advisors_partners', { data: [], error: null });
   client.__setResponse('commercial_relationships', { data: [], error: null });
@@ -374,6 +397,91 @@ describe('the client adapter beyond the conformance suite', () => {
 
     const [template] = await repos.prepare.templates(ctx, 'corporate');
     expect(template!.clientType).toBe('corporate');
+  });
+
+  it('keeps outcome facts out of a register entry', async () => {
+    // "How did they do it" is precedent; "how did it go for them" is
+    // performance. Performance figures about named listed securities, served to
+    // a paying subscriber, is the one shape this product must not take — so the
+    // filter is asserted rather than assumed.
+    const client = createFakeSupabase();
+    seed(client, true);
+    client.__setResponse('research_companies', {
+      data: [
+        {
+          slug: 'an-entity',
+          legal_name: 'An Entity Ltd',
+          jurisdiction: 'Australia',
+          tier: 'tier-1',
+          company_listings: [],
+          treasury_events: [],
+          research_company_facts: [
+            {
+              field_key: 'custody',
+              label: 'Custody',
+              value: 'Third-party qualified custodian',
+              as_of: '2026-06-30',
+              is_superseded: false,
+            },
+            {
+              field_key: 'operating_metric',
+              label: 'Funding runway',
+              value: '14 months',
+              as_of: '2026-06-30',
+              is_superseded: false,
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const repos = createClientRepositories(client as unknown as ClientSupabaseClient, principal);
+
+    const [entry] = await repos.register.list(ctx);
+    const labels = entry!.position.map((fact) => fact.label);
+
+    expect(labels).toContain('Custody');
+    expect(labels).not.toContain('Funding runway');
+  });
+
+  it('drops a fact whose key nobody has classified yet', async () => {
+    // Silent exclusion is the safe direction. A key coined by the research
+    // pipeline reaches subscribers when someone classifies it, not before.
+    const client = createFakeSupabase();
+    seed(client, true);
+    client.__setResponse('research_companies', {
+      data: [
+        {
+          slug: 'an-entity',
+          legal_name: 'An Entity Ltd',
+          jurisdiction: 'Australia',
+          tier: 'tier-1',
+          company_listings: [],
+          treasury_events: [],
+          research_company_facts: [
+            {
+              field_key: 'unrealised_gain',
+              label: 'Unrealised gain',
+              value: '$4.1m',
+              as_of: '2026-06-30',
+              is_superseded: false,
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const repos = createClientRepositories(client as unknown as ClientSupabaseClient, principal);
+
+    expect((await repos.register.list(ctx))[0]!.position).toEqual([]);
+  });
+
+  it('asks the lookup for implementation keys only', async () => {
+    const { client, ctx: repos } = context(true);
+    await repos.register.list(ctx);
+
+    const builder = client.__buildersFor('field_source_minimums').at(0)!;
+    expect(builder.eq).toHaveBeenCalledWith('client_fact_class', 'implementation');
   });
 
   it('asks the disclosure question once per bundle however many surfaces read', async () => {

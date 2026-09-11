@@ -4,22 +4,119 @@ Reconciliation of the [`client-app`](./README.md) spec bundle against the live r
 the live database, and what has been built since. Same purpose and same shape as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** Session 1 and session 2 are built, session 3 is built through `/prepare`. Every
-migration is **written and not applied** — see [Applying the migrations](#applying-the-migrations).
-Three of the bundle's twelve assumptions were wrong, one of them by an order of magnitude, and
-two of the four documents the bundle said to read before session 1 describe things that do not
-exist.
+**Status:** Built against bundle 0.3.0, then revised for **bundle 0.4.0**, which removed the
+licensing premise the first build rested on — see
+[What 0.4.0 changed](#what-040-changed-and-what-it-cost). Session 1 and session 2 are built,
+session 3 is built through `/prepare`. Every migration is **written and not applied** — see
+[Applying the migrations](#applying-the-migrations). Three of the bundle's twelve assumptions
+were wrong, one of them by an order of magnitude.
 **Last updated:** 2026-09-11
 
 ---
 
 ## Picking this up cold
 
-1. **This file** — what was verified, what was wrong, and what each phase shipped.
-2. **[`assumptions.md`](./assumptions.md)** — the twelve assumptions. A2, A3 and A4 now carry
-   verified answers. A1 is still outstanding and is not a code task.
-3. The four spec docs, which were written without the repository to hand. Where they disagree
-   with this file, this file is the one that was checked.
+1. **This file** — what was verified, what was wrong, what each phase shipped, and what the
+   0.4.0 change of approach cost.
+2. **[`changelog.md`](./changelog.md)** — what changed in the bundle and why. 0.4.0 is the one
+   that matters: it removed every licensing and authorisation assumption.
+3. **[`assumptions.md`](./assumptions.md)** — the twelve assumptions. A2, A3 and A4 now carry
+   verified answers. A1 was rewritten by 0.4.0 and is still outstanding, though it is no longer
+   a deed to read.
+4. The spec docs, which were written without the repository to hand. Where they disagree with
+   this file, this file is the one that was checked.
+
+---
+
+## What 0.4.0 changed, and what it cost
+
+The first build was made against bundle 0.3.0, which assumed BTS operated as an Authorised
+Representative under someone else's AFS licence. **0.4.0 removed that premise entirely.** BTS
+has never held an AFS authorisation and has never needed one; it does not give financial
+advice, and bitcoin is not a financial product.
+
+That is a change of position rather than a change of wording, and it reached further into the
+build than a rename would have.
+
+### The migrations were amended in place, not corrected forward
+
+They had never run anywhere — unapplied, on a feature branch. Writing a migration to drop a
+column that has never existed in any database would leave a permanent record of a decision
+that was never enacted, and anyone reading the schema later would have to reconstruct why.
+What changed:
+
+| Change | Why |
+|---|---|
+| `client_classification`, `classification_evidence`, `classification_set_by`, `classification_set_at` dropped | Retail and wholesale are distinctions inside a regime this service is not in |
+| `smsf_wholesale_needs_evidence` dropped | It constrained a column that no longer exists |
+| `company_profile.ar_number`, `.licence_holder`, `.licence_number` dropped; `.acn` added | A licence field could only ever be empty, and an empty one on an export invites the reader to wonder which kind of empty |
+| `compliance_documents.doc_type` retyped | `service_statement` and `information_notice` in; **`fsg` rejected by the CHECK constraint**, because publishing one would imply an authorisation BTS does not hold |
+| `no_fees_mvp` rationale rewritten | Product reason first — independence is the inventory — with INFO 269 as the structural backstop rather than conflicted remuneration |
+
+### The register grew a second gate
+
+Rule 4 changed from "dated, sourced and framed as fact" to **implementation facts, not outcome
+facts**, and that is not a copy change — it decides which rows reach a client surface.
+
+`field_source_minimums` gained `client_fact_class`, and the RLS policy on
+`research_company_facts` admits only `implementation`. The seven live field keys were
+classified in the migration: six implementation, and `operating_metric` — "funding runway",
+"operating context" — marked `outcome`, because how an entity is faring is performance rather
+than precedent.
+
+A key nobody has classified has no row and is invisible. That direction is deliberate: a
+missing implementation fact is a gap, while a leaked outcome fact is the product changing
+shape. A pipeline coining `unrealised_gain` tomorrow reaches subscribers when someone
+classifies it, and not before.
+
+### Cite in a pack was built, and needed a template to land in
+
+The register and `/prepare` are the same feature at two stages, and 0.4.0 joined them. A fact
+row on a register entry can be dropped into the precedent section of a pack in progress,
+carrying its provenance, and the export lists cited facts apart from bound ones — because the
+author selected those and the template supplied the others.
+
+Three decisions inside it worth recording:
+
+- **The citation carries no section id.** It is made from `/register`, which has never seen
+  the pack's template and cannot know its sections. Storing one would mean guessing, and
+  freezing a decision the template is allowed to change when it is next versioned. The
+  precedent section is resolved at render, from whichever section declares
+  `accepts_citations`, and the validator allows at most one.
+- **`StoredPack` records whether its template accepts citations.** So `/register` can answer
+  "which of my packs can take this" without loading templates it has no other reason to fetch,
+  and a pack that cannot hold a citation is not offered rather than accepting one that would
+  render nowhere.
+- **A board paper template was seeded.** Without one, Cite in a pack was a mechanism with
+  nowhere to put a fact — the register would have offered no pack, the action would never have
+  fired, and the feature that makes the register's purpose legible would have been dead on
+  arrival. The board paper is also the only template a corporate subscriber had. It ships as a
+  draft, like the trustee minute, and its section 5 is the precedent section.
+
+A test asserts at least one seeded template has a precedent section, so this cannot silently
+regress.
+
+### Everything else was naming, and naming was load-bearing
+
+"General advice warning" became **information-only notice** everywhere — component, app shell,
+export front matter and its heading. The phrase implies licensed general advice, which is a
+different thing from factual information, and a notice claiming a licence you do not hold is
+worse than no notice because it asserts something untrue about the service.
+
+The FSG became the **Service Statement** at the gate, in the middleware, in the account
+history and in the adapter's disclosure check. `client_disclosures` did not change: the gate,
+the versioning and the re-block behaviour all carry over, which is what the bundle predicted.
+
+A test asserts no export contains the words "afsl", "licence", "license" or "authorised
+representative", so a field for one cannot creep back into `CompanyIdentity` unnoticed.
+
+### What 0.4.0 did not change
+
+The structural rules all survived, and each does more work than before. With an authorisation,
+these rules keep you inside a lane you are allowed to drive in; without one, they are the
+position itself. The two-method write surface, prose never leaving the device, the absence of
+any column for personal circumstances, no conclusions in templates, no call to action on a
+financial product — none of it moved.
 
 ---
 
@@ -146,8 +243,9 @@ Order, and what each does:
 | `20260911050000_client_library.sql` | `client_library_sections` and `client_library_entries` — a third table the bundle assumed rather than specified |
 | `20260911060000_invite_redemption.sql` | `redeem_client_invite()` and `client_invite_details()`, both `SECURITY DEFINER` |
 | `20260911070000_seed_trustee_minute_template.sql` | The trustee minute template, as a **draft** |
+| `20260911080000_seed_board_paper_template.sql` | The board paper template, as a **draft**. The only one with a precedent section |
 
-All eight were applied to a throwaway local Postgres mirroring the live table catalogue, and
+All nine were applied to a throwaway local Postgres mirroring the live table catalogue, and
 every constraint was exercised behaviourally rather than assumed: `no_fees_mvp` rejects a fee
 and accepts a zero-fee row, `active_requires_lex_review` rejects an unreviewed active template,
 the one-active-per-slug index rejects the second, `promotion_needs_approver` rejects an
@@ -171,8 +269,12 @@ After applying, the two manual steps the bundle calls for and no migration can d
 1. Assess every `products_services` row against the DAP and TCP definitions, then
    `ALTER COLUMN is_financial_product SET NOT NULL`. 24 rows today. Until then unassessed rows
    are invisible to subscribers by policy, which is the safe direction.
-2. Draft and load the FSG and the general advice warning, and fill `company_profile`. The
-   disclosure gate serves nothing until this is done, so no subscriber can pass it.
+2. Write and load the **Service Statement** and the information notice, and fill
+   `company_profile`. The gate serves nothing until this is done, so no subscriber can pass
+   it. This is the single thing blocking first login.
+3. Publish the two seeded templates, which ship as drafts. Each needs a Lex reviewer named
+   against it — `active_requires_lex_review` enforces that, and the migration headers carry
+   the `UPDATE`.
 
 ---
 
@@ -277,19 +379,27 @@ almost certainly a suggested allocation.
 
 ## Open, and deliberately so
 
-- **A1, the AR deed.** Outstanding.
-- **The FSG.** Outstanding, and it blocks first login.
+- **A1, now "was the not-advice position assessed against Minute specifically".** Outstanding,
+  and no longer a deed to read — it is a question about whether whoever advised saw a narrated
+  brief, a register of named entities and provider monitoring, or saw the education and
+  consulting business.
+- **The Service Statement.** Outstanding, and it blocks first login.
 - **`is_financial_product` backfill.** 24 rows, human judgement each.
 - **Print fidelity in Safari (A9).** The export is not an export feature until it has been
   tested there, and it has not been.
 - **Co-editing (A10).** Two individual trustees on one minute is the normal case, not an edge
   case, and the working-copy JSON hand-off is a workaround.
 - **The Lex approval queue in `apps/web`.**
-- **The remaining five `/prepare` templates.** The trustee minute was built first on the
+- **The remaining four `/prepare` templates.** The trustee minute was built first on the
   bundle's reasoning that it is the most constrained and surfaces every problem the others will
   have. It did: the SIS Reg 4.09(2) heads are the reason `facts: []` had to be legal on a
   section, and the reason the validator checks that every prompt ends in a question mark rather
-  than trusting the author.
+  than trusting the author. The board paper followed because Cite in a pack needed a precedent
+  section to land in.
+- **Cited-fact staleness**, the open question 0.4.0 added. A fact cited in March and refreshed
+  in May may carry a newer date and a changed value while the prose around it still argues the
+  old one. The export states both dates so a reader can see it; nothing detects the stale
+  sentence, and the spec is right that it is probably unsolvable.
 - **A fixture adapter for the client domains.** There is none, which is why conformance
   assertion 5 is two partial checks rather than one whole one. If `apps/client` ever gets a demo
   surface, the harness is already parameterised for it.

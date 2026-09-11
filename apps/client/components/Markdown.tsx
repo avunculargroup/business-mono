@@ -3,10 +3,10 @@ import styles from './Markdown.module.css';
 /**
  * A small markdown renderer for authored, reviewed prose.
  *
- * Everything it renders — FSG text, library entries, brief narration — is
- * written by BTS and has been through Lex. None of it is user input and none of
- * it is fetched from a third party, which is what makes a renderer this size
- * defensible instead of reckless.
+ * Everything it renders — the Service Statement, library entries, brief
+ * narration — is written by BTS and has been through Lex. None of it is user
+ * input and none of it is fetched from a third party, which is what makes a
+ * renderer this size defensible instead of reckless.
  *
  * It does not render raw HTML, and that is the security property: the input is
  * escaped by React at every leaf, so a stray `<script>` in a library entry
