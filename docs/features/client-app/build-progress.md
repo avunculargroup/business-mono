@@ -140,9 +140,31 @@ Order, and what each does:
 |---|---|
 | `20260911000000_rls_hardening.sql` | `is_team_member()`, all 114 policy rewrites, the two deliberate exceptions, the regression guard |
 | `20260911010000_compliance_documents.sql` | The two tables A4 assumed existed. No seed data. |
-| `20260911020000_client_tables.sql` | `client_accounts`, `client_users`, `client_disclosures`, the disjointness triggers, `current_client_account_id()`, `v_client_subscriptions` |
+| `20260911020000_client_tables.sql` | `client_accounts`, `client_users`, `client_disclosures`, `client_invites`, the disjointness triggers, `current_client_account_id()`, `v_client_subscriptions` |
 | `20260911030000_directory_and_signals.sql` | Financial product classification, client notes, `commercial_relationships` and `no_fees_mvp`, client read policies on the spine tables |
 | `20260911040000_prepare.sql` | `prepare_templates`, `prepare_generations`, `v_prepare_template_reviews` |
+| `20260911050000_client_library.sql` | `client_library_sections` and `client_library_entries` — a third table the bundle assumed rather than specified |
+| `20260911060000_invite_redemption.sql` | `redeem_client_invite()` and `client_invite_details()`, both `SECURITY DEFINER` |
+| `20260911070000_seed_trustee_minute_template.sql` | The trustee minute template, as a **draft** |
+
+All eight were applied to a throwaway local Postgres mirroring the live table catalogue, and
+every constraint was exercised behaviourally rather than assumed: `no_fees_mvp` rejects a fee
+and accepts a zero-fee row, `active_requires_lex_review` rejects an unreviewed active template,
+the one-active-per-slug index rejects the second, `promotion_needs_approver` rejects an
+unapproved promotion, `client_clearance_needs_approver` rejects an unapproved clearance,
+`smsf_wholesale_needs_evidence` rejects an undocumented wholesale SMSF, the disjointness
+trigger rejects a founder as a subscriber, and `audit_permissive_policies()` returns zero rows.
+
+That run caught three things a review would probably not have:
+
+- **A policy ordering bug.** `research_companies_client_read` referenced `client_cleared`
+  before the `ALTER TABLE` that adds it. The migration would have failed halfway.
+- **`report_segments` belongs to `reports`, not `market_reports`.** A read policy joining the
+  two would have matched nothing while looking correct. The Brief's findings are a JSONB column
+  on `market_reports`, so the policy was removed rather than fixed.
+- **`research_classifications` has no `company_id`.** It is keyed `subject_table`/`subject_id`
+  per *field*, so the register's clearance flag went on `research_companies` instead — which is
+  also the right place for it, since clearing an entry is a decision about the whole entry.
 
 After applying, the two manual steps the bundle calls for and no migration can do:
 
@@ -193,6 +215,15 @@ recorded here rather than quietly downgraded.
   acknowledgement with document version, timestamp and IP.
 - The app shell with the standing general advice warning in the layout rather than per route.
 
+**Deviation:** the invite flow needed a privileged insert — a subscriber cannot hold an
+`INSERT` policy on `client_users`, because a seat that can create seats is not a seat. The
+obvious way out is a service-role key in `apps/client`, and it is the wrong way out: the service
+role bypasses RLS, so one key in one server action would make the hardening migration
+decorative. The privilege went into two `SECURITY DEFINER` functions instead, each with one job
+and a body readable in a migration diff. `redeem_client_invite` refuses an invitation redeemed
+by an address other than the one it was issued to, and returns the same message for every
+failure mode so it cannot be used to guess tokens.
+
 **Not built:** the Lex client-promotion gate and its approval queue in `apps/web` (session 2
 tasks 7 and 8). The schema half is in place — promotion cannot happen without
 `client_promoted_by` and `client_promoted_at`, enforced by `promotion_needs_approver` — so no
@@ -214,6 +245,34 @@ were built before their populated counterparts on every route that has one.
 blocklist, the IndexedDB store, fact resolution with absence-as-fact, the trustee minute
 template end to end, and export with generated front matter and provenance appendix.
 
+**The last check is a test, not a ritual.** The session plan asks someone to open the network
+tab, complete a board paper, export it, and look for a typed sentence in a request body.
+`apps/client/lib/prepare/prose.test.ts` makes that structural instead: the modules holding
+subscriber prose are asserted to contain no `fetch`, no `XMLHttpRequest`, no `sendBeacon`, no
+WebSocket and no server action, so there is no request body for a sentence to end up in. Weaker
+than the manual check in one way — it cannot see a leak introduced in a component — and stronger
+in another, because it runs on every commit. The component side is covered by the write-surface
+case in `lib/boundary.test.ts`.
+
+**The trustee minute ships as a draft.** `active_requires_lex_review` would reject an active row
+with no reviewer, and the right response to that constraint is to respect it rather than name a
+reviewer who has not read the template. The migration header carries the `UPDATE` that publishes
+it. A test runs every seeded template through the real parser and validator, so one cannot be
+seeded broken, and asserts no template body contains a bare percentage — which in a template is
+almost certainly a suggested allocation.
+
+**Two additional deviations, both places where writing a test changed the design:**
+
+- The boundary test's write rule originally matched `.insert(` anywhere and caught
+  `lib/prepare/store.ts`, which does nothing but write — to IndexedDB, on the subscriber's own
+  device, which is the entire two-layer model working. A test that has to be suppressed on the
+  file it was most meant to protect is the wrong test, so it now matches the query-builder
+  shape, with a case proving it still catches a real table write.
+- Conformance assertion 7 was passing vacuously, because the templates fixture was defined and
+  never wired in. Fixing it exposed a flaw in the harness rather than the fixture: it assumed
+  one context could answer as both a corporate and an SMSF subscriber, which no real adapter
+  does, because tenancy is bound at construction. `createContext` now takes a client type.
+
 ---
 
 ## Open, and deliberately so
@@ -228,4 +287,9 @@ template end to end, and export with generated front matter and provenance appen
 - **The Lex approval queue in `apps/web`.**
 - **The remaining five `/prepare` templates.** The trustee minute was built first on the
   bundle's reasoning that it is the most constrained and surfaces every problem the others will
-  have. It did.
+  have. It did: the SIS Reg 4.09(2) heads are the reason `facts: []` had to be legal on a
+  section, and the reason the validator checks that every prompt ends in a question mark rather
+  than trusting the author.
+- **A fixture adapter for the client domains.** There is none, which is why conformance
+  assertion 5 is two partial checks rather than one whole one. If `apps/client` ever gets a demo
+  surface, the harness is already parameterised for it.

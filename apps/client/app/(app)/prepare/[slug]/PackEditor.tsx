@@ -254,17 +254,16 @@ function Enquiry({
         </div>
       ) : null}
 
-      <label>
-        <span className="sr-only" />
-        <textarea
-          className={styles.textarea}
-          value={body}
-          onChange={(event) => change(event.target.value)}
-          onBlur={() => void onPersist(section.id, body, skipped)}
-          aria-label={section.prompt}
-          disabled={skipped}
-        />
-      </label>
+      {/* The prompt above is the label, so the field carries it via aria-label
+          rather than being wrapped in a second, visually-empty one. */}
+      <textarea
+        className={styles.textarea}
+        value={body}
+        onChange={(event) => change(event.target.value)}
+        onBlur={() => void onPersist(section.id, body, skipped)}
+        aria-label={section.prompt}
+        disabled={skipped}
+      />
 
       <div className={styles.enquiryActions}>
         <button
