@@ -21,6 +21,9 @@ If the user invokes this skill without any other guidance, ask them what they wa
 
 - `README.md` — full brand, voice, visual, and iconography guidance
 - `colors_and_type.css` — CSS variables: colours, type, spacing, radii, shadows, motion
+- `references/naming.md` — the product and company names, the three registers of the company
+  name, the Minute lockup specs, vernacular, and the prohibited word list. Read it before
+  writing any user-facing copy or naming anything.
 - `assets/bts-logo.svg` — the brand mark
 - `ui_kits/platform/` — JSX components + `index.html` for the internal platform
 - `preview/` — individual design-system cards (colour swatches, type specimens, components)
