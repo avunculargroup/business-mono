@@ -13,9 +13,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.5"
+    "typescript": "^5.5",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

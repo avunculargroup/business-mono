@@ -19,6 +19,10 @@
     "./types": {
       "types": "./src/types/database.ts",
       "import": "./dist/types/database.js"
+    },
+    "./types/pending": {
+      "types": "./src/types/pendingClientTables.ts",
+      "import": "./dist/types/pendingClientTables.js"
     }
   },
   "main": "dist/index.js",
@@ -31,7 +35,8 @@
     "db:migrate": "npx supabase db push",
     "db:diff": "npx supabase db diff",
     "db:pull": "npx supabase db pull",
-    "db:reset": "npx supabase db reset"
+    "db:reset": "npx supabase db reset",
+    "test": "vitest run"
   },
   "dependencies": {
     "@platform/shared": "workspace:*",
@@ -42,6 +47,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
-    "typescript": "^5.5"
+    "typescript": "^5.5",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

@@ -20,3 +20,17 @@ export { createEcosystemRepository } from './repositories/ecosystem';
 export { createIndicatorsRepository } from './repositories/indicators';
 export { createMarketReportRepository } from './repositories/marketReports';
 export { createResearchRepository } from './repositories/research';
+
+/**
+ * The client adapter. A different scope over the same database, not a different
+ * database — `apps/client` composes this instead of `createSupabaseRepositories`.
+ */
+export {
+  createClientAdapterContext,
+  requireDisclosure,
+  DisclosureRequiredError,
+  type ClientAdapterContext,
+  type ClientSupabaseClient,
+} from './client/context';
+export { createClientRepositories } from './client/bundle';
+export { FACT_SOURCES, KNOWN_FACT_KEYS, type FactSource } from './client/facts';

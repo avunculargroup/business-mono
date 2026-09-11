@@ -28,15 +28,18 @@ export type RepositoryMode = 'live' | 'demo' | 'client';
  * returns a bundle that cannot see rows outside it, so a caller has no way to
  * ask the wrong question.
  *
- * Only the internal team principal exists today. A `client` variant becomes a
- * second member of this union if and when the client app firms up; nothing in
- * the seam has to change for that, which is the whole point of settling the
- * rule before the verticals landed.
+ * The `client` variant is that second member, added when `apps/client` landed.
+ * Nothing else in the seam changed for it, which is the whole point of settling
+ * the rule before the verticals did — a differently-scoped consumer is a
+ * different construction, not a signature change across every repository.
+ *
+ * `accountId` is on the principal rather than on any method for the same
+ * reason: a subscriber's tenancy is decided once, at construction, and a caller
+ * holding the bundle has no way to ask about another account.
  */
-export interface Principal {
-  kind: 'team';
-  userId: string;
-}
+export type Principal =
+  | { kind: 'team'; userId: string }
+  | { kind: 'client'; userId: string; accountId: string };
 
 /**
  * Every domain the seam knows about.
