@@ -94,6 +94,18 @@ describe('PositionPanel', () => {
     expect(screen.getAllByText(/308\.8 BTC/).length).toBeGreaterThan(0);
   });
 
+  it('states that no holdings were sourced rather than rendering a zero total', () => {
+    // Two of the three companies in the register are in exactly this state: a
+    // record with documents and facts but no holdings snapshot at a source
+    // class the register accepts. A bare "0 BTC" would read as a sourced
+    // figure meaning the company holds nothing, which is a different and
+    // wrong claim.
+    withRail(<PositionPanel asset="btc" comparableTotal={0} rows={[]} excluded={[]} />);
+
+    expect(screen.getByText(/No holdings snapshot has been sourced/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 BTC/)).not.toBeInTheDocument();
+  });
+
   it('flags a holding in a vehicle the issuer manages', () => {
     withRail(
       <PositionPanel asset="btc" comparableTotal={0} rows={[lookThrough]} excluded={[lookThrough]} />,
