@@ -43,6 +43,14 @@ Transform tasks into verifiable goals before implementing:
 - `apps/web` has its own Vitest suite (`pnpm --filter @platform/web test`), same convention: a `*.test.{ts,tsx}` next to the module, tests run against TS source via the `vitest.config.ts` workspace aliases. Pure-logic `*.test.ts` run in the `node` environment; component `*.test.tsx` run in `jsdom` with React Testing Library + `@testing-library/jest-dom` matchers (registered in `test/setup.ts`). The two environments are split via `test.projects` in `vitest.config.ts` — one project per environment, each matching its own file extension and carrying `extends: true` so it inherits the root `resolve.alias`, `oxc.jsx`, and `setupFiles`. A new component test only needs the `.test.tsx` extension to land in `jsdom`. Prefer role/text/attribute queries over CSS-module class names. Server-component pages are tested by mocking `@/lib/supabase/server` with the chainable fake in `test/mocks/supabase.ts` (web-side counterpart to the agents mock) and stubbing the interactive client child via `vi.mock`, then asserting query wiring + prop hand-off (see `app/(app)/crm/companies/page.test.tsx`). Root `pnpm test` runs every package via Turborepo — `apps/agents`, `apps/web`, `packages/ui`, `packages/voice` — so all are gated by the PR workflow.
 - `packages/ui` has its own Vitest suite (`pnpm --filter @platform/ui test`). It is jsdom throughout, with no node/jsdom project split, because every module in it renders. Shared presentational components and their `*.test.tsx` live here, **not** in `apps/web/components/` — there is no `components/ui/` in the app any more. Design tokens live in `packages/ui/src/tokens.css`; `apps/web/app/globals.css` only carries app-level base styles and defines no tokens.
 - `packages/data`, `packages/data-supabase` and `packages/data-fixtures` each have their own Vitest suite (`pnpm --filter @platform/data test`). A new repository domain adds its cases to the shared contract harness in `packages/data/src/testing/` — parameterised over an adapter and imported as `@platform/data/testing` — rather than building its own; both the live and fixture adapters must pass the same suite (`@platform/data-fixtures` runs it in `src/bundle.test.ts`). Do not add fields to `ReadContext`: it is guarded at compile time and by `context.test.ts`, because scoping belongs at bundle construction and never in a method argument (see `docs/features/demo-app/repository-contract.md`).
+- `apps/client` has its own Vitest suite (`pnpm --filter @platform/client test`), same
+  node/jsdom project split as `apps/web` and `apps/demo`. Three of its tests are structural
+  rather than behavioural and should be treated as load-bearing: `lib/boundary.test.ts` (no
+  agent stack, no service-role key, no direct table write), `lib/prepare/prose.test.ts` (the
+  modules holding subscriber prose contain no transport at all), and
+  `lib/prepare/templates.test.ts` (every seeded `/prepare` template parses and validates).
+  `packages/shared` and `packages/db` now have suites too — the first because the `/prepare`
+  template parser lives there, the second because of the pending-types bridge below.
 - Design tokens are guarded by `apps/web/app/globals.test.ts`, which asserts the canonical set and that `.claude/skills/bts-design/colors_and_type.css` stays identical to it. That skill file is a deliberate copy, not an `@import`, because the skill's workflow is to copy assets out of the repo — change a token in one and you must change it in the other in the same commit, or the build goes red.
 - Visual regression (`e2e/`, Playwright) is **advisory and separate** from `pnpm test`. Run it with `pnpm test:visual`, which shells out to the same container image CI uses — baselines are container-specific, so a raw local run (`test:visual:local`) diffs on text-heavy specimens and is not a regression. See `.github/workflows/e2e.yml`.
 
@@ -55,6 +63,7 @@ Transform tasks into verifiable goals before implementing:
 │   ├── agents/          # Mastra AI agents server (Railway)
 │   │   ├── evals/       # LLM-touching evals (runEvals + scorers) — `pnpm test:eval`
 │   │   └── test/        # Shared Vitest helpers (mocks, factories, setup)
+│   ├── client/          # Minute — invite-only paid subscription app (Next.js, Vercel)
 │   ├── demo/            # Public fixture-backed demo (Next.js) — no DB client, no auth, read-only
 │   └── web/             # Next.js frontend (Vercel) — dashboards, approvals, settings, per-agent pages
 ├── packages/
@@ -97,12 +106,18 @@ Transform tasks into verifiable goals before implementing:
 - `@platform/voice` — voice/transcription helpers
 - `@platform/agents` — Mastra agent server (not consumed by other packages)
 - `@platform/demo` — the public demo app (not consumed by other packages)
+- `@platform/client` — Minute, the client app (not consumed by other packages)
 - `@platform/web` — Next.js frontend (not consumed by other packages)
 
 ### Import rules
 
 - `apps/agents` imports from `@platform/agent-traces`, `@platform/db`, `@platform/shared`, and `@platform/signal`
 - `apps/web` imports from `@platform/data`, `@platform/data-supabase`, `@platform/db`, `@platform/shared` and `@platform/ui` (NOT `@platform/signal`)
+- `apps/client` imports the same set as `apps/web`. It holds a database client, because it is
+  an authenticated app — what its boundary test asserts instead is that it cannot reach
+  `@platform/signal`, `@platform/voice` or the agent stack, cannot name a service-role key, and
+  writes to no table directly. Every tenancy guarantee it makes is an RLS policy, so one
+  service-role key would make the whole hardening migration decorative
 - `apps/demo` imports from `@platform/agent-traces`, `@platform/data`, `@platform/data-fixtures`, `@platform/shared` and `@platform/ui` — and nothing else. It must never gain a dependency that can open a database connection; `apps/demo/lib/boundary.test.ts` asserts the whole transitive graph, so adding one goes red
 - `packages/data` imports from `@platform/shared` only — no database client, no app code. Its read
   models reuse the enums the ingestion side already defines rather than re-declaring them.
@@ -288,6 +303,8 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`packages/db/src/client.ts`        |Supabase client initialisation                                                                                 |
 |`packages/db/src/rpc/vectorSearch.ts`, `fulltextSearch.ts`, `graphTraverse.ts`, `newsSearch.ts`|Knowledge query wrappers — use these instead of writing raw RPC calls                              |
 |`packages/shared/src/types.ts`     |Shared TypeScript types and enums                                                                              |
+|`packages/shared/src/prepare.ts`   |`/prepare` template parser, validator and the prohibited-conclusion blocklist. Three packages consume it; a second implementation would eventually disagree with this one about what a valid template is|
+|`packages/db/src/types/pendingClientTables.ts`|**Temporary.** Hand-written types for the client-app tables, because the generated types come from the live database and those migrations are deliberately unapplied. Delete it once they are applied and types regenerated — its test says so|
 |`packages/shared/src/modelScopes.ts`|Registry of every agent and AI-using workflow step that can be model-configured via `/settings/models`. Add new entries here whenever you add an agent or an LLM-calling workflow step|
 |`packages/signal/src/client.ts`    |Signal CLI HTTP client                                                                                         |
 |`infra/signal-cli/README.md`       |Sidecar deployment and registration instructions                                                               |
@@ -316,6 +333,9 @@ Read the relevant docs BEFORE writing code.
 |Supabase queries, RPC functions, vector/graph search     |`packages/db/src/rpc/`                                       |Check existing wrappers before writing raw queries                                            |
 |Corporate research — the register, the ingest workflow, the pages|`docs/features/corporate-holdings/build-progress.md` first, then `corporate-research-spec.md`|The spec bundle was written without the repo to hand; build-progress records every name that moved and two pieces of its reference DDL that would have failed at run time. Three rules are enforced in the schema and must not be re-implemented in code: `holding_bases.comparable` gates aggregates, a trigger gates source class at write time, and no lookup keys on a ticker|
 |Repository interfaces, a new data domain, `apps/web` data wiring|`docs/features/demo-app/repository-contract.md` + `docs/features/demo-app/build-progress.md`|Read models not tables, filtering pushed into the adapter, scoping at construction never in a signature, one contract suite both adapters pass|
+|Anything in `apps/client` (Minute), the client tables, `/prepare`|`docs/features/client-app/build-progress.md` first, then `client-app-mvp-spec.md` and `prepare-feature-spec.md`|The bundle was written without the repo to hand and three of its assumptions were wrong. Four rules must not be re-litigated in code: the write surface is exactly two methods and neither takes free text; composed subscriber prose never leaves the device; `is_financial_product = true` means the card emits no anchor at all; and there is no service-role key in that app, ever|
+|RLS policies, on any table|`supabase/migrations/20260911000000_rls_hardening.sql`|`is_team_member()` is the team predicate and `current_client_account_id()` the subscriber one. `audit_permissive_policies()` must return zero rows — a new table copying the old `auth.role()` or `USING (true)` pattern is how 114 policies accumulated unnoticed|
+|Client-facing copy, or naming anything|`.claude/skills/bts-design/references/naming.md`|Three registers of the company name, the Minute lockup, the vernacular, and a prohibited word list that is longer than it looks — "advice", "recommend", "should", "best" and "signal" as a verb are all on it|
 |Anything touching Bitcoin terminology                    |`docs/brand-voice.md`                                        |Capital B = network/protocol, lowercase b = currency/unit                                     |
 |Signal integration, Simon's messaging                    |`packages/signal/` + `infra/signal-cli/README.md`            |Client API and sidecar deployment                                                             |
 |Fastmail accounts, exclusions, email review queue        |`apps/web/app/(app)/settings/integrations/fastmail/`         |Web UI for managing DB-stored accounts and exclusions                                         |
