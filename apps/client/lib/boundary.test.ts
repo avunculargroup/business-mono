@@ -122,23 +122,41 @@ describe('the Minute dependency boundary', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('has no write path beyond the two the contract allows', () => {
+  it('has no database write path beyond the two the contract allows', () => {
     // Rule 1 of the compliance architecture: the app never captures a
     // subscriber's personal circumstances, and the enforcement is that there is
     // nowhere to put them. `apps/demo` asserts its write surface is empty; this
     // app's is exactly two methods, so the equivalent assertion is that no
-    // source file inserts or updates anything directly.
+    // source file writes to a table directly.
+    //
+    // Matched on the query-builder shape — `.from('table')` followed by a
+    // mutation — rather than on the method names alone. The first version of
+    // this test matched `.insert(` anywhere and caught `lib/prepare/store.ts`,
+    // which does nothing but write: to IndexedDB, on the subscriber's own
+    // device, which is the entire two-layer model working as designed. A test
+    // that has to be suppressed on the file it was most meant to protect is
+    // the wrong test.
+    const TABLE_WRITE = /\.from\(\s*['"][a-z_]+['"]\s*\)[\s\S]{0,240}?\.(insert|update|upsert|delete)\(/;
+
     const offenders = sourceFiles(APP_ROOT)
       .filter((file) => !file.endsWith('boundary.test.ts'))
-      .filter((file) => {
-        const source = readFileSync(file, 'utf8');
-        return /\.(insert|update|upsert|delete)\(/.test(source);
-      });
+      .filter((file) => TABLE_WRITE.test(readFileSync(file, 'utf8')));
 
     expect(
       offenders.map((f) => f.replace(APP_ROOT, '')),
       'Writes belong in ClientWriteRepository, which is two methods and no free '
         + 'text. A write here is a write nobody reviewed against Rule 1.',
     ).toEqual([]);
+  });
+
+  it('still catches a direct table write when one is added', () => {
+    // The narrowing above could have been narrowed into uselessness, so the
+    // pattern is exercised against the thing it exists to catch.
+    const TABLE_WRITE = /\.from\(\s*['"][a-z_]+['"]\s*\)[\s\S]{0,240}?\.(insert|update|upsert|delete)\(/;
+
+    expect(
+      TABLE_WRITE.test("await supabase.from('client_users').update({ full_name: name })"),
+    ).toBe(true);
+    expect(TABLE_WRITE.test("await store.put(pack); await store.delete(id)")).toBe(false);
   });
 });

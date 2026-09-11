@@ -136,7 +136,21 @@ const TEMPLATE_ROWS = [
   },
 ];
 
-function seed(client: FakeSupabaseClient, acknowledged: boolean): void {
+/**
+ * `clientType` shapes what the templates table returns, because the canned-
+ * response fake cannot honour the adapter's own `.in('client_type', …)`.
+ *
+ * So the fake answers the way Postgres would, and a separate case below
+ * asserts the adapter actually issues that filter. Two partial checks where a
+ * real RLS session would give one whole one — the same limitation assertion 5
+ * carries, recorded in docs/features/client-app/build-progress.md rather than
+ * papered over.
+ */
+function seed(
+  client: FakeSupabaseClient,
+  acknowledged: boolean,
+  clientType: 'corporate' | 'smsf' = 'corporate',
+): void {
   client.__setResponse('compliance_documents', { data: FSG, error: null });
   client.__setResponse('client_disclosures', {
     data: acknowledged ? { id: 'ack-1' } : null,
@@ -160,14 +174,20 @@ function seed(client: FakeSupabaseClient, acknowledged: boolean): void {
   client.__setResponse('commercial_relationships', { data: [], error: null });
   client.__setResponse('client_library_sections', { data: [], error: null });
   client.__setResponse('client_library_entries', { data: [], error: null });
+  client.__setResponse('prepare_templates', {
+    data: TEMPLATE_ROWS.filter(
+      (row) => row.client_type === 'both' || row.client_type === clientType,
+    ),
+    error: null,
+  });
   client.__setResponse('client_users', { data: { id: principal.userId, account_id: 'account-1' }, error: null });
   client.__setResponse('client_accounts', { data: null, error: null });
   client.__setResponse('company_profile', { data: null, error: null });
 }
 
-function context(acknowledged: boolean) {
+function context(acknowledged: boolean, clientType: 'corporate' | 'smsf' = 'corporate') {
   const client = createFakeSupabase();
-  seed(client, acknowledged);
+  seed(client, acknowledged, clientType);
   return {
     client,
     ctx: createClientRepositories(client as unknown as ClientSupabaseClient, principal),
@@ -176,7 +196,7 @@ function context(acknowledged: boolean) {
 
 describeClientContract({
   name: 'supabase',
-  createContext: () => context(true).ctx,
+  createContext: (clientType) => context(true, clientType).ctx,
   createUndisclosedContext: () => context(false).ctx,
   scenario: {
     clearedFactKey: 'btc_spot_aud',
@@ -315,6 +335,45 @@ describe('the client adapter beyond the conformance suite', () => {
     const repos = createClientRepositories(client as unknown as ClientSupabaseClient, principal);
 
     expect((await repos.signals.list(ctx))[0]!.isAbsenceSignal).toBe(true);
+  });
+
+  it('filters templates on the session\'s client type, not in the component', async () => {
+    const { client, ctx: repos } = context(true);
+    await repos.prepare.templates(ctx, 'corporate');
+
+    const builder = client.__buildersFor('prepare_templates').at(0)!;
+    expect(builder.eq).toHaveBeenCalledWith('status', 'active');
+    expect(builder.in).toHaveBeenCalledWith('client_type', ['both', 'corporate']);
+  });
+
+  it('serves an smsf session the smsf template and not the corporate one', async () => {
+    const { ctx: repos } = context(true, 'smsf');
+    const templates = await repos.prepare.templates(ctx, 'smsf');
+
+    expect(templates.map((template) => template.slug)).toEqual(['trustee-minute']);
+  });
+
+  it('parses the stored template body into sections', async () => {
+    const { ctx: repos } = context(true);
+    const [template] = await repos.prepare.templates(ctx, 'corporate');
+
+    expect(template!.sections).toHaveLength(1);
+    expect(template!.sections[0]!.prompt).toBe('What decision is sought?');
+  });
+
+  it('lets the row win over the body when they disagree on client type', async () => {
+    // prepare_templates_client_read filters on the column, so a body claiming
+    // 'both' while the column says 'smsf' must not widen who receives it.
+    const client = createFakeSupabase();
+    seed(client, true);
+    client.__setResponse('prepare_templates', {
+      data: [{ ...TEMPLATE_ROWS[0], body: '---\nclient_type: both\n---\n' }],
+      error: null,
+    });
+    const repos = createClientRepositories(client as unknown as ClientSupabaseClient, principal);
+
+    const [template] = await repos.prepare.templates(ctx, 'corporate');
+    expect(template!.clientType).toBe('corporate');
   });
 
   it('asks the disclosure question once per bundle however many surfaces read', async () => {

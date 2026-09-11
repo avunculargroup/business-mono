@@ -19,6 +19,7 @@ import {
   CLIENT_READ_DOMAINS,
   type ClientDataContext,
   type ClientReadDomain,
+  type ClientType,
   type Fact,
 } from '../repositories/client';
 import { testReadContext } from './contract';
@@ -37,8 +38,15 @@ export interface ClientAdapterUnderTest {
   /** Appears in the test name, e.g. 'supabase'. */
   name: string;
 
-  /** A context for a subscriber whose disclosure is current. */
-  createContext(): ClientDataContext | Promise<ClientDataContext>;
+  /**
+   * A context for a subscriber whose disclosure is current.
+   *
+   * Takes the client type because tenancy is bound at construction, not passed
+   * per call — so one context cannot answer as both a corporate and an SMSF
+   * subscriber, and a harness that assumed it could would be asserting
+   * something no real adapter does. Assertion 7 needs one of each.
+   */
+  createContext(clientType: ClientType): ClientDataContext | Promise<ClientDataContext>;
 
   /**
    * A context for a subscriber who has not acknowledged the current FSG.
@@ -94,7 +102,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 1 — the write surface is exactly ClientWriteRepository
     // --------------------------------------------------------
     it('exposes no mutating method outside the write repository', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
 
       for (const [domain, repo] of readDomains(ctx)) {
         for (const name of methodNames(repo)) {
@@ -109,7 +117,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     });
 
     it('keeps the write repository to the two writes the app is allowed', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
 
       expect(methodNames(ctx.writes).sort()).toEqual([
         'acknowledgeDisclosure',
@@ -121,7 +129,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 2 — Fact.value is always a string
     // --------------------------------------------------------
     it('serves every fact value as a string, including the numeric-looking ones', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const { facts } = await ctx.prepare.resolveFacts(read, [
@@ -140,7 +148,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     });
 
     it('serves indicator points as strings too', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const available = await ctx.indicators.available(read);
@@ -160,7 +168,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 3 — an uncleared key comes back absent, not dropped
     // --------------------------------------------------------
     it('returns an uncleared fact key in `absent` rather than dropping it', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
       const key = adapter.scenario.unclearedFactKey;
 
@@ -175,7 +183,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     });
 
     it('does not throw on an unknown fact key', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const resolved = await ctx.prepare.resolveFacts(read, ['no_such_fact_key_at_all']);
@@ -187,7 +195,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 4 — no brief and a quiet brief are different states
     // --------------------------------------------------------
     it('distinguishes no brief from a brief that says nothing happened', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const brief = await ctx.brief.latest(read);
@@ -206,7 +214,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 5 — unpromoted signals never appear
     // --------------------------------------------------------
     it('returns no unpromoted signal', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const signals = await ctx.signals.list(read);
@@ -221,7 +229,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     // 7 — a corporate session sees no SMSF template
     // --------------------------------------------------------
     it('serves a corporate session no smsf template', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('corporate');
       const read = testReadContext();
 
       const templates = await ctx.prepare.templates(read, 'corporate');
@@ -232,7 +240,7 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
     });
 
     it('serves an smsf session no corporate template', async () => {
-      const ctx = await adapter.createContext();
+      const ctx = await adapter.createContext('smsf');
       const read = testReadContext();
 
       const templates = await ctx.prepare.templates(read, 'smsf');

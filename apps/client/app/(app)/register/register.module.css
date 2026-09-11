@@ -1,0 +1,151 @@
+.tier {
+  margin-bottom: var(--space-8);
+}
+
+.tierLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.row {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--color-surface-hover);
+}
+
+.name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  flex: 1;
+  min-width: 24ch;
+}
+
+.jurisdiction,
+.tickers {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* Detail view */
+.facts {
+  list-style: none;
+  margin: 0 0 var(--space-8);
+  padding: 0;
+}
+
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.factLabel {
+  flex: 1;
+  min-width: 22ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.factValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.factDate {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  min-width: 11ch;
+}
+
+/* Stated absences render exactly like facts, because they are facts. Dimming
+   them would file them as missing data rather than as findings. */
+.absences {
+  list-style: none;
+  margin: 0 0 var(--space-8);
+  padding: 0;
+}
+
+.absence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.absenceLabel {
+  flex: 1;
+  min-width: 22ch;
+  font-size: var(--text-sm);
+}
+
+.absenceReason {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.event {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.eventDate {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 11ch;
+}
+
+.eventDescription {
+  flex: 1;
+  min-width: 28ch;
+}
+
+.eventSource {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
