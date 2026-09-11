@@ -4,10 +4,10 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** All three sessions complete, plus one production fix (session 4). Two things
-remain, both needing network access to real filings: the ingest run against Locate's own
-documents, and the recorded trace bundle.
-**Last updated:** 2026-09-05
+**Status:** All three sessions complete, one production fix (session 4), and the register
+seeded to three records (session 5). Two things remain, both needing network access to real
+filings: the ingest run against Locate's own documents, and the recorded trace bundle.
+**Last updated:** 2026-09-11
 
 ---
 
@@ -302,3 +302,99 @@ takes each provenance view's last definition, and asserts the projection list ca
 column `toProvenance` maps. It is red on the unfixed schema and green on the fixed one.
 
 **Verified.** `pnpm test` (13 packages, 2,355 tests) and `turbo typecheck` green.
+
+---
+
+## Session 5 — records 2 and 3 into the register
+
+The register held one company. The three dossiers describe three, and the other two had
+never been entered: `research_companies` had a single row, and no migration but
+`20260904010000_seed_locate_technologies.sql` ever wrote to it. Records 2 and 3 were always
+meant to arrive through `researchIngest`, which is still blocked on network access to real
+filings — so the register stayed at one while the ingest run waited.
+
+**Shipped.** `supabase/migrations/20260911000000_seed_digitalx_and_block.sql` — DigitalX
+Limited (`digitalx`, regional, native exposure) and Block, Inc. (`block-inc`, bellwether,
+operational integration), both `is_published = FALSE`. Identity, former names, listings,
+documents, the facts the gate admits, and one structural absence. Eleven documents, eight
+facts, five listings, one absence.
+
+**No ledger, and that is the point.** No `treasury_events`, no
+`treasury_holdings_snapshots` for either record. The ingest acceptance criterion is to run
+the workflow over a company's filings and diff its output against a hand-entered record;
+Locate is that baseline. Hand-entering two more ledgers would spend records 2 and 3 as
+independent checks before the workflow has ever run — three hand-made records prove only
+that the same pair of hands made all three. The quantities wait for the run meant to
+produce them.
+
+It is also what the dossiers support. Neither record has a quantity that could be entered
+honestly: DigitalX's "364 BTC" headline carries no stated basis and sits between its own
+308.8 direct and 503.7 look-through figures, and Block's 28,355 BTC is corporate treasury
+plus customer assets held via Cash App, of which only 8,997.89 is the company's. Both need
+`basis` vocabulary that does not exist yet — `stated_unreconciled` and a value for customer
+assets held alongside corporate treasury.
+
+### What the source-class gate refused
+
+Four claims could not be stored as facts. Each is in `curator_notes` with its provenance,
+and the document it came from is registered so the claim has a visible home — the same
+shape as Locate's Treasury Management Policy, registered and populating nothing.
+
+| Claim | Source | Rank vs required |
+|---|---|---|
+| DigitalX's 17 Feb 1999 ASX listing date | third-party profile | 6 vs 5 (`identity`) |
+| Block's ISIN, former tickers, FY2025 figures | encyclopaedia | 6 vs 5 (`identity`) |
+| Block's ASU 2023-08 fair-value election | 10-K (`audited_accounts`) | 3 vs 2 (`accounting_treatment`) |
+| Block's DCA purchase policy | Bitcoin Blueprint (`company_web`) | 5 vs 2 (`mandate`) |
+
+All four refusals were executed against Postgres 16 rather than reasoned about; the first
+three are asserted in the verification below.
+
+`isin` is left NULL on Block's row rather than filled from an encyclopaedia. It is key
+material, and the register resolves on registration numbers.
+
+### One thing to decide: audited accounts cannot state an accounting treatment
+
+The third row above is not a judgement about Block. `field_source_minimums` ranks
+`audited_accounts` (3) below `exchange_announcement` (2) and sets `accounting_treatment`'s
+minimum at 2 — so audited financial statements cannot populate an accounting-treatment
+fact, while an unaudited quarterly can. For measurement bases that ordering looks inverted:
+the 10-K is the authoritative source for an accounting election and is the one source the
+gate refuses.
+
+The cost is concrete. Two ASX-quoted bitcoin holders whose identical economic exposure
+produces opposite earnings behaviour — Locate's AASB 138 revaluation routing gains to OCI
+against Block's fair value through net income — is the strongest teaching point across the
+three records, and it cannot be stored. DigitalX's Appendix 4E is an exchange announcement,
+so that record does carry the fact its sibling cannot.
+
+Not worked around. Changing a rank changes what every existing row may assert, and a gate
+refusing a claim it should admit is a better failure than the reverse. The question is
+whether `accounting_treatment`'s minimum should be 3, or whether the rank ordering should
+place audited accounts above exchange announcements.
+
+**Verified.** Against Postgres 16, with the base migration, the Locate seed and the
+session-4 view fix applied first:
+
+- The migration applies clean and is idempotent — re-running it changes no counts.
+- Three companies across three tiers; `v_company_facts`, `v_research_absences` and
+  `v_research_freshness` all return rows for the new records, and `v_company_position` and
+  `v_research_ledger` return none, as intended.
+- The three gate refusals above raise, each with the expected rank in the message.
+- DigitalX reads stale (monthly cadence, 141 days since its latest document), which is the
+  freshness stamp working: the dossier records two to four monthly disclosures and the June
+  2026 quarterly as unreviewed.
+- `pnpm test` (13 packages, 2,356 tests), `turbo typecheck` and `turbo lint` green.
+
+**One test added.** `PositionPanel`'s empty branch had no coverage, because every fixture
+the suite exercised had a position. It is now the live path for two of the three companies
+in the register, so `ResearchPanels.test.tsx` asserts that a positionless record states no
+holdings were sourced rather than rendering a bare `0 BTC` — a sourced-looking figure
+meaning the company holds nothing, which is a different and wrong claim. Confirmed red
+against a mutation of the branch.
+
+**Not done.** Everything session 2 listed still stands: the ingest run against real
+documents, the recorded `TraceBundle`, and a `routines` row to schedule it. This session
+moved none of them — it removed the reason the register was empty while they wait. The
+local Postgres harness stubs pgvector, which the container lacks; no vector column is
+touched by this seed.
