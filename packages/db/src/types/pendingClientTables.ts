@@ -314,6 +314,33 @@ export type PendingColumnAdditions = {
   };
 };
 
+/**
+ * Functions the client-app migrations create.
+ *
+ * Both are SECURITY DEFINER with one job each, and both exist so `apps/client`
+ * can run on the anon key alone — the alternative was a service-role key in the
+ * app, which bypasses RLS and would have made the hardening migration
+ * decorative.
+ */
+export type PendingClientFunctions = {
+  redeem_client_invite: {
+    Args: { invite_token: string };
+    Returns: string;
+  };
+  client_invite_details: {
+    Args: { invite_token: string };
+    Returns: Array<{ email: string; full_name: string; account_name: string }>;
+  };
+  is_team_member: {
+    Args: Record<PropertyKey, never>;
+    Returns: boolean;
+  };
+  current_client_account_id: {
+    Args: Record<PropertyKey, never>;
+    Returns: string | null;
+  };
+};
+
 type GeneratedTables = Database['public']['Tables'];
 
 type WithAddedColumns = {
@@ -335,9 +362,10 @@ type WithAddedColumns = {
  * that does not exist yet.
  */
 export type ClientDatabase = Omit<Database, 'public'> & {
-  public: Omit<Database['public'], 'Tables'> & {
+  public: Omit<Database['public'], 'Tables' | 'Functions'> & {
     Tables: Omit<GeneratedTables, keyof PendingColumnAdditions> &
       WithAddedColumns &
       PendingClientTables;
+    Functions: Database['public']['Functions'] & PendingClientFunctions;
   };
 };

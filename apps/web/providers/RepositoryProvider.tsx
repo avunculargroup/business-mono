@@ -29,10 +29,21 @@ export function RepositoryProvider({
   // Keyed on the principal's fields rather than its identity: the server
   // rebuilds the prop object on every render, so depending on the object would
   // hand every consumer a new bundle each time and defeat the memo.
-  const { kind, userId } = principal;
+  //
+  // The principal is rebuilt from those fields rather than passed through, so
+  // every field it carries has to be named here. `accountId` is null for the
+  // team variant, which is the only one `apps/web` ever sees — a client session
+  // cannot reach this app at all, because a person is staff or a subscriber and
+  // never both.
+  const { userId } = principal;
+  const accountId = principal.kind === 'client' ? principal.accountId : null;
   const bundle = useMemo(
-    () => createSupabaseRepositories(createClient(), { kind, userId }),
-    [kind, userId],
+    () =>
+      createSupabaseRepositories(
+        createClient(),
+        accountId === null ? { kind: 'team', userId } : { kind: 'client', userId, accountId },
+      ),
+    [userId, accountId],
   );
 
   return <BaseRepositoryProvider bundle={bundle}>{children}</BaseRepositoryProvider>;
