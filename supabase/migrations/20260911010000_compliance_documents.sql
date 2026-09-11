@@ -137,8 +137,24 @@ CREATE TABLE company_profile (
   abn            TEXT,
   acn            TEXT,
 
-  contact_email  TEXT,
-  website        TEXT,
+  -- The Service Statement's variable schema sources everything
+  -- below. Sections 11 and 12 give a subscriber somewhere to send a
+  -- complaint and someone to contact, and a statement that names
+  -- neither is a statement that has not been finished.
+  registered_address  TEXT,
+  registered_state    TEXT,
+  registered_postcode TEXT,
+
+  public_phone        TEXT,
+  public_email        TEXT,
+  public_website      TEXT,
+
+  -- Section 11. Separate from the public contact details because a
+  -- complaint should reach a named person or role rather than a
+  -- general inbox, and because BTS may want those to differ.
+  complaints_contact  TEXT,
+  complaints_email    TEXT,
+  complaints_phone    TEXT,
 
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -3,11 +3,11 @@
 **Product:** Minute, by Bitcoin Treasury Solutions
 **Codebase:** `apps/client` in `business-mono`
 **Feature:** Invite-only paid subscription app for CFOs and SMSF trustees
-**Status:** Bundle 0.4.0, reconciled against the live repository and database. The spec
+**Status:** Bundle 0.5.0, reconciled against the live repository and database. The spec
 documents below are what the app is built *against*; where the build diverged,
 [`build-progress.md`](./build-progress.md) records the divergence and why, and is the
 document to trust.
-**Bundle version:** 0.4.0
+**Bundle version:** 0.5.0
 **Last updated:** 2026-09-09
 
 ---
@@ -65,12 +65,14 @@ Read in this order.
 | `README.md` | This file. Start here. |
 | [`build-progress.md`](./build-progress.md) | **Read second.** The verification pass against the live database, and what building it changed. Several of the bundle's assumptions were wrong, one by an order of magnitude. |
 | [`changelog.md`](./changelog.md) | What changed in this bundle and why. Amendments are recorded here rather than made silently. |
+| [`compliance/service-statement.md`](./compliance/service-statement.md) | The Service Statement the blocking gate serves. **Draft.** Sections 2, 4 and 6 carry the weight. |
+| [`compliance/service-statement-variables.json`](./compliance/service-statement-variables.json) | Its variable schema, sourced from `company_profile`. |
 | [`assumptions.md`](./assumptions.md) | Twelve assumptions, ordered by blast radius, each carrying its verified answer. |
 | [`client-app-mvp-spec.md`](./client-app-mvp-spec.md) | The main spec. Personas, product architecture, the security finding, data model, eight routes. |
 | [`prepare-feature-spec.md`](./prepare-feature-spec.md) | `/prepare` in full — the differentiator. Template format, fact injection contract, six artefact outlines, local-only storage model. |
 | [`sessions.md`](./sessions.md) | Three-session build plan with definitions of done. |
-| [`../../../supabase/migrations/`](../../../supabase/migrations/) | The migrations. Execution source of truth, applied on push to `main` — see [`packages/db/MIGRATIONS.md`](../../../packages/db/MIGRATIONS.md). The bundle's reference `schema/*.sql` files were rewritten against the real schema; the result is listed in [`build-progress.md`](./build-progress.md). |
-| [`.claude/skills/bts-design/references/naming.md`](../../../.claude/skills/bts-design/references/naming.md) | Naming rules, now in the design skill where the `bts-design` skill points at them. |
+| [`../../../supabase/migrations/`](../../../supabase/migrations/) | The migrations. Execution source of truth, applied on push to `main` — see [`packages/db/MIGRATIONS.md`](../../../packages/db/MIGRATIONS.md). |
+| [`.claude/skills/bts-design/references/naming.md`](../../../.claude/skills/bts-design/references/naming.md) | Naming rules, in the design skill where the `bts-design` skill points at them. |
 | [`../../../packages/data/src/repositories/client.ts`](../../../packages/data/src/repositories/client.ts) | `@platform/data` interfaces. Read-only by construction, with the conformance suite beside them. |
 
 ---
@@ -186,8 +188,12 @@ These are not restated in every document. They apply everywhere.
 1. ~~Run the audit query.~~ **Done** — 114 policies over 107 tables. The hardening migration
    covers all of them and is written but **not applied**; applying it is a deliberate act, not
    a side effect of merging. See [`build-progress.md`](./build-progress.md).
-2. **Write the Service Statement.** Outstanding, and it is the single thing blocking first
-   login: the gate serves it, and with none published nobody can pass.
+2. **Review the Service Statement draft** in
+   [`compliance/`](./compliance/service-statement.md). Sections 2, 4 and 6 are the ones to put
+   in front of whoever advised on the not-advice position, with the product in front of them.
+   Section 8's terms were drafted from conversation and need confirming, as does the privacy
+   policy URL. It is seeded as a **draft**, and the gate serves only an active document — so
+   until it is reviewed and activated, nobody can pass.
 3. **Confirm the not-advice position was assessed against Minute specifically** — a narrated
    brief, a register of named entities, monitoring of custody providers — rather than against
    the education and consulting business. Outstanding.

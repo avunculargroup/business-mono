@@ -433,8 +433,21 @@ export interface ComplianceDocument {
   effectiveFrom: string | null;
 }
 
+/**
+ * The whole profile, for resolving a compliance document's variables.
+ *
+ * Distinct from `CompanyIdentity`, which is the four fields a `/prepare` export
+ * puts in its front matter. The Service Statement needs registered address,
+ * public contact details and complaints contact as well — and putting those in
+ * `CompanyIdentity` would push nine fields into every export's front matter to
+ * serve one document.
+ */
+export type CompanyProfile = Record<string, string | null>;
+
 export interface ClientComplianceRepository {
   identity(ctx: ReadContext): Promise<CompanyIdentity | null>;
+  /** For document variable resolution. Null when the profile is unset. */
+  profile(ctx: ReadContext): Promise<CompanyProfile | null>;
   /** The active document of a type, or null when none has been drafted. */
   activeDocument(
     ctx: ReadContext,

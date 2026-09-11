@@ -4,12 +4,13 @@ Reconciliation of the [`client-app`](./README.md) spec bundle against the live r
 the live database, and what has been built since. Same purpose and same shape as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** Built against bundle 0.3.0, then revised for **bundle 0.4.0**, which removed the
-licensing premise the first build rested on — see
-[What 0.4.0 changed](#what-040-changed-and-what-it-cost). Session 1 and session 2 are built,
-session 3 is built through `/prepare`. Every migration is **written and not applied** — see
-[Applying the migrations](#applying-the-migrations). Three of the bundle's twelve assumptions
-were wrong, one of them by an order of magnitude.
+**Status:** Built against bundle 0.3.0, revised for **0.4.0** (which removed the licensing
+premise the first build rested on) and again for **0.5.0** (which supplied the Service
+Statement the gate had been waiting on) — see
+[What 0.4.0 changed](#what-040-changed-and-what-it-cost) and
+[What 0.5.0 added](#what-050-added-the-statement). Sessions 1–3 are built. Every migration is
+**written and not applied** — see [Applying the migrations](#applying-the-migrations). Three of
+the bundle's twelve assumptions were wrong, one of them by an order of magnitude.
 **Last updated:** 2026-09-11
 
 ---
@@ -25,6 +26,66 @@ were wrong, one of them by an order of magnitude.
    a deed to read.
 4. The spec docs, which were written without the repository to hand. Where they disagree with
    this file, this file is the one that was checked.
+
+---
+
+## What 0.5.0 added: the statement
+
+0.4.0 deleted the FSG and made the gate depend on its replacement without supplying one, which
+left the app unable to admit anyone. 0.5.0 supplies it: a twelve-section Service Statement,
+drafted, with a variable schema sourced from `company_profile`.
+
+It is **seeded as a draft**, so the gate — which serves only an active document — still admits
+nobody. That is the intended state: sections 2, 4 and 6 belong in front of whoever advised on
+the not-advice position, and section 8's subscription terms and the privacy URL came from
+conversation rather than from a document.
+
+### The statement made three demands on the schema
+
+- **`company_profile` gained nine fields.** Registered address, state and postcode; public
+  phone, email and website; and the three complaints fields. Sections 11 and 12 give a
+  subscriber somewhere to send a complaint and someone to contact, and a statement naming
+  neither has not been finished. The `contact_email` and `website` columns invented earlier
+  were dropped in favour of the variable schema's `public_email` and `public_website` — two
+  fields for one thing drift apart.
+- **Variables resolve at render, and a missing one blocks the gate.** The body is stored with
+  `{{placeholders}}` and resolved from `company_profile` by
+  [`packages/shared/src/complianceDocument.ts`](../../../packages/shared/src/complianceDocument.ts).
+  It never partially substitutes: if anything is missing the body comes back empty and the
+  caller is told which keys. A half-resolved document looks finished and is not, and the one
+  thing this document has to be is accurate.
+- **`client_accounts` gained a tripwire comment.** Section 3 says "Minute has no facility for
+  you to tell us", and that is a verifiable claim about that table rather than a promise about
+  conduct. Adding a column capable of holding a subscriber's financial position makes a
+  document every subscriber has acknowledged misleading. The comment says so, at the place
+  someone would be about to do it.
+
+### Two deliberate deviations from the bundle's schema note
+
+The note describes a `compliance_documents` table that did not exist — it was created by this
+work — so both of its instructions land differently:
+
+- **The column is `doc_type`, not `document_type`.** Renaming it now would churn the adapter,
+  the pending types and the app for no gain.
+- **`'fsg'` is not in the CHECK constraint, and stays out.** The bundle says to keep the unused
+  licensing values because removing them "buys tidiness and no capability" — an argument
+  against churning an *existing* enum. This constraint was written after the no-authorisation
+  position was settled, and adding `fsg` to it would add exactly the capability that position
+  says must not be used. The constraint rejects it, and a test asserts the rejection.
+
+### What the statement is now checked against
+
+`apps/client/lib/serviceStatement.test.ts` reads the seeded body out of the migration and
+asserts two things. First, that every placeholder is one the resolver can source — the failure
+mode otherwise is the gate refusing to render on launch day. Second, that the document's claims
+still match the product: that it states the not-advice position without hedging, claims no
+facility for personal circumstances, promises prepared documents stay on the device, describes
+the register as precedent rather than investment research, and does not point a subscriber at
+AFCA.
+
+That last one matters more than it looks. Every subscriber acknowledges this document before
+using the service, so a statement that drifts from what the app does is worse than no statement
+at all.
 
 ---
 
@@ -244,8 +305,9 @@ Order, and what each does:
 | `20260911060000_invite_redemption.sql` | `redeem_client_invite()` and `client_invite_details()`, both `SECURITY DEFINER` |
 | `20260911070000_seed_trustee_minute_template.sql` | The trustee minute template, as a **draft** |
 | `20260911080000_seed_board_paper_template.sql` | The board paper template, as a **draft**. The only one with a precedent section |
+| `20260911090000_seed_service_statement.sql` | The Service Statement, as a **draft** |
 
-All nine were applied to a throwaway local Postgres mirroring the live table catalogue, and
+All ten were applied to a throwaway local Postgres mirroring the live table catalogue, and
 every constraint was exercised behaviourally rather than assumed: `no_fees_mvp` rejects a fee
 and accepts a zero-fee row, `active_requires_lex_review` rejects an unreviewed active template,
 the one-active-per-slug index rejects the second, `promotion_needs_approver` rejects an
@@ -269,9 +331,12 @@ After applying, the two manual steps the bundle calls for and no migration can d
 1. Assess every `products_services` row against the DAP and TCP definitions, then
    `ALTER COLUMN is_financial_product SET NOT NULL`. 24 rows today. Until then unassessed rows
    are invisible to subscribers by policy, which is the safe direction.
-2. Write and load the **Service Statement** and the information notice, and fill
-   `company_profile`. The gate serves nothing until this is done, so no subscriber can pass
-   it. This is the single thing blocking first login.
+2. **Review and activate the Service Statement**, which is seeded as a draft, and fill
+   `company_profile` so its variables resolve. The gate serves only an active document and
+   refuses to render a partially-resolved one, so both are required before anyone can pass.
+   Still the single thing blocking first login. The information notice also needs writing —
+   the app carries a hard-coded fallback so no export ships without one, but the library
+   version is what should be served.
 3. Publish the two seeded templates, which ship as drafts. Each needs a Lex reviewer named
    against it — `active_requires_lex_review` enforces that, and the migration headers carry
    the `UPDATE`.
@@ -383,7 +448,11 @@ almost certainly a suggested allocation.
   and no longer a deed to read — it is a question about whether whoever advised saw a narrated
   brief, a register of named entities and provider monitoring, or saw the education and
   consulting business.
-- **The Service Statement.** Outstanding, and it blocks first login.
+- **The Service Statement.** Drafted and seeded; **not reviewed and not active**, and it
+  blocks first login. Sections 2, 4 and 6 need the eye of whoever advised on the position;
+  section 8's terms and the privacy URL came from conversation.
+- **`company_profile` is empty.** Thirteen fields, none of them inventable — the gate fails
+  closed until they are filled.
 - **`is_financial_product` backfill.** 24 rows, human judgement each.
 - **Print fidelity in Safari (A9).** The export is not an export feature until it has been
   tested there, and it has not been.

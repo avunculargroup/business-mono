@@ -77,6 +77,7 @@ export type {
   ClientWriteRepository,
   CommercialDisclosure,
   CompanyIdentity,
+  CompanyProfile,
   ComplianceClass,
   ComplianceDocument,
   DirectoryEntry,

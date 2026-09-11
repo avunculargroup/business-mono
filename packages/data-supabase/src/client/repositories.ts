@@ -17,6 +17,7 @@ import type {
   ClientType,
   CommercialDisclosure,
   ComplianceClass,
+  CompanyProfile,
   ComplianceDocument,
   DirectoryEntry,
   Finding,
@@ -876,6 +877,22 @@ export function createClientComplianceRepository(
         abn: data.abn,
         acn: data.acn,
       };
+    },
+
+    /**
+     * Not gated, for the same reason `activeDocument` is not: the Service
+     * Statement is rendered from this, and a blocked session has to be able to
+     * read the document it is being asked to acknowledge.
+     */
+    async profile(_ctx: ReadContext) {
+      const { data } = await adapter.client
+        .from('company_profile')
+        .select(
+          'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone',
+        )
+        .maybeSingle();
+
+      return data ? (data as CompanyProfile) : null;
     },
 
     /**

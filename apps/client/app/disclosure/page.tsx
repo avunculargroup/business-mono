@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Lockup } from '@/components/Lockup';
 import { Markdown } from '@/components/Markdown';
 import { acknowledgeDisclosure } from '@/app/actions/disclosure';
+import { resolveDocument } from '@platform/shared';
 import { getClientRepositories, readContext } from '@/lib/repositories';
 import styles from './disclosure.module.css';
 
@@ -31,7 +32,27 @@ export default async function DisclosurePage() {
   if (!repositories) redirect('/login');
 
   const ctx = readContext();
-  const statement = await repositories.compliance.activeDocument(ctx, 'service_statement');
+  const [statement, profile] = await Promise.all([
+    repositories.compliance.activeDocument(ctx, 'service_statement'),
+    repositories.compliance.profile(ctx),
+  ]);
+
+  // The statement is stored with {{variables}} and resolved here from
+  // company_profile. A half-resolved document looks finished and is not, so
+  // `resolveDocument` returns nothing at all rather than a body with
+  // "ABN {{bts_abn}}" in it, and the page treats that as not-ready.
+  const resolved = statement
+    ? resolveDocument(statement.body, {
+        profile: profile ?? {},
+        version: statement.version,
+        date: statement.effectiveFrom ?? new Date().toISOString().slice(0, 10),
+        manual: {
+          bts_privacy_policy_url: process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] ?? '',
+        },
+      })
+    : null;
+
+  const ready = resolved !== null && resolved.missing.length === 0;
 
   return (
     <div className={styles.page}>
@@ -40,7 +61,7 @@ export default async function DisclosurePage() {
           <Lockup variant="gold-rule" />
         </header>
 
-        {statement === null ? (
+        {statement === null || !ready ? (
           /* Absence is a fact, and this one is load-bearing. No active Service
              Statement means nobody can pass the gate, which is correct rather
              than broken — but it must say which it is, because a subscriber
@@ -57,6 +78,16 @@ export default async function DisclosurePage() {
               Please contact Bitcoin Treasury Solutions. If you were given a start date, it has
               not been met.
             </p>
+            {resolved && resolved.missing.length > 0 ? (
+              /* Only a founder sees this in practice — a subscriber cannot get
+                 here before the statement is activated. It names what is
+                 missing because "not available" with no detail sends someone
+                 hunting through a table. */
+              <p className={styles.note}>
+                The statement is published but not fully filled in. Missing from the company
+                profile: <span className="mono">{resolved.missing.join(', ')}</span>.
+              </p>
+            ) : null}
           </section>
         ) : (
           <>
@@ -83,7 +114,7 @@ export default async function DisclosurePage() {
                   ) : null}
                 </span>
               </div>
-              <Markdown>{statement.body}</Markdown>
+              <Markdown>{resolved!.body}</Markdown>
             </section>
 
             <form action={acknowledgeDisclosure} className={styles.form}>

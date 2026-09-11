@@ -8,6 +8,39 @@ that repeat a decision somebody already made well.
 
 ---
 
+## 0.5.0 — 2026-09-11
+
+### Added: the Service Statement draft
+
+`compliance/service-statement.md` plus its variable schema. Twelve sections. Fills the gap
+0.4.0 created by deleting the FSG while making the gate depend on its replacement.
+
+Two jobs: tell the subscriber plainly what they are buying, and be the artefact BTS points to
+if anyone asks why it concluded no authorisation was required. Unlike an FSG there are no
+statutory content requirements to structure against, so its value is entirely in being
+accurate and contemporaneous with launch.
+
+Decisions inside it worth noting:
+
+- **Section 3 is a claim about the schema, not about conduct.** "Minute has no facility for
+  you to tell us" is verifiable against `client_accounts`. If a column capable of holding
+  financial position is ever added, the sentence becomes false and the document becomes
+  misleading — a useful tripwire, flagged for the migration.
+- **Section 11 deliberately omits AFCA.** AFCA handles complaints about financial firms, and
+  pointing subscribers there would imply a status BTS does not have. Australian Consumer Law
+  is the correct reference.
+- **Section 9 is the only place with a point of view** — that independence is why the service
+  is worth paying for. It is a statement about the business model rather than about any
+  investment, which is what makes it safe.
+- **Section 8 was drafted from conversation rather than a terms document.** Flagged for
+  confirmation. If BTS later adopts separate subscription terms, section 8 should shrink to a
+  cross-reference; two documents describing the same terms will eventually disagree.
+
+New enum value `service_statement` on `compliance_documents.document_type`, with migration.
+The unused licensing values stay — removing them buys tidiness and no capability.
+
+---
+
 ## 0.4.0 — 2026-09-09
 
 ### Removed: all licensing and authorisation material

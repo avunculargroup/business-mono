@@ -60,6 +60,31 @@ CREATE INDEX idx_client_accounts_renews ON client_accounts(subscription_renews_a
 COMMENT ON TABLE client_accounts IS
   'Subscribing organisation or fund. Deliberately holds no financial position data: BTS does not give financial advice, and a service that cannot receive personal circumstances cannot give it.';
 
+-- ------------------------------------------------------------
+-- TRIPWIRE — read this before adding a column here
+-- ------------------------------------------------------------
+-- Section 3 of the Service Statement, which every subscriber
+-- acknowledges before they can use the service, says:
+--
+--   "Minute has no facility for you to tell us. There is nowhere
+--    in the service to enter that information, and nowhere in our
+--    systems to hold it."
+--
+-- That is a verifiable claim about THIS TABLE, not a promise about
+-- how anyone behaves. A column capable of holding a subscriber's
+-- financial position — fund balance, holdings, member details,
+-- risk tolerance, entity financials — makes the sentence false and
+-- makes a document every subscriber has acknowledged misleading.
+--
+-- It is also the single change that would move this service into
+-- the advice regime, because personal circumstances are the
+-- ingredient that turns information into advice.
+--
+-- If you are about to add one: don't. If you must, the Service
+-- Statement has to change first, and that is a conversation with
+-- whoever advised on the position rather than a migration.
+-- ------------------------------------------------------------
+
 
 -- ------------------------------------------------------------
 -- client_users

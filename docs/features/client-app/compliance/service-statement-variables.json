@@ -1,0 +1,137 @@
+{
+  "variables": [
+    {
+      "key": "bts_legal_name",
+      "label": "BTS Legal Name",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "legal_name",
+      "description": "Registered legal name including Pty Ltd"
+    },
+    {
+      "key": "bts_trading_name",
+      "label": "BTS Trading Name",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "trading_name",
+      "description": "Trading name. Never the BTS acronym in a client-facing document."
+    },
+    {
+      "key": "bts_abn",
+      "label": "BTS ABN",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "abn"
+    },
+    {
+      "key": "bts_acn",
+      "label": "BTS ACN",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "acn"
+    },
+    {
+      "key": "bts_registered_address",
+      "label": "Registered Address",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "registered_address"
+    },
+    {
+      "key": "bts_registered_state",
+      "label": "Registered State",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "registered_state"
+    },
+    {
+      "key": "bts_registered_postcode",
+      "label": "Registered Postcode",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "registered_postcode"
+    },
+    {
+      "key": "bts_public_phone",
+      "label": "Public Phone",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "public_phone"
+    },
+    {
+      "key": "bts_public_email",
+      "label": "Public Email",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "public_email"
+    },
+    {
+      "key": "bts_public_website",
+      "label": "Public Website",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "public_website"
+    },
+    {
+      "key": "complaints_contact",
+      "label": "Complaints Contact",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "complaints_contact",
+      "description": "Name or role. Section 11."
+    },
+    {
+      "key": "complaints_email",
+      "label": "Complaints Email",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "complaints_email"
+    },
+    {
+      "key": "complaints_phone",
+      "label": "Complaints Phone",
+      "type": "string",
+      "required": true,
+      "source": "company_profile",
+      "source_field": "complaints_phone"
+    },
+    {
+      "key": "bts_privacy_policy_url",
+      "label": "Privacy Policy URL",
+      "type": "string",
+      "required": true,
+      "source": "manual",
+      "default": "https://bitcointreasurysolutions.com.au/privacy",
+      "description": "Confirmed in conversation 2026-09-11. Verify the page exists and covers Minute before this document goes active."
+    },
+    {
+      "key": "statement_version",
+      "label": "Statement Version",
+      "type": "string",
+      "required": true,
+      "source": "computed",
+      "source_field": "document_version",
+      "description": "Drives the blocking gate. A new version re-blocks every active session and requires fresh acknowledgement."
+    },
+    {
+      "key": "statement_date",
+      "label": "Date",
+      "type": "date",
+      "required": true,
+      "source": "computed",
+      "source_field": "today"
+    }
+  ]
+}

@@ -13,3 +13,4 @@ export * from './ecosystem.js';
 export * from './corporateHoldings.js';
 export * from './reportWatch.js';
 export * from './prepare.js';
+export * from './complianceDocument.js';

@@ -23,13 +23,17 @@ itself.
 
 ## Status
 
-Sessions 1–3 are built. **Every migration is written and not applied**, and the two things
-blocking first login are documents rather than code:
+Sessions 1–3 are built. **Every migration is written and not applied**, and what blocks first
+login is a document being signed off rather than code being written:
 
-- **No Service Statement exists**, and `compliance_documents` did not exist either until this
-  work created it. The gate blocks every route and serves the active Service Statement, so
-  until one is written and loaded, nobody can pass. That is the correct failure, and the gate
-  says which it is rather than showing a blank page.
+- **The Service Statement is seeded as a draft**, twelve sections, with `status = 'draft'` and
+  version `0.1`. The gate serves the *active* statement, so nobody passes until a director
+  reviews it and sets it active. That is the correct failure, and the gate names it rather than
+  showing a blank page.
+- **`company_profile` is empty**, and the statement's `{{variables}}` resolve from it at render.
+  An unfilled profile is not a degraded document, it is no document: `resolveDocument` returns
+  an empty body and the list of missing keys, and the gate refuses. A subscriber never sees
+  "ABN {{bts_abn}}".
 - **The not-advice position has not been confirmed against Minute specifically** (assumption
   A1) — a narrated brief, a register of named entities, monitoring of custody providers, rather
   than the education and consulting business.
@@ -108,6 +112,14 @@ The middleware runs on the edge and a matcher is an easy thing to get subtly wro
 the only enforcement. The gate decision itself is a pure function in `lib/gates.ts`, tested
 without a request — the rules are the part that must not be wrong and they do not need I/O to
 exercise.
+
+What the gate serves is checked too. `lib/serviceStatement.test.ts` reads the statement out of
+its migration and asserts it against `resolveDocument` in `@platform/shared` — a placeholder
+nobody wired up would otherwise surface as a gate that refuses to render on launch day. The
+same test asserts the statement's claims about the product: section 3 says there is no facility
+to tell us your circumstances, section 5 says prepared documents stay on the device, section 7
+says every fact carries a link. Subscribers acknowledge those, so a statement that drifts from
+what the app does is worse than no statement at all.
 
 ---
 

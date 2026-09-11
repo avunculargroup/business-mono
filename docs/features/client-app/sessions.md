@@ -4,7 +4,7 @@ Three sessions, following the house pattern: data layer → auth and gates → s
 an explicit definition of done. Do not begin a session with the previous one's checks unmet.
 
 **Before session 1:** resolve A1–A4 in [`assumptions.md`](./assumptions.md). A4 is a document
-to write, and it has a lead time.
+to review and activate, and it has a lead time.
 
 **A2, A3 and A4 have been run** — see [`build-progress.md`](./build-progress.md). A2 was
 understated by roughly ten times and A4 was wrong outright. The bundle's `schema/00N-*.sql`
@@ -16,11 +16,11 @@ doc.
 
 ## Session 0 — Not code
 
-1. **Write the Service Statement.** What the service is and is not: factual information rather
-   than financial advice, no client assets held, no facility to consider the subscriber's
-   circumstances, paid by the subscriber and nobody else. It goes in `compliance_documents`
-   and the blocking gate has nothing to serve without it. This is the artefact that evidences
-   the not-advice position, so write it carefully.
+1. **Finalise the Service Statement.** Draft is at
+   [`compliance/service-statement.md`](./compliance/service-statement.md), and it is already
+   seeded into `compliance_documents` as a `draft`. Confirm section 8's subscription terms,
+   verify the privacy policy page exists and covers Minute, fill `company_profile` so the
+   variables resolve, then set it `active` — the gate serves only an active document.
 2. **Confirm the not-advice position was assessed against Minute specifically** — a narrated
    brief, a register of named entities, monitoring of custody providers — rather than against
    the education and consulting business.

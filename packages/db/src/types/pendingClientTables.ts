@@ -143,8 +143,15 @@ export type PendingClientTables = {
       trading_name: string;
       abn: string | null;
       acn: string | null;
-      contact_email: string | null;
-      website: string | null;
+      registered_address: string | null;
+      registered_state: string | null;
+      registered_postcode: string | null;
+      public_phone: string | null;
+      public_email: string | null;
+      public_website: string | null;
+      complaints_contact: string | null;
+      complaints_email: string | null;
+      complaints_phone: string | null;
     };
     Insert: Partial<PendingClientTables['company_profile']['Row']> & {
       legal_name: string;
