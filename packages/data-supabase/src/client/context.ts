@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ClientDatabase } from '@platform/db';
+import { DisclosureRequiredError } from '@platform/data';
 import type { Principal } from '@platform/data';
 
 /**
@@ -45,12 +46,15 @@ export interface ClientAdapterContext {
  * middleware should already have redirected; this is what makes the gate hold
  * if it did not.
  */
-export class DisclosureRequiredError extends Error {
-  constructor() {
-    super('The current disclosure has not been acknowledged');
-    this.name = 'DisclosureRequiredError';
-  }
-}
+/**
+ * Re-exported, not defined here.
+ *
+ * It moved to `@platform/data` when the fixture adapter gained the client
+ * domains: two adapters throwing two classes for one contract condition would
+ * make an `instanceof` check right against one and silently wrong against the
+ * other. The re-export keeps every existing import working.
+ */
+export { DisclosureRequiredError };
 
 export function createClientAdapterContext(
   client: ClientSupabaseClient,

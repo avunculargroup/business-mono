@@ -5,7 +5,7 @@ export {
   type QueryOptions,
   type ReadContext,
 } from './context';
-export { DemoWriteBlockedError, NotFoundError } from './errors';
+export { DemoWriteBlockedError, DisclosureRequiredError, NotFoundError } from './errors';
 export { DEMO_DOMAINS } from './bundle';
 export type {
   Bundle,

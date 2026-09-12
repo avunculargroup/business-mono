@@ -78,7 +78,7 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 ├── packages/
 │   ├── agent-traces/    # Recorded workflow traces + the BTS-owned trace schema
 │   ├── data/            # Repository interfaces + contract test harness (no DB client)
-│   ├── data-fixtures/   # Fixture repository implementation for the demo
+│   ├── data-fixtures/   # Fixture repositories — the demo's, and the client contract's second adapter
 │   ├── data-supabase/   # Live repository implementation over Supabase
 │   ├── db/              # Supabase client, generated types, RPC wrappers
 │   ├── shared/          # Shared TypeScript types, enums, constants

@@ -529,6 +529,44 @@ naming the fix.
 
 ---
 
+### Session 4 — the client fixture adapter
+
+`@platform/data-fixtures` now implements the ten client read domains and the two writes, and
+`describeClientContract` runs against it as a second adapter. The reason to want one was recorded
+as outstanding from the first session: a contract suite that only ever meets one implementation
+gets shaped around that implementation's habits, and nobody notices until the second one arrives.
+
+**Two assertions stopped being partial.** The Supabase side runs against a canned-response fake
+that cannot honour a `.eq()` or an `.in()`, so assertion 5 (no unpromoted signal) and assertion 7
+(no cross-type template) were each split into "the fake hands back pre-filtered rows" plus "a
+separate case checks the adapter issues the filter". The fixture adapter holds the unpromoted
+signal and all three client types' templates in its data and filters in TypeScript, so each is
+one whole check again.
+
+**The suite was mutation-tested rather than trusted.** Assertion 7 passed vacuously once already
+in this build, so a green suite against a new adapter is not evidence on its own. Three
+deliberate breaks were introduced one at a time — drop the promoted filter, drop the client-type
+filter, remove the disclosure gate — and each was caught (1, 2 and 1 failures respectively), then
+reverted. The suite is testing the adapter, not the fixtures.
+
+**Two things the typechecker found that a reviewer would not have.** The fixture set had no
+`client_type = 'both'` template, which the column allows and the live adapter serves — a template
+nobody sees is a template nobody tests, so one was added and assertion 7 got harder. And the
+fixture template rows carry their own `clientType`, which now wins over the body's, mirroring the
+live adapter: there it matters because the RLS policy filters on the column, so a body claiming
+`both` while the column says `smsf` must not widen who gets it.
+
+**`DisclosureRequiredError` moved to `@platform/data`.** It was defined in the Supabase adapter,
+and two adapters throwing two classes for one contract condition would make an `instanceof` check
+right against one and silently wrong against the other. `@platform/data-supabase` re-exports it,
+so every existing import still resolves.
+
+What this does **not** do is give the client app a demo surface. There is no fixture-backed
+Minute, and nothing here asks for one — the adapter exists so the contract has two implementations
+to be a contract between.
+
+---
+
 ---
 
 ## Open, and deliberately so
@@ -560,6 +598,4 @@ naming the fix.
   in May may carry a newer date and a changed value while the prose around it still argues the
   old one. The export states both dates so a reader can see it; nothing detects the stale
   sentence, and the spec is right that it is probably unsolvable.
-- **A fixture adapter for the client domains.** There is none, which is why conformance
-  assertion 5 is two partial checks rather than one whole one. If `apps/client` ever gets a demo
-  surface, the harness is already parameterised for it.
+
