@@ -31,8 +31,8 @@ export function InteractionForm({ contactId, onSuccess }: InteractionFormProps) 
     <form action={formAction} className={styles.form}>
       <input type="hidden" name="contact_id" value={contactId} />
 
-      <div className={styles.field}>
-        <label className={styles.label}>Type</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Type</span>
         <select name="type" required className={styles.select}>
           <option value="call">Call</option>
           <option value="email">Email</option>
@@ -41,37 +41,37 @@ export function InteractionForm({ contactId, onSuccess }: InteractionFormProps) 
           <option value="note">Note</option>
           <option value="other">Other</option>
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Direction</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Direction</span>
         <select name="direction" className={styles.select}>
           <option value="">N/A</option>
           <option value="inbound">Inbound</option>
           <option value="outbound">Outbound</option>
           <option value="internal">Internal</option>
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Date and time</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Date and time</span>
         <input
           name="occurred_at"
           type="datetime-local"
           defaultValue={new Date().toISOString().slice(0, 16)}
           className={styles.input}
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Summary</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Summary</span>
         <textarea name="summary" rows={3} className={styles.textarea} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Raw content / notes</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Raw content / notes</span>
         <textarea name="transcript" rows={4} className={styles.textarea} />
-      </div>
+      </label>
 
       <input type="hidden" name="source" value="manual" />
 

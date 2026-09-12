@@ -86,8 +86,8 @@ export function PipelineItemForm({
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Title <span className={styles.required}>*</span></label>
+      <label className={styles.field}>
+        <span className={styles.label}>Title <span className={styles.required}>*</span></span>
         <input
           type="text"
           name="title"
@@ -96,10 +96,10 @@ export function PipelineItemForm({
           className={styles.input}
           placeholder="e.g. Why CFOs miss Bitcoin's scarcity proof"
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Outline / description</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Outline / description</span>
         <textarea
           name="body"
           rows={4}
@@ -107,11 +107,11 @@ export function PipelineItemForm({
           className={styles.textarea}
           placeholder="What angle will this piece take?"
         />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Stage</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Stage</span>
           <select name="status" defaultValue={defaultValues?.status ?? 'idea'} className={styles.select}>
             {Object.entries(INSIGHT_PIPELINE_STAGE_LABELS)
               .filter(([s]) => s !== 'archived')
@@ -119,9 +119,9 @@ export function PipelineItemForm({
                 <option key={value} value={value}>{label}</option>
               ))}
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Score (0–100)</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Score (0–100)</span>
           <input
             type="number"
             name="score"
@@ -131,7 +131,7 @@ export function PipelineItemForm({
             className={styles.input}
             placeholder="Optional priority score"
           />
-        </div>
+        </label>
       </div>
 
       {painPoints.length > 0 && (
@@ -198,23 +198,23 @@ export function PipelineItemForm({
       )}
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Publish date</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Publish date</span>
           <input
             type="date"
             name="scheduled_for"
             defaultValue={defaultValues?.scheduled_for ? defaultValues.scheduled_for.split('T')[0] : ''}
             className={styles.input}
           />
-        </div>
+        </label>
         {teamMembers.length > 0 && (
-          <div className={styles.field}>
-            <label className={styles.label}>Owner</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Owner</span>
             <select name="assigned_to" defaultValue={defaultValues?.assigned_to ?? ''} className={styles.select}>
               <option value="">— Assign —</option>
               {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
-          </div>
+          </label>
         )}
       </div>
 

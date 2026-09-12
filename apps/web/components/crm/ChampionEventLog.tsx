@@ -77,17 +77,17 @@ export function ChampionEventLog({ championId, initialEvents }: ChampionEventLog
           <p className={styles.eventFormTitle}>Log event</p>
           <form action={formAction} className={formStyles.form}>
             <div className={formStyles.row}>
-              <div className={formStyles.field}>
-                <label className={formStyles.label}>Event type <span className={formStyles.required}>*</span></label>
+              <label className={formStyles.field}>
+                <span className={formStyles.label}>Event type <span className={formStyles.required}>*</span></span>
                 <select name="event_type" defaultValue="note" className={formStyles.select}>
                   <option value="job_change">Job change</option>
                   <option value="promotion">Promotion</option>
                   <option value="departure">Departure</option>
                   <option value="note">Note</option>
                 </select>
-              </div>
-              <div className={formStyles.field}>
-                <label className={formStyles.label}>Date <span className={formStyles.required}>*</span></label>
+              </label>
+              <label className={formStyles.field}>
+                <span className={formStyles.label}>Date <span className={formStyles.required}>*</span></span>
                 <input
                   type="date"
                   name="event_date"
@@ -95,17 +95,17 @@ export function ChampionEventLog({ championId, initialEvents }: ChampionEventLog
                   className={formStyles.input}
                   required
                 />
-              </div>
+              </label>
             </div>
-            <div className={formStyles.field}>
-              <label className={formStyles.label}>Details</label>
+            <label className={formStyles.field}>
+              <span className={formStyles.label}>Details</span>
               <textarea
                 name="details"
                 rows={3}
                 className={formStyles.textarea}
                 placeholder="New company, new title, context…"
               />
-            </div>
+            </label>
             {state?.error && <p className={formStyles.error}>{state.error}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>

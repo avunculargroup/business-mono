@@ -50,8 +50,8 @@ export function SnippetForm({ snippet, accountId, onSuccess, onPendingChange }: 
 
   return (
     <form id={SNIPPET_FORM_ID} action={formAction}>
-      <div className={styles.field}>
-        <label className={styles.label}>Snippet</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Snippet</span>
         <textarea
           className={styles.textarea}
           value={body}
@@ -59,20 +59,20 @@ export function SnippetForm({ snippet, accountId, onSuccess, onPendingChange }: 
           placeholder="Paste the exemplar text — a phrase, opener, or full post that shows the voice."
           rows={5}
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Why it works (curator note)</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Why it works (curator note)</span>
         <textarea
           className={styles.textarea}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="What does this demonstrate about the voice? This is the teaching content — required."
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Type</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Type</span>
         <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as typeof type)}>
           {SNIPPET_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -80,16 +80,16 @@ export function SnippetForm({ snippet, accountId, onSuccess, onPendingChange }: 
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Platform</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Platform</span>
         <select className={styles.select} value={platform} onChange={(e) => setPlatform(e.target.value)}>
           <option value="">Any platform</option>
           <option value="linkedin">LinkedIn</option>
           <option value="twitter_x">X</option>
         </select>
-      </div>
+      </label>
 
       <ChipField label="Topic tags" values={tags} onChange={setTags} placeholder="e.g. custody, volatility" lowercase />
     </form>

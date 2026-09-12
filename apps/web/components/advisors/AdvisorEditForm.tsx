@@ -52,36 +52,36 @@ export function AdvisorEditForm({ advisor, companies, teamMembers, onSuccess, on
   return (
     <form id="advisor-edit-form" action={formAction} className={styles.form}>
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Name *</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Name *</span>
           <input name="name" required defaultValue={advisor.name} className={styles.input} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Type *</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Type *</span>
           <select name="type" required defaultValue={advisor.type} className={styles.select}>
             <option value="advisor">Advisor</option>
             <option value="partner">Partner</option>
           </select>
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Specialization</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Specialization</span>
         <input name="specialization" defaultValue={advisor.specialization ?? ''} className={styles.input} />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Company</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Company</span>
           <select name="company_id" defaultValue={advisor.company_id ?? ''} className={styles.select}>
             <option value="">None</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Engagement model</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Engagement model</span>
           <select name="engagement_model" defaultValue={advisor.engagement_model ?? ''} className={styles.select}>
             <option value="">None</option>
             <option value="ongoing_retainer">Ongoing retainer</option>
@@ -90,19 +90,19 @@ export function AdvisorEditForm({ advisor, companies, teamMembers, onSuccess, on
             <option value="revenue_share">Revenue share</option>
             <option value="honorary">Honorary</option>
           </select>
-        </div>
+        </label>
       </div>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Key relationship</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Key relationship</span>
           <select name="key_relationship_id" defaultValue={advisor.key_relationship_id ?? ''} className={styles.select}>
             <option value="">None</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>
-        </div>
+        </label>
         <div className={styles.field} style={{ justifyContent: 'flex-end', paddingBottom: 'var(--space-2)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
             <input type="checkbox" name="active" defaultChecked={advisor.active} />
@@ -111,31 +111,31 @@ export function AdvisorEditForm({ advisor, companies, teamMembers, onSuccess, on
         </div>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Bio</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Bio</span>
         <textarea name="bio" rows={4} defaultValue={advisor.bio ?? ''} className={styles.textarea} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Rate notes</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Rate notes</span>
         <input name="rate_notes" defaultValue={advisor.rate_notes ?? ''} className={styles.input} />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Website</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Website</span>
           <input name="website" type="url" defaultValue={advisor.website ?? ''} className={styles.input} placeholder="https://" />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>LinkedIn</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>LinkedIn</span>
           <input name="linkedin_url" type="url" defaultValue={advisor.linkedin_url ?? ''} className={styles.input} placeholder="https://" />
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Logo URL</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Logo URL</span>
         <input name="logo_url" type="url" defaultValue={advisor.logo_url ?? ''} className={styles.input} placeholder="https://" />
-      </div>
+      </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
     </form>

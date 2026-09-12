@@ -202,8 +202,8 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
         }
       >
         <div className={styles.form}>
-          <div className={styles.field}>
-            <label className={styles.label}>Business *</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Business *</span>
             <input
               className={styles.input}
               type="text"
@@ -211,9 +211,9 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
               value={form.business}
               onChange={setField('business')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Website</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Website</span>
             <input
               className={styles.input}
               type="url"
@@ -221,9 +221,9 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
               value={form.website}
               onChange={setField('website')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Service type</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Service type</span>
             <input
               className={styles.input}
               type="text"
@@ -231,9 +231,9 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
               value={form.service_type}
               onChange={setField('service_type')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Plan</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Plan</span>
             <select
               className={styles.select}
               value={form.payment_type}
@@ -244,18 +244,18 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
               <option value="paid">Paid</option>
               <option value="trial">Trial</option>
             </select>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Expiry</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Expiry</span>
             <input
               className={styles.input}
               type="date"
               value={form.expiry}
               onChange={setField('expiry')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Account email</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Account email</span>
             <input
               className={styles.input}
               type="email"
@@ -263,16 +263,16 @@ export function SubscriptionsSection({ initialSubscriptions }: SubscriptionsSect
               value={form.account_email}
               onChange={setField('account_email')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Notes</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Notes</span>
             <textarea
               className={styles.textarea}
               placeholder="Any notes…"
               value={form.notes}
               onChange={setField('notes')}
             />
-          </div>
+          </label>
         </div>
       </SlideOver>
 

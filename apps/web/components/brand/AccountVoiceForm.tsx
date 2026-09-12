@@ -148,33 +148,33 @@ export function AccountVoiceForm({
       </p>
 
       {/* Account identity */}
-      <div className={styles.field}>
-        <label className={styles.label}>Display name</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Display name</span>
         <input
           className={styles.input}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder="e.g. Chris · X"
         />
-      </div>
-      <div className={styles.field}>
-        <label className={styles.label}>Handle</label>
+      </label>
+      <label className={styles.field}>
+        <span className={styles.label}>Handle</span>
         <input
           className={styles.input}
           value={handle}
           onChange={(e) => setHandle(e.target.value)}
           placeholder="e.g. @chris"
         />
-      </div>
-      <div className={styles.field}>
-        <label className={styles.label}>Profile URL</label>
+      </label>
+      <label className={styles.field}>
+        <span className={styles.label}>Profile URL</span>
         <input
           className={styles.input}
           value={profileUrl}
           onChange={(e) => setProfileUrl(e.target.value)}
           placeholder="https://…"
         />
-      </div>
+      </label>
 
       <div className={styles.voiceDivider}>Voice</div>
 
@@ -328,8 +328,8 @@ export function AccountVoiceForm({
         </div>
 
         {/* Register */}
-        <div className={styles.field}>
-          <label className={styles.label}>Register</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Register</span>
           <select
             className={styles.select}
             value={format.register ?? ''}
@@ -345,11 +345,11 @@ export function AccountVoiceForm({
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
-        </div>
+        </label>
 
         {/* Paragraphing */}
-        <div className={styles.field}>
-          <label className={styles.label}>Paragraphing</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Paragraphing</span>
           <select
             className={styles.select}
             value={format.paragraphing ?? ''}
@@ -365,11 +365,11 @@ export function AccountVoiceForm({
             <option value="short-paragraphs">Short paragraphs</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
         {/* Hashtag use */}
-        <div className={styles.field}>
-          <label className={styles.label}>Hashtag use</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Hashtag use</span>
           <select
             className={styles.select}
             value={format.hashtag_use ?? ''}
@@ -385,11 +385,11 @@ export function AccountVoiceForm({
             <option value="sparingly">Sparingly (1–2)</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
         {/* Emoji use */}
-        <div className={styles.field}>
-          <label className={styles.label}>Emoji use</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Emoji use</span>
           <select
             className={styles.select}
             value={format.emoji_use ?? ''}
@@ -405,12 +405,12 @@ export function AccountVoiceForm({
             <option value="sparingly">Sparingly</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
         {/* Thread style — only meaningful on X (LinkedIn is always single) */}
         {account.platform === 'twitter_x' && (
-          <div className={styles.field}>
-            <label className={styles.label}>Thread style</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Thread style</span>
             <select
               className={styles.select}
               value={format.thread_style ?? ''}
@@ -425,7 +425,7 @@ export function AccountVoiceForm({
               <option value="platform-default">Platform default</option>
               <option value="single-only">Single posts only (no threads)</option>
             </select>
-          </div>
+          </label>
         )}
       </div>
 

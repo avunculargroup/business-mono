@@ -53,8 +53,8 @@ export function AdvisorContactForm({ advisorId, allContacts, existingContactIds,
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Contact *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Contact *</span>
         <select name="contact_id" required className={styles.select} defaultValue="">
           <option value="">Select a contact</option>
           {available.map((c) => (
@@ -63,12 +63,12 @@ export function AdvisorContactForm({ advisorId, allContacts, existingContactIds,
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Role</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Role</span>
         <input name="role" className={styles.input} placeholder="e.g. primary, admin" />
-      </div>
+      </label>
 
       <Button variant="primary" type="submit" loading={isSubmitting}>Add contact</Button>
     </form>
