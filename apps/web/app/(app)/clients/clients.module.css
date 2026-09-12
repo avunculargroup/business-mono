@@ -316,3 +316,43 @@
     transform: none;
   }
 }
+
+/* ── Operations ──────────────────────────────────────────── */
+
+.operations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  width: 100%;
+}
+
+/*
+ * A locked-out subscriber is an incident, not a statistic. Warning rather than
+ * destructive: nothing is broken and nobody did anything wrong — a document was
+ * published and people have not read it yet.
+ */
+.blocked {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.activity {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+/* Only the two that need attention take a colour. An account opened last week
+   is not a state worth tinting. */
+.active { color: var(--color-text-secondary); }
+.quiet { color: var(--color-text-secondary); }
+.dormant { color: var(--color-warning); }
+.never { color: var(--color-warning); }

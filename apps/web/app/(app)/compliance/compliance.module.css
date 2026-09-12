@@ -452,3 +452,15 @@
 .newVersionRow .input {
   max-width: 140px;
 }
+
+/*
+ * Blast radius on a live template. Neutral, not alarming: a widely used
+ * template is a success until the day it is not, and colouring it would say
+ * something about the number that the number does not say by itself.
+ */
+.reach {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}

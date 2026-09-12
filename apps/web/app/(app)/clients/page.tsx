@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { inviteState } from '@/lib/clients/invite';
+import {
+  activityState,
+  blockedSeats,
+  daysSinceLastSeen,
+  seatStandings,
+} from '@/lib/clients/operations';
 import { ClientAccounts, type AccountRow } from './ClientAccounts';
 import styles from './clients.module.css';
 
@@ -53,7 +59,7 @@ export default async function ClientsPage() {
   // Three round-trips rather than embedded selects: the bridge types carry no
   // PostgREST relationship metadata, and hand-writing some into a file whose
   // whole purpose is to be deleted would be work with a negative lifespan.
-  const [accounts, seats, invites] = await Promise.all([
+  const [accounts, seats, invites, disclosures, activeStatement] = await Promise.all([
     supabase
       .from('client_accounts')
       .select(
@@ -65,13 +71,67 @@ export default async function ClientsPage() {
     supabase
       .from('client_invites')
       .select('id, account_id, email, full_name, role, expires_at, accepted_at, revoked_at'),
+    // Who has acknowledged what, and what they need to have acknowledged.
+    // Publishing a Service Statement version puts every subscriber back at the
+    // gate, and until this read existed nothing said who they were.
+    supabase.from('client_disclosures').select('client_user_id, document_version'),
+    supabase
+      .from('compliance_documents')
+      .select('version')
+      .eq('doc_type', 'service_statement')
+      .eq('status', 'active')
+      .maybeSingle(),
   ]);
 
   const readError =
-    accounts.error?.message ?? seats.error?.message ?? invites.error?.message ?? null;
+    accounts.error?.message
+    ?? seats.error?.message
+    ?? invites.error?.message
+    ?? disclosures.error?.message
+    ?? null;
+
+  const disclosureRows = ((disclosures.data ?? []) as Array<{
+    client_user_id: string;
+    document_version: string;
+  }>).map((row) => ({
+    clientUserId: row.client_user_id,
+    documentVersion: row.document_version,
+  }));
+
+  // Null when nothing is active, which makes every seat blocked — correct
+  // rather than alarmist, since the gate has no document to serve.
+  const activeVersion =
+    (activeStatement.data as { version: string } | null)?.version ?? null;
 
   const seatRows = (seats.data ?? []) as SeatRecord[];
   const inviteRows = (invites.data ?? []) as InviteRecord[];
+
+  const accountSeats = (accountId: string) =>
+    seatRows.filter((seat) => seat.account_id === accountId);
+
+  /**
+   * The three operational facts about an account, computed once per row.
+   *
+   * Blocked seats first, because that is an incident rather than a metric: the
+   * person is sitting at the gate and cannot do anything about it themselves.
+   */
+  function operationsFor(accountId: string) {
+    const seats = accountSeats(accountId).map((seat) => ({
+      id: seat.id,
+      fullName: seat.full_name,
+      status: seat.status,
+      lastSeenAt: seat.last_seen_at,
+    }));
+
+    const standings = seatStandings(seats, disclosureRows, activeVersion);
+    const days = daysSinceLastSeen(seats);
+
+    return {
+      blocked: blockedSeats(standings).map((seat) => seat.fullName),
+      daysSinceLastSeen: days,
+      activity: activityState(days),
+    };
+  }
 
   const rows: AccountRow[] = ((accounts.data ?? []) as AccountRecord[])
     .map((account) => ({
@@ -81,16 +141,15 @@ export default async function ClientsPage() {
       subscriptionStatus: account.subscription_status,
       startedAt: account.subscription_started_at,
       renewsAt: account.subscription_renews_at,
-      seats: seatRows
-        .filter((seat) => seat.account_id === account.id)
-        .map((seat) => ({
-          id: seat.id,
-          fullName: seat.full_name,
-          email: seat.email,
-          role: seat.role,
-          status: seat.status,
-          lastSeenAt: seat.last_seen_at,
-        })),
+      seats: accountSeats(account.id).map((seat) => ({
+        id: seat.id,
+        fullName: seat.full_name,
+        email: seat.email,
+        role: seat.role,
+        status: seat.status,
+        lastSeenAt: seat.last_seen_at,
+      })),
+      operations: operationsFor(account.id),
       // Accepted invitations are not listed: the seat they produced is, and
       // showing both would double-count the same person under two headings.
       invites: inviteRows

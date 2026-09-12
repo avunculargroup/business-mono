@@ -713,6 +713,43 @@ because it guards the token *set* and not its *use*; and UI test coverage is 15/
 
 ---
 
+### Session 4 — what operating Minute actually needs
+
+The sweep asked whether the UI was covered and answered in terms of launch: could a subscriber
+be onboarded, could each gate be passed. Running it is a different question, and three of its
+answers were missing.
+
+**Blast radius had no reader.** `prepare_generations` exists, in its own table comment, so that
+"if a template is later found to be wrong, this answers who received it." Nothing queried it. The
+compliance capability the table was built for could not be exercised — and it is the kind that
+only gets asked for in a bad week, when nobody has time to write the query. It now sits beside
+each live template's review date, scoped to that **version**: a recall is of specific text, and
+counting every version would send someone chasing packs built from wording that was never in
+question. It counts `created` only, because a pack exported three times is one document in one
+subscriber's hands and overstating a recall is the specific way this number does harm.
+
+**Nobody could see who was locked out.** Publishing a Service Statement version puts every
+subscriber back at the gate until they re-acknowledge — and `/compliance` had just made that one
+click. A self-inflicted outage with no visibility, introduced two commits earlier by the button
+that causes it. `/clients` now names the people sitting at the gate per account. A superseded
+acknowledgement does not count, which is the point: it is a record of agreeing to different
+words.
+
+**No usage signal.** `last_seen_at` sat on every seat and nothing aggregated it. "Never opened"
+is kept distinct from "dormant" because they are different problems — onboarding that stalled
+versus interest that faded — and pre-revenue, with a handful of accounts, that distinction is
+most of the signal.
+
+The thresholds (14 days, 42 days) are not rules from anywhere and the code says so. Two weeks is
+long enough that a busy fortnight does not trip it; six is long enough that calling an account
+dormant is a statement rather than a guess.
+
+**A test caught an ordering bug** in the page wiring — `generationRows` used above its
+declaration, which typecheck accepted and the runtime did not. Worth noting only because it is
+the second time this session that a page test earned itself on a mistake typecheck could not see.
+
+---
+
 ---
 
 ## Open, and deliberately so

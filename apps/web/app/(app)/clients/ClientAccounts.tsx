@@ -10,6 +10,7 @@ import {
   setSubscriptionStatus,
 } from '@/app/actions/clientAccounts';
 import type { InviteState } from '@/lib/clients/invite';
+import type { ActivityState } from '@/lib/clients/operations';
 import styles from './clients.module.css';
 
 export interface AccountRow {
@@ -35,6 +36,12 @@ export interface AccountRow {
     state: InviteState;
     expiresAt: string;
   }>;
+  operations: {
+    /** Names of active seats that cannot get in until they re-acknowledge. */
+    blocked: string[];
+    daysSinceLastSeen: number | null;
+    activity: ActivityState;
+  };
 }
 
 const SUBSCRIPTION_STATUSES = [
@@ -177,6 +184,7 @@ function AccountCard({ account }: { account: AccountRow }) {
         </select>
       </div>
 
+      <Operations operations={account.operations} />
       <Seats seats={account.seats} />
       <Invites invites={account.invites} />
 
@@ -193,6 +201,37 @@ function AccountCard({ account }: { account: AccountRow }) {
         </button>
       )}
     </li>
+  );
+}
+
+/**
+ * The operational line: who cannot get in, and whether anyone is here.
+ *
+ * Blocked seats read as a warning rather than a statistic, because that is what
+ * they are. Publishing a Service Statement version is one click and it puts
+ * every subscriber back at the gate — nothing else in the app tells you that
+ * happened, and the people affected cannot resolve it from their side beyond
+ * reading and accepting.
+ */
+function Operations({ operations }: { operations: AccountRow['operations'] }) {
+  const { blocked, daysSinceLastSeen, activity } = operations;
+
+  return (
+    <div className={styles.operations}>
+      {blocked.length > 0 && (
+        <p className={styles.blocked} role="status">
+          {blocked.length === 1
+            ? `${blocked[0]} has not accepted the current Service Statement and cannot use Minute until they do.`
+            : `${blocked.length} people have not accepted the current Service Statement and cannot use Minute until they do: ${blocked.join(', ')}.`}
+        </p>
+      )}
+
+      <span className={`${styles.activity} ${styles[activity]}`}>
+        {activity === 'never'
+          ? 'Never opened'
+          : `Last opened ${daysSinceLastSeen === 0 ? 'today' : `${daysSinceLastSeen} days ago`}`}
+      </span>
+    </div>
   );
 }
 

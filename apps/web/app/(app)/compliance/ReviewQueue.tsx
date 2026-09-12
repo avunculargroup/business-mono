@@ -20,6 +20,8 @@ export interface QueueItem extends ReviewableRow {
   /** The stored template source. Templates only; library entries are not edited here. */
   body?: string;
   version?: string;
+  /** How far this version already reached. Templates only. */
+  reach?: { accounts: number; packs: number; lastGeneratedAt: string | null };
 }
 
 interface Props {
@@ -134,6 +136,8 @@ export function ReviewQueue({ awaiting, live }: Props) {
                     </span>
                   </div>
 
+                  {item.reach && <Reach reach={item.reach} />}
+
                   {item.kind === 'template' && item.body !== undefined && (
                     <>
                       <button
@@ -163,6 +167,35 @@ export function ReviewQueue({ awaiting, live }: Props) {
         )}
       </section>
     </>
+  );
+}
+
+/**
+ * How far a live template version has already reached.
+ *
+ * This is the number the review calendar was always for. `prepare_generations`
+ * records it so that a template later found to be wrong can be traced to the
+ * documents built from it, and reading it next to the review date is what turns
+ * "due for re-reading" into "due, and forty packs depend on it".
+ */
+function Reach({
+  reach,
+}: {
+  reach: NonNullable<QueueItem['reach']>;
+}) {
+  if (reach.packs === 0) {
+    // Worth saying rather than hiding: a live template nobody has used is a
+    // different situation from one in forty packs, and both inform how urgent
+    // a re-read is.
+    return <p className={styles.reach}>No packs built from this version yet.</p>;
+  }
+
+  return (
+    <p className={styles.reach}>
+      {reach.packs} {reach.packs === 1 ? 'pack' : 'packs'} built from this version, across{' '}
+      {reach.accounts} {reach.accounts === 1 ? 'account' : 'accounts'}
+      {reach.lastGeneratedAt ? `, most recently ${reach.lastGeneratedAt.slice(0, 10)}` : ''}.
+    </p>
   );
 }
 

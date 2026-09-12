@@ -6,6 +6,7 @@ import {
   profileFieldsUsedBy,
   type ProfileField,
 } from '@/lib/compliance/documents';
+import { blastRadius } from '@/lib/clients/operations';
 import { ReviewQueue, type QueueItem } from './ReviewQueue';
 import { CompanyProfileForm } from './CompanyProfileForm';
 import { DocumentList, type DocumentRow } from './DocumentList';
@@ -68,7 +69,7 @@ export default async function CompliancePage() {
 
   // Two round-trips rather than one embedded select: the tables are unrelated,
   // and the bridge types carry no PostgREST relationship metadata to join on.
-  const [templates, library, documents, profileRow] = await Promise.all([
+  const [templates, library, documents, generations, profileRow] = await Promise.all([
     supabase
       .from('prepare_templates')
       .select(
@@ -80,6 +81,12 @@ export default async function CompliancePage() {
     supabase
       .from('compliance_documents')
       .select('id, doc_type, title, version, body, status, effective_from'),
+    // Blast radius. `prepare_generations` exists, in its own comment, so that
+    // "if a template is later found to be wrong, this answers who received
+    // it" — and nothing read it until now, so the question could not be asked.
+    supabase
+      .from('prepare_generations')
+      .select('account_id, template_id, template_version, event, generated_at'),
     supabase
       .from('company_profile')
       .select(
@@ -87,6 +94,20 @@ export default async function CompliancePage() {
       )
       .maybeSingle(),
   ]);
+
+  const generationRows = ((generations.data ?? []) as Array<{
+    account_id: string;
+    template_id: string;
+    template_version: string;
+    event: string;
+    generated_at: string;
+  }>).map((row) => ({
+    accountId: row.account_id,
+    templateId: row.template_id,
+    templateVersion: row.template_version,
+    event: row.event,
+    generatedAt: row.generated_at,
+  }));
 
   const templateRows = (templates.data ?? []) as TemplateRow[];
   const libraryRows = (library.data ?? []) as LibraryRow[];
@@ -98,6 +119,10 @@ export default async function CompliancePage() {
       detail: `${row.artefact_type.replace(/_/g, ' ')} · ${row.client_type} · v${row.version}`,
       body: row.body,
       version: row.version,
+      // Scoped to this version, not the slug: a recall is of specific text, and
+      // counting every version would send someone chasing packs built from
+      // wording that was never in question.
+      reach: blastRadius(generationRows, row.id, row.version),
     })),
     ...libraryRows.map((row) => ({
       ...toReviewable(row),
@@ -119,6 +144,7 @@ export default async function CompliancePage() {
     ?? documents.error?.message
     ?? profileRow.error?.message
     ?? null;
+
 
   const profile = (profileRow.data ?? null) as Partial<
     Record<ProfileField, string | null>

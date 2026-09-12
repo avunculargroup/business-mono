@@ -15,6 +15,7 @@ vi.mock('./ClientAccounts', () => ({
       displayName: string;
       seats: Array<{ email: string }>;
       invites: Array<{ email: string; state: string }>;
+      operations: { blocked: string[]; activity: string };
     }>;
   }) => (
     <div
@@ -24,6 +25,8 @@ vi.mock('./ClientAccounts', () => ({
       data-invites={accounts
         .map((a) => a.invites.map((i) => `${i.email}:${i.state}`).join('|'))
         .join(';')}
+      data-blocked={accounts.map((a) => a.operations.blocked.join('|')).join(';')}
+      data-activity={accounts.map((a) => a.operations.activity).join(';')}
     />
   ),
 }));
@@ -58,7 +61,22 @@ beforeEach(() => {
   supabase.__setResponse('client_accounts', { data: [ACCOUNT], error: null });
   supabase.__setResponse('client_users', { data: [], error: null });
   supabase.__setResponse('client_invites', { data: [], error: null });
+  supabase.__setResponse('client_disclosures', { data: [], error: null });
+  supabase.__setResponse('compliance_documents', { data: { version: '1.0' }, error: null });
 });
+
+function seat(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'u1',
+    account_id: 'acct-1',
+    full_name: 'A Person',
+    email: 'a@example.test',
+    role: 'primary',
+    status: 'active',
+    last_seen_at: null,
+    ...overrides,
+  };
+}
 
 describe('ClientsPage', () => {
   it('renders the header', async () => {
@@ -142,5 +160,61 @@ describe('ClientsPage', () => {
     render(await ClientsPage());
 
     expect(screen.getByRole('status')).toHaveTextContent(/Could not read the subscriber tables/);
+  });
+});
+
+describe('the operational readout', () => {
+  it('names who is locked out by the current Service Statement', async () => {
+    // The incident this page exists to surface. Publishing a version is one
+    // click and puts every subscriber back at the gate.
+    supabase.__setResponse('client_users', { data: [seat()], error: null });
+
+    render(await ClientsPage());
+
+    expect(screen.getByTestId('accounts')).toHaveAttribute('data-blocked', 'A Person');
+  });
+
+  it('clears someone who acknowledged the current version', async () => {
+    supabase.__setResponse('client_users', { data: [seat()], error: null });
+    supabase.__setResponse('client_disclosures', {
+      data: [{ client_user_id: 'u1', document_version: '1.0' }],
+      error: null,
+    });
+
+    render(await ClientsPage());
+
+    expect(screen.getByTestId('accounts')).toHaveAttribute('data-blocked', '');
+  });
+
+  it('still blocks someone who only acknowledged a superseded version', async () => {
+    supabase.__setResponse('client_users', { data: [seat()], error: null });
+    supabase.__setResponse('client_disclosures', {
+      data: [{ client_user_id: 'u1', document_version: '0.9' }],
+      error: null,
+    });
+
+    render(await ClientsPage());
+
+    expect(screen.getByTestId('accounts')).toHaveAttribute('data-blocked', 'A Person');
+  });
+
+  it('reports an account nobody has ever opened', async () => {
+    // Distinct from dormant: onboarding stalled rather than interest faded.
+    supabase.__setResponse('client_users', { data: [seat()], error: null });
+
+    render(await ClientsPage());
+
+    expect(screen.getByTestId('accounts')).toHaveAttribute('data-activity', 'never');
+  });
+
+  it('reports a recently used account as active', async () => {
+    supabase.__setResponse('client_users', {
+      data: [seat({ last_seen_at: new Date().toISOString() })],
+      error: null,
+    });
+
+    render(await ClientsPage());
+
+    expect(screen.getByTestId('accounts')).toHaveAttribute('data-activity', 'active');
   });
 });
