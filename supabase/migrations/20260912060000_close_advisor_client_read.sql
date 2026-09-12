@@ -56,6 +56,40 @@
 
 DROP POLICY IF EXISTS "advisors_partners_client_read" ON advisors_partners;
 
+
+-- ------------------------------------------------------------
+-- Except the ones BTS has to name
+-- ------------------------------------------------------------
+-- Dropping the grant outright breaks the disclosure route, which
+-- is the one place it must not break.
+--
+-- `ClientDirectoryRepository.disclosures()` powers
+-- `/directory/how-we-make-money`, and it resolves entity names for
+-- both `entity_type`s. With no grant an advisor relationship
+-- renders as "Unnamed entity" — disclosing that a relationship
+-- exists while hiding who it is with, which reads as evasion on
+-- the one surface whose entire purpose is candour about BTS's own
+-- arrangements. Worse than the blanket grant it replaced.
+--
+-- So: exactly the rows the disclosure has to name, and no others.
+-- An advisor with no active commercial relationship stays
+-- invisible; one BTS has an arrangement with can be named, because
+-- BTS is obliged to name them. The directory listing is still
+-- closed — `list()` does not query this table at all.
+-- ------------------------------------------------------------
+
+CREATE POLICY "advisors_partners_client_disclosure_read" ON advisors_partners
+  FOR SELECT USING (
+    current_client_account_id() IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+        FROM commercial_relationships cr
+       WHERE cr.entity_type = 'advisor_partner'
+         AND cr.entity_id = advisors_partners.id
+         AND cr.is_active
+    )
+  );
+
 COMMENT ON TABLE advisors_partners IS
   'Named individuals and partner organisations, internal only. Deliberately NOT readable by Minute subscribers — see 20260912060000_close_advisor_client_read.sql for the three preconditions that would have to be met first.';
 
@@ -63,10 +97,12 @@ COMMENT ON TABLE advisors_partners IS
 -- ------------------------------------------------------------
 -- Verification
 -- ------------------------------------------------------------
--- No client-facing policy should remain:
+-- Only the team policy and the narrow disclosure one:
 --   SELECT policyname FROM pg_policies
 --    WHERE tablename = 'advisors_partners';
---   -- expect only the team policy
+--
+-- An advisor with no active relationship is invisible; one with a
+-- relationship is nameable. Exercise both, as a subscriber.
 --
 -- And the audit guard should still be clean:
 --   SELECT * FROM audit_permissive_policies();

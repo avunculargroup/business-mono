@@ -790,6 +790,45 @@ the contract actually reads.
 
 ---
 
+### Session 4 — the final sweep
+
+**Closing the advisor grant broke the disclosure route, and the sweep caught it.**
+`ClientDirectoryRepository.disclosures()` resolves entity names for both `entity_type`s, so with
+no grant at all an advisor relationship rendered as **"Unnamed entity"** — disclosing that an
+arrangement exists while hiding who it is with, on the one page whose entire purpose is candour
+about BTS's own revenue. Worse than the blanket grant it replaced.
+
+The answer is neither grant. `advisors_partners_client_disclosure_read` exposes exactly the rows
+an active `commercial_relationships` row names, and nothing else: an advisor BTS has an
+arrangement with can be named because BTS is obliged to name them; one it does not stays
+invisible. Verified against the mirror as a subscriber — two advisors, one disclosed, only one
+readable.
+
+**The rest of the grant audit came out clean.** Of the tables granted to subscribers,
+`company_listings`, `research_company_facts`, `treasury_events`, `onchain_observations` and
+`indicator_observations` are all reached through embedded selects, so the grants are load-bearing
+even though no query names them. `holding_bases` and `source_classes` are reference lookups with
+no entity identity, granted for a rendering path the adapter does not yet take — worth knowing,
+not worth closing.
+
+**Three bugs in this session's own code**, all in `/clients`, and the first is the worst thing
+written all session:
+
+- **The copy button lied.** `void navigator.clipboard?.writeText(link)` followed by an
+  unconditional `setCopied(true)`. Outside a secure context the API is absent; when permission is
+  refused the promise rejects and `void` swallows it. Either way the button said "Copied" and
+  nothing was on the clipboard — and the token is shown once and unrecoverable, so the sequence
+  copy, "Copied", Done loses an invitation permanently. It now awaits the write, claims nothing
+  it did not do, and on failure says the link is about to be lost.
+- **Disabling a seat failed silently.** The action's result was discarded, so a refusal looked
+  identical to success. That is access revocation: believing it worked when it did not is the
+  dangerous direction.
+- **Changing a subscription status** did the same thing, less dangerously.
+
+All three are mutation-tested — each fix reverted, each caught.
+
+---
+
 ---
 
 ## Open, and deliberately so

@@ -190,7 +190,7 @@ describe('what subscribers are granted in the database', () => {
       .join('\n');
   }
 
-  it('does not leave a client-read policy on advisors_partners', () => {
+  it('does not leave the broad listing grant on advisors_partners', () => {
     const sql = migrationSql();
 
     // Created then dropped is fine — the migrations replay in order and the
@@ -201,9 +201,23 @@ describe('what subscribers are granted in the database', () => {
     expect(
       created === -1 || dropped > created,
       'advisors_partners holds named individuals with an unconstrained engagement_model. '
-        + 'Re-granting needs a classification gate, the fee rule extended to reach it, and a '
-        + 'heading that is not a restricted term — see the migration header.',
+        + 'Re-granting the listing needs a classification gate, the fee rule extended to reach '
+        + 'it, and a heading that is not a restricted term — see the migration header.',
     ).toBe(true);
+  });
+
+  it('still lets the disclosure route name an advisor BTS has an arrangement with', () => {
+    // The narrow grant that replaced the broad one, and it is not optional.
+    // `disclosures()` resolves entity names for both entity_types; with no
+    // grant at all an advisor relationship renders as "Unnamed entity" —
+    // disclosing that an arrangement exists while hiding who it is with, on
+    // the one page whose entire purpose is candour about BTS's own revenue.
+    const sql = migrationSql();
+
+    expect(sql).toContain('CREATE POLICY "advisors_partners_client_disclosure_read"');
+    // Scoped by an existence check against commercial_relationships, so an
+    // advisor with no arrangement stays invisible.
+    expect(sql).toMatch(/advisors_partners_client_disclosure_read[\s\S]{0,600}commercial_relationships/);
   });
 
   it('has no advisors domain on the client contract', () => {

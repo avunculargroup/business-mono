@@ -147,6 +147,7 @@ function NewAccountForm({ onDone }: { onDone: () => void }) {
 
 function AccountCard({ account }: { account: AccountRow }) {
   const [inviting, setInviting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   return (
@@ -169,10 +170,11 @@ function AccountCard({ account }: { account: AccountRow }) {
           value={account.subscriptionStatus}
           onChange={(event) =>
             startTransition(async () => {
-              await setSubscriptionStatus(
+              const result = await setSubscriptionStatus(
                 account.id,
                 event.target.value as (typeof SUBSCRIPTION_STATUSES)[number],
               );
+              setError(result.error ?? null);
             })
           }
         >
@@ -183,6 +185,12 @@ function AccountCard({ account }: { account: AccountRow }) {
           ))}
         </select>
       </div>
+
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       <Operations operations={account.operations} />
       <Seats seats={account.seats} />
@@ -236,6 +244,7 @@ function Operations({ operations }: { operations: AccountRow['operations'] }) {
 }
 
 function Seats({ seats }: { seats: AccountRow['seats'] }) {
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   if (seats.length === 0) {
@@ -243,6 +252,12 @@ function Seats({ seats }: { seats: AccountRow['seats'] }) {
   }
 
   return (
+    <>
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
     <table className={styles.table}>
       <caption className={styles.caption}>Seats</caption>
       <thead>
@@ -267,10 +282,14 @@ function Seats({ seats }: { seats: AccountRow['seats'] }) {
                 className={styles.linkButton}
                 onClick={() =>
                   startTransition(async () => {
-                    await setClientSeatStatus(
+                    // Disabling a seat is access revocation. A discarded
+                    // failure here means someone believes they revoked access
+                    // and did not.
+                    const result = await setClientSeatStatus(
                       seat.id,
                       seat.status === 'active' ? 'disabled' : 'active',
                     );
+                    setError(result.error ?? null);
                   })
                 }
               >
@@ -281,6 +300,7 @@ function Seats({ seats }: { seats: AccountRow['seats'] }) {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
@@ -343,6 +363,7 @@ function InviteForm({ accountId, onDone }: { accountId: string; onDone: () => vo
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function submit(event: React.FormEvent) {
@@ -372,15 +393,31 @@ function InviteForm({ accountId, onDone }: { accountId: string; onDone: () => vo
           <button
             type="button"
             className={styles.ghostButton}
-            onClick={() => {
-              void navigator.clipboard?.writeText(link);
-              setCopied(true);
+            onClick={async () => {
+              // Never claim a copy that did not happen. The clipboard API is
+              // absent outside a secure context and rejects when permission is
+              // refused, and this token cannot be recovered — a button that
+              // said "Copied" either way would lose the invitation for good.
+              setCopyFailed(false);
+              try {
+                await navigator.clipboard.writeText(link);
+                setCopied(true);
+              } catch {
+                setCopyFailed(true);
+              }
             }}
           >
             {copied ? <Check size={16} strokeWidth={1.5} /> : <Copy size={16} strokeWidth={1.5} />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
+
+        {copyFailed && (
+          <p className={styles.error} role="alert">
+            Could not reach the clipboard. Select the link above and copy it by hand — it is not
+            shown again, and closing this panel loses it.
+          </p>
+        )}
         <button type="button" className={styles.primaryButton} onClick={onDone}>
           Done
         </button>
