@@ -542,7 +542,11 @@ naming the fix.
   section 8's terms and the privacy URL came from conversation.
 - **`company_profile` is empty.** Thirteen fields, none of them inventable — the gate fails
   closed until they are filled.
-- **`is_financial_product` backfill.** 24 rows, human judgement each.
+- **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
+  twenty-four is drafted in
+  [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)
+  — eleven proposed `true`, thirteen `false`, five flagged as genuinely arguable — but nothing
+  is written and the database still requires a person to name themselves against each row.
 - **Print fidelity in Safari (A9).** The export is not an export feature until it has been
   tested there, and it has not been.
 - **Co-editing (A10).** Two individual trustees on one minute is the normal case, not an edge
