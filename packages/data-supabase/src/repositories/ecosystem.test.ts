@@ -243,11 +243,37 @@ describe('change writes', () => {
       { status: 'dismissed' },
       { pinned: true },
       { curator_note: null },
-      { client_relevant: true },
+      {
+        client_relevant: true,
+        client_promoted_by: expect.any(String),
+        client_promoted_at: expect.any(String),
+      },
     ]);
     for (const builder of builders) {
       expect(builder.eq).toHaveBeenCalledWith('id', 'ch-1');
     }
+  });
+
+  it('names the promoter, which promotion_needs_approver requires', async () => {
+    // The constraint rejects client_relevant = true with no approver, so an
+    // update setting only the flag would fail once the client-app migrations
+    // land. The id comes from the principal bound at construction, never from
+    // a method argument.
+    await ecosystem().setClientRelevant('ch-1', true);
+
+    const patch = client.__buildersFor('ecosystem_changes')[0]!.update.mock.calls[0][0];
+    expect(patch.client_promoted_by).toBe(principal.userId);
+    expect(patch.client_promoted_at).toEqual(expect.any(String));
+  });
+
+  it('leaves the approver in place when withdrawing', async () => {
+    // Un-promoting does not unmake the decision that it was promoted, and the
+    // constraint only cares while the flag is true.
+    await ecosystem().setClientRelevant('ch-1', false);
+
+    expect(client.__buildersFor('ecosystem_changes')[0]!.update.mock.calls[0][0]).toEqual({
+      client_relevant: false,
+    });
   });
 
   it('promotes nothing on its own — the gate is the caller\'s', async () => {

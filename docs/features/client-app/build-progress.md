@@ -672,6 +672,47 @@ against the real seeded board paper with its front matter bumped and the duplica
 
 ---
 
+### Session 4 — a UI coverage sweep, and what it found
+
+A sweep across routes, tests, tokens and accessibility turned up one thing that
+outweighed everything else: **the client-facing gates had no team-side UI at all**, so
+`/signals`, `/register`, `/directory` and `/library` would have shipped permanently empty. Not
+broken — empty with no error, which is worse, because an empty page reads as a quiet day. Only
+the Brief worked, because `market_reports` is produced by an existing routine.
+
+And underneath that, **nothing anywhere inserted a `client_invites` row.** There was a redemption
+function and no issuance path. Minute had a front door and no way to hand anyone a key. That is
+now `/clients`: accounts, seats, and invitations whose token is minted and hashed in Node so the
+plaintext never reaches Postgres, shown once and unrecoverable by construction.
+
+**The sharpest find was not a gap but a break.** `flagClientRelevant` already existed, worked, and
+was tested — and it sets only `client_relevant`. The client-app migrations add
+`promotion_needs_approver`, which rejects that. So applying the migrations would have broken a
+shipped feature, and nothing caught it: the migration is unapplied, and the action's test mocks
+the repository, so neither side could see the other. The fix is in the adapter rather than the
+app, taking the promoter from the principal bound at construction — no contract change, no
+signature change, and the one place it could go wrong is now the one place it is tested.
+
+That reframed the work. The first instinct was a `promoteSignal` action alongside the existing
+one, which would have left two paths to the same state — worse than none. What was actually
+missing on that surface was the **client-safe note**, a second column with a second author:
+`curator_note` is written for a director and is allowed to editorialise, and a programmatic copy
+would eventually carry "we would move off this custodian" onto a subscriber's screen. Promotion
+is an act of authorship, not a filter.
+
+`setRegisterClearance` and `classifyProduct` are genuinely new, and both refuse before the
+constraint does — `classification_has_reasoning` would reject a classification with no note, and
+a sentence explaining why beats a constraint violation.
+
+**Still outstanding from the sweep**, and not yet done: the controls for register clearance and
+product classification are actions without a surface; `/library` has no sections, no entries and
+no editor; `apps/web` carries 214 accessibility warnings, 192 of them one unassociated-label
+pattern; 15 raw hex values sit outside the token system, which `globals.test.ts` cannot catch
+because it guards the token *set* and not its *use*; and UI test coverage is 15/72 pages in
+`apps/web` and 0/15 in `apps/client`.
+
+---
+
 ---
 
 ## Open, and deliberately so
