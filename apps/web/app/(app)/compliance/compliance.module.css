@@ -379,3 +379,76 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── Body editing ────────────────────────────────────────── */
+
+/*
+ * Monospace, and tall. These are markdown documents and YAML-fronted
+ * templates: proportional text hides an indentation mistake in a `::section`
+ * block, and a four-row box hides everything else.
+ */
+.bodyTextarea {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.bodyTextarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * Validator findings. Listed in full rather than truncated to the first —
+ * fixing one at a time when the parser already found six is a slow way to
+ * spend an afternoon.
+ */
+.problems {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: var(--color-agent-rejected);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+}
+
+.frozenNote {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.newVersionRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.newVersionRow .label {
+  align-self: center;
+}
+
+.newVersionRow .input {
+  max-width: 140px;
+}

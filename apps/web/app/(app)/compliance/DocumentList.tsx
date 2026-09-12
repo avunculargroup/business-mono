@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FileCheck } from 'lucide-react';
+import { FileCheck, PencilLine } from 'lucide-react';
 import { activateComplianceDocument } from '@/app/actions/complianceDocuments';
+import {
+  createComplianceDocumentVersion,
+  updateComplianceDocumentBody,
+} from '@/app/actions/complianceEditing';
+import { BodyEditor } from './BodyEditor';
 import styles from './compliance.module.css';
 
 export interface DocumentRow {
@@ -18,6 +23,8 @@ export interface DocumentRow {
   missing: string[];
   /** The fully resolved body, for preview. Empty when not ready. */
   body: string;
+  /** The stored body with its `{{variables}}` intact. What the editor edits. */
+  rawBody: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -36,12 +43,15 @@ const TYPE_LABELS: Record<string, string> = {
  * tell them apart before a subscriber does is to resolve the document here and
  * look at it.
  *
- * There is no editing. Bodies live in migrations, the same as `/prepare`
- * template bodies: the migration is the reviewed artefact, and a textarea that
- * saved over one would put the two into silent disagreement.
+ * Bodies are editable while a document is a draft and frozen once it is live,
+ * because `client_disclosures.document_version` records what a subscriber
+ * acknowledged: editing live text would leave that record pointing at wording
+ * that no longer exists. Changing a live document means cutting a new version,
+ * which the editor offers in place of the textarea.
  */
 export function DocumentList({ documents }: { documents: DocumentRow[] }) {
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -105,6 +115,15 @@ export function DocumentList({ documents }: { documents: DocumentRow[] }) {
                 {previewId === doc.id ? 'Hide preview' : 'Preview as a subscriber sees it'}
               </button>
 
+              <button
+                type="button"
+                className={styles.ghostButton}
+                onClick={() => setEditingId(editingId === doc.id ? null : doc.id)}
+              >
+                <PencilLine size={16} strokeWidth={1.5} />
+                {editingId === doc.id ? 'Close' : live ? 'New version' : 'Edit body'}
+              </button>
+
               {!live && (
                 <button
                   type="button"
@@ -117,6 +136,16 @@ export function DocumentList({ documents }: { documents: DocumentRow[] }) {
                 </button>
               )}
             </div>
+
+            {editingId === doc.id && (
+              <BodyEditor
+                body={doc.rawBody}
+                status={doc.status}
+                version={doc.version}
+                onSave={(body) => updateComplianceDocumentBody(doc.id, body)}
+                onNewVersion={(version) => createComplianceDocumentVersion(doc.id, version)}
+              />
+            )}
 
             {previewId === doc.id && doc.ready && (
               <pre className={styles.preview}>{doc.body}</pre>

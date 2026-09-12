@@ -38,6 +38,7 @@ type TemplateRow = {
   version: string;
   artefact_type: string;
   client_type: string;
+  body: string;
   lex_reviewed_at: string | null;
   review_due_date: string | null;
 };
@@ -71,7 +72,7 @@ export default async function CompliancePage() {
     supabase
       .from('prepare_templates')
       .select(
-        'id, slug, title, status, version, artefact_type, client_type, lex_reviewed_at, review_due_date',
+        'id, slug, title, status, version, artefact_type, client_type, body, lex_reviewed_at, review_due_date',
       ),
     supabase
       .from('client_library_entries')
@@ -95,6 +96,8 @@ export default async function CompliancePage() {
       ...toReviewable(row),
       kind: 'template' as const,
       detail: `${row.artefact_type.replace(/_/g, ' ')} · ${row.client_type} · v${row.version}`,
+      body: row.body,
+      version: row.version,
     })),
     ...libraryRows.map((row) => ({
       ...toReviewable(row),
@@ -154,6 +157,7 @@ export default async function CompliancePage() {
         ready: readiness.ready,
         missing: readiness.missing,
         body: readiness.body,
+        rawBody: row.body,
       };
     })
     .sort(

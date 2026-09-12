@@ -615,6 +615,63 @@ the RPC raising rather than silently no-opping on an unknown id.
 
 ---
 
+### Session 4 — editing, and the rule underneath it
+
+Both compliance documents and `/prepare` templates are now edited from `/compliance`. The
+previous session had declined to build this, on the grounds that bodies live in migrations and a
+textarea saving over one puts the reviewed artefact and the database into silent disagreement.
+That reasoning was half right, and the missing half turned out to be the more important rule.
+
+**Two denormalised columns decide it.** `client_disclosures.document_version` records what a
+subscriber acknowledged, and `prepare_generations.template_version` records what a pack was built
+from. Neither is a foreign key — both are copies of the version string, because the row they
+describe gets superseded and the record has to outlive it. So editing the body of a *live* row
+does not create a documentation drift problem, it silently invalidates evidence: someone
+acknowledged text that no longer exists anywhere, and nothing in either table would show it,
+because both store the version string and the version string did not change.
+
+The rule, therefore, is not "no editing". It is:
+
+- **Editable while unpublished** — draft, under review, approved.
+- **Frozen once live**, and frozen when retired: a superseded Service Statement is the exact text
+  someone was given, which is what makes it evidence.
+- **Changing a live one means cutting a new version**, which gets its own acknowledgements.
+- **Editing a template body clears its Lex review**, because a review describes specific text.
+
+All four are triggers in `20260912050000_frozen_bodies.sql`, not app code, because this is the
+kind of rule an app forgets — a second surface, a script, a console session at 11pm all go through
+Postgres. Clearing the review rather than rejecting the edit is deliberate: rejecting would mean a
+reviewer who spots a typo has to get the review unpicked first, and the likely outcome of that
+friction is the typo shipping. Clearing costs a re-review, which is the correct price and the same
+bargain a new commit strikes with a code-review approval. `active_requires_lex_review` then
+composes with it — verified — so a freshly edited template cannot be activated at all.
+
+**Template saves run the validator and refuse.** This is the check
+`packages/shared/src/prepare.ts` has always said belonged in `apps/web` — "validates on save
+before a founder can set a template active" — and until there was an editor there was nothing to
+validate. It refuses rather than warns: a template that saves and will not render is discovered
+by a subscriber halfway through a board paper, and a warning is the shape of thing that gets
+clicked past. Every problem is listed, not just the first, and the same parse writes
+`facts_required`, so the column and the body cannot come to disagree about what the body says.
+
+Library entries are **not** editable here. Their bodies are prose with no parser behind them, so
+an editor would be one with no validation — a different thing, worth building deliberately rather
+than by extension.
+
+**What this does not solve** is the original concern, and it should not be claimed as solved: a
+migration that has been applied is history, the database is then the live copy, and a fresh
+environment seeded from `supabase/migrations/` gets the seeded text rather than the edited text.
+That is correct for staging and wrong for nothing in particular today, but it is drift, and it is
+the reason to keep substantive rewrites in migrations rather than typing them into the box.
+
+**Verified**: 48 new tests, the whole workspace green, and every trigger branch exercised against
+the local mirror — live body rejected, live version rename rejected, other columns on a live row
+still writable, a draft edit clearing the review, `active_requires_lex_review` then blocking
+activation, a no-op body write leaving an untouched review standing, and the new-version copy run
+against the real seeded board paper with its front matter bumped and the duplicate rejected.
+
+---
+
 ---
 
 ## Open, and deliberately so

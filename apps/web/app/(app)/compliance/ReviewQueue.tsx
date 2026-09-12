@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ShieldCheck, CalendarClock } from 'lucide-react';
+import { ShieldCheck, CalendarClock, PencilLine } from 'lucide-react';
 import { recordLexReview } from '@/app/actions/complianceReviews';
+import { createTemplateVersion, updateTemplateBody } from '@/app/actions/complianceEditing';
+import { BodyEditor } from './BodyEditor';
 import {
   daysUntilReview,
   reviewUrgency,
@@ -15,6 +17,9 @@ export interface QueueItem extends ReviewableRow {
   kind: ReviewableKind;
   /** A short line under the title: artefact type, client type, version. */
   detail: string;
+  /** The stored template source. Templates only; library entries are not edited here. */
+  body?: string;
+  version?: string;
 }
 
 interface Props {
@@ -31,6 +36,7 @@ function defaultDueDate(): string {
 
 export function ReviewQueue({ awaiting, live }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
     <>
@@ -58,14 +64,43 @@ export function ReviewQueue({ awaiting, live }: Props) {
                 {openId === `${item.kind}-${item.id}` ? (
                   <ReviewForm item={item} onCancel={() => setOpenId(null)} />
                 ) : (
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={() => setOpenId(`${item.kind}-${item.id}`)}
-                  >
-                    <ShieldCheck size={16} strokeWidth={1.5} />
-                    Record review
-                  </button>
+                  <div className={styles.formActions}>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      onClick={() => setOpenId(`${item.kind}-${item.id}`)}
+                    >
+                      <ShieldCheck size={16} strokeWidth={1.5} />
+                      Record review
+                    </button>
+
+                    {/* Templates only. A library entry's body is prose with no
+                        parser behind it, and editing it here would be an editor
+                        with no validation — a different thing, worth building
+                        deliberately rather than by extension. */}
+                    {item.kind === 'template' && item.body !== undefined && (
+                      <button
+                        type="button"
+                        className={styles.ghostButton}
+                        onClick={() =>
+                          setEditingId(editingId === item.id ? null : item.id)
+                        }
+                      >
+                        <PencilLine size={16} strokeWidth={1.5} />
+                        {editingId === item.id ? 'Close' : 'Edit body'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {editingId === item.id && item.body !== undefined && (
+                  <BodyEditor
+                    body={item.body}
+                    status={item.status}
+                    version={item.version ?? ''}
+                    onSave={(body) => updateTemplateBody(item.id, body)}
+                    onNewVersion={(version) => createTemplateVersion(item.id, version)}
+                  />
                 )}
               </li>
             ))}
@@ -98,6 +133,29 @@ export function ReviewQueue({ awaiting, live }: Props) {
                       {dueLabel(days, urgency)}
                     </span>
                   </div>
+
+                  {item.kind === 'template' && item.body !== undefined && (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.ghostButton}
+                        onClick={() => setEditingId(editingId === item.id ? null : item.id)}
+                      >
+                        <PencilLine size={16} strokeWidth={1.5} />
+                        {editingId === item.id ? 'Close' : 'New version'}
+                      </button>
+
+                      {editingId === item.id && (
+                        <BodyEditor
+                          body={item.body}
+                          status={item.status}
+                          version={item.version ?? ''}
+                          onSave={(body) => updateTemplateBody(item.id, body)}
+                          onNewVersion={(version) => createTemplateVersion(item.id, version)}
+                        />
+                      )}
+                    </>
+                  )}
                 </li>
               );
             })}

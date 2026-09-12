@@ -77,7 +77,7 @@ Everything under `app/(app)/` sits inside the authenticated shell (sidebar + hea
 | `/products`, `/advisors` | Ecosystem registers — human-maintained, no agent writes |
 | `/routines` | Scheduled agent routines |
 | `/brand` | Brand hub — assets and the voice editor |
-| `/compliance` | Everything that must be true before a Minute subscriber can log in: the `company_profile` singleton, the compliance documents (resolve-preview and publish, no body editing), and the Lex approval queue for `/prepare` templates and client library entries |
+| `/compliance` | Everything that must be true before a Minute subscriber can log in: the `company_profile` singleton, the compliance documents (edit, resolve-preview, publish), and the Lex approval queue for `/prepare` templates and client library entries. Bodies are editable while unpublished and frozen once live — a live one is changed by cutting a new version |
 | `/decks`, `/docs`, `/files` | Supporting workspace pages |
 | `/settings` | `integrations` (Fastmail, LinkedIn), `team`, `models` (per-agent/per-step model selection) |
 
