@@ -38,10 +38,10 @@ login is a document being signed off rather than code being written:
   A1) — a narrated brief, a register of named entities, monitoring of custody providers, rather
   than the education and consulting business.
 
-Also outstanding: publishing the two seeded templates (they ship as drafts and need a Lex
+Also outstanding: publishing the six seeded templates (they all ship as drafts and need a Lex
 reviewer named against each), the `is_financial_product` backfill (24 rows, human judgement
-each), the Lex approval queue in `apps/web`, print fidelity in Safari, and four of the six
-`/prepare` templates.
+each), the Lex approval queue in `apps/web`, print fidelity in Safari, and the seasonal 30 June
+valuation pack.
 
 ---
 

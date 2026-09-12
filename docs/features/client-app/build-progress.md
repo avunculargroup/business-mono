@@ -440,6 +440,51 @@ almost certainly a suggested allocation.
   one context could answer as both a corporate and an SMSF subscriber, which no real adapter
   does, because tenancy is bound at construction. `createContext` now takes a client type.
 
+### Session 4 — the remaining four templates
+
+All six artefacts from the spec are now seeded: the audit committee briefing note and the
+treasury policy skeleton for corporates, the investment strategy addendum and the auditor
+evidence checklist for SMSFs. Every one is a draft, for the same reason the first two were, and
+each migration header carries the `UPDATE` that publishes it.
+
+The bundle's outline was followed section for section. Three places where it could not be, all
+of them about which sections bind facts:
+
+- **The audit committee note's section 2 is marked "(facts)" and binds none.** The fact meant is
+  the AASB position, and `FACT_SOURCES` cannot express it: the registry serves observed and
+  reported series with a provenance rail and an expected cadence, and an accounting standard is
+  neither. The measurement basis is the subscriber's answer; `regulatory_reference` on the
+  section is what points them at the standard. `btc_spot_aud` binds to the valuation section
+  instead, because a price is evidence about methodology and not about classification.
+- **The auditor checklist's item 8 is marked "(facts)" and binds none either.** A custody
+  provider's regulatory status as at a date is a `/signals` entry with a Lex-gated compliance
+  class, not an indicator series. Routing it through `facts` would strip that gate, so the
+  subscriber reads it on `/signals` and states it here. The as-at date is the whole of the item
+  and the signals page is where the as-at date lives.
+- **The treasury policy binds nothing at all**, and is the only seeded template of which that is
+  true. A policy states standing rules; a fact is true as at a timestamp. A spot price inside a
+  standing instruction is stale within the week, and worse than stale — it reads as the figure
+  the limits were set against.
+
+Section 4 of the treasury policy is the one to re-read at review. It is a limits framework —
+position limit, concentration limit, rebalancing trigger — containing no figures at all,
+because the right numbers depend on a balance sheet Minute has deliberately never seen. Nothing
+enforces the absence of digits there and nothing can: a constraint rejecting digits would reject
+a clause number too. The template test's bare-percentage check is the nearest thing, and it is a
+backstop rather than a guarantee.
+
+The six SIS Reg 4.09(2) heads in the investment strategy addendum are reproduced as the
+regulation puts them. That is the safest writing in the whole feature — BTS is quoting the
+regulation at the trustee and the trustee is answering it — and it is worth noticing that the
+diversification head cannot be answered from anything BTS holds, because it asks about the
+fund's investments as a whole.
+
+**Verified**: all six bodies through the real parser and validator, all four migrations against
+the local mirror, and `active_requires_lex_review` exercised both ways on the treasury policy —
+rejected with no reviewer, accepted once one is named, rolled back.
+
+---
+
 ---
 
 ## Open, and deliberately so
@@ -459,12 +504,11 @@ almost certainly a suggested allocation.
 - **Co-editing (A10).** Two individual trustees on one minute is the normal case, not an edge
   case, and the working-copy JSON hand-off is a workaround.
 - **The Lex approval queue in `apps/web`.**
-- **The remaining four `/prepare` templates.** The trustee minute was built first on the
-  bundle's reasoning that it is the most constrained and surfaces every problem the others will
-  have. It did: the SIS Reg 4.09(2) heads are the reason `facts: []` had to be legal on a
-  section, and the reason the validator checks that every prompt ends in a question mark rather
-  than trusting the author. The board paper followed because Cite in a pack needed a precedent
-  section to land in.
+- **The seasonal 30 June valuation pack.** All six artefacts are now seeded; the seventh is the
+  seasonal variant, which is items 6, 7 and 8 of the auditor evidence checklist run standalone
+  between 1 May and 31 July. It is deliberately not a seventh body: a copied subset drifts from
+  its parent, and the drift is invisible until a subscriber assembles a valuation pack that
+  asks an older question than the checklist does. It should be generated from the checklist.
 - **Cited-fact staleness**, the open question 0.4.0 added. A fact cited in March and refreshed
   in May may carry a newer date and a changed value while the prose around it still argues the
   old one. The export states both dates so a reader can see it; nothing detects the stale
