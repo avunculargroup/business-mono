@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { ShieldCheck, CalendarClock, PencilLine } from 'lucide-react';
 import { recordLexReview } from '@/app/actions/complianceReviews';
 import { createTemplateVersion, updateTemplateBody } from '@/app/actions/complianceEditing';
+import { updateLibraryEntryBody } from '@/app/actions/clientLibrary';
 import { BodyEditor } from './BodyEditor';
 import {
   daysUntilReview,
@@ -17,7 +18,7 @@ export interface QueueItem extends ReviewableRow {
   kind: ReviewableKind;
   /** A short line under the title: artefact type, client type, version. */
   detail: string;
-  /** The stored template source. Templates only; library entries are not edited here. */
+  /** The stored source — a template body, or a library entry's markdown. */
   body?: string;
   version?: string;
   /** How far this version already reached. Templates only. */
@@ -76,11 +77,11 @@ export function ReviewQueue({ awaiting, live }: Props) {
                       Record review
                     </button>
 
-                    {/* Templates only. A library entry's body is prose with no
-                        parser behind it, and editing it here would be an editor
-                        with no validation — a different thing, worth building
-                        deliberately rather than by extension. */}
-                    {item.kind === 'template' && item.body !== undefined && (
+                    {/* Both kinds. An earlier pass excluded library entries on
+                        the grounds that prose has no parser to validate against
+                        — which is a reason the editor checks less, not a reason
+                        to withhold one, and it left the library uneditable. */}
+                    {item.body !== undefined && (
                       <button
                         type="button"
                         className={styles.ghostButton}
@@ -100,8 +101,23 @@ export function ReviewQueue({ awaiting, live }: Props) {
                     body={item.body}
                     status={item.status}
                     version={item.version ?? ''}
-                    onSave={(body) => updateTemplateBody(item.id, body)}
-                    onNewVersion={(version) => createTemplateVersion(item.id, version)}
+                    onSave={(body) =>
+                      item.kind === 'template'
+                        ? updateTemplateBody(item.id, body)
+                        : updateLibraryEntryBody(item.id, body)
+                    }
+                    onNewVersion={(version) =>
+                      item.kind === 'template'
+                        ? createTemplateVersion(item.id, version)
+                        // A library entry has no version column, so there is no
+                        // new version to cut. Published means published, and the
+                        // remedy is a new entry — said rather than silently
+                        // offering a control that cannot work.
+                        : Promise.resolve({
+                            error:
+                              'A published library entry cannot be revised. Create a new entry and archive this one.',
+                          })
+                    }
                   />
                 )}
               </li>

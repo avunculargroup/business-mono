@@ -10,6 +10,7 @@ import { blastRadius } from '@/lib/clients/operations';
 import { ReviewQueue, type QueueItem } from './ReviewQueue';
 import { CompanyProfileForm } from './CompanyProfileForm';
 import { DocumentList, type DocumentRow } from './DocumentList';
+import { LibrarySections, type LibrarySectionRow } from './LibrarySections';
 import styles from './compliance.module.css';
 
 /**
@@ -46,11 +47,21 @@ type TemplateRow = {
 
 type LibraryRow = {
   id: string;
+  section_id: string;
   slug: string;
   title: string;
+  body: string;
   status: string;
   lex_reviewed_at: string | null;
   review_due_date: string | null;
+};
+
+type LibrarySectionRecord = {
+  id: string;
+  key: string;
+  title: string;
+  client_type: string;
+  sort_order: number;
 };
 
 function toReviewable(row: TemplateRow | LibraryRow): ReviewableRow {
@@ -69,7 +80,8 @@ export default async function CompliancePage() {
 
   // Two round-trips rather than one embedded select: the tables are unrelated,
   // and the bridge types carry no PostgREST relationship metadata to join on.
-  const [templates, library, documents, generations, profileRow] = await Promise.all([
+  const [templates, library, librarySections, documents, generations, profileRow] =
+    await Promise.all([
     supabase
       .from('prepare_templates')
       .select(
@@ -77,7 +89,10 @@ export default async function CompliancePage() {
       ),
     supabase
       .from('client_library_entries')
-      .select('id, slug, title, status, lex_reviewed_at, review_due_date'),
+      .select('id, section_id, slug, title, body, status, lex_reviewed_at, review_due_date'),
+    supabase
+      .from('client_library_sections')
+      .select('id, key, title, client_type, sort_order'),
     supabase
       .from('compliance_documents')
       .select('id, doc_type, title, version, body, status, effective_from'),
@@ -128,8 +143,29 @@ export default async function CompliancePage() {
       ...toReviewable(row),
       kind: 'library' as const,
       detail: 'Library entry',
+      body: row.body,
     })),
   ];
+
+  // Sections carry their entries, sorted the way the client app orders them:
+  // by sort_order then title. Not a ranking — a stable sequence, so the page
+  // does not shuffle between renders.
+  const sectionRows: LibrarySectionRow[] = ((librarySections.data ?? []) as LibrarySectionRecord[])
+    .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title))
+    .map((section) => ({
+      id: section.id,
+      key: section.key,
+      title: section.title,
+      clientType: section.client_type,
+      entries: libraryRows
+        .filter((entry) => entry.section_id === section.id)
+        .map((entry) => ({
+          id: entry.id,
+          slug: entry.slug,
+          title: entry.title,
+          status: entry.status,
+        })),
+    }));
 
   const awaiting = sortQueue(items.filter(isAwaitingReview));
   const live = sortQueue(items.filter((item) => isLive(item, item.kind)));
@@ -142,6 +178,7 @@ export default async function CompliancePage() {
     templates.error?.message
     ?? library.error?.message
     ?? documents.error?.message
+    ?? librarySections.error?.message
     ?? profileRow.error?.message
     ?? null;
 
@@ -237,6 +274,16 @@ export default async function CompliancePage() {
             version of the same type in one transaction, so there is never a moment with none.
           </p>
           <DocumentList documents={documentRows} />
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Library</h2>
+          <p className={styles.sectionLede}>
+            The reference layer a subscriber reads when a term needs explaining. `/library` shows
+            sections that have at least one entry, so an empty section is invisible rather than
+            empty. Entries publish through the review queue below.
+          </p>
+          <LibrarySections sections={sectionRows} />
         </section>
 
         <ReviewQueue awaiting={awaiting} live={live} />

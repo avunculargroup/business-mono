@@ -43,6 +43,20 @@ vi.mock('./DocumentList', () => ({
   ),
 }));
 
+vi.mock('./LibrarySections', () => ({
+  LibrarySections: ({
+    sections,
+  }: {
+    sections: Array<{ key: string; entries: Array<{ slug: string }> }>;
+  }) => (
+    <div
+      data-testid="library"
+      data-sections={sections.map((s) => s.key).join(',')}
+      data-entries={sections.map((s) => s.entries.map((e) => e.slug).join('|')).join(';')}
+    />
+  ),
+}));
+
 vi.mock('./ReviewQueue', () => ({
   ReviewQueue: ({
     awaiting,
@@ -79,11 +93,24 @@ function template(overrides: Record<string, unknown> = {}) {
 function libraryEntry(overrides: Record<string, unknown> = {}) {
   return {
     id: 'l1',
+    section_id: 'sec-1',
     slug: 'custody-basics',
     title: 'Custody basics',
+    body: 'Who can move the asset.',
     status: 'draft',
     lex_reviewed_at: null,
     review_due_date: null,
+    ...overrides,
+  };
+}
+
+function librarySection(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'sec-1',
+    key: 'custody',
+    title: 'Custody',
+    client_type: 'both',
+    sort_order: 0,
     ...overrides,
   };
 }
@@ -113,6 +140,8 @@ beforeEach(() => {
   supabase.__setResponse('prepare_templates', { data: [], error: null });
   supabase.__setResponse('client_library_entries', { data: [], error: null });
   supabase.__setResponse('compliance_documents', { data: [], error: null });
+  supabase.__setResponse('client_library_sections', { data: [], error: null });
+  supabase.__setResponse('prepare_generations', { data: [], error: null });
   supabase.__setResponse('company_profile', { data: null, error: null });
   process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] = 'https://example.test/privacy';
 });
@@ -270,5 +299,46 @@ describe('the compliance documents section', () => {
     render(await CompliancePage());
 
     expect(screen.getByRole('status')).toHaveTextContent(/Could not read the review tables/);
+  });
+});
+
+describe('the library section', () => {
+  it('nests entries under the section that owns them', async () => {
+    supabase.__setResponse('client_library_sections', {
+      data: [librarySection(), librarySection({ id: 'sec-2', key: 'valuation', sort_order: 1 })],
+      error: null,
+    });
+    supabase.__setResponse('client_library_entries', { data: [libraryEntry()], error: null });
+
+    render(await CompliancePage());
+
+    const library = screen.getByTestId('library');
+    expect(library).toHaveAttribute('data-sections', 'custody,valuation');
+    expect(library).toHaveAttribute('data-entries', 'custody-basics;');
+  });
+
+  it('orders sections by sort_order, then title', async () => {
+    // A stable sequence rather than a ranking — the page must not shuffle
+    // between renders.
+    supabase.__setResponse('client_library_sections', {
+      data: [
+        librarySection({ id: 'b', key: 'zeta', title: 'Zeta', sort_order: 1 }),
+        librarySection({ id: 'a', key: 'alpha', title: 'Alpha', sort_order: 0 }),
+      ],
+      error: null,
+    });
+
+    render(await CompliancePage());
+
+    expect(screen.getByTestId('library')).toHaveAttribute('data-sections', 'alpha,zeta');
+  });
+
+  it('shows a section with no entries, because it is invisible to subscribers', async () => {
+    supabase.__setResponse('client_library_sections', { data: [librarySection()], error: null });
+
+    render(await CompliancePage());
+
+    expect(screen.getByTestId('library')).toHaveAttribute('data-sections', 'custody');
+    expect(screen.getByTestId('library')).toHaveAttribute('data-entries', '');
   });
 });

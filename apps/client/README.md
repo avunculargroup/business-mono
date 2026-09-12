@@ -40,8 +40,14 @@ login is a document being signed off rather than code being written:
 
 Also outstanding: publishing the six seeded templates (they all ship as drafts and need a Lex
 reviewer named against each — `/compliance` in `apps/web` is where that happens), the
-`is_financial_product` backfill (24 rows, human judgement each), print fidelity in Safari, and
-the seasonal 30 June valuation pack.
+`is_financial_product` backfill (24 rows, human judgement each — classify each on its product
+page), writing the library (no sections or entries exist yet; `/compliance` is where they are
+created), print fidelity in Safari, and the seasonal 30 June valuation pack.
+
+Everything a subscriber sees is gated on a column a human sets, and every one of those gates now
+has a surface in `apps/web`: `/clients` for accounts and invitations, `/compliance` for the
+statement, templates and library, `/research/[slug]` for register clearance, `/products/[id]`
+for directory classification, and `/signals` for signal promotion.
 
 ---
 
