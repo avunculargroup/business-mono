@@ -101,6 +101,15 @@ export interface CompanyDossier extends RegisterEntry {
   curatorNotes: string | null;
   lastVerifiedAt: string | null;
   isPublished: boolean;
+  /**
+   * Whether a Minute subscriber may see this entry.
+   *
+   * A different question from `isPublished`, which is whether the internal
+   * register shows it, and collapsing the two would make the second unaskable.
+   * No default of true anywhere: an entry reaches a paying subscriber because
+   * someone said so, and `client_clearance_needs_approver` records who.
+   */
+  clientCleared: boolean;
   formerNames: FormerName[];
   /** Every venue, including ones it has left. */
   listingHistory: CompanyListing[];

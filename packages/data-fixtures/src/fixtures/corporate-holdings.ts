@@ -250,6 +250,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'conflict is shown rather than resolved out of sight.',
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: true,
+      clientCleared: true,
     },
     {
       id: E.verrall.id,
@@ -299,6 +300,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'rather than render empty. Not comparable with an operating business.',
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: true,
+      clientCleared: true,
     },
     {
       id: E.nyala.id,
@@ -365,6 +367,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'custodied for customers.',
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: false,
+      clientCleared: false,
     },
     {
       id: E.tarra.id,
@@ -414,6 +417,10 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'flags Calder as overdue is unremarkable here.',
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: true,
+      // Published internally and NOT cleared for subscribers. The pair that
+      // proves is_published and client_cleared are different questions: an
+      // adapter conflating them still passes every case where they agree.
+      clientCleared: false,
     },
     {
       id: E.calder.id,
@@ -463,6 +470,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'window.',
       lastVerifiedAt: onDate(anchor, -95),
       isPublished: true,
+      clientCleared: true,
     },
   ];
 }

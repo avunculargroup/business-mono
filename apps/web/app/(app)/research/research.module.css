@@ -124,3 +124,10 @@
   line-height: var(--leading-relaxed);
   color: var(--color-text-secondary);
 }
+
+/* The subscriber-visibility control on a company record. Sits above the record
+   because it is a decision about the whole page rather than a field on it. */
+.gateWrap {
+  padding: var(--space-6) var(--space-6) 0;
+  max-width: var(--content-max-width);
+}
