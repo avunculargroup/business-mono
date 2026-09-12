@@ -54,6 +54,12 @@ Transform tasks into verifiable goals before implementing:
   circumstances, prose never transmitted, every fact carries a link — are still true). That
   last one is the only test that reads a migration as its fixture, because the statement is a
   string in SQL and nothing else connects it to the code that renders it.
+  Its page tests use `@platform/data-fixtures` as the test double, via
+  `test/mocks/repositories.ts`, rather than a hand-written fake — that adapter already passes
+  the client contract suite, so a page test exercises something production-shaped instead of a
+  mock free to answer in shapes no real adapter can produce. It is a **devDependency**, which
+  `lib/boundary.test.ts` permits by design: that test checks runtime dependencies only, so a
+  fixture package can be used in tests without ever reaching the bundle.
   `packages/shared` and `packages/db` now have suites too — the first because the `/prepare`
   template parser and the compliance-document resolver live there, the second because of the
   pending-types bridge below.
