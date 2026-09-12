@@ -485,6 +485,50 @@ rejected with no reviewer, accepted once one is named, rolled back.
 
 ---
 
+### Session 4 — the Lex approval queue
+
+`/compliance` in `apps/web`. Two tables gate what a paying subscriber can see, both carry a
+CHECK constraint saying nothing goes live without a named reviewer, and until this page existed
+the only way to satisfy either was an `UPDATE` written by hand into a migration header. That is
+a workable answer once and an unworkable one every quarter.
+
+**The two review views are not an approval queue, and it took building one to notice.**
+`v_prepare_template_reviews` and `v_client_library_reviews` both filter to rows that are already
+live — they were written to feed a review calendar, and they do that well. The queue needs the
+opposite set, the drafts nothing has published yet, so the page reads the base tables and the
+views stay what they are. `apps/web/lib/compliance/queue.ts` holds the rules as pure functions
+because they are the part that must not be wrong, and the awkward one is that the two tables
+spell the live state differently: a template is `active` and a library entry is `published`.
+Getting that backwards would leave published entries sitting in the review queue for ever, so
+it has a test of its own.
+
+**Review and publication are one action, not two.** Both constraints already make review the
+precondition of publication, and template bodies live in migrations — so a reviewer who finds a
+problem does not fix it on this page, they change the migration. That leaves publication as the
+only outcome the surface produces, and two buttons would invite exactly the state the
+constraints exist to prevent: reviewed, and quietly never published.
+
+**`client_library_entries` gained `lex_notes`, and the migration was amended in place.** Writing
+the action exposed the gap: it required a note before publishing and then had nowhere to put one
+for a library entry. `prepare_templates` had the column and the library table did not, which
+made a library review a timestamp and a name — nothing a person reading the row in eighteen
+months could use. Amended rather than corrected forward, for the reason recorded above: these
+migrations have never run anywhere.
+
+**`apps/web`'s Supabase client is now typed against `ClientDatabase`.** It is `Database` plus the
+pending-types bridge, so it is a superset and every existing query kept its types — the whole
+workspace typechecks unchanged. It reverts when the migrations are applied and the bridge is
+deleted.
+
+**Verified**: 38 new tests (21 on the pure queue rules, 6 on the page's bucketing, 11 on the
+action), the whole workspace green at 604 web tests and clean typecheck, and the publish flow run
+against the local mirror as the exact statements the action issues — the row goes active with its
+note, and a second active version of the same slug raises `23505` on
+`idx_prepare_templates_one_active`, which is the code the action translates into a sentence
+naming the fix.
+
+---
+
 ---
 
 ## Open, and deliberately so
@@ -503,7 +547,6 @@ rejected with no reviewer, accepted once one is named, rolled back.
   tested there, and it has not been.
 - **Co-editing (A10).** Two individual trustees on one minute is the normal case, not an edge
   case, and the working-copy JSON hand-off is a workaround.
-- **The Lex approval queue in `apps/web`.**
 - **The seasonal 30 June valuation pack.** All six artefacts are now seeded; the seventh is the
   seasonal variant, which is items 6, 7 and 8 of the auditor evidence checklist run standalone
   between 1 May and 31 July. It is deliberately not a seventh body: a copied subset drifts from

@@ -39,9 +39,9 @@ login is a document being signed off rather than code being written:
   than the education and consulting business.
 
 Also outstanding: publishing the six seeded templates (they all ship as drafts and need a Lex
-reviewer named against each), the `is_financial_product` backfill (24 rows, human judgement
-each), the Lex approval queue in `apps/web`, print fidelity in Safari, and the seasonal 30 June
-valuation pack.
+reviewer named against each — `/compliance` in `apps/web` is where that happens), the
+`is_financial_product` backfill (24 rows, human judgement each), print fidelity in Safari, and
+the seasonal 30 June valuation pack.
 
 ---
 

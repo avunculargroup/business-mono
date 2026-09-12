@@ -77,6 +77,12 @@ CREATE TABLE client_library_entries (
 
   lex_reviewed_at       TIMESTAMPTZ,
   lex_reviewed_by       UUID REFERENCES team_members(id),
+  -- Mirrors prepare_templates.lex_notes. Without it a review is a
+  -- timestamp and a name, and nobody reading the row in eighteen
+  -- months can tell what was actually checked. The approval queue
+  -- in apps/web requires a note before it will publish either kind
+  -- of row, and this is where the library half of that lands.
+  lex_notes             TEXT,
 
   sort_order            INTEGER NOT NULL DEFAULT 0,
 

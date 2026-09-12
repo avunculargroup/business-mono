@@ -275,6 +275,7 @@ export type PendingClientTables = {
       review_due_date: string | null;
       lex_reviewed_at: string | null;
       lex_reviewed_by: string | null;
+      lex_notes: string | null;
       sort_order: number;
       created_by: string | null;
     };
