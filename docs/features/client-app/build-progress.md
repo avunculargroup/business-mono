@@ -567,6 +567,54 @@ to be a contract between.
 
 ---
 
+### Session 4 — publishing a compliance document
+
+`/compliance` gained the two things that stood between a filled database and a working gate: the
+`company_profile` singleton as a form, and the compliance documents with a resolve-preview and a
+publish action.
+
+**The interesting part is a partial unique index.** `idx_compliance_documents_one_active` is on
+`(doc_type) WHERE status = 'active'`, so publishing a new version means superseding the incumbent
+and activating the successor, and the state in between is zero active Service Statements — which
+locks every subscriber out of Minute. The obvious single statement does not work:
+
+```sql
+UPDATE compliance_documents
+   SET status = CASE WHEN id = p_id THEN 'active' ELSE 'superseded' END
+ WHERE doc_type = ... AND (id = p_id OR status = 'active');
+```
+
+Postgres maintains the index as each row is updated, so whether that succeeds depends on which
+row the executor reaches first. Tested both ways against the mirror: incumbent-first succeeds,
+successor-first raises `23505`. **A statement that passes or fails on physical row order is worse
+than one that always fails, because it passes in testing.** So
+`activate_compliance_document(p_id)` does it as two statements in one function body — the index is
+checked at the end of each — and it is `SECURITY INVOKER`, because it needs no elevated rights and
+a definer function here would be a way to change what a subscriber acknowledges without passing
+RLS.
+
+**Publication is refused server-side when the document cannot resolve**, not merely disabled in
+the UI. The action re-reads the profile and re-runs `resolveDocument` before calling the RPC,
+because the button that got you there can be stale — someone else may have blanked a field since
+the page rendered — and an active statement whose variables do not resolve is the same lockout as
+no statement at all, with a more confusing error.
+
+**No body editing, deliberately**, matching the `/prepare` templates: bodies live in migrations,
+the migration is the reviewed artefact, and a textarea saving over one would put the two into
+silent disagreement. The page previews the *resolved* body in monospace rather than rendering the
+markdown, because what matters at this moment is that every `{{variable}}` became a value, and
+rendered prose makes a stray brace easy to miss.
+
+**The profile form names only the fields the statement actually uses.** Which those are is a
+property of the body, not a constant — reporting the terms of service blocked on a complaints
+phone number no document mentions would be a lie.
+
+**Verified**: 29 new tests, the whole workspace green, and the real flow run against the local
+mirror — profile filled, seeded statement activated through the RPC, exactly one active row, and
+the RPC raising rather than silently no-opping on an unknown id.
+
+---
+
 ---
 
 ## Open, and deliberately so
@@ -577,9 +625,14 @@ to be a contract between.
   consulting business.
 - **The Service Statement.** Drafted and seeded; **not reviewed and not active**, and it
   blocks first login. Sections 2, 4 and 6 need the eye of whoever advised on the position;
-  section 8's terms and the privacy URL came from conversation.
+  section 8's terms and the privacy URL came from conversation. Reviewing it is still a human
+  act, but publishing it is no longer a hand-written `UPDATE` — `/compliance` in `apps/web` does
+  it, and refuses while the document cannot fully resolve.
 - **`company_profile` is empty.** Thirteen fields, none of them inventable — the gate fails
-  closed until they are filled.
+  closed until they are filled. There is now a form for them on `/compliance`, which marks each
+  blank field the Service Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**,
+  which is not a profile field and is the one that catches people: a complete profile plus an
+  unset environment variable still blocks the gate.
 - **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
   twenty-four is drafted in
   [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)

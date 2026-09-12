@@ -77,7 +77,7 @@ Everything under `app/(app)/` sits inside the authenticated shell (sidebar + hea
 | `/products`, `/advisors` | Ecosystem registers — human-maintained, no agent writes |
 | `/routines` | Scheduled agent routines |
 | `/brand` | Brand hub — assets and the voice editor |
-| `/compliance` | Lex approval queue for Minute. Publishes `/prepare` templates and client library entries, which two CHECK constraints will not let go live without a named reviewer and a note |
+| `/compliance` | Everything that must be true before a Minute subscriber can log in: the `company_profile` singleton, the compliance documents (resolve-preview and publish, no body editing), and the Lex approval queue for `/prepare` templates and client library entries |
 | `/decks`, `/docs`, `/files` | Supporting workspace pages |
 | `/settings` | `integrations` (Fastmail, LinkedIn), `team`, `models` (per-agent/per-step model selection) |
 

@@ -340,6 +340,10 @@ export type PendingClientFunctions = {
     Args: { invite_token: string };
     Returns: Array<{ email: string; full_name: string; account_name: string }>;
   };
+  activate_compliance_document: {
+    Args: { p_id: string };
+    Returns: undefined;
+  };
   is_team_member: {
     Args: Record<PropertyKey, never>;
     Returns: boolean;
