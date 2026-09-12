@@ -1,0 +1,74 @@
+-- ============================================================
+-- SUBSCRIBERS DO NOT READ THE ADVISOR REGISTER
+-- ============================================================
+-- Depends on: 20260911030000_directory_and_signals.sql
+--
+-- That migration granted subscribers `advisors_partners` where
+-- `active = TRUE`, on the reading that `/directory` shows "every
+-- listed entity" and the ecosystem has two registers. Nothing in
+-- `ClientDirectoryRepository` ever read it, so the grant has sat
+-- open and unused.
+--
+-- It should not be opened. Five things, and the third is the one
+-- that decides it:
+--
+-- 1. `advisors_partners` holds NAMED INDIVIDUALS, not providers.
+--    `type IN ('advisor','partner')`, and the fields are `bio`,
+--    `linkedin_url`, `rate_notes`, `specialization`. That is a
+--    promotional profile, not a factual register entry, and a list
+--    of people with specialisations reads as a shortlist of who to
+--    hire however neutrally it is worded.
+--
+-- 2. There is no classification gate. `products_services` has
+--    `is_financial_product`, and the whole no-call-to-action
+--    mechanism hangs off it. Advisors have no equivalent, so
+--    nothing structurally stops an advisor card carrying an
+--    outbound link — the directory's safety is structural or it is
+--    nothing.
+--
+-- 3. `engagement_model` allows 'revenue_share', and `no_fees_mvp`
+--    does not reach it. That constraint forces
+--    `commercial_relationships.fee_basis = 'none'`, so
+--    `/directory/how-we-make-money` can only ever print "no fee".
+--    An advisor on a revenue share would appear in the directory
+--    while the disclosure page truthfully reported no fees, because
+--    the fee lives in a different table the page does not read.
+--    Accurate and misleading at the same time, which is worse than
+--    either.
+--
+-- 4. "Advisor" is restricted under s923C, reserved for people on
+--    the Financial Advisers Register. A subscriber-facing list
+--    headed from `type = 'advisor'` uses the word in exactly the
+--    context `.claude/skills/bts-design/references/naming.md`
+--    forbids.
+--
+-- 5. A live grant on an unread table is the worst shape for this to
+--    be in. Adding `advisors.list()` to the contract would look
+--    like wiring up an existing permission rather than making a
+--    product decision, and the decision would never get made.
+--
+-- CLOSED PENDING A DECISION, not closed forever. If advisors should
+-- reach subscribers, that needs: a classification gate of its own,
+-- `engagement_model` brought under the fee rule or surfaced in the
+-- disclosure, and a heading that does not use a restricted term.
+-- Re-granting is one policy; the three preconditions are the work.
+-- ============================================================
+
+DROP POLICY IF EXISTS "advisors_partners_client_read" ON advisors_partners;
+
+COMMENT ON TABLE advisors_partners IS
+  'Named individuals and partner organisations, internal only. Deliberately NOT readable by Minute subscribers — see 20260912060000_close_advisor_client_read.sql for the three preconditions that would have to be met first.';
+
+
+-- ------------------------------------------------------------
+-- Verification
+-- ------------------------------------------------------------
+-- No client-facing policy should remain:
+--   SELECT policyname FROM pg_policies
+--    WHERE tablename = 'advisors_partners';
+--   -- expect only the team policy
+--
+-- And the audit guard should still be clean:
+--   SELECT * FROM audit_permissive_policies();
+--   -- expect zero rows
+-- ------------------------------------------------------------

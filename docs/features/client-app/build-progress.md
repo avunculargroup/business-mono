@@ -750,6 +750,46 @@ the second time this session that a page test earned itself on a mistake typeche
 
 ---
 
+### Session 4 — the advisor grant, closed
+
+A question about whether Minute's `/directory` shows the same products as the internal ecosystem
+register turned up a second source nobody was reading. `20260911030000` granted subscribers
+`advisors_partners` where `active = TRUE`, on the reading that the spec's "every listed entity"
+covers both ecosystem registers. `ClientDirectoryRepository` never queried it.
+
+The grant should not be opened, and the reason is not squeamishness about listing people.
+
+`advisors_partners` holds **named individuals** — `type IN ('advisor','partner')`, with `bio`,
+`linkedin_url`, `rate_notes` and `specialization`. There is **no classification gate** on it: the
+directory's no-call-to-action rule hangs entirely off `products_services.is_financial_product`,
+and advisors have no equivalent, so nothing structural stops an advisor card carrying an outbound
+link. "Advisor" is **restricted under s923C**, so a subscriber-facing list headed from that column
+uses the word in the one context `naming.md` forbids.
+
+**The deciding one is the fee.** `engagement_model` allows `'revenue_share'`, and `no_fees_mvp`
+does not reach it — that constraint is on `commercial_relationships`, forcing
+`fee_basis = 'none'`. So an advisor on a revenue share could appear in the directory while
+`/directory/how-we-make-money` truthfully reported no fees, because the fee lives in a table that
+page does not read. Accurate and misleading at once, which is worse than either, and it defeats
+the disclosure route's whole purpose.
+
+Closed **pending a decision**, not forever. Re-granting is one policy; the preconditions are the
+work — a classification gate of its own, `engagement_model` brought under the fee rule or
+surfaced in the disclosure, and a heading that is not a restricted term. All three are named in
+the migration header and in the test's failure message.
+
+`apps/client/lib/boundary.test.ts` now asserts the migrations leave no client-read policy on the
+table, and that `CLIENT_READ_DOMAINS` has no `advisors` — the runtime and compile-time halves of
+one rule, failing together. Mutation-tested: removing the `DROP` fails the guard with the three
+preconditions in the message.
+
+**The general lesson is the shape, not the table.** A live grant on an unread table is the worst
+state for a permission to be in, because wiring it up later reads as using something that already
+exists rather than as making a decision. Worth checking the other client policies against what
+the contract actually reads.
+
+---
+
 ---
 
 ## Open, and deliberately so

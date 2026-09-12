@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CLIENT_READ_DOMAINS } from '@platform/data';
 
 /**
  * What Minute cannot reach, and what says so.
@@ -158,5 +159,56 @@ describe('the Minute dependency boundary', () => {
       TABLE_WRITE.test("await supabase.from('client_users').update({ full_name: name })"),
     ).toBe(true);
     expect(TABLE_WRITE.test("await store.put(pack); await store.delete(id)")).toBe(false);
+  });
+});
+
+/**
+ * What a subscriber is granted in the database, as distinct from what the app
+ * happens to query.
+ *
+ * The two drift apart in one direction only: a policy can outlive the code that
+ * needed it, and an open grant on an unread table is the worst shape for that,
+ * because wiring it up later looks like using an existing permission rather
+ * than making a decision.
+ *
+ * `advisors_partners` was exactly that. It was granted to subscribers on the
+ * reading that `/directory` shows "every listed entity", and nothing ever read
+ * it. It holds named individuals with `bio`, `rate_notes` and an
+ * `engagement_model` that allows 'revenue_share' — which `no_fees_mvp` does not
+ * reach, so an advisor on a revenue share could appear in the directory while
+ * `/directory/how-we-make-money` truthfully reported no fees. See
+ * `supabase/migrations/20260912060000_close_advisor_client_read.sql`.
+ */
+describe('what subscribers are granted in the database', () => {
+  const MIGRATIONS = fileURLToPath(new URL('../../../supabase/migrations', import.meta.url));
+
+  function migrationSql(): string {
+    return readdirSync(MIGRATIONS)
+      .filter((file) => file.endsWith('.sql'))
+      .sort()
+      .map((file) => readFileSync(join(MIGRATIONS, file), 'utf8'))
+      .join('\n');
+  }
+
+  it('does not leave a client-read policy on advisors_partners', () => {
+    const sql = migrationSql();
+
+    // Created then dropped is fine — the migrations replay in order and the
+    // drop is last. What must not happen is a create with no drop after it.
+    const created = sql.lastIndexOf('CREATE POLICY "advisors_partners_client_read"');
+    const dropped = sql.lastIndexOf('DROP POLICY IF EXISTS "advisors_partners_client_read"');
+
+    expect(
+      created === -1 || dropped > created,
+      'advisors_partners holds named individuals with an unconstrained engagement_model. '
+        + 'Re-granting needs a classification gate, the fee rule extended to reach it, and a '
+        + 'heading that is not a restricted term — see the migration header.',
+    ).toBe(true);
+  });
+
+  it('has no advisors domain on the client contract', () => {
+    // The compile-time half of the same rule. A domain here would be the
+    // natural next step after a grant, and the two should fail together.
+    expect(CLIENT_READ_DOMAINS).not.toContain('advisors');
   });
 });
