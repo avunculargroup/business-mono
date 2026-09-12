@@ -66,7 +66,7 @@
 .addBtn {
   width: 100%;
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-surface);
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);

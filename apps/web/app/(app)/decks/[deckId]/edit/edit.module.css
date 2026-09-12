@@ -61,7 +61,7 @@
 
 .presentBtn {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-surface);
 }
 
 .presentBtn:hover {

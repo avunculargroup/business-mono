@@ -28,7 +28,7 @@
  * canonical set into `@platform/ui` and brought the skill copy to parity. The drift that
  * used to be recorded here is now asserted to be empty.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -172,5 +172,71 @@ describe('the bts-design skill copy', () => {
     // comment names packages/ui deliberately, to say where the canonical copy lives.
     const imports = [...raw.matchAll(/@import\s+[^;]+;/g)].map((m) => m[0]);
     expect(imports.filter((i) => i.includes('packages/ui'))).toEqual([]);
+  });
+});
+
+/**
+ * Token *use*, not just the token set.
+ *
+ * The cases above guarantee the two palettes agree with each other. They say
+ * nothing about whether a component actually reaches for one — and fifteen raw
+ * hex values had accumulated in CSS modules by the time anyone looked, three of
+ * them colours the BTS palette does not contain. Two were fallbacks on tokens
+ * that were never defined, so the off-palette value was the one rendering.
+ */
+describe('raw colour values in CSS modules', () => {
+  /**
+   * Files allowed to leave the palette, and why.
+   *
+   * `PresentMode` fills a projector or a shared screen, where the warm
+   * off-white ground reads as a grey wash and bleeds light into a dark room.
+   * True black there is a decision about the medium. Anything joining this list
+   * needs the same kind of reason written in the file itself.
+   */
+  const ALLOWED = ['PresentMode.module.css'];
+
+  function cssModules(dir: string, found: string[] = []): string[] {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) cssModules(full, found);
+      else if (entry.name.endsWith('.module.css')) found.push(full);
+    }
+    return found;
+  }
+
+  it('uses tokens rather than hex literals', () => {
+    const offenders: string[] = [];
+
+    for (const file of cssModules(join(REPO_ROOT, 'apps/web'))) {
+      if (ALLOWED.some((name) => file.endsWith(name))) continue;
+
+      const raw = readFileSync(file, 'utf8');
+      for (const [index, line] of raw.split('\n').entries()) {
+        if (line.trimStart().startsWith('*') || line.trimStart().startsWith('/*')) continue;
+        if (/#[0-9a-fA-F]{3,8}\b/.test(line)) {
+          offenders.push(`${file.split('/apps/web/')[1]}:${index + 1} ${line.trim()}`);
+        }
+      }
+    }
+
+    expect(offenders, 'use a --color-* token, or add the file to ALLOWED with a reason').toEqual(
+      [],
+    );
+  });
+
+  it('never falls back to a hex behind a token', () => {
+    // `var(--color-destructive-hover, #d32f2f)` rendered #d32f2f, because that
+    // token was never defined — a fallback is where an off-palette colour hides
+    // in something that reads as correct.
+    const offenders: string[] = [];
+
+    for (const file of cssModules(join(REPO_ROOT, 'apps/web'))) {
+      const raw = readFileSync(file, 'utf8');
+      if (/var\(\s*--[a-z0-9-]+\s*,\s*#/i.test(raw)) {
+        offenders.push(file.split('/apps/web/')[1]!);
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 });

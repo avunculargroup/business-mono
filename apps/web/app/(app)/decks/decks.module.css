@@ -120,7 +120,7 @@
 }
 
 .statusChip[data-status="draft"]     { background: var(--color-surface-hover); color: var(--color-text-secondary); }
-.statusChip[data-status="published"] { background: #E8F5E9; color: #2E7D32; }
+.statusChip[data-status="published"] { background: var(--color-stage-client-bg); color: var(--color-stage-client-fg); }
 .statusChip[data-status="archived"]  { background: var(--color-surface-subtle); color: var(--color-text-tertiary); }
 
 .cardDate {
@@ -132,7 +132,7 @@
   display: inline-flex;
   align-items: center;
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-surface);
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-4);
