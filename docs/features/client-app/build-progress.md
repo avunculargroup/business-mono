@@ -529,7 +529,7 @@ migrations have never run anywhere.
 **`apps/web`'s Supabase client is now typed against `ClientDatabase`.** It is `Database` plus the
 pending-types bridge, so it is a superset and every existing query kept its types — the whole
 workspace typechecks unchanged. It reverts when the migrations are applied and the bridge is
-deleted.
+deleted. *(It has since reverted — see "The bridge came down" below.)*
 
 **Verified**: 38 new tests (21 on the pure queue rules, 6 on the page's bucketing, 11 on the
 action), the whole workspace green at 604 web tests and clean typecheck, and the publish flow run
@@ -839,6 +839,36 @@ written all session:
 All three are mutation-tested — each fix reverted, each caught.
 
 ---
+
+### Session 4 — the bridge came down
+
+The migrations applied (see "It did not apply the first time" above for the detour), the
+migrate workflow regenerated `packages/db/src/types/database.ts` from the live schema, and
+`packages/db/src/types/pendingClientTables.test.ts` went red on the next run — which is what it
+was written to do. All eleven bridged tables were in the generated types, along with the four
+sets of added columns and all five functions, so the bridge had become a hand-written override
+of a generator that now knew better. It is deleted, and `ClientDatabase` is gone with it: the
+five consumers (`apps/client`'s three clients, its middleware, and the client adapter's
+`ClientSupabaseClient`) type against `Database` like everything else.
+
+Two things worth recording.
+
+**The types commit is pushed with `[skip ci]`, so nothing checked it.** The regenerated types
+landed on `main` and took the test red with them; the failure was only visible to someone
+running the suite locally. That is the same shape as the migration collision — a workflow
+writing to `main` without anything gating what it writes — and it is why the bridge test was
+worth having: without it, the drift between a hand-written type and a generated one would have
+been silent instead of loud.
+
+**One narrowing was lost, deliberately.** The bridge typed
+`field_source_minimums.client_fact_class` as `'implementation' | 'outcome' | null`; the
+generator emits `string | null`, because that column is a CHECK constraint rather than a
+Postgres enum and no generator can see through one. The single consumer is the
+`.eq('client_fact_class', 'implementation')` filter in the register repository, and
+`conformance.test.ts` pins that literal, so a typo is caught at test time rather than compile
+time. Keeping a one-column bridge to preserve it would have re-created the exact problem the
+bridge test exists to prevent — a hand-written type overriding the generated one — for a string
+that is already asserted.
 
 ---
 

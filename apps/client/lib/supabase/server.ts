@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import type { ClientDatabase } from '@platform/db';
+import type { Database } from '@platform/db';
 
 /**
  * The cookie-authed client, typed against the schema the client-app migrations
@@ -14,7 +14,7 @@ import type { ClientDatabase } from '@platform/db';
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient<ClientDatabase>(
+  return createServerClient<Database>(
     process.env['NEXT_PUBLIC_SUPABASE_URL']!,
     process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']!,
     {
