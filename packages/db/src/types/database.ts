@@ -767,6 +767,397 @@ export type Database = {
           },
         ]
       }
+      client_accounts: {
+        Row: {
+          client_type: string
+          created_at: string
+          created_by: string | null
+          display_name: string
+          id: string
+          notes: string | null
+          related_company_id: string | null
+          subscription_renews_at: string | null
+          subscription_started_at: string | null
+          subscription_status: string
+          updated_at: string
+        }
+        Insert: {
+          client_type: string
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          id?: string
+          notes?: string | null
+          related_company_id?: string | null
+          subscription_renews_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_type?: string
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          id?: string
+          notes?: string | null
+          related_company_id?: string | null
+          subscription_renews_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_accounts_related_company_id_fkey"
+            columns: ["related_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_disclosures: {
+        Row: {
+          acknowledged_at: string
+          client_user_id: string
+          document_id: string | null
+          document_version: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          acknowledged_at?: string
+          client_user_id: string
+          document_id?: string | null
+          document_version: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          acknowledged_at?: string
+          client_user_id?: string
+          document_id?: string | null
+          document_version?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_disclosures_client_user_id_fkey"
+            columns: ["client_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_disclosures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          account_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          full_name: string
+          id: string
+          revoked_at: string | null
+          role: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at: string
+          full_name: string
+          id?: string
+          revoked_at?: string | null
+          role?: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          full_name?: string
+          id?: string
+          revoked_at?: string | null
+          role?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_library_entries: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_reviewed_at: string | null
+          lex_notes: string | null
+          lex_reviewed_at: string | null
+          lex_reviewed_by: string | null
+          regulatory_references: string[]
+          review_due_date: string | null
+          section_id: string
+          slug: string
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          regulatory_references?: string[]
+          review_due_date?: string | null
+          section_id: string
+          slug: string
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          regulatory_references?: string[]
+          review_due_date?: string | null
+          section_id?: string
+          slug?: string
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_library_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_library_entries_lex_reviewed_by_fkey"
+            columns: ["lex_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_library_entries_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "client_library_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_library_sections: {
+        Row: {
+          client_type: string
+          created_at: string
+          id: string
+          key: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_type: string
+          created_at?: string
+          id?: string
+          key: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_type?: string
+          created_at?: string
+          id?: string
+          key?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_users: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          last_seen_at: string | null
+          role: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          last_seen_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          last_seen_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commercial_relationships: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          direction: string
+          disclosure_text: string
+          ended_at: string | null
+          entity_id: string
+          entity_type: string
+          fee_amount: number | null
+          fee_basis: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          related_contract_id: string | null
+          relationship_type: string
+          started_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          direction: string
+          disclosure_text: string
+          ended_at?: string | null
+          entity_id: string
+          entity_type: string
+          fee_amount?: number | null
+          fee_basis?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          related_contract_id?: string | null
+          relationship_type: string
+          started_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          direction?: string
+          disclosure_text?: string
+          ended_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          fee_amount?: number | null
+          fee_basis?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          related_contract_id?: string | null
+          relationship_type?: string
+          started_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_relationships_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_watchlist: {
         Row: {
           activity_level: number | null
@@ -1023,6 +1414,63 @@ export type Database = {
           },
         ]
       }
+      company_profile: {
+        Row: {
+          abn: string | null
+          acn: string | null
+          complaints_contact: string | null
+          complaints_email: string | null
+          complaints_phone: string | null
+          created_at: string
+          id: boolean
+          legal_name: string
+          public_email: string | null
+          public_phone: string | null
+          public_website: string | null
+          registered_address: string | null
+          registered_postcode: string | null
+          registered_state: string | null
+          trading_name: string
+          updated_at: string
+        }
+        Insert: {
+          abn?: string | null
+          acn?: string | null
+          complaints_contact?: string | null
+          complaints_email?: string | null
+          complaints_phone?: string | null
+          created_at?: string
+          id?: boolean
+          legal_name: string
+          public_email?: string | null
+          public_phone?: string | null
+          public_website?: string | null
+          registered_address?: string | null
+          registered_postcode?: string | null
+          registered_state?: string | null
+          trading_name: string
+          updated_at?: string
+        }
+        Update: {
+          abn?: string | null
+          acn?: string | null
+          complaints_contact?: string | null
+          complaints_email?: string | null
+          complaints_phone?: string | null
+          created_at?: string
+          id?: boolean
+          legal_name?: string
+          public_email?: string | null
+          public_phone?: string | null
+          public_website?: string | null
+          registered_address?: string | null
+          registered_postcode?: string | null
+          registered_state?: string | null
+          trading_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_record_types: {
         Row: {
           category: string
@@ -1144,6 +1592,56 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      compliance_documents: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          doc_type: string
+          effective_from: string | null
+          id: string
+          notes: string | null
+          status: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          doc_type: string
+          effective_from?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          doc_type?: string
+          effective_from?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compliance_snippets: {
         Row: {
@@ -2139,6 +2637,9 @@ export type Database = {
           acknowledged_by: string | null
           advisor_partner_id: string | null
           change_type: string
+          client_note: string | null
+          client_promoted_at: string | null
+          client_promoted_by: string | null
           client_relevant: boolean
           compliance_class: string | null
           compliance_notes: string | null
@@ -2167,6 +2668,9 @@ export type Database = {
           acknowledged_by?: string | null
           advisor_partner_id?: string | null
           change_type: string
+          client_note?: string | null
+          client_promoted_at?: string | null
+          client_promoted_by?: string | null
           client_relevant?: boolean
           compliance_class?: string | null
           compliance_notes?: string | null
@@ -2195,6 +2699,9 @@ export type Database = {
           acknowledged_by?: string | null
           advisor_partner_id?: string | null
           change_type?: string
+          client_note?: string | null
+          client_promoted_at?: string | null
+          client_promoted_by?: string | null
           client_relevant?: boolean
           compliance_class?: string | null
           compliance_notes?: string | null
@@ -2231,6 +2738,13 @@ export type Database = {
             columns: ["advisor_partner_id"]
             isOneToOne: false
             referencedRelation: "advisors_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ecosystem_changes_client_promoted_by_fkey"
+            columns: ["client_promoted_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
           {
@@ -2556,16 +3070,19 @@ export type Database = {
       }
       field_source_minimums: {
         Row: {
+          client_fact_class: string | null
           field_key: string
           min_source_rank: number
           rationale: string | null
         }
         Insert: {
+          client_fact_class?: string | null
           field_key: string
           min_source_rank: number
           rationale?: string | null
         }
         Update: {
+          client_fact_class?: string | null
           field_key?: string
           min_source_rank?: number
           rationale?: string | null
@@ -4566,6 +5083,146 @@ export type Database = {
           },
         ]
       }
+      prepare_generations: {
+        Row: {
+          account_id: string
+          artefact_type: string
+          event: string
+          fact_snapshot: Json
+          generated_at: string
+          id: string
+          template_id: string
+          template_version: string
+        }
+        Insert: {
+          account_id: string
+          artefact_type: string
+          event?: string
+          fact_snapshot?: Json
+          generated_at?: string
+          id?: string
+          template_id: string
+          template_version: string
+        }
+        Update: {
+          account_id?: string
+          artefact_type?: string
+          event?: string
+          fact_snapshot?: Json
+          generated_at?: string
+          id?: string
+          template_id?: string
+          template_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prepare_generations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prepare_generations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prepare_generations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "prepare_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prepare_generations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "v_prepare_template_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prepare_templates: {
+        Row: {
+          artefact_type: string
+          body: string
+          client_type: string
+          created_at: string
+          created_by: string | null
+          facts_required: string[]
+          id: string
+          lex_notes: string | null
+          lex_reviewed_at: string | null
+          lex_reviewed_by: string | null
+          notes: string | null
+          regulatory_references: string[] | null
+          review_due_date: string | null
+          slug: string
+          status: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          artefact_type: string
+          body: string
+          client_type: string
+          created_at?: string
+          created_by?: string | null
+          facts_required?: string[]
+          id?: string
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          notes?: string | null
+          regulatory_references?: string[] | null
+          review_due_date?: string | null
+          slug: string
+          status?: string
+          title: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          artefact_type?: string
+          body?: string
+          client_type?: string
+          created_at?: string
+          created_by?: string | null
+          facts_required?: string[]
+          id?: string
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          notes?: string | null
+          regulatory_references?: string[] | null
+          review_due_date?: string | null
+          slug?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prepare_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prepare_templates_lex_reviewed_by_fkey"
+            columns: ["lex_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_key_contacts: {
         Row: {
           contact_id: string
@@ -4664,14 +5321,18 @@ export type Database = {
           australian_owned: boolean
           business_name: string | null
           category: string | null
+          classified_at: string | null
+          classified_by: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
           id: string
+          is_financial_product: boolean | null
           key_relationship_id: string | null
           logo_url: string | null
           name: string
+          product_classification_note: string | null
           product_image_url: string | null
           slug: string
           updated_at: string
@@ -4680,14 +5341,18 @@ export type Database = {
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          is_financial_product?: boolean | null
           key_relationship_id?: string | null
           logo_url?: string | null
           name: string
+          product_classification_note?: string | null
           product_image_url?: string | null
           slug?: string
           updated_at?: string
@@ -4696,19 +5361,30 @@ export type Database = {
           australian_owned?: boolean
           business_name?: string | null
           category?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
+          is_financial_product?: boolean | null
           key_relationship_id?: string | null
           logo_url?: string | null
           name?: string
+          product_classification_note?: string | null
           product_image_url?: string | null
           slug?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_services_classified_by_fkey"
+            columns: ["classified_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_services_company_id_fkey"
             columns: ["company_id"]
@@ -5331,6 +6007,9 @@ export type Database = {
           abn: string | null
           acn: string | null
           arbn: string | null
+          client_cleared: boolean
+          client_cleared_at: string | null
+          client_cleared_by: string | null
           created_at: string
           created_by: string | null
           curator_notes: string | null
@@ -5359,6 +6038,9 @@ export type Database = {
           abn?: string | null
           acn?: string | null
           arbn?: string | null
+          client_cleared?: boolean
+          client_cleared_at?: string | null
+          client_cleared_by?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
@@ -5387,6 +6069,9 @@ export type Database = {
           abn?: string | null
           acn?: string | null
           arbn?: string | null
+          client_cleared?: boolean
+          client_cleared_at?: string | null
+          client_cleared_by?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
@@ -5412,6 +6097,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "research_companies_client_cleared_by_fkey"
+            columns: ["client_cleared_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "research_companies_created_by_fkey"
             columns: ["created_by"]
@@ -6883,6 +7575,34 @@ export type Database = {
         }
         Relationships: []
       }
+      v_client_library_reviews: {
+        Row: {
+          client_type: string | null
+          days_until_review: number | null
+          id: string | null
+          last_reviewed_at: string | null
+          regulatory_references: string[] | null
+          review_due_date: string | null
+          section_key: string | null
+          slug: string | null
+          status: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      v_client_subscriptions: {
+        Row: {
+          active_seats: number | null
+          client_type: string | null
+          days_until_renewal: number | null
+          display_name: string | null
+          id: string | null
+          last_seen_at: string | null
+          subscription_renews_at: string | null
+          subscription_status: string | null
+        }
+        Relationships: []
+      }
       v_company_facts: {
         Row: {
           as_of: string | null
@@ -6935,14 +7655,14 @@ export type Database = {
           },
           {
             foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["conflicting_source_class"]
+            columns: ["source_class"]
             isOneToOne: false
             referencedRelation: "source_classes"
             referencedColumns: ["code"]
           },
           {
             foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["source_class"]
+            columns: ["conflicting_source_class"]
             isOneToOne: false
             referencedRelation: "source_classes"
             referencedColumns: ["code"]
@@ -7251,6 +7971,24 @@ export type Database = {
           transcript_source: string | null
           transcript_status: string | null
           youtube_url: string | null
+        }
+        Relationships: []
+      }
+      v_prepare_template_reviews: {
+        Row: {
+          artefact_type: string | null
+          client_type: string | null
+          days_until_review: number | null
+          id: string | null
+          lex_reviewed_at: string | null
+          lex_reviewed_by_name: string | null
+          packs_generated: number | null
+          regulatory_references: string[] | null
+          review_due_date: string | null
+          slug: string | null
+          status: string | null
+          title: string | null
+          version: string | null
         }
         Relationships: []
       }
@@ -7605,9 +8343,30 @@ export type Database = {
       }
     }
     Functions: {
+      activate_compliance_document: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       assert_source_minimum: {
         Args: { doc_id: string; target_field: string }
         Returns: undefined
+      }
+      audit_permissive_policies: {
+        Args: never
+        Returns: {
+          cmd: string
+          policyname: string
+          reason: string
+          tablename: string
+        }[]
+      }
+      client_invite_details: {
+        Args: { invite_token: string }
+        Returns: {
+          account_name: string
+          email: string
+          full_name: string
+        }[]
       }
       commit_research_ingest: { Args: { payload: Json }; Returns: Json }
       compute_pipeline_validation: {
@@ -7621,10 +8380,12 @@ export type Database = {
         Args: { p_base: string; p_id: string; p_table: string }
         Returns: string
       }
+      current_client_account_id: { Args: never; Returns: string }
       delete_social_credential: {
         Args: { p_social_account_id: string }
         Returns: undefined
       }
+      is_team_member: { Args: never; Returns: boolean }
       match_voice_snippets: {
         Args: {
           match_count?: number
@@ -7648,6 +8409,7 @@ export type Database = {
           topic_tags: string[]
         }[]
       }
+      redeem_client_invite: { Args: { invite_token: string }; Returns: string }
       search_segments: {
         Args: {
           match_count?: number
