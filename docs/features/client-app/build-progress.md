@@ -292,11 +292,22 @@ hardening migration rewrites every policy in the database in one transaction. It
 it has been generated from the live catalogue rather than hand-listed, and it still deserves a
 founder reading it once.
 
+**It did not apply the first time, and the reason is worth keeping.** The hardening migration
+was originally dated `20260911000000`, which a migration on another branch
+(`20260911000000_seed_digitalx_and_block.sql`) had already taken and already applied. The
+ledger keys on those 14 digits alone, so the two files were one row as far as Supabase was
+concerned; `db push` hit the duplicate, aborted, and took the remaining sixteen migrations with
+it. Nothing about that was visible from the pull request — CI was green, the merge was clean,
+and the failure was a red run in a workflow nobody watches. The schema simply did not change,
+and every new page in `apps/web` sat on its empty state looking like a query bug. Renaming to
+`20260910000000` fixed it, and `packages/db/src/migrations.test.ts` now fails on a duplicate
+timestamp so the next collision is caught by the PR that causes it.
+
 Order, and what each does:
 
 | Migration | What it does |
 |---|---|
-| `20260911000000_rls_hardening.sql` | `is_team_member()`, all 114 policy rewrites, the two deliberate exceptions, the regression guard |
+| `20260910000000_rls_hardening.sql` | `is_team_member()`, all 114 policy rewrites, the two deliberate exceptions, the regression guard |
 | `20260911010000_compliance_documents.sql` | The two tables A4 assumed existed. No seed data. |
 | `20260911020000_client_tables.sql` | `client_accounts`, `client_users`, `client_disclosures`, `client_invites`, the disjointness triggers, `current_client_account_id()`, `v_client_subscriptions` |
 | `20260911030000_directory_and_signals.sql` | Financial product classification, client notes, `commercial_relationships` and `no_fees_mvp`, client read policies on the spine tables |

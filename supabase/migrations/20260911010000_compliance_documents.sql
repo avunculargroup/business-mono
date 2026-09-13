@@ -1,7 +1,7 @@
 -- ============================================================
 -- COMPLIANCE DOCUMENTS AND COMPANY PROFILE
 -- ============================================================
--- Depends on: 20260911000000_rls_hardening.sql
+-- Depends on: 20260910000000_rls_hardening.sql
 --
 -- These two tables are an invention, and this comment is the
 -- flag on it.

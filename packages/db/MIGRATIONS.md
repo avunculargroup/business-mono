@@ -41,6 +41,17 @@ supabase/migrations/20260401120000_add_webhook_logs_table.sql
 Write standard SQL. Make it idempotent where possible (`IF NOT EXISTS`,
 `CREATE OR REPLACE`, exception handlers). See existing migrations for examples.
 
+**The timestamp must be unique across the whole directory.** The ledger
+(`supabase_migrations.schema_migrations`) keys on the 14 digits alone — the
+text after them is a label, not part of the identity — so two files sharing a
+timestamp are one row to Supabase, and `db push` aborts on the second with
+`duplicate key value violates unique constraint "schema_migrations_pkey"`.
+The abort takes the rest of the batch with it: a merge carrying seventeen
+migrations once applied none of them, green CI and all, because the collision
+was first in the batch. Two branches in flight collide easily, since everyone
+rounds the time to the hour. `packages/db/src/migrations.test.ts` checks this,
+so a collision goes red in CI rather than in a deploy log nobody is reading.
+
 ### 2. Update schema.sql
 
 Edit `schema.sql` at the repo root to reflect the new consolidated state.
