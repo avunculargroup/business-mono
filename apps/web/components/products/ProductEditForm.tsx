@@ -48,19 +48,19 @@ export function ProductEditForm({ product, companies, teamMembers, onSuccess, on
 
   return (
     <form id="product-edit-form" action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Name *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Name *</span>
         <input name="name" required defaultValue={product.name} className={styles.input} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Business name</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Business name</span>
         <input name="business_name" defaultValue={product.business_name ?? ''} className={styles.input} />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Category</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Category</span>
           <select name="category" defaultValue={product.category ?? ''} className={styles.select}>
             <option value="">None</option>
             <option value="custody">Custody</option>
@@ -75,28 +75,28 @@ export function ProductEditForm({ product, companies, teamMembers, onSuccess, on
             <option value="lending">Lending</option>
             <option value="other">Other</option>
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Company</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Company</span>
           <select name="company_id" defaultValue={product.company_id ?? ''} className={styles.select}>
             <option value="">None</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-        </div>
+        </label>
       </div>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Key relationship</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Key relationship</span>
           <select name="key_relationship_id" defaultValue={product.key_relationship_id ?? ''} className={styles.select}>
             <option value="">None</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>
-        </div>
+        </label>
         <div className={styles.field} style={{ justifyContent: 'flex-end', paddingBottom: 'var(--space-2)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
             <input type="checkbox" name="australian_owned" defaultChecked={product.australian_owned} />
@@ -105,20 +105,20 @@ export function ProductEditForm({ product, companies, teamMembers, onSuccess, on
         </div>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Description</span>
         <textarea name="description" rows={4} defaultValue={product.description ?? ''} className={styles.textarea} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Logo URL</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Logo URL</span>
         <input name="logo_url" type="url" defaultValue={product.logo_url ?? ''} className={styles.input} placeholder="https://" />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Product image URL</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Product image URL</span>
         <input name="product_image_url" type="url" defaultValue={product.product_image_url ?? ''} className={styles.input} placeholder="https://" />
-      </div>
+      </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
     </form>

@@ -1,0 +1,38 @@
+/* The quiet day. A designed state, not a fallback — it is built first, on
+   every surface that has one, because a state built second looks like an
+   afterthought and this one is the most common state the app has. */
+.quiet {
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.rule {
+  width: 28px;
+  height: 2px;
+  background: var(--color-border);
+  margin: 0 auto var(--space-6);
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+.detail {
+  max-width: 52ch;
+  margin: 0 auto;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.asAt {
+  margin-top: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}

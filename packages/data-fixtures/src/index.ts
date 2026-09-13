@@ -7,5 +7,9 @@
  * dependency it does not have.
  */
 export { createFixtureRepositories } from './bundle';
+export {
+  createClientFixtureContext,
+  type ClientFixtureOptions,
+} from './repositories/client';
 export { blocked } from './blocked';
 export { addDays, at, onDate, type DayOffset } from './fixtures/anchor';

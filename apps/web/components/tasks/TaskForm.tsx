@@ -76,29 +76,29 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Title *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Title *</span>
         <input
           name="title"
           required
           defaultValue={defaultValues?.title ?? ''}
           className={styles.input}
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Description</span>
         <textarea
           name="description"
           rows={3}
           defaultValue={defaultValues?.description ?? ''}
           className={styles.textarea}
         />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Project</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Project</span>
           <select
             name="project_id"
             defaultValue={defaultValues?.project_id ?? ''}
@@ -109,9 +109,9 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Contact</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Contact</span>
           <select
             name="related_contact_id"
             defaultValue={defaultValues?.related_contact_id ?? ''}
@@ -122,12 +122,12 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
               <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
             ))}
           </select>
-        </div>
+        </label>
       </div>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Assigned to</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Assigned to</span>
           <select
             name="assigned_to"
             defaultValue={defaultValues?.assigned_to ?? user.id}
@@ -138,9 +138,9 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
               <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Priority</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Priority</span>
           <select
             name="priority"
             defaultValue={defaultValues?.priority ?? 'medium'}
@@ -151,12 +151,12 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
             <option value="high">High</option>
             <option value="urgent">Urgent</option>
           </select>
-        </div>
+        </label>
       </div>
 
       {mode === 'edit' && (
-        <div className={styles.field}>
-          <label className={styles.label}>Status</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Status</span>
           <select
             name="status"
             defaultValue={defaultValues?.status ?? 'todo'}
@@ -168,18 +168,18 @@ export function TaskForm({ projects, teamMembers, contacts, onSuccess, onPending
             <option value="done">Done</option>
             <option value="cancelled">Cancelled</option>
           </select>
-        </div>
+        </label>
       )}
 
-      <div className={styles.field}>
-        <label className={styles.label}>Due date</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Due date</span>
         <input
           name="due_date"
           type="date"
           defaultValue={defaultValues?.due_date ?? ''}
           className={styles.input}
         />
-      </div>
+      </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
     </form>

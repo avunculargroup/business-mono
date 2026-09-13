@@ -314,8 +314,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
         </div>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Name</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Name</span>
         <input
           className={styles.input}
           value={values.name}
@@ -323,13 +323,13 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
           placeholder={isPodcast ? 'What Bitcoin Did' : isYoutube ? 'Channel name' : isEmail ? 'Gromen Tree Rings' : 'Bitcoin Magazine'}
           required
         />
-      </div>
+      </label>
 
       {/* Email newsletter source. */}
       {isEmail && (
         <div className={styles.revealGroup}>
-          <div className={styles.field}>
-            <label className={styles.label}>Slug</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Slug</span>
             <input
               className={`${styles.input} ${styles.inputMono}`}
               value={values.slug}
@@ -341,7 +341,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
               <strong>{previewSlug ? computeInboundAddress(previewSlug, domain) : `research+{slug}@${domain}`}</strong>.
               The first email is ingested as a test.
             </span>
-          </div>
+          </label>
 
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -364,8 +364,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 })}
               </div>
             </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Relevance threshold</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Relevance threshold</span>
               <input
                 className={`${styles.input} ${styles.inputMono}`}
                 type="number"
@@ -376,11 +376,11 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 onChange={(e) => update('relevance_threshold', Number(e.target.value))}
               />
               <span className={styles.hint}>Items below this score are de-emphasised in the feed.</span>
-            </div>
+            </label>
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Sender allowlist</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Sender allowlist</span>
             <textarea
               className={styles.input}
               rows={3}
@@ -392,7 +392,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
               Approved From domains or addresses, one per line. Leave empty to accept the first sender, then
               trust it from the source list.
             </span>
-          </div>
+          </label>
 
           {/* The money switch. Default off; an honest warning line when on. */}
           <div className={styles.moneySwitch}>
@@ -413,8 +413,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   Each followed link costs a page fetch and two model calls. Best for link roundups, not
                   long-form essays that only cite their sources in passing.
                 </p>
-                <div className={styles.field}>
-                  <label className={styles.label}>Maximum links per issue</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Maximum links per issue</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     type="number"
@@ -428,7 +428,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                     Links are taken in the order they appear. A separate cap limits how many are followed
                     across all sources in one poll.
                   </span>
-                </div>
+                </label>
               </>
             )}
           </div>
@@ -440,8 +440,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
           selected strategies are shown, in the order they will be tried. */}
       {isReportWatch && (
         <div className={styles.revealGroup}>
-          <div className={styles.field}>
-            <label className={styles.label}>Site URL</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Site URL</span>
             <input
               className={styles.input}
               type="url"
@@ -450,7 +450,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
               placeholder="https://river.com"
             />
             <span className={styles.hint}>Used to resolve relative links found during detection.</span>
-          </div>
+          </label>
 
           <div className={styles.field}>
             <label className={styles.label}>Detection strategies</label>
@@ -523,8 +523,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   Test detection
                 </Button>
               </div>
-              <div className={styles.field}>
-                <label className={styles.label}>Feed URL</label>
+              <label className={styles.field}>
+                <span className={styles.label}>Feed URL</span>
                 <input
                   className={styles.input}
                   type="url"
@@ -532,7 +532,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   onChange={(e) => update('rss_feed_url', e.target.value)}
                   placeholder="https://river.com/learn/rss.xml"
                 />
-              </div>
+              </label>
             </div>
           )}
 
@@ -550,8 +550,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   Test detection
                 </Button>
               </div>
-              <div className={styles.field}>
-                <label className={styles.label}>Sitemap URL</label>
+              <label className={styles.field}>
+                <span className={styles.label}>Sitemap URL</span>
                 <input
                   className={styles.input}
                   type="url"
@@ -559,19 +559,19 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   onChange={(e) => update('sitemap_url', e.target.value)}
                   placeholder="https://river.com/sitemap.xml"
                 />
-              </div>
+              </label>
               <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Path prefix</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Path prefix</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.sitemap_path_prefix}
                     onChange={(e) => update('sitemap_path_prefix', e.target.value)}
                     placeholder="/reports/"
                   />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Exclude paths</label>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Exclude paths</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.sitemap_path_exclude}
@@ -579,7 +579,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                     placeholder="/reports/archive/"
                   />
                   <span className={styles.hint}>One per line, or comma-separated.</span>
-                </div>
+                </label>
               </div>
             </div>
           )}
@@ -598,8 +598,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   Test detection
                 </Button>
               </div>
-              <div className={styles.field}>
-                <label className={styles.label}>Reports page URL</label>
+              <label className={styles.field}>
+                <span className={styles.label}>Reports page URL</span>
                 <input
                   className={styles.input}
                   type="url"
@@ -607,10 +607,10 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   onChange={(e) => update('index_url', e.target.value)}
                   placeholder="https://river.com/reports"
                 />
-              </div>
+              </label>
               <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Item selector</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Item selector</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.item_selector}
@@ -618,36 +618,36 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                     placeholder="article.report-card"
                   />
                   <span className={styles.hint}>The repeating card or row. Test detection tells you if it matches.</span>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Link selector</label>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Link selector</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.link_selector}
                     onChange={(e) => update('link_selector', e.target.value)}
                     placeholder="a[href]"
                   />
-                </div>
+                </label>
               </div>
               <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Title selector</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Title selector</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.title_selector}
                     onChange={(e) => update('title_selector', e.target.value)}
                     placeholder="h3"
                   />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Date selector</label>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Date selector</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.date_selector}
                     onChange={(e) => update('date_selector', e.target.value)}
                     placeholder="time"
                   />
-                </div>
+                </label>
               </div>
               <label className={styles.checkbox}>
                 <input
@@ -658,8 +658,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 <span>Follow the card link one hop to find the PDF</span>
               </label>
               {values.follow_to_pdf && (
-                <div className={styles.field}>
-                  <label className={styles.label}>PDF link selector</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>PDF link selector</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     value={values.pdf_link_selector}
@@ -669,7 +669,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   <span className={styles.hint}>
                     Applied on the landing page. Exactly one hop is followed, never more.
                   </span>
-                </div>
+                </label>
               )}
             </div>
           )}
@@ -717,8 +717,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
           <div className={styles.field}>
             <label className={styles.label}>URL filters</label>
             <div className={styles.fieldRow}>
-              <div className={styles.field}>
-                <label className={styles.label}>Must match</label>
+              <label className={styles.field}>
+                <span className={styles.label}>Must match</span>
                 <textarea
                   className={`${styles.input} ${styles.inputMono}`}
                   rows={2}
@@ -727,9 +727,9 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   placeholder={'\\.pdf$\n/reports/'}
                 />
                 <span className={styles.hint}>Regular expressions, one per line. A URL matching any of them is kept.</span>
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label}>Must not match</label>
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Must not match</span>
                 <textarea
                   className={`${styles.input} ${styles.inputMono}`}
                   rows={2}
@@ -738,7 +738,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   placeholder={'/tag/\n/author/'}
                 />
                 <span className={styles.hint}>A URL matching any of these is rejected, whatever else it matched.</span>
-              </div>
+              </label>
             </div>
           </div>
 
@@ -766,8 +766,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
             </span>
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Licence notes</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Licence notes</span>
             <textarea
               className={styles.input}
               rows={2}
@@ -776,7 +776,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
               placeholder="Attribution required. No redistribution of full documents."
             />
             <span className={styles.hint}>Terms of use, attribution requirements, known restrictions.</span>
-          </div>
+          </label>
 
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -799,8 +799,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 })}
               </div>
             </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Crawl delay (seconds)</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Crawl delay (seconds)</span>
               <input
                 className={`${styles.input} ${styles.inputMono}`}
                 type="number"
@@ -810,9 +810,9 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 onChange={(e) => update('crawl_delay_seconds', Number(e.target.value) || 0)}
               />
               <span className={styles.hint}>The publisher&rsquo;s own robots.txt delay wins if it is longer.</span>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Candidates per run</label>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Candidates per run</span>
               <input
                 className={`${styles.input} ${styles.inputMono}`}
                 type="number"
@@ -822,7 +822,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 onChange={(e) => update('max_candidates_per_run', Number(e.target.value) || 1)}
               />
               <span className={styles.hint}>Newest first. A large backlog is worked through over several days.</span>
-            </div>
+            </label>
           </div>
 
           {/* The money switch. Default off; an honest warning line when on. */}
@@ -844,8 +844,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   OCR is billed per page. It runs only on pages whose text layer is missing or unreadable, so a
                   typeset PDF never costs anything.
                 </p>
-                <div className={styles.field}>
-                  <label className={styles.label}>Page limit per document</label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Page limit per document</span>
                   <input
                     className={`${styles.input} ${styles.inputMono}`}
                     type="number"
@@ -857,7 +857,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                   <span className={styles.hint}>
                     Pages past the limit are recorded as not extracted rather than dropped silently.
                   </span>
-                </div>
+                </label>
               </>
             )}
           </div>
@@ -868,8 +868,8 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
       {!isYoutube && !isEmail && !isReportWatch && (
         <div className={styles.revealGroup}>
           {type === 'rss' && (
-            <div className={styles.field}>
-              <label className={styles.label}>Site URL</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Site URL</span>
               <input
                 className={styles.input}
                 type="url"
@@ -878,11 +878,11 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 placeholder="https://bitcoinmagazine.com"
               />
               <span className={styles.hint}>For Substack blogs, the feed is derived automatically from the site URL.</span>
-            </div>
+            </label>
           )}
 
-          <div className={styles.field}>
-            <label className={styles.label}>Feed URL</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Feed URL</span>
             <input
               className={styles.input}
               type="url"
@@ -895,7 +895,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 ? 'The podcast RSS feed scanned for new episodes.'
                 : 'The RSS or Atom feed scanned for new articles. Required for non-Substack sources.'}
             </span>
-          </div>
+          </label>
         </div>
       )}
 
@@ -924,17 +924,17 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
       {hasTranscriptSettings && (
         <div className={styles.revealGroup}>
           <div className={styles.fieldRow}>
-            <div className={styles.field}>
-              <label className={styles.label}>Transcript language</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Transcript language</span>
               <input
                 className={styles.input}
                 value={values.preferred_transcript_lang}
                 onChange={(e) => update('preferred_transcript_lang', e.target.value)}
                 placeholder="en"
               />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Backfill cap</label>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Backfill cap</span>
               <input
                 className={`${styles.input} ${styles.inputMono}`}
                 type="number"
@@ -943,9 +943,9 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 onChange={(e) => update('max_backfill_episodes', Number(e.target.value) || 0)}
               />
               <span className={styles.hint}>Episodes ingested on first fetch.</span>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Max age (days)</label>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Max age (days)</span>
               <input
                 className={`${styles.input} ${styles.inputMono}`}
                 type="number"
@@ -957,7 +957,7 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                 }
               />
               <span className={styles.hint}>Optional. Skip Deepgram beyond this.</span>
-            </div>
+            </label>
           </div>
 
           {/* The money switch. Default off; an honest warning line when on. */}

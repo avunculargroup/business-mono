@@ -1,0 +1,25 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals", "next/typescript", "plugin:jsx-a11y/recommended"],
+  "ignorePatterns": [".next/", "node_modules/", "next-env.d.ts", "*.config.*"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "jsx-a11y/alt-text": "warn",
+    "jsx-a11y/anchor-is-valid": "warn",
+    "jsx-a11y/aria-props": "warn",
+    "jsx-a11y/aria-proptypes": "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
+    "jsx-a11y/control-has-associated-label": "warn",
+    "jsx-a11y/label-has-associated-control": "warn",
+    "jsx-a11y/media-has-caption": "warn",
+    "jsx-a11y/no-autofocus": "warn",
+    "jsx-a11y/no-noninteractive-element-interactions": "warn",
+    "jsx-a11y/no-static-element-interactions": "warn",
+    "jsx-a11y/role-has-required-aria-props": "warn",
+    "react/no-unescaped-entities": "warn"
+  }
+}

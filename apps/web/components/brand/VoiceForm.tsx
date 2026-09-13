@@ -82,15 +82,15 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
 
   return (
     <form id={VOICE_FORM_ID} action={formAction}>
-      <div className={styles.field}>
-        <label className={styles.label}>Persona</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Persona</span>
         <textarea
           className={styles.textarea}
           value={persona}
           onChange={(e) => setPersona(e.target.value)}
           placeholder="One short paragraph: who this voice is and how it speaks."
         />
-      </div>
+      </label>
 
       <ChipField
         label="Tone attributes"
@@ -193,8 +193,8 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
           </div>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Register</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Register</span>
           <select
             className={styles.select}
             value={format.register ?? ''}
@@ -210,10 +210,10 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
-        </div>
+        </label>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Paragraphing</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Paragraphing</span>
           <select
             className={styles.select}
             value={format.paragraphing ?? ''}
@@ -229,10 +229,10 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
             <option value="short-paragraphs">Short paragraphs</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Hashtag use</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Hashtag use</span>
           <select
             className={styles.select}
             value={format.hashtag_use ?? ''}
@@ -248,10 +248,10 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
             <option value="sparingly">Sparingly (1–2)</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Emoji use</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Emoji use</span>
           <select
             className={styles.select}
             value={format.emoji_use ?? ''}
@@ -267,10 +267,10 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
             <option value="sparingly">Sparingly</option>
             <option value="platform-default">Platform default</option>
           </select>
-        </div>
+        </label>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Thread style</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Thread style</span>
           <select
             className={styles.select}
             value={format.thread_style ?? ''}
@@ -285,21 +285,21 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
             <option value="platform-default">Platform default</option>
             <option value="single-only">Single posts only (no threads)</option>
           </select>
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Company mission</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Company mission</span>
         <textarea
           className={styles.textarea}
           value={mission}
           onChange={(e) => setMission(e.target.value)}
           placeholder="One paragraph: what BTS sounds like and why."
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Bitcoin capitalisation rule (enforced across all output)</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Bitcoin capitalisation rule (enforced across all output)</span>
         <textarea
           className={styles.textarea}
           value={bitcoinRule}
@@ -309,7 +309,7 @@ export function VoiceForm({ voice, onSuccess, onPendingChange }: VoiceFormProps)
         <span className={styles.hint}>
           This rule is always applied and never overridable by an account voice.
         </span>
-      </div>
+      </label>
 
       <div className={styles.voiceDivider}>Topic & positioning policy</div>
 

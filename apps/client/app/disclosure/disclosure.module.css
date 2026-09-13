@@ -1,0 +1,100 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-12) var(--space-4);
+}
+
+.card {
+  width: 100%;
+  max-width: 760px;
+}
+
+.header {
+  margin-bottom: var(--space-12);
+}
+
+.intro h1,
+.unavailable h1 {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-4);
+}
+
+.intro p,
+.unavailable p {
+  max-width: 66ch;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  margin-bottom: var(--space-3);
+}
+
+.document {
+  margin: var(--space-8) 0;
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  /* The document scrolls within the page rather than the page scrolling past
+     it, so the acknowledgement stays adjacent to the thing acknowledged. */
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.documentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.documentTitle {
+  font-weight: 600;
+}
+
+.version {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.submit {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-bg);
+  background: var(--color-text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-6);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.submit:hover {
+  background: var(--color-accent-dark);
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.footer {
+  margin-top: var(--space-12);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.exit {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}

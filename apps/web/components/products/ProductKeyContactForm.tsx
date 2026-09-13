@@ -53,8 +53,8 @@ export function ProductKeyContactForm({ productId, allContacts, existingContactI
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Contact *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Contact *</span>
         <select name="contact_id" required className={styles.select} defaultValue="">
           <option value="">Select a contact</option>
           {available.map((c) => (
@@ -63,10 +63,10 @@ export function ProductKeyContactForm({ productId, allContacts, existingContactI
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Role</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Role</span>
         <select name="role" className={styles.select} defaultValue="">
           <option value="">None</option>
           <option value="primary">Primary</option>
@@ -75,7 +75,7 @@ export function ProductKeyContactForm({ productId, allContacts, existingContactI
           <option value="support">Support</option>
           <option value="other">Other</option>
         </select>
-      </div>
+      </label>
 
       <Button variant="primary" type="submit" loading={isSubmitting}>Add contact</Button>
     </form>

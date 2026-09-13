@@ -11,3 +11,8 @@ export {
   describeCorporateHoldingsContract,
   type CorporateHoldingsScenario,
 } from './corporateHoldings';
+export {
+  ASSERTION_6_LIVES_IN,
+  describeClientContract,
+  type ClientAdapterUnderTest,
+} from './client';

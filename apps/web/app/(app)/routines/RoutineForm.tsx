@@ -320,8 +320,8 @@ export function RoutineForm({
     <form onSubmit={handleSubmit} className={styles.form}>
       {error && <div className={styles.formError}>{error}</div>}
 
-      <div className={styles.field}>
-        <label className={styles.label}>Name</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Name</span>
         <input
           className={styles.input}
           value={values.name}
@@ -329,10 +329,10 @@ export function RoutineForm({
           placeholder="Daily bitcoin headlines"
           required
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description (optional)</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Description (optional)</span>
         <textarea
           className={styles.textarea}
           value={values.description}
@@ -340,11 +340,11 @@ export function RoutineForm({
           rows={2}
           placeholder="Morning briefing digest shown on the dashboard"
         />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Agent</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Agent</span>
           <select
             className={styles.input}
             value={values.agent_name}
@@ -356,10 +356,10 @@ export function RoutineForm({
               </option>
             ))}
           </select>
-        </div>
+        </label>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Action type</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Action type</span>
           <select
             className={styles.input}
             value={values.action_type}
@@ -371,24 +371,24 @@ export function RoutineForm({
               </option>
             ))}
           </select>
-        </div>
+        </label>
       </div>
 
       {(values.action_type === RoutineActionType.RESEARCH_DIGEST ||
         values.action_type === RoutineActionType.MONITOR_CHANGE) && (
         <>
-          <div className={styles.field}>
-            <label className={styles.label}>Subject</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Subject</span>
             <input
               className={styles.input}
               value={String(cfg['subject'] ?? '')}
               onChange={(e) => updateConfig({ subject: e.target.value })}
               placeholder="Daily Bitcoin headlines"
             />
-          </div>
+          </label>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Context (optional)</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Context (optional)</span>
             <textarea
               className={styles.textarea}
               value={String(cfg['context'] ?? '')}
@@ -396,10 +396,10 @@ export function RoutineForm({
               rows={3}
               placeholder="Background or framing for the agent — e.g. focus on treasury news"
             />
-          </div>
+          </label>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Search queries (one per line)</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Search queries (one per line)</span>
             <textarea
               className={styles.textarea}
               value={searchQueriesText}
@@ -407,14 +407,14 @@ export function RoutineForm({
               rows={3}
               placeholder={'bitcoin news today\nBTC price'}
             />
-          </div>
+          </label>
         </>
       )}
 
       {values.action_type === RoutineActionType.NEWS_INGEST && (
         <>
-          <div className={styles.field}>
-            <label className={styles.label}>Category</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Category</span>
             <select
               className={styles.input}
               value={(cfg['category'] as string | undefined) ?? NewsCategory.REGULATORY}
@@ -426,10 +426,10 @@ export function RoutineForm({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Relevance filter</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Relevance filter</span>
             <select
               className={styles.input}
               value={(cfg['relevance_filter'] as string | undefined) ?? defaultRelevanceFilter((cfg['category'] as NewsCategoryT | undefined) ?? NewsCategory.REGULATORY)}
@@ -444,7 +444,7 @@ export function RoutineForm({
             <span className={styles.hint}>
               Stories failing this check are dropped after curation. Use “Keep all curated stories” for macro feeds that needn’t be Australian or Bitcoin specific.
             </span>
-          </div>
+          </label>
 
           <div className={styles.field}>
             <label className={styles.label}>Search queries</label>
@@ -460,8 +460,8 @@ export function RoutineForm({
           </div>
 
           <div className={styles.row}>
-            <div className={styles.field}>
-              <label className={styles.label}>Results per query</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Results per query</span>
               <input
                 type="number"
                 min={5}
@@ -473,9 +473,9 @@ export function RoutineForm({
               <span className={styles.hint}>
                 Raw articles Tavily returns per query before curation.
               </span>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Curated cap</label>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Curated cap</span>
               <input
                 type="number"
                 min={1}
@@ -487,15 +487,15 @@ export function RoutineForm({
               <span className={styles.hint}>
                 Top stories the LLM judge keeps. The rest are discarded.
               </span>
-            </div>
+            </label>
           </div>
         </>
       )}
 
       {values.action_type === RoutineActionType.NEWS_SOURCE_SCAN && (
         <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Items per source</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Items per source</span>
             <input
               type="number"
               min={1}
@@ -505,9 +505,9 @@ export function RoutineForm({
               onChange={(e) => updateConfig({ max_items_per_source: e.target.value })}
             />
             <span className={styles.hint}>Feed items considered per active RSS source each run.</span>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Lookback (days)</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Lookback (days)</span>
             <input
               type="number"
               min={1}
@@ -519,14 +519,14 @@ export function RoutineForm({
             <span className={styles.hint}>
               Articles published before this are skipped. Sources are managed on the news sources page.
             </span>
-          </div>
+          </label>
         </div>
       )}
 
       {values.action_type === RoutineActionType.NEWS_CURATION && (
         <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Max stories</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Max stories</span>
             <input
               type="number"
               min={1}
@@ -536,9 +536,9 @@ export function RoutineForm({
               onChange={(e) => updateConfig({ max_stories: e.target.value })}
             />
             <span className={styles.hint}>Items featured on the dashboard tile (up to 6).</span>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Lookback (hours)</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Lookback (hours)</span>
             <input
               type="number"
               min={6}
@@ -550,14 +550,14 @@ export function RoutineForm({
             <span className={styles.hint}>
               How far back to pull news and podcast episodes from.
             </span>
-          </div>
+          </label>
         </div>
       )}
 
       {values.action_type === RoutineActionType.PODCAST_INGEST && (
         <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Items per source</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Items per source</span>
             <input
               type="number"
               min={1}
@@ -569,9 +569,9 @@ export function RoutineForm({
             <span className={styles.hint}>
               Feed items considered per podcast source each run.
             </span>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Lookback (days)</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Lookback (days)</span>
             <input
               type="number"
               min={1}
@@ -583,15 +583,15 @@ export function RoutineForm({
             <span className={styles.hint}>
               Episodes published before this are skipped. Per-feed settings live on the source.
             </span>
-          </div>
+          </label>
         </div>
       )}
 
       {values.action_type === RoutineActionType.NEWSLETTER && (
         <>
           <div className={styles.row}>
-            <div className={styles.field}>
-              <label className={styles.label}>Content window</label>
+            <label className={styles.field}>
+              <span className={styles.label}>Content window</span>
               <select
                 className={styles.input}
                 value={String(cfg['time_range'] ?? 'month')}
@@ -604,9 +604,9 @@ export function RoutineForm({
                 ))}
               </select>
               <span className={styles.hint}>How far back the story retrieval reaches.</span>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Stories</label>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Stories</span>
               <input
                 type="number"
                 min={3}
@@ -616,11 +616,11 @@ export function RoutineForm({
                 onChange={(e) => updateConfig({ story_count: e.target.value })}
               />
               <span className={styles.hint}>Between 3 and 8.</span>
-            </div>
+            </label>
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Words per story</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Words per story</span>
             <input
               type="number"
               min={100}
@@ -629,10 +629,10 @@ export function RoutineForm({
               value={String(cfg['target_word_count'] ?? 250)}
               onChange={(e) => updateConfig({ target_word_count: e.target.value })}
             />
-          </div>
+          </label>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Audience context (optional)</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Audience context (optional)</span>
             <textarea
               className={styles.textarea}
               value={String(cfg['audience_context'] ?? '')}
@@ -640,7 +640,7 @@ export function RoutineForm({
               rows={2}
               placeholder="Who this issue is written for — e.g. CFOs at mid-market Australian firms"
             />
-          </div>
+          </label>
 
           <div className={styles.field}>
             <label className={styles.checkbox}>
@@ -660,8 +660,8 @@ export function RoutineForm({
 
       {values.action_type === RoutineActionType.SOCIAL_POST_FROM_NEWS && (
         <>
-          <div className={styles.field}>
-            <label className={styles.label}>Founder</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Founder</span>
             <select
               className={styles.input}
               value={String(cfg['founder_team_member_id'] ?? '')}
@@ -677,7 +677,7 @@ export function RoutineForm({
             <span className={styles.hint}>
               Posts are drafted in this person’s voice and emailed to them for review.
             </span>
-          </div>
+          </label>
 
           <div className={styles.field}>
             <label className={styles.label}>Platforms</label>
@@ -695,8 +695,8 @@ export function RoutineForm({
             </div>
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Lookback (hours)</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Lookback (hours)</span>
             <input
               type="number"
               min={6}
@@ -706,13 +706,13 @@ export function RoutineForm({
               onChange={(e) => updateConfig({ lookback_hours: e.target.value })}
             />
             <span className={styles.hint}>How far back to look for a story worth posting about.</span>
-          </div>
+          </label>
         </>
       )}
 
       {values.action_type === RoutineActionType.INDICATOR_POLL && (
-        <div className={styles.field}>
-          <label className={styles.label}>Backfill periods</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Backfill periods</span>
           <input
             type="number"
             min={1}
@@ -725,12 +725,12 @@ export function RoutineForm({
             History pulled the first time an indicator is seen, so year-on-year and the sparkline
             aren’t empty on day one. 12–24 is the usual range.
           </span>
-        </div>
+        </label>
       )}
 
       {values.action_type === RoutineActionType.ONCHAIN_POLL && (
-        <div className={styles.field}>
-          <label className={styles.label}>Backfill days</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Backfill days</span>
           <input
             type="number"
             min={1}
@@ -743,12 +743,12 @@ export function RoutineForm({
             History pulled the first time an indicator is seen. Hash Ribbons needs 60 days of hash
             rate before it can be computed.
           </span>
-        </div>
+        </label>
       )}
 
       {values.action_type === RoutineActionType.REPORT_WATCH_SCAN && (
-        <div className={styles.field}>
-          <label className={styles.label}>Acquisitions per run</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Acquisitions per run</span>
           <input
             type="number"
             min={1}
@@ -761,7 +761,7 @@ export function RoutineForm({
             Cap on reports downloaded across all watched sources each run. Sources are managed on the
             news sources page.
           </span>
-        </div>
+        </label>
       )}
 
       {values.action_type === RoutineActionType.MARKET_REPORT && (
@@ -775,8 +775,8 @@ export function RoutineForm({
 
       {values.action_type === RoutineActionType.RESEARCH_DIGEST && (
         <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Max sources</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Max sources</span>
             <input
               type="number"
               min={1}
@@ -785,7 +785,7 @@ export function RoutineForm({
               value={String(cfg['max_sources'] ?? 10)}
               onChange={(e) => updateConfig({ max_sources: e.target.value })}
             />
-          </div>
+          </label>
           <div className={styles.field}>
             <label className={styles.checkbox}>
               <input
@@ -811,8 +811,8 @@ export function RoutineForm({
               <span>Notify via Signal on change</span>
             </label>
           </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Notify agent (optional)</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Notify agent (optional)</span>
             <select
               className={styles.input}
               value={(cfg['notify_agent'] as string | null) ?? ''}
@@ -825,7 +825,7 @@ export function RoutineForm({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
         </div>
       )}
 
@@ -848,19 +848,19 @@ export function RoutineForm({
           </div>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Time of day</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Time of day</span>
           <input
             type="time"
             className={styles.input}
             value={values.time_of_day}
             onChange={(e) => update('time_of_day', e.target.value)}
           />
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Timezone</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Timezone</span>
         <select
           className={styles.input}
           value={values.timezone}
@@ -872,7 +872,7 @@ export function RoutineForm({
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
       <div className={styles.field}>
         <label className={styles.checkbox}>
@@ -886,15 +886,15 @@ export function RoutineForm({
       </div>
 
       {values.show_on_dashboard && (
-        <div className={styles.field}>
-          <label className={styles.label}>Dashboard title (optional)</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Dashboard title (optional)</span>
           <input
             className={styles.input}
             value={values.dashboard_title}
             onChange={(e) => update('dashboard_title', e.target.value)}
             placeholder="Today in Bitcoin"
           />
-        </div>
+        </label>
       )}
 
       <div className={styles.field}>

@@ -191,3 +191,10 @@
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
 }
+
+/* The subscriber-visibility control. Above the detail because it decides
+   whether the whole entry reaches a paying subscriber, and how. */
+.gateWrap {
+  padding: var(--space-6) var(--space-6) 0;
+  max-width: var(--content-max-width);
+}

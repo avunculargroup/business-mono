@@ -1,0 +1,490 @@
+.container {
+  padding: var(--space-6);
+  max-width: var(--content-max-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.intro {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.readError {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.empty {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--text-md);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1);
+}
+
+.cardDetail {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.slug {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  color: var(--color-text-primary);
+}
+
+.statusBadge {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+}
+
+.due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/*
+ * Only overdue and unscheduled take a colour. A review comfortably in the
+ * future is not a state worth tinting, and colouring every row would leave
+ * nothing for the two that need attention.
+ */
+.overdue { color: var(--color-destructive); }
+.unscheduled { color: var(--color-warning); }
+.soon { color: var(--color-text-primary); }
+.scheduled { color: var(--color-text-secondary); }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.textarea,
+.input {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  resize: vertical;
+}
+
+.textarea:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.input {
+  max-width: 220px;
+}
+
+.hint {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.error {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-destructive);
+  background: var(--color-agent-rejected);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.formActions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.primaryButton,
+.ghostButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background 150ms ease, transform 100ms ease;
+  align-self: flex-start;
+}
+
+.primaryButton {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-surface);
+}
+
+.ghostButton {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.ghostButton:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+
+.primaryButton:active:not(:disabled),
+.ghostButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.primaryButton:disabled,
+.ghostButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.primaryButton:focus-visible,
+.ghostButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .ghostButton {
+    transition: none;
+  }
+
+  .primaryButton:active:not(:disabled),
+  .ghostButton:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ── Company profile ─────────────────────────────────────── */
+
+.sectionLede {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: calc(var(--space-2) * -1) 0 0;
+  max-width: 68ch;
+}
+
+.profileForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.profileField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.profileField .input {
+  max-width: none;
+}
+
+.requiredMark {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+}
+
+/*
+ * Warning, not destructive. A blank field is an unfinished job rather than an
+ * error — nobody did anything wrong, the work is simply not done.
+ */
+.blocksGate {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  margin: 0;
+}
+
+.saved {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-success);
+  margin: 0;
+}
+
+/* ── Compliance documents ────────────────────────────────── */
+
+.liveBadge {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-hover);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+}
+
+.blocked {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/*
+ * The resolved document, shown as stored. Monospace and pre-wrapped rather
+ * than rendered markdown: what matters here is that every {{variable}} has
+ * become a value, and rendered prose makes a stray brace easy to miss.
+ */
+.preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Body editing ────────────────────────────────────────── */
+
+/*
+ * Monospace, and tall. These are markdown documents and YAML-fronted
+ * templates: proportional text hides an indentation mistake in a `::section`
+ * block, and a four-row box hides everything else.
+ */
+.bodyTextarea {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.bodyTextarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * Validator findings. Listed in full rather than truncated to the first —
+ * fixing one at a time when the parser already found six is a slow way to
+ * spend an afternoon.
+ */
+.problems {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: var(--color-agent-rejected);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+}
+
+.frozenNote {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.newVersionRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.newVersionRow .label {
+  align-self: center;
+}
+
+.newVersionRow .input {
+  max-width: 140px;
+}
+
+/*
+ * Blast radius on a live template. Neutral, not alarming: a widely used
+ * template is a success until the day it is not, and colouring it would say
+ * something about the number that the number does not say by itself.
+ */
+.reach {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ── Library ─────────────────────────────────────────────── */
+
+.entryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.entryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}

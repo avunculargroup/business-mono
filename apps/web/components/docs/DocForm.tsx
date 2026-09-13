@@ -50,8 +50,8 @@ export function DocForm({ onSuccess, onPendingChange, mode = 'create', defaultVa
 
   return (
     <form id={formId} action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Type <span className={styles.required}>*</span></label>
+      <label className={styles.field}>
+        <span className={styles.label}>Type <span className={styles.required}>*</span></span>
         <select
           name="type"
           required
@@ -64,10 +64,10 @@ export function DocForm({ onSuccess, onPendingChange, mode = 'create', defaultVa
           <option value="memo">Memo</option>
           <option value="strategy">Strategy</option>
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Title <span className={styles.required}>*</span></label>
+      <label className={styles.field}>
+        <span className={styles.label}>Title <span className={styles.required}>*</span></span>
         <input
           type="text"
           name="title"
@@ -76,10 +76,10 @@ export function DocForm({ onSuccess, onPendingChange, mode = 'create', defaultVa
           className={styles.input}
           placeholder="e.g. Q2 Treasury Strategy Review"
         />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Description</span>
         <textarea
           name="description"
           rows={3}
@@ -87,7 +87,7 @@ export function DocForm({ onSuccess, onPendingChange, mode = 'create', defaultVa
           className={styles.textarea}
           placeholder="Short description of this document's purpose…"
         />
-      </div>
+      </label>
 
       <div className={styles.field}>
         <label className={styles.label}>Tags</label>

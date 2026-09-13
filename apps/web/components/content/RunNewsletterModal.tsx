@@ -43,42 +43,42 @@ export function RunNewsletterModal({ open, onClose }: RunNewsletterModalProps) {
       }
     >
       <form id="newsletter-form" action={formAction} className={styles.form}>
-        <div className={styles.field}>
-          <label className={styles.label}>Time range</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Time range</span>
           <select name="timeRange" defaultValue="month" className={styles.select}>
             <option value="week">Past week</option>
             <option value="fortnight">Past fortnight</option>
             <option value="month">Past month</option>
           </select>
-        </div>
+        </label>
 
         <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Stories</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Stories</span>
             <select name="storyCount" defaultValue="5" className={styles.select}>
               {[3, 4, 5, 6, 7, 8].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Words per story</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Words per story</span>
             <select name="targetWordCount" defaultValue="250" className={styles.select}>
               {[150, 200, 250, 300, 400].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-          </div>
+          </label>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Audience (optional)</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Audience (optional)</span>
           <input
             name="audienceContext"
             className={styles.input}
             placeholder="Leave blank for the default CFO audience"
           />
-        </div>
+        </label>
 
         <p className={styles.label}>
           You&apos;ll review the story shortlist and the full draft here before anything is saved.

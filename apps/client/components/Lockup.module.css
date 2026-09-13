@@ -1,0 +1,79 @@
+/* Lockup specs from .claude/skills/bts-design/references/naming.md. */
+
+.lockup {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.product {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.endorsement {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Variant 1 — stacked. Primary, and the default everywhere. */
+.stacked .product {
+  font-size: 28px;
+}
+
+.stacked .endorsement {
+  margin-top: 10px;
+}
+
+/* Variant 2 — horizontal, for the nav bar. The company name drops to sentence
+   case at 13px and is separated by a rule rather than by spacing alone. */
+.horizontal {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.horizontal .product {
+  font-size: 24px;
+}
+
+.horizontal .endorsement {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
+
+/* Variant 3 — gold rule, for cover pages and /prepare exports. */
+.gold-rule .product {
+  font-size: 34px;
+}
+
+.gold-rule .endorsement {
+  margin-top: 10px;
+}
+
+.rule {
+  display: block;
+  width: 28px;
+  height: 2px;
+  background: var(--color-accent-base);
+  margin-bottom: 14px;
+}
+
+@media (max-width: 640px) {
+  .horizontal .product {
+    font-size: 20px;
+  }
+
+  .horizontal .endorsement {
+    display: none;
+  }
+}

@@ -67,7 +67,7 @@ const COMPANY_COLUMNS =
   'id, slug, legal_name, jurisdiction, tier, primary_archetype, self_described_archetype, ' +
   'reporting_standard, expected_disclosure_cadence, acn, abn, arbn, isin, operational_hq, ' +
   'functional_currency, presentation_currency, financial_year_end, market_cap_band, ' +
-  'funding_source, curator_notes, last_verified_at, is_published, ' +
+  'funding_source, curator_notes, last_verified_at, is_published, client_cleared, ' +
   'company_listings(venue, ticker, listing_type, filing_entity, listed_from, listed_to), ' +
   'company_former_names(name, used_to)';
 
@@ -120,6 +120,7 @@ type CompanyRow = {
   curator_notes: string | null;
   last_verified_at: string | null;
   is_published: boolean;
+  client_cleared: boolean;
   company_listings: ListingRow[] | null;
   company_former_names: { name: string; used_to: string | null }[] | null;
 };
@@ -271,6 +272,7 @@ function toDossier(row: CompanyRow): CompanyDossier {
     curatorNotes: row.curator_notes,
     lastVerifiedAt: row.last_verified_at,
     isPublished: row.is_published,
+    clientCleared: row.client_cleared,
   };
 }
 

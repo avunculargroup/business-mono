@@ -119,8 +119,8 @@ export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormPro
         />
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Type <span className={styles.required}>*</span></label>
+      <label className={styles.field}>
+        <span className={styles.label}>Type <span className={styles.required}>*</span></span>
         <select name="type" required defaultValue="report" className={styles.select}>
           <option value="report">Report</option>
           <option value="proposal">Proposal</option>
@@ -128,10 +128,10 @@ export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormPro
           <option value="memo">Memo</option>
           <option value="strategy">Strategy</option>
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Title <span className={styles.required}>*</span></label>
+      <label className={styles.field}>
+        <span className={styles.label}>Title <span className={styles.required}>*</span></span>
         <input
           type="text"
           name="title"
@@ -141,7 +141,7 @@ export function ImportDocxForm({ onSuccess, onPendingChange }: ImportDocxFormPro
           className={styles.input}
           placeholder="Document title"
         />
-      </div>
+      </label>
 
       <div className={styles.field}>
         <label className={styles.label}>Tags</label>

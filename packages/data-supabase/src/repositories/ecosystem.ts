@@ -182,9 +182,26 @@ export function createEcosystemRepository(
     },
 
     async setClientRelevant(id: string, flag: boolean): Promise<void> {
+      // The approver columns come from the principal, not from a parameter.
+      // `promotion_needs_approver` requires them whenever client_relevant is
+      // true, so an update that set only the flag would fail the moment the
+      // client-app migrations land — this method predates that constraint and
+      // was the one place it would have broken.
+      //
+      // On withdrawal they are left in place. Who promoted it and when is the
+      // record of a decision that was made, and un-promoting does not unmake
+      // it; the constraint only cares while the flag is true.
       const { error } = await client
         .from('ecosystem_changes')
-        .update({ client_relevant: flag })
+        .update(
+          flag
+            ? {
+                client_relevant: true,
+                client_promoted_by: principal.userId,
+                client_promoted_at: new Date().toISOString(),
+              }
+            : { client_relevant: false },
+        )
         .eq('id', id);
 
       if (error) throw error;

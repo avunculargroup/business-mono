@@ -32,13 +32,13 @@ export function BrandAssetForm({ onSuccess, onPendingChange }: BrandAssetFormPro
 
   return (
     <form id="brand-asset-form" action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Name *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Name *</span>
         <input name="name" required className={styles.input} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Type *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Type *</span>
         <select name="type" defaultValue="other" className={styles.select}>
           <option value="logo">Logo</option>
           <option value="colour_palette">Colour palette</option>
@@ -49,17 +49,17 @@ export function BrandAssetForm({ onSuccess, onPendingChange }: BrandAssetFormPro
           <option value="image">Image</option>
           <option value="other">Other</option>
         </select>
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Description</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Description</span>
         <textarea name="description" rows={2} className={styles.textarea} />
-      </div>
+      </label>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Content</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Content</span>
         <textarea name="content" rows={5} className={styles.textarea} placeholder="Paste text content, colour codes, guidelines, etc." />
-      </div>
+      </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
     </form>

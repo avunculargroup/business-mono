@@ -445,22 +445,22 @@ function BriefForm({
         Paste an audio or YouTube URL and a short note on why it is worth ingesting. The transcript
         waterfall runs once, and the result joins the research index.
       </p>
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>Title (optional)</label>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Title (optional)</span>
         <input name="title" className={styles.input} placeholder="Episode title" />
-      </div>
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>YouTube URL</label>
+      </label>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>YouTube URL</span>
         <input name="youtube_url" type="url" className={styles.input} placeholder="https://youtube.com/watch?v=…" />
-      </div>
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>Audio URL</label>
+      </label>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Audio URL</span>
         <input name="audio_url" type="url" className={styles.input} placeholder="https://…/episode.mp3" />
-      </div>
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>Why ingest this</label>
+      </label>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Why ingest this</span>
         <textarea name="why" className={styles.textarea} rows={2} placeholder="Context for the index" required />
-      </div>
+      </label>
       <label className={styles.switchRow}>
         <input type="checkbox" checked={allowDeepgram} onChange={(e) => setAllowDeepgram(e.target.checked)} />
         <span>Allow Deepgram if no free transcript exists</span>

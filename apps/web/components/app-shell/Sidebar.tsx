@@ -27,6 +27,8 @@ import {
   HardDrive,
   ScrollText,
   Megaphone,
+  ShieldCheck,
+  UserRound,
   X,
 } from 'lucide-react';
 import { useCurrentUser } from '@/providers/UserProvider';
@@ -83,6 +85,8 @@ const workNav = [
 ];
 
 const systemNav = [
+  { href: '/clients', label: 'Subscribers', icon: UserRound },
+  { href: '/compliance', label: 'Compliance review', icon: ShieldCheck },
   { href: '/activity', label: 'Agent Activity', icon: Activity },
   { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
   { href: '/files',    label: 'Files',          icon: HardDrive },

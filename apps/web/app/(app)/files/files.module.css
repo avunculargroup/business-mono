@@ -290,7 +290,7 @@
 }
 
 .actionBtn.destructive:hover {
-  background: #F8ECEC;
+  background: var(--color-agent-rejected);
   color: var(--color-destructive);
   border-color: var(--color-destructive);
 }
@@ -515,7 +515,7 @@
 
 .uploadItemRemove:hover {
   color: var(--color-destructive);
-  background: #F8ECEC;
+  background: var(--color-agent-rejected);
 }
 
 /* ── Tags input section ───────────────────────────────────── */

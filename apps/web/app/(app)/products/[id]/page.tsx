@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { ProductDetail } from '@/components/products/ProductDetail';
+import { ProductClassification } from '@/components/clientGate/ProductClassification';
+import styles from './product-detail.module.css';
 import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { idColumn } from '@/lib/utils';
 
@@ -73,6 +75,16 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       <PageHeader title={product.name} backHref="/products" />
+      {/* The highest-consequence toggle in the internal app: true means the
+          directory card emits no anchor at all. Above the detail, because it is
+          a decision about the whole entry. */}
+      <div className={styles.gateWrap}>
+        <ProductClassification
+          productId={product.id}
+          isFinancialProduct={product.is_financial_product ?? null}
+          note={product.product_classification_note ?? null}
+        />
+      </div>
       <ProductDetail
         product={product}
         keyContacts={keyContacts ?? []}

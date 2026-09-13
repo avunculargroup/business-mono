@@ -5,7 +5,7 @@ export {
   type QueryOptions,
   type ReadContext,
 } from './context';
-export { DemoWriteBlockedError, NotFoundError } from './errors';
+export { DemoWriteBlockedError, DisclosureRequiredError, NotFoundError } from './errors';
 export { DEMO_DOMAINS } from './bundle';
 export type {
   Bundle,
@@ -51,6 +51,50 @@ export type {
   VariantGateDecision,
   VariantReview,
 } from './repositories/campaigns';
+export { CLIENT_READ_DOMAINS } from './repositories/client';
+export type {
+  AbsentFact,
+  ArtefactType,
+  Brief,
+  ClientAccountRepository,
+  ClientBriefRepository,
+  ClientComplianceRepository,
+  ClientDataContext,
+  ClientDirectoryRepository,
+  ClientIndicatorRepository,
+  ClientLibraryRepository,
+  ClientPrepareRepository,
+  ClientProvenance,
+  ClientReadDomain,
+  ClientRegisterEntry,
+  ClientRegisterRepository,
+  ClientSeat,
+  ClientSession,
+  ClientSessionRepository,
+  ClientSignalRepository,
+  ClientSubscription,
+  ClientType,
+  ClientWriteRepository,
+  CommercialDisclosure,
+  CompanyIdentity,
+  CompanyProfile,
+  ComplianceClass,
+  ComplianceDocument,
+  DirectoryEntry,
+  Fact,
+  FactBasis,
+  Finding,
+  FindingType,
+  IndicatorPoint,
+  IndicatorSeries,
+  LibraryEntry,
+  LibrarySection,
+  PrepareTemplate,
+  ResolvedFacts,
+  Signal,
+  SignalQuery,
+  TemplateSection,
+} from './repositories/client';
 export type {
   CompanyContact,
   CompanyDetail,

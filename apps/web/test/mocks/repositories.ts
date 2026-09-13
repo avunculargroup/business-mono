@@ -291,6 +291,7 @@ export function fakeCompanyDossier(overrides: Partial<CompanyDossier> = {}): Com
     curatorNotes: null,
     lastVerifiedAt: null,
     isPublished: false,
+    clientCleared: false,
     ...overrides,
   };
 }

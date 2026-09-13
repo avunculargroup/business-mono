@@ -35,14 +35,14 @@ export function ContentForm({ teamMembers, onSuccess, onPendingChange }: Content
 
   return (
     <form id="content-form" action={formAction} className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Title *</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Title *</span>
         <input name="title" required className={styles.input} />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Type *</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Type *</span>
           <select name="type" defaultValue="idea" className={styles.select}>
             <option value="idea">Idea</option>
             <option value="linkedin">LinkedIn</option>
@@ -51,22 +51,22 @@ export function ContentForm({ teamMembers, onSuccess, onPendingChange }: Content
             <option value="blog">Blog</option>
             <option value="email">Email</option>
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Author</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Author</span>
           <select name="created_by" defaultValue={user.id} className={styles.select}>
             <option value="">None</option>
             {teamMembers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Body</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Body</span>
         <textarea name="body" rows={5} className={styles.textarea} />
-      </div>
+      </label>
 
       <input type="hidden" name="status" value="idea" />
 

@@ -171,8 +171,8 @@ export function DomainsSection({ initialDomains }: DomainsSectionProps) {
         }
       >
         <div className={styles.form}>
-          <div className={styles.field}>
-            <label className={styles.label}>Domain name *</label>
+          <label className={styles.field}>
+            <span className={styles.label}>Domain name *</span>
             <input
               className={styles.input}
               type="text"
@@ -180,9 +180,9 @@ export function DomainsSection({ initialDomains }: DomainsSectionProps) {
               value={form.name}
               onChange={setDomainName}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Provider</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Provider</span>
             <input
               className={styles.input}
               type="text"
@@ -190,25 +190,25 @@ export function DomainsSection({ initialDomains }: DomainsSectionProps) {
               value={form.provider}
               onChange={set('provider')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Renewal date</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Renewal date</span>
             <input
               className={styles.input}
               type="date"
               value={form.renewal_date}
               onChange={set('renewal_date')}
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Notes</label>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Notes</span>
             <textarea
               className={styles.textarea}
               placeholder="Any notes…"
               value={form.notes}
               onChange={set('notes')}
             />
-          </div>
+          </label>
         </div>
       </SlideOver>
 

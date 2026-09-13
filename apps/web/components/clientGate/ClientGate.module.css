@@ -1,0 +1,161 @@
+.gate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/*
+ * Gold means "reaching a subscriber", and it is the only place on these pages
+ * it appears. Not green: green would read as good, and whether an entry should
+ * reach a subscriber is a judgement rather than an achievement.
+ */
+.cleared { color: var(--color-accent-hover); }
+.withheld { color: var(--color-text-secondary); }
+.unassessed { color: var(--color-warning); }
+
+.consequence {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.textarea {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.hint {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 68ch;
+}
+
+.error {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-destructive);
+  background: var(--color-agent-rejected);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.primaryButton,
+.ghostButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background 150ms ease, transform 100ms ease;
+}
+
+.primaryButton {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-surface);
+}
+
+.ghostButton {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.ghostButton:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.primaryButton:active:not(:disabled),
+.ghostButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.primaryButton:disabled,
+.ghostButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.primaryButton:focus-visible,
+.ghostButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .ghostButton { transition: none; }
+  .primaryButton:active:not(:disabled),
+  .ghostButton:active:not(:disabled) { transform: none; }
+}

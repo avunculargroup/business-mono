@@ -1,0 +1,56 @@
+.grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.series {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+/* Values are monospaced everywhere. It is how a reader tells a figure from a
+   sentence about a figure. */
+.value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+.unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-left: var(--space-1);
+}
+
+/* The previous observation, stated as a figure with its date. No delta, no
+   arrow, no colour — a rising number is not good news, and rendering it as
+   good news is an implied view. */
+.prior {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}

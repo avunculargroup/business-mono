@@ -81,7 +81,7 @@
   padding: var(--space-2) var(--space-5);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: #fff;
+  color: var(--color-surface);
   cursor: pointer;
   transition: opacity 0.15s;
 }

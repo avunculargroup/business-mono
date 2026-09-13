@@ -46,8 +46,8 @@ export function ProductReferralAgreementForm({ productId, onSuccess, onPendingCh
       <input type="hidden" name="product_service_id" value={productId} />
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Agreement type</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Agreement type</span>
           <select name="agreement_type" defaultValue="" className={styles.select}>
             <option value="">None</option>
             <option value="referral_fee">Referral fee</option>
@@ -56,23 +56,23 @@ export function ProductReferralAgreementForm({ productId, onSuccess, onPendingCh
             <option value="strategic">Strategic</option>
             <option value="other">Other</option>
           </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Counterparty</label>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>Counterparty</span>
           <input name="counterparty_name" className={styles.input} placeholder="Who is this with?" />
-        </div>
+        </label>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Fee structure</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Fee structure</span>
         <input name="fee_structure" className={styles.input} placeholder="Describe the fee arrangement" />
-      </div>
+      </label>
 
       <div className={styles.row}>
-        <div className={styles.field}>
-          <label className={styles.label}>Percentage (%)</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Percentage (%)</span>
           <input name="percentage" type="number" step="0.01" min="0" max="100" className={styles.input} placeholder="e.g. 2.5" />
-        </div>
+        </label>
         <div className={styles.field} style={{ justifyContent: 'flex-end', paddingBottom: 'var(--space-2)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
             <input type="checkbox" name="active" defaultChecked />
@@ -81,10 +81,10 @@ export function ProductReferralAgreementForm({ productId, onSuccess, onPendingCh
         </div>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Notes</label>
+      <label className={styles.field}>
+        <span className={styles.label}>Notes</span>
         <textarea name="notes" rows={3} className={styles.textarea} />
-      </div>
+      </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
     </form>

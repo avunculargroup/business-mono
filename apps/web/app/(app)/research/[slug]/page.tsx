@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation';
 import { getRepositories } from '@/lib/repositories';
 import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
+import styles from '../research.module.css';
 import { CompanyRecord } from '@/components/research/CompanyRecord';
+import { RegisterClearance } from '@/components/clientGate/RegisterClearance';
 
 /**
  * One company's record.
@@ -42,6 +44,11 @@ export default async function ResearchCompanyPage({
   return (
     <>
       <PageHeader title={company.legalName} backHref="/research" backLabel="Register" />
+      {/* Above the record rather than buried in it: whether a paying subscriber
+          sees this entry is a decision about the whole page, not a field on it. */}
+      <div className={styles.gateWrap}>
+        <RegisterClearance companyId={company.id} cleared={company.clientCleared} />
+      </div>
       <CompanyRecord
         company={company}
         ledger={ledger.items}

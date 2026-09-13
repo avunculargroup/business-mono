@@ -1,3 +1,13 @@
+/*
+ * The one file in the app that does not use the palette, deliberately.
+ *
+ * Presentation mode fills a projector or a shared screen, where the warm
+ * off-white ground the rest of the platform uses reads as a grey wash and
+ * bleeds light into a dark room. True black is a decision about the medium
+ * rather than a lapse in the design system, so the values below are raw and
+ * this comment is why. `apps/web/app/globals.test.ts` allows this file by name.
+ */
+
 .stage {
   width: 100vw;
   height: 100vh;

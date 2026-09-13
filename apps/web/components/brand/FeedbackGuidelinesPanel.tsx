@@ -106,8 +106,8 @@ export function FeedbackGuidelinesPanel({ accounts, guidelines, feedback }: Feed
           </>
         }
       >
-        <div className={styles.field}>
-          <label className={styles.label}>Guidelines — one per line</label>
+        <label className={styles.field}>
+          <span className={styles.label}>Guidelines — one per line</span>
           <textarea
             className={styles.textarea}
             rows={10}
@@ -118,7 +118,7 @@ export function FeedbackGuidelinesPanel({ accounts, guidelines, feedback }: Feed
           <p className={styles.hint}>
             New review feedback is folded into this list automatically; edits here are kept as the starting point.
           </p>
-        </div>
+        </label>
 
         {editingFeedback.length > 0 && (
           <div className={styles.section}>
