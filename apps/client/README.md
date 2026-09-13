@@ -187,13 +187,19 @@ pnpm --filter @platform/client test
 pnpm --filter @platform/client typecheck
 ```
 
-Two environment variables, both public, both anon:
+Four environment variables, every one of them public — copy
+[`.env.example`](./.env.example) to `.env.local`, which carries the reasoning for each:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_SITE_URL            # optional; the magic-link redirect origin
+NEXT_PUBLIC_PRIVACY_POLICY_URL  # required wherever the gate must open
+NEXT_PUBLIC_SITE_URL            # optional; the invitation magic-link origin
 ```
+
+The privacy policy URL is the Service Statement's one manual variable, and an unset one is not
+a cosmetic gap: `resolveDocument` counts an empty string as missing and returns no body at all,
+so the gate reports the statement as unavailable and nobody signs in.
 
 **There is no service-role key here and there must not be.** It bypasses RLS, and every tenancy
 guarantee this app makes is an RLS policy — one key in one server action would make the
