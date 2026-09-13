@@ -853,12 +853,24 @@ five consumers (`apps/client`'s three clients, its middleware, and the client ad
 
 Two things worth recording.
 
-**The types commit is pushed with `[skip ci]`, so nothing checked it.** The regenerated types
+**The types commit was pushed with `[skip ci]`, so nothing checked it.** The regenerated types
 landed on `main` and took the test red with them; the failure was only visible to someone
 running the suite locally. That is the same shape as the migration collision — a workflow
 writing to `main` without anything gating what it writes — and it is why the bridge test was
 worth having: without it, the drift between a hand-written type and a generated one would have
 been silent instead of loud.
+
+The `[skip ci]` is now gone. That commit rewrites a type every package compiles against, so it
+can break the build by itself, and letting `Tests` run on it costs a few minutes per migration
+deploy. It cannot loop: `migrate.yml` triggers only on `supabase/migrations/**` and its own
+file, and the types commit touches neither.
+
+**`test.yml` gained a `workflow_dispatch`,** for a reason found the same morning. GitHub did not
+deliver the `pull_request` event for the PR that removed the bridge: its head commit got no run
+at all, while the checks GitHub *displayed* against the PR were runs from two earlier commits on
+the same branch — a green tick attached to code nobody had tested. With no dispatch handle the
+only ways to get a run were an empty commit or closing and reopening the PR. There is a button
+now.
 
 **One narrowing was lost, deliberately.** The bridge typed
 `field_source_minimums.client_fact_class` as `'implementation' | 'outcome' | null`; the
