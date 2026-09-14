@@ -1,8 +1,5 @@
 export { supabase, createRealtimeClient } from './client.js';
 export type { Database, Json } from './types/database.js';
-// The schema as it will be once the client-app migrations are applied.
-// Temporary — see the file's header and its test.
-export type { ClientDatabase } from './types/pendingClientTables.js';
 export { vectorSearch } from './rpc/vectorSearch.js';
 export { graphTraverse } from './rpc/graphTraverse.js';
 export { fulltextSearch } from './rpc/fulltextSearch.js';

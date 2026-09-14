@@ -90,6 +90,15 @@ jobs:
           if git diff --cached --quiet; then
             echo "Types unchanged — nothing to commit"
           else
-            git commit -m "chore: regenerate Supabase types [skip ci]"
+            # No [skip ci]. This commit rewrites a type every package compiles
+            # against, so it can break the build on its own — and it did: applying
+            # the client-app migrations regenerated types that took
+            # pendingClientTables.test.ts red, and `main` sat broken because the
+            # commit that broke it was the one commit nothing checked. Letting
+            # `Tests` run on it costs a few minutes per migration deploy and makes
+            # that failure visible where it happens. It cannot loop: this workflow
+            # triggers only on supabase/migrations/** and its own file, neither of
+            # which this commit touches.
+            git commit -m "chore: regenerate Supabase types"
             git push
           fi
