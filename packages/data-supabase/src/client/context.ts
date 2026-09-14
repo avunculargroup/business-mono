@@ -1,20 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ClientDatabase } from '@platform/db';
+import type { Database } from '@platform/db';
 import { DisclosureRequiredError } from '@platform/data';
 import type { Principal } from '@platform/data';
 
 /**
- * The cookie-authed client, typed against the schema the client-app migrations
- * create.
+ * The cookie-authed client.
  *
- * Distinct from `PlatformSupabaseClient` on purpose. `apps/web` and
- * `apps/agents` type against `Database`, which is generated from the live
- * database and therefore cannot see a table whose migration has not run — so
- * neither of them can reach a client table by accident, and `apps/client` does
- * not have to wait on a production migration to compile. See
- * `packages/db/src/types/pendingClientTables.ts`.
+ * Distinct from `PlatformSupabaseClient` in name only now that both are typed
+ * against the generated schema — the separation is kept because what makes this
+ * client the client one is the principal it closes over below, not its row
+ * types.
  */
-export type ClientSupabaseClient = SupabaseClient<ClientDatabase>;
+export type ClientSupabaseClient = SupabaseClient<Database>;
 
 /**
  * What every client domain closes over.

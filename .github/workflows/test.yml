@@ -4,6 +4,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Run on demand. GitHub does not always deliver the `pull_request` event — a PR
+  # opened on 2026-09-13 got no run at all, and with no dispatch handle the only
+  # ways to get one were an empty commit or closing and reopening the PR. Neither
+  # is acceptable, so there is a button now. Also useful for re-running against a
+  # changed base without touching the branch.
+  workflow_dispatch:
 
 jobs:
   test:
