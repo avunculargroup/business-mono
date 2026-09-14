@@ -157,6 +157,8 @@ const moreNav: MoreNavSection[] = [
   {
     label: 'System',
     items: [
+      { href: '/clients',    label: 'Subscribers',       icon: UserRound  },
+      { href: '/compliance', label: 'Compliance review', icon: ShieldCheck },
       { href: '/activity', label: 'Agent Activity', icon: Activity },
       { href: '/brand',    label: 'Brand Hub',      icon: Bookmark },
       { href: '/files',    label: 'Files',          icon: HardDrive },
