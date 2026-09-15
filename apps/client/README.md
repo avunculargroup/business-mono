@@ -206,7 +206,30 @@ invitation alike, through [`lib/siteUrl.ts`](./lib/siteUrl.ts). Supabase decides
 destination when it sends the mail, so an omitted `emailRedirectTo` falls back to the project's
 Site URL rather than to the request: that is how ordinary sign-in once mailed subscribers a
 localhost link. Unset here it defaults to the deployed origin, which means local dev mails a
-production link unless you set it. Register whatever you set as a Supabase Auth redirect URL.
+production link unless you set it.
+
+### Passing `emailRedirectTo` is only half of it
+
+The other half is a Supabase setting, and it is not in this repository. GoTrue matches redirect
+URLs **exactly** against the project's allow-list, and a callback that is not on the list is not
+rejected — it is discarded, and the link falls back to the project's Site URL. The send
+succeeds, `signInWithOtp` returns no error, and the subscriber gets a link addressed somewhere
+else. A fresh project's Site URL is `http://localhost:3000`, so that is where the link goes.
+
+So a working deployment needs both, under **Authentication → URL Configuration**:
+
+| Setting       | Value                                             |
+| ------------- | ------------------------------------------------- |
+| Site URL      | `https://minute.btreasury.com.au`                 |
+| Redirect URLs | `https://minute.btreasury.com.au/auth/callback`   |
+
+No trailing slash on either. A Site URL of `https://minute.btreasury.com.au/` builds
+`…//auth/callback`, which is a different string and so is not on the list — presenting as the
+same bug it was set to fix. `NEXT_PUBLIC_SITE_URL`, if you set it anywhere, must name an origin
+whose `/auth/callback` is registered too; that is what makes local dev work, and
+[`supabase/config.toml`](../../supabase/config.toml) already registers the loopback ones for
+`supabase start`. Nothing in this repository pushes the hosted values — CI applies migrations,
+not configuration — so this is a dashboard change and stays one.
 
 **There is no service-role key here and there must not be.** It bypasses RLS, and every tenancy
 guarantee this app makes is an RLS policy — one key in one server action would make the
