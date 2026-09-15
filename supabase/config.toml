@@ -153,7 +153,25 @@ enabled = true
 # in emails.
 site_url = "http://127.0.0.1:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+#
+# GoTrue matches these exactly, and a requested redirect that is not on the list is not an
+# error: it is discarded, and the link falls back to `site_url` above. The mail still sends,
+# still looks right, and addresses the subscriber to an origin that is not theirs. That
+# silence is the whole failure mode behind Minute's localhost sign-in links — apps/client
+# passes a correct `emailRedirectTo` (see apps/client/lib/siteUrl.ts) and an unregistered
+# callback throws it away.
+#
+# This file configures `supabase start` only. CI runs `supabase db push`, never
+# `supabase config push`, so nothing here reaches the hosted project — its allow-list is a
+# dashboard setting. The values it needs are listed in apps/client/README.md.
+#
+# Both spellings of the loopback host are registered because `site_url` uses one and a
+# browser opened on the other is a different origin to GoTrue. On a port other than 3000
+# (Next picks 3001 when 3000 is taken) add that exact callback too.
+additional_redirect_urls = [
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).

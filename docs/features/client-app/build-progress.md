@@ -895,6 +895,21 @@ that is already asserted.
   section 8's terms and the privacy URL came from conversation. Reviewing it is still a human
   act, but publishing it is no longer a hand-written `UPDATE` — `/compliance` in `apps/web` does
   it, and refuses while the document cannot fully resolve.
+- **The Supabase redirect allow-list.** Sign-in links still land on `localhost:3000`, and the
+  app is no longer the reason: both send paths pass `emailRedirectTo` through
+  [`lib/siteUrl.ts`](../../../apps/client/lib/siteUrl.ts), and both have since the fix. What
+  remains is a project setting. GoTrue matches redirect URLs exactly and treats an unregistered
+  one as absent rather than invalid — it drops the callback, falls back to the project's Site
+  URL, and returns no error, so a correct `emailRedirectTo` and a missing allow-list entry are
+  indistinguishable from the app's side. A fresh project's Site URL is `http://localhost:3000`.
+  Fixing it means setting Site URL to `https://minute.btreasury.com.au` and adding
+  `https://minute.btreasury.com.au/auth/callback` to Redirect URLs, neither with a trailing
+  slash, under Authentication → URL Configuration. Nothing in this repository can do it: the
+  migrate workflow runs `supabase db push`, and `supabase/config.toml` configures
+  `supabase start` only — it now registers the loopback callbacks so local dev works, which is
+  the most the repo can reach. Like the privacy URL above, this is the shape of problem that
+  costs a day: every artefact in the diff is correct and the feature is still broken.
+
 - **`company_profile` is empty.** Thirteen fields, none of them inventable — the gate fails
   closed until they are filled. There is now a form for them on `/compliance`, which marks each
   blank field the Service Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**,
