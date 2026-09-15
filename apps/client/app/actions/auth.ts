@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { siteOrigin } from '@/lib/siteUrl';
 
 /**
  * Sign-in by magic link. There is no password and no sign-up form.
@@ -10,6 +11,12 @@ import { createClient } from '@/lib/supabase/server';
  * address with no auth user gets no link, so the form cannot be used to
  * discover whether an address is a subscriber, and it cannot be used to become
  * one. Accounts are provisioned by a founder, through `/invite`.
+ *
+ * `emailRedirectTo` is passed for the same reason the invite path passes it:
+ * without it the link points at the Supabase project's Site URL, which is
+ * localhost until somebody changes it, and the subscriber gets a link their
+ * machine cannot resolve. The callback derives *its* origin from the request,
+ * but by then the mail has already been addressed.
  */
 export async function requestSignInLink(
   _previous: { message: string } | null,
@@ -22,7 +29,10 @@ export async function requestSignInLink(
   const supabase = await createClient();
   await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: false },
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: `${siteOrigin()}/auth/callback`,
+    },
   });
 
   // The same message whichever way it went. Telling an anonymous visitor that
