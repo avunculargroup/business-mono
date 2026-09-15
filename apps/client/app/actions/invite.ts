@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { siteOrigin } from '@/lib/siteUrl';
 
 /**
  * Send the sign-in link for an invitation.
@@ -30,8 +31,6 @@ export async function acceptInvite(
     };
   }
 
-  const origin = process.env['NEXT_PUBLIC_SITE_URL'] ?? 'https://minute.btreasury.com.au';
-
   await supabase.auth.signInWithOtp({
     email: invite.email,
     options: {
@@ -40,7 +39,7 @@ export async function acceptInvite(
       shouldCreateUser: true,
       // The token rides along so the callback can redeem it once there is a
       // session to redeem it for.
-      emailRedirectTo: `${origin}/auth/callback?invite=${encodeURIComponent(token)}`,
+      emailRedirectTo: `${siteOrigin()}/auth/callback?invite=${encodeURIComponent(token)}`,
     },
   });
 

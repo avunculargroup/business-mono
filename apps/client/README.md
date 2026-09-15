@@ -194,12 +194,19 @@ Four environment variables, every one of them public — copy
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 NEXT_PUBLIC_PRIVACY_POLICY_URL  # required wherever the gate must open
-NEXT_PUBLIC_SITE_URL            # optional; the invitation magic-link origin
+NEXT_PUBLIC_SITE_URL            # the magic-link origin; defaults to the deployed one
 ```
 
 The privacy policy URL is the Service Statement's one manual variable, and an unset one is not
 a cosmetic gap: `resolveDocument` counts an empty string as missing and returns no body at all,
 so the gate reports the statement as unavailable and nobody signs in.
+
+The site URL is where **both** magic-link paths send a subscriber back to — sign-in and
+invitation alike, through [`lib/siteUrl.ts`](./lib/siteUrl.ts). Supabase decides a link's
+destination when it sends the mail, so an omitted `emailRedirectTo` falls back to the project's
+Site URL rather than to the request: that is how ordinary sign-in once mailed subscribers a
+localhost link. Unset here it defaults to the deployed origin, which means local dev mails a
+production link unless you set it. Register whatever you set as a Supabase Auth redirect URL.
 
 **There is no service-role key here and there must not be.** It bypasses RLS, and every tenancy
 guarantee this app makes is an RLS policy — one key in one server action would make the
