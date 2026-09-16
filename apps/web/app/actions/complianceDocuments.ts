@@ -21,10 +21,6 @@ import {
  * accident.
  */
 
-function privacyPolicyUrl(): string {
-  return process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] ?? '';
-}
-
 export async function saveCompanyProfile(values: Record<string, string>) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -89,7 +85,7 @@ export async function activateComplianceDocument(documentId: string) {
   const { data: profile, error: profileError } = await auth.supabase
     .from('company_profile')
     .select(
-      'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone',
+      'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone, privacy_policy_url',
     )
     .maybeSingle();
 
@@ -105,7 +101,6 @@ export async function activateComplianceDocument(documentId: string) {
       effectiveFrom: document.effective_from,
     },
     profile as Partial<Record<ProfileField, string | null>> | null,
-    privacyPolicyUrl(),
     new Date().toISOString().slice(0, 10),
   );
 

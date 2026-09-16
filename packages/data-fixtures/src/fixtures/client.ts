@@ -100,6 +100,7 @@ export function companyProfile(): CompanyProfile {
     complaints_contact: 'The Directors',
     complaints_email: 'complaints@example.invalid',
     complaints_phone: '+61 3 0000 0001',
+    privacy_policy_url: 'https://example.invalid/privacy',
   };
 }
 

@@ -36,19 +36,17 @@ authenticated team member read/write across the app tables, so one user sees eve
 | `OPENROUTER_API_KEY` | No | Dashboard credits card reads "Credits unavailable" |
 | `OPENAI_API_KEY` | No | Podcast transcript search fails with a humane message |
 | `NEXT_PUBLIC_RESEARCH_INBOUND_DOMAIN` | No | Inbound-address preview defaults to `btreasury.com.au` |
-| `NEXT_PUBLIC_PRIVACY_POLICY_URL` | To publish a compliance document | `/compliance` reports `bts_privacy_policy_url` as having no value and refuses to publish the Service Statement |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | No | LinkedIn "Connect" returns `?error=not_configured` |
 
 The optional ones each disable exactly one feature, and the UI says so rather than
 failing — that is deliberate, so a partial local setup is still usable.
 
-`NEXT_PUBLIC_PRIVACY_POLICY_URL` is the one to watch, because it is set twice. Minute
-(`apps/client`) reads it too, on its own Vercel project, and its README is where it is
-documented — so it is easy to set it there, see `/compliance` here still call it unset, and
-conclude the page is wrong. Both projects need it, with the same value, and because Next.js
-fixes `NEXT_PUBLIC_` values at build time, this app needs a redeploy after it is set. It is
-read server-side only here (the `/compliance` page and the publish action); the prefix is
-Minute's name for it, not a statement that the browser sees it.
+Nothing here gates the Service Statement any more. The privacy policy URL used to —
+`NEXT_PUBLIC_PRIVACY_POLICY_URL`, set on this Vercel project *and* on Minute's, with a
+redeploy of each because Next.js fixes `NEXT_PUBLIC_` values at build time. It is
+`company_profile.privacy_policy_url` as of migration `20260916010000`, typed into the profile
+form on `/compliance` like every other placeholder the statement uses. If you find the
+variable still set on either project, delete it: nothing reads it.
 
 ## Scripts
 

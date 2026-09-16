@@ -6,6 +6,36 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-16 — `privacy_policy_url` onto `company_profile`
+
+`20260916010000_privacy_policy_url_on_profile.sql` retires the last Service
+Statement variable that did not live in the database.
+
+- **It was an environment variable, in two places.** `bts_privacy_policy_url`
+  was `source: 'manual'` in the variable schema and read from
+  `NEXT_PUBLIC_PRIVACY_POLICY_URL` — by the gate in `apps/client` and by the
+  publish page in `apps/web`, which are separate Vercel projects. Publishing one
+  document meant setting one string twice and redeploying both, because Next.js
+  fixes `NEXT_PUBLIC_` values at build time.
+- **The failure mode was indistinguishable from a bug.** A complete profile plus
+  an unset variable still blocked the gate, and `/compliance` named a key with no
+  field on the form under it. Setting it on Minute and then reading `/compliance`
+  say it was unset is what actually happened; `20260916000000`'s notes record it.
+- **The reasoning that kept it out was true and not load-bearing.** The page it
+  points at is a commitment that a page exists rather than a fact about the
+  company. So is an ABN a commitment that the entity is registered, and a person
+  verifies both before the statement goes active either way. What the variable
+  bought was a value `/compliance` could not fix.
+- **Nullable and unseeded**, like the rest of the table — a placeholder URL would
+  ship inside a document subscribers acknowledge. No backfill is possible from
+  SQL, so wherever the variable is already set the column starts empty and the
+  gate stays closed until the value is typed into `/compliance`. Afterwards the
+  variable can be deleted from both Vercel projects.
+- **No policy change.** `company_profile_client_read` is a table policy with no
+  column list, so a subscriber can read the new column without one.
+
+---
+
 ## 2026-09-16 — Consolidate company identity onto `company_profile`
 
 `20260916000000_consolidate_company_identity.sql` gives the company's legal

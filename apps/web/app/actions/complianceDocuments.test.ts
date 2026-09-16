@@ -36,7 +36,6 @@ beforeEach(() => {
   supabase.__setResponse('company_profile', { data: FILLED, error: null });
   authed = true;
   revalidatePath.mockClear();
-  process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] = 'https://example.test/privacy';
 });
 
 describe('saveCompanyProfile', () => {
@@ -119,8 +118,14 @@ describe('activateComplianceDocument', () => {
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it('refuses when the privacy URL is unset, which no profile form would show', async () => {
-    delete process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'];
+  it('refuses when the privacy URL is unset, which is now a profile field like any other', async () => {
+    // It was read from NEXT_PUBLIC_PRIVACY_POLICY_URL until 20260916010000, so
+    // this case used to be the one no profile form could show. It is a column
+    // now, and the refusal has to survive the move.
+    supabase.__setResponse('company_profile', {
+      data: { ...FILLED, privacy_policy_url: null },
+      error: null,
+    });
 
     const result = await activateComplianceDocument('doc-1');
 

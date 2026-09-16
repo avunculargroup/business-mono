@@ -1424,6 +1424,7 @@ export type Database = {
           created_at: string
           id: boolean
           legal_name: string
+          privacy_policy_url: string | null
           public_email: string | null
           public_phone: string | null
           public_website: string | null
@@ -1442,6 +1443,7 @@ export type Database = {
           created_at?: string
           id?: boolean
           legal_name: string
+          privacy_policy_url?: string | null
           public_email?: string | null
           public_phone?: string | null
           public_website?: string | null
@@ -1460,6 +1462,7 @@ export type Database = {
           created_at?: string
           id?: boolean
           legal_name?: string
+          privacy_policy_url?: string | null
           public_email?: string | null
           public_phone?: string | null
           public_website?: string | null

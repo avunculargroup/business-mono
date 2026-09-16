@@ -19,15 +19,22 @@ const LABELS: Record<ProfileField, string> = {
   complaints_contact: 'Complaints contact',
   complaints_email: 'Complaints email',
   complaints_phone: 'Complaints phone',
+  privacy_policy_url: 'Privacy policy URL',
 };
 
 /**
  * The `company_profile` singleton, as a form.
  *
- * Thirteen fields, and the Service Statement uses all thirteen — so this is
+ * Fourteen fields, and the Service Statement uses all fourteen — so this is
  * not settings, it is the gate's prerequisite. A single blank field here means
  * every subscriber sees "the Service Statement is not available" instead of the
  * document.
+ *
+ * The privacy policy URL is the one field asserting something outside the
+ * database: it is a commitment that the page it points at exists. That is why
+ * it was an environment variable until 20260916010000, and why being an
+ * environment variable helped nobody — the value still had to be typed by a
+ * person, twice, on two Vercel projects, with a redeploy each.
  */
 export function CompanyProfileForm({
   initial,

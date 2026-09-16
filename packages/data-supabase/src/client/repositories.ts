@@ -888,7 +888,7 @@ export function createClientComplianceRepository(
       const { data } = await adapter.client
         .from('company_profile')
         .select(
-          'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone',
+          'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone, privacy_policy_url',
         )
         .maybeSingle();
 

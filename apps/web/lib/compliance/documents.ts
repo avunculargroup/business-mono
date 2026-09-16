@@ -30,6 +30,7 @@ export const PROFILE_FIELDS = [
   'complaints_contact',
   'complaints_email',
   'complaints_phone',
+  'privacy_policy_url',
 ] as const;
 
 export type ProfileField = (typeof PROFILE_FIELDS)[number];
@@ -49,8 +50,7 @@ export interface DocumentReadiness {
    * Placeholder keys with no value, sorted.
    *
    * Named rather than counted: "fill in three more" sends someone hunting, and
-   * `bts_privacy_policy_url` in particular is not a profile field at all, so a
-   * count would have them staring at a complete-looking form.
+   * every key now names a field on the profile form.
    */
   missing: string[];
   /** The resolved body, or empty when `ready` is false. Never half-substituted. */
@@ -66,22 +66,20 @@ export interface DocumentInput {
 /**
  * Resolve a document against the profile, and say what is missing.
  *
- * `privacyPolicyUrl` comes from an environment variable rather than the
- * profile, which is the trap this function exists to surface: a complete
- * profile plus an unset `NEXT_PUBLIC_PRIVACY_POLICY_URL` still blocks the gate,
- * and nothing on a profile form would tell you that.
+ * Every placeholder resolves from `company_profile`, including the privacy
+ * policy URL — which was read from `NEXT_PUBLIC_PRIVACY_POLICY_URL` until
+ * migration 20260916010000 gave it a column. A complete profile is now
+ * sufficient, so everything this reports is fixable on the profile form.
  */
 export function documentReadiness(
   document: DocumentInput,
   profile: ProfileValues | null,
-  privacyPolicyUrl: string | null,
   today: string,
 ): DocumentReadiness {
   const { body, missing } = resolveDocument(document.body, {
     profile: profile ?? {},
     version: document.version,
     date: document.effectiveFrom ?? today,
-    manual: { bts_privacy_policy_url: privacyPolicyUrl ?? '' },
   });
 
   return { ready: missing.length === 0, missing, body };

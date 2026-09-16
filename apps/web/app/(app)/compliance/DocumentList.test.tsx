@@ -38,30 +38,20 @@ describe('DocumentList', () => {
     );
   });
 
-  it('says where the privacy policy URL comes from when it is the blocker', () => {
-    // The whole point of the extra line: the value is an environment variable
-    // of this app, is usually already set on Minute's separate Vercel project,
-    // and is baked in at build time — so "it is set in prod" and "this page
-    // says it is not" are both true, and nothing else on the page says why.
+  it('names the privacy policy URL like any other blocker', () => {
+    // It used to carry an extra line saying it came from
+    // NEXT_PUBLIC_PRIVACY_POLICY_URL rather than from the profile form. It is a
+    // column as of 20260916010000, so the plain list is now the whole truth.
     render(<DocumentList documents={[doc({ missing: ['bts_privacy_policy_url'] })]} />);
 
-    expect(screen.getByText(/NEXT_PUBLIC_PRIVACY_POLICY_URL/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/not a field on the profile form below/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/redeploy this app/)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Cannot go live: bts_privacy_policy_url has no value',
+    );
   });
 
-  it('leaves the privacy policy note out when something else is missing', () => {
-    render(<DocumentList documents={[doc({ missing: ['bts_abn'] })]} />);
-
-    expect(screen.queryByText(/NEXT_PUBLIC_PRIVACY_POLICY_URL/)).not.toBeInTheDocument();
-  });
-
-  it('leaves it out on a document that resolves', () => {
+  it('says nothing at all on a document that resolves', () => {
     render(<DocumentList documents={[doc({ ready: true, missing: [], body: 'ABN 123.' })]} />);
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.queryByText(/NEXT_PUBLIC_PRIVACY_POLICY_URL/)).not.toBeInTheDocument();
   });
 });

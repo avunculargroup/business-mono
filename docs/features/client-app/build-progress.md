@@ -11,7 +11,7 @@ Statement the gate had been waiting on) — see
 [What 0.5.0 added](#what-050-added-the-statement). Sessions 1–3 are built. Every migration is
 **written and not applied** — see [Applying the migrations](#applying-the-migrations). Three of
 the bundle's twelve assumptions were wrong, one of them by an order of magnitude.
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-16
 
 ---
 
@@ -907,8 +907,9 @@ that is already asserted.
   slash, under Authentication → URL Configuration. Nothing in this repository can do it: the
   migrate workflow runs `supabase db push`, and `supabase/config.toml` configures
   `supabase start` only — it now registers the loopback callbacks so local dev works, which is
-  the most the repo can reach. Like the privacy URL above, this is the shape of problem that
-  costs a day: every artefact in the diff is correct and the feature is still broken.
+  the most the repo can reach. Like the privacy URL was until `20260916010000`, this is the
+  shape of problem that costs a day: every artefact in the diff is correct and the feature is
+  still broken. That one was fixable by moving the value into the database. This one is not.
 
 - **`company_profile` is eight fields short.** It was thirteen. Migration
   `20260916000000_consolidate_company_identity.sql` copied the five that already existed as
@@ -917,14 +918,15 @@ that is already asserted.
   eight (registered address, state and postcode, public phone and email, and the three
   complaints fields) existed nowhere in the schema and are still blank; the gate fails closed
   until they are filled, on the `/compliance` form, which marks each blank field the Service
-  Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**, which is not a profile
-  field and is the one that catches people: a complete profile plus an unset environment
-  variable still blocks the gate. It caught someone. It is read by **both** apps — the gate in
-  `apps/client` and the publish page in `apps/web` — which are separate Vercel projects, and
-  only the client's README documented it, so the natural move is to set it on Minute and then
-  read `/compliance` in `apps/web` insisting it is unset. Both projects, same value, and a
-  redeploy each, because Next.js fixes `NEXT_PUBLIC_` values at build time. `/compliance` now
-  says all of that on the blocked document rather than naming the placeholder and stopping.
+  Statement actually uses. **Nine now**, and the ninth is the one that caught someone:
+  `bts_privacy_policy_url` was `NEXT_PUBLIC_PRIVACY_POLICY_URL`, read by **both** apps — the
+  gate in `apps/client` and the publish page in `apps/web` — on separate Vercel projects, so a
+  complete profile plus an unset variable still blocked the gate, and the natural move was to
+  set it on Minute and then read `/compliance` in `apps/web` insisting it was unset. Migration
+  `20260916010000` made it `company_profile.privacy_policy_url`, a field on the same form as
+  the other thirteen. Nothing reads the variable now; delete it wherever it is still set. Note
+  that no SQL can backfill it, so a project that already had the variable starts with an empty
+  column — the value has to be typed in once.
 - **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
   twenty-four is drafted in
   [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)
