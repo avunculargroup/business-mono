@@ -41,13 +41,17 @@ describe('countWords', () => {
 });
 
 describe('resolvePlaceholders', () => {
-  const vars = { abn: '12 345 678 901', website: 'bts.example', legal_name: 'BTS Pty Ltd' };
+  const vars = {
+    abn: '12 345 678 901',
+    public_website: 'bts.example',
+    legal_name: 'BTS Pty Ltd',
+  };
 
   it('resolves known keys', () => {
     expect(resolvePlaceholders('ABN {{abn}}', vars)).toBe('ABN 12 345 678 901');
   });
   it('supports spec aliases', () => {
-    expect(resolvePlaceholders('{{bts_abn}} / {{public_website}}', vars)).toBe(
+    expect(resolvePlaceholders('{{bts_abn}} / {{website}}', vars)).toBe(
       '12 345 678 901 / bts.example',
     );
   });
@@ -71,7 +75,14 @@ describe('assembleNewsletter', () => {
       intro: 'Welcome.',
       outro: 'Until next time.',
       stories: [story('a', 10), story('b', 10)],
-      company: { trading_name: 'BTS', abn: '123', website: 'bts.example', tagline: 'Sound money.' },
+      // trading_name, abn and public_website come from company_profile; tagline
+      // is still a company_records value. fetchCompanyVars merges the two.
+      company: {
+        trading_name: 'BTS',
+        abn: '123',
+        public_website: 'bts.example',
+        tagline: 'Sound money.',
+      },
     });
     expect(md).toContain('# BTS Newsletter — May 2026');
     expect(md).toContain('## From the team');

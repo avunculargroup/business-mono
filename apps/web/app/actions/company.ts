@@ -11,6 +11,10 @@ import type {
   SubscriptionPaymentType,
 } from '@platform/shared';
 import { humanizeError } from '@/lib/errors';
+import type { ProfileField } from '@/lib/compliance/documents';
+
+/** The `company_profile` columns, as the compliance module already names them. */
+export type CompanyProfileValues = Partial<Record<ProfileField, string | null>>;
 
 const BUCKET = 'company-assets';
 
@@ -405,4 +409,29 @@ export async function deleteSubscription(
   if (error) return { error: humanizeError(error) };
   revalidatePath('/company');
   return { success: true };
+}
+
+// ──────────────────────────────────────────────────────────
+// Legal identity
+// ──────────────────────────────────────────────────────────
+
+/**
+ * The `company_profile` singleton, for the read-only panel on `/company`.
+ *
+ * Read here, written at `/compliance`. That split is deliberate: the Service
+ * Statement will not render with a single field missing, so the form belongs
+ * next to the document it blocks. But "what is our ABN" should still be
+ * answerable from the page called Company, which is where these five values
+ * lived as `company_records` rows until migration `20260916000000` moved them.
+ */
+export async function getCompanyProfile(): Promise<CompanyProfileValues | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('company_profile')
+    .select(
+      'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone',
+    )
+    .maybeSingle();
+  if (error) throw new Error(humanizeError(error));
+  return (data ?? null) as CompanyProfileValues | null;
 }

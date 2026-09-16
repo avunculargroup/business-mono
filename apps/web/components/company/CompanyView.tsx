@@ -100,7 +100,7 @@ export function CompanyView({ records, recordTypes: initialTypes, signedUrls, in
         <EmptyState
           icon={Building2}
           title="No company records yet"
-          description="Add legal details, brand assets, mission, and other company reference data."
+          description="Add brand assets, mission, values, and other company reference data. Legal identity is edited on Compliance."
           actionLabel="Add first record"
           onAction={() => { setEditRecord(null); setShowForm(true); }}
         />

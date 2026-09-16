@@ -1,11 +1,13 @@
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { CompanyView } from '@/components/company/CompanyView';
-import { getCompanyRecords, getCompanyRecordTypes, getCompanyAssetUrl, getDomains, getSubscriptions } from '@/app/actions/company';
+import { LegalIdentitySection } from '@/components/company/LegalIdentitySection';
+import { getCompanyRecords, getCompanyRecordTypes, getCompanyAssetUrl, getCompanyProfile, getDomains, getSubscriptions } from '@/app/actions/company';
 
 export default async function CompanyPage() {
-  const [records, recordTypes, domains, subscriptions] = await Promise.all([
+  const [records, recordTypes, profile, domains, subscriptions] = await Promise.all([
     getCompanyRecords(),
     getCompanyRecordTypes(),
+    getCompanyProfile(),
     getDomains(),
     getSubscriptions(),
   ]);
@@ -23,6 +25,7 @@ export default async function CompanyPage() {
   return (
     <>
       <PageHeader title="Company" />
+      <LegalIdentitySection profile={profile} />
       <CompanyView
         records={records}
         recordTypes={recordTypes}

@@ -2,9 +2,10 @@ import type { ReviewedStory } from './schemas.js';
 
 // Deterministic newsletter assembly. Pure + side-effect free so the template,
 // placeholder resolution, and word-count flagging are unit-testable. Company
-// details ({{abn}}, {{website}}, etc.) are resolved from a map sourced from the
-// existing company_records table (keys: legal_name, trading_name, abn, website,
-// tagline, ...).
+// details ({{abn}}, {{public_website}}, etc.) are resolved from a map keyed by
+// company_profile's own column names (legal_name, trading_name, abn,
+// public_website), merged with whatever free-form keys company_records still
+// carries (tagline, ...). See lib/companyProfile.ts.
 
 export type CompanyVars = Record<string, string>;
 
@@ -18,12 +19,12 @@ export function countWords(text: string): number {
 /**
  * Replace {{key}} placeholders from the supplied vars. Unknown placeholders are
  * removed (resolved to empty string) so no raw {{...}} leaks into the output.
- * Supports a few spec aliases ({{bts_abn}} → abn, {{public_website}} → website).
+ * Supports a few spec aliases ({{bts_abn}} → abn, {{website}} → public_website).
  */
 export function resolvePlaceholders(template: string, vars: CompanyVars): string {
   const aliases: Record<string, string> = {
     bts_abn: 'abn',
-    public_website: 'website',
+    website: 'public_website',
   };
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, rawKey: string) => {
     const key = aliases[rawKey] ?? rawKey;
@@ -68,7 +69,7 @@ export function assembleNewsletter(args: AssembleArgs): string {
     ? `*${company['tagline']}*\n`
     : `*${name} helps Australian corporates navigate bitcoin treasury strategy.*\n`;
   const abn = company['abn'] ? `ABN ${company['abn']}` : '';
-  const website = company['website'] ?? '';
+  const website = company['public_website'] ?? '';
   const footerMeta = [abn, website].filter(Boolean).join(' | ');
 
   return [

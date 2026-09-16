@@ -18,6 +18,7 @@ import {
 import { coerceToSchema } from './coerce.js';
 import { assembleNewsletter, countWords, overLengthStoryIds, type CompanyVars } from './assembly.js';
 import { buildGate1Message, buildGate2Message, buildNoStoriesMessage, editionLabel } from './messages.js';
+import { loadCompanyIdentity } from '../../lib/companyProfile.js';
 import { setWorkflowProgress, clearWorkflowProgress } from '../../lib/workflowProgress.js';
 import {
   newsletterInputSchema,
@@ -61,13 +62,27 @@ async function fetchBrandTone(): Promise<string> {
   return (data?.content as string | undefined) ?? '';
 }
 
+/**
+ * Placeholder values for the newsletter footer, from two sources.
+ *
+ * `company_profile` holds the legal identity — trading name, ABN, website —
+ * under its own column names, and is the only home for it since migration
+ * `20260916000000`. `company_records` still holds the free-form reference
+ * material the footer also reads (`tagline`). The profile is merged last so
+ * that a record type colliding with one of its columns loses.
+ */
 async function fetchCompanyVars(): Promise<CompanyVars> {
-  const { data } = await supabase
-    .from('company_records')
-    .select('type_key, value');
+  const [records, profile] = await Promise.all([
+    supabase.from('company_records').select('type_key, value'),
+    loadCompanyIdentity(),
+  ]);
+
   const vars: CompanyVars = {};
-  for (const row of (data ?? []) as Array<{ type_key: string; value: string | null }>) {
+  for (const row of (records.data ?? []) as Array<{ type_key: string; value: string | null }>) {
     if (row.value) vars[row.type_key] = row.value;
+  }
+  for (const [key, value] of Object.entries(profile ?? {})) {
+    if (value) vars[key] = value;
   }
   return vars;
 }

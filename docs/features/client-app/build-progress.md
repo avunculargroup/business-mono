@@ -910,11 +910,16 @@ that is already asserted.
   the most the repo can reach. Like the privacy URL above, this is the shape of problem that
   costs a day: every artefact in the diff is correct and the feature is still broken.
 
-- **`company_profile` is empty.** Thirteen fields, none of them inventable — the gate fails
-  closed until they are filled. There is now a form for them on `/compliance`, which marks each
-  blank field the Service Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**,
-  which is not a profile field and is the one that catches people: a complete profile plus an
-  unset environment variable still blocks the gate.
+- **`company_profile` is eight fields short.** It was thirteen. Migration
+  `20260916000000_consolidate_company_identity.sql` copied the five that already existed as
+  `company_records` rows — legal name, trading name, ABN, ACN, website — and retired those
+  record types, so the company's legal identity now has one home rather than two. The other
+  eight (registered address, state and postcode, public phone and email, and the three
+  complaints fields) existed nowhere in the schema and are still blank; the gate fails closed
+  until they are filled, on the `/compliance` form, which marks each blank field the Service
+  Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**, which is not a profile
+  field and is the one that catches people: a complete profile plus an unset environment
+  variable still blocks the gate.
 - **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
   twenty-four is drafted in
   [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)
