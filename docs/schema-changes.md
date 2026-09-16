@@ -6,6 +6,49 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-16 — Consolidate company identity onto `company_profile`
+
+`20260916000000_consolidate_company_identity.sql` gives the company's legal
+identity one home. It had two.
+
+- **The overlap was five fields.** `20260424000000` seeded `company_record_types`
+  with built-in `legal_name`, `trading_name`, `abn`, `acn` and `website`, and
+  they were filled in. `20260911010000` then created `company_profile` as a typed
+  singleton for the Service Statement and the `/prepare` front matter, with the
+  same five values among its thirteen columns — and nobody filled it in, because
+  doing so meant typing them a second time.
+- **Three consumers, two tables.** The newsletter footer and the news digest
+  email read `company_records`; the Minute gate, the `/prepare` front matter and
+  `/compliance` read `company_profile`. They had not yet disagreed only because
+  the second copy was empty. `assembly.ts` already carried an alias map
+  (`bts_abn` → `abn`, `public_website` → `website`) reconciling the two naming
+  schemes.
+- **`company_profile` won on RLS, not on taste.** A subscriber must read legal
+  identity to render the Service Statement, and `company_profile` already carries
+  `company_profile_client_read`. `company_records` is team-only and its types are
+  user-extensible from `/company`, so opening it to subscribers would mean an
+  allowlist policy on `type_key` that the next custom record type silently
+  escapes. It is also EAV, which collapses "the field is blank" and "the type
+  does not exist" into one answer — the distinction `resolveDocument` exists to
+  draw.
+- **The record types go, not just the rows.** Leaving them would let someone add
+  a second `legal_name` from `/company` tomorrow, and `deleteCompanyRecordType`
+  refuses to remove a built-in, so the UI could not undo it. `tagline`, `logo`,
+  `mission`, `vision`, `values`, `about` and `cert_incorp` are untouched —
+  free-form reference material with no fixed schema and no subscriber reading it
+  is what `company_records` is good at.
+- **Both cleanup statements are guarded on the copy having succeeded.**
+  `legal_name` and `trading_name` are NOT NULL, so a profile row can only be built
+  when both exist. Where they do not, the INSERT is a no-op and the DELETEs are
+  skipped in turn rather than deleting originals that were never copied.
+- **This seeds a real ABN, and `20260911010000` said nothing in it would be
+  seeded.** That rule was about not inventing a placeholder that ships to whoever
+  reads an export. Every value here is copied from a row a founder typed.
+
+The eight remaining profile fields — registered address, state and postcode,
+public phone and email, and the three complaints fields — existed nowhere in the
+schema and are still blank. Nothing can copy them.
+
 ## 2026-09-04 — Corporate holdings register
 
 `20260904000000_add_corporate_holdings.sql` adds the fourteen tables, one

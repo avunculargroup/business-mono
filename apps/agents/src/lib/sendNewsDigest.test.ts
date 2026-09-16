@@ -42,11 +42,13 @@ function resetTableData() {
       { id: 'u1', full_name: 'Chris Pollard' },
       { id: 'u2', full_name: 'Carolyn Crawford' },
     ],
-    company_records: [
-      { type_key: 'trading_name', value: 'Bitcoin Treasury Solutions' },
-      { type_key: 'abn', value: '82683088173' },
-      { type_key: 'website', value: 'https://www.bitcointreasurysolutions.com.au' },
-    ],
+    // The legal identity singleton — .maybeSingle() resolves to this row.
+    company_profile: {
+      legal_name: 'Avuncular Group Pty Ltd',
+      trading_name: 'Bitcoin Treasury Solutions',
+      abn: '82683088173',
+      public_website: 'https://www.bitcointreasurysolutions.com.au',
+    },
   };
 }
 

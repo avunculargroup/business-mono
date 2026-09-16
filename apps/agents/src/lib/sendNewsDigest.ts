@@ -20,6 +20,7 @@ import { supabase } from '@platform/db';
 import type { RoutineResult } from '@platform/shared';
 import { FastmailJmapClient, type JmapAddress } from './fastmailJmap.js';
 import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js';
+import { loadCompanyIdentity } from './companyProfile.js';
 import { createLogger } from './logger.js';
 
 const teamEmailLog = createLogger('team-email');
@@ -198,17 +199,14 @@ async function loadRecipients(): Promise<JmapAddress[]> {
   return recipients;
 }
 
-/** Footer details, sourced from company_records (same keys the newsletter uses). */
+/** Footer details, sourced from the company_profile singleton. */
 export async function loadCompanyFooter(): Promise<CompanyFooter> {
-  const { data } = await supabase.from('company_records').select('type_key, value');
-  const vars: Record<string, string> = {};
-  for (const row of (data ?? []) as Array<{ type_key: string; value: string | null }>) {
-    if (row.value) vars[row.type_key] = row.value;
-  }
+  const profile = await loadCompanyIdentity();
+
   return {
-    name: vars['trading_name'] || vars['legal_name'] || 'Bitcoin Treasury Solutions',
-    website: vars['website'],
-    abn: vars['abn'],
+    name: profile?.trading_name || profile?.legal_name || 'Bitcoin Treasury Solutions',
+    website: profile?.public_website ?? undefined,
+    abn: profile?.abn ?? undefined,
   };
 }
 
