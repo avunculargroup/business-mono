@@ -105,7 +105,7 @@ export default async function CompliancePage() {
     supabase
       .from('company_profile')
       .select(
-        'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone',
+        'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone, privacy_policy_url',
       )
       .maybeSingle(),
   ]);
@@ -191,7 +191,6 @@ export default async function CompliancePage() {
   // subscriber would actually get rather than what the body says before
   // substitution.
   const today = new Date().toISOString().slice(0, 10);
-  const privacyPolicyUrl = process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] ?? '';
 
   const documentRows: DocumentRow[] = ((documents.data ?? []) as Array<{
     id: string;
@@ -206,7 +205,6 @@ export default async function CompliancePage() {
       const readiness = documentReadiness(
         { body: row.body, version: row.version, effectiveFrom: row.effective_from },
         profile,
-        privacyPolicyUrl,
         today,
       );
 

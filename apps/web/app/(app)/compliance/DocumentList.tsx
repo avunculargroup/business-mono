@@ -35,18 +35,6 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 /**
- * The one placeholder that is not a `company_profile` field.
- *
- * It comes from `NEXT_PUBLIC_PRIVACY_POLICY_URL` in *this* app's environment,
- * and naming it in the same breath as `bts_abn` sends someone to the profile
- * form below to look for a field that is not there. Worse, the variable is also
- * read by Minute, so it is usually already set — on the other Vercel project —
- * and the honest answer to "but it is set" is "not here, and not until a
- * redeploy".
- */
-const PRIVACY_POLICY_KEY = 'bts_privacy_policy_url';
-
-/**
  * Compliance documents, by version, with what each one is blocked on.
  *
  * The preview is the point. The Service Statement gates every route in Minute,
@@ -114,16 +102,6 @@ export function DocumentList({ documents }: { documents: DocumentRow[] }) {
                 Cannot go live: {doc.missing.join(', ')}{' '}
                 {doc.missing.length === 1 ? 'has' : 'have'} no value. A subscriber would see
                 &ldquo;not available&rdquo; instead of the document.
-              </p>
-            )}
-
-            {!doc.ready && doc.missing.includes(PRIVACY_POLICY_KEY) && (
-              <p className={styles.blockedDetail}>
-                {PRIVACY_POLICY_KEY} is not a field on the profile form below. It reads{' '}
-                <code>NEXT_PUBLIC_PRIVACY_POLICY_URL</code> from this app&rsquo;s environment, so
-                setting it on the Minute project does not reach here. It is also a{' '}
-                <code>NEXT_PUBLIC_</code> variable, which Next.js fixes at build time: after
-                setting it, redeploy this app before expecting this line to clear.
               </p>
             )}
 

@@ -20,6 +20,7 @@ const PROFILE = {
   complaints_contact: 'The Directors',
   complaints_email: 'complaints@example.test',
   complaints_phone: '+61 3 0000 0001',
+  privacy_policy_url: 'https://example.test/privacy',
 };
 
 function variables(overrides: Partial<DocumentVariables> = {}): DocumentVariables {
@@ -27,7 +28,6 @@ function variables(overrides: Partial<DocumentVariables> = {}): DocumentVariable
     profile: PROFILE,
     version: '1.0',
     date: '2026-09-11',
-    manual: { bts_privacy_policy_url: 'https://example.test/privacy' },
     ...overrides,
   };
 }
@@ -48,7 +48,7 @@ describe('resolveDocument', () => {
     expect(body).toBe('Version 1.0 · 2026-09-11');
   });
 
-  it('substitutes a manual value', () => {
+  it('substitutes the privacy policy URL, which is a profile field like any other', () => {
     const { body } = resolveDocument('See {{bts_privacy_policy_url}}', variables());
 
     expect(body).toBe('See https://example.test/privacy');

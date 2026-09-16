@@ -46,9 +46,6 @@ export default async function DisclosurePage() {
         profile: profile ?? {},
         version: statement.version,
         date: statement.effectiveFrom ?? new Date().toISOString().slice(0, 10),
-        manual: {
-          bts_privacy_policy_url: process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] ?? '',
-        },
       })
     : null;
 

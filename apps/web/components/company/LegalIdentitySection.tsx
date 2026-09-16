@@ -22,7 +22,10 @@ const GROUPS: readonly Group[] = [
     label: 'Registered office',
     fields: ['registered_address', 'registered_state', 'registered_postcode'],
   },
-  { label: 'Public contact', fields: ['public_phone', 'public_email', 'public_website'] },
+  {
+    label: 'Public contact',
+    fields: ['public_phone', 'public_email', 'public_website', 'privacy_policy_url'],
+  },
   {
     label: 'Complaints',
     fields: ['complaints_contact', 'complaints_email', 'complaints_phone'],
@@ -43,6 +46,7 @@ const LABELS: Record<ProfileField, string> = {
   complaints_contact: 'Contact',
   complaints_email: 'Email',
   complaints_phone: 'Phone',
+  privacy_policy_url: 'Privacy policy',
 };
 
 const NUMERIC: readonly ProfileField[] = ['abn', 'acn', 'registered_postcode'];

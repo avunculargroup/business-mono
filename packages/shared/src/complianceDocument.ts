@@ -2,7 +2,7 @@
  * Variable substitution for compliance documents.
  *
  * The Service Statement is stored in `compliance_documents.body` with
- * `{{variable}}` placeholders, and its variable schema sources them from
+ * `{{variable}}` placeholders, and its variable schema sources them all from
  * `company_profile` plus the document's own version and date. This resolves
  * them at render.
  *
@@ -22,7 +22,7 @@
  */
 
 /** Where a variable's value comes from. Mirrors the variable schema's `source`. */
-export type VariableSource = 'company_profile' | 'computed' | 'manual';
+export type VariableSource = 'company_profile' | 'computed';
 
 export interface DocumentVariables {
   /** Whatever `company_profile` holds, by the schema's `source_field` names. */
@@ -31,15 +31,6 @@ export interface DocumentVariables {
   version: string;
   /** Rendered as the statement date. ISO date, not a timestamp. */
   date: string;
-  /**
-   * Values with no home in `company_profile`.
-   *
-   * Only the privacy policy URL today. It is `source: 'manual'` in the schema
-   * because the page it points at is not a fact about the company, it is a
-   * commitment about a page existing — and the schema note says to verify that
-   * before the document goes active.
-   */
-  manual?: Record<string, string | null | undefined>;
 }
 
 export interface ResolvedDocument {
@@ -78,6 +69,12 @@ const COMPANY_PROFILE_FIELDS: Readonly<Record<string, string>> = Object.freeze({
   complaints_contact: 'complaints_contact',
   complaints_email: 'complaints_email',
   complaints_phone: 'complaints_phone',
+  // Not a fact about the company but a commitment that a page exists, which is
+  // why it lived in an environment variable until 20260916010000. It is
+  // verified by a person before the document goes active either way, and a
+  // second storage mechanism meant setting the same string on two Vercel
+  // projects to publish one document.
+  bts_privacy_policy_url: 'privacy_policy_url',
 });
 
 /** Keys the document computes rather than reads. */
@@ -87,7 +84,6 @@ const COMPUTED_KEYS = ['statement_version', 'statement_date'] as const;
 export const DOCUMENT_VARIABLE_KEYS: readonly string[] = Object.freeze([
   ...Object.keys(COMPANY_PROFILE_FIELDS),
   ...COMPUTED_KEYS,
-  'bts_privacy_policy_url',
 ]);
 
 function valueFor(key: string, variables: DocumentVariables): string | null {
@@ -95,15 +91,12 @@ function valueFor(key: string, variables: DocumentVariables): string | null {
   if (key === 'statement_date') return variables.date || null;
 
   const field = COMPANY_PROFILE_FIELDS[key];
-  if (field) {
-    const value = variables.profile[field];
-    // An empty string is as missing as a null. A document rendering
-    // "ABN " with nothing after it is not a finished document.
-    return value && value.trim() !== '' ? value : null;
-  }
+  if (!field) return null;
 
-  const manual = variables.manual?.[key];
-  return manual && manual.trim() !== '' ? manual : null;
+  const value = variables.profile[field];
+  // An empty string is as missing as a null. A document rendering
+  // "ABN " with nothing after it is not a finished document.
+  return value && value.trim() !== '' ? value : null;
 }
 
 /**

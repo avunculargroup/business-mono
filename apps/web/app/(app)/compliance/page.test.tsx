@@ -143,7 +143,6 @@ beforeEach(() => {
   supabase.__setResponse('client_library_sections', { data: [], error: null });
   supabase.__setResponse('prepare_generations', { data: [], error: null });
   supabase.__setResponse('company_profile', { data: null, error: null });
-  process.env['NEXT_PUBLIC_PRIVACY_POLICY_URL'] = 'https://example.test/privacy';
 });
 
 describe('CompliancePage', () => {

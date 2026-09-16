@@ -18,28 +18,28 @@ function doc(overrides: Partial<Parameters<typeof documentReadiness>[0]> = {}) {
 }
 
 describe('documentReadiness', () => {
-  it('is ready when the profile and the privacy URL are both filled', () => {
-    const result = documentReadiness(doc(), FULL, 'https://example.test/privacy', '2026-09-12');
+  it('is ready when the profile is filled', () => {
+    const result = documentReadiness(doc(), FULL, '2026-09-12');
 
     expect(result.ready).toBe(true);
     expect(result.missing).toEqual([]);
     expect(result.body).not.toContain('{{');
   });
 
-  it('names an unset privacy URL, which is not a profile field at all', () => {
-    // The trap this function exists for: a complete profile still blocks the
-    // gate if NEXT_PUBLIC_PRIVACY_POLICY_URL is unset, and nothing on a profile
-    // form would say so.
-    const result = documentReadiness(doc(), FULL, null, '2026-09-12');
+  it('names an unset privacy URL like any other blank profile field', () => {
+    // It was read from NEXT_PUBLIC_PRIVACY_POLICY_URL until 20260916010000, so
+    // a complete profile could still block the gate with nothing on the form to
+    // say why. It is a column now, and this is the case that says so.
+    const result = documentReadiness(doc(), { ...FULL, privacy_policy_url: null }, '2026-09-12');
 
     expect(result.ready).toBe(false);
     expect(result.missing).toEqual(['bts_privacy_policy_url']);
   });
 
   it('treats an empty-string privacy URL as unset', () => {
-    // process.env['X'] ?? '' is what the client app does, so '' is the shape an
-    // unset variable actually arrives in.
-    const result = documentReadiness(doc(), FULL, '', '2026-09-12');
+    // A cleared input posts '' rather than null, so '' is a shape the column
+    // actually holds.
+    const result = documentReadiness(doc(), { ...FULL, privacy_policy_url: '' }, '2026-09-12');
 
     expect(result.missing).toEqual(['bts_privacy_policy_url']);
   });
@@ -47,7 +47,7 @@ describe('documentReadiness', () => {
   it('returns no body at all when anything is missing', () => {
     // Never half-substituted. A body with "ABN {{bts_abn}}" in it looks
     // finished and is not.
-    const result = documentReadiness(doc(), null, 'https://example.test', '2026-09-12');
+    const result = documentReadiness(doc(), null, '2026-09-12');
 
     expect(result.body).toBe('');
     expect(result.missing.length).toBeGreaterThan(0);
@@ -57,7 +57,6 @@ describe('documentReadiness', () => {
     const result = documentReadiness(
       doc(),
       { ...FULL, abn: null, legal_name: '  ' },
-      'https://example.test',
       '2026-09-12',
     );
 
@@ -65,19 +64,14 @@ describe('documentReadiness', () => {
   });
 
   it('dates the document from effective_from when it has one', () => {
-    const result = documentReadiness(
-      doc({ effectiveFrom: '2026-01-01' }),
-      FULL,
-      'https://example.test',
-      '2026-09-12',
-    );
+    const result = documentReadiness(doc({ effectiveFrom: '2026-01-01' }), FULL, '2026-09-12');
 
     expect(result.body).toContain('2026-01-01');
     expect(result.body).not.toContain('2026-09-12');
   });
 
   it('falls back to today when it has no effective date yet', () => {
-    const result = documentReadiness(doc(), FULL, 'https://example.test', '2026-09-12');
+    const result = documentReadiness(doc(), FULL, '2026-09-12');
 
     expect(result.body).toContain('2026-09-12');
   });
@@ -102,7 +96,11 @@ describe('profileFieldsUsedBy', () => {
   });
 
   it('ignores placeholders that are not profile fields', () => {
-    expect(profileFieldsUsedBy('{{statement_version}} {{bts_privacy_policy_url}}')).toEqual([]);
+    expect(profileFieldsUsedBy('{{statement_version}} {{statement_date}}')).toEqual([]);
+  });
+
+  it('lists the privacy policy URL, which is a profile field as of 20260916010000', () => {
+    expect(profileFieldsUsedBy('{{bts_privacy_policy_url}}')).toEqual(['privacy_policy_url']);
   });
 });
 

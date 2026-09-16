@@ -187,26 +187,25 @@ pnpm --filter @platform/client test
 pnpm --filter @platform/client typecheck
 ```
 
-Four environment variables, every one of them public — copy
+Three environment variables, every one of them public — copy
 [`.env.example`](./.env.example) to `.env.local`, which carries the reasoning for each:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_PRIVACY_POLICY_URL  # required wherever the gate must open
 NEXT_PUBLIC_SITE_URL            # the magic-link origin; defaults to the deployed one
 ```
 
-The privacy policy URL is the Service Statement's one manual variable, and an unset one is not
-a cosmetic gap: `resolveDocument` counts an empty string as missing and returns no body at all,
-so the gate reports the statement as unavailable and nobody signs in.
+There was a fourth, `NEXT_PUBLIC_PRIVACY_POLICY_URL`, and it is now
+`company_profile.privacy_policy_url` — migration `20260916010000`, filled in from `/compliance`
+in `apps/web`. It was the Service Statement's one variable with no home on that table, so it
+had to be set identically on two separate Vercel projects with a redeploy of each, and setting
+it on one while reading the other's `/compliance` page report it missing is exactly what
+happened. Nothing in this app reads it now; delete it wherever it is still set.
 
-**It has to be set on two projects.** `apps/web` reads the same variable to resolve the
-statement on `/compliance` — the page that publishes it — and the two apps are separate Vercel
-projects, so a value set here is not a value set there. Set only here and `/compliance` reports
-`bts_privacy_policy_url` as having no value while prod plainly has it; set only there and this
-gate stays closed. Same value, both projects, and a redeploy of each: `NEXT_PUBLIC_` values are
-fixed at build time.
+An unfilled profile field is still not a cosmetic gap: `resolveDocument` counts an empty string
+as missing and returns no body at all, so the gate reports the statement as unavailable and
+nobody signs in. The difference is that `/compliance` can now fix every field it names.
 
 The site URL is where **both** magic-link paths send a subscriber back to — sign-in and
 invitation alike, through [`lib/siteUrl.ts`](./lib/siteUrl.ts). Supabase decides a link's

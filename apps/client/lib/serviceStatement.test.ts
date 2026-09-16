@@ -78,6 +78,9 @@ describe('the seeded Service Statement', () => {
         'complaints_contact',
         'complaints_email',
         'complaints_phone',
+        // A column as of 20260916010000, not an environment variable. The
+        // statement resolves from one source now.
+        'privacy_policy_url',
       ].map((field) => [field, 'value']),
     );
 
@@ -85,7 +88,6 @@ describe('the seeded Service Statement', () => {
       profile: filled,
       version: '0.1',
       date: '2026-09-11',
-      manual: { bts_privacy_policy_url: 'https://example.test/privacy' },
     });
 
     expect(missing).toEqual([]);

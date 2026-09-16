@@ -112,9 +112,10 @@
       "label": "Privacy Policy URL",
       "type": "string",
       "required": true,
-      "source": "manual",
+      "source": "company_profile",
+      "source_field": "privacy_policy_url",
       "default": "https://bitcointreasurysolutions.com.au/privacy",
-      "description": "Confirmed in conversation 2026-09-11. Verify the page exists and covers Minute before this document goes active."
+      "description": "Confirmed in conversation 2026-09-11. Was source: manual, read from NEXT_PUBLIC_PRIVACY_POLICY_URL on two Vercel projects; a column on company_profile as of migration 20260916010000. Still the one variable asserting something outside the database — verify the page exists and covers Minute before this document goes active."
     },
     {
       "key": "statement_version",

@@ -360,28 +360,6 @@
 }
 
 /*
- * Where a blocked placeholder's value actually lives, when the answer is not
- * "the form below". Quieter than .blocked on purpose: the warning is the
- * headline, this is the instruction under it.
- */
-.blockedDetail {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  margin: var(--space-2) 0 0;
-  padding: 0 var(--space-3);
-  line-height: 1.55;
-}
-
-.blockedDetail code {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  background: var(--color-surface-subtle);
-  border-radius: var(--radius-sm);
-  padding: 1px 4px;
-}
-
-/*
  * The resolved document, shown as stored. Monospace and pre-wrapped rather
  * than rendered markdown: what matters here is that every {{variable}} has
  * become a value, and rendered prose makes a stray brace easy to miss.
