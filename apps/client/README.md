@@ -201,6 +201,13 @@ The privacy policy URL is the Service Statement's one manual variable, and an un
 a cosmetic gap: `resolveDocument` counts an empty string as missing and returns no body at all,
 so the gate reports the statement as unavailable and nobody signs in.
 
+**It has to be set on two projects.** `apps/web` reads the same variable to resolve the
+statement on `/compliance` — the page that publishes it — and the two apps are separate Vercel
+projects, so a value set here is not a value set there. Set only here and `/compliance` reports
+`bts_privacy_policy_url` as having no value while prod plainly has it; set only there and this
+gate stays closed. Same value, both projects, and a redeploy of each: `NEXT_PUBLIC_` values are
+fixed at build time.
+
 The site URL is where **both** magic-link paths send a subscriber back to — sign-in and
 invitation alike, through [`lib/siteUrl.ts`](./lib/siteUrl.ts). Supabase decides a link's
 destination when it sends the mail, so an omitted `emailRedirectTo` falls back to the project's

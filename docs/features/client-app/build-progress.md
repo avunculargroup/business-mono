@@ -919,7 +919,12 @@ that is already asserted.
   until they are filled, on the `/compliance` form, which marks each blank field the Service
   Statement actually uses. Also **`NEXT_PUBLIC_PRIVACY_POLICY_URL`**, which is not a profile
   field and is the one that catches people: a complete profile plus an unset environment
-  variable still blocks the gate.
+  variable still blocks the gate. It caught someone. It is read by **both** apps — the gate in
+  `apps/client` and the publish page in `apps/web` — which are separate Vercel projects, and
+  only the client's README documented it, so the natural move is to set it on Minute and then
+  read `/compliance` in `apps/web` insisting it is unset. Both projects, same value, and a
+  redeploy each, because Next.js fixes `NEXT_PUBLIC_` values at build time. `/compliance` now
+  says all of that on the blocked document rather than naming the placeholder and stopping.
 - **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
   twenty-four is drafted in
   [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)
