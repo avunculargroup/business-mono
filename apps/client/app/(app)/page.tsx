@@ -98,6 +98,21 @@ function PopulatedBrief({ brief }: { brief: Brief }) {
   );
 }
 
+/**
+ * How a provenance basis reads to a subscriber.
+ *
+ * The contract's three words are precise and none of them explains itself on a
+ * card. "Derived" in particular has to say whose derivation it is: a figure
+ * this platform computed from a provider's series is a different kind of claim
+ * from one the provider published, and the rail is where that distinction is
+ * either made or lost.
+ */
+const BASIS_LABEL: Record<Finding['provenance'][number]['basis'], string> = {
+  reported: 'as published',
+  observed: 'observed',
+  derived: 'computed from this source',
+};
+
 function FindingRow({ finding }: { finding: Finding }) {
   return (
     <li className={styles.finding}>
@@ -105,15 +120,32 @@ function FindingRow({ finding }: { finding: Finding }) {
         {/* The type as a neutral label. Never coloured by direction — a
             threshold crossing is an event, not news. */}
         <span className={styles.type}>{finding.findingType}</span>
-        <h3 className={styles.headline}>{finding.headline}</h3>
-      </div>
-
-      <p className={styles.detail}>{finding.detail}</p>
-
-      <div className={styles.rail}>
-        <span>
+        <span className={styles.asAt}>
           As at <span className="mono">{finding.asAt || 'not stated'}</span>
         </span>
+      </div>
+
+      <h3 className={styles.headline}>
+        {finding.headline || 'This finding was stored without a description'}
+      </h3>
+
+      {finding.detail ? <p className={styles.detail}>{finding.detail}</p> : null}
+
+      {/* The measurement, not a sentence about it. A subscriber paying to be
+          told what changed is owed the figure and the distribution it was
+          judged against; without them the card is an assertion. */}
+      {finding.evidence.length > 0 ? (
+        <dl className={styles.evidence}>
+          {finding.evidence.map((row, index) => (
+            <div key={`${finding.id}-e${index}`} className={styles.evidenceRow}>
+              <dt className={styles.evidenceLabel}>{row.label}</dt>
+              <dd className={styles.evidenceValue}>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      <div className={styles.rail}>
         {finding.provenance.length === 0 ? (
           /* Absence is a fact. A finding with no source says so rather than
              rendering an empty rail that reads as "no rail needed". */
@@ -129,7 +161,7 @@ function FindingRow({ finding }: { finding: Finding }) {
                 source.sourceName
               )}
               {' · '}
-              {source.basis}
+              {BASIS_LABEL[source.basis]}
             </span>
           ))
         )}
@@ -162,8 +194,16 @@ function RecentDays({ briefs, currentId }: { briefs: Brief[]; currentId?: string
                 <span className={styles.quietTag}>Quiet day</span>
               ) : (
                 <span className={styles.recentSummary}>
-                  {brief.findings.length}{' '}
-                  {brief.findings.length === 1 ? 'finding' : 'findings'}
+                  {/* The first finding's own words, not a count. A row reading
+                      "3 findings" tells a subscriber how much they missed
+                      without telling them whether any of it mattered. */}
+                  {brief.findings[0]?.headline || 'Narration only'}
+                  {brief.findings.length > 1 ? (
+                    <span className={styles.recentMore}>
+                      {' '}
+                      and {brief.findings.length - 1} more
+                    </span>
+                  ) : null}
                 </span>
               )}
             </li>

@@ -84,6 +84,7 @@ export type {
   Fact,
   FactBasis,
   Finding,
+  FindingEvidence,
   FindingType,
   IndicatorPoint,
   IndicatorSeries,

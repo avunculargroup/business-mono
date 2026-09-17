@@ -21,8 +21,21 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* The observation date, not the publication date. It sits in the eyebrow row
+   rather than the provenance rail because it qualifies the headline — a reader
+   scanning the card needs to know what day it is a claim about before they
+   read the claim. */
+.asAt {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  /* The words stay in the sans and only the date goes mono, via the global
+     `.mono` utility on the inner span. Setting the family here would put "As
+     at" in the data face too. */
 }
 
 /* The finding type, as a neutral label. No colour carries a direction: a
@@ -40,14 +53,61 @@
 }
 
 .headline {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   font-weight: 600;
+  line-height: var(--leading-normal);
+  margin-bottom: var(--space-2);
 }
 
 .detail {
   color: var(--color-text-secondary);
   line-height: var(--leading-relaxed);
-  margin-bottom: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+/* The evidence strip: label in the sans at caption size, figure in the mono.
+   A definition list rather than a table, because each row is one labelled
+   quantity and a table would promise a comparison across rows that isn't
+   there. Two columns on anything wider than a phone; stacked below that,
+   where a fixed label column would squeeze the figures. */
+.evidence {
+  display: grid;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  /* An inset panel rather than rules above and below. The rail underneath
+     already carries a border, and three horizontal lines on one card is the
+     look the system spends its whitespace avoiding. */
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-md);
+}
+
+.evidenceRow {
+  display: grid;
+  grid-template-columns: minmax(12ch, 22ch) 1fr;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+}
+
+.evidenceLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.evidenceValue {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 600px) {
+  .evidenceRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 .rail {
@@ -96,6 +156,10 @@
   min-width: 24ch;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+}
+
+.recentMore {
+  color: var(--color-text-tertiary);
 }
 
 .quietTag {

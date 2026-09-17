@@ -884,6 +884,74 @@ that is already asserted.
 
 ---
 
+### Session 5 — the Brief said "streak" and nothing else
+
+Session 4 recorded that "only the Brief worked, because `market_reports` is produced by an
+existing routine." The route worked. What it rendered did not, and nothing caught it because
+both sides were tested against their own vocabulary.
+
+`market_reports.findings` is written by the agent-side findings engine, whose shape is `Finding`
+in `@platform/shared`: `metric_key`, `observed`, `baseline`, `narration_hint`, `evidence_refs`.
+The client adapter's `toBrief` read `headline`, `detail` and `provenance`. **Nothing has ever
+written any of the three.** So every live finding reached the page as an empty headline, an
+empty paragraph and "Source not attached" under a type chip — a subscriber saw the word
+"streak" and no other content. The fixture adapter's briefs were authored in the read model's
+own vocabulary, so the page test passed against data no production row could produce; the
+conformance suite asks only whether a quiet day is a column rather than an inference, which it
+was. Two green suites, one unrenderable page.
+
+The translation now lives in `packages/data-supabase/src/client/briefFindings.ts`, on the way
+out rather than at write time, so every brief already published becomes legible — a new column
+would only have fixed the next one. `narration_hint.means` is the headline (the engine already
+writes a plain-language sentence: "Volatility (30d) has held between 46.9 and 51.8 for 10
+consecutive days"), `noise_note` the detail, `observed` and `baseline` the evidence rows, and
+the indicator catalogue behind `metric_key` the provenance.
+
+Four things that reading the computors changed, none of which were obvious from the read model:
+
+- **`observed` is not the series' value.** Each computor picks whatever quantity suits its
+  question: an anomaly measures a period-over-period percentage change against the distribution
+  of those changes, a divergence a trailing correlation, a streak a count of periods held. Only
+  a threshold crossing reports the level. The first draft applied the indicator's own units
+  uniformly, which would have printed an anomaly's `-3.43` as a Mayer Multiple ratio and called
+  a percentage something else. The `SHAPES` table names the space per type. Inflection has three
+  code paths — run length, forecast level, or moving-average spread, by series — so it claims no
+  unit at all, because mirroring the computor's key lists here would put a second copy of the
+  engine's internals in the adapter and the two would disagree the first time either moved.
+- **The invariant that made the evidence strip possible** is that `observed` and the `baseline`
+  percentiles are always in the same space as each other, whatever that space is. So a card can
+  always show the figure against its own band; what it must not do is assume which units those
+  are.
+- **A derived metric carries no provider,** because the schema forbids it one. The Mayer
+  Multiple is a ratio of BTC/USD to its own 200-day average, and the average is derived too, so
+  provenance walks `derivation_spec` to the fetched series underneath. Stopping at the first hop
+  is what "Source not attached" was, over perfectly good provenance.
+- **`basis` describes the quantity, not the series.** Coin Metrics publishes BTC/USD; it does
+  not publish "fell 3.4% over the day". `reported` is claimed only where the observed figure is
+  the series' own published value on a series someone fetched, and everything else is `derived`,
+  which the rail prints as "computed from this source".
+
+**The rail was also dating findings wrong.** The stored key is `as_of`; the adapter read only
+`as_at`, so it fell through to the report's publication date. A report published on the 17th
+narrating an observation from the 16th said "As at 2026-09-17".
+
+`Finding` gained `evidence: FindingEvidence[]`, pre-formatted strings for the same reason
+`Fact.value` is one. The strip is the card's substance — a subscriber paying to be told what
+changed is owed the measurement, not only the sentence about it. The recent-days list now shows
+each day's first headline instead of a count: "3 findings" says how much was missed without
+saying whether any of it mattered.
+
+Verified against production rather than against fixtures: five published `market_reports` rows
+covering all four live finding types were run through the projection and read by eye, and the
+unit tests were mutation-checked one rule at a time — no chain walk, no hint fallback, series
+units on an anomaly, `as_at` only — each of which takes the suite red.
+
+One thing left alone. `packages/data-supabase/src/client/facts.ts` formats a percentage on
+`unit === '%'`, and the live indicator tables spell it `percent`, so `/prepare` renders a cash
+rate as `3.85` rather than `3.85%`. Pre-existing, adjacent, and not this change.
+
+---
+
 ## Open, and deliberately so
 
 - **A1, now "was the not-advice position assessed against Minute specifically".** Outstanding,

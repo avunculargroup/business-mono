@@ -7,7 +7,6 @@ import type {
   ClientIndicatorRepository,
   ClientLibraryRepository,
   ClientPrepareRepository,
-  ClientProvenance,
   ClientRegisterEntry,
   ClientRegisterRepository,
   ClientSession,
@@ -20,8 +19,6 @@ import type {
   CompanyProfile,
   ComplianceDocument,
   DirectoryEntry,
-  Finding,
-  FindingType,
   IndicatorSeries,
   LibrarySection,
   PrepareTemplate,
@@ -29,17 +26,15 @@ import type {
   Signal,
 } from '@platform/data';
 import { parseTemplate } from '@platform/shared';
+import {
+  buildMetricCatalog,
+  toClientFinding,
+  type MacroCatalogRow,
+  type MetricCatalog,
+  type OnchainCatalogRow,
+} from './briefFindings';
 import { requireDisclosure, type ClientAdapterContext } from './context';
 import { resolveFacts } from './facts';
-
-const FINDING_TYPES: readonly FindingType[] = [
-  'anomaly',
-  'divergence',
-  'inflection',
-  'streak',
-  'threshold',
-  'staleness',
-];
 
 const COMPLIANCE_CLASSES: readonly ComplianceClass[] = [
   'neutral',
@@ -62,10 +57,6 @@ function toComplianceClass(value: string | null): ComplianceClass {
   return COMPLIANCE_CLASSES.includes(value as ComplianceClass)
     ? (value as ComplianceClass)
     : 'solvency_adjacent';
-}
-
-function toFindingType(value: unknown): FindingType {
-  return FINDING_TYPES.includes(value as FindingType) ? (value as FindingType) : 'anomaly';
 }
 
 // ============================================================
@@ -121,37 +112,20 @@ type MarketReportRow = {
   findings: unknown;
 };
 
-function toBrief(row: MarketReportRow): Brief {
+function toBrief(row: MarketReportRow, catalog: MetricCatalog): Brief {
   const raw = Array.isArray(row.findings) ? row.findings : [];
-
-  const findings: Finding[] = raw.map((item, index) => {
-    const one = (item ?? {}) as Record<string, unknown>;
-    const provenance = Array.isArray(one['provenance'])
-      ? (one['provenance'] as Array<Record<string, unknown>>)
-      : [];
-
-    return {
-      id: typeof one['id'] === 'string' ? one['id'] : `${row.id}-${index}`,
-      findingType: toFindingType(one['finding_type'] ?? one['findingType']),
-      headline: String(one['headline'] ?? ''),
-      detail: String(one['detail'] ?? ''),
-      asAt: String(one['as_at'] ?? one['asAt'] ?? row.as_of ?? ''),
-      provenance: provenance.map((p): ClientProvenance => ({
-        sourceName: String(p['source_name'] ?? p['sourceName'] ?? 'Unattributed'),
-        ...(typeof (p['source_url'] ?? p['sourceUrl']) === 'string'
-          ? { sourceUrl: String(p['source_url'] ?? p['sourceUrl']) }
-          : {}),
-        asAt: String(p['as_at'] ?? p['asAt'] ?? row.as_of ?? ''),
-        basis: 'reported',
-      })),
-    };
-  });
 
   return {
     id: row.id,
     publishedAt: row.as_of ?? '',
     narration: row.narration_markdown ?? '',
-    findings,
+    // The stored shape is the findings engine's, not this read model's, so the
+    // whole translation lives in briefFindings.ts. Reading its field names
+    // straight off the JSON is what used to render a headline-less card with
+    // "Source not attached" under it.
+    findings: raw.map((item, index) =>
+      toClientFinding(item, index, row.id, row.as_of ?? '', catalog),
+    ),
     // A column, not an inference from an empty list. A quiet day is a published
     // report that says nothing cleared the floor; no report at all is `null`
     // from `latest()`. Different states, and the page renders them differently.
@@ -164,35 +138,74 @@ const BRIEF_COLUMNS = 'id, as_of, report_mode, narration_markdown, findings';
 export function createClientBriefRepository(
   adapter: ClientAdapterContext,
 ): ClientBriefRepository {
+  /**
+   * The indicator catalogue, fetched once per bundle.
+   *
+   * Two small reads — every active series in both tables — rather than a
+   * filtered lookup per brief, because `recent()` spans a week of reports whose
+   * findings touch an unpredictable handful of series, and the macro side is
+   * keyed by a slug of its label that no `.in()` can express. Memoised for the
+   * same reason the disclosure check is: one page render reads the latest brief
+   * and the last seven days, and that is one catalogue between them.
+   */
+  let pending: Promise<MetricCatalog> | null = null;
+
+  const catalogue = (): Promise<MetricCatalog> => {
+    pending ??= (async () => {
+      const [onchain, macro] = await Promise.all([
+        adapter.client
+          .from('onchain_indicators')
+          .select('key, name, short_label, unit, decimals, provider, provider_metric_code, derivation_spec')
+          .eq('is_active', true),
+        adapter.client
+          .from('economic_indicators')
+          .select('name, short_label, unit, decimals, provider, provider_series_code, provider_table_ref')
+          .eq('is_active', true),
+      ]);
+
+      return buildMetricCatalog(
+        (onchain.data ?? []) as OnchainCatalogRow[],
+        (macro.data ?? []) as MacroCatalogRow[],
+      );
+    })();
+    return pending;
+  };
+
   return {
     async latest(ctx: ReadContext): Promise<Brief | null> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
-        .from('market_reports')
-        .select(BRIEF_COLUMNS)
-        .eq('status', 'published')
-        .lte('as_of', ctx.asOf.toISOString().slice(0, 10))
-        .order('as_of', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [{ data }, catalog] = await Promise.all([
+        adapter.client
+          .from('market_reports')
+          .select(BRIEF_COLUMNS)
+          .eq('status', 'published')
+          .lte('as_of', ctx.asOf.toISOString().slice(0, 10))
+          .order('as_of', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        catalogue(),
+      ]);
 
-      return data ? toBrief(data as MarketReportRow) : null;
+      return data ? toBrief(data as MarketReportRow, catalog) : null;
     },
 
     async recent(ctx: ReadContext, days: number): Promise<Brief[]> {
       await requireDisclosure(adapter);
 
       const from = new Date(ctx.asOf.getTime() - days * 86_400_000);
-      const { data } = await adapter.client
-        .from('market_reports')
-        .select(BRIEF_COLUMNS)
-        .eq('status', 'published')
-        .gte('as_of', from.toISOString().slice(0, 10))
-        .lte('as_of', ctx.asOf.toISOString().slice(0, 10))
-        .order('as_of', { ascending: false });
+      const [{ data }, catalog] = await Promise.all([
+        adapter.client
+          .from('market_reports')
+          .select(BRIEF_COLUMNS)
+          .eq('status', 'published')
+          .gte('as_of', from.toISOString().slice(0, 10))
+          .lte('as_of', ctx.asOf.toISOString().slice(0, 10))
+          .order('as_of', { ascending: false }),
+        catalogue(),
+      ]);
 
-      return (data ?? []).map((row) => toBrief(row as MarketReportRow));
+      return (data ?? []).map((row) => toBrief(row as MarketReportRow, catalog));
     },
   };
 }
