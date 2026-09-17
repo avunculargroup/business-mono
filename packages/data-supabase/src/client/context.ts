@@ -63,22 +63,29 @@ export function createClientAdapterContext(
     // The Service Statement is the document the gate is about. None active
     // means nobody can pass, which is the correct behaviour while one has not
     // been written — see docs/features/client-app/build-progress.md on A4.
-    const { data: statement } = await client
+    // A failed query throws rather than resolving `false`. The gate stays shut
+    // either way — nothing downstream runs — but `false` here means "this
+    // subscriber has not acknowledged the statement", and telling someone that
+    // when the real answer is that the database did not answer sends them to
+    // acknowledge a document they already have.
+    const { data: statement, error: statementError } = await client
       .from('compliance_documents')
       .select('version')
       .eq('doc_type', 'service_statement')
       .eq('status', 'active')
       .maybeSingle();
 
+    if (statementError) throw statementError;
     if (!statement?.version) return false;
 
-    const { data: ack } = await client
+    const { data: ack, error: ackError } = await client
       .from('client_disclosures')
       .select('id')
       .eq('client_user_id', principal.userId)
       .eq('document_version', statement.version)
       .maybeSingle();
 
+    if (ackError) throw ackError;
     return ack !== null;
   };
 

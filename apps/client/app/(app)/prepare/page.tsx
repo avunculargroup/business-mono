@@ -10,6 +10,29 @@ import styles from './prepare.module.css';
 export const metadata: Metadata = { title: 'Prepare' };
 
 /**
+ * What an empty list says, per fund type.
+ *
+ * The list is scoped to the account's `client_type` twice over — the RLS policy
+ * filters on it and so does the adapter — so a trustee cannot see a corporate
+ * template even when one is live, and vice versa. "No templates are available
+ * yet" hides that: it reads as nothing published anywhere, which is a different
+ * state with a different fix. Naming the scope is the difference between a
+ * subscriber who knows what they are waiting for and one who files a bug.
+ */
+const NOTHING_FOR_THIS_TYPE: Record<ClientType, string> = {
+  corporate:
+    'Templates are published separately for companies and for self-managed funds, and '
+    + 'none is live for a company yet. Every template is reviewed before it is '
+    + 'published, because a template that states a conclusion would state it in every '
+    + 'document generated from it.',
+  smsf:
+    'Templates are published separately for self-managed funds and for companies, and '
+    + 'none is live for a self-managed fund yet. Every template is reviewed before it '
+    + 'is published, because a template that states a conclusion would state it in '
+    + 'every document generated from it.',
+};
+
+/**
  * `/prepare` — the reason a subscription renews.
  *
  * Everything else in Minute is a well-made version of something a determined
@@ -55,10 +78,7 @@ export default async function PreparePage() {
         {templates.length === 0 ? (
           <EmptyDay
             headline="No templates are available yet"
-            detail={
-              'Every template is reviewed before it is published, because a template that '
-              + 'states a conclusion would state it in every document generated from it.'
-            }
+            detail={NOTHING_FOR_THIS_TYPE[clientType]}
           />
         ) : (
           <div className={styles.templates}>

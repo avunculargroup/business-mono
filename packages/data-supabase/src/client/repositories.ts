@@ -82,20 +82,22 @@ export function createClientSessionRepository(
      * acknowledge.
      */
     async current(_ctx: ReadContext): Promise<ClientSession | null> {
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('client_users')
         .select('id, account_id')
         .eq('id', adapter.principal.userId)
         .maybeSingle();
 
+      if (error) throw error;
       if (!data) return null;
 
-      const { data: account } = await adapter.client
+      const { data: account, error: accountError } = await adapter.client
         .from('client_accounts')
         .select('display_name, client_type')
         .eq('id', data.account_id)
         .maybeSingle();
 
+      if (accountError) throw accountError;
       if (!account) return null;
 
       return {
@@ -168,7 +170,7 @@ export function createClientBriefRepository(
     async latest(ctx: ReadContext): Promise<Brief | null> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('market_reports')
         .select(BRIEF_COLUMNS)
         .eq('status', 'published')
@@ -177,6 +179,7 @@ export function createClientBriefRepository(
         .limit(1)
         .maybeSingle();
 
+      if (error) throw error;
       return data ? toBrief(data as MarketReportRow) : null;
     },
 
@@ -184,7 +187,7 @@ export function createClientBriefRepository(
       await requireDisclosure(adapter);
 
       const from = new Date(ctx.asOf.getTime() - days * 86_400_000);
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('market_reports')
         .select(BRIEF_COLUMNS)
         .eq('status', 'published')
@@ -192,6 +195,7 @@ export function createClientBriefRepository(
         .lte('as_of', ctx.asOf.toISOString().slice(0, 10))
         .order('as_of', { ascending: false });
 
+      if (error) throw error;
       return (data ?? []).map((row) => toBrief(row as MarketReportRow));
     },
   };
@@ -288,14 +292,16 @@ export function createClientSignalRepository(
       if (query.categories?.length) builder = builder.in('change_type', query.categories);
       builder = builder.limit(query.limit ?? 50);
 
-      const { data } = await builder;
+      const { data, error } = await builder;
+
+      if (error) throw error;
       return (data ?? []).map((row) => toSignal(row as SignalRow));
     },
 
     async byEntity(_ctx: ReadContext, entityId: string): Promise<Signal[]> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('ecosystem_changes')
         .select(SIGNAL_COLUMNS)
         .eq('client_relevant', true)
@@ -303,6 +309,7 @@ export function createClientSignalRepository(
         .or(`product_service_id.eq.${entityId},advisor_partner_id.eq.${entityId}`)
         .order('occurred_at', { ascending: false, nullsFirst: false });
 
+      if (error) throw error;
       return (data ?? []).map((row) => toSignal(row as SignalRow));
     },
   };
@@ -343,13 +350,14 @@ export function createClientIndicatorRepository(
     async available(_ctx: ReadContext): Promise<Array<{ key: string; label: string }>> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('onchain_indicators')
         .select('key, name, short_label')
         .eq('is_active', true)
         .eq('is_displayed', true)
         .order('key');
 
+      if (error) throw error;
       return (data ?? [])
         .filter((row): row is typeof row & { key: string } => Boolean(row.key))
         .map((row) => ({ key: row.key, label: row.short_label ?? row.name ?? row.key }));
@@ -363,12 +371,14 @@ export function createClientIndicatorRepository(
       await requireDisclosure(adapter);
       if (keys.length === 0) return [];
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('onchain_indicators')
         .select(
           'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at, is_current)',
         )
         .in('key', keys);
+
+      if (error) throw error;
 
       const out: IndicatorSeries[] = [];
 
@@ -452,11 +462,12 @@ const REGISTER_COLUMNS =
 async function implementationFactKeys(
   adapter: ClientAdapterContext,
 ): Promise<Set<string>> {
-  const { data } = await adapter.client
+  const { data, error } = await adapter.client
     .from('field_source_minimums')
     .select('field_key, client_fact_class')
     .eq('client_fact_class', 'implementation');
 
+  if (error) throw error;
   return new Set((data ?? []).map((row) => row.field_key));
 }
 
@@ -537,7 +548,7 @@ export function createClientRegisterRepository(
     async list(_ctx: ReadContext): Promise<ClientRegisterEntry[]> {
       await requireDisclosure(adapter);
 
-      const [{ data }, implementationKeys] = await Promise.all([
+      const [{ data, error }, implementationKeys] = await Promise.all([
         adapter.client
           .from('research_companies')
           .select(REGISTER_COLUMNS)
@@ -547,13 +558,14 @@ export function createClientRegisterRepository(
         implementationFactKeys(adapter),
       ]);
 
+      if (error) throw error;
       return (data ?? []).map((row) => toRegisterEntry(row as RegisterRow, implementationKeys));
     },
 
     async bySlug(_ctx: ReadContext, slug: string): Promise<ClientRegisterEntry | null> {
       await requireDisclosure(adapter);
 
-      const [{ data }, implementationKeys] = await Promise.all([
+      const [{ data, error }, implementationKeys] = await Promise.all([
         adapter.client
           .from('research_companies')
           .select(REGISTER_COLUMNS)
@@ -564,6 +576,7 @@ export function createClientRegisterRepository(
         implementationFactKeys(adapter),
       ]);
 
+      if (error) throw error;
       return data ? toRegisterEntry(data as RegisterRow, implementationKeys) : null;
     },
   };
@@ -597,11 +610,12 @@ export function createClientDirectoryRepository(
   adapter: ClientAdapterContext,
 ): ClientDirectoryRepository {
   async function disclosureByEntity(): Promise<Map<string, string>> {
-    const { data } = await adapter.client
+    const { data, error } = await adapter.client
       .from('commercial_relationships')
       .select('entity_id, disclosure_text')
       .eq('is_active', true);
 
+    if (error) throw error;
     return new Map((data ?? []).map((row) => [row.entity_id, row.disclosure_text]));
   }
 
@@ -609,7 +623,7 @@ export function createClientDirectoryRepository(
     async list(_ctx: ReadContext): Promise<DirectoryEntry[]> {
       await requireDisclosure(adapter);
 
-      const [{ data }, disclosures] = await Promise.all([
+      const [{ data, error }, disclosures] = await Promise.all([
         adapter.client
           .from('products_services')
           .select('id, name, category, australian_owned, is_financial_product')
@@ -620,6 +634,8 @@ export function createClientDirectoryRepository(
           .order('name'),
         disclosureByEntity(),
       ]);
+
+      if (error) throw error;
 
       return (data ?? []).map((row) => ({
         id: row.id,
@@ -647,13 +663,15 @@ export function createClientDirectoryRepository(
     async disclosures(_ctx: ReadContext): Promise<CommercialDisclosure[]> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('commercial_relationships')
         .select(
           'entity_id, entity_type, relationship_type, direction, fee_basis, disclosure_text, started_at',
         )
         .eq('is_active', true)
         .order('started_at', { ascending: false, nullsFirst: false });
+
+      if (error) throw error;
 
       const productIds = (data ?? [])
         .filter((r) => r.entity_type === 'product_service')
@@ -662,14 +680,22 @@ export function createClientDirectoryRepository(
         .filter((r) => r.entity_type === 'advisor_partner')
         .map((r) => r.entity_id);
 
+      type NameLookup = {
+        data: Array<{ id: string; name: string | null }>;
+        error: { message: string } | null;
+      };
+
       const [products, advisors] = await Promise.all([
         productIds.length
           ? adapter.client.from('products_services').select('id, name').in('id', productIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
+          : Promise.resolve({ data: [], error: null } satisfies NameLookup),
         advisorIds.length
           ? adapter.client.from('advisors_partners').select('id, name').in('id', advisorIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
+          : Promise.resolve({ data: [], error: null } satisfies NameLookup),
       ]);
+
+      if (products.error) throw products.error;
+      if (advisors.error) throw advisors.error;
 
       const names = new Map<string, string>();
       for (const row of products.data ?? []) names.set(row.id, row.name ?? 'Unnamed');
@@ -708,15 +734,16 @@ export function createClientLibraryRepository(
       // not type — and rather than hand-write that metadata into a file whose
       // whole purpose is to be deleted, the join happens here. Revisit when the
       // generated types catch up.
-      const { data: sections } = await adapter.client
+      const { data: sections, error: sectionsError } = await adapter.client
         .from('client_library_sections')
         .select('id, key, title, sort_order')
         .in('client_type', ['both', clientType])
         .order('sort_order');
 
+      if (sectionsError) throw sectionsError;
       if (!sections?.length) return [];
 
-      const { data: entries } = await adapter.client
+      const { data: entries, error: entriesError } = await adapter.client
         .from('client_library_entries')
         .select(
           // One literal, not a concatenation: supabase-js infers the row type
@@ -727,6 +754,8 @@ export function createClientLibraryRepository(
         .eq('status', 'published')
         .in('section_id', sections.map((section) => section.id))
         .order('sort_order');
+
+      if (entriesError) throw entriesError;
 
       const bySection = new Map<string, LibrarySection['entries']>();
       for (const entry of entries ?? []) {
@@ -752,13 +781,14 @@ export function createClientLibraryRepository(
     async entry(_ctx: ReadContext, slug: string) {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('client_library_entries')
         .select('slug, title, body, regulatory_references, last_reviewed_at, review_due_date')
         .eq('status', 'published')
         .eq('slug', slug)
         .maybeSingle();
 
+      if (error) throw error;
       if (!data) return null;
 
       return {
@@ -824,26 +854,28 @@ export function createClientPrepareRepository(
     async templates(_ctx: ReadContext, clientType: ClientType): Promise<PrepareTemplate[]> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('prepare_templates')
         .select(TEMPLATE_COLUMNS)
         .eq('status', 'active')
         .in('client_type', ['both', clientType])
         .order('title');
 
+      if (error) throw error;
       return (data ?? []).map((row) => toPrepareTemplate(row as TemplateRow));
     },
 
     async template(_ctx: ReadContext, slug: string): Promise<PrepareTemplate | null> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('prepare_templates')
         .select(TEMPLATE_COLUMNS)
         .eq('status', 'active')
         .eq('slug', slug)
         .maybeSingle();
 
+      if (error) throw error;
       return data ? toPrepareTemplate(data as TemplateRow) : null;
     },
 
@@ -864,11 +896,12 @@ export function createClientComplianceRepository(
     async identity(_ctx: ReadContext) {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('company_profile')
         .select('legal_name, trading_name, abn, acn')
         .maybeSingle();
 
+      if (error) throw error;
       if (!data) return null;
 
       return {
@@ -885,13 +918,14 @@ export function createClientComplianceRepository(
      * read the document it is being asked to acknowledge.
      */
     async profile(_ctx: ReadContext) {
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('company_profile')
         .select(
           'legal_name, trading_name, abn, acn, registered_address, registered_state, registered_postcode, public_phone, public_email, public_website, complaints_contact, complaints_email, complaints_phone, privacy_policy_url',
         )
         .maybeSingle();
 
+      if (error) throw error;
       return data ? (data as CompanyProfile) : null;
     },
 
@@ -904,13 +938,14 @@ export function createClientComplianceRepository(
       _ctx: ReadContext,
       docType: ComplianceDocument['docType'],
     ): Promise<ComplianceDocument | null> {
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('compliance_documents')
         .select('id, doc_type, title, version, body, effective_from')
         .eq('doc_type', docType)
         .eq('status', 'active')
         .maybeSingle();
 
+      if (error) throw error;
       if (!data) return null;
 
       return {
@@ -926,12 +961,13 @@ export function createClientComplianceRepository(
     async acknowledgements(_ctx: ReadContext) {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('client_disclosures')
         .select('document_version, acknowledged_at')
         .eq('client_user_id', adapter.principal.userId)
         .order('acknowledged_at', { ascending: false });
 
+      if (error) throw error;
       return (data ?? []).map((row) => ({
         documentVersion: row.document_version,
         acknowledgedAt: row.acknowledged_at,
@@ -952,7 +988,7 @@ export function createClientAccountRepository(
       await requireDisclosure(adapter);
 
       // Two queries, for the same reason as the library sections above.
-      const { data } = await adapter.client
+      const { data, error } = await adapter.client
         .from('client_accounts')
         .select(
           'display_name, client_type, subscription_status, subscription_started_at, subscription_renews_at',
@@ -960,13 +996,16 @@ export function createClientAccountRepository(
         .eq('id', adapter.principal.accountId)
         .maybeSingle();
 
+      if (error) throw error;
       if (!data) return null;
 
-      const { data: seats } = await adapter.client
+      const { data: seats, error: seatsError } = await adapter.client
         .from('client_users')
         .select('full_name, email, role, status, last_seen_at')
         .eq('account_id', adapter.principal.accountId)
         .order('full_name');
+
+      if (seatsError) throw seatsError;
 
       return {
         displayName: data.display_name,

@@ -118,12 +118,14 @@ async function readOnchain(
   const out = new Map<string, ObservationRow>();
   if (refs.length === 0) return out;
 
-  const { data } = await adapter.client
+  const { data, error } = await adapter.client
     .from('onchain_indicators')
     .select(
       'key, name, short_label, unit, decimals, provider, onchain_observations(value, observed_at, is_current)',
     )
     .in('key', refs);
+
+  if (error) throw error;
 
   for (const row of data ?? []) {
     const observations = (row.onchain_observations ?? []) as Array<{
@@ -154,12 +156,14 @@ async function readMacro(
   const out = new Map<string, ObservationRow>();
   if (refs.length === 0) return out;
 
-  const { data } = await adapter.client
+  const { data, error } = await adapter.client
     .from('economic_indicators')
     .select(
       'provider_series_code, name, short_label, unit, decimals, provider, indicator_observations(value, period_date, is_current)',
     )
     .in('provider_series_code', refs);
+
+  if (error) throw error;
 
   for (const row of data ?? []) {
     const observations = (row.indicator_observations ?? []) as Array<{
