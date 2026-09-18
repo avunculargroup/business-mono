@@ -119,11 +119,36 @@ export type FindingType =
   | 'threshold'
   | 'staleness';
 
+/**
+ * One measured quantity behind a finding.
+ *
+ * `value` is a pre-formatted string for the same reason `Fact.value` is: a
+ * number in the browser invites arithmetic, arithmetic on a served figure is a
+ * derivation, and a derivation nobody reviewed is a basis claim. Every figure
+ * here was computed server-side by the findings engine and is read back, never
+ * recomputed on the way out.
+ */
+export interface FindingEvidence {
+  label: string;
+  value: string;
+}
+
 export interface Finding {
   id: string;
   findingType: FindingType;
   headline: string;
   detail: string;
+  /**
+   * The numbers the finding rests on — what was observed, and the trailing
+   * distribution it was judged against.
+   *
+   * On the read model rather than folded into `detail`, because a subscriber
+   * paying to be told what changed is owed the measurement and not only the
+   * sentence about it. A finding that arrives with an empty array is one whose
+   * stored shape carried no figures, and the page says so rather than
+   * rendering a card that looks complete.
+   */
+  evidence: FindingEvidence[];
   asAt: string;
   provenance: ClientProvenance[];
 }

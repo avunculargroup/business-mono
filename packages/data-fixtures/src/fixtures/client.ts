@@ -118,6 +118,10 @@ export function briefs(anchor: Date): Brief[] {
           headline: 'An attestation did not arrive on its usual cadence',
           detail:
             'The provider has published within seven days of quarter end for eight quarters. This quarter it has not.',
+          evidence: [
+            { label: 'Periods without a print', value: '1 quarter' },
+            { label: 'Usual cadence', value: 'Within 7 days of quarter end' },
+          ],
           asAt: onDate(anchor, -1),
           provenance: [
             {
@@ -127,6 +131,41 @@ export function briefs(anchor: Date): Brief[] {
               basis: 'observed',
             },
           ],
+        },
+        {
+          // A finding computed from a series rather than watched on a page:
+          // the numbers are the substance, and the source is a derivation
+          // rather than something a provider stated.
+          id: 'finding-2',
+          findingType: 'streak',
+          headline: 'Volatility (30d) has held between 46.9 and 51.8 for 10 consecutive days',
+          detail: 'The persistence is the story, not the level.',
+          evidence: [
+            { label: 'Held for', value: '10 consecutive days' },
+            { label: 'Usual range (90d)', value: '23.3% to 47.7%' },
+            { label: 'Median (90d)', value: '34.4%' },
+          ],
+          asAt: onDate(anchor, -2),
+          provenance: [
+            {
+              sourceName: 'Coin Metrics',
+              sourceUrl: 'https://coinmetrics.io/community-network-data/',
+              asAt: onDate(anchor, -2),
+              basis: 'derived',
+            },
+          ],
+        },
+        {
+          // The awkward row, and it is here for the same reason the unpromoted
+          // signal is: a finding whose series this adapter cannot attribute
+          // must render as a stated absence, not as a card that looks sourced.
+          id: 'finding-3',
+          findingType: 'threshold',
+          headline: 'A monitored series crossed a level it had not crossed this year',
+          detail: '',
+          evidence: [{ label: 'Observed', value: '1.04' }],
+          asAt: onDate(anchor, -1),
+          provenance: [],
         },
       ],
       isQuietDay: false,
