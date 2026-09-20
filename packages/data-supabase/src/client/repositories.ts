@@ -25,7 +25,7 @@ import type {
   ReadContext,
   Signal,
 } from '@platform/data';
-import { parseTemplate } from '@platform/shared';
+import { macroMetricKey, parseTemplate } from '@platform/shared';
 import {
   buildMetricCatalog,
   toClientFinding,
@@ -355,38 +355,44 @@ function cadenceDays(frequency: string | null): number {
 /**
  * The page reads two unrelated tables, so a series key has to say which one.
  *
- * `onchain_indicators` is keyed by a slug (`key`) and `economic_indicators` only
- * by its surrogate `id` — its `provider_series_code` is NULL for every RBA and
- * ABS row, so keying macro on that would drop half the seeded catalogue. Two
- * key spaces with no shared column means the prefix is what lets `series()`
- * send each key back to the table it came from.
+ * This is not a scheme of this adapter's own: the findings engine already
+ * unified both catalogues under one metric key — `onchain_indicators.key`
+ * unprefixed, and `macro:<slug of short_label>` for an economic indicator, via
+ * `macroMetricKey` in `@platform/shared`. That namespace is in the database,
+ * not only in code: `finding_divergence_pairs` seeds `macro:us_m2`,
+ * `macro:s_p_500`, `macro:gold` and `macro:dxy` against a bare
+ * `btc_price_usd`, and every `market_reports.findings[].metric_key` is written
+ * in it. `briefFindings.ts` already mirrors it to caption the Brief.
  *
- * Nothing persists these: `available()` hands them to `series()` and the page
- * uses them as React keys. They are an addressing detail of this adapter, not
- * an identifier the subscriber or the database ever sees.
+ * So this page uses it too. A second scheme would have put two different
+ * meanings behind the same `macro:` prefix in one app.
+ *
+ * Why not the surrogate `id`, which is the one column every macro row has:
+ * because it would have been that second scheme. `provider_series_code` is no
+ * use either — it is NULL for the RBA cash rate, AU broad money and gold, three
+ * of the ten active rows — which is the trap `macroMetricKey` was coined to
+ * avoid in the first place.
  */
-type SeriesKind = 'onchain' | 'macro';
-
-function encodeKey(kind: SeriesKind, ref: string): string {
-  return `${kind}:${ref}`;
+function isMacroKey(key: string): boolean {
+  return key.startsWith('macro:');
 }
 
-/** Splits `available()`'s keys back into the two tables they address. */
-function partitionKeys(keys: string[]): Record<SeriesKind, string[]> {
-  const out: Record<SeriesKind, string[]> = { onchain: [], macro: [] };
-
-  for (const key of keys) {
-    const separator = key.indexOf(':');
-    if (separator === -1) continue;
-
-    const kind = key.slice(0, separator);
-    const ref = key.slice(separator + 1);
-    if (!ref) continue;
-    if (kind === 'onchain' || kind === 'macro') out[kind].push(ref);
-  }
-
-  return out;
-}
+/**
+ * How many observations a series carries at most, newest first.
+ *
+ * An embedded PostgREST select is capped by the server's `max-rows`, and what
+ * it drops when the cap bites is unspecified because an embedded resource has
+ * no order unless one is asked for. `btc_price_usd` holds 2,670 current
+ * observations (and 92k rows in total, the demoted vintages of the duplicate
+ * poll that 20260824110000 cleaned up), so this is not hypothetical: an
+ * unordered, unbounded read of that series can return an arbitrary slice, and
+ * then `points.at(-1)` — the figure the page prints — is an arbitrary day.
+ *
+ * Ordering descending and capping makes the newest end the one that survives.
+ * 400 daily points is a bit over a year, which covers the sparkline the read
+ * model describes and the latest/prior pair the page renders.
+ */
+const MAX_POINTS = 400;
 
 /**
  * Formats a value once, here, so nothing downstream can do arithmetic on a
@@ -418,7 +424,7 @@ export function createClientIndicatorRepository(
           .order('key'),
         adapter.client
           .from('economic_indicators')
-          .select('id, name, short_label')
+          .select('short_label, name')
           .eq('is_active', true)
           .order('short_label'),
       ]);
@@ -427,11 +433,11 @@ export function createClientIndicatorRepository(
         ...(onchain.data ?? [])
           .filter((row): row is typeof row & { key: string } => Boolean(row.key))
           .map((row) => ({
-            key: encodeKey('onchain', row.key),
+            key: row.key,
             label: row.short_label ?? row.name ?? row.key,
           })),
         ...(macro.data ?? []).map((row) => ({
-          key: encodeKey('macro', row.id),
+          key: macroMetricKey(row.short_label),
           label: row.short_label ?? row.name,
         })),
       ];
@@ -445,24 +451,46 @@ export function createClientIndicatorRepository(
       await requireDisclosure(adapter);
       if (keys.length === 0) return [];
 
-      const wanted = partitionKeys(keys);
+      const macroKeys = new Set(keys.filter(isMacroKey));
+      const onchainKeys = keys.filter((key) => !isMacroKey(key));
 
       const [onchain, macro] = await Promise.all([
-        wanted.onchain.length > 0
+        onchainKeys.length > 0
           ? adapter.client
             .from('onchain_indicators')
             .select(
-              'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at, is_current)',
+              'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at)',
             )
-            .in('key', wanted.onchain)
+            .in('key', onchainKeys)
+            // Superseded vintages stay on the table as history, so without this
+            // a revised day renders twice — and for btc_price_usd, where 89k of
+            // 92k rows are demoted duplicates, it is the difference between
+            // reading 2,670 rows and reading all of them.
+            .eq('onchain_observations.is_current', true)
+            .gte('onchain_observations.observed_at', fromDate ?? '0001-01-01')
+            .order('observed_at', {
+              referencedTable: 'onchain_observations',
+              ascending: false,
+            })
+            .limit(MAX_POINTS, { referencedTable: 'onchain_observations' })
           : null,
-        wanted.macro.length > 0
+        // The macro slug is computed from `short_label`, so no `.in()` can
+        // express it and the match happens below. The catalogue is twelve rows
+        // and the page asks for all of them, so this reads what it needs.
+        macroKeys.size > 0
           ? adapter.client
             .from('economic_indicators')
             .select(
-              'id, name, short_label, unit, decimals, provider, period_granularity, indicator_observations(value, period_date, is_current)',
+              'short_label, name, unit, decimals, provider, period_granularity, indicator_observations(value, period_date)',
             )
-            .in('id', wanted.macro)
+            .eq('is_active', true)
+            .eq('indicator_observations.is_current', true)
+            .gte('indicator_observations.period_date', fromDate ?? '0001-01-01')
+            .order('period_date', {
+              referencedTable: 'indicator_observations',
+              ascending: false,
+            })
+            .limit(MAX_POINTS, { referencedTable: 'indicator_observations' })
           : null,
       ]);
 
@@ -470,20 +498,20 @@ export function createClientIndicatorRepository(
 
       for (const row of onchain?.data ?? []) {
         if (!row.key) continue;
+        // Back to ascending: the query ordered newest-first so the cap would
+        // keep the newest end, and the read model's points run oldest-first.
         const observations = ((row.onchain_observations ?? []) as Array<{
           value: number | null;
           observed_at: string | null;
-          is_current: boolean | null;
         }>)
           .filter((o) => o.value !== null && o.observed_at !== null)
-          .filter((o) => (fromDate ? o.observed_at! >= fromDate : true))
           .sort((a, b) => (a.observed_at! < b.observed_at! ? -1 : 1));
 
         if (observations.length === 0) continue;
 
         const digits = row.decimals ?? 2;
         out.push({
-          key: encodeKey('onchain', row.key),
+          key: row.key,
           label: row.short_label ?? row.name ?? row.key,
           ...(row.unit ? { unit: row.unit } : {}),
           sourceName: row.provider ?? 'Unattributed',
@@ -497,24 +525,20 @@ export function createClientIndicatorRepository(
       }
 
       for (const row of macro?.data ?? []) {
-        // Only the current vintage. `indicator_observations` keeps superseded
-        // values on the table as history — that is what `is_revision` and
-        // `superseded_value` are for — so an unfiltered read renders a revised
-        // period twice, once at the number the provider withdrew.
+        const key = macroMetricKey(row.short_label);
+        if (!macroKeys.has(key)) continue;
+
         const observations = ((row.indicator_observations ?? []) as Array<{
           value: number | null;
           period_date: string | null;
-          is_current: boolean | null;
         }>)
-          .filter((o) => o.is_current)
           .filter((o) => o.value !== null && o.period_date !== null)
-          .filter((o) => (fromDate ? o.period_date! >= fromDate : true))
           .sort((a, b) => (a.period_date! < b.period_date! ? -1 : 1));
 
         if (observations.length === 0) continue;
 
         out.push({
-          key: encodeKey('macro', row.id),
+          key,
           label: row.short_label ?? row.name,
           ...(row.unit ? { unit: row.unit } : {}),
           sourceName: row.provider,

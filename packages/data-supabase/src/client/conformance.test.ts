@@ -43,30 +43,35 @@ const ONCHAIN_ROWS = [
   },
 ];
 
+/**
+ * Shaped from the live `economic_indicators` rows, not from the registry.
+ *
+ * The previous fixture gave each row a `provider_series_code` of `AU_CPI_ANNUAL`
+ * / `AU_CASH_RATE` — values invented to match `FACT_SOURCES`, present in no
+ * database — and spelled the unit `%`, which neither indicator table uses. It
+ * agreed with the adapter about a vocabulary production does not share, so two
+ * broken lookups passed against it. Real labels, real unit spelling.
+ */
 const MACRO_ROWS = [
   {
-    id: 'macro-cpi',
-    provider_series_code: 'AU_CPI_ANNUAL',
-    name: 'Australian CPI, annual',
-    short_label: 'CPI',
-    unit: '%',
+    short_label: 'AU CPI',
+    name: 'AU CPI (All Groups)',
+    unit: 'index',
     decimals: 1,
-    provider: 'ABS',
-    period_granularity: 'quarterly',
-    is_active: true,
-    indicator_observations: [{ value: 3.2, period_date: '2026-06-30', is_current: true }],
-  },
-  {
-    id: 'macro-cash-rate',
-    provider_series_code: 'AU_CASH_RATE',
-    name: 'RBA cash rate target',
-    short_label: 'Cash rate',
-    unit: '%',
-    decimals: 2,
-    provider: 'RBA',
+    provider: 'abs',
     period_granularity: 'monthly',
     is_active: true,
-    indicator_observations: [{ value: 3.85, period_date: '2026-08-12', is_current: true }],
+    indicator_observations: [{ value: 3.2, period_date: '2026-06-01', is_current: true }],
+  },
+  {
+    short_label: 'RBA Cash Rate',
+    name: 'RBA Cash Rate Target',
+    unit: 'percent',
+    decimals: 2,
+    provider: 'rba',
+    period_granularity: 'monthly',
+    is_active: true,
+    indicator_observations: [{ value: 3.85, period_date: '2026-08-01', is_current: true }],
   },
 ];
 

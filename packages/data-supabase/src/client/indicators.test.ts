@@ -9,9 +9,10 @@ import { createClientIndicatorRepository } from './repositories';
  *
  * The conformance suite exercises this repository through the canned-response
  * fake, which honours no filter — so it cannot tell whether `series()` sent a
- * macro key to the macro table or to `onchain_indicators.key`, where it would
- * match nothing in Postgres and the series would silently vanish. These cases
- * read the builders directly to assert the routing the fake cannot.
+ * macro key to the macro table, nor whether the vintage filter was issued at
+ * all. These cases read the builders directly to assert the query the fake
+ * cannot, because for these two tables an unfiltered or unordered read is the
+ * bug rather than a slower path to the same answer.
  */
 
 const principal: Extract<Principal, { kind: 'client' }> = {
@@ -27,39 +28,39 @@ const ONCHAIN_ROWS = [
     key: 'btc_price_aud',
     name: 'Bitcoin price (AUD)',
     short_label: 'BTC/AUD',
-    unit: 'AUD',
+    unit: 'aud',
     decimals: 0,
-    provider: 'Coin Metrics',
+    provider: 'coinmetrics',
     poll_frequency: 'daily',
+    // Newest first, as the query asks for.
     onchain_observations: [
-      { value: 167120, observed_at: '2026-09-09', is_current: true },
-      { value: 168342.5, observed_at: '2026-09-10', is_current: true },
+      { value: 168342.5, observed_at: '2026-09-10' },
+      { value: 167120, observed_at: '2026-09-09' },
     ],
   },
 ];
 
-/**
- * Two vintages of one period, plus a second period.
- *
- * `AU_CPI_ANNUAL` was revised: 3.1 was published for June and later superseded
- * by 3.2. Both rows stay on the table — that is what the revision columns are
- * for — so a read that ignores `is_current` renders June twice, once at the
- * number the ABS withdrew.
- */
 const MACRO_ROWS = [
   {
-    id: 'macro-cpi',
-    name: 'Australian CPI, annual',
-    short_label: 'CPI',
+    short_label: 'RBA Cash Rate',
+    name: 'RBA Cash Rate Target',
     unit: 'percent',
-    decimals: 1,
-    provider: 'ABS',
-    period_granularity: 'quarterly',
+    decimals: 2,
+    provider: 'rba',
+    period_granularity: 'monthly',
     indicator_observations: [
-      { value: 3.1, period_date: '2026-06-01', is_current: false },
-      { value: 3.2, period_date: '2026-06-01', is_current: true },
-      { value: 2.9, period_date: '2026-03-01', is_current: true },
+      { value: 3.85, period_date: '2026-08-01' },
+      { value: 3.6, period_date: '2026-07-01' },
     ],
+  },
+  {
+    short_label: 'US M2',
+    name: 'US M2 Money Supply',
+    unit: 'usd_billion',
+    decimals: 1,
+    provider: 'fred',
+    period_granularity: 'monthly',
+    indicator_observations: [{ value: 22014.3, period_date: '2026-07-01' }],
   },
 ];
 
@@ -79,15 +80,18 @@ function seed(client: FakeSupabaseClient): void {
 }
 
 describe('client indicator repository', () => {
-  it('advertises both catalogues, each key naming its own table', async () => {
+  it('advertises both catalogues under the platform metric keys', async () => {
     const client = createFakeSupabase();
     seed(client);
 
     const available = await repository(client).available(readContext);
 
+    // On-chain bare, macro slugged from short_label — the same namespace
+    // `finding_divergence_pairs` and `market_reports.findings` are written in.
     expect(available).toEqual([
-      { key: 'onchain:btc_price_aud', label: 'BTC/AUD' },
-      { key: 'macro:macro-cpi', label: 'CPI' },
+      { key: 'btc_price_aud', label: 'BTC/AUD' },
+      { key: 'macro:rba_cash_rate', label: 'RBA Cash Rate' },
+      { key: 'macro:us_m2', label: 'US M2' },
     ]);
   });
 
@@ -108,50 +112,99 @@ describe('client indicator repository', () => {
     const client = createFakeSupabase();
     seed(client);
 
-    await repository(client).series(readContext, [
-      'onchain:btc_price_aud',
-      'macro:macro-cpi',
-    ]);
+    await repository(client).series(readContext, ['btc_price_aud', 'macro:rba_cash_rate']);
 
     const [onchain] = client.__buildersFor('onchain_indicators');
-    const [macro] = client.__buildersFor('economic_indicators');
-
-    // The prefix is stripped: Postgres holds the bare slug and the bare id.
     expect(onchain.in).toHaveBeenCalledWith('key', ['btc_price_aud']);
-    expect(macro.in).toHaveBeenCalledWith('id', ['macro-cpi']);
+    // The macro slug is computed, so it is matched in the adapter rather than
+    // pushed into the query — but only active rows are ever considered.
+    const [macro] = client.__buildersFor('economic_indicators');
+    expect(macro.eq).toHaveBeenCalledWith('is_active', true);
   });
 
   it('does not query a table no key addresses', async () => {
     const client = createFakeSupabase();
     seed(client);
 
-    await repository(client).series(readContext, ['onchain:btc_price_aud']);
+    await repository(client).series(readContext, ['btc_price_aud']);
 
     expect(client.__buildersFor('economic_indicators')).toHaveLength(0);
   });
 
-  it('serves a macro series from the current vintage only', async () => {
+  it('returns only the macro series asked for, not the whole active catalogue', async () => {
     const client = createFakeSupabase();
     seed(client);
 
-    const series = await repository(client).series(readContext, ['macro:macro-cpi']);
+    const series = await repository(client).series(readContext, ['macro:us_m2']);
 
-    expect(series).toEqual([
-      {
-        key: 'macro:macro-cpi',
-        label: 'CPI',
-        unit: 'percent',
-        sourceName: 'ABS',
-        // From period_granularity ('quarterly'), never poll_frequency.
-        expectedCadenceDays: 92,
-        lastObservedAt: '2026-06-01',
-        points: [
-          { at: '2026-03-01', value: '2.9' },
-          { at: '2026-06-01', value: '3.2' },
-        ],
-      },
-    ]);
+    // The query cannot express the slug, so the narrowing happens here — and
+    // the fake hands back both rows precisely so this asserts it.
+    expect(series.map((one) => one.key)).toEqual(['macro:us_m2']);
   });
+
+  // --------------------------------------------------------
+  // The vintage filter, on both sides
+  // --------------------------------------------------------
+
+  it('asks the database for current vintages only, on both tables', async () => {
+    const client = createFakeSupabase();
+    seed(client);
+
+    await repository(client).series(readContext, ['btc_price_aud', 'macro:rba_cash_rate']);
+
+    const [onchain] = client.__buildersFor('onchain_indicators');
+    const [macro] = client.__buildersFor('economic_indicators');
+
+    // Superseded rows stay on both tables as history. btc_price_usd alone
+    // carries 89k demoted vintages against 2,670 live ones, so this is the
+    // difference between a correct series and an arbitrary slice of one.
+    expect(onchain.eq).toHaveBeenCalledWith('onchain_observations.is_current', true);
+    expect(macro.eq).toHaveBeenCalledWith('indicator_observations.is_current', true);
+  });
+
+  it('orders newest-first and caps, so a capped read keeps the newest end', async () => {
+    const client = createFakeSupabase();
+    seed(client);
+
+    await repository(client).series(readContext, ['btc_price_aud', 'macro:rba_cash_rate']);
+
+    const [onchain] = client.__buildersFor('onchain_indicators');
+    const [macro] = client.__buildersFor('economic_indicators');
+
+    // An embedded resource has no order unless one is asked for, and max-rows
+    // truncates silently, so without both of these `points.at(-1)` is whatever
+    // PostgREST felt like returning.
+    expect(onchain.order).toHaveBeenCalledWith('observed_at', {
+      referencedTable: 'onchain_observations',
+      ascending: false,
+    });
+    expect(onchain.limit).toHaveBeenCalledWith(400, {
+      referencedTable: 'onchain_observations',
+    });
+    expect(macro.order).toHaveBeenCalledWith('period_date', {
+      referencedTable: 'indicator_observations',
+      ascending: false,
+    });
+  });
+
+  it('returns points oldest-first whatever order the query asked for', async () => {
+    const client = createFakeSupabase();
+    seed(client);
+
+    const [series] = await repository(client).series(readContext, ['btc_price_aud']);
+
+    // The read model's points run oldest-first and the page reads .at(-1) as
+    // the latest, so the descending query has to be turned back around.
+    expect(series.points).toEqual([
+      { at: '2026-09-09', value: '167,120' },
+      { at: '2026-09-10', value: '168,343' },
+    ]);
+    expect(series.lastObservedAt).toBe('2026-09-10');
+  });
+
+  // --------------------------------------------------------
+  // Cadence
+  // --------------------------------------------------------
 
   it('reads the macro cadence from the period, not the poll frequency', async () => {
     const client = createFakeSupabase();
@@ -164,33 +217,41 @@ describe('client indicator repository', () => {
       error: null,
     });
 
-    const [series] = await repository(client).series(readContext, ['macro:macro-cpi']);
+    const [series] = await repository(client).series(readContext, ['macro:rba_cash_rate']);
 
     expect(series.expectedCadenceDays).toBe(31);
   });
 
-  it('honours fromDate on the macro side', async () => {
+  it('carries the macro label, unit and provider through unchanged', async () => {
     const client = createFakeSupabase();
     seed(client);
 
-    const [series] = await repository(client).series(
-      readContext,
-      ['macro:macro-cpi'],
-      '2026-05-01',
-    );
+    const [series] = await repository(client).series(readContext, ['macro:rba_cash_rate']);
 
-    expect(series.points).toEqual([{ at: '2026-06-01', value: '3.2' }]);
+    expect(series).toMatchObject({
+      key: 'macro:rba_cash_rate',
+      label: 'RBA Cash Rate',
+      unit: 'percent',
+      sourceName: 'rba',
+      lastObservedAt: '2026-08-01',
+    });
+    expect(series.points.at(-1)).toEqual({ at: '2026-08-01', value: '3.85' });
   });
 
-  it('drops a key with no prefix rather than guessing a table for it', async () => {
+  it('pushes fromDate into the query rather than filtering after the fact', async () => {
     const client = createFakeSupabase();
     seed(client);
 
-    const series = await repository(client).series(readContext, ['btc_price_aud']);
+    await repository(client).series(readContext, ['btc_price_aud'], '2026-05-01');
 
-    expect(series).toEqual([]);
-    expect(client.__buildersFor('onchain_indicators')).toHaveLength(0);
-    expect(client.__buildersFor('economic_indicators')).toHaveLength(0);
+    const [onchain] = client.__buildersFor('onchain_indicators');
+    // Filtering in the adapter after an unbounded fetch would read the whole
+    // history to throw most of it away, and the cap would already have chosen
+    // which part survived.
+    expect(onchain.gte).toHaveBeenCalledWith(
+      'onchain_observations.observed_at',
+      '2026-05-01',
+    );
   });
 
   it('still refuses every read when the disclosure is not acknowledged', async () => {
@@ -201,6 +262,8 @@ describe('client indicator repository', () => {
     const indicators = repository(client);
 
     await expect(indicators.available(readContext)).rejects.toThrow();
-    await expect(indicators.series(readContext, ['macro:macro-cpi'])).rejects.toThrow();
+    await expect(
+      indicators.series(readContext, ['macro:rba_cash_rate']),
+    ).rejects.toThrow();
   });
 });

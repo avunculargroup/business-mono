@@ -5,6 +5,7 @@ import type {
   ReadContext,
   ResolvedFacts,
 } from '@platform/data';
+import { macroMetricKey } from '@platform/shared';
 import { requireDisclosure, type ClientAdapterContext } from './context';
 
 /**
@@ -31,7 +32,18 @@ import { requireDisclosure, type ClientAdapterContext } from './context';
 export interface FactSource {
   /** Which indicator table holds it. */
   kind: 'onchain' | 'macro';
-  /** `onchain_indicators.key`, or `economic_indicators.provider_series_code`. */
+  /**
+   * The platform's unified metric key: `onchain_indicators.key` unprefixed, or
+   * `macro:<slug of short_label>` via `macroMetricKey`.
+   *
+   * It was `economic_indicators.provider_series_code` for macro, which could
+   * never have resolved: that column is NULL for the RBA cash rate, AU broad
+   * money and gold — three of the ten active rows — and the two refs written
+   * against it, `AU_CASH_RATE` and `AU_CPI_ANNUAL`, are not values of it or of
+   * any other column. Both facts resolved to `AbsentFact` on every pack ever
+   * generated. `macroMetricKey` is the scheme the findings engine, the
+   * divergence-pair seeds and the Brief already share; there is no second one.
+   */
   ref: string;
   label: string;
   basis: Fact['basis'];
@@ -66,7 +78,12 @@ export const FACT_SOURCES: Readonly<Record<string, FactSource>> = Object.freeze(
   },
   au_cpi_annual: {
     kind: 'macro',
-    ref: 'AU_CPI_ANNUAL',
+    // 'AU CPI' is seeded inactive with no observations — the ABS adapter does
+    // not exist yet — so this resolves to an AbsentFact until it does. That is
+    // the correct answer and a different one from the wrong ref it had: the
+    // pack now says the series is not answering rather than that the key is
+    // not cleared.
+    ref: 'macro:au_cpi',
     label: 'Australian CPI, annual',
     basis: 'reported',
     complianceClass: 'neutral',
@@ -74,7 +91,7 @@ export const FACT_SOURCES: Readonly<Record<string, FactSource>> = Object.freeze(
   },
   au_cash_rate: {
     kind: 'macro',
-    ref: 'AU_CASH_RATE',
+    ref: 'macro:rba_cash_rate',
     label: 'RBA cash rate target',
     basis: 'reported',
     complianceClass: 'neutral',
@@ -108,9 +125,22 @@ function format(value: number, decimals: number | null, unit: string | null): st
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
-  return unit === '%' ? `${formatted}%` : formatted;
+  // Both tables spell it `percent`; `'%'` is in neither, so this branch matched
+  // nothing live and eight active series rendered a bare number. The literal is
+  // kept because it costs nothing and a fixture may still use it.
+  return unit === 'percent' || unit === '%' ? `${formatted}%` : formatted;
 }
 
+/**
+ * The latest current observation, not merely a current one.
+ *
+ * `is_current` flags the live vintage of *each* period, so a series with
+ * twenty months of history has twenty current rows. Picking the first of them
+ * out of an unordered embedded select — which is what this did — puts whichever
+ * row PostgREST happened to return first on a board paper, and for `US M2`
+ * that is one of twenty-one months. The order has to be asked for, and the
+ * newest taken.
+ */
 async function readOnchain(
   adapter: ClientAdapterContext,
   refs: string[],
@@ -121,17 +151,19 @@ async function readOnchain(
   const { data } = await adapter.client
     .from('onchain_indicators')
     .select(
-      'key, name, short_label, unit, decimals, provider, onchain_observations(value, observed_at, is_current)',
+      'key, name, short_label, unit, decimals, provider, onchain_observations(value, observed_at)',
     )
-    .in('key', refs);
+    .in('key', refs)
+    .eq('onchain_observations.is_current', true)
+    .order('observed_at', { referencedTable: 'onchain_observations', ascending: false })
+    .limit(1, { referencedTable: 'onchain_observations' });
 
   for (const row of data ?? []) {
     const observations = (row.onchain_observations ?? []) as Array<{
       value: number | null;
       observed_at: string | null;
-      is_current: boolean | null;
     }>;
-    const current = observations.filter((o) => o.is_current).at(0) ?? observations.at(0);
+    const current = observations.at(0);
     if (!current || current.value === null || !row.key) continue;
 
     out.set(row.key, {
@@ -147,6 +179,12 @@ async function readOnchain(
   return out;
 }
 
+/**
+ * Same rule as `readOnchain`, keyed by the unified macro metric key.
+ *
+ * The slug is computed from `short_label`, so no `.in()` can express it and the
+ * match happens here. The catalogue is twelve rows.
+ */
 async function readMacro(
   adapter: ClientAdapterContext,
   refs: string[],
@@ -154,23 +192,29 @@ async function readMacro(
   const out = new Map<string, ObservationRow>();
   if (refs.length === 0) return out;
 
+  const wanted = new Set(refs);
   const { data } = await adapter.client
     .from('economic_indicators')
     .select(
-      'provider_series_code, name, short_label, unit, decimals, provider, indicator_observations(value, period_date, is_current)',
+      'short_label, name, unit, decimals, provider, indicator_observations(value, period_date)',
     )
-    .in('provider_series_code', refs);
+    .eq('is_active', true)
+    .eq('indicator_observations.is_current', true)
+    .order('period_date', { referencedTable: 'indicator_observations', ascending: false })
+    .limit(1, { referencedTable: 'indicator_observations' });
 
   for (const row of data ?? []) {
+    const key = macroMetricKey(row.short_label);
+    if (!wanted.has(key)) continue;
+
     const observations = (row.indicator_observations ?? []) as Array<{
       value: number | null;
       period_date: string | null;
-      is_current: boolean | null;
     }>;
-    const current = observations.filter((o) => o.is_current).at(0) ?? observations.at(0);
-    if (!current || current.value === null || !row.provider_series_code) continue;
+    const current = observations.at(0);
+    if (!current || current.value === null) continue;
 
-    out.set(row.provider_series_code, {
+    out.set(key, {
       value: current.value,
       at: current.period_date,
       decimals: row.decimals,

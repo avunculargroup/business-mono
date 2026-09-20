@@ -946,9 +946,10 @@ covering all four live finding types were run through the projection and read by
 unit tests were mutation-checked one rule at a time — no chain walk, no hint fallback, series
 units on an anomaly, `as_at` only — each of which takes the suite red.
 
-One thing left alone. `packages/data-supabase/src/client/facts.ts` formats a percentage on
-`unit === '%'`, and the live indicator tables spell it `percent`, so `/prepare` renders a cash
-rate as `3.85` rather than `3.85%`. Pre-existing, adjacent, and not this change.
+One thing left alone at the time. `packages/data-supabase/src/client/facts.ts` formats a
+percentage on `unit === '%'`, and the live indicator tables spell it `percent`, so `/prepare`
+rendered a cash rate as `3.85` rather than `3.85%`. Fixed in the indicators pass below, where
+it turned out to be one of four defects in that file rather than a cosmetic one.
 
 ### `/indicators` was on-chain only, under a heading that promised macro
 
@@ -992,11 +993,65 @@ time, as the briefs were: macro keys sent to the on-chain table, the `is_current
 dropped, the cadence read from `poll_frequency`, and a key advertised under a prefix `series()`
 cannot resolve — each takes the suite red.
 
-**Left alone, and it is a real bug.** The on-chain branch has never filtered `is_current`
-either, though it selects the column and the poll has kept superseded vintages on the table
-since `20260824110000_onchain_one_current_vintage_per_day.sql`. A revised day therefore renders
-twice in an on-chain series. Same field, same function, one line — but it changes what a shipped
-surface displays, which is not what wiring up macro was asked to do.
+### Then the same pass, read against the database
+
+Everything above was reasoned from the migrations. Reading the live tables changed three of its
+conclusions and turned up four more defects, all of which are now fixed.
+
+**The key scheme was wrong, and it was mine.** `macro:<id>` collided with a namespace that
+already existed: the findings engine unified both catalogues years of commits ago —
+`onchain_indicators.key` unprefixed, `macro:<slug of short_label>` via `macroMetricKey` in
+`@platform/shared` — and it is in the database, not only in code. `finding_divergence_pairs`
+seeds `macro:us_m2`, `macro:s_p_500`, `macro:gold` and `macro:dxy` against a bare
+`btc_price_usd`, every `market_reports.findings[].metric_key` is written in it, and
+`briefFindings.ts` already mirrors it to caption the Brief. Two different meanings behind one
+`macro:` prefix in one app is worse than either alone, so `/indicators` uses the platform's.
+The surrogate `id` was never needed; `provider_series_code` is still unusable, and the live
+reason is stronger than the seeds suggested — it is NULL for the RBA cash rate, AU broad money
+**and gold**, and gold has no `provider_table_ref` either, so no coalesce would have saved it.
+
+**The on-chain vintage bug is not cosmetic.** "A revised day renders twice" was the migration's
+worst case, not the live one. `btc_price_usd` and `active_addresses` each hold **91,994
+observations of which 2,670 are current** — the demoted residue of the duplicate-poll incident
+that `20260824110000` cleaned up by demoting rather than deleting. So `/indicators` was asking
+PostgREST for 92k embedded rows per series to print two numbers, and an embedded resource has
+no order unless one is asked for while `max-rows` truncates silently. The series was not
+doubled; it was an arbitrary slice, and `points.at(-1)` — the figure on the card — was an
+arbitrary day. The filter is now `.eq('…is_current', true)` in the query on both tables, with an
+explicit descending order and a 400-point cap, so the newest end is the end that survives. That
+ordering is not a nicety: without it the `is_current` filter still leaves 2,670 rows and the
+truncation still chooses which of them come back.
+
+**`fromDate` was being applied after the fetch**, which meant the cap had already picked the
+window before the caller's window was considered. It is a `.gte()` now.
+
+**Three defects in `/prepare` fact resolution**, none of which had a test that could see them:
+
+- **Both macro refs matched nothing.** `AU_CASH_RATE` and `AU_CPI_ANNUAL` are not values of
+  `provider_series_code` or of any other column in any table. Every pack ever generated
+  resolved both to an `AbsentFact`. They are the unified metric keys now — `macro:rba_cash_rate`
+  and `macro:au_cpi`.
+- **The lookup column could not have worked anyway,** for the NULL reason above.
+- **The observation picked was arbitrary.** `is_current` flags the live vintage of *each*
+  period, so `US M2` has twenty-one current rows, not one. `observations.filter(o =>
+  o.is_current).at(0)` took whichever the unordered embed happened to return first — a cash rate
+  from any month in the history, on a board paper, with today's date beside it. Ordered and
+  limited in the query now.
+
+And the percentage: `'%'` appears in neither indicator table. Both spell it `percent`, across
+three macro and five on-chain active series, so that branch matched nothing live.
+
+**The fixtures were the reason none of this was visible.** The conformance suite's macro rows
+carried `provider_series_code: 'AU_CASH_RATE'` and `unit: '%'` — a vocabulary invented to match
+the adapter, present in no database — so a test asserting `'3.85%'` passed against two broken
+lookups and a dead format branch. Exactly the failure the Brief's findings had, in the same
+file, four months later. Those rows are shaped from the live catalogue now, and
+`facts.test.ts` checks every macro ref in the registry against the set of metric keys the real
+`short_label`s produce, so a ref that names nothing goes red rather than waiting to be noticed.
+
+Mutation-checked one rule at a time, as before: the on-chain `is_current` filter dropped, the
+sort flipped to ascending, the macro ref reverted, the percent spelling reverted, and the
+ordering removed from the fact reader — each takes the suite red on its own.
 
 ---
 
