@@ -950,6 +950,54 @@ One thing left alone. `packages/data-supabase/src/client/facts.ts` formats a per
 `unit === '%'`, and the live indicator tables spell it `percent`, so `/prepare` renders a cash
 rate as `3.85` rather than `3.85%`. Pre-existing, adjacent, and not this change.
 
+### `/indicators` was on-chain only, under a heading that promised macro
+
+The page's lede said "Macro and on-chain series", the README and the MVP spec both said the
+same, and `ClientIndicatorRepository` read `onchain_indicators` and nothing else. No macro
+series had ever reached it. The RLS grants were not the obstacle —
+`20260911030000_directory_and_signals.sql` gave subscribers `economic_indicators` and
+`indicator_observations` at the same time as the on-chain pair — and the rest of the app
+already reads both: `/prepare` fact resolution and the Brief's metric catalogue each query the
+macro tables. Only this repository skipped them.
+
+The fixture adapter is why it read as consistent. Its `indicatorSeries()` seeds `au_cash_rate`,
+sourced to the RBA, so the contract suite saw a macro series on one adapter and never asked the
+other for one. A third green suite over a surface that could not produce the data.
+
+Three things the macro side does not share with the on-chain side, none of them cosmetic:
+
+- **It has no slug.** `economic_indicators.provider_series_code` is NULL for every RBA and ABS
+  row — the RBA cash rate is `provider_table_ref = 'F1.1'` — so keying macro on it would have
+  dropped half the seeded catalogue, silently, as an empty page rather than an error. The
+  surrogate `id` is the only column present on every row. With two key spaces sharing no
+  column, `available()` now emits `onchain:<key>` and `macro:<id>` and `series()` routes on the
+  prefix. Nothing persists these: they travel from one method to the other and become React
+  keys. An unprefixed key resolves to nothing rather than being guessed at.
+- **Its cadence is not its poll frequency.** `poll_frequency` is how often we hit the API —
+  `daily` for the cash rate, so a decision is caught the same day — while the natural reference
+  period is `period_granularity`, added by `20260703000000_add_market_indicators.sql` precisely
+  because the two differ. Reading the poll cadence would have marked a quarterly CPI print stale
+  the day after it landed, on the freshness dot, which is the only gold on the page.
+- **Revisions are first-class.** `indicator_observations` keeps superseded vintages as history
+  behind `is_current`, with `is_revision` and `superseded_value` beside them. An unfiltered read
+  renders a revised period twice, once at the number the provider withdrew.
+
+The contract suite's indicator assertion was passing vacuously: it looped over the returned
+series asserting each point is a string, and an adapter returning nothing satisfied that. It now
+requires a non-empty result, and a second case requires every key `available()` advertised to
+come back from `series()` under that same key — the round-trip is a contract condition once the
+two methods read different tables, because a key that cannot be resolved is a series that
+vanishes from the page and looks exactly like a quiet market. Mutation-checked one rule at a
+time, as the briefs were: macro keys sent to the on-chain table, the `is_current` filter
+dropped, the cadence read from `poll_frequency`, and a key advertised under a prefix `series()`
+cannot resolve — each takes the suite red.
+
+**Left alone, and it is a real bug.** The on-chain branch has never filtered `is_current`
+either, though it selects the column and the poll has kept superseded vintages on the table
+since `20260824110000_onchain_one_current_vintage_per_day.sql`. A revised day therefore renders
+twice in an on-chain series. Same field, same function, one line — but it changes what a shipped
+surface displays, which is not what wiring up macro was asked to do.
+
 ---
 
 ## Open, and deliberately so

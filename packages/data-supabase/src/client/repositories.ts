@@ -326,7 +326,10 @@ export function createClientSignalRepository(
 // ============================================================
 
 /**
- * Cadence in days, from the poll frequency the indicator declares.
+ * Cadence in days, from the frequency word the indicator declares.
+ *
+ * Which column supplies that word differs by table, and the two tables disagree
+ * about what their `poll_frequency` means — see the macro branch of `series()`.
  *
  * Drives the freshness indicator — the only gold on the page — so an unknown
  * frequency maps to a long cadence rather than a short one. Over-reporting
@@ -349,6 +352,53 @@ function cadenceDays(frequency: string | null): number {
   }
 }
 
+/**
+ * The page reads two unrelated tables, so a series key has to say which one.
+ *
+ * `onchain_indicators` is keyed by a slug (`key`) and `economic_indicators` only
+ * by its surrogate `id` — its `provider_series_code` is NULL for every RBA and
+ * ABS row, so keying macro on that would drop half the seeded catalogue. Two
+ * key spaces with no shared column means the prefix is what lets `series()`
+ * send each key back to the table it came from.
+ *
+ * Nothing persists these: `available()` hands them to `series()` and the page
+ * uses them as React keys. They are an addressing detail of this adapter, not
+ * an identifier the subscriber or the database ever sees.
+ */
+type SeriesKind = 'onchain' | 'macro';
+
+function encodeKey(kind: SeriesKind, ref: string): string {
+  return `${kind}:${ref}`;
+}
+
+/** Splits `available()`'s keys back into the two tables they address. */
+function partitionKeys(keys: string[]): Record<SeriesKind, string[]> {
+  const out: Record<SeriesKind, string[]> = { onchain: [], macro: [] };
+
+  for (const key of keys) {
+    const separator = key.indexOf(':');
+    if (separator === -1) continue;
+
+    const kind = key.slice(0, separator);
+    const ref = key.slice(separator + 1);
+    if (!ref) continue;
+    if (kind === 'onchain' || kind === 'macro') out[kind].push(ref);
+  }
+
+  return out;
+}
+
+/**
+ * Formats a value once, here, so nothing downstream can do arithmetic on a
+ * series point. Same rule as Fact.value.
+ */
+function formatPoint(value: number, decimals: number): string {
+  return new Intl.NumberFormat('en-AU', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
 export function createClientIndicatorRepository(
   adapter: ClientAdapterContext,
 ): ClientIndicatorRepository {
@@ -356,16 +406,35 @@ export function createClientIndicatorRepository(
     async available(_ctx: ReadContext): Promise<Array<{ key: string; label: string }>> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
-        .from('onchain_indicators')
-        .select('key, name, short_label')
-        .eq('is_active', true)
-        .eq('is_displayed', true)
-        .order('key');
+      // `economic_indicators` has no `is_displayed`: the macro catalogue is
+      // small and hand-seeded, so `is_active` is the only gate it carries.
+      // Adding a display flag there is a migration, not a filter invented here.
+      const [onchain, macro] = await Promise.all([
+        adapter.client
+          .from('onchain_indicators')
+          .select('key, name, short_label')
+          .eq('is_active', true)
+          .eq('is_displayed', true)
+          .order('key'),
+        adapter.client
+          .from('economic_indicators')
+          .select('id, name, short_label')
+          .eq('is_active', true)
+          .order('short_label'),
+      ]);
 
-      return (data ?? [])
-        .filter((row): row is typeof row & { key: string } => Boolean(row.key))
-        .map((row) => ({ key: row.key, label: row.short_label ?? row.name ?? row.key }));
+      return [
+        ...(onchain.data ?? [])
+          .filter((row): row is typeof row & { key: string } => Boolean(row.key))
+          .map((row) => ({
+            key: encodeKey('onchain', row.key),
+            label: row.short_label ?? row.name ?? row.key,
+          })),
+        ...(macro.data ?? []).map((row) => ({
+          key: encodeKey('macro', row.id),
+          label: row.short_label ?? row.name,
+        })),
+      ];
     },
 
     async series(
@@ -376,16 +445,30 @@ export function createClientIndicatorRepository(
       await requireDisclosure(adapter);
       if (keys.length === 0) return [];
 
-      const { data } = await adapter.client
-        .from('onchain_indicators')
-        .select(
-          'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at, is_current)',
-        )
-        .in('key', keys);
+      const wanted = partitionKeys(keys);
+
+      const [onchain, macro] = await Promise.all([
+        wanted.onchain.length > 0
+          ? adapter.client
+            .from('onchain_indicators')
+            .select(
+              'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at, is_current)',
+            )
+            .in('key', wanted.onchain)
+          : null,
+        wanted.macro.length > 0
+          ? adapter.client
+            .from('economic_indicators')
+            .select(
+              'id, name, short_label, unit, decimals, provider, period_granularity, indicator_observations(value, period_date, is_current)',
+            )
+            .in('id', wanted.macro)
+          : null,
+      ]);
 
       const out: IndicatorSeries[] = [];
 
-      for (const row of data ?? []) {
+      for (const row of onchain?.data ?? []) {
         if (!row.key) continue;
         const observations = ((row.onchain_observations ?? []) as Array<{
           value: number | null;
@@ -400,20 +483,52 @@ export function createClientIndicatorRepository(
 
         const digits = row.decimals ?? 2;
         out.push({
-          key: row.key,
+          key: encodeKey('onchain', row.key),
           label: row.short_label ?? row.name ?? row.key,
           ...(row.unit ? { unit: row.unit } : {}),
           sourceName: row.provider ?? 'Unattributed',
           expectedCadenceDays: cadenceDays(row.poll_frequency),
           lastObservedAt: observations.at(-1)!.observed_at!,
-          // Formatted here, once, so nothing downstream can do arithmetic on a
-          // series point. Same rule as Fact.value.
           points: observations.map((o) => ({
             at: o.observed_at!,
-            value: new Intl.NumberFormat('en-AU', {
-              minimumFractionDigits: digits,
-              maximumFractionDigits: digits,
-            }).format(o.value!),
+            value: formatPoint(o.value!, digits),
+          })),
+        });
+      }
+
+      for (const row of macro?.data ?? []) {
+        // Only the current vintage. `indicator_observations` keeps superseded
+        // values on the table as history — that is what `is_revision` and
+        // `superseded_value` are for — so an unfiltered read renders a revised
+        // period twice, once at the number the provider withdrew.
+        const observations = ((row.indicator_observations ?? []) as Array<{
+          value: number | null;
+          period_date: string | null;
+          is_current: boolean | null;
+        }>)
+          .filter((o) => o.is_current)
+          .filter((o) => o.value !== null && o.period_date !== null)
+          .filter((o) => (fromDate ? o.period_date! >= fromDate : true))
+          .sort((a, b) => (a.period_date! < b.period_date! ? -1 : 1));
+
+        if (observations.length === 0) continue;
+
+        out.push({
+          key: encodeKey('macro', row.id),
+          label: row.short_label ?? row.name,
+          ...(row.unit ? { unit: row.unit } : {}),
+          sourceName: row.provider,
+          // `period_granularity`, never `poll_frequency`. The poll cadence is
+          // how often we hit the API — daily for the RBA cash rate, which is
+          // polled every day so a decision is caught the same day. Reporting
+          // that as the expected cadence would mark a quarterly CPI print stale
+          // the day after it lands. The column exists precisely because the two
+          // are different; see 20260703000000_add_market_indicators.sql.
+          expectedCadenceDays: cadenceDays(row.period_granularity),
+          lastObservedAt: observations.at(-1)!.period_date!,
+          points: observations.map((o) => ({
+            at: o.period_date!,
+            value: formatPoint(o.value!, row.decimals),
           })),
         });
       }

@@ -45,21 +45,27 @@ const ONCHAIN_ROWS = [
 
 const MACRO_ROWS = [
   {
+    id: 'macro-cpi',
     provider_series_code: 'AU_CPI_ANNUAL',
     name: 'Australian CPI, annual',
     short_label: 'CPI',
     unit: '%',
     decimals: 1,
     provider: 'ABS',
+    period_granularity: 'quarterly',
+    is_active: true,
     indicator_observations: [{ value: 3.2, period_date: '2026-06-30', is_current: true }],
   },
   {
+    id: 'macro-cash-rate',
     provider_series_code: 'AU_CASH_RATE',
     name: 'RBA cash rate target',
     short_label: 'Cash rate',
     unit: '%',
     decimals: 2,
     provider: 'RBA',
+    period_granularity: 'monthly',
+    is_active: true,
     indicator_observations: [{ value: 3.85, period_date: '2026-08-12', is_current: true }],
   },
 ];
