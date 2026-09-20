@@ -1,0 +1,42 @@
+{
+  "meta": { "schema": "https://json.sdmx.org/2.1/sdmx-json-data-schema.json" },
+  "dataSets": [
+    {
+      "action": "Information",
+      "series": {
+        "0:0:0:0": {
+          "attributes": [0],
+          "observations": {
+            "0": [135.2, 0],
+            "1": [136.1, 0],
+            "2": [137.0, 0],
+            "3": [null, 0]
+          }
+        }
+      }
+    }
+  ],
+  "structure": {
+    "name": "Consumer Price Index",
+    "dimensions": {
+      "series": [
+        { "id": "MEASURE", "name": "Measure", "keyPosition": 0, "values": [{ "id": "1", "name": "Index Numbers" }] },
+        { "id": "INDEX", "name": "Index", "keyPosition": 1, "values": [{ "id": "10001", "name": "All groups CPI" }] },
+        { "id": "TSEST", "name": "Adjustment", "keyPosition": 2, "values": [{ "id": "10", "name": "Original" }] },
+        { "id": "REGION", "name": "Region", "keyPosition": 3, "values": [{ "id": "50", "name": "Weighted average of eight capital cities" }] }
+      ],
+      "observation": [
+        {
+          "id": "TIME_PERIOD",
+          "name": "Time Period",
+          "values": [
+            { "id": "2025-Q3", "name": "Q3 2025" },
+            { "id": "2025-Q4", "name": "Q4 2025" },
+            { "id": "2026-Q1", "name": "Q1 2026" },
+            { "id": "2026-Q2", "name": "Q2 2026" }
+          ]
+        }
+      ]
+    }
+  }
+}

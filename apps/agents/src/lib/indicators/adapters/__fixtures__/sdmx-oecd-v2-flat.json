@@ -1,0 +1,36 @@
+{
+  "meta": { "schema": "https://json.sdmx.org/2.0/sdmx-json-data-schema.json" },
+  "dataSets": [
+    {
+      "action": "Information",
+      "observations": {
+        "0:0:0:0": [101.4],
+        "0:0:0:1": [100.8],
+        "0:0:0:2": [99.7]
+      }
+    }
+  ],
+  "structures": [
+    {
+      "name": "Business confidence index",
+      "dimensions": {
+        "series": [
+          { "id": "REF_AREA", "name": "Reference area", "values": [{ "id": "AUS", "name": "Australia" }] },
+          { "id": "FREQ", "name": "Frequency", "values": [{ "id": "M", "name": "Monthly" }] },
+          { "id": "MEASURE", "name": "Measure", "values": [{ "id": "BCICP", "name": "Business confidence index" }] }
+        ],
+        "observation": [
+          {
+            "id": "TIME_PERIOD",
+            "name": "Time period",
+            "values": [
+              { "id": "2026-06", "name": "June 2026" },
+              { "id": "2026-07", "name": "July 2026" },
+              { "id": "2026-08", "name": "August 2026" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

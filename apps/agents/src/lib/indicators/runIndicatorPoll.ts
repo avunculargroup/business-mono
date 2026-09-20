@@ -92,7 +92,7 @@ export async function runIndicatorPoll(
   // `pnpm --filter @platform/db generate-types` runs post-migration.
   for (const indicator of (indicators ?? []) as unknown as IndicatorRow[]) {
     const adapter = getAdapter(indicator.provider);
-    if (!adapter) continue; // e.g. 'abs' — no adapter yet
+    if (!adapter) continue; // every provider in the union has one; a new one may not
     if (!isDue(indicator.poll_frequency, now, routine.timezone)) continue;
     result.indicators_polled += 1;
 

@@ -1,0 +1,6 @@
+{
+  "meta": { "schema": "https://json.sdmx.org/2.1/sdmx-json-data-schema.json" },
+  "errors": [
+    { "code": 150, "title": "Invalid data key: dimension REGION has no value '99'" }
+  ]
+}
