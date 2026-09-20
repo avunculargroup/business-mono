@@ -25,7 +25,7 @@ import type {
   ReadContext,
   Signal,
 } from '@platform/data';
-import { parseTemplate } from '@platform/shared';
+import { macroMetricKey, parseTemplate } from '@platform/shared';
 import {
   buildMetricCatalog,
   toClientFinding,
@@ -326,7 +326,10 @@ export function createClientSignalRepository(
 // ============================================================
 
 /**
- * Cadence in days, from the poll frequency the indicator declares.
+ * Cadence in days, from the frequency word the indicator declares.
+ *
+ * Which column supplies that word differs by table, and the two tables disagree
+ * about what their `poll_frequency` means — see the macro branch of `series()`.
  *
  * Drives the freshness indicator — the only gold on the page — so an unknown
  * frequency maps to a long cadence rather than a short one. Over-reporting
@@ -349,6 +352,59 @@ function cadenceDays(frequency: string | null): number {
   }
 }
 
+/**
+ * The page reads two unrelated tables, so a series key has to say which one.
+ *
+ * This is not a scheme of this adapter's own: the findings engine already
+ * unified both catalogues under one metric key — `onchain_indicators.key`
+ * unprefixed, and `macro:<slug of short_label>` for an economic indicator, via
+ * `macroMetricKey` in `@platform/shared`. That namespace is in the database,
+ * not only in code: `finding_divergence_pairs` seeds `macro:us_m2`,
+ * `macro:s_p_500`, `macro:gold` and `macro:dxy` against a bare
+ * `btc_price_usd`, and every `market_reports.findings[].metric_key` is written
+ * in it. `briefFindings.ts` already mirrors it to caption the Brief.
+ *
+ * So this page uses it too. A second scheme would have put two different
+ * meanings behind the same `macro:` prefix in one app.
+ *
+ * Why not the surrogate `id`, which is the one column every macro row has:
+ * because it would have been that second scheme. `provider_series_code` is no
+ * use either — it is NULL for the RBA cash rate, AU broad money and gold, three
+ * of the ten active rows — which is the trap `macroMetricKey` was coined to
+ * avoid in the first place.
+ */
+function isMacroKey(key: string): boolean {
+  return key.startsWith('macro:');
+}
+
+/**
+ * How many observations a series carries at most, newest first.
+ *
+ * An embedded PostgREST select is capped by the server's `max-rows`, and what
+ * it drops when the cap bites is unspecified because an embedded resource has
+ * no order unless one is asked for. `btc_price_usd` holds 2,670 current
+ * observations (and 92k rows in total, the demoted vintages of the duplicate
+ * poll that 20260824110000 cleaned up), so this is not hypothetical: an
+ * unordered, unbounded read of that series can return an arbitrary slice, and
+ * then `points.at(-1)` — the figure the page prints — is an arbitrary day.
+ *
+ * Ordering descending and capping makes the newest end the one that survives.
+ * 400 daily points is a bit over a year, which covers the sparkline the read
+ * model describes and the latest/prior pair the page renders.
+ */
+const MAX_POINTS = 400;
+
+/**
+ * Formats a value once, here, so nothing downstream can do arithmetic on a
+ * series point. Same rule as Fact.value.
+ */
+function formatPoint(value: number, decimals: number): string {
+  return new Intl.NumberFormat('en-AU', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
 export function createClientIndicatorRepository(
   adapter: ClientAdapterContext,
 ): ClientIndicatorRepository {
@@ -356,16 +412,35 @@ export function createClientIndicatorRepository(
     async available(_ctx: ReadContext): Promise<Array<{ key: string; label: string }>> {
       await requireDisclosure(adapter);
 
-      const { data } = await adapter.client
-        .from('onchain_indicators')
-        .select('key, name, short_label')
-        .eq('is_active', true)
-        .eq('is_displayed', true)
-        .order('key');
+      // `economic_indicators` has no `is_displayed`: the macro catalogue is
+      // small and hand-seeded, so `is_active` is the only gate it carries.
+      // Adding a display flag there is a migration, not a filter invented here.
+      const [onchain, macro] = await Promise.all([
+        adapter.client
+          .from('onchain_indicators')
+          .select('key, name, short_label')
+          .eq('is_active', true)
+          .eq('is_displayed', true)
+          .order('key'),
+        adapter.client
+          .from('economic_indicators')
+          .select('short_label, name')
+          .eq('is_active', true)
+          .order('short_label'),
+      ]);
 
-      return (data ?? [])
-        .filter((row): row is typeof row & { key: string } => Boolean(row.key))
-        .map((row) => ({ key: row.key, label: row.short_label ?? row.name ?? row.key }));
+      return [
+        ...(onchain.data ?? [])
+          .filter((row): row is typeof row & { key: string } => Boolean(row.key))
+          .map((row) => ({
+            key: row.key,
+            label: row.short_label ?? row.name ?? row.key,
+          })),
+        ...(macro.data ?? []).map((row) => ({
+          key: macroMetricKey(row.short_label),
+          label: row.short_label ?? row.name,
+        })),
+      ];
     },
 
     async series(
@@ -376,24 +451,60 @@ export function createClientIndicatorRepository(
       await requireDisclosure(adapter);
       if (keys.length === 0) return [];
 
-      const { data } = await adapter.client
-        .from('onchain_indicators')
-        .select(
-          'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at, is_current)',
-        )
-        .in('key', keys);
+      const macroKeys = new Set(keys.filter(isMacroKey));
+      const onchainKeys = keys.filter((key) => !isMacroKey(key));
+
+      const [onchain, macro] = await Promise.all([
+        onchainKeys.length > 0
+          ? adapter.client
+            .from('onchain_indicators')
+            .select(
+              'key, name, short_label, unit, decimals, provider, poll_frequency, onchain_observations(value, observed_at)',
+            )
+            .in('key', onchainKeys)
+            // Superseded vintages stay on the table as history, so without this
+            // a revised day renders twice — and for btc_price_usd, where 89k of
+            // 92k rows are demoted duplicates, it is the difference between
+            // reading 2,670 rows and reading all of them.
+            .eq('onchain_observations.is_current', true)
+            .gte('onchain_observations.observed_at', fromDate ?? '0001-01-01')
+            .order('observed_at', {
+              referencedTable: 'onchain_observations',
+              ascending: false,
+            })
+            .limit(MAX_POINTS, { referencedTable: 'onchain_observations' })
+          : null,
+        // The macro slug is computed from `short_label`, so no `.in()` can
+        // express it and the match happens below. The catalogue is twelve rows
+        // and the page asks for all of them, so this reads what it needs.
+        macroKeys.size > 0
+          ? adapter.client
+            .from('economic_indicators')
+            .select(
+              'short_label, name, unit, decimals, provider, period_granularity, indicator_observations(value, period_date)',
+            )
+            .eq('is_active', true)
+            .eq('indicator_observations.is_current', true)
+            .gte('indicator_observations.period_date', fromDate ?? '0001-01-01')
+            .order('period_date', {
+              referencedTable: 'indicator_observations',
+              ascending: false,
+            })
+            .limit(MAX_POINTS, { referencedTable: 'indicator_observations' })
+          : null,
+      ]);
 
       const out: IndicatorSeries[] = [];
 
-      for (const row of data ?? []) {
+      for (const row of onchain?.data ?? []) {
         if (!row.key) continue;
+        // Back to ascending: the query ordered newest-first so the cap would
+        // keep the newest end, and the read model's points run oldest-first.
         const observations = ((row.onchain_observations ?? []) as Array<{
           value: number | null;
           observed_at: string | null;
-          is_current: boolean | null;
         }>)
           .filter((o) => o.value !== null && o.observed_at !== null)
-          .filter((o) => (fromDate ? o.observed_at! >= fromDate : true))
           .sort((a, b) => (a.observed_at! < b.observed_at! ? -1 : 1));
 
         if (observations.length === 0) continue;
@@ -406,14 +517,42 @@ export function createClientIndicatorRepository(
           sourceName: row.provider ?? 'Unattributed',
           expectedCadenceDays: cadenceDays(row.poll_frequency),
           lastObservedAt: observations.at(-1)!.observed_at!,
-          // Formatted here, once, so nothing downstream can do arithmetic on a
-          // series point. Same rule as Fact.value.
           points: observations.map((o) => ({
             at: o.observed_at!,
-            value: new Intl.NumberFormat('en-AU', {
-              minimumFractionDigits: digits,
-              maximumFractionDigits: digits,
-            }).format(o.value!),
+            value: formatPoint(o.value!, digits),
+          })),
+        });
+      }
+
+      for (const row of macro?.data ?? []) {
+        const key = macroMetricKey(row.short_label);
+        if (!macroKeys.has(key)) continue;
+
+        const observations = ((row.indicator_observations ?? []) as Array<{
+          value: number | null;
+          period_date: string | null;
+        }>)
+          .filter((o) => o.value !== null && o.period_date !== null)
+          .sort((a, b) => (a.period_date! < b.period_date! ? -1 : 1));
+
+        if (observations.length === 0) continue;
+
+        out.push({
+          key,
+          label: row.short_label ?? row.name,
+          ...(row.unit ? { unit: row.unit } : {}),
+          sourceName: row.provider,
+          // `period_granularity`, never `poll_frequency`. The poll cadence is
+          // how often we hit the API — daily for the RBA cash rate, which is
+          // polled every day so a decision is caught the same day. Reporting
+          // that as the expected cadence would mark a quarterly CPI print stale
+          // the day after it lands. The column exists precisely because the two
+          // are different; see 20260703000000_add_market_indicators.sql.
+          expectedCadenceDays: cadenceDays(row.period_granularity),
+          lastObservedAt: observations.at(-1)!.period_date!,
+          points: observations.map((o) => ({
+            at: o.period_date!,
+            value: formatPoint(o.value!, row.decimals),
           })),
         });
       }

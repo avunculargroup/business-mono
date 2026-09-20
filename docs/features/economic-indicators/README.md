@@ -17,6 +17,7 @@ agents (Rex citing exact figures, Charlie/Margot triggered by a fresh print).
 | [`feature-spec.md`](./feature-spec.md) | The main spec — data model, views, agent integration, UI, open questions | Start here; before Sessions 1 & 3 |
 | [`adapter-contract.md`](./adapter-contract.md) | The ingest seam — the common shape FRED / RBA / ABS each map to | Before Session 2 |
 | [`assumptions.md`](./assumptions.md) | What was inferred without full repo context — verify these before building | Before any session |
+| [`activating-an-indicator.md`](./activating-an-indicator.md) | Step-by-step runbook for turning a seeded indicator on and verifying its first real data | Before activating `AU CPI` or `AU Bus. Confidence` |
 | `sql/seed.sql` | The six v1 indicators, with FRED codes / RBA table refs and confidence notes | Session 1 |
 | `sql/v_indicator_latest.sql` | Canonical `v_indicator_latest` view, with year-on-year join | Session 1 |
 | `prototype/macro-indicators-panel.html` | Faithful design reference for the panel (not product code) | Session 3 |

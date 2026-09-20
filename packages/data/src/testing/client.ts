@@ -158,11 +158,42 @@ export function describeClientContract(adapter: ClientAdapterUnderTest): void {
         available.map((s) => s.key),
       );
 
+      // Without this the assertion below passes against an adapter that serves
+      // nothing at all — the vacuous green this suite exists to prevent.
+      expect(series.length).toBeGreaterThan(0);
+
       for (const one of series) {
         for (const point of one.points) {
           expect(typeof point.value).toBe('string');
         }
       }
+    });
+
+    it('answers every key `available()` advertised, under that same key', async () => {
+      const ctx = await adapter.createContext('corporate');
+      const read = testReadContext();
+
+      const available = await ctx.indicators.available(read);
+      const series = await ctx.indicators.series(
+        read,
+        available.map((s) => s.key),
+      );
+
+      // `available()` and `series()` read different tables in the live adapter,
+      // and a series key has to carry which one. That makes the round-trip a
+      // contract condition rather than a formality: a key an adapter advertises
+      // and then cannot resolve is a series that silently vanishes from the
+      // page, which looks identical to a quiet market.
+      //
+      // Stated as equality on purpose, which is a claim: a catalogue must not
+      // advertise a series it cannot serve. Both adapters satisfy it today. An
+      // indicator that is active with no observations yet would break it — and
+      // should, because the honest fix is for `available()` to stop listing it
+      // rather than for the page to list a series it never renders.
+      expect(
+        series.map((one) => one.key).sort(),
+        'a key from available() came back unresolvable from series()',
+      ).toEqual(available.map((one) => one.key).sort());
     });
 
     // --------------------------------------------------------

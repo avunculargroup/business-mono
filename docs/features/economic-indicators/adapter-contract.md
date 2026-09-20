@@ -137,15 +137,25 @@ The fiddly one. No API — you fetch a statistical-table CSV and parse it.
 - **releasedAt:** `null`.
 - **Gotcha:** RBA occasionally restructures column order between table revisions. Label-matching survives this; index-matching doesn't. This adapter is where the build time goes — budget for it.
 
-### ABS — `apps/agents/.../adapters/abs.ts` — DEFERRED
+### ABS and OECD — `adapters/sdmx.ts`, `adapters/abs.ts`, `adapters/oecd.ts` — BUILT, NOT ACTIVATED
 
-Built only when the AU CPI row flips `is_active = true`. Sketch so the seam is reserved:
+The escape hatch below was **declined**: the FRED OECD mirror would have put an Australian CPI figure on an Australian product via a third party, on a series whose OECD MEI family was widely discontinued, and this product cites its sources. Both SDMX providers were built instead, sharing one parser — the clunky part is the encoding, not the publisher, and `AU Bus. Confidence` (provider `oecd`) was waiting on the same work.
 
-- **Endpoint:** ABS Data API (SDMX), `GET https://data.api.abs.gov.au/rest/data/{dataflow}/{datakey}` with a JSON `Accept` header / `format` param. `{dataflow}` from `providerTableRef`.
-- **Shape:** SDMX-JSON — dimensions and observations are index-keyed arrays you cross-reference against the structure block. Genuinely clunky; this is why it's deferred.
-- **periodDate:** from the `TIME_PERIOD` dimension (`2026-Q1`) → normalise to first-of-quarter.
-- **releasedAt:** `null`.
-- **Escape hatch:** if SDMX parsing isn't worth it, the seed file notes the FRED OECD mirror `AUSCPIALLQINMEI` — which would make this a FRED adapter call instead, no ABS code at all. Decide before building, not during.
+- **Endpoints:** ABS `GET https://data.api.abs.gov.au/rest/data/{dataflow}/{dataKey}?format=jsondata`; OECD `GET https://sdmx.oecd.org/public/rest/data/{agency},{dataflow},{version}/{dataKey}?format=jsondata`.
+- **`provider_table_ref` grammar:** `"{dataflow}/{dataKey}"`, spaces around the slash ignored, key optional. Chosen to read the seeded rows as written.
+- **Shape:** SDMX-JSON, both encodings — 1.0's single `structure` and 2.0's `structures[]` — and both dataset forms, series-nested and flat. Observations are index-keyed and cross-referenced against the structure block, so a dataset and a structure that disagree produce a confident wrong answer unless the index is bounds-checked. It is.
+- **periodDate:** from `TIME_PERIOD`, and **the value decides the period, not `period_granularity`** — `2026-Q1` is a quarter whatever the registry row says. Granularity settles only a full date (`2026-08-15`), which a daily series keeps and everything else collapses.
+- **releasedAt:** `null`, as everywhere in v1.
+- **Windowing:** SDMX has no row limit, so the workflow's `limit` becomes a `startPeriod` date via `sdmxWindow.ts`, rounded up by one period.
+
+**Neither has met a live response.** There is no network egress from the environment they were written in — `data.api.abs.gov.au` is refused at the proxy — so the fixtures are synthesised from the SDMX-JSON spec rather than recorded (`__fixtures__/README.md` says which are which). The parser therefore follows `goldApi.ts`: strict, and every failure quotes the real body back, so one `agent_activity` row carries what is needed to correct it. A green test suite says the parser reads SDMX-JSON; it does not say either row will ingest.
+
+Both rows stay `is_active = false` until someone runs one. Two things are known to be unfinished, and both fail with a message that says so rather than guessing:
+
+- **AU CPI's ref is `CPI`** — a dataflow with no data key, which asks for every series in it. The parser refuses a multi-series answer and names the series that came back, which is what the key should be written from.
+- **AU Business Confidence's ref names no agency.** `DSD_STES@DF_CLI` is not addressable; OECD needs `{agency},{dataflow},{version}`. The adapter refuses rather than build a URL that 404s, because a 404 from a wrong agency is indistinguishable from a missing series.
+
+- **Escape hatch (declined, kept for the record):** the seed file notes the FRED OECD mirror `AUSCPIALLQINMEI`, which would have made this a FRED adapter call with no ABS code at all.
 
 -----
 
