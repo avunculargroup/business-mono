@@ -1527,6 +1527,7 @@ CREATE TABLE news_items (
   ingestion_ref        TEXT,                        -- email Message-ID; idempotency key, deduped before url/semantic dedup
   canonical_url        TEXT,                        -- real "view in browser"/original link (email items)
   image_url            TEXT,                        -- og:image/twitter:image scraped from the source page (web-page ingestion paths only)
+  paywalled            BOOLEAN,                     -- article sits behind a paywall; null = not checked (email bodies, pre-column rows, unfetchable pages)
   author               TEXT,
   published_at         TIMESTAMPTZ,
   fetched_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),

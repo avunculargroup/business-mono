@@ -38,7 +38,7 @@ import {
 } from '../lib/newsletterExtract.js';
 import { extractNewsletterLinks } from '../lib/newsletterLinks.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
-import { fetchOgImage } from '../lib/fetchOgImage.js';
+import { fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
 import { createLogger } from '../lib/logger.js';
@@ -56,9 +56,6 @@ const MAX_FOLLOWED_LINKS_PER_CYCLE = 20;
 // not content. Higher than the RSS path's 200 because there we still have a
 // real feed summary to fall back on; here we have nothing.
 const MIN_FOLLOWED_BODY_CHARS = 1000;
-
-const PAYWALL_RE =
-  /subscribe to (?:continue|read)|create an account to|this content is for (?:subscribers|members)|already a (?:subscriber|member)\?/i;
 
 // Model scopes for the followed-link path, configurable at /settings/models
 // independently of the RSS/feed ingestion steps.
@@ -387,7 +384,7 @@ export async function ingestNewsletterLinks(args: {
         log.info({ url: link.url, chars: markdown.length }, 'link skipped — body too short');
         continue;
       }
-      if (PAYWALL_RE.test(markdown.slice(0, 2000))) {
+      if (isPaywallStub(markdown)) {
         skipped += 1;
         log.info({ url: link.url }, 'link skipped — paywall stub');
         continue;
@@ -396,7 +393,7 @@ export async function ingestNewsletterLinks(args: {
       // Jina follows redirects server-side, so this unwraps tracking wrappers.
       const url = fetched?.resolved_url ?? link.url;
       const title = fetched?.title?.trim() || link.anchorText || link.url;
-      const imageUrl = await fetchOgImage(url);
+      const { imageUrl, paywalled } = await fetchPageMeta(url);
 
       const { data: extracted } = await extractNewsMetadata({
         title,
@@ -417,6 +414,7 @@ export async function ingestNewsletterLinks(args: {
         publishedAt: null,
         url,
         imageUrl,
+        paywalled,
         ingestionRef: `${parentIngestionRef}#link:${link.url}`,
         ingestedBy: 'rex',
         rubricScopeKey: LINK_RUBRIC_SCOPE,

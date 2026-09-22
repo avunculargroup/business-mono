@@ -55,7 +55,7 @@ import { verifyMoodSummary } from './newsCurationVerify.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
-import { fetchOgImage } from '../lib/fetchOgImage.js';
+import { fetchOgImage, fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
 import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
@@ -464,7 +464,7 @@ export async function runNewsCuration(
   const [newsRes, podcastRes] = await Promise.all([
     supabase
       .from('news_items')
-      .select('id, title, url, summary, key_points, category, source_name, relevance_score, published_at, image_url')
+      .select('id, title, url, summary, key_points, category, source_name, relevance_score, published_at, image_url, paywalled')
       .gte('fetched_at', since)
       .neq('status', 'archived')
       .order('relevance_score', { ascending: false, nullsFirst: false })
@@ -493,6 +493,7 @@ export async function runNewsCuration(
     source_name: (r.source_name as string) ?? 'News',
     category: (r.category as string) ?? 'news',
     image_url: (r.image_url as string | null) ?? undefined,
+    ...(r.paywalled === true ? { paywalled: true } : {}),
     summary: (r.summary as string | null) ?? '',
     key_points: Array.isArray(r.key_points)
       ? (r.key_points as unknown[]).filter((p): p is string => typeof p === 'string')
@@ -586,6 +587,7 @@ ${candidateLines}`;
     source_name: c.source_name,
     category: c.category,
     image_url: c.image_url,
+    ...(c.paywalled ? { paywalled: true } : {}),
   }));
 
   // ── Charlie writes the two-sentence, fact-grounded intro summary ─────────────
@@ -664,6 +666,7 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
       source: s.source_name,
       excerpt: '',
       retrieved_at: retrievedAt,
+      ...(s.paywalled ? { paywalled: true } : {}),
     })),
     metadata: {
       mood_summary: moodSummary,
@@ -1105,14 +1108,19 @@ async function runNewsIngest(
       // Fetch full article body via Jina Reader, and the page's og:image in parallel.
       let bodyMarkdown: string | null = null;
       let imageUrl: string | null = null;
+      let paywalled: boolean | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
             { title?: string; markdown?: string } | undefined
           >,
-          fetchOgImage(item.url).then((og) => { imageUrl = og; }),
+          fetchPageMeta(item.url).then((meta) => {
+            imageUrl = meta.imageUrl;
+            paywalled = meta.paywalled;
+          }),
         ]);
         const md = fetched?.markdown?.trim();
+        if (md && isPaywallStub(md)) paywalled = true;
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
         // body fetch failed; carry on with snippet-only enrichment
@@ -1172,6 +1180,7 @@ async function runNewsIngest(
         publishedAt: item.published_at,
         url: item.url,
         imageUrl,
+        paywalled,
         routineId: routine.id,
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,
@@ -1406,14 +1415,19 @@ async function runNewsSourceScan(
     try {
       let bodyMarkdown: string | null = null;
       let imageUrl: string | null = null;
+      let paywalled: boolean | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
             { title?: string; markdown?: string } | undefined
           >,
-          fetchOgImage(item.url).then((og) => { imageUrl = og; }),
+          fetchPageMeta(item.url).then((meta) => {
+            imageUrl = meta.imageUrl;
+            paywalled = meta.paywalled;
+          }),
         ]);
         const md = fetched?.markdown?.trim();
+        if (md && isPaywallStub(md)) paywalled = true;
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
         // body fetch failed; carry on with snippet-only enrichment
@@ -1457,6 +1471,7 @@ async function runNewsSourceScan(
         publishedAt: item.published_at,
         url: item.url,
         imageUrl,
+        paywalled,
         routineId: routine.id,
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,

@@ -42,6 +42,8 @@ export interface IngestNewsItemInput {
   canonicalUrl?: string | null;
   /** og:image/twitter:image scraped from the source page (web-page ingestion paths only). */
   imageUrl?: string | null;
+  /** Whether the source page is paywalled; null/omitted = not checked (see news_items.paywalled). */
+  paywalled?: boolean | null;
   /** Email Message-ID — idempotency key, deduped before url/semantic dedup. */
   ingestionRef?: string | null;
   hasPdfAttachment?: boolean;
@@ -164,6 +166,7 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     ingestion_ref: input.ingestionRef ?? null,
     canonical_url: input.canonicalUrl ?? null,
     image_url: input.imageUrl ?? null,
+    paywalled: input.paywalled ?? null,
     author: input.author ?? null,
     published_at: input.publishedAt,
     body_markdown: input.body,

@@ -6,6 +6,27 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-22 — `news_items.paywalled`
+
+`20260922000000_add_news_item_paywalled.sql` adds a nullable **`paywalled
+BOOLEAN`** so the daily `news_curation` digest can mark stories a reader will hit
+a paywall on.
+
+- **Detected at ingestion, from the page we already fetch.** The web-page paths
+  (RSS scan, Tavily search ingest, newsletter followed links) fetch each article's
+  HTML for its og:image; `fetchPageMeta` reads the paywall signal from the same
+  response — schema.org `isAccessibleForFree: false` (the markup publishers give
+  Google for paywalled content) or `article:content_tier` of `locked`/`metered`.
+  A subscribe-to-continue stub in the Jina body also counts.
+- **Null is not false.** Null means nobody checked: rows from before this column,
+  email newsletter bodies (the subscription already paid for them), report PDFs,
+  and pages that could not be fetched. False means the page was read and carried
+  no paywall signal. The digest only marks `true`.
+- **No backfill.** Older rows stay null; the digest looks back 24 hours, so the
+  pill is accurate from the first run after deploy.
+
+---
+
 ## 2026-09-16 — `privacy_policy_url` onto `company_profile`
 
 `20260916010000_privacy_policy_url_on_profile.sql` retires the last Service

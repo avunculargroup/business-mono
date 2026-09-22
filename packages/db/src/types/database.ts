@@ -3992,6 +3992,7 @@ export type Database = {
           ingestion_ref: string | null
           key_points: Json
           knowledge_item_id: string | null
+          paywalled: boolean | null
           published_at: string | null
           relevance_reasoning: string | null
           relevance_score: number | null
@@ -4027,6 +4028,7 @@ export type Database = {
           ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
+          paywalled?: boolean | null
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null
@@ -4062,6 +4064,7 @@ export type Database = {
           ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
+          paywalled?: boolean | null
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null

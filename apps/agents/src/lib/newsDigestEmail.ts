@@ -18,6 +18,7 @@ const C = {
   textPrimary: '#1A1915',
   textSecondary: '#6B6860',
   textTertiary: '#9E9C96',
+  surfaceSubtle: '#F4F4F1',
   accent: '#C9A84C',
   accentDark: '#9A7A2E',
 } as const;
@@ -63,6 +64,7 @@ interface DigestItem {
   /** news_items / podcast id, for the in-app fallback link. */
   id?: string;
   kind?: 'news' | 'podcast';
+  paywalled?: boolean;
 }
 
 /**
@@ -85,6 +87,9 @@ function cleanTitle(title: string): string {
   }
   return current;
 }
+
+/** Badge text for a story whose article sits behind a paywall. */
+const PAYWALL_LABEL = 'Paywall';
 
 function escapeHtml(s: string): string {
   return s
@@ -124,6 +129,7 @@ function digestItems(result: RoutineResult): DigestItem[] {
       source: s.source_name,
       id: s.id,
       kind: s.kind,
+      paywalled: s.paywalled,
     }));
   }
   // Fall back to the action-agnostic sources[] the tile also reads from.
@@ -131,6 +137,7 @@ function digestItems(result: RoutineResult): DigestItem[] {
     title: cleanTitle(s.title ?? s.url),
     url: s.url,
     source: s.source ?? '',
+    paywalled: s.paywalled,
   }));
 }
 
@@ -173,7 +180,7 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
   if (greeting) textLines.push(greeting, '');
   if (mood) textLines.push(mood, '');
   items.forEach((it, i) => {
-    textLines.push(`${i + 1}. ${it.title}${it.source ? ` (${it.source})` : ''}`);
+    textLines.push(`${i + 1}. ${it.title}${it.source ? ` (${it.source})` : ''}${it.paywalled ? ` [${PAYWALL_LABEL}]` : ''}`);
     const href = storyHref(it, input.webAppUrl);
     if (href) textLines.push(`   ${href}`);
   });
@@ -190,8 +197,13 @@ export function renderNewsDigestEmail(input: NewsDigestEmailInput): RenderedEmai
       const linked = href
         ? `<a href="${escapeHtml(href)}" style="color:${C.textPrimary};text-decoration:none;font-weight:600;">${titleHtml}</a>`
         : `<span style="color:${C.textPrimary};font-weight:600;">${titleHtml}</span>`;
-      const sourceHtml = it.source
-        ? `<div style="color:${C.textTertiary};font-size:12px;margin-top:2px;">${escapeHtml(it.source)}</div>`
+      // Status badge, not a pill shape: the chip's 4px radius and neutral tones
+      // (StatusChip in @platform/ui), inlined for email clients.
+      const paywallHtml = it.paywalled
+        ? `<span style="display:inline-block;background:${C.surfaceSubtle};color:${C.textSecondary};font-size:11px;font-weight:600;line-height:1.4;padding:1px 6px;border-radius:4px;${it.source ? 'margin-left:8px;' : ''}">${PAYWALL_LABEL}</span>`
+        : '';
+      const sourceHtml = it.source || paywallHtml
+        ? `<div style="color:${C.textTertiary};font-size:12px;margin-top:2px;">${it.source ? escapeHtml(it.source) : ''}${paywallHtml}</div>`
         : '';
       return `<tr><td style="padding:0 0 16px 0;font-family:${FONT_BODY};font-size:15px;line-height:1.5;">${linked}${sourceHtml}</td></tr>`;
     })
