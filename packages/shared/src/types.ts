@@ -331,6 +331,8 @@ export interface ResearchSource {
   source?: string;
   /** og:image scraped from the source page, when available (news routines). */
   image_url?: string | null;
+  /** The article sits behind a paywall (news_curation digest). Absent = not known to be. */
+  paywalled?: boolean;
 }
 
 export interface ResearchBrief {

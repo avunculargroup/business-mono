@@ -113,6 +113,21 @@ describe('runNewsCuration', () => {
     ]);
   });
 
+  it('carries news_items.paywalled onto the story and its source, only when true', async () => {
+    setPool(
+      [{ ...newsItem(0), paywalled: true }, { ...newsItem(1), paywalled: false }, { ...newsItem(2), paywalled: null }],
+      [],
+    );
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }, { index: 2 }] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    const stories = meta['stories'] as Array<{ id: string; paywalled?: boolean }>;
+    expect(stories.map((s) => s.paywalled)).toEqual([true, undefined, undefined]);
+    expect(outcome.result?.sources?.map((s) => s.paywalled)).toEqual([true, undefined, undefined]);
+  });
+
   it('replaces the intro with the verifier rewrite when the draft is unfaithful', async () => {
     setPool([newsItem(0), newsItem(1)], []);
     editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });

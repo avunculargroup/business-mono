@@ -13,6 +13,10 @@ vi.mock('@platform/db', () => ({ supabase: {} }));
 vi.mock('../workflows/newsExtract.js', () => ({ extractNewsMetadata }));
 vi.mock('../workflows/ingestNewsItem.js', () => ({ ingestNewsItem }));
 vi.mock('../agents/researcher/tools.js', () => ({ fetchUrl: { execute: fetchUrlExecute } }));
+// The paywall decision reads paywalled_domains; covered in its own test file.
+vi.mock('../lib/paywalledDomains.js', () => ({
+  resolvePaywalled: vi.fn(async ({ page }: { page: boolean | null }) => page),
+}));
 
 const { processResearchEmail } = await import('./researchMailListener.js');
 type EmailSource = Parameters<typeof processResearchEmail>[1] extends Map<string, infer S> ? S : never;

@@ -2,13 +2,14 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { NewsSourcesClient, type SourceStats } from './NewsSourcesClient';
 import { ReportWatchHealth } from './ReportWatchHealth';
+import { PaywalledDomains, type PaywalledDomainRow } from './PaywalledDomains';
 import { RESEARCH_INBOUND_DOMAIN } from '@/lib/news/emailSource';
 import type { NewsSourceRecord, ReportWatchHealthRow } from '@platform/shared';
 
 export default async function NewsSourcesPage() {
   const supabase = await createClient();
 
-  const [{ data: sources }, { data: episodes }, { data: health }] = await Promise.all([
+  const [{ data: sources }, { data: episodes }, { data: health }, { data: paywalled }] = await Promise.all([
     supabase.from('news_sources').select('*').order('name', { ascending: true }),
     // Per-source episode + transcript-coverage counts for the feed list. Small
     // data set (pre-revenue), so aggregate in JS rather than via an RPC.
@@ -18,6 +19,7 @@ export default async function NewsSourcesPage() {
     // panel renders nothing on an empty list.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('v_report_watch_health' as any).select('*') as any),
+    supabase.from('paywalled_domains').select('id, domain').order('domain', { ascending: true }),
   ]);
 
   const stats: Record<string, SourceStats> = {};
@@ -38,6 +40,7 @@ export default async function NewsSourcesPage() {
         stats={stats}
         inboundDomain={RESEARCH_INBOUND_DOMAIN}
       />
+      <PaywalledDomains initialDomains={(paywalled ?? []) as PaywalledDomainRow[]} />
     </>
   );
 }

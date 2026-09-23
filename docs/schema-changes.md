@@ -6,6 +6,55 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-23 — `paywalled_domains`
+
+`20260923000000_add_paywalled_domains.sql` adds the list of publishers whose
+articles are marked paywalled without reading the page, edited from
+`/news/sources`.
+
+- **Why a list.** Our direct page fetch is blocked on every Bloomberg (558) and
+  FT (509) article in the last 60 days, so neither page signal from
+  `2026-09-22` ever fires for them. Being blocked is not itself evidence: The
+  Block, Reuters and CryptoSlate block the fetch too and are free. The publisher
+  has to be named.
+- **Metered counts.** SMH, The Age, Project Syndicate and similar are seeded
+  alongside the hard paywalls — a metered wall still stops a reader partway
+  through the month.
+- **Host or subdomain.** `ft.com` covers `markets.ft.com`. Stored bare and
+  lowercase (no `www.`), enforced by a CHECK; the web action normalises a pasted
+  URL down to its host first.
+- **Only ever adds the flag.** A listed domain sets `paywalled = true`; an
+  unlisted one falls back to the page and body signals. Removing a domain does
+  not clear the flag on articles already ingested.
+- **Alongside it, a wider body check.** Paywall wording is now looked for across
+  the whole fetched body, not the first 2,000 characters, and includes FT's
+  "Subscribe to unlock this article" — present in 453 of those 509 FT bodies,
+  about 12,000 characters in.
+- RLS: `is_team_member()`, one `FOR ALL` policy.
+
+---
+
+## 2026-09-22 — `news_items.paywalled`
+
+`20260922000000_add_news_item_paywalled.sql` adds a nullable **`paywalled
+BOOLEAN`** so the daily `news_curation` digest can mark stories a reader will hit
+a paywall on.
+
+- **Detected at ingestion, from the page we already fetch.** The web-page paths
+  (RSS scan, Tavily search ingest, newsletter followed links) fetch each article's
+  HTML for its og:image; `fetchPageMeta` reads the paywall signal from the same
+  response — schema.org `isAccessibleForFree: false` (the markup publishers give
+  Google for paywalled content) or `article:content_tier` of `locked`/`metered`.
+  A subscribe-to-continue stub in the Jina body also counts.
+- **Null is not false.** Null means nobody checked: rows from before this column,
+  email newsletter bodies (the subscription already paid for them), report PDFs,
+  and pages that could not be fetched. False means the page was read and carried
+  no paywall signal. The digest only marks `true`.
+- **No backfill.** Older rows stay null; the digest looks back 24 hours, so the
+  pill is accurate from the first run after deploy.
+
+---
+
 ## 2026-09-16 — `privacy_policy_url` onto `company_profile`
 
 `20260916010000_privacy_policy_url_on_profile.sql` retires the last Service

@@ -60,6 +60,11 @@
   white-space: nowrap;
 }
 
+.paywall {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
 .link {
   color: var(--color-text-primary);
   text-decoration: none;
