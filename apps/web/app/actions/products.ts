@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { humanizeError } from '@/lib/errors';
 import { parseForm } from '@/lib/forms';
+import { PRODUCT_IMAGES_BUCKET } from '@/lib/products/signImages';
 
 const productSchema = z.object({
   name:                z.string().min(1, 'Name is required'),
@@ -96,8 +97,18 @@ export async function deleteProduct(id: string) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
+  // Gallery rows cascade with the product; their files do not.
+  const { data: images } = await supabase
+    .from('product_images')
+    .select('storage_path')
+    .eq('product_service_id', id);
+
   const { error } = await supabase.from('products_services').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
+
+  if (images && images.length > 0) {
+    await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(images.map((i) => i.storage_path));
+  }
 
   revalidatePath('/products');
   return { success: true };

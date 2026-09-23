@@ -5226,6 +5226,75 @@ export type Database = {
           },
         ]
       }
+      product_images: {
+        Row: {
+          alt_text: string | null
+          byte_size: number | null
+          created_at: string
+          created_by: string | null
+          filename: string | null
+          focal_x: number
+          focal_y: number
+          height: number | null
+          id: string
+          mime_type: string | null
+          product_service_id: string
+          sort_order: number
+          storage_path: string
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          byte_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          filename?: string | null
+          focal_x?: number
+          focal_y?: number
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          product_service_id: string
+          sort_order?: number
+          storage_path: string
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          byte_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          filename?: string | null
+          focal_x?: number
+          focal_y?: number
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          product_service_id?: string
+          sort_order?: number
+          storage_path?: string
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_images_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_key_contacts: {
         Row: {
           contact_id: string
@@ -5330,6 +5399,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          featured_image_id: string | null
           id: string
           is_financial_product: boolean | null
           key_relationship_id: string | null
@@ -5350,6 +5420,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          featured_image_id?: string | null
           id?: string
           is_financial_product?: boolean | null
           key_relationship_id?: string | null
@@ -5370,6 +5441,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          featured_image_id?: string | null
           id?: string
           is_financial_product?: boolean | null
           key_relationship_id?: string | null
@@ -5401,6 +5473,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team_members"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_services_featured_image_fkey"
+            columns: ["featured_image_id", "id"]
+            isOneToOne: false
+            referencedRelation: "product_images"
+            referencedColumns: ["id", "product_service_id"]
           },
           {
             foreignKeyName: "products_services_key_relationship_id_fkey"

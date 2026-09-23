@@ -1606,7 +1606,8 @@ CREATE TABLE IF NOT EXISTS products_services (
                        )),
   description          TEXT,
   logo_url             TEXT,
-  product_image_url    TEXT,
+  product_image_url    TEXT,        -- legacy external link; uploaded images live in product_images
+  featured_image_id    UUID,        -- FK (featured_image_id, id) → product_images(id, product_service_id), added below
   key_relationship_id  UUID        REFERENCES team_members(id) ON DELETE SET NULL,
   created_by           UUID        REFERENCES team_members(id) ON DELETE SET NULL,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1628,6 +1629,34 @@ CREATE TABLE IF NOT EXISTS product_referral_agreements (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Child: uploaded images (bucket: product-images, private). focal_x/focal_y are
+-- percentages fed to CSS object-position, so one file crops to square or wide.
+CREATE TABLE IF NOT EXISTS product_images (
+  id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_service_id UUID         NOT NULL REFERENCES products_services(id) ON DELETE CASCADE,
+  storage_path       TEXT         NOT NULL UNIQUE,
+  filename           TEXT,
+  mime_type          TEXT,
+  byte_size          BIGINT,
+  width              INTEGER,
+  height             INTEGER,
+  alt_text           TEXT,
+  focal_x            NUMERIC(5,2) NOT NULL DEFAULT 50 CHECK (focal_x BETWEEN 0 AND 100),
+  focal_y            NUMERIC(5,2) NOT NULL DEFAULT 50 CHECK (focal_y BETWEEN 0 AND 100),
+  sort_order         INTEGER      NOT NULL DEFAULT 0,
+  created_by         UUID         REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (id, product_service_id)
+);
+
+-- One featured image per product, and only one of its own.
+ALTER TABLE products_services
+  ADD CONSTRAINT products_services_featured_image_fkey
+  FOREIGN KEY (featured_image_id, id)
+  REFERENCES product_images(id, product_service_id)
+  ON DELETE SET NULL (featured_image_id);
 
 -- Junction: key contacts
 CREATE TABLE IF NOT EXISTS product_key_contacts (

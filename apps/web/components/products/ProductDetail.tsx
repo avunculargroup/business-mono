@@ -16,6 +16,8 @@ import { WatchesCard } from '@/components/ecosystem/WatchesCard';
 import { ChangesCard, type EntityChange } from '@/components/ecosystem/ChangesCard';
 import type { WatchRow } from '@/components/ecosystem/EcosystemWatchForm';
 import { formatDate } from '@/lib/utils';
+import type { ProductImage } from '@/lib/products/images';
+import { ProductGallery } from './ProductGallery';
 import styles from '@/app/(app)/products/[id]/product-detail.module.css';
 
 const categoryLabels: Record<string, string> = {
@@ -54,6 +56,7 @@ type Product = {
   description: string | null;
   logo_url: string | null;
   product_image_url: string | null;
+  featured_image_id: string | null;
   company_id: string | null;
   key_relationship_id: string | null;
   companies: { id: string; name: string } | null;
@@ -94,6 +97,7 @@ interface ProductDetailProps {
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   allContacts: { id: string; first_name: string; last_name: string; email: string | null }[];
+  images: ProductImage[];
 }
 
 export function ProductDetail({
@@ -106,6 +110,7 @@ export function ProductDetail({
   companies,
   teamMembers,
   allContacts,
+  images,
 }: ProductDetailProps) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -238,6 +243,14 @@ export function ProductDetail({
 
       {/* Right: sections */}
       <div className={styles.main}>
+        {/* Images */}
+        <ProductGallery
+          productId={product.id}
+          productName={product.name}
+          images={images}
+          featuredImageId={product.featured_image_id}
+        />
+
         {/* Key contacts */}
         <div className={styles.card}>
           <div className={styles.cardHeader}>
