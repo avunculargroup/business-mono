@@ -55,7 +55,8 @@ import { verifyMoodSummary } from './newsCurationVerify.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
-import { fetchOgImage, fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
+import { fetchOgImage, fetchPageMeta } from '../lib/fetchOgImage.js';
+import { resolvePaywalled } from '../lib/paywalledDomains.js';
 import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
@@ -1108,7 +1109,8 @@ async function runNewsIngest(
       // Fetch full article body via Jina Reader, and the page's og:image in parallel.
       let bodyMarkdown: string | null = null;
       let imageUrl: string | null = null;
-      let paywalled: boolean | null = null;
+      let pagePaywalled: boolean | null = null;
+      let fetchedBody: string | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
@@ -1116,15 +1118,18 @@ async function runNewsIngest(
           >,
           fetchPageMeta(item.url).then((meta) => {
             imageUrl = meta.imageUrl;
-            paywalled = meta.paywalled;
+            pagePaywalled = meta.paywalled;
           }),
         ]);
         const md = fetched?.markdown?.trim();
-        if (md && isPaywallStub(md)) paywalled = true;
+        fetchedBody = md ?? null;
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
         // body fetch failed; carry on with snippet-only enrichment
       }
+      // Page markup, body wording, or a listed publisher (the only signal when
+      // the site blocks the page fetch).
+      const paywalled = await resolvePaywalled({ url: item.url, page: pagePaywalled, body: fetchedBody });
 
       // Structured extraction (summary, key_points, topic_tags, AU relevance).
       const extractionInput = bodyMarkdown ?? item.summary;
@@ -1415,7 +1420,8 @@ async function runNewsSourceScan(
     try {
       let bodyMarkdown: string | null = null;
       let imageUrl: string | null = null;
-      let paywalled: boolean | null = null;
+      let pagePaywalled: boolean | null = null;
+      let fetchedBody: string | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
@@ -1423,15 +1429,18 @@ async function runNewsSourceScan(
           >,
           fetchPageMeta(item.url).then((meta) => {
             imageUrl = meta.imageUrl;
-            paywalled = meta.paywalled;
+            pagePaywalled = meta.paywalled;
           }),
         ]);
         const md = fetched?.markdown?.trim();
-        if (md && isPaywallStub(md)) paywalled = true;
+        fetchedBody = md ?? null;
         if (md && md.length > 200) bodyMarkdown = md;
       } catch {
         // body fetch failed; carry on with snippet-only enrichment
       }
+      // Page markup, body wording, or a listed publisher (the only signal when
+      // the site blocks the page fetch).
+      const paywalled = await resolvePaywalled({ url: item.url, page: pagePaywalled, body: fetchedBody });
 
       const extractionInput = (bodyMarkdown ?? item.summary).slice(0, 12000);
       const { data: extracted, reason: extractionReason } = await extractNewsMetadata({

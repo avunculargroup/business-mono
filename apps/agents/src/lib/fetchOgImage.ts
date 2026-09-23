@@ -71,6 +71,17 @@ export function isPaywallStub(markdown: string): boolean {
   return PAYWALL_STUB_RE.test(markdown.slice(0, 2000));
 }
 
+// Paywall wording anywhere in a fetched body. Wider than the stub check: FT's
+// "Subscribe to unlock this article" sits ~12k characters in, after the site
+// navigation, where a 2k-character stub check never looks. Only phrases that
+// name a subscription wall — bare "subscribe" appears in free sites' footers.
+const PAYWALL_MARKER_RE =
+  /subscribe to unlock|unlock (?:this|the full) article|(?:subscribe|sign in|log in|register) to continue reading/i;
+
+export function hasPaywallMarker(markdown: string): boolean {
+  return PAYWALL_STUB_RE.test(markdown) || PAYWALL_MARKER_RE.test(markdown);
+}
+
 // Match a <meta> tag for the given property/name, regardless of whether the
 // identifying attribute comes before or after the content attribute.
 function findMetaContent(html: string, key: string): string | null {

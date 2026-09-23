@@ -1562,6 +1562,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS news_items_source_ingestion_ref_uniq
   ON news_items (source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL;
 CREATE INDEX IF NOT EXISTS news_items_source_idx ON news_items (source_id);
 
+-- Publishers behind a hard or metered paywall, edited from /news/sources. A web
+-- article whose host is one of these (or a subdomain) is ingested with
+-- news_items.paywalled = true — the fallback for sites that block the page
+-- fetch. (migration: 20260923000000; RLS: is_team_member())
+CREATE TABLE paywalled_domains (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  domain      TEXT        NOT NULL UNIQUE,              -- bare lowercase host, no www.
+  created_by  UUID        REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- RPC: semantic search on news_items
 CREATE OR REPLACE FUNCTION vector_search_news(
   query_embedding  VECTOR(1536),

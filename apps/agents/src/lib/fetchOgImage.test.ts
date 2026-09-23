@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { fetchOgImage, fetchPageMeta, detectPaywall, isPaywallStub } from './fetchOgImage.js';
+import { fetchOgImage, fetchPageMeta, detectPaywall, isPaywallStub, hasPaywallMarker } from './fetchOgImage.js';
 
 function response(body: string, ok = true, status = 200): Response {
   return { ok, status, text: async () => body } as Response;
@@ -128,5 +128,19 @@ describe('isPaywallStub', () => {
 
   it('ignores a normal article body', () => {
     expect(isPaywallStub('# Headline\n\nThe central bank held rates steady on Tuesday.')).toBe(false);
+  });
+});
+
+describe('hasPaywallMarker', () => {
+  it('finds FT-style wording far past the stub window', () => {
+    expect(hasPaywallMarker(`${'Menu item. '.repeat(1500)}Subscribe to unlock this article`)).toBe(true);
+  });
+
+  it.each(['Register to continue reading', 'Unlock the full article', 'Already a subscriber?'])('matches "%s"', (phrase) => {
+    expect(hasPaywallMarker(`Intro.\n\n${phrase}`)).toBe(true);
+  });
+
+  it('ignores a bare subscribe call-to-action in a free footer', () => {
+    expect(hasPaywallMarker('Full free article text.\n\nSubscribe to our newsletter.')).toBe(false);
   });
 });

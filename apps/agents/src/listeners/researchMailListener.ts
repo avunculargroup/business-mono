@@ -39,6 +39,7 @@ import {
 import { extractNewsletterLinks } from '../lib/newsletterLinks.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
+import { resolvePaywalled } from '../lib/paywalledDomains.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
 import { createLogger } from '../lib/logger.js';
@@ -393,7 +394,9 @@ export async function ingestNewsletterLinks(args: {
       // Jina follows redirects server-side, so this unwraps tracking wrappers.
       const url = fetched?.resolved_url ?? link.url;
       const title = fetched?.title?.trim() || link.anchorText || link.url;
-      const { imageUrl, paywalled } = await fetchPageMeta(url);
+      const page = await fetchPageMeta(url);
+      const imageUrl = page.imageUrl;
+      const paywalled = await resolvePaywalled({ url, page: page.paywalled, body: markdown });
 
       const { data: extracted } = await extractNewsMetadata({
         title,
