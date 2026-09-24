@@ -175,10 +175,45 @@
   color: var(--color-text-tertiary);
 }
 
+.positionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .coords {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
+}
+
+/* Phones: actions move under the image as a full-size
+   row of 44px targets, and the stage leaves room for the previews. */
+@media (max-width: 767px) {
+  /* A tile is never narrower than its three 44px buttons: two a row on most
+     phones, one on the narrowest. */
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  }
+
+  .tileActions {
+    position: static;
+    justify-content: flex-end;
+    margin-top: var(--space-1);
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .stageImg {
+    max-height: 240px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

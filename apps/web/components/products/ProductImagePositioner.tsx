@@ -61,9 +61,6 @@ export function ProductImagePositioner({ image, productName, saving, onClose, on
       title="Position image"
       footer={
         <>
-          <Button variant="ghost" onClick={() => setPoint({ x: 50, y: 50 })} disabled={saving}>
-            Reset to centre
-          </Button>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button variant="primary" onClick={() => onSave(point)} loading={saving}>Save position</Button>
         </>
@@ -72,7 +69,8 @@ export function ProductImagePositioner({ image, productName, saving, onClose, on
       {draft && (
         <div className={styles.positioner}>
           <p className={styles.hint}>
-            Click or drag to mark what must stay in frame. Arrow keys move it 1%, Shift + arrow 10%.
+            Tap, click or drag to mark what must stay in frame. With a keyboard, arrow keys move it 1%,
+            Shift + arrow 10%.
           </p>
 
           <div
@@ -114,7 +112,12 @@ export function ProductImagePositioner({ image, productName, saving, onClose, on
             </figure>
           </div>
 
-          <span className={styles.coords}>{point.x}% · {point.y}%</span>
+          <div className={styles.positionRow}>
+            <span className={styles.coords}>{point.x}% · {point.y}%</span>
+            <Button variant="ghost" size="sm" onClick={() => setPoint({ x: 50, y: 50 })} disabled={saving}>
+              Reset to centre
+            </Button>
+          </div>
         </div>
       )}
     </Modal>
