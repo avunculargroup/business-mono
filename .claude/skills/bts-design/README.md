@@ -13,7 +13,7 @@ This design system captures the visual and content foundations of the BTS intern
 - **Repo:** `avunculargroup/business-mono` (branch `main`)
 - **Design authority:** this skill. It was first built from [`docs/DESIGN_BRIEF.md`](https://github.com/avunculargroup/business-mono/blob/main/docs/DESIGN_BRIEF.md), which is now legacy and kept for history only. When something is missing, add it here rather than going back to the brief.
 - **Voice authority:** [`docs/brand-voice.md`](https://github.com/avunculargroup/business-mono/blob/main/docs/brand-voice.md) — tone, terminology, Bitcoin stance
-- **Implementation:** `apps/web/app/globals.css` (CSS tokens), `apps/web/components/*` (React components)
+- **Implementation:** `packages/ui/src/tokens.css` (CSS tokens; `colors_and_type.css` here is a guarded copy), `packages/ui/src/*` (shared components), `apps/web/components/*` (app-specific components). `apps/web/app/globals.css` holds base styles only and defines no tokens.
 - **Logo source:** `apps/web/components/app-shell/BtsLogo.tsx`
 
 No public marketing site was part of the scope — this system is the *internal* platform.
@@ -107,7 +107,7 @@ Display-size text (48px+) is explicitly off-brand — Playfair appears at H1–H
 
 - 4px base unit. Scale: `4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 / 64 / 80`.
 - Card padding `20px` (tighter than a public product). Content area padding `32px`.
-- Sidebar `240px` expanded, `64px` icon-only below `md` (768px).
+- App shell by width: `240px` sidebar from 1024px up · `64px` icon-only sidebar from 768px to 1023px · below 768px no sidebar, a bottom tab bar instead (see Mobile).
 - Max content width `1200px`, centred.
 - **Whitespace is a feature** — resist the urge to fill every column.
 
@@ -169,9 +169,10 @@ There is **no stock photography** in this product. No hero images, no finance cl
 
 ### Fixed / sticky elements
 
-- Sidebar: fixed left, full height, 240px wide.
+- Sidebar: fixed left, full height, 240px wide (64px icon-only from 768px to 1023px).
 - Page header: sticky top, 64px tall, surface background, bottom border.
 - Content area: scrolls independently of sidebar.
+- Below 768px: bottom tab bar fixed to the bottom, `64px` plus the safe-area inset, with three tabs (Home, Simon, More). More opens a bottom sheet with the rest of the navigation. The content area adds matching bottom padding so nothing sits under the bar.
 
 ### Mobile
 
