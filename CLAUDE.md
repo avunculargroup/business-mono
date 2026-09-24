@@ -94,7 +94,7 @@ Transform tasks into verifiable goals before implementing:
 ├── docs/
 │   ├── agents/          # Individual agent specifications
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance (content source of truth)
-│   ├── DESIGN_BRIEF.md  # UI design system backing data — consumed by the bts-design skill (do not read directly)
+│   ├── DESIGN_BRIEF.md  # Legacy, kept for history — use the bts-design skill; add anything it lacks to the skill
 │   ├── schema-changes.md  # Changelog: what changed from original schema and why
 │   └── webhooks.md
 ├── schema.sql           # Consolidated database schema (source of truth)
@@ -306,7 +306,7 @@ Three complementary query strategies (all within Supabase, wrapped as RPC in `pa
 |`schema.sql`                       |Consolidated schema — human-readable reference only (not executable; use `supabase/migrations/`)               |
 |`supabase/migrations/`             |Migration files — applied sequentially via `supabase db push` (auto on push to `main`)                        |
 |`packages/db/MIGRATIONS.md`        |Developer workflow for creating and applying migrations                                                        |
-|`docs/DESIGN_BRIEF.md`             |Backing data for the `bts-design` skill — do not read directly; invoke the skill instead                       |
+|`docs/DESIGN_BRIEF.md`             |**Legacy**, kept for history — invoke the `bts-design` skill instead. Anything the skill lacks gets added to the skill, not read from here|
 |`docs/brand-voice.md`              |**Content source of truth** — tone, terminology, Bitcoin stance, banned words, content lengths, microcopy rules|
 |`docs/schema-changes.md`           |Schema changelog — what changed from original and why                                                          |
 |`docs/webhooks.md`                 |Webhook endpoint specs, payloads, authentication                                                               |

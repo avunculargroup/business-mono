@@ -92,7 +92,7 @@ Three agents are **internal** — invoked only inside one pipeline, never on Sim
 │   ├── agents/          # Per-agent specification docs
 │   ├── features/        # Per-feature spec bundles, each with its own README
 │   ├── reviews/         # Point-in-time reviews (not maintained after writing)
-│   ├── DESIGN_BRIEF.md  # Backing data for the bts-design skill — invoke the skill, don't read this
+│   ├── DESIGN_BRIEF.md  # Legacy — use the bts-design skill; add anything it lacks to the skill
 │   ├── brand-voice.md   # Brand voice, tone, terminology, Bitcoin stance
 │   ├── schema-changes.md
 │   └── webhooks.md

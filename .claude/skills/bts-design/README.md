@@ -11,7 +11,7 @@ This design system captures the visual and content foundations of the BTS intern
 ## Sources
 
 - **Repo:** `avunculargroup/business-mono` (branch `main`)
-- **Design authority:** [`docs/DESIGN_BRIEF.md`](https://github.com/avunculargroup/business-mono/blob/main/docs/DESIGN_BRIEF.md) — colours, typography, components, tokens, IA
+- **Design authority:** this skill. It was first built from [`docs/DESIGN_BRIEF.md`](https://github.com/avunculargroup/business-mono/blob/main/docs/DESIGN_BRIEF.md), which is now legacy and kept for history only. When something is missing, add it here rather than going back to the brief.
 - **Voice authority:** [`docs/brand-voice.md`](https://github.com/avunculargroup/business-mono/blob/main/docs/brand-voice.md) — tone, terminology, Bitcoin stance
 - **Implementation:** `apps/web/app/globals.css` (CSS tokens), `apps/web/components/*` (React components)
 - **Logo source:** `apps/web/components/app-shell/BtsLogo.tsx`

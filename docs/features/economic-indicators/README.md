@@ -27,7 +27,8 @@ agents (Rex citing exact figures, Charlie/Margot triggered by a fresh print).
 > unlinked for that reason.
 
 Referenced from the repo root: [`../../../CLAUDE.md`](../../../CLAUDE.md) (routing),
-[`../../../schema.sql`](../../../schema.sql), [`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md).
+[`../../../schema.sql`](../../../schema.sql), [`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md)
+(legacy — use the `bts-design` skill).
 
 -----
 
@@ -45,8 +46,8 @@ Build the scheduled Mastra **Workflow** (not an Agent) with one adapter per prov
 logging, and the content-beat proposal step. Verify Mastra signatures via the `mastra` skill.
 
 **Session 3 — dashboard panel.** Build the local/global card panel against
-`v_indicator_latest` and `v_indicator_series`, following
-[`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md) and the reference render in
+`v_indicator_latest` and `v_indicator_series`, following the `bts-design` skill (not the
+legacy [`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md)) and the reference render in
 `prototype/`. The React-port contract and the
 neutral-delta colour rule are in the prototype's header comment.
 
