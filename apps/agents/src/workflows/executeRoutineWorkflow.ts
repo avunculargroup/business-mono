@@ -56,6 +56,7 @@ import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
 import { fetchOgImage } from '../lib/fetchOgImage.js';
+import { decodeHtmlEntities, isEmailSafeImage } from '../lib/emailImage.js';
 import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
 import { computeNextRunAt } from '../lib/computeNextRunAt.js';
 import { cosineSimilarity } from '../lib/cosineSimilarity.js';
@@ -639,18 +640,20 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
   // best-effort og:image fetch for older rows ingested before that column
   // existed). Falling through to the second/third story means a single missing
   // image no longer leaves the digest — email and dashboard tile — without any.
+  // Each candidate is probed first: a URL that 403s, 404s or serves WebP shows
+  // as a broken image in the inbox, so it is skipped rather than sent. Stored
+  // URLs are entity-decoded because rows scraped before the og:image fix carry
+  // a literal `&amp;` in their query string.
   let headlineImageUrl: string | undefined;
   for (const story of stories) {
-    if (story.image_url) {
-      headlineImageUrl = story.image_url;
+    const candidate = story.image_url
+      ? decodeHtmlEntities(story.image_url)
+      : story.kind === 'news' && story.url
+        ? await fetchOgImage(story.url)
+        : null;
+    if (candidate && (await isEmailSafeImage(candidate))) {
+      headlineImageUrl = candidate;
       break;
-    }
-    if (story.kind === 'news' && story.url) {
-      const og = await fetchOgImage(story.url);
-      if (og) {
-        headlineImageUrl = og;
-        break;
-      }
     }
   }
 
