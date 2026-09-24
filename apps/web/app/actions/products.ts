@@ -16,7 +16,6 @@ const productSchema = z.object({
   australian_owned:    z.string().optional(),
   description:         z.string().optional(),
   logo_url:            z.string().optional(),
-  product_image_url:   z.string().optional(),
   created_by:          z.string().uuid().optional().or(z.literal('')),
 });
 
@@ -50,7 +49,6 @@ export async function createProduct(formData: FormData) {
       australian_owned:    d.australian_owned === 'on',
       description:         d.description || null,
       logo_url:            d.logo_url || null,
-      product_image_url:   d.product_image_url || null,
       created_by:          d.created_by || null,
     })
     .select()
@@ -82,7 +80,6 @@ export async function updateProduct(id: string, formData: FormData) {
       australian_owned:    d.australian_owned === 'on',
       description:         d.description || null,
       logo_url:            d.logo_url || null,
-      product_image_url:   d.product_image_url || null,
     })
     .eq('id', id);
 

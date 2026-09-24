@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, X, Link as LinkIcon } from 'lucide-react';
+import { Package, Plus, X } from 'lucide-react';
 import { Button } from '@platform/ui/Button';
 import { SlideOver } from '@platform/ui/SlideOver';
 import { StatusChip } from '@platform/ui/StatusChip';
@@ -55,7 +55,6 @@ type Product = {
   australian_owned: boolean;
   description: string | null;
   logo_url: string | null;
-  product_image_url: string | null;
   featured_image_id: string | null;
   company_id: string | null;
   key_relationship_id: string | null;
@@ -222,16 +221,6 @@ export function ProductDetail({
           <div className={styles.field}>
             <span className={styles.label}>Description</span>
             <p className={styles.valueSecondary}>{product.description}</p>
-          </div>
-        )}
-
-        {product.product_image_url && (
-          <div className={styles.field}>
-            <span className={styles.label}>Product image</span>
-            <a href={product.product_image_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 14 }}>
-              <LinkIcon size={14} strokeWidth={1.5} />
-              View image
-            </a>
           </div>
         )}
 

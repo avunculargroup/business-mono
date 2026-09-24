@@ -6,9 +6,10 @@
 -- which is featured. Each image has a focal point, so the same
 -- file crops sensibly into a square tile or a wide banner.
 --
--- products_services.product_image_url is left in place. It holds
--- an external link, not a stored file, so there is nothing to
--- move across.
+-- products_services.product_image_url is left in place but no
+-- longer read or written by the app. It held an external link,
+-- not a stored file, so there is nothing to move across, and
+-- dropping it would discard any links already entered.
 -- ============================================================
 
 

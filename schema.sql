@@ -1606,7 +1606,7 @@ CREATE TABLE IF NOT EXISTS products_services (
                        )),
   description          TEXT,
   logo_url             TEXT,
-  product_image_url    TEXT,        -- legacy external link; uploaded images live in product_images
+  product_image_url    TEXT,        -- retired: no longer read or written; uploaded images live in product_images
   featured_image_id    UUID,        -- FK (featured_image_id, id) → product_images(id, product_service_id), added below
   key_relationship_id  UUID        REFERENCES team_members(id) ON DELETE SET NULL,
   created_by           UUID        REFERENCES team_members(id) ON DELETE SET NULL,

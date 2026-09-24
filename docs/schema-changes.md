@@ -28,8 +28,11 @@ uploaded images instead of one pasted URL.
   untouched image renders as it always would have.
 - **Storage policies use `is_team_member()`**, not the `authenticated` role the
   `platform-files` policies still carry.
-- **`product_image_url` is kept.** It holds an external link, not a stored file,
-  so there was nothing to migrate.
+- **`product_image_url` is retired, not dropped.** The web app no longer reads or
+  writes it — the gallery replaces the URL field on the product forms. It held an
+  external link, not a stored file, so there was nothing to migrate, and dropping
+  the column would discard links already entered. Drop it in a later migration
+  once nobody needs them.
 
 ---
 

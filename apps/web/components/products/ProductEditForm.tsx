@@ -13,7 +13,6 @@ type Product = {
   australian_owned: boolean;
   description: string | null;
   logo_url: string | null;
-  product_image_url: string | null;
   company_id: string | null;
   key_relationship_id: string | null;
 };
@@ -113,11 +112,6 @@ export function ProductEditForm({ product, companies, teamMembers, onSuccess, on
       <label className={styles.field}>
         <span className={styles.label}>Logo URL</span>
         <input name="logo_url" type="url" defaultValue={product.logo_url ?? ''} className={styles.input} placeholder="https://" />
-      </label>
-
-      <label className={styles.field}>
-        <span className={styles.label}>Product image URL</span>
-        <input name="product_image_url" type="url" defaultValue={product.product_image_url ?? ''} className={styles.input} placeholder="https://" />
       </label>
 
       {state?.error && <p className={styles.error}>{state.error}</p>}
