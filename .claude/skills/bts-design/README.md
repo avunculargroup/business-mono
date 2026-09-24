@@ -173,6 +173,18 @@ There is **no stock photography** in this product. No hero images, no finance cl
 - Page header: sticky top, 64px tall, surface background, bottom border.
 - Content area: scrolls independently of sidebar.
 
+### Mobile
+
+The founders work on desktop, but every page and dialog must still be usable on a phone for quick checks. Mobile is secondary, not optional.
+
+- **One breakpoint:** `@media (max-width: 767px)`. Don't invent others for phone layout.
+- **Tap targets at least 44px** below 768px. `Button`, `Modal` and `SlideOver` in `@platform/ui` already do this. A bespoke icon button (a remove ×, a tile action) must do it too, which usually means moving it out of an overlay and into its own row.
+- **No horizontal page scroll at 320px.** Grids drop to one or two columns. Size `minmax()` to the content a cell must hold (three 44px buttons need about 136px), not to a number of columns.
+- **Hover is never the only way in.** Touch has no hover, so an action revealed only on hover doesn't exist on a phone.
+- **Dialog footers hold two buttons.** A third (Reset, Clear) goes in the body. Three rarely fit at 320px.
+- **Drag surfaces** use pointer events with `touch-action: none` on the surface, plus a keyboard equivalent.
+- **Check it before calling it done:** render at 375px and 320px and look for overflow and undersized targets.
+
 ---
 
 ## Iconography

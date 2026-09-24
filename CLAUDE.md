@@ -332,7 +332,7 @@ Read the relevant docs BEFORE writing code.
 
 |Task                                                     |Read first                                                   |Why                                                                                           |
 |---------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-|Any UI component, page, or styling                       |Invoke `bts-design` skill                                    |Colours, typography, spacing, component specs, CSS tokens, accessibility rules                |
+|Any UI component, page, or styling                       |Invoke `bts-design` skill                                    |Colours, typography, spacing, component specs, CSS tokens, accessibility rules, **mobile rules** — every UI change is checked at 375px and 320px (tap targets ≥44px, no horizontal scroll) before it is reported done|
 |CSS tokens or custom properties                          |Invoke `bts-design` skill                                    |Canonical token names — do not invent new ones or use raw hex values                          |
 |UI copy, empty states, labels, microcopy                 |`docs/brand-voice.md` → UI Microcopy Rules section           |Tone, action label patterns, banned phrases                                                   |
 |Content drafts, Content Creator agent                    |`docs/brand-voice.md`                                        |Tone, terminology, banned words, Bitcoin stance, content lengths                              |
