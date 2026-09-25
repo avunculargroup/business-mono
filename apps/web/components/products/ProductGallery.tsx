@@ -13,7 +13,7 @@ import {
   setFeaturedProductImage,
   updateProductImagePosition,
 } from '@/app/actions/productImages';
-import { ACCEPTED_IMAGE_TYPES, pickFeatured, sortImages, type ProductImage } from '@/lib/products/images';
+import { ACCEPTED_IMAGE_TYPES, pickFeatured, sortImages, uploadErrorMessage, type ProductImage } from '@/lib/products/images';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/products/signImages';
 import { ProductImageFrame } from './ProductImageFrame';
 import { ProductImagePositioner } from './ProductImagePositioner';
@@ -57,8 +57,8 @@ export function ProductGallery({ productId, productName, images: initialImages, 
     const supabase = createClient();
     const { error: uploadErr } = await supabase.storage
       .from(PRODUCT_IMAGES_BUCKET)
-      .uploadToSignedUrl(urlRes.path, urlRes.signedUrl, file);
-    if (uploadErr) { toast.error(`${file.name} didn't upload. Try again.`); return null; }
+      .uploadToSignedUrl(urlRes.path, urlRes.token, file);
+    if (uploadErr) { toast.error(uploadErrorMessage(file.name, uploadErr)); return null; }
 
     // A local preview until the next page load signs the stored file.
     const localUrl = URL.createObjectURL(file);

@@ -215,7 +215,7 @@ export async function deleteCompanyRecord(
 export async function createCompanyUploadSignedUrl(
   filename: string,
   _mimeType: string,
-): Promise<{ error: string } | { success: true; signedUrl: string; path: string }> {
+): Promise<{ error: string } | { success: true; token: string; path: string }> {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
@@ -229,7 +229,7 @@ export async function createCompanyUploadSignedUrl(
     .createSignedUploadUrl(path);
 
   if (error) return { error: humanizeError(error) };
-  return { success: true, signedUrl: data.signedUrl, path };
+  return { success: true, token: data.token, path };
 }
 
 export async function getCompanyAssetUrl(path: string): Promise<string | null> {
