@@ -6,6 +6,36 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-09-23 — Product image gallery with a featured image and focal point
+
+`20260923000000_product_images.sql` lets a product or service carry several
+uploaded images instead of one pasted URL.
+
+- **`product_images`** — one row per uploaded file in the new private
+  `product-images` bucket (10 MB, image types only). Rows cascade with the
+  product; `deleteProduct` removes the files, which do not.
+- **The featured image is a pointer on the parent**, `products_services.featured_image_id`,
+  not an `is_featured` flag on the child. One column can only name one image, so
+  two featured images is unrepresentable rather than guarded. The key is composite
+  — `(featured_image_id, id) → product_images(id, product_service_id)` — so it
+  cannot name another product's image, and deleting the featured image clears only
+  the pointer (PG15 column-list `SET NULL`). With no pointer the app falls back to
+  the first image in gallery order.
+- **One focal point per image, not one crop per shape.** `focal_x`/`focal_y` are
+  percentages fed straight to CSS `object-position` under `object-fit: cover`, so the
+  same stored point keeps the subject in frame for a square tile and a 16:9
+  banner. The default 50/50 is exactly what `cover` does with no position, so an
+  untouched image renders as it always would have.
+- **Storage policies use `is_team_member()`**, not the `authenticated` role the
+  `platform-files` policies still carry.
+- **`product_image_url` is retired, not dropped.** The web app no longer reads or
+  writes it — the gallery replaces the URL field on the product forms. It held an
+  external link, not a stored file, so there was nothing to migrate, and dropping
+  the column would discard links already entered. Drop it in a later migration
+  once nobody needs them.
+
+---
+
 ## 2026-09-16 — `privacy_policy_url` onto `company_profile`
 
 `20260916010000_privacy_policy_url_on_profile.sql` retires the last Service

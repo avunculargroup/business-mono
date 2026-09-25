@@ -6,6 +6,7 @@ import { ProductClassification } from '@/components/clientGate/ProductClassifica
 import styles from './product-detail.module.css';
 import { getCompanyOptions, getTeamMemberOptions } from '@/lib/referenceData';
 import { idColumn } from '@/lib/utils';
+import { PRODUCT_IMAGE_COLUMNS, signProductImages } from '@/lib/products/signImages';
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +33,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     companies,
     teamMembers,
     { data: allContacts },
+    { data: imageRows },
   ] = await Promise.all([
     supabase
       .from('product_key_contacts')
@@ -57,7 +59,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     getCompanyOptions(),
     getTeamMemberOptions(supabase),
     supabase.from('contacts').select('id, first_name, last_name, email').order('first_name'),
+    supabase
+      .from('product_images')
+      .select(PRODUCT_IMAGE_COLUMNS)
+      .eq('product_service_id', product.id),
   ]);
+
+  const images = await signProductImages(supabase, imageRows ?? []);
 
   const contactIds = (keyContacts ?? [])
     .map((kc: { contacts: { id: string } | null }) => kc.contacts?.id)
@@ -95,6 +103,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         companies={companies ?? []}
         teamMembers={teamMembers ?? []}
         allContacts={allContacts ?? []}
+        images={images}
       />
     </>
   );

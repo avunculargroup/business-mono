@@ -162,7 +162,8 @@ actions call `getAuthedRepositories()` (`lib/action.ts`). Surfaces not yet conve
 ## Design references
 
 - **Visual design**: invoke the `bts-design` skill for colours, typography, spacing,
-  component specs and CSS tokens. Do not read `docs/DESIGN_BRIEF.md` directly — it is
-  backing data for the skill, and the skill is the implementation source of truth.
+  component specs, CSS tokens and mobile rules. `docs/DESIGN_BRIEF.md` is legacy and kept
+  for history only — the skill is the source of truth, and anything it lacks gets added to
+  the skill rather than read from the brief.
 - **UI copy**: [`../../docs/brand-voice.md`](../../docs/brand-voice.md) → UI Microcopy Rules
   — action label patterns, empty states, banned phrases.
