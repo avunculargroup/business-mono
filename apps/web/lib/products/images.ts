@@ -31,6 +31,35 @@ export const SHAPE_RATIO: Record<ImageShape, string> = {
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
+/**
+ * A plain sentence for a failed direct-to-Storage upload. Storage errors carry
+ * an HTTP status and a terse message; map the ones a director can act on.
+ */
+export function uploadErrorMessage(filename: string, err: unknown): string {
+  const rec = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
+  const message = typeof rec['message'] === 'string' ? rec['message'] : '';
+  const status = Number(rec['status'] ?? rec['statusCode']);
+
+  if (status === 413 || /maximum allowed size|too large/i.test(message)) {
+    return `${filename} is over 10 MB.`;
+  }
+  if (status === 415 || /mime type|not supported/i.test(message)) {
+    return `${filename} isn't a supported image. Use JPEG, PNG, WebP, GIF or AVIF.`;
+  }
+  if (/expired/i.test(message)) {
+    return `The upload link for ${filename} expired. Try again.`;
+  }
+  if (status === 401 || status === 403 || /row-level security|unauthorized|permission/i.test(message)) {
+    return `You don't have permission to upload ${filename}.`;
+  }
+  if (/fetch|network/i.test(message)) {
+    return `${filename} didn't upload. Check your connection and try again.`;
+  }
+  return message
+    ? `${filename} didn't upload: ${message}`
+    : `${filename} didn't upload. Try again.`;
+}
+
 export function clampFocal(value: number): number {
   if (!Number.isFinite(value)) return 50;
   return Math.round(Math.min(100, Math.max(0, value)));

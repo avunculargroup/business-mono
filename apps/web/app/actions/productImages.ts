@@ -20,7 +20,7 @@ export async function createProductImageUploadUrl(
   filename: string,
   mimeType: string,
   byteSize: number,
-): Promise<{ error: string } | { success: true; signedUrl: string; path: string }> {
+): Promise<{ error: string } | { success: true; token: string; path: string }> {
   if (!ACCEPTED_IMAGE_TYPES.includes(mimeType)) {
     return { error: `${filename} isn't a supported image. Use JPEG, PNG, WebP, GIF or AVIF.` };
   }
@@ -37,7 +37,9 @@ export async function createProductImageUploadUrl(
 
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: humanizeError(error) };
-  return { success: true, signedUrl: data.signedUrl, path };
+  // uploadToSignedUrl takes the token, not the URL — passing the URL sends
+  // it as the token and Storage rejects every upload with a 400.
+  return { success: true, token: data.token, path };
 }
 
 export async function registerProductImage(params: {

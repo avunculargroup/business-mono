@@ -28,7 +28,7 @@ const PRODUCT = 'p1';
 
 beforeEach(() => {
   bucket = {
-    createSignedUploadUrl: vi.fn(async (path: string) => ({ data: { signedUrl: `https://signed/${path}` }, error: null })),
+    createSignedUploadUrl: vi.fn(async (path: string) => ({ data: { signedUrl: `https://signed/${path}?token=tok`, token: 'tok', path }, error: null })),
     remove: vi.fn(async () => ({ data: [], error: null })),
   };
   supabase = Object.assign(createFakeSupabase(), { storage: { from: vi.fn(() => bucket) } });
@@ -44,6 +44,13 @@ describe('createProductImageUploadUrl', () => {
     expect(supabase.storage.from).toHaveBeenCalledWith('product-images');
     const path = (res as { path: string }).path;
     expect(path).toMatch(/^p1\/[0-9a-f-]{36}\.jpg$/);
+  });
+
+  it('returns the bare upload token, not the signed URL', async () => {
+    const res = await createProductImageUploadUrl(PRODUCT, 'a.png', 'image/png', 10);
+
+    expect(res).toMatchObject({ success: true, token: 'tok' });
+    expect(res).not.toHaveProperty('signedUrl');
   });
 
   it('refuses a non-image before asking for a URL', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampFocal, focalFromPoint, nudgeFocal, objectPosition, pickFeatured, sortImages } from './images';
+import { clampFocal, focalFromPoint, nudgeFocal, objectPosition, pickFeatured, sortImages, uploadErrorMessage } from './images';
 
 const img = (id: string, sort_order: number, created_at: string) => ({ id, sort_order, created_at });
 
@@ -83,5 +83,27 @@ describe('sortImages', () => {
     const images = [img('b', 1, '2026-01-01'), img('c', 0, '2026-01-03'), img('a', 0, '2026-01-02')];
     expect(sortImages(images).map((i) => i.id)).toEqual(['a', 'c', 'b']);
     expect(images[0]!.id).toBe('b');
+  });
+});
+
+describe('uploadErrorMessage', () => {
+  it('names an oversize file', () => {
+    expect(uploadErrorMessage('a.jpg', { status: 413, message: 'The object exceeded the maximum allowed size' })).toBe('a.jpg is over 10 MB.');
+  });
+
+  it('names an unsupported type', () => {
+    expect(uploadErrorMessage('a.heic', { statusCode: '415', message: 'mime type image/heic is not supported' })).toContain("isn't a supported image");
+  });
+
+  it('says when the upload link expired', () => {
+    expect(uploadErrorMessage('a.jpg', { status: 400, message: 'jwt expired' })).toBe('The upload link for a.jpg expired. Try again.');
+  });
+
+  it('passes through a message it does not recognise rather than hiding it', () => {
+    expect(uploadErrorMessage('a.jpg', { status: 400, message: 'invalid signature' })).toBe("a.jpg didn't upload: invalid signature");
+  });
+
+  it('falls back to a plain retry with nothing to go on', () => {
+    expect(uploadErrorMessage('a.jpg', null)).toBe("a.jpg didn't upload. Try again.");
   });
 });
