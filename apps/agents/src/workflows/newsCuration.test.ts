@@ -12,6 +12,7 @@ const editorGenerate = vi.fn();
 const charlieGenerate = vi.fn();
 const fetchOgImage = vi.fn();
 const verifyMoodSummary = vi.fn();
+const isEmailSafeImage = vi.fn();
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../agents/researcher/index.js', () => ({ rex: { generate: vi.fn() } }));
@@ -29,6 +30,10 @@ vi.mock('../lib/transcripts/store.js', () => ({
   storeAvailableTranscript: vi.fn(),
 }));
 vi.mock('../lib/fetchOgImage.js', () => ({ fetchOgImage }));
+vi.mock('../lib/emailImage.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/emailImage.js')>()),
+  isEmailSafeImage,
+}));
 vi.mock('./newsCurationVerify.js', () => ({ verifyMoodSummary }));
 vi.mock('../config/model.js', () => ({
   stepRequestContext: vi.fn(() => ({})),
@@ -85,6 +90,7 @@ beforeEach(() => {
   fakeSupabase.__responses.clear();
   charlieGenerate.mockResolvedValue({ object: { mood_summary: 'Quiet markets, steady accumulation.' } });
   fetchOgImage.mockResolvedValue('https://og.example.com/headline.jpg');
+  isEmailSafeImage.mockResolvedValue(true);
   // Default: the intro passes verification unchanged.
   verifyMoodSummary.mockImplementation(async ({ draft }: { draft: string }) => ({ summary: draft, status: 'ok' }));
 });
@@ -165,6 +171,41 @@ describe('runNewsCuration', () => {
     expect(fetchOgImage).toHaveBeenNthCalledWith(1, 'https://news.example.com/0');
     expect(fetchOgImage).toHaveBeenNthCalledWith(2, 'https://news.example.com/1');
     expect(meta['headline_image_url']).toBe('https://og.example.com/second.jpg');
+  });
+
+  it('skips a headline image that does not load and uses the next story', async () => {
+    setPool([newsItem(0)], [podcastEpisode(1)]);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });
+    // The og:image for the lead story 403s (or serves WebP); the podcast art loads.
+    isEmailSafeImage.mockImplementation(async (url: string) => url !== 'https://og.example.com/headline.jpg');
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(isEmailSafeImage).toHaveBeenCalledWith('https://og.example.com/headline.jpg');
+    expect(meta['headline_image_url']).toBe('https://art.example.com/1.jpg');
+  });
+
+  it('decodes HTML entities in a stored image URL', async () => {
+    setPool([{ ...newsItem(0), image_url: 'https://cdn.example.com/a.jpg?w=1920&amp;h=1080' }], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(isEmailSafeImage).toHaveBeenCalledWith('https://cdn.example.com/a.jpg?w=1920&h=1080');
+    expect(meta['headline_image_url']).toBe('https://cdn.example.com/a.jpg?w=1920&h=1080');
+  });
+
+  it('leaves the headline image undefined when no candidate image loads', async () => {
+    setPool([newsItem(0)], [podcastEpisode(1)]);
+    editorGenerate.mockResolvedValue({ object: { selected: [{ index: 0 }, { index: 1 }] } });
+    isEmailSafeImage.mockResolvedValue(false);
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    const meta = outcome.result?.metadata as Record<string, unknown>;
+    expect(meta['headline_image_url']).toBeUndefined();
   });
 
   it('leaves the headline image undefined when no story resolves one', async () => {
