@@ -4,10 +4,22 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** All three sessions complete, one production fix (session 4), and the register
-seeded to three records (session 5). Two things remain, both needing network access to real
-filings: the ingest run against Locate's own documents, and the recorded trace bundle.
-**Last updated:** 2026-09-11
+**Status:** Sessions 1–3 complete, one production fix (session 4), and the register
+seeded to three records (session 5). The register has since grown to twelve records
+(4–12) written directly to the database, which are **not yet in a seed migration**.
+Two things still remain from session 2: the ingest run against real filings, and the
+recorded trace bundle.
+**Last updated:** 2026-09-29
+
+
+> **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
+> Panther Metals, Angel Studios, RUM Group, Goodfood, Sequans) produced ~20 structural
+> findings and a set of decisions taken on 29 September 2026 — per-field source
+> allow-lists, `review_state` on records and rows, encumbrance, discovery via
+> `reportWatch`, deterministic `natural_key`, and the Minute visibility bug. Those are
+> in `schema-ingest-spec.md` in this folder, which is the current plan. Read it before
+> this file; everything below describes the state as at 11 September.
+
 
 ---
 
