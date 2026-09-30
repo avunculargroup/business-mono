@@ -17,7 +17,7 @@ recorded trace bundle.
 > findings and a set of decisions taken on 29 September 2026 — per-field source
 > allow-lists, `review_state` on records and rows, encumbrance, discovery via
 > `reportWatch`, deterministic `natural_key`, and the Minute visibility bug. Those are
-> in `schema-ingest-spec.md` in this folder, which is the current plan. Read it before
+> in [`schema-ingest-spec.md`](./schema-ingest-spec.md), which is the current plan. Read it before
 > this file; everything below describes the state as at 11 September.
 
 

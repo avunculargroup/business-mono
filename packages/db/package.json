@@ -32,6 +32,7 @@
     "lint": "tsc --noEmit",
     "generate-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts",
     "seed:brand-voice": "tsx src/seeds/brand-voice.ts",
+    "seed:dump-register": "tsx src/seeds/dump-register-seed.ts",
     "db:migrate": "npx supabase db push",
     "db:diff": "npx supabase db diff",
     "db:pull": "npx supabase db pull",
