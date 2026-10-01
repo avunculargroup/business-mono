@@ -111,13 +111,16 @@ export type InstrumentType = (typeof InstrumentType)[keyof typeof InstrumentType
 
 // ── Sources and bases (lookup tables, typed for the seeded set) ─────────────
 
-// Ordered strongest first. The rank, not the name, is what the ingest gate
-// compares, and it lives in the `source_classes` table.
+// In `source_classes.rank` order, which is display order only. The ingest
+// gate checks membership in each field's set in `field_source_classes`, not
+// a rank — custody accepts filed narrative where the ledger does not.
 export const SOURCE_CLASS_CODES = [
   'regulated_disclosure',
   'exchange_announcement',
   'audited_accounts',
-  'investor_presentation',
+  'filed_financials',
+  'filed_narrative',
+  'furnished_release',
   'company_web',
   'secondary',
 ] as const;

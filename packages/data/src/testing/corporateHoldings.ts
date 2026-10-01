@@ -78,10 +78,10 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       }
     });
 
-    it('sources every ledger entry from an exchange announcement or better', async () => {
+    it('sources every ledger entry from a class the ledger accepts', async () => {
       // Rule 2, seen from the read side. The DB trigger enforces it on write;
       // this catches an adapter reading a view that joined the wrong document.
-      const belowMinimum = ['investor_presentation', 'company_web', 'secondary'];
+      const belowMinimum = ['filed_narrative', 'furnished_release', 'company_web', 'secondary'];
       const company = await bySlug(scenario.mixedClassificationSlug);
       const ledger = await (await repo()).getLedger(ctx, company.id);
 

@@ -23,6 +23,8 @@ Six of the eleven records are now blocked on the same source-ladder question, wh
 
 ## Decision 1 — rank by filing item, not by document
 
+> **Superseded in part (29 September).** The section-level table below stands. The single rank threshold does not: each field now carries an allow-list of source classes (see [Decided](#decided-29-september)), so where this section and Decision 2 talk about a class *outranking* another, read *is in the field's allowed set*.
+
 This is the blocking change. Session 5 raised it as one company's problem; it is now six.
 
 **What is refused today, and by which record:**
@@ -278,7 +280,7 @@ Minute has a register at `/register`, backed by `ClientRegisterRepository`. It s
 
 Visibility is two gates. Both the RLS policy on `research_companies` and the client repository require `is_published = TRUE` **and** `client_cleared = TRUE`. Five records — Block, DigitalX, Locate, Metaplanet and Strategy — carry `client_cleared = true` with a clearer and a timestamp. All twelve carry `is_published = false`.
 
-**Nothing in the codebase ever writes `is_published`.** Not a server action, not a form, not a seed migration. Across every app, package and migration it appears only as a column definition, a default of `FALSE`, or a `WHERE` clause. The only control that exists is `RegisterClearance` on the internal `/research/[slug]` page, which writes `client_cleared` and whose own doc comment warns that someone reading it as "publish" will clear entries that were never meant to leave the building. That is exactly what happened, and the warning was aimed at the wrong risk: the cleared entries are safe, they are simply invisible.
+**No human-facing control ever writes `is_published`.** Not a server action, not a form, not a seed migration. The one writer is the `researchIngest` resume branch (`apps/agents/src/workflows/researchIngest/index.ts`), which has never run against a real record; everywhere else it appears only as a column definition, a default of `FALSE`, or a `WHERE` clause. The `review_state` migration must change that writer and its tests in the same diff. The only control that exists is `RegisterClearance` on the internal `/research/[slug]` page, which writes `client_cleared` and whose own doc comment warns that someone reading it as "publish" will clear entries that were never meant to leave the building. That is exactly what happened, and the warning was aimed at the wrong risk: the cleared entries are safe, they are simply invisible.
 
 **The naming is the root cause.** "Published" reads as outward. The flag means visible on the *internal* register — inward. Worse, the internal list ignores it entirely: `listCompanies` filters on tier, archetype and jurisdiction and nothing else. So `is_published` gates nothing internally and silently blocks the client path, which is the only thing it does.
 
@@ -306,11 +308,11 @@ The distinction between the two gates is worth keeping despite all this, and it 
 
 ## Sequencing, and what needs deciding
 
-**Do this first, before anything else: write the seed migration.** Records 4 to 11 exist only in the live database. A reset or a fresh branch loses eight records and restores three. Every other record went in through a numbered seed migration, and nothing in the repo reviews what is currently there. One migration, idempotent, in the pattern of `20260911000000_seed_digitalx_and_block.sql`.
+**Do this first, before anything else: write the seed migration.** Records 4 to 12 exist only in the live database. A reset or a fresh branch loses nine records and restores three. Every other record went in through a numbered seed migration, and nothing in the repo reviews what is currently there. One migration, idempotent, in the pattern of `20260911000000_seed_digitalx_and_block.sql`.
 
 **Then, in order:**
 
-1. **Decision 1 and 2 together.** One migration: `research_document_sections`, the new source classes, `source_section_id` on the three child tables, and the amended `assert_source_minimum`. Backfill sections for the filings already registered, then re-enter the refused claims — all are recorded verbatim in each record's `curator_notes`.
+1. **Decision 1 and 2 together.** One migration: `research_document_sections`, the new source classes, `source_section_id` on the three child tables, `field_source_minimums` changed from a rank threshold to a per-field allow-list, and `assert_source_minimum` amended to check the section's class against that list. Backfill sections for the filings already registered, then re-enter the refused claims — all are recorded verbatim in each record's `curator_notes`.
 2. **Identity and calendars.** `company_identifiers`, nullable `jurisdiction` with `jurisdiction_basis`, `security_class`, `fiscal_calendar_type`. Migrate the Australian-shaped columns across and drop them.
 3. **Holdings vocabulary.** Two bases, encumbrance columns, `cost_basis_convention`, `asset_class` on snapshots.
 4. **Absence and divergence.** `ledger_absence_reason`, `resolution_status`, `secondary_claims`, `tracker_divergence`. Backfill the reason codes for the four empty records.
@@ -320,19 +322,20 @@ The distinction between the two gates is worth keeping despite all this, and it 
 
 Steps 2 to 4 are independent of each other and can be reordered or parallelised. Step 1 is not — it changes what every existing row is permitted to assert, so it should land alone and be reviewed as its own diff.
 
-**Acceptance criteria**
+### Acceptance criteria
 
-- A fresh database from migrations reproduces all eleven records, verified by count and by spot-checking three `curator_notes`.
+- A fresh database from migrations reproduces all twelve records, verified by count and by spot-checking three `curator_notes`.
 - The custody and accounting claims listed in Decision 1 are stored, each attached to a filing item, with the gate still refusing the same claims when sourced from a furnished exhibit.
 - `pnpm test`, `turbo typecheck` and `turbo lint` green; the new conformance cases pass against both adapters.
 - A company page for an empty record states which of the five reasons applies.
 
-**Decided (29 September)**
+### Decided (29 September)
 
 - **Source ranking** — replace the single rank threshold with a per-field allow-list of source classes. This supersedes the "does Item 1 earn rank 2" question: the ladder was conflating timeliness with reliability in one integer, and per-field sets let `custody` accept filed narrative while `ledger_event` does not. `field_source_minimums` is already per-field; it stores a threshold instead of a set.
 - **Encumbrance** — a flag, not a basis. `encumbered_quantity` plus the counterparty or instrument and the obligation secured, so Sequans' 817 BTC reads as convertible debt collateral rather than a bare number. Basis stays `direct_spot` for the comparable remainder. A `holding_encumbrances` child table only when a second simultaneous creditor appears.
 - **Non-bitcoin assets** — record and filter. In scope if held under the treasury policy the record is about; out of scope if it is merely another balance-sheet asset. Aggregates, comparisons and tier views filter to `BTC` unless asked otherwise.
 - **Tracker claims** — opportunistic only. Keep `secondary_claims`, populate it during research when a figure is in front of you, no scheduled scraping. Revisit if divergence findings prove to be what clients respond to.
+- **Filed periodic reports split in two** (1 October) — `filed_financials` (10-Q statements and notes) and `filed_narrative` (10-K/10-Q Items 1–7, MD&A) rather than one `filed_periodic_report`, so the ledger accepts the first and refuses the second while custody accepts both. Built in `20261001030000_source_sections_and_allowed_classes.sql`.
 - **Foreign private issuers** — ratified. 6-K is an accepted source; furnished content ranks lower only where a filed channel exists for the same disclosure. Sequans' rows stand.
 - **`review_state`** — `draft | internal | retired`, with clearance permitted only from `internal`. The internal list defaults to `internal` and exposes `draft` as a filter value with a count badge, so the review queue is the existing UI rather than a new one. On migration: the three seeded records and the five cleared ones become `internal`; records written on 23 September become `draft`.
 - **Minute summaries** — a hand-written `client_summary` per record, cleared as part of `setRegisterClearance`, with clearance blocked where it is empty. Composing from stored facts was rejected. Twelve to write, including the five already cleared, which predate the implementation-facts rule. Rex may draft; a human edits and clears.
@@ -351,9 +354,9 @@ Consequences to build for:
 
 **The ingest drafts the `client_summary`** (decided 29 September). A step after classification composes a subscriber-facing summary from the record's stored facts — mandate, custody, accounting treatment — and writes it as a draft alongside the rest of the run's output. A human edits and clears; nothing reaches Minute on a model's say-so.
 
-Two constraints on that step, and they are not stylistic. It is the only place in the platform where a model drafts prose intended for subscribers, under an AR licensing position, so: it composes only from `client_fact_class` implementation facts and never from `curator_notes`, which are internal voice and frequently outcome-shaped; and the drafted summary is inert until cleared, with clearance blocked where the text is empty or unedited from the draft. The restricted-metrics seed applies here as a hard filter, not a guideline — mNAV, BTC Yield and the rest cannot appear even when a primary filing states them.
+Two constraints on that step, and they are not stylistic. It is the only place in the platform where a model drafts prose intended for subscribers, and BTS holds no AFS authorisation — the text must stay information about how an entity implemented something, never anything a reader could take as advice — so: it composes only from `client_fact_class` implementation facts and never from `curator_notes`, which are internal voice and frequently outcome-shaped; and the drafted summary is inert until cleared, with clearance blocked where the text is empty or unedited from the draft. The restricted-metrics seed applies here as a hard filter, not a guideline — mNAV, BTC Yield and the rest cannot appear even when a primary filing states them. The prohibited word list in `.claude/skills/bts-design/references/naming.md` ("advice", "recommend", "should", "best" and the rest) is a hard filter on the same terms.
 
-**Still open**
+### Still open
 
 - **Notification is decided and the plumbing already exists.** A dashboard card plus an email. Email sends through `lib/fastmailJmap.ts`, a typed JMAP client (RFC 8620 and 8621) authenticating with Fastmail app-specific passwords, which already carries the submission spec for sending. Two senders use it today — `sendNewsDigest.ts` for the daily headlines and `sendSocialDraft.ts` for social drafts — and the market report goes out the same way. So this is a `sendReviewQueueDigest` beside them: same client, same identity, same recipient pattern, no provider decision and no domain setup. Follow `sendNewsDigest`'s conventions rather than inventing a second digest style.
 - **The card** follows the existing `show_on_dashboard` routine-tile pattern on the internal dashboard: draft count, companies involved, time of last run, linking to `/research?review_state=draft`. The email carries the same summary and the same link.

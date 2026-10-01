@@ -32,6 +32,7 @@
     "lint": "tsc --noEmit",
     "generate-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts",
     "seed:brand-voice": "tsx src/seeds/brand-voice.ts",
+    "seed:dump-register": "tsx src/seeds/dump-register-seed.ts",
     "db:migrate": "npx supabase db push",
     "db:diff": "npx supabase db diff",
     "db:pull": "npx supabase db pull",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.5",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

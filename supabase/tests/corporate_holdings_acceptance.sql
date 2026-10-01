@@ -3,7 +3,7 @@
 -- Spec: docs/features/corporate-holdings/README.md → Session 1
 --
 -- Run against a database with 20260904000000_add_corporate_holdings.sql
--- applied:
+-- and 20261001030000_source_sections_and_allowed_classes.sql applied:
 --
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/corporate_holdings_acceptance.sql
 --
@@ -14,14 +14,14 @@
 -- feature guards against. Proving the round trip and keeping the
 -- register clean are the same requirement, so the test commits nothing.
 --
--- Every assertion RAISEs on failure, so a clean run printing the three
+-- Every assertion RAISEs on failure, so a clean run printing the four
 -- NOTICEs below is the pass condition.
 -- ============================================================
 
 BEGIN;
 
 -- ------------------------------------------------------------
--- Fixture: one company, four documents spanning four source classes.
+-- Fixture: one company, five documents spanning five source classes.
 -- ------------------------------------------------------------
 
 INSERT INTO research_companies
@@ -40,26 +40,32 @@ INSERT INTO research_documents
   (id, company_id, document_type, source_class, title, venue, announcement_id,
    pdf_url, published_at, is_audited)
 VALUES
-  -- Rank 1. Strong enough for anything.
+  -- Accepted for every field.
   ('00000000-0000-4000-8000-0000000000d1',
    '00000000-0000-4000-8000-000000000001', 'offer_document', 'regulated_disclosure',
    'Meridian Freight Group — Product Disclosure Statement', 'asx', 'MFGX-PDS-001',
    'https://example.invalid/fixtures/mfg-pds.pdf', '2025-11-03', TRUE),
-  -- Rank 2. The minimum for a ledger event.
+  -- Accepted for a ledger event.
   ('00000000-0000-4000-8000-0000000000d2',
    '00000000-0000-4000-8000-000000000001', 'announcement', 'exchange_announcement',
    'Treasury Update', 'asx', 'MFGX-ANN-004',
    'https://example.invalid/fixtures/mfg-ann-004.pdf', '2025-06-04', FALSE),
-  -- Rank 4. Fine for an operating metric, not for the ledger.
+  -- Furnished. Fine for an operating metric, not for the ledger.
   ('00000000-0000-4000-8000-0000000000d3',
-   '00000000-0000-4000-8000-000000000001', 'other', 'investor_presentation',
+   '00000000-0000-4000-8000-000000000001', 'other', 'furnished_release',
    'Q3 FY26 Investor Presentation', 'nzx', 'MFGX-PRES-Q3',
    'https://example.invalid/fixtures/mfg-q3fy26.pdf', '2026-04-22', FALSE),
-  -- Rank 5. The About page that claimed self-custody.
+  -- The About page that claimed self-custody.
   ('00000000-0000-4000-8000-0000000000d4',
    '00000000-0000-4000-8000-000000000001', 'other', 'company_web',
    'Meridian Freight — About us', NULL, 'MFGX-WEB-ABOUT',
-   'https://example.invalid/fixtures/mfg-about.html', '2026-02-10', FALSE);
+   'https://example.invalid/fixtures/mfg-about.html', '2026-02-10', FALSE),
+  -- An annual report: audited statements with unaudited prose inside them.
+  -- Criterion 4 splits it into sections.
+  ('00000000-0000-4000-8000-0000000000d5',
+   '00000000-0000-4000-8000-000000000001', 'annual_report', 'audited_accounts',
+   'Meridian Freight Group — Annual Report FY25', 'nzx', 'MFGX-AR-FY25',
+   'https://example.invalid/fixtures/mfg-ar-fy25.pdf', '2025-08-28', TRUE);
 
 INSERT INTO fx_rates (rate_date, base_currency, quote_currency, rate, source) VALUES
   ('2026-04-20', 'NZD', 'AUD', 0.92000000, 'acceptance fixture');
@@ -87,7 +93,7 @@ BEGIN
        'direct_spot', '00000000-0000-4000-8000-0000000000d4', 'mfg:web:should-fail');
   EXCEPTION WHEN OTHERS THEN
     raised := TRUE;
-    IF SQLERRM NOT LIKE '%below the minimum%' THEN
+    IF SQLERRM NOT LIKE '%not accepted for field%' THEN
       RAISE EXCEPTION 'Gate raised, but not for the reason expected: %', SQLERRM;
     END IF;
   END;
@@ -258,6 +264,88 @@ BEGIN
     RAISE EXCEPTION
       'Freshness FAILED: cadence made no difference, so staleness is a fixed window';
   END IF;
+END $$;
+
+
+-- ------------------------------------------------------------
+-- Criterion 4 — the gate ranks the section a claim cites, not the
+-- document that carries it.
+--
+-- An annual report's business description is unaudited prose inside an
+-- audited document. Custody may come from it; the ledger may not; and a
+-- claim citing no section falls back to the document's own class.
+-- ------------------------------------------------------------
+
+INSERT INTO research_document_sections (id, document_id, filing_item, source_class, is_filed)
+VALUES
+  ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000d5',
+   'Annual report — business review', 'filed_narrative', TRUE);
+
+-- Custody accepts filed narrative.
+INSERT INTO research_company_facts
+  (company_id, field_key, label, value, source_document_id, source_section_id, natural_key)
+VALUES
+  ('00000000-0000-4000-8000-000000000001', 'custody', 'Custodian',
+   'Held with a named third-party custodian.',
+   '00000000-0000-4000-8000-0000000000d5', '00000000-0000-4000-8000-0000000000e1',
+   'mfg:fact:custody');
+
+DO $$
+DECLARE raised TEXT;
+BEGIN
+  -- The ledger does not.
+  BEGIN
+    INSERT INTO treasury_events
+      (company_id, event_type, event_date, quantity, headline, basis,
+       source_document_id, source_section_id, natural_key)
+    VALUES
+      ('00000000-0000-4000-8000-000000000001', 'acquisition', '2025-06-30', 2.0,
+       'Holding stated in the business review', 'direct_spot',
+       '00000000-0000-4000-8000-0000000000d5', '00000000-0000-4000-8000-0000000000e1',
+       'mfg:narrative:should-fail');
+  EXCEPTION WHEN OTHERS THEN raised := SQLERRM;
+  END;
+  IF raised IS NULL OR raised NOT LIKE '%filed_narrative is not accepted for field ledger_event%' THEN
+    RAISE EXCEPTION 'Criterion 4 FAILED: a ledger event from filed narrative gave %', coalesce(raised, 'no error');
+  END IF;
+
+  -- A section cannot lend its class to another document's claim.
+  raised := NULL;
+  BEGIN
+    INSERT INTO research_company_facts
+      (company_id, field_key, label, value, source_document_id, source_section_id, natural_key)
+    VALUES
+      ('00000000-0000-4000-8000-000000000001', 'custody', 'Custodian', 'Borrowed section.',
+       '00000000-0000-4000-8000-0000000000d4', '00000000-0000-4000-8000-0000000000e1',
+       'mfg:fact:borrowed-section');
+  EXCEPTION WHEN OTHERS THEN raised := SQLERRM;
+  END;
+  IF raised IS NULL OR raised NOT LIKE '%does not belong to document%' THEN
+    RAISE EXCEPTION 'Criterion 4 FAILED: a borrowed section gave %', coalesce(raised, 'no error');
+  END IF;
+END $$;
+
+-- No section cited: the document's own class decides, and audited accounts
+-- are accepted for the ledger.
+INSERT INTO treasury_events
+  (company_id, event_type, event_date, quantity, headline, basis, source_document_id, natural_key)
+VALUES
+  ('00000000-0000-4000-8000-000000000001', 'acquisition', '2025-06-30', 2.0,
+   'Holding in the audited balance sheet', 'direct_spot',
+   '00000000-0000-4000-8000-0000000000d5', 'mfg:acq:2025-06-30');
+
+DO $$
+DECLARE cls TEXT; item TEXT;
+BEGIN
+  SELECT source_class, source_filing_item INTO cls, item
+    FROM v_company_facts
+   WHERE slug = 'demo-meridian-freight' AND field_key = 'custody';
+
+  IF cls IS DISTINCT FROM 'filed_narrative' OR item IS DISTINCT FROM 'Annual report — business review' THEN
+    RAISE EXCEPTION 'Criterion 4 FAILED: v_company_facts reported % / %, not the cited section', cls, item;
+  END IF;
+
+  RAISE NOTICE 'Criterion 4 PASSED: the gate ranked the cited section, and the view reports it';
 END $$;
 
 

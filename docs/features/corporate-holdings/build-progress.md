@@ -4,12 +4,12 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** Sessions 1–3 complete, one production fix (session 4), and the register
-seeded to three records (session 5). The register has since grown to twelve records
-(4–12) written directly to the database, which are **not yet in a seed migration**.
-Two things still remain from session 2: the ingest run against real filings, and the
-recorded trace bundle.
-**Last updated:** 2026-09-29
+**Status:** Sessions 1–3 complete, one production fix (session 4), the register seeded to
+three records (session 5), then to twelve, with step 1 of
+[`schema-ingest-spec.md`](./schema-ingest-spec.md) built — sections and per-field source
+sets (session 6). Steps 2–6 of that spec are not started. Two things still remain from
+session 2: the ingest run against real filings, and the recorded trace bundle.
+**Last updated:** 2026-10-01
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -17,8 +17,9 @@ recorded trace bundle.
 > findings and a set of decisions taken on 29 September 2026 — per-field source
 > allow-lists, `review_state` on records and rows, encumbrance, discovery via
 > `reportWatch`, deterministic `natural_key`, and the Minute visibility bug. Those are
-> in `schema-ingest-spec.md` in this folder, which is the current plan. Read it before
-> this file; everything below describes the state as at 11 September.
+> in [`schema-ingest-spec.md`](./schema-ingest-spec.md), which is the current plan. Read it before
+> this file. Sessions 1–5 below describe the state as at 11 September; session 6 is the
+> first built against that spec.
 
 
 ---
@@ -410,3 +411,67 @@ documents, the recorded `TraceBundle`, and a `routines` row to schedule it. This
 moved none of them — it removed the reason the register was empty while they wait. The
 local Postgres harness stubs pgvector, which the container lacks; no vector column is
 touched by this seed.
+
+---
+
+## Session 6 — records 4–12 seeded, and the gate ranks by filing item
+
+Built against [`schema-ingest-spec.md`](./schema-ingest-spec.md): its "do this first" seed
+migration, and step 1 (Decisions 1 and 2). Branch `claude/corporate-schema-ingest`.
+
+**Shipped.**
+
+- **The spec, corrected.** Renamed from `corporate-schema-injest-spec.md.md`. Decisions 1–2
+  marked as superseded by the per-field sets, the record counts fixed (twelve, not eleven),
+  the claim that nothing writes `is_published` corrected (the `researchIngest` resume
+  branch does), and the AR licensing premise removed — BTS holds no AFS authorisation.
+- **The dump script, fixed before first use.** Moved to `packages/db/src/seeds/`, with the
+  SQL emission split into a pure, tested `registerSeed.ts`. Against the live schema the
+  uploaded version would have failed outright — its `company_listings` `ON CONFLICT` named
+  no matching constraint, since the unique key includes `listed_from` — and silently
+  dropped `research_findings.event_id`, which Strategy and Metaplanet both use. It now
+  emits `INSERT … WHERE NOT EXISTS` with NULL-safe keys, resolves documents, sections and
+  events by natural key, and throws on any column it does not know about rather than
+  dropping it. `tsx` added to `packages/db`, which `seed:brand-voice` also lacked.
+- **`20261001010949_seed_register_records_4_to_12.sql`** — generated from the live database:
+  138 inserts across nine records, matching live table by table. A no-op against live.
+- **`20261001030000_source_sections_and_allowed_classes.sql`** — `field_source_classes`
+  replaces `min_source_rank` with a set per field; `filed_financials` and `filed_narrative`
+  added and kept apart (decided 1 October), so the ledger accepts a 10-Q's notes and refuses
+  10-K prose while custody accepts both; `investor_presentation` becomes
+  `furnished_release`; `research_document_sections` plus a nullable `source_section_id` on
+  facts, events and snapshots, with the gate using the cited section's class and refusing a
+  section from another document; the three views report it. The six forced-fit 10-Qs
+  (Angel Studios, RUM Group) become `filed_financials`.
+- `ProvenanceRail` flags against the ledger's set rather than `rank > 2`, so audited accounts
+  stop reading as below the ledger's class. The conformance case and the SQL acceptance test
+  follow the rename, and the acceptance test gains criterion 4 for sections.
+
+**Session 5's open question, answered.** Audited accounts are now in
+`accounting_treatment`'s set, so Block's ASU 2023-08 election is storable. It has not been
+re-entered — see below.
+
+**Verified.**
+
+- The seed: replayed into a fresh database (twelve records, counts and checksums identical
+  to live) and re-run to insert nothing.
+- The source migration: run against the live database inside one `DO` block that ends in a
+  deliberate exception, so it could not commit. The acceptance test passed all four
+  criteria, every stored claim on the twelve records passed the new sets, and the
+  reclassification landed as expected. A follow-up read confirmed live was unchanged. Not
+  yet replayed on a fresh database after the seed.
+- `pnpm test` (16 packages), `turbo typecheck` and `turbo lint` green.
+
+**Not done.**
+
+- `jgaap`, the `jurisdiction_notes` seeds and `restricted_metrics`, which the spec puts in
+  step 1's migration. Small; they go in their own.
+- Sections for the registered 10-Ks, 10-Qs and 8-Ks, and re-entry of the refused claims in
+  Decision 1's table. Both are live-database writes and need the migration applied first.
+  Several 10-Q titles still say "class is a forced fit", which is no longer true.
+- Regenerating `packages/db/src/types/database.ts` once the migration is applied.
+- Steps 2–6 of the spec. Three questions are open before 5 and 6: row-level `review_state`
+  as specified passes visibility into a repository read, which `ReadContext` forbids —
+  internal and client visibility need to be separate bundles; where a company binding
+  lives for discovery, since `report_watch_sources` does not exist and reportWatch reads
+  `news_sources`; and Sequans' 817 BTC encumbered against "holds none".
