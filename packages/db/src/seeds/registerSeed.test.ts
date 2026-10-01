@@ -39,8 +39,13 @@ const listing: Row = {
   filing_entity: null, listed_from: null, listed_to: null, note: null,
 };
 
-function dump(children: Record<string, Row[]>) {
-  return emitRecord({ company, children }).sql;
+const section: Row = {
+  id: 's-1', document_id: 'd-1', filing_item: '8-K Item 8.01', source_class: 'exchange_announcement',
+  is_filed: true, notes: null, created_at: 'x',
+};
+
+function dump(children: Record<string, Row[]>, sections?: Row[]) {
+  return emitRecord({ company, children, sections }).sql;
 }
 
 describe('registerSeed', () => {
@@ -92,6 +97,23 @@ describe('registerSeed', () => {
   it('dollar-quotes text containing apostrophes', () => {
     expect(sqlLiteral("holder's")).toBe("$q$holder's$q$");
     expect(sqlLiteral('a $q$ b\'')).toBe("$qq$a $q$ b'$qq$");
+  });
+
+  it('emits sections after their documents and resolves a cited section by filing item', () => {
+    const sql = dump(
+      { research_documents: [doc], treasury_events: [{ ...event, source_section_id: 's-1' }] },
+      [section],
+    );
+    expect(sql.indexOf('INSERT INTO research_documents')).toBeLessThan(sql.indexOf('INSERT INTO research_document_sections'));
+    expect(sql.indexOf('INSERT INTO research_document_sections')).toBeLessThan(sql.indexOf('INSERT INTO treasury_events'));
+    expect(sql).toContain("FROM research_document_sections WHERE document_id = (SELECT id FROM research_documents");
+    expect(sql).toContain("filing_item = '8-K Item 8.01')");
+    expect(sql).not.toContain("'s-1'");
+  });
+
+  it('throws when a row cites a section the record does not carry', () => {
+    expect(() => dump({ research_documents: [doc], treasury_events: [{ ...event, source_section_id: 's-9' }] }))
+      .toThrow(/references section s-9/);
   });
 
   it('lists every child table in dependency order', () => {

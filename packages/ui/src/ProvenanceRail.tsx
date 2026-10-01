@@ -23,7 +23,9 @@ export type ProvenanceSourceClass =
   | 'regulated_disclosure'
   | 'exchange_announcement'
   | 'audited_accounts'
-  | 'investor_presentation'
+  | 'filed_financials'
+  | 'filed_narrative'
+  | 'furnished_release'
   | 'company_web'
   | 'secondary';
 
@@ -40,20 +42,36 @@ export const SOURCE_CLASS_LABELS: Record<ProvenanceSourceClass, string> = {
   regulated_disclosure: 'Regulated disclosure',
   exchange_announcement: 'Exchange announcement',
   audited_accounts: 'Audited accounts',
-  investor_presentation: 'Investor presentation',
+  filed_financials: 'Filed financials',
+  filed_narrative: 'Filed narrative',
+  furnished_release: 'Furnished release',
   company_web: 'Company website',
   secondary: 'Secondary',
 };
 
-/** Rank 1 is strongest. Mirrors `source_classes.rank`. */
+/** Display order, 1 first. Mirrors `source_classes.rank`. */
 export const SOURCE_CLASS_RANK: Record<ProvenanceSourceClass, number> = {
   regulated_disclosure: 1,
   exchange_announcement: 2,
   audited_accounts: 3,
-  investor_presentation: 4,
-  company_web: 5,
-  secondary: 6,
+  filed_financials: 4,
+  filed_narrative: 5,
+  furnished_release: 6,
+  company_web: 7,
+  secondary: 8,
 };
+
+/**
+ * The classes the ledger accepts. Mirrors the `ledger_event` rows of
+ * `field_source_classes` — a set, because filed narrative sits between
+ * accepted classes in display order and is still refused.
+ */
+export const LEDGER_SOURCE_CLASSES: ReadonlySet<ProvenanceSourceClass> = new Set([
+  'regulated_disclosure',
+  'exchange_announcement',
+  'audited_accounts',
+  'filed_financials',
+]);
 
 const ProvenanceContext = createContext(false);
 
@@ -119,7 +137,6 @@ export function Cited({
   className?: string;
 }) {
   const shown = useProvenanceShown();
-  const rank = SOURCE_CLASS_RANK[source.sourceClass];
 
   return (
     <span className={cn(styles.cited, className)}>
@@ -143,7 +160,7 @@ export function Cited({
           <span className={styles.when}>Date not disclosed</span>
         )}
         {detail ? <span className={styles.detail}>{detail}</span> : null}
-        {rank > 2 ? (
+        {!LEDGER_SOURCE_CLASSES.has(source.sourceClass) ? (
           <span className={styles.weak}>Below the class the ledger accepts</span>
         ) : null}
       </span>
@@ -162,8 +179,12 @@ export function SourceBadge({
 
   return (
     <span
-      className={cn(styles.badge, rank <= 2 ? styles.badgeStrong : styles.badgeWeak, className)}
-      title={`Source class ${rank} of 6`}
+      className={cn(
+        styles.badge,
+        LEDGER_SOURCE_CLASSES.has(sourceClass) ? styles.badgeStrong : styles.badgeWeak,
+        className,
+      )}
+      title={`Source class ${rank} of ${Object.keys(SOURCE_CLASS_RANK).length}`}
     >
       {SOURCE_CLASS_LABELS[sourceClass]}
     </span>

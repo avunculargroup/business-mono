@@ -3002,12 +3002,19 @@ CREATE TABLE report_segments (
 --   holding_bases(code PK, label, description, comparable BOOLEAN)
 --     seeded: direct_spot (comparable), look_through, includes_customer_assets,
 --     stated_unreconciled
---   source_classes(code PK, rank UNIQUE, label, is_audited) — rank 1 strongest
---     seeded: regulated_disclosure 1, exchange_announcement 2, audited_accounts 3,
---     investor_presentation 4, company_web 5, secondary 6
---   field_source_minimums(field_key PK, min_source_rank → source_classes.rank,
---     rationale) — custody/accounting_treatment/mandate/covenants/ledger_event
---     require rank ≤ 2; operating_metric ≤ 4; identity ≤ 5
+--   source_classes(code PK, rank UNIQUE, label, is_audited) — rank is display
+--     order only (20261001030000): regulated_disclosure 1, exchange_announcement 2
+--     (incl. TDnet, RNS, SEDAR+, filed 8-K items, 6-K), audited_accounts 3 (incl.
+--     20-F), filed_financials 4 (10-Q statements and notes), filed_narrative 5
+--     (10-K/10-Q Items 1–7, MD&A), furnished_release 6 (was investor_presentation;
+--     8-K Ex 99, decks), company_web 7, secondary 8
+--   field_source_minimums(field_key PK, rationale, client_fact_class) — the
+--     field catalogue. Its min_source_rank threshold was dropped in favour of:
+--   field_source_classes(field_key, source_class) PK both — the SET of classes
+--     each field accepts. ledger_event and accounting_treatment: regulated,
+--     exchange, audited, filed_financials. custody/mandate/covenants: those plus
+--     filed_narrative. operating_metric: plus furnished_release. identity: plus
+--     company_web. Never secondary.
 
 -- research_companies — slug UNIQUE, legal_name, acn/abn/arbn/isin/lei,
 --   jurisdiction, primary_archetype and self_described_archetype (kept apart:
@@ -3031,6 +3038,11 @@ CREATE TABLE report_segments (
 -- document_chunks(document_id, chunk_index, page_from/to, content,
 --   embedding VECTOR(1536), HNSW vector_cosine_ops) — whole-document chunks,
 --   never section-keyed.
+-- research_document_sections(document_id, filing_item, source_class, is_filed,
+--   notes) UNIQUE (document_id, filing_item) — a filing is not uniform inside
+--   itself (8-K Item 8.01 is filed, its Exhibit 99.1 furnished), so a claim may
+--   cite a section and is gated on the section's class. Facts, events and
+--   snapshots carry a nullable source_section_id; NULL means the whole document.
 
 -- treasury_events — event_type, asset_class (not bitcoin-only), event_date,
 --   quantity, consideration_native + native_currency + fees_included,
@@ -3066,7 +3078,10 @@ CREATE TABLE report_segments (
 --   against an offer document naming a third-party custodian is the finding,
 --   not a data-quality problem to resolve silently.
 
--- Triggers: assert_source_minimum(doc_id, field) is the shared assertion.
+-- Triggers: assert_source_accepted(doc_id, section_id, field) is the shared
+--   assertion: the cited section's class (else the document's) must be in
+--   field_source_classes for the field, and the section must belong to the
+--   document.
 --   enforce_source_minimum() passes TG_ARGV[0] and is attached to
 --   treasury_events and treasury_holdings_snapshots for 'ledger_event';
 --   enforce_source_minimum_for_row() reads NEW.field_key and is attached to

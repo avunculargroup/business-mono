@@ -91,7 +91,13 @@ async function main(): Promise<void> {
     for (const spec of CHILD_TABLES) {
       children[spec.table] = await readRows(spec.table, company['id'] as string, slug);
     }
-    dumps.push({ company, children });
+    const documentIds = children['research_documents']!.map((d) => d['id'] as string);
+    const { data: sections, error: sectionError } = documentIds.length
+      ? await supabase.from('research_document_sections').select('*').in('document_id', documentIds)
+      : { data: [], error: null };
+    if (sectionError) throw new Error(`Failed to read research_document_sections for ${slug}: ${sectionError.message}`);
+
+    dumps.push({ company, children, sections: (sections ?? []) as Row[] });
   }
 
   const sql = emitMigration(dumps, new Date().toISOString().slice(0, 10));

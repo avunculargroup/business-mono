@@ -15,7 +15,7 @@
 
 export type Row = Record<string, unknown>;
 
-type RefKind = 'document' | 'event';
+type RefKind = 'document' | 'section' | 'event';
 
 export interface TableSpec {
   table: string;
@@ -88,7 +88,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     columns: ['field_key', 'label', 'value', 'as_of', 'is_superseded', 'natural_key'],
     key: ['natural_key'],
     orderBy: 'natural_key',
-    refs: { source_document_id: 'document' },
+    refs: { source_document_id: 'document', source_section_id: 'section' },
     // superseded_by is checked in emitChildRows: a self-reference would need
     // ordering this emitter does not do, and no record uses it yet.
     ignored: [...ROW_AUDIT, 'updated_at', 'superseded_by'],
@@ -102,7 +102,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     ],
     key: ['natural_key'],
     orderBy: 'natural_key',
-    refs: { source_document_id: 'document' },
+    refs: { source_document_id: 'document', source_section_id: 'section' },
     ignored: [...ROW_AUDIT, 'updated_at'],
   },
   {
@@ -114,7 +114,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     ],
     key: ['natural_key'],
     orderBy: 'natural_key',
-    refs: { source_document_id: 'document' },
+    refs: { source_document_id: 'document', source_section_id: 'section' },
     ignored: [...ROW_AUDIT],
   },
   {
@@ -129,6 +129,16 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     ignored: [...ROW_AUDIT],
   },
 ];
+
+/**
+ * Sections belong to a document, not a company, so they sit outside
+ * CHILD_TABLES and are emitted straight after the documents they split.
+ */
+export const SECTION_SPEC = {
+  table: 'research_document_sections',
+  columns: ['filing_item', 'source_class', 'is_filed', 'notes'],
+  ignored: ['id', 'document_id', 'created_at'],
+} as const;
 
 // --- SQL literals ------------------------------------------------------
 
@@ -168,9 +178,22 @@ function keyMatch(key: readonly string[], row: Row): string {
   return key.map((c) => `${c} IS NOT DISTINCT FROM ${sqlLiteral(row[c])}`).join(' AND ');
 }
 
-function refSubquery(slug: string, kind: RefKind, target: Row): string {
-  if (kind === 'document') {
-    return `(SELECT id FROM research_documents WHERE company_id = ${companyIdSubquery(slug)} AND ${keyMatch(['venue', 'announcement_id'], target)})`;
+function documentSubquery(slug: string, doc: Row): string {
+  return `(SELECT id FROM research_documents WHERE company_id = ${companyIdSubquery(slug)} AND ${keyMatch(['venue', 'announcement_id'], doc)})`;
+}
+
+interface Lookups {
+  documents: Map<string, Row>;
+  sections: Map<string, Row>;
+  events: Map<string, Row>;
+}
+
+function refSubquery(slug: string, kind: RefKind, target: Row, lookups: Lookups): string {
+  if (kind === 'document') return documentSubquery(slug, target);
+  if (kind === 'section') {
+    const doc = lookups.documents.get(target['document_id'] as string);
+    if (!doc) throw new Error(`Section ${String(target['filing_item'])} belongs to a document outside ${slug}.`);
+    return `(SELECT id FROM research_document_sections WHERE document_id = ${documentSubquery(slug, doc)} AND filing_item = ${sqlLiteral(target['filing_item'])})`;
   }
   return `(SELECT id FROM treasury_events WHERE company_id = ${companyIdSubquery(slug)} AND natural_key = ${sqlLiteral(target['natural_key'])})`;
 }
@@ -192,6 +215,8 @@ export interface RecordDump {
   company: Row;
   /** Rows per child table name, as read (all columns). */
   children: Record<string, Row[]>;
+  /** Sections of this record's documents. */
+  sections?: Row[];
 }
 
 export function emitCompany(company: Row): string {
@@ -206,11 +231,31 @@ export function emitCompany(company: Row): string {
   ].join('\n');
 }
 
+export function emitSections(slug: string, sections: Row[], documents: Map<string, Row>): string {
+  if (sections.length === 0) return '';
+  const statements = sections.map((row) => {
+    assertKnownColumns(SECTION_SPEC.table, row, [...SECTION_SPEC.columns, ...SECTION_SPEC.ignored]);
+    const doc = documents.get(row['document_id'] as string);
+    if (!doc) throw new Error(`Section ${String(row['filing_item'])} belongs to a document outside ${slug}.`);
+    const docRef = documentSubquery(slug, doc);
+    return [
+      `INSERT INTO ${SECTION_SPEC.table} (document_id, ${SECTION_SPEC.columns.join(', ')})`,
+      `SELECT`,
+      `  ${[docRef, ...SECTION_SPEC.columns.map((c) => sqlLiteral(row[c]))].join(',\n  ')}`,
+      `WHERE NOT EXISTS (`,
+      `  SELECT 1 FROM ${SECTION_SPEC.table} WHERE document_id = ${docRef}`,
+      `    AND filing_item = ${sqlLiteral(row['filing_item'])}`,
+      `);`,
+    ].join('\n');
+  });
+  return `-- ${SECTION_SPEC.table} (${sections.length})\n${statements.join('\n\n')}`;
+}
+
 export function emitChildRows(
   slug: string,
   spec: TableSpec,
   rows: Row[],
-  lookups: { documents: Map<string, Row>; events: Map<string, Row> },
+  lookups: Lookups,
 ): string {
   if (rows.length === 0) return '';
   const refColumns = Object.keys(spec.refs ?? {});
@@ -230,7 +275,7 @@ export function emitChildRows(
         values.push('NULL');
         continue;
       }
-      const target = (kind === 'document' ? lookups.documents : lookups.events).get(id);
+      const target = { document: lookups.documents, section: lookups.sections, event: lookups.events }[kind].get(id);
       if (!target) {
         // A reference outside this record would silently become NULL and
         // fail the source gate on replay. Fail loudly instead.
@@ -239,7 +284,7 @@ export function emitChildRows(
             `which is not among ${slug}'s rows. Dump the owning record too, or fix the row.`,
         );
       }
-      values.push(refSubquery(slug, kind, target));
+      values.push(refSubquery(slug, kind, target, lookups));
     }
 
     return [
@@ -262,8 +307,9 @@ function byId(rows: Row[] | undefined): Map<string, Row> {
 
 export function emitRecord(dump: RecordDump): { sql: string; summary: string } {
   const slug = dump.company['slug'] as string;
-  const lookups = {
+  const lookups: Lookups = {
     documents: byId(dump.children['research_documents']),
+    sections: byId(dump.sections),
     events: byId(dump.children['treasury_events']),
   };
 
@@ -284,6 +330,14 @@ export function emitRecord(dump: RecordDump): { sql: string; summary: string } {
     if (rows.length === 0) continue;
     parts.push('', emitChildRows(slug, spec, rows, lookups));
     counts.push(`${rows.length} ${spec.table.replace('research_', '').replace('treasury_', '')}`);
+
+    if (spec.table === 'research_documents' && dump.sections?.length) {
+      const sections = [...dump.sections].sort((a, b) =>
+        `${String(a['document_id'])}|${String(a['filing_item'])}`.localeCompare(`${String(b['document_id'])}|${String(b['filing_item'])}`),
+      );
+      parts.push('', emitSections(slug, sections, lookups.documents));
+      counts.push(`${sections.length} document_sections`);
+    }
   }
 
   return { sql: parts.join('\n'), summary: `--   ${slug}: ${counts.join(', ') || 'company row only'}` };
