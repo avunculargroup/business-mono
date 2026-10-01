@@ -42,10 +42,6 @@ const COMPANIES = [
     self_described_archetype: 'treasury_company',
     reporting_standard: 'nz_ifrs',
     expected_disclosure_cadence: 'episodic',
-    acn: '000 000 001',
-    abn: '00 000 000 001',
-    arbn: null,
-    isin: 'XX0000000001',
     operational_hq: 'New South Wales',
     functional_currency: 'AUD',
     presentation_currency: 'NZD',
@@ -59,6 +55,7 @@ const COMPANIES = [
     // filings are. Rule 3, as data.
     company_listings: [listing('asx', 'MFGX', '2025-12-17'), listing('nzx', 'MFGX', null)],
     company_former_names: [{ name: 'Parcelway Technologies Limited', used_to: '2025-05-19' }],
+    company_identifiers: [{ scheme: 'isin', value: 'XX0000000001', valid_from: null, valid_to: null }],
   },
   {
     id: 'rc-verrall',
@@ -70,10 +67,6 @@ const COMPANIES = [
     self_described_archetype: null,
     reporting_standard: 'aasb',
     expected_disclosure_cadence: 'monthly',
-    acn: '000 000 002',
-    abn: '00 000 000 002',
-    arbn: null,
-    isin: 'XX0000000002',
     operational_hq: 'Western Australia',
     functional_currency: 'AUD',
     presentation_currency: 'AUD',
@@ -85,6 +78,7 @@ const COMPANIES = [
     is_published: true,
     company_listings: [listing('asx', 'VRDM', null)],
     company_former_names: [],
+    company_identifiers: [],
   },
   {
     id: 'rc-tarra',
@@ -96,10 +90,6 @@ const COMPANIES = [
     self_described_archetype: null,
     reporting_standard: 'aasb',
     expected_disclosure_cadence: 'episodic',
-    acn: '000 000 004',
-    abn: '00 000 000 004',
-    arbn: null,
-    isin: 'XX0000000004',
     operational_hq: 'Victoria',
     functional_currency: 'AUD',
     presentation_currency: 'AUD',
@@ -111,6 +101,7 @@ const COMPANIES = [
     is_published: true,
     company_listings: [listing('asx', 'TARH', null)],
     company_former_names: [],
+    company_identifiers: [],
   },
   {
     id: 'rc-calder',
@@ -122,10 +113,6 @@ const COMPANIES = [
     self_described_archetype: null,
     reporting_standard: 'aasb',
     expected_disclosure_cadence: 'monthly',
-    acn: '000 000 005',
-    abn: '00 000 000 005',
-    arbn: null,
-    isin: 'XX0000000005',
     operational_hq: 'Queensland',
     functional_currency: 'AUD',
     presentation_currency: 'AUD',
@@ -137,6 +124,7 @@ const COMPANIES = [
     is_published: true,
     company_listings: [listing('asx', 'CLDR', null)],
     company_former_names: [],
+    company_identifiers: [],
   },
 ];
 
@@ -481,6 +469,15 @@ describe('query wiring', () => {
 
     expect(company?.listings.map((l) => l.venue)).toEqual(['nzx']);
     expect(company?.listingHistory.map((l) => l.venue)).toEqual(['asx', 'nzx']);
+  });
+
+  it('reads identifiers from company_identifiers, not from a column per scheme', async () => {
+    const company = await corporateHoldings().getCompany(ctx, 'demo-meridian-freight');
+
+    expect(company?.identifiers).toEqual([
+      { scheme: 'isin', value: 'XX0000000001', validFrom: null, validTo: null },
+    ]);
+    expect(company).not.toHaveProperty('isin');
   });
 
   it('joins a jurisdiction note on the dimensions a company actually has', async () => {

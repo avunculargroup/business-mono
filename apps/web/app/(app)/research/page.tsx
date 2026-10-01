@@ -84,7 +84,7 @@ export default async function ResearchRegisterPage() {
                             {ARCHETYPE_LABELS[company.selfDescribedArchetype as Archetype]}
                           </span>
                         ) : null}
-                        <span className={styles.jurisdiction}>{company.jurisdiction}</span>
+                        <span className={styles.jurisdiction}>{company.jurisdiction ?? 'Not established'}</span>
                       </span>
                       <span className={styles.listings}>
                         {company.listings.length === 0

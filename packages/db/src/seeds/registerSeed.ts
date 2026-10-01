@@ -37,18 +37,21 @@ export interface TableSpec {
 
 export const COMPANY_SPEC = {
   columns: [
-    'slug', 'legal_name', 'jurisdiction', 'operational_hq',
+    'slug', 'legal_name', 'jurisdiction', 'jurisdiction_basis', 'operational_hq',
     'primary_archetype', 'self_described_archetype',
     'reporting_standard', 'functional_currency', 'presentation_currency',
-    'financial_year_end', 'tier', 'expected_disclosure_cadence',
-    'market_cap_band', 'funding_source', 'acn', 'abn', 'arbn', 'isin', 'lei',
+    'financial_year_end', 'fiscal_calendar_type', 'tier', 'expected_disclosure_cadence',
+    'market_cap_band', 'funding_source', 'cost_basis_convention',
+    'holding_status', 'exited_on', 'ledger_absence_reason',
     'curator_notes', 'last_verified_at',
   ],
   // Visibility is an environment decision, not a property of the research:
-  // seeded records land unpublished and uncleared.
+  // seeded records land unpublished and uncleared. acn/abn/arbn/isin/lei are
+  // deprecated copies of company_identifiers, which is dumped instead.
   ignored: [
     'id', 'is_published', 'client_cleared', 'client_cleared_by', 'client_cleared_at',
     'created_by', 'created_at', 'updated_at',
+    'acn', 'abn', 'arbn', 'isin', 'lei',
   ],
 } as const;
 
@@ -64,8 +67,18 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     ignored: ['id', 'company_id'],
   },
   {
+    table: 'company_identifiers',
+    columns: ['scheme', 'value', 'valid_from', 'valid_to', 'note'],
+    key: ['scheme', 'value'],
+    orderBy: 'scheme',
+    ignored: [...ROW_AUDIT],
+  },
+  {
     table: 'company_listings',
-    columns: ['venue', 'ticker', 'listing_type', 'filing_entity', 'listed_from', 'listed_to', 'note'],
+    columns: [
+      'venue', 'ticker', 'listing_type', 'security_class', 'filing_entity',
+      'listed_from', 'listed_to', 'note',
+    ],
     key: ['venue', 'ticker', 'listed_from'],
     orderBy: 'ticker',
     ignored: ['id', 'company_id'],
@@ -75,7 +88,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     columns: [
       'document_type', 'source_class', 'title', 'venue', 'announcement_id',
       'pdf_url', 'published_at', 'filing_entity', 'is_audited',
-      'retrieved_at', 'retrieval_error',
+      'retrieved_at', 'retrieval_error', 'resolution_status',
     ],
     key: ['venue', 'announcement_id'],
     orderBy: 'announcement_id',
@@ -110,6 +123,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     columns: [
       'as_of_date', 'asset', 'instrument_type', 'quantity', 'basis',
       'look_through_btc_equivalent', 'is_related_party_vehicle', 'includes_customer_assets',
+      'encumbered_quantity', 'encumbrance_counterparty', 'encumbrance_obligation',
       'value_native', 'native_currency', 'natural_key',
     ],
     key: ['natural_key'],
@@ -126,6 +140,15 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     key: ['natural_key'],
     orderBy: 'natural_key',
     refs: { source_document_id: 'document', event_id: 'event' },
+    ignored: [...ROW_AUDIT],
+  },
+  {
+    table: 'secondary_claims',
+    columns: [
+      'source_name', 'source_url', 'claimed_quantity', 'claimed_as_of', 'observed_at', 'note',
+    ],
+    key: ['source_name', 'observed_at'],
+    orderBy: 'observed_at',
     ignored: [...ROW_AUDIT],
   },
 ];

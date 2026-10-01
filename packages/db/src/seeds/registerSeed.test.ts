@@ -87,7 +87,7 @@ describe('registerSeed', () => {
   it('throws on a column it does not know, rather than dropping it', () => {
     expect(() => dump({ treasury_events: [{ ...event, review_state: 'draft' }], research_documents: [doc] }))
       .toThrow(/review_state/);
-    expect(() => emitCompany({ ...company, jurisdiction_basis: 'unknown' })).toThrow(/jurisdiction_basis/);
+    expect(() => emitCompany({ ...company, client_summary: 'draft' })).toThrow(/client_summary/);
   });
 
   it('throws when a row is sourced to a document outside the record', () => {
@@ -116,10 +116,23 @@ describe('registerSeed', () => {
       .toThrow(/references section s-9/);
   });
 
+  it('dumps identifiers from their table and leaves the deprecated columns behind', () => {
+    const sql = dump({
+      company_identifiers: [{
+        id: 'i-1', company_id: 'c-1', scheme: 'sec_cik', value: '1050446',
+        valid_from: null, valid_to: null, note: null, created_at: 'x',
+      }],
+    });
+    expect(sql).toContain('INSERT INTO company_identifiers');
+    expect(sql).toContain("scheme IS NOT DISTINCT FROM 'sec_cik' AND value IS NOT DISTINCT FROM '1050446'");
+    expect(emitCompany({ ...company, isin: 'US5949724083' })).not.toContain('US5949724083');
+  });
+
   it('lists every child table in dependency order', () => {
     expect(CHILD_TABLES.map((t) => t.table)).toEqual([
-      'company_former_names', 'company_listings', 'research_documents',
+      'company_former_names', 'company_identifiers', 'company_listings', 'research_documents',
       'research_company_facts', 'treasury_events', 'treasury_holdings_snapshots', 'research_findings',
+      'secondary_claims',
     ]);
   });
 });

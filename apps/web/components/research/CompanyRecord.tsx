@@ -23,6 +23,7 @@ import {
 } from '@platform/ui/ResearchPanels';
 import { ARCHETYPE_LABELS, type Archetype } from '@platform/ui/ArchetypeComparison';
 import styles from './CompanyRecord.module.css';
+import { formatIdentifiers } from './identifiers';
 
 /**
  * One company's record.
@@ -88,7 +89,7 @@ export function CompanyRecord({
       <div className={styles.page}>
         <header className={styles.mast}>
           <p className={styles.eyebrow}>
-            {company.tier.replace(/_/g, '-')} · {company.jurisdiction}
+            {company.tier.replace(/_/g, '-')} · {company.jurisdiction ?? 'jurisdiction not established'}
           </p>
 
           {/* Rule 3, at the top of the page. A reader searching the current
@@ -153,7 +154,7 @@ export function CompanyRecord({
             <div className={styles.fact}>
               <dt>Registration</dt>
               <dd className={styles.mono}>
-                {company.acn ?? company.arbn ?? company.abn ?? company.isin ?? 'Not recorded'}
+                {formatIdentifiers(company.identifiers)}
                 <em>Resolution runs on this, never on a ticker</em>
               </dd>
             </div>

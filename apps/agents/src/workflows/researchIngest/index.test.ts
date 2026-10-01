@@ -245,7 +245,7 @@ describe('failed retrieval', () => {
   it('records the error on the document instead of throwing', async () => {
     // A document that 404s repeatedly is a signal, and a silent skip hides it.
     fetchAllMock.mockResolvedValue([
-      { kind: 'failed', documentId: 'doc-1', error: 'not_found: HTTP 404' },
+      { kind: 'failed', documentId: 'doc-1', error: 'not_found: HTTP 404', resolution: 'fetch_failed' },
     ]);
 
     const result = await run();
@@ -255,7 +255,25 @@ describe('failed retrieval', () => {
     expect(updates).toContainEqual(
       expect.objectContaining({
         table: 'research_documents',
-        values: expect.objectContaining({ retrieval_error: 'not_found: HTTP 404' }),
+        values: expect.objectContaining({
+          retrieval_error: 'not_found: HTTP 404',
+          resolution_status: 'fetch_failed',
+        }),
+      }),
+    );
+  });
+
+  it('records a document with no URL as never attempted, not as a failed fetch', async () => {
+    fetchAllMock.mockResolvedValue([
+      { kind: 'failed', documentId: 'doc-1', error: 'unresolved: no pdf_url', resolution: 'no_url' },
+    ]);
+
+    await run();
+
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        table: 'research_documents',
+        values: expect.objectContaining({ resolution_status: 'no_url' }),
       }),
     );
   });

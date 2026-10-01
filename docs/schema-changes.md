@@ -6,6 +6,31 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-01 — Corporate holdings: identity, holdings vocabulary, absence and divergence
+
+Steps 2–4 of `docs/features/corporate-holdings/schema-ingest-spec.md`, one migration each.
+
+- **`20261001100000_research_identity_and_calendars.sql`** — `company_identifiers`
+  (scheme/value, with validity dates), backfilled from `acn`/`abn`/`arbn`/`isin`/`lei`.
+  Those columns stay for now: migrations apply on merge, before the apps redeploy,
+  so dropping a column the deployed app still selects would break it. A later
+  migration drops them. `jurisdiction` becomes nullable with `jurisdiction_basis`
+  and a check that a NULL jurisdiction says `unknown` (Hamak, RUM Group, which held
+  the string `unknown`). `company_listings.security_class`. `fiscal_calendar_type`,
+  with Goodfood's week-based sentence moved out of `financial_year_end`.
+  `reporting_standard` admits `jgaap` (Metaplanet, was `other`).
+- **`20261001100100_research_holdings_vocabulary.sql`** — `etf_wrapped` basis
+  (not comparable). Encumbrance columns on snapshots, as a flag rather than a basis
+  per the 29 September decision, so there is no `pledged_collateral` basis.
+  `cost_basis_convention` (Strategy inclusive, Metaplanet net). `holding_status` +
+  `exited_on` (Sequans exited 24 September 2026). `restricted_metrics`, seeded with
+  six issuer metrics. No `asset_class` on snapshots: they already carry `asset`.
+- **`20261001100200_research_absence_and_divergence.sql`** — `ledger_absence_reason`,
+  backfilled for the seven records without a ledger. `research_documents.resolution_status`,
+  which the ingest now maintains. `secondary_claims`. `tracker_divergence` finding type.
+
+---
+
 ## 2026-10-01 — Corporate holdings: rank by filing item, per-field source sets
 
 `20261001030000_source_sections_and_allowed_classes.sql` replaces the source

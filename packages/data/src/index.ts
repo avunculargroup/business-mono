@@ -121,6 +121,7 @@ export {
 } from './repositories/corporateHoldings';
 export type {
   CompanyDossier,
+  CompanyIdentifier,
   CompanyFact,
   CompanyListing,
   CorporateHoldingsRepository,

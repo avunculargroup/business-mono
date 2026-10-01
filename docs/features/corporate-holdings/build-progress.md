@@ -7,7 +7,8 @@ repository, and a record of what each session shipped. Same purpose as
 **Status:** Sessions 1–3 complete, one production fix (session 4), the register seeded to
 three records (session 5), then to twelve, with step 1 of
 [`schema-ingest-spec.md`](./schema-ingest-spec.md) built — sections and per-field source
-sets (session 6). Steps 2–6 of that spec are not started. Two things still remain from
+sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence and divergence
+(session 7). Steps 5 and 6 are not started. Two things still remain from
 session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-01
 
@@ -475,3 +476,66 @@ re-entered — see below.
   internal and client visibility need to be separate bundles; where a company binding
   lives for discovery, since `report_watch_sources` does not exist and reportWatch reads
   `news_sources`; and Sequans' 817 BTC encumbered against "holds none".
+
+---
+
+## Session 7 — identity, holdings vocabulary, absence and divergence
+
+Steps 2–4 of [`schema-ingest-spec.md`](./schema-ingest-spec.md), one migration each. Session
+6's merge (#392) applied cleanly; its types regeneration landed on `main` separately.
+
+**Shipped.**
+
+- **`20261001100000_research_identity_and_calendars.sql`** — `company_identifiers`,
+  backfilled from the five Australian-shaped columns (one ABN, one ARBN, one ISIN across the
+  register). `jurisdiction` nullable with `jurisdiction_basis`; Hamak and RUM Group move from
+  the string `unknown` to NULL with basis `unknown`. `company_listings.security_class`,
+  `fiscal_calendar_type` (Goodfood's sentence leaves `financial_year_end`), `jgaap`
+  (Metaplanet).
+- **`20261001100100_research_holdings_vocabulary.sql`** — `etf_wrapped`; encumbrance as three
+  snapshot columns; `cost_basis_convention`; `holding_status` + `exited_on` (Sequans);
+  `restricted_metrics`.
+- **`20261001100200_research_absence_and_divergence.sql`** — `ledger_absence_reason` for the
+  seven records without a ledger; `research_documents.resolution_status`; `secondary_claims`;
+  `tracker_divergence`.
+- **Read model.** `CompanyDossier.identifiers` replaces `acn`/`abn`/`arbn`/`isin`, and
+  `RegisterEntry.jurisdiction` is nullable. Both adapters, the web record page (all
+  identifiers, superseded ones dated), the register lists and `BasisChip` follow. The ingest
+  writes `resolution_status`, distinguishing a document with no URL from a failed fetch.
+- **Dump script** knows every new column, dumps `company_identifiers` and `secondary_claims`,
+  and leaves the deprecated identifier columns behind.
+
+**Departures from the spec, and why.**
+
+- **Expand, then contract.** The identifier columns are copied, not dropped. Migrations apply
+  on merge, before Vercel and Railway redeploy, so dropping a column the running app still
+  selects breaks it for the length of the deploy. Nothing reads them after this PR; a later
+  migration drops them.
+- **No `pledged_collateral` basis.** The 29 September decision made encumbrance a flag. The
+  step-3 list predates it.
+- **No `asset_class` on snapshots.** They already carry `asset`, defaulting to `btc`.
+- **Metaplanet's long URL is `resolved`, not `unfetchable`.** The 250-character limit the spec
+  cites belonged to the research tool; the ingest's fetcher has none.
+- **`jurisdiction_notes` seeds not written.** They are accounting and listing-rule claims
+  (Japanese GAAP against AASB 136, ASX LR 11.1, the ASU 2023-08 principal market, UK
+  depositary interests) and need a researcher's primary sources, not a migration author's.
+
+**Verified.**
+
+- All three migrations run against live inside one self-aborting `DO` block, with checks that
+  each new constraint refuses what it should and accepts what it should. That run caught a
+  real bug: the jurisdiction check was `jurisdiction_basis = 'unknown'`, which is NULL — and so
+  passes — when both columns are NULL. Fixed to `IS NOT DISTINCT FROM`. Every backfill landed
+  on the intended rows, and a follow-up read confirmed live was unchanged.
+- `pnpm test` (16 packages), `turbo typecheck` (17) and `turbo lint` green.
+
+**Not done.**
+
+- Drop `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` once this has deployed.
+- `security_class` on existing listings, `holding_status` beyond Sequans, CIKs and other
+  identifiers for records 4–12 — all research data, entered against sources.
+- Surfacing the new fields on the pages: absence reasons, holding status, encumbrance,
+  tracker divergence. That is step 6's panel work.
+- Session 6's data follow-up still stands: sections for registered filings, and re-entry of
+  the refused claims.
+
