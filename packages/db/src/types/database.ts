@@ -1356,6 +1356,61 @@ export type Database = {
           },
         ]
       }
+      company_identifiers: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          scheme: string
+          valid_from: string | null
+          valid_to: string | null
+          value: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          scheme: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          scheme?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_listings: {
         Row: {
           company_id: string
@@ -1365,6 +1420,7 @@ export type Database = {
           listed_to: string | null
           listing_type: string
           note: string | null
+          security_class: string | null
           ticker: string
           venue: string
         }
@@ -1376,6 +1432,7 @@ export type Database = {
           listed_to?: string | null
           listing_type: string
           note?: string | null
+          security_class?: string | null
           ticker: string
           venue: string
         }
@@ -1387,6 +1444,7 @@ export type Database = {
           listed_to?: string | null
           listing_type?: string
           note?: string | null
+          security_class?: string | null
           ticker?: string
           venue?: string
         }
@@ -6111,18 +6169,24 @@ export type Database = {
           client_cleared: boolean
           client_cleared_at: string | null
           client_cleared_by: string | null
+          cost_basis_convention: string | null
           created_at: string
           created_by: string | null
           curator_notes: string | null
+          exited_on: string | null
           expected_disclosure_cadence: string
           financial_year_end: string | null
+          fiscal_calendar_type: string | null
           functional_currency: string | null
           funding_source: string | null
+          holding_status: string | null
           id: string
           is_published: boolean
           isin: string | null
-          jurisdiction: string
+          jurisdiction: string | null
+          jurisdiction_basis: string | null
           last_verified_at: string | null
+          ledger_absence_reason: string | null
           legal_name: string
           lei: string | null
           market_cap_band: string | null
@@ -6142,18 +6206,24 @@ export type Database = {
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
+          exited_on?: string | null
           expected_disclosure_cadence?: string
           financial_year_end?: string | null
+          fiscal_calendar_type?: string | null
           functional_currency?: string | null
           funding_source?: string | null
+          holding_status?: string | null
           id?: string
           is_published?: boolean
           isin?: string | null
-          jurisdiction: string
+          jurisdiction?: string | null
+          jurisdiction_basis?: string | null
           last_verified_at?: string | null
+          ledger_absence_reason?: string | null
           legal_name: string
           lei?: string | null
           market_cap_band?: string | null
@@ -6173,18 +6243,24 @@ export type Database = {
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
+          exited_on?: string | null
           expected_disclosure_cadence?: string
           financial_year_end?: string | null
+          fiscal_calendar_type?: string | null
           functional_currency?: string | null
           funding_source?: string | null
+          holding_status?: string | null
           id?: string
           is_published?: boolean
           isin?: string | null
-          jurisdiction?: string
+          jurisdiction?: string | null
+          jurisdiction_basis?: string | null
           last_verified_at?: string | null
+          ledger_absence_reason?: string | null
           legal_name?: string
           lei?: string | null
           market_cap_band?: string | null
@@ -6469,6 +6545,7 @@ export type Database = {
           page_count: number | null
           pdf_url: string | null
           published_at: string | null
+          resolution_status: string | null
           retrieval_error: string | null
           retrieved_at: string | null
           source_class: string
@@ -6488,6 +6565,7 @@ export type Database = {
           page_count?: number | null
           pdf_url?: string | null
           published_at?: string | null
+          resolution_status?: string | null
           retrieval_error?: string | null
           retrieved_at?: string | null
           source_class: string
@@ -6507,6 +6585,7 @@ export type Database = {
           page_count?: number | null
           pdf_url?: string | null
           published_at?: string | null
+          resolution_status?: string | null
           retrieval_error?: string | null
           retrieved_at?: string | null
           source_class?: string
@@ -6704,6 +6783,27 @@ export type Database = {
           },
         ]
       }
+      restricted_metrics: {
+        Row: {
+          aliases: string[]
+          code: string
+          label: string
+          reason: string
+        }
+        Insert: {
+          aliases?: string[]
+          code: string
+          label: string
+          reason: string
+        }
+        Update: {
+          aliases?: string[]
+          code?: string
+          label?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       risk_register: {
         Row: {
           created_at: string
@@ -6830,6 +6930,64 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      secondary_claims: {
+        Row: {
+          claimed_as_of: string | null
+          claimed_quantity: number | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          observed_at: string
+          source_name: string
+          source_url: string | null
+        }
+        Insert: {
+          claimed_as_of?: string | null
+          claimed_quantity?: number | null
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          observed_at: string
+          source_name: string
+          source_url?: string | null
+        }
+        Update: {
+          claimed_as_of?: string | null
+          claimed_quantity?: number | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          observed_at?: string
+          source_name?: string
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
           },
         ]
@@ -7456,6 +7614,9 @@ export type Database = {
           basis: string
           company_id: string
           created_at: string
+          encumbered_quantity: number | null
+          encumbrance_counterparty: string | null
+          encumbrance_obligation: string | null
           id: string
           includes_customer_assets: boolean
           instrument_type: string
@@ -7474,6 +7635,9 @@ export type Database = {
           basis: string
           company_id: string
           created_at?: string
+          encumbered_quantity?: number | null
+          encumbrance_counterparty?: string | null
+          encumbrance_obligation?: string | null
           id?: string
           includes_customer_assets?: boolean
           instrument_type?: string
@@ -7492,6 +7656,9 @@ export type Database = {
           basis?: string
           company_id?: string
           created_at?: string
+          encumbered_quantity?: number | null
+          encumbrance_counterparty?: string | null
+          encumbrance_obligation?: string | null
           id?: string
           includes_customer_assets?: boolean
           instrument_type?: string
