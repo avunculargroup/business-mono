@@ -3001,7 +3001,10 @@ CREATE TABLE report_segments (
 -- empirically, and a fifth is expected.
 --   holding_bases(code PK, label, description, comparable BOOLEAN)
 --     seeded: direct_spot (comparable), look_through, includes_customer_assets,
---     stated_unreconciled
+--     stated_unreconciled, etf_wrapped (20261001100100; spot ETF units, never a coin count)
+--   restricted_metrics(code PK, label, aliases[], reason) — issuer metrics that
+--     cannot reach a subscriber even from a primary filing: BTC Yield, BTC Gain,
+--     BTC ¥ Gain, effective net acquisition cost, mNAV, BTC per share
 --   source_classes(code PK, rank UNIQUE, label, is_audited) — rank is display
 --     order only (20261001030000): regulated_disclosure 1, exchange_announcement 2
 --     (incl. TDnet, RNS, SEDAR+, filed 8-K items, 6-K), audited_accounts 3 (incl.
@@ -3023,18 +3026,34 @@ CREATE TABLE report_segments (
 --   market_cap_band + funding_source (the peer-shape matching inputs, columns
 --   so the criteria stay visible), curator_notes, is_published.
 --   Partial unique indexes on acn/abn/arbn/isin WHERE NOT NULL, so the many
---   NULLs do not collide.
+--   NULLs do not collide. acn/abn/arbn/isin/lei are deprecated copies of
+--   company_identifiers (20261001100000) and are dropped once nothing reads them.
+--   From 20261001100000–20261001100200: jurisdiction is nullable, with
+--   jurisdiction_basis (stated_in_filing | inferred_from_listing | unknown) and a
+--   CHECK that a NULL jurisdiction carries 'unknown'; fiscal_calendar_type
+--   (calendar_date | week_based_52_53), financial_year_end for the date case only;
+--   reporting_standard admits jgaap; cost_basis_convention (inclusive_of_fees |
+--   net_of_fees | unstated); holding_status (active | exited | never_held) with
+--   exited_on set exactly when exited; ledger_absence_reason (no_stated_basis |
+--   source_class_refused | primary_not_located | filing_system_unreachable |
+--   no_holding).
+-- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
+--   UNIQUE (company_id, scheme, value), indexed on (scheme, value) — entity
+--   resolution runs here. Open scheme vocabulary: a company can hold two CIKs.
 -- company_former_names(company_id, name, used_from, used_to) — a table, not
 --   JSONB, because it is a lookup path during ingest.
 -- company_listings(company_id, venue, ticker, listing_type, filing_entity,
 --   listed_from, listed_to) — listing_type gates regional-register membership
 --   rather than annotating it; a cdi_foreign_exempt quotation is exempt from
---   most listing rules.
+--   most listing rules. security_class (common | preferred | depositary_interest |
+--   cdi | other) says what the line is: Strategy has five primary Nasdaq lines.
 
 -- research_documents — every fact traces here by a NOT NULL FK. document_type,
 --   source_class → source_classes, announcement_id (resolves to the PDF URL),
 --   content_sha256 UNIQUE WHERE NOT NULL for re-fetch dedupe, and
 --   retrieval_error: a failed fetch is recorded, never discarded.
+--   resolution_status (resolved | no_url | unfetchable | fetch_failed) separates
+--   a document never attempted from one that failed; the ingest maintains it.
 -- document_chunks(document_id, chunk_index, page_from/to, content,
 --   embedding VECTOR(1536), HNSW vector_cosine_ops) — whole-document chunks,
 --   never section-keyed.
@@ -3050,7 +3069,9 @@ CREATE TABLE report_segments (
 --   natural_key with UNIQUE (company_id, natural_key) for idempotent re-ingest.
 -- treasury_holdings_snapshots — same shape plus instrument_type,
 --   look_through_btc_equivalent, is_related_party_vehicle,
---   includes_customer_assets. basis is NOT NULL here, unlike on events: a
+--   includes_customer_assets, and encumbered_quantity + encumbrance_counterparty
+--   + encumbrance_obligation (≤ quantity; an encumbrance names what it secures).
+--   basis is NOT NULL here, unlike on events: a
 --   holdings row without a basis is the bug rule 1 exists to prevent, while an
 --   event with no quantity legitimately has no basis to state.
 -- fx_rates(rate_date, base_currency, quote_currency, rate, source) — AUD is
@@ -3067,7 +3088,11 @@ CREATE TABLE report_segments (
 --   on metric series and has no subject columns. is_absence + subject carry
 --   structural absence, which is a stated fact rather than an empty panel;
 --   materiality is nullable because the deterministic payload commits before
---   any narration runs.
+--   any narration runs. finding_type admits tracker_divergence.
+-- secondary_claims(company_id, source_name, source_url, claimed_quantity,
+--   claimed_as_of, observed_at, note) UNIQUE (company_id, source_name,
+--   observed_at) — tracker figures, recorded as evidence of divergence and never
+--   as a source.
 
 -- research_company_facts — the qualitative fields (custody, mandate,
 --   accounting_treatment, covenants, operating_metric), each with the document

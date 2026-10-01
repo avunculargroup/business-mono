@@ -63,7 +63,7 @@ export default async function DemoResearchPage() {
                             ].toLowerCase()}
                           </span>
                         ) : null}
-                        <span className={styles.jurisdiction}>{company.jurisdiction}</span>
+                        <span className={styles.jurisdiction}>{company.jurisdiction ?? 'Not established'}</span>
                       </span>
                     </Link>
                   </li>

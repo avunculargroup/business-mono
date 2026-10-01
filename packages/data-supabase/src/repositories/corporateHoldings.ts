@@ -1,5 +1,6 @@
 import type {
   CompanyDossier,
+  CompanyIdentifier,
   CompanyFact,
   CompanyListing,
   CorporateHoldingsRepository,
@@ -65,11 +66,12 @@ const LEDGER_LIMIT = 200;
 
 const COMPANY_COLUMNS =
   'id, slug, legal_name, jurisdiction, tier, primary_archetype, self_described_archetype, ' +
-  'reporting_standard, expected_disclosure_cadence, acn, abn, arbn, isin, operational_hq, ' +
+  'reporting_standard, expected_disclosure_cadence, operational_hq, ' +
   'functional_currency, presentation_currency, financial_year_end, market_cap_band, ' +
   'funding_source, curator_notes, last_verified_at, is_published, client_cleared, ' +
   'company_listings(venue, ticker, listing_type, filing_entity, listed_from, listed_to), ' +
-  'company_former_names(name, used_to)';
+  'company_former_names(name, used_to), ' +
+  'company_identifiers(scheme, value, valid_from, valid_to)';
 
 const LEDGER_COLUMNS =
   'id, company_id, event_type, asset_class, event_date, quantity, consideration_native, ' +
@@ -101,16 +103,12 @@ type CompanyRow = {
   id: string;
   slug: string;
   legal_name: string;
-  jurisdiction: string;
+  jurisdiction: string | null;
   tier: ResearchTier;
   primary_archetype: ResearchArchetype;
   self_described_archetype: ResearchArchetype | null;
   reporting_standard: ReportingStandard | null;
   expected_disclosure_cadence: DisclosureCadence;
-  acn: string | null;
-  abn: string | null;
-  arbn: string | null;
-  isin: string | null;
   operational_hq: string | null;
   functional_currency: string | null;
   presentation_currency: string | null;
@@ -123,6 +121,14 @@ type CompanyRow = {
   client_cleared: boolean;
   company_listings: ListingRow[] | null;
   company_former_names: { name: string; used_to: string | null }[] | null;
+  company_identifiers: IdentifierRow[] | null;
+};
+
+type IdentifierRow = {
+  scheme: string;
+  value: string;
+  valid_from: string | null;
+  valid_to: string | null;
 };
 
 type LedgerRow = {
@@ -237,6 +243,10 @@ function toListing(row: ListingRow): CompanyListing {
   };
 }
 
+function toIdentifier(row: IdentifierRow): CompanyIdentifier {
+  return { scheme: row.scheme, value: row.value, validFrom: row.valid_from, validTo: row.valid_to };
+}
+
 function toFormerName(row: { name: string; used_to: string | null }): FormerName {
   return { name: row.name, usedTo: row.used_to };
 }
@@ -259,10 +269,7 @@ function toDossier(row: CompanyRow): CompanyDossier {
     listings: listings.filter((listing) => listing.listedTo === null),
     listingHistory: listings,
     formerNames: (row.company_former_names ?? []).map(toFormerName),
-    acn: row.acn,
-    abn: row.abn,
-    arbn: row.arbn,
-    isin: row.isin,
+    identifiers: (row.company_identifiers ?? []).map(toIdentifier),
     operationalHq: row.operational_hq,
     functionalCurrency: row.functional_currency,
     presentationCurrency: row.presentation_currency,

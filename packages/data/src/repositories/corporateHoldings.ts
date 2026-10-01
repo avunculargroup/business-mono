@@ -57,6 +57,20 @@ export interface CompanyListing {
   listedTo: string | null;
 }
 
+/**
+ * A registration number or filer id. A company can hold several in one scheme
+ * over time — Angel Studios' bitcoin history spans two SEC CIKs — so the
+ * dossier carries a list, never a column per scheme.
+ */
+export interface CompanyIdentifier {
+  /** Open vocabulary: 'sec_cik', 'acn', 'abn', 'arbn', 'isin', 'lei', 'iom_company_number', … */
+  scheme: string;
+  value: string;
+  validFrom: string | null;
+  /** Null means current. */
+  validTo: string | null;
+}
+
 /** A name the company filed under before. The reason ingest is not name-keyed. */
 export interface FormerName {
   name: string;
@@ -68,7 +82,12 @@ export interface RegisterEntry {
   id: string;
   slug: string;
   legalName: string;
-  jurisdiction: string;
+  /**
+   * Country of incorporation. Null where it could not be established — a
+   * depositary-interest listing hides it, or secondary sources conflict —
+   * rather than a sentinel string a reader would take for a country.
+   */
+  jurisdiction: string | null;
   tier: ResearchTier;
   primaryArchetype: ResearchArchetype;
   /**
@@ -86,10 +105,7 @@ export interface RegisterEntry {
 
 /** A company's own page. */
 export interface CompanyDossier extends RegisterEntry {
-  acn: string | null;
-  abn: string | null;
-  arbn: string | null;
-  isin: string | null;
+  identifiers: CompanyIdentifier[];
   operationalHq: string | null;
   functionalCurrency: string | null;
   /** May differ from the functional currency; a record reported in NZD may transact in AUD. */

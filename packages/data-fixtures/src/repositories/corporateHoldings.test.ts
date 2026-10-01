@@ -105,7 +105,8 @@ describe('the register, as the demo stages it', () => {
         expect(listing.ticker).toHaveLength(4);
       }
       const dossier = await repositories.corporateHoldings.getCompany(ctx, entry.slug);
-      expect(dossier?.isin?.startsWith('XX')).toBe(true);
+      const isin = dossier?.identifiers.find((id) => id.scheme === 'isin');
+      expect(isin?.value.startsWith('XX')).toBe(true);
     }
   });
 

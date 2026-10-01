@@ -122,6 +122,7 @@ describe('fetchDocument', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome).toHaveProperty('error', expect.stringContaining('not_found'));
+    expect(outcome).toHaveProperty('resolution', 'fetch_failed');
   });
 
   it('records an unresolved document as failed without a request', async () => {
@@ -130,6 +131,7 @@ describe('fetchDocument', () => {
     const outcome = await fetchDocument(ref);
 
     expect(outcome.kind).toBe('failed');
+    expect(outcome).toHaveProperty('resolution', 'no_url');
     expect(fetchBytesMock).not.toHaveBeenCalled();
   });
 

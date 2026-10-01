@@ -135,6 +135,7 @@ const fetchDocumentsStep = createStep({
             page_count: outcome.pageCount,
             retrieved_at: new Date().toISOString(),
             retrieval_error: null,
+            resolution_status: 'resolved',
           })
           .eq('id', outcome.documentId);
         documents.push({
@@ -169,7 +170,11 @@ const fetchDocumentsStep = createStep({
       // and a silent skip is how it stays invisible.
       await db
         .from('research_documents')
-        .update({ retrieved_at: new Date().toISOString(), retrieval_error: outcome.error })
+        .update({
+          retrieved_at: new Date().toISOString(),
+          retrieval_error: outcome.error,
+          resolution_status: outcome.resolution,
+        })
         .eq('id', outcome.documentId);
       log.warn({ documentId: outcome.documentId, error: outcome.error }, 'document unavailable');
     }

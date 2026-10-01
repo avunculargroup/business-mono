@@ -116,8 +116,12 @@ export type FetchOutcome =
   | { kind: 'fetched'; documentId: string; sha256: string; text: string; pageCount: number | null }
   /** The content hash matched what is already stored. Nothing downloaded twice. */
   | { kind: 'unchanged'; documentId: string; sha256: string }
-  /** The attempt failed and is recorded. A document that 404s repeatedly is a signal. */
-  | { kind: 'failed'; documentId: string; error: string };
+  /**
+   * The attempt failed and is recorded. A document that 404s repeatedly is a
+   * signal. `resolution` separates a document that was never attempted — no URL
+   * to send a request to — from one that was attempted and failed.
+   */
+  | { kind: 'failed'; documentId: string; error: string; resolution: 'no_url' | 'fetch_failed' };
 
 export function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -136,13 +140,18 @@ function looksLikePdf(bytes: Uint8Array): boolean {
  */
 export async function fetchDocument(ref: DocumentRef): Promise<FetchOutcome> {
   if (ref.status === 'unresolved') {
-    return { kind: 'failed', documentId: ref.id, error: `unresolved: ${ref.reason}` };
+    return { kind: 'failed', documentId: ref.id, error: `unresolved: ${ref.reason}`, resolution: 'no_url' };
   }
 
   const result = await fetchBytes(ref.url);
   if (!result.ok) {
     log.warn({ documentId: ref.id, reason: result.error.kind }, 'document fetch failed');
-    return { kind: 'failed', documentId: ref.id, error: `${result.error.kind}: ${result.error.message}` };
+    return {
+      kind: 'failed',
+      documentId: ref.id,
+      error: `${result.error.kind}: ${result.error.message}`,
+      resolution: 'fetch_failed',
+    };
   }
 
   const digest = sha256(result.artefact.bytes);
@@ -156,7 +165,12 @@ export async function fetchDocument(ref: DocumentRef): Promise<FetchOutcome> {
   if (looksLikePdf(result.artefact.bytes)) {
     const extracted = await extractPdfText(result.artefact.bytes);
     if (!extracted.ok) {
-      return { kind: 'failed', documentId: ref.id, error: `pdf extraction: ${extracted.message}` };
+      return {
+        kind: 'failed',
+        documentId: ref.id,
+        error: `pdf extraction: ${extracted.message}`,
+        resolution: 'fetch_failed',
+      };
     }
     return {
       kind: 'fetched',
@@ -175,7 +189,12 @@ export async function fetchDocument(ref: DocumentRef): Promise<FetchOutcome> {
   const html = new TextDecoder().decode(result.artefact.bytes);
   const extracted = await extractHtml(ref.url, html);
   if (!extracted.ok) {
-    return { kind: 'failed', documentId: ref.id, error: `html extraction: ${extracted.message}` };
+    return {
+      kind: 'failed',
+      documentId: ref.id,
+      error: `html extraction: ${extracted.message}`,
+      resolution: 'fetch_failed',
+    };
   }
   return {
     kind: 'fetched',

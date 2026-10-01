@@ -1,4 +1,5 @@
 import type {
+  CompanyIdentifier,
   CompanyDossier,
   CompanyFact,
   JurisdictionNote,
@@ -182,6 +183,13 @@ export function researchCompanyDocuments(anchor: Date): Record<string, Provenanc
 
 const E = RESEARCH_ENTITIES;
 
+/** The registration numbers a fixture entity holds, as the dossier lists them. */
+function identifiers(ids: Record<string, string | null>): CompanyIdentifier[] {
+  return Object.entries(ids)
+    .filter((entry): entry is [string, string] => entry[1] !== null)
+    .map(([scheme, value]) => ({ scheme, value, validFrom: null, validTo: null }));
+}
+
 /**
  * The register, five records deep.
  *
@@ -233,10 +241,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         },
       ],
       formerNames: [{ name: 'Parcelway Technologies Limited', usedTo: onDate(anchor, -480) }],
-      acn: E.meridian.acn,
-      abn: E.meridian.abn,
-      arbn: null,
-      isin: E.meridian.isin,
+      identifiers: identifiers({ acn: E.meridian.acn, abn: E.meridian.abn, arbn: null, isin: E.meridian.isin }),
       operationalHq: 'New South Wales',
       functionalCurrency: 'AUD',
       presentationCurrency: 'NZD',
@@ -283,10 +288,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         },
       ],
       formerNames: [],
-      acn: E.verrall.acn,
-      abn: E.verrall.abn,
-      arbn: null,
-      isin: E.verrall.isin,
+      identifiers: identifiers({ acn: E.verrall.acn, abn: E.verrall.abn, arbn: null, isin: E.verrall.isin }),
       operationalHq: 'Western Australia',
       functionalCurrency: 'AUD',
       presentationCurrency: 'AUD',
@@ -349,10 +351,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         },
       ],
       formerNames: [{ name: 'Nyala Commerce Inc.', usedTo: onDate(anchor, -1650) }],
-      acn: null,
-      abn: null,
-      arbn: '000 000 003',
-      isin: E.nyala.isin,
+      identifiers: identifiers({ acn: null, abn: null, arbn: '000 000 003', isin: E.nyala.isin }),
       operationalHq: 'United States',
       functionalCurrency: 'USD',
       presentationCurrency: 'USD',
@@ -400,10 +399,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         },
       ],
       formerNames: [],
-      acn: E.tarra.acn,
-      abn: E.tarra.abn,
-      arbn: null,
-      isin: E.tarra.isin,
+      identifiers: identifiers({ acn: E.tarra.acn, abn: E.tarra.abn, arbn: null, isin: E.tarra.isin }),
       operationalHq: 'Victoria',
       functionalCurrency: 'AUD',
       presentationCurrency: 'AUD',
@@ -453,10 +449,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         },
       ],
       formerNames: [],
-      acn: E.calder.acn,
-      abn: E.calder.abn,
-      arbn: null,
-      isin: E.calder.isin,
+      identifiers: identifiers({ acn: E.calder.acn, abn: E.calder.abn, arbn: null, isin: E.calder.isin }),
       operationalHq: 'Queensland',
       functionalCurrency: 'AUD',
       presentationCurrency: 'AUD',
