@@ -3019,15 +3019,14 @@ CREATE TABLE report_segments (
 --     filed_narrative. operating_metric: plus furnished_release. identity: plus
 --     company_web. Never secondary.
 
--- research_companies — slug UNIQUE, legal_name, acn/abn/arbn/isin/lei,
+-- research_companies — slug UNIQUE, legal_name,
 --   jurisdiction, primary_archetype and self_described_archetype (kept apart:
 --   the divergence is the case study), reporting_standard,
 --   functional/presentation currency, tier, expected_disclosure_cadence,
 --   market_cap_band + funding_source (the peer-shape matching inputs, columns
---   so the criteria stay visible), curator_notes, is_published.
---   Partial unique indexes on acn/abn/arbn/isin WHERE NOT NULL, so the many
---   NULLs do not collide. acn/abn/arbn/isin/lei are deprecated copies of
---   company_identifiers (20261001100000) and are dropped once nothing reads them.
+--   so the criteria stay visible), curator_notes, is_published. Registration
+--   numbers live in company_identifiers; the acn/abn/arbn/isin/lei columns were
+--   dropped in 20261001120000.
 --   From 20261001100000–20261001100200: jurisdiction is nullable, with
 --   jurisdiction_basis (stated_in_filing | inferred_from_listing | unknown) and a
 --   CHECK that a NULL jurisdiction carries 'unknown'; fiscal_calendar_type
@@ -3038,8 +3037,8 @@ CREATE TABLE report_segments (
 --   source_class_refused | primary_not_located | filing_system_unreachable |
 --   no_holding).
 -- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
---   UNIQUE (company_id, scheme, value), indexed on (scheme, value) — entity
---   resolution runs here. Open scheme vocabulary: a company can hold two CIKs.
+--   UNIQUE (scheme, value) — entity resolution runs here, and a registration
+--   number names one company. Open scheme vocabulary: a company can hold two CIKs.
 -- company_former_names(company_id, name, used_from, used_to) — a table, not
 --   JSONB, because it is a lookup path during ingest.
 -- company_listings(company_id, venue, ticker, listing_type, filing_entity,

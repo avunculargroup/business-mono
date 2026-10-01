@@ -531,7 +531,9 @@ Steps 2–4 of [`schema-ingest-spec.md`](./schema-ingest-spec.md), one migration
 
 **Not done.**
 
-- Drop `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` once this has deployed.
+- ~~Drop `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` once this has deployed.~~ Done in
+  `20261001120000`, which also moves their no-two-companies guarantee to a unique index on
+  `company_identifiers(scheme, value)`.
 - `security_class` on existing listings, `holding_status` beyond Sequans, CIKs and other
   identifiers for records 4–12 — all research data, entered against sources.
 - Surfacing the new fields on the pages: absence reasons, holding status, encumbrance,
