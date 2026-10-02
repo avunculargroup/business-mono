@@ -12,9 +12,10 @@ import type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  TrackerClaim,
   WithheldField,
 } from '@platform/data';
-import { ArchetypeMismatchError } from '@platform/data';
+import { ArchetypeMismatchError, measureTrackerClaim } from '@platform/data';
 import { STALE_AFTER_DAYS } from '@platform/shared';
 import { paginate } from '../paginate';
 import {
@@ -26,6 +27,7 @@ import {
   researchLedger,
   researchPositions,
   researchRegister,
+  researchTrackerClaims,
   researchWithheld,
 } from '../fixtures';
 
@@ -39,6 +41,29 @@ function daysSince(anchor: Date, isoDate: string): number {
 export function createCorporateHoldingsRepository(): CorporateHoldingsRepository {
   const company = (anchor: Date, id: string): CompanyDossier | undefined =>
     researchCompanies(anchor).find((row) => row.id === id || row.slug === id);
+
+  const position = (anchor: Date, companyId: string): PositionSummary => {
+    const found = company(anchor, companyId);
+    const rows = found ? (researchPositions(anchor)[found.id] ?? []) : [];
+
+    // The asset the aggregate is about. Everything else is a row on the page
+    // and never a summand — a treasury holding two assets has two positions,
+    // not one larger one.
+    const asset = 'btc';
+    const inAsset = rows.filter((row) => row.asset === asset);
+    const comparable = inAsset.filter((row) => row.basisComparable);
+    const comparableTotal = comparable.reduce((sum, row) => sum + row.quantity, 0);
+
+    return {
+      companyId: found?.id ?? companyId,
+      asset,
+      comparableTotal,
+      unencumberedTotal:
+        comparableTotal - comparable.reduce((sum, row) => sum + (row.encumberedQuantity ?? 0), 0),
+      rows,
+      excluded: inAsset.filter((row) => !row.basisComparable),
+    };
+  };
 
   return {
     async listCompanies(
@@ -85,26 +110,7 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
       return paginate(rows, opts);
     },
 
-    async getPosition(ctx: ReadContext, companyId: string): Promise<PositionSummary> {
-      const found = company(ctx.asOf, companyId);
-      const rows = found ? (researchPositions(ctx.asOf)[found.id] ?? []) : [];
-
-      // The asset the aggregate is about. Everything else is a row on the page
-      // and never a summand — a treasury holding two assets has two positions,
-      // not one larger one.
-      const asset = 'btc';
-      const inAsset = rows.filter((row) => row.asset === asset);
-
-      return {
-        companyId: found?.id ?? companyId,
-        asset,
-        comparableTotal: inAsset
-          .filter((row) => row.basisComparable)
-          .reduce((sum, row) => sum + row.quantity, 0),
-        rows,
-        excluded: inAsset.filter((row) => !row.basisComparable),
-      };
-    },
+    getPosition: async (ctx: ReadContext, companyId: string) => position(ctx.asOf, companyId),
 
     async getJurisdictionNotes(
       ctx: ReadContext,
@@ -172,6 +178,27 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
     ): Promise<StructuralAbsence[]> {
       const found = company(ctx.asOf, companyId);
       return found ? (researchAbsences(ctx.asOf)[found.id] ?? []) : [];
+    },
+
+    async getTrackerClaims(ctx: ReadContext, companyId: string): Promise<TrackerClaim[]> {
+      const found = company(ctx.asOf, companyId);
+      if (!found) return [];
+      const claims = researchTrackerClaims(ctx.asOf)[found.id] ?? [];
+      if (claims.length === 0) return [];
+
+      // Against the comparable total only, as the live adapter measures it.
+      const summary = position(ctx.asOf, found.id);
+      const comparable = summary.rows.filter(
+        (row) => row.basisComparable && row.asset === summary.asset,
+      );
+      const sourced =
+        comparable.length === 0
+          ? null
+          : { quantity: summary.comparableTotal, asOf: comparable[0].asOfDate };
+
+      return claims
+        .map((claim) => measureTrackerClaim(claim, sourced))
+        .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
     },
 
     async compareCompanies(ctx: ReadContext, slugs: string[]): Promise<CompanyDossier[]> {

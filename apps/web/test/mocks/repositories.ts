@@ -152,6 +152,7 @@ export function createFakeRepositories(
             companyId: 'rc-1',
             asset: 'btc',
             comparableTotal: 0,
+            unencumberedTotal: 0,
             rows: [],
             excluded: [],
           },
@@ -161,6 +162,7 @@ export function createFakeRepositories(
       getFreshness: vi.fn(async () => fakeFreshness()),
       getWithheldFields: vi.fn(async () => []),
       getStructuralAbsences: vi.fn(async () => []),
+      getTrackerClaims: vi.fn(async () => []),
       compareCompanies: vi.fn(async () => []),
     },
     companies: {
@@ -289,6 +291,9 @@ export function fakeCompanyDossier(overrides: Partial<CompanyDossier> = {}): Com
     lastVerifiedAt: null,
     isPublished: false,
     clientCleared: false,
+    ledgerAbsenceReason: null,
+    holdingStatus: null,
+    exitedOn: null,
     ...overrides,
   };
 }

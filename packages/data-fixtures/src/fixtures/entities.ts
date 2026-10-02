@@ -238,4 +238,43 @@ export const RESEARCH_ENTITIES = {
     abn: '00 000 000 005',
     isin: 'XX0000000005',
   },
+  // The four below carry pathologies the first five could not: an ETF-wrapped
+  // position, a currency-only disclosure, claims refused by source class, and
+  // an exit. Each is a shape records 4–12 produced against real filings.
+  halden: {
+    id: 'rc-halden',
+    slug: 'demo-halden-foods',
+    legalName: 'Halden Foods Limited',
+    ticker: 'HLDF',
+    acn: '000 000 006',
+    abn: '00 000 000 006',
+    isin: 'XX0000000006',
+  },
+  corran: {
+    id: 'rc-corran',
+    slug: 'demo-corran-minerals',
+    legalName: 'Corran Minerals Limited',
+    ticker: 'CRNM',
+    acn: '000 000 007',
+    abn: '00 000 000 007',
+    isin: 'XX0000000007',
+  },
+  ashby: {
+    id: 'rc-ashby',
+    slug: 'demo-ashby-media',
+    legalName: 'Ashby Media Group Limited',
+    ticker: 'ASHM',
+    acn: '000 000 008',
+    abn: '00 000 000 008',
+    isin: 'XX0000000008',
+  },
+  wexford: {
+    id: 'rc-wexford',
+    slug: 'demo-wexford-semiconductor',
+    legalName: 'Wexford Semiconductor Limited',
+    ticker: 'WXFS',
+    acn: '000 000 009',
+    abn: '00 000 000 009',
+    isin: 'XX0000000009',
+  },
 } as const satisfies Record<string, FixtureResearchEntity>;

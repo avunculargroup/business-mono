@@ -28,6 +28,7 @@ export {
   researchLedger,
   researchPositions,
   researchRegister,
+  researchTrackerClaims,
   researchWithheld,
 } from './corporate-holdings';
 export { ecosystemChanges, watchHealth } from './ecosystem-changes';
