@@ -15,6 +15,7 @@ const fetchAllMock = vi.fn();
 const embedTextsMock = vi.fn();
 const tables = new Map<string, unknown[]>();
 const updates: Array<{ table: string; values: Record<string, unknown> }> = [];
+const upserts: Array<{ table: string; values: unknown; options: unknown }> = [];
 
 vi.mock('../../agents/researcher/index.js', () => ({ rex: { generate: rexGenerate } }));
 vi.mock('../../agents/compliance/index.js', () => ({ lex: { generate: lexGenerate } }));
@@ -31,9 +32,13 @@ vi.mock('../../lib/contentEmbeddings.js', () => ({
 function builder(table: string) {
   const chain: Record<string, unknown> = {};
   const self = () => chain;
-  for (const method of ['select', 'eq', 'order', 'limit', 'upsert']) {
+  for (const method of ['select', 'eq', 'order', 'limit']) {
     chain[method] = vi.fn(self);
   }
+  chain['upsert'] = vi.fn((values: unknown, options: unknown) => {
+    upserts.push({ table, values, options });
+    return chain;
+  });
   chain['update'] = vi.fn((values: Record<string, unknown>) => {
     updates.push({ table, values });
     return chain;
@@ -90,6 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   tables.clear();
   updates.length = 0;
+  upserts.length = 0;
 
   tables.set('research_documents', [
     {
@@ -103,6 +109,14 @@ beforeEach(() => {
     },
   ]);
   tables.set('treasury_events', []);
+  // The ledger's accepted set, as 20261001030000 seeds it.
+  tables.set(
+    'field_source_classes',
+    ['regulated_disclosure', 'exchange_announcement', 'audited_accounts', 'filed_financials'].map(
+      (source_class) => ({ source_class }),
+    ),
+  );
+  tables.set('research_document_sections', []);
   tables.set('research_companies', [
     { slug: 'locate-technologies', legal_name: 'Locate Technologies Limited' },
   ]);
@@ -207,6 +221,114 @@ describe('the happy path', () => {
 
     const [, args] = rpcMock.mock.calls[0];
     expect((args as { payload: { events: unknown[] } }).payload.events).toHaveLength(1);
+  });
+});
+
+describe('what the extractor reads', () => {
+  const EIGHT_K = [
+    'FORM 8-K',
+    '',
+    '**Item 7.01 Regulation FD Disclosure.**',
+    '',
+    'The presentation states BTC Yield of 12.5% for the period.',
+    '',
+    '**Item 8.01 Other Events.**',
+    '',
+    'The Company has acquired 6.08914 bitcoin for A$1,000,000, inclusive of fees and expenses.',
+    '',
+    'SIGNATURES',
+  ].join('\n');
+
+  function secFiling() {
+    tables.set('research_documents', [
+      {
+        id: 'doc-1',
+        venue: 'sec',
+        announcement_id: '0001',
+        pdf_url: 'https://www.sec.gov/Archives/edgar/data/1/0001/filing.htm',
+        title: 'Form 8-K — weekly update',
+        content_sha256: null,
+        source_class: 'exchange_announcement',
+      },
+    ]);
+    // As the table reads back after the upsert.
+    tables.set('research_document_sections', [
+      { id: 'sec-701', filing_item: '8-K Item 7.01', source_class: 'furnished_release' },
+      { id: 'sec-801', filing_item: '8-K Item 8.01', source_class: 'exchange_announcement' },
+    ]);
+    fetchAllMock.mockResolvedValue([
+      { kind: 'fetched', documentId: 'doc-1', sha256: 'abc', text: EIGHT_K, pageCount: null },
+    ]);
+  }
+
+  it('reads only the filed item of an 8-K, and cites it on the event', async () => {
+    secFiling();
+
+    await run();
+
+    // One extraction call for Item 8.01; the furnished Item 7.01 is not read.
+    const extractCalls = rexGenerate.mock.calls.filter(
+      ([, opts]) => (opts as { requestContext: { key: string } }).requestContext.key ===
+        'researchIngest.extract_events',
+    );
+    expect(extractCalls).toHaveLength(1);
+    const [[messages]] = extractCalls as unknown as Array<[Array<{ content: string }>]>;
+    expect(messages[0].content).toContain('Filing item: 8-K Item 8.01');
+    expect(messages[0].content).not.toContain('BTC Yield');
+
+    const [, args] = rpcMock.mock.calls[0];
+    const [event] = (args as { payload: { events: Array<{ source_section_id: string | null }> } })
+      .payload.events;
+    expect(event.source_section_id).toBe('sec-801');
+  });
+
+  it('stores each item as a section, leaving any it already holds alone', async () => {
+    secFiling();
+
+    await run();
+
+    const sectionUpserts = upserts.filter((u) => u.table === 'research_document_sections');
+
+    expect(sectionUpserts).toHaveLength(1);
+    const { values, options } = sectionUpserts[0];
+    const rows = values as Array<{ filing_item: string; source_class: string }>;
+    expect(rows.map((row) => [row.filing_item, row.source_class])).toEqual([
+      ['8-K Item 7.01', 'furnished_release'],
+      ['8-K Item 8.01', 'exchange_announcement'],
+    ]);
+    expect(options).toEqual({ onConflict: 'document_id,filing_item', ignoreDuplicates: true });
+  });
+
+  it('never reads a source the ledger refuses', async () => {
+    // A news article in the company's documents. Extracting from it would
+    // put an event in front of the gate, which raises and fails the commit.
+    tables.set('research_documents', [
+      {
+        id: 'doc-1',
+        venue: 'web',
+        announcement_id: null,
+        pdf_url: 'https://news.test/article',
+        title: 'News report',
+        content_sha256: null,
+        source_class: 'secondary',
+      },
+    ]);
+
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect(rexGenerate).not.toHaveBeenCalled();
+  });
+
+  it('refuses to run with no accepted set to judge by', async () => {
+    // Fail closed: an empty set would mean reading nothing and reporting a
+    // quiet run, which is indistinguishable from a quiet week.
+    tables.set('field_source_classes', []);
+
+    const result = await run();
+
+    expect(result.status).toBe('failed');
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });
 

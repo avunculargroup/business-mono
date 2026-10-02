@@ -67,12 +67,13 @@ Supabase Realtime subscription.
 
 ### `researchIngest` — the corporate research pipeline
 
-`src/workflows/researchIngest/`. Ten steps over the corporate holdings register:
-resolve → fetch → chunk and embed → **extract (Rex)** → validate → reconcile →
-**score (Rex)** → **classify (Lex)** → persist → approval gate. Spec:
-[`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md).
+`src/workflows/researchIngest/`. Eleven steps over the corporate holdings register:
+resolve → fetch → chunk and embed → split and admit → **extract (Rex)** → validate →
+reconcile → **score (Rex)** → **classify (Lex)** → persist → approval gate. Spec:
+[`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md),
+amended by [`schema-ingest-spec.md`](../../docs/features/corporate-holdings/schema-ingest-spec.md).
 
-Four things about it are load-bearing and easy to undo by accident:
+Six things about it are load-bearing and easy to undo by accident:
 
 - **`validateNumerics` is not a model call and must not become one.** Every figure an
   extraction claims is re-located in the source text arithmetically, and the whole event
@@ -84,6 +85,16 @@ Four things about it are load-bearing and easy to undo by accident:
 - **The gate is at publication, not ingest.** Ingest runs unattended; only
   `promoteToPublished` suspends. A pipeline that stops for approval on every quarterly
   stops running.
+- **The extractor reads only what the ledger accepts.** An SEC filing (venue `sec`) is
+  split on its item headings by `edgarSections.ts` — string work, never a model — and each
+  item stored in `research_document_sections` with its own class; other documents are read
+  whole. Only units whose class is in `field_source_classes` for `ledger_event` reach Rex,
+  and each event cites the section it came from. The source-class trigger raises rather
+  than skipping, so one event from a news article or an MD&A would otherwise fail the
+  whole commit.
+- **Event keys are computed, not asked for.** `naturalKey.ts` builds
+  `<slug>:<code>:<date>` from the record; a key that varied between runs would duplicate
+  ledger rows on reconcile.
 - **Persist goes through the `commit_research_ingest` RPC.** PostgREST has no
   transactions, and four sequential inserts can half-succeed — leaving events committed
   with the classifications that gate them missing.

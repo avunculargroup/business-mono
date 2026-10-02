@@ -30,6 +30,7 @@ import { chunkText, embedTexts } from '../../lib/contentEmbeddings.js';
 import { createLogger } from '../../lib/logger.js';
 import { fetchAll, resolveDocuments, type DocumentRow } from './documents.js';
 import { assignNaturalKeys } from './naturalKey.js';
+import { admitUnits, sectionsFor, unitsFor, type ReadingUnit, type StoredSection } from './readingUnits.js';
 import { claimsForEvent, validateClaims } from './numerics.js';
 import { isQuietRun, materialDeltas, reconcile, type CommittedEvent } from './reconcile.js';
 import {
@@ -37,6 +38,7 @@ import {
   extractionSchema,
   fetchSummarySchema,
   readableDocumentSchema,
+  readingUnitSchema,
   rejectedClaimSchema,
   researchIngestInputSchema,
   researchIngestOutputSchema,
@@ -54,7 +56,11 @@ import {
 const resolvedSchema = researchIngestInputSchema.extend({ refs: z.array(z.any()) });
 const fetchedSchema = researchIngestInputSchema.extend({ fetch: fetchSummarySchema });
 const embeddedSchema = fetchedSchema.extend({ chunkCount: z.number() });
-const extractedSchema = fetchedSchema.extend({ candidates: z.array(candidateEventSchema) });
+const sectionedSchema = embeddedSchema.extend({ units: z.array(readingUnitSchema) });
+const extractedSchema = fetchedSchema.extend({
+  units: z.array(readingUnitSchema),
+  candidates: z.array(candidateEventSchema),
+});
 const validatedSchema = fetchedSchema.extend({
   validated: z.array(candidateEventSchema),
   rejected: z.array(rejectedClaimSchema),
@@ -102,6 +108,7 @@ const resolveDocumentsStep = createStep({
     const refs = resolveDocuments(rows).map((ref, index) => ({
       ...ref,
       sourceClass: rows[index].source_class,
+      venue: rows[index].venue,
     }));
 
     log.info({ companyId: inputData.companyId, documents: refs.length }, 'documents resolved');
@@ -115,7 +122,12 @@ const fetchDocumentsStep = createStep({
   inputSchema: resolvedSchema,
   outputSchema: fetchedSchema,
   execute: async ({ inputData }) => {
-    const refs = inputData.refs as Array<{ id: string; title: string; sourceClass: string }>;
+    const refs = inputData.refs as Array<{
+      id: string;
+      title: string;
+      sourceClass: string;
+      venue: string | null;
+    }>;
     const outcomes = await fetchAll(inputData.refs as never);
 
     const documents: Array<z.infer<typeof readableDocumentSchema>> = [];
@@ -144,6 +156,7 @@ const fetchDocumentsStep = createStep({
           title: ref.title,
           text: outcome.text,
           sourceClass: ref.sourceClass,
+          venue: ref.venue,
         });
         continue;
       }
@@ -161,7 +174,13 @@ const fetchDocumentsStep = createStep({
           .maybeSingle();
         const text = (data as { full_text: string | null } | null)?.full_text;
         if (text) {
-          documents.push({ id: outcome.documentId, title: ref.title, text, sourceClass: ref.sourceClass });
+          documents.push({
+            id: outcome.documentId,
+            title: ref.title,
+            text,
+            sourceClass: ref.sourceClass,
+            venue: ref.venue,
+          });
         }
         continue;
       }
@@ -222,10 +241,84 @@ const chunkAndEmbedStep = createStep({
   },
 });
 
-// ── 4. Extract (Rex) ─────────────────────────────────────────────────────────
+// ── 4. Split and admit ───────────────────────────────────────────────────────
+// Deterministic. An SEC filing is split on its item headings and each item
+// stored as a section the gate can judge; then only text the ledger accepts
+// goes on to the extractor. A claim from a news article or a 10-K's MD&A is
+// never extracted, rather than extracted and refused at commit — where the
+// refusal raises and takes the whole run's transaction with it.
+const splitSectionsStep = createStep({
+  id: 'split_sections',
+  inputSchema: embeddedSchema,
+  outputSchema: sectionedSchema,
+  execute: async ({ inputData }) => {
+    // The accepted set is read from the table the gate reads, so the two
+    // cannot disagree about what the ledger admits.
+    const { data: accepted, error: acceptedError } = await db
+      .from('field_source_classes')
+      .select('source_class')
+      .eq('field_key', 'ledger_event');
+    if (acceptedError) throw acceptedError;
+    const acceptedClasses = new Set(
+      ((accepted ?? []) as Array<{ source_class: string }>).map((row) => row.source_class),
+    );
+    if (acceptedClasses.size === 0) {
+      throw new Error('field_source_classes has no classes for ledger_event');
+    }
+
+    const units: ReadingUnit[] = [];
+    for (const document of inputData.fetch.documents) {
+      const sections = sectionsFor(document);
+      let stored: StoredSection[] = [];
+
+      if (sections.length > 0) {
+        // Existing rows are left alone: a section someone classified by hand
+        // keeps that class.
+        const { error: upsertError } = await db.from('research_document_sections').upsert(
+          sections.map((section) => ({
+            document_id: document.id,
+            filing_item: section.filingItem,
+            source_class: section.sourceClass,
+            is_filed: section.isFiled,
+          })),
+          { onConflict: 'document_id,filing_item', ignoreDuplicates: true },
+        );
+        if (upsertError) throw upsertError;
+
+        const { data, error } = await db
+          .from('research_document_sections')
+          .select('id, filing_item, source_class')
+          .eq('document_id', document.id);
+        if (error) throw error;
+        stored = (data ?? []) as StoredSection[];
+      }
+
+      units.push(...unitsFor(document, sections, stored));
+    }
+
+    const { admitted, skipped } = admitUnits(units, acceptedClasses);
+    if (skipped.length > 0) {
+      log.info(
+        {
+          companyId: inputData.companyId,
+          skipped: skipped.map((unit) => ({
+            documentId: unit.documentId,
+            filingItem: unit.filingItem,
+            sourceClass: unit.sourceClass,
+          })),
+        },
+        'text the ledger does not accept was not read',
+      );
+    }
+
+    return { ...inputData, units: admitted };
+  },
+});
+
+// ── 5. Extract (Rex) ─────────────────────────────────────────────────────────
 const extractEventsStep = createStep({
   id: 'extract_events',
-  inputSchema: embeddedSchema,
+  inputSchema: sectionedSchema,
   outputSchema: extractedSchema,
   execute: async ({ inputData }) => {
     // The key prefix comes from the record, never the model: that is what stops
@@ -242,12 +335,12 @@ const extractEventsStep = createStep({
 
     const extracted: Array<Omit<CandidateEvent, 'natural_key'>> = [];
 
-    for (const document of inputData.fetch.documents) {
+    for (const unit of inputData.units) {
       const prompt = `Extract treasury events from this filing.
 
-Document id: ${document.id}
-Title: ${document.title}
-Source class: ${document.sourceClass}
+Document id: ${unit.documentId}
+Title: ${unit.title}${unit.filingItem ? `\nFiling item: ${unit.filingItem}` : ''}
+Source class: ${unit.sourceClass}
 
 Rules:
 - Quote figures EXACTLY as the document states them. Do not round, convert, or
@@ -267,7 +360,7 @@ Rules:
   what you looked for in notes. Saying nothing is a valid answer.
 
 Document text:
-${document.text.slice(0, MAX_DOCUMENT_CHARS)}`;
+${unit.text.slice(0, MAX_DOCUMENT_CHARS)}`;
 
       const response = await rex.generate([{ role: 'user', content: prompt }], {
         requestContext: stepRequestContext('researchIngest.extract_events'),
@@ -284,15 +377,22 @@ ${document.text.slice(0, MAX_DOCUMENT_CHARS)}`;
       // never a dead run.
       const parsed = extractionSchema.safeParse(response.object);
       if (!parsed.success) {
-        log.warn({ documentId: document.id }, 'extraction did not match the schema; skipping document');
+        log.warn(
+          { documentId: unit.documentId, filingItem: unit.filingItem },
+          'extraction did not match the schema; skipping document',
+        );
         continue;
       }
 
       for (const event of parsed.data.events) {
         // The extractor names its own source, but it is overwritten with the
-        // document actually being read: a model that attributes an event to a
-        // different filing has produced provenance nobody can check.
-        extracted.push({ ...event, source_document_id: document.id } as Omit<CandidateEvent, 'natural_key'>);
+        // document and item actually being read: a model that attributes an
+        // event to a different filing has produced provenance nobody can check.
+        extracted.push({
+          ...event,
+          source_document_id: unit.documentId,
+          source_section_id: unit.sectionId,
+        } as Omit<CandidateEvent, 'natural_key'>);
       }
     }
 
@@ -316,12 +416,13 @@ ${document.text.slice(0, MAX_DOCUMENT_CHARS)}`;
       promoteToPublished: inputData.promoteToPublished,
       requestedBy: inputData.requestedBy,
       fetch: inputData.fetch,
+      units: inputData.units,
       candidates,
     };
   },
 });
 
-// ── 5. Validate ──────────────────────────────────────────────────────────────
+// ── 6. Validate ──────────────────────────────────────────────────────────────
 // Deterministic, and the step that makes the rest of the pipeline trustworthy.
 // Rejects do not commit.
 const validateNumericsStep = createStep({
@@ -329,12 +430,17 @@ const validateNumericsStep = createStep({
   inputSchema: extractedSchema,
   outputSchema: validatedSchema,
   execute: async ({ inputData }) => {
-    const textById = new Map(inputData.fetch.documents.map((d) => [d.id, d.text]));
+    // Checked against the item the event was read from, not the whole filing:
+    // a figure that appears only in a section the ledger refuses has not been
+    // found in the source the event cites.
+    const unitKey = (documentId: string, sectionId: string | null) => `${documentId}:${sectionId ?? ''}`;
+    const textByUnit = new Map(inputData.units.map((u) => [unitKey(u.documentId, u.sectionId), u.text]));
     const validated: CandidateEvent[] = [];
     const rejected: Array<z.infer<typeof rejectedClaimSchema>> = [];
 
     for (const candidate of inputData.candidates) {
-      const sourceText = textById.get(candidate.source_document_id) ?? '';
+      const sourceText =
+        textByUnit.get(unitKey(candidate.source_document_id, candidate.source_section_id)) ?? '';
       const verdict = validateClaims(claimsForEvent(candidate), sourceText);
 
       if (verdict.ok) {
@@ -366,7 +472,7 @@ const validateNumericsStep = createStep({
   },
 });
 
-// ── 6. Reconcile ─────────────────────────────────────────────────────────────
+// ── 7. Reconcile ─────────────────────────────────────────────────────────────
 const reconcileStep = createStep({
   id: 'reconcile',
   inputSchema: validatedSchema,
@@ -395,7 +501,7 @@ const reconcileStep = createStep({
   },
 });
 
-// ── 7. Score (Rex) ───────────────────────────────────────────────────────────
+// ── 8. Score (Rex) ───────────────────────────────────────────────────────────
 // Runs on pre-computed rows. Bruno's rule, applied here: the narrator narrates
 // what arithmetic already decided, and it is handed the material deltas only.
 const scoreStep = createStep({
@@ -461,7 +567,7 @@ Rules:
   },
 });
 
-// ── 8. Classify (Lex) ────────────────────────────────────────────────────────
+// ── 9. Classify (Lex) ────────────────────────────────────────────────────────
 const classifyStep = createStep({
   id: 'classify',
   inputSchema: scoredSchema,
@@ -532,7 +638,7 @@ Return one classification per event. A field you are unsure about is internal.`;
   },
 });
 
-// ── 9. Persist ───────────────────────────────────────────────────────────────
+// ── 10. Persist ───────────────────────────────────────────────────────────────
 // One transaction, via commit_research_ingest. PostgREST has none, and four
 // sequential inserts can half-succeed — leaving events committed with the
 // classifications that gate them missing, which is the one failure direction
@@ -571,7 +677,7 @@ const persistStep = createStep({
   },
 });
 
-// ── 10. Approval gate ────────────────────────────────────────────────────────
+// ── 11. Approval gate ────────────────────────────────────────────────────────
 // The only human gate, and it is about publication rather than ingest. A run
 // that is not promoting anything passes straight through — which is most runs.
 const approvalGateStep = createStep({
@@ -656,6 +762,7 @@ export const researchIngestWorkflow = createWorkflow({
   .then(resolveDocumentsStep)
   .then(fetchDocumentsStep)
   .then(chunkAndEmbedStep)
+  .then(splitSectionsStep)
   .then(extractEventsStep)
   .then(validateNumericsStep)
   .then(reconcileStep)

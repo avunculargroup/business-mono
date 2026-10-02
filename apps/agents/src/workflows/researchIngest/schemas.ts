@@ -47,6 +47,18 @@ export const readableDocumentSchema = z.object({
   title: z.string(),
   text: z.string(),
   sourceClass: z.string(),
+  /** Only an SEC filing is split into items; see `readingUnits.ts`. */
+  venue: z.string().nullable().default(null),
+});
+
+/** A document, or one item of a filing, as the extractor reads it. */
+export const readingUnitSchema = z.object({
+  documentId: z.string(),
+  sectionId: z.string().nullable(),
+  filingItem: z.string().nullable(),
+  title: z.string(),
+  text: z.string(),
+  sourceClass: z.string(),
 });
 
 export const fetchSummarySchema = z.object({
@@ -78,6 +90,12 @@ export const candidateEventSchema = z.object({
   disclosure_venue: z.string().nullable().default(null),
   basis: z.enum(HOLDING_BASIS_CODES as unknown as [string, ...string[]]).nullable().default(null),
   source_document_id: z.string(),
+  /**
+   * The filing item the event was read from, where the document was split.
+   * Set from the unit being read, never by the model: the gate judges the
+   * claim by this section's class.
+   */
+  source_section_id: z.string().nullable().default(null),
   /** Computed by `assignNaturalKeys`, never by the model. */
   natural_key: z.string(),
 });
@@ -87,7 +105,10 @@ export type CandidateEvent = z.infer<typeof candidateEventSchema>;
  * What Rex returns: a candidate without its key. The key is built afterwards
  * from the record's slug, so a model cannot vary it between runs.
  */
-export const extractedEventSchema = candidateEventSchema.omit({ natural_key: true });
+export const extractedEventSchema = candidateEventSchema.omit({
+  natural_key: true,
+  source_section_id: true,
+});
 
 export const extractionSchema = z.object({
   events: z.array(extractedEventSchema),
