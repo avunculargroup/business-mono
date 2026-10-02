@@ -6,8 +6,8 @@ const company: Row = {
   operational_hq: null, primary_archetype: 'treasury_company', self_described_archetype: null,
   reporting_standard: 'us_gaap', functional_currency: 'USD', presentation_currency: 'USD',
   financial_year_end: '12-31', tier: 'large', expected_disclosure_cadence: null,
-  market_cap_band: null, funding_source: null, acn: null, abn: null, arbn: null, isin: null,
-  lei: null, curator_notes: "It's the holder's own figure", last_verified_at: '2026-09-21',
+  market_cap_band: null, funding_source: null,
+  curator_notes: "It's the holder's own figure", last_verified_at: '2026-09-21',
   is_published: true, client_cleared: true, client_cleared_by: 'tm-1',
   client_cleared_at: '2026-09-22', created_by: null, created_at: 'x', updated_at: 'x',
 };
@@ -116,7 +116,7 @@ describe('registerSeed', () => {
       .toThrow(/references section s-9/);
   });
 
-  it('dumps identifiers from their table and leaves the deprecated columns behind', () => {
+  it('dumps identifiers from their table', () => {
     const sql = dump({
       company_identifiers: [{
         id: 'i-1', company_id: 'c-1', scheme: 'sec_cik', value: '1050446',
@@ -125,7 +125,6 @@ describe('registerSeed', () => {
     });
     expect(sql).toContain('INSERT INTO company_identifiers');
     expect(sql).toContain("scheme IS NOT DISTINCT FROM 'sec_cik' AND value IS NOT DISTINCT FROM '1050446'");
-    expect(emitCompany({ ...company, isin: 'US5949724083' })).not.toContain('US5949724083');
   });
 
   it('lists every child table in dependency order', () => {

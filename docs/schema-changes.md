@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-01 — Corporate holdings: drop the per-scheme identifier columns
+
+`20261001120000_drop_research_company_identifier_columns.sql` — the contract half of
+`20261001100000`. Drops `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` and their
+partial unique indexes, after refusing to run if any value exists only in those
+columns. Their guarantee, that no two companies share a registration number, moves to
+a unique index on `company_identifiers(scheme, value)`.
+
+---
+
 ## 2026-10-01 — Corporate holdings: identity, holdings vocabulary, absence and divergence
 
 Steps 2–4 of `docs/features/corporate-holdings/schema-ingest-spec.md`, one migration each.

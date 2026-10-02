@@ -46,12 +46,10 @@ export const COMPANY_SPEC = {
     'curator_notes', 'last_verified_at',
   ],
   // Visibility is an environment decision, not a property of the research:
-  // seeded records land unpublished and uncleared. acn/abn/arbn/isin/lei are
-  // deprecated copies of company_identifiers, which is dumped instead.
+  // seeded records land unpublished and uncleared.
   ignored: [
     'id', 'is_published', 'client_cleared', 'client_cleared_by', 'client_cleared_at',
     'created_by', 'created_at', 'updated_at',
-    'acn', 'abn', 'arbn', 'isin', 'lei',
   ],
 } as const;
 
