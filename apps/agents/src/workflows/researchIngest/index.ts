@@ -29,6 +29,7 @@ import { lex } from '../../agents/compliance/index.js';
 import { chunkText, embedTexts } from '../../lib/contentEmbeddings.js';
 import { createLogger } from '../../lib/logger.js';
 import { fetchAll, resolveDocuments, type DocumentRow } from './documents.js';
+import { assignNaturalKeys } from './naturalKey.js';
 import { claimsForEvent, validateClaims } from './numerics.js';
 import { isQuietRun, materialDeltas, reconcile, type CommittedEvent } from './reconcile.js';
 import {
@@ -227,7 +228,19 @@ const extractEventsStep = createStep({
   inputSchema: embeddedSchema,
   outputSchema: extractedSchema,
   execute: async ({ inputData }) => {
-    const candidates: CandidateEvent[] = [];
+    // The key prefix comes from the record, never the model: that is what stops
+    // one sale arriving as "mstr:disp:…" on one run and "strategy:disposal:…" on
+    // the next.
+    const { data: company, error: companyError } = await db
+      .from('research_companies')
+      .select('slug')
+      .eq('id', inputData.companyId)
+      .maybeSingle();
+    if (companyError) throw companyError;
+    const slug = (company as { slug: string } | null)?.slug;
+    if (!slug) throw new Error(`research company ${inputData.companyId} not found`);
+
+    const extracted: Array<Omit<CandidateEvent, 'natural_key'>> = [];
 
     for (const document of inputData.fetch.documents) {
       const prompt = `Extract treasury events from this filing.
@@ -243,8 +256,11 @@ Rules:
 - Consideration goes in the currency the document states, in native units.
   Never convert.
 - If the document says a consideration is inclusive of fees, set fees_included.
-- Give each event a natural_key that will be identical if this same document is
-  read again: "<company-slug-fragment>:<event-type-fragment>:<event-date>".
+- event_date is the day the event happened, as YYYY-MM-DD. For an event that
+  spans a period, such as a week of sales, use the last day of the period. Never
+  use the filing date or a date from the signature block.
+- If the document restates earlier events, as in a holdings history table,
+  extract every row: restatements are matched to what is already recorded.
 - Only extract what this document states. Do not carry anything over from
   general knowledge about the company.
 - If the document states no treasury event at all, return an empty list and say
@@ -276,8 +292,22 @@ ${document.text.slice(0, MAX_DOCUMENT_CHARS)}`;
         // The extractor names its own source, but it is overwritten with the
         // document actually being read: a model that attributes an event to a
         // different filing has produced provenance nobody can check.
-        candidates.push({ ...event, source_document_id: document.id } as CandidateEvent);
+        extracted.push({ ...event, source_document_id: document.id } as Omit<CandidateEvent, 'natural_key'>);
       }
+    }
+
+    const { keyed, invalid, conflicts } = assignNaturalKeys(slug, extracted);
+    const candidates = keyed as CandidateEvent[];
+    if (invalid.length > 0) {
+      // Dropped rather than passed on: an unparseable date fails the DATE cast
+      // inside the commit transaction and takes every other row down with it.
+      log.warn(
+        { companyId: inputData.companyId, dates: invalid.map((event) => event.event_date) },
+        'candidates dropped: event date is not YYYY-MM-DD',
+      );
+    }
+    if (conflicts.length > 0) {
+      log.warn({ companyId: inputData.companyId, keys: conflicts }, 'documents disagree about an event');
     }
 
     log.info({ companyId: inputData.companyId, candidates: candidates.length }, 'events extracted');

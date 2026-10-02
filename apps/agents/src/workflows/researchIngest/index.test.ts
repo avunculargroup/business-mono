@@ -74,8 +74,10 @@ const ACQUISITION = {
   disclosure_venue: 'asx',
   basis: 'direct_spot',
   source_document_id: 'doc-1',
-  natural_key: 'loc:acq:2025-06-04',
 };
+
+/** What the extract step computes for it, from the record's slug. */
+const ACQUISITION_KEY = 'locate-technologies:acq:2025-06-04';
 
 async function run(input: Record<string, unknown> = {}) {
   const instance = await researchIngestWorkflow.createRun();
@@ -101,7 +103,9 @@ beforeEach(() => {
     },
   ]);
   tables.set('treasury_events', []);
-  tables.set('research_companies', [{ legal_name: 'Locate Technologies Limited' }]);
+  tables.set('research_companies', [
+    { slug: 'locate-technologies', legal_name: 'Locate Technologies Limited' },
+  ]);
 
   fetchAllMock.mockResolvedValue([
     { kind: 'fetched', documentId: 'doc-1', sha256: 'abc123', text: ANNOUNCEMENT_TEXT, pageCount: 1 },
@@ -120,7 +124,7 @@ beforeEach(() => {
     object: {
       classifications: [
         {
-          event_natural_key: 'loc:acq:2025-06-04',
+          event_natural_key: ACQUISITION_KEY,
           field_key: 'ledger_event',
           classification: 'publishable',
           reason: 'A disclosed fact with a citation.',
@@ -177,6 +181,33 @@ describe('the happy path', () => {
     const [event] = (args as { payload: { events: Array<{ source_document_id: string }> } }).payload.events;
     expect(event.source_document_id).toBe('doc-1');
   });
+
+  it('keys each event from the record, ignoring any key the model offers', async () => {
+    // Prefix drift: a model-written key varies between runs, and a key that
+    // varies reconciles as new and duplicates the row.
+    rexGenerate.mockResolvedValue({
+      object: { events: [{ ...ACQUISITION, natural_key: 'loc:acquisition:2025-06-04' }], notes: null },
+    });
+
+    await run();
+
+    const [, args] = rpcMock.mock.calls[0];
+    const [event] = (args as { payload: { events: Array<{ natural_key: string }> } }).payload.events;
+    expect(event.natural_key).toBe(ACQUISITION_KEY);
+  });
+
+  it('drops a candidate whose date cannot be stored, and commits the rest', async () => {
+    // An unparseable date fails the DATE cast inside the commit transaction and
+    // would take every other row in the run down with it.
+    rexGenerate.mockResolvedValue({
+      object: { events: [ACQUISITION, { ...ACQUISITION, event_date: 'June 29, 2026' }], notes: null },
+    });
+
+    await run();
+
+    const [, args] = rpcMock.mock.calls[0];
+    expect((args as { payload: { events: unknown[] } }).payload.events).toHaveLength(1);
+  });
 });
 
 describe('the numeric gate', () => {
@@ -201,7 +232,7 @@ describe('the numeric gate', () => {
       object: {
         events: [
           ACQUISITION,
-          { ...ACQUISITION, quantity: 99, natural_key: 'loc:acq:invented' },
+          { ...ACQUISITION, quantity: 99 },
         ],
         notes: null,
       },
@@ -220,7 +251,7 @@ describe('the quiet-day path', () => {
     // Re-ingesting the same document. Calling the model anyway would produce a
     // finding about nothing, which is how a feed teaches its reader to ignore it.
     tables.set('treasury_events', [
-      { natural_key: 'loc:acq:2025-06-04', quantity: 6.08914, consideration_native: 1000000 },
+      { natural_key: ACQUISITION_KEY, quantity: 6.08914, consideration_native: 1000000 },
     ]);
 
     const result = await run();

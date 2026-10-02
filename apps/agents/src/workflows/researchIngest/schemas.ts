@@ -4,10 +4,9 @@
  * Two things these encode that comments could not. The agent steps produce
  * structured output constrained by the schemas here, so a model cannot invent a
  * field or an event type the register has no column for. And every candidate
- * carries `natural_key` from the moment it is extracted, because idempotency is
- * a property of the extraction rather than something the persist step works out
- * afterwards — re-ingesting a document has to update the same rows, and the
- * only thing that can say which rows those are is the extractor.
+ * carries `natural_key` from the extract step onward, computed there from what
+ * the model read rather than asked of it — re-ingesting a document has to
+ * update the same rows, and a key a model writes differs between runs.
  */
 
 import { z } from 'zod';
@@ -79,14 +78,19 @@ export const candidateEventSchema = z.object({
   disclosure_venue: z.string().nullable().default(null),
   basis: z.enum(HOLDING_BASIS_CODES as unknown as [string, ...string[]]).nullable().default(null),
   source_document_id: z.string(),
-  natural_key: z
-    .string()
-    .describe('Stable across re-ingests of the same document, e.g. "loc:acq:2025-06-04"'),
+  /** Computed by `assignNaturalKeys`, never by the model. */
+  natural_key: z.string(),
 });
 export type CandidateEvent = z.infer<typeof candidateEventSchema>;
 
+/**
+ * What Rex returns: a candidate without its key. The key is built afterwards
+ * from the record's slug, so a model cannot vary it between runs.
+ */
+export const extractedEventSchema = candidateEventSchema.omit({ natural_key: true });
+
 export const extractionSchema = z.object({
-  events: z.array(candidateEventSchema),
+  events: z.array(extractedEventSchema),
   /** What the extractor looked for and did not find. Absence is reportable. */
   notes: z.string().nullable().default(null),
 });
