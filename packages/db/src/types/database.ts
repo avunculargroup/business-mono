@@ -8068,6 +8068,9 @@ export type Database = {
           basis: string | null
           basis_comparable: boolean | null
           company_id: string | null
+          encumbered_quantity: number | null
+          encumbrance_counterparty: string | null
+          encumbrance_obligation: string | null
           includes_customer_assets: boolean | null
           instrument_type: string | null
           is_related_party_vehicle: boolean | null
