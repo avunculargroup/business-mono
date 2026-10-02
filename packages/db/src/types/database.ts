@@ -6163,9 +6163,6 @@ export type Database = {
       }
       research_companies: {
         Row: {
-          abn: string | null
-          acn: string | null
-          arbn: string | null
           client_cleared: boolean
           client_cleared_at: string | null
           client_cleared_by: string | null
@@ -6182,13 +6179,11 @@ export type Database = {
           holding_status: string | null
           id: string
           is_published: boolean
-          isin: string | null
           jurisdiction: string | null
           jurisdiction_basis: string | null
           last_verified_at: string | null
           ledger_absence_reason: string | null
           legal_name: string
-          lei: string | null
           market_cap_band: string | null
           operational_hq: string | null
           presentation_currency: string | null
@@ -6200,9 +6195,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          abn?: string | null
-          acn?: string | null
-          arbn?: string | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
@@ -6219,13 +6211,11 @@ export type Database = {
           holding_status?: string | null
           id?: string
           is_published?: boolean
-          isin?: string | null
           jurisdiction?: string | null
           jurisdiction_basis?: string | null
           last_verified_at?: string | null
           ledger_absence_reason?: string | null
           legal_name: string
-          lei?: string | null
           market_cap_band?: string | null
           operational_hq?: string | null
           presentation_currency?: string | null
@@ -6237,9 +6227,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          abn?: string | null
-          acn?: string | null
-          arbn?: string | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
@@ -6256,13 +6243,11 @@ export type Database = {
           holding_status?: string | null
           id?: string
           is_published?: boolean
-          isin?: string | null
           jurisdiction?: string | null
           jurisdiction_basis?: string | null
           last_verified_at?: string | null
           ledger_absence_reason?: string | null
           legal_name?: string
-          lei?: string | null
           market_cap_band?: string | null
           operational_hq?: string | null
           presentation_currency?: string | null
