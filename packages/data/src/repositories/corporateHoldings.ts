@@ -1,7 +1,9 @@
 import type {
   DisclosureCadence,
   HoldingBasis,
+  HoldingStatus,
   InstrumentType,
+  LedgerAbsenceReason,
   ListingType,
   ReportingStandard,
   ResearchArchetype,
@@ -10,6 +12,7 @@ import type {
   SourceClass,
   TreasuryEventType,
 } from '@platform/shared';
+import { MATERIALITY_FLOOR } from '@platform/shared';
 import type { Paginated, QueryOptions, ReadContext } from '../context';
 
 /**
@@ -129,6 +132,21 @@ export interface CompanyDossier extends RegisterEntry {
   formerNames: FormerName[];
   /** Every venue, including ones it has left. */
   listingHistory: CompanyListing[];
+  /**
+   * Why the record has no ledger, where it has none. Seven records were empty
+   * for four unrelated reasons, and an empty panel cannot tell them apart: a
+   * filing that states no basis is a finding, a filing nobody has located is
+   * a research job. Null where the record has a ledger, or has not been assessed.
+   */
+  ledgerAbsenceReason: LedgerAbsenceReason | null;
+  /**
+   * Stated, never inferred from the latest snapshot. A zero balance means one
+   * thing for a company that exited and another for one between purchases.
+   * Null means not yet assessed.
+   */
+  holdingStatus: HoldingStatus | null;
+  /** Set exactly when `holdingStatus` is `exited`. */
+  exitedOn: string | null;
 }
 
 /**
@@ -182,6 +200,16 @@ export interface PositionRow {
   isRelatedPartyVehicle: boolean;
   /** Assets custodied for third parties, aggregated into a headline figure. */
   includesCustomerAssets: boolean;
+  /**
+   * The part of `quantity` pledged to a creditor. Encumbrance is a flag, not a
+   * basis: pledged bitcoin is direct spot in every respect but who has a claim
+   * on it, so the row stays comparable and the pledge is shown beside it.
+   */
+  encumberedQuantity: number | null;
+  /** The lender, or the instrument the pledge secures. */
+  encumbranceCounterparty: string | null;
+  /** What the pledge secures. Never null where `encumberedQuantity` is positive. */
+  encumbranceObligation: string | null;
   provenance: Provenance;
 }
 
@@ -197,6 +225,12 @@ export interface PositionSummary {
   companyId: string;
   asset: string;
   comparableTotal: number;
+  /**
+   * `comparableTotal` less what is pledged against it. Decided here for the
+   * same reason the total is: anything labelled unencumbered that a component
+   * computed for itself is a figure that can quietly include collateral.
+   */
+  unencumberedTotal: number;
   rows: PositionRow[];
   excluded: PositionRow[];
 }
@@ -291,6 +325,59 @@ export interface WithheldField {
   reason: string;
 }
 
+/**
+ * A figure a tracker publishes, measured against the register's own sourced
+ * position.
+ *
+ * Evidence of divergence, never a source: nothing here feeds a snapshot or a
+ * total. One record's trackers were nine months stale and 28% low, which is
+ * the reason the register exists, and the reader needs to see both numbers.
+ */
+export interface TrackerClaim {
+  sourceName: string;
+  sourceUrl: string | null;
+  claimedQuantity: number | null;
+  /** The date the tracker stamps on its figure. */
+  claimedAsOf: string | null;
+  /** When the register saw it. */
+  observedAt: string;
+  note: string | null;
+  /** The comparable total it is measured against, and that total's date. */
+  sourcedQuantity: number | null;
+  sourcedAsOf: string | null;
+  /**
+   * Signed: negative where the tracker is low. Relative to the sourced figure,
+   * and null where either side has no number to compare.
+   */
+  divergence: number | null;
+  /** At or above the materiality floor — a finding, rather than rounding. */
+  isMaterial: boolean;
+}
+
+/**
+ * The divergence rule, written once so both adapters apply the same one.
+ *
+ * Measured against the sourced figure rather than the claim: the register's
+ * number is the reference, and a tracker 28% low reads as -0.28.
+ */
+export function measureTrackerClaim(
+  claim: Omit<TrackerClaim, 'sourcedQuantity' | 'sourcedAsOf' | 'divergence' | 'isMaterial'>,
+  sourced: { quantity: number; asOf: string } | null,
+): TrackerClaim {
+  const divergence =
+    claim.claimedQuantity === null || sourced === null || sourced.quantity === 0
+      ? null
+      : (claim.claimedQuantity - sourced.quantity) / sourced.quantity;
+
+  return {
+    ...claim,
+    sourcedQuantity: sourced?.quantity ?? null,
+    sourcedAsOf: sourced?.asOf ?? null,
+    divergence,
+    isMaterial: divergence !== null && Math.abs(divergence) >= MATERIALITY_FLOOR,
+  };
+}
+
 export interface RegisterFilter {
   tier?: ResearchTier;
   archetype?: ResearchArchetype;
@@ -380,6 +467,13 @@ export interface CorporateHoldingsRepository {
 
   /** Facts the register states because they are absent. Empty is a valid answer. */
   getStructuralAbsences(ctx: ReadContext, companyId: string): Promise<StructuralAbsence[]>;
+
+  /**
+   * What the trackers claim, each measured against the comparable position.
+   * Internal only — tracker figures are third-party claims and never reach a
+   * client surface. Newest observation first.
+   */
+  getTrackerClaims(ctx: ReadContext, companyId: string): Promise<TrackerClaim[]>;
 
   /**
    * The companies a comparison would render, or `ArchetypeMismatchError`.

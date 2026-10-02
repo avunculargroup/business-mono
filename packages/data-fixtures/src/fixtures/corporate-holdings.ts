@@ -14,7 +14,7 @@ import { onDate } from './anchor';
 import { RESEARCH_ENTITIES } from './entities';
 
 /**
- * The corporate research register, as five shapes.
+ * The corporate research register, as nine shapes.
  *
  * Wholly fictional entities carrying real pathologies. Each record exists to
  * demonstrate one failure mode found while researching real companies; a set of
@@ -142,6 +142,56 @@ function documents(anchor: Date) {
       isAudited: false,
       daysAgo: 92,
     }),
+    haldenAnnouncement: doc(anchor, {
+      documentId: 'doc-hldf-ann-001',
+      documentTitle: 'Halden Foods — treasury investment',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/hldf-ann-001.pdf',
+      isAudited: false,
+      daysAgo: 150,
+    }),
+    corranQuarterly: doc(anchor, {
+      documentId: 'doc-crnm-4c',
+      documentTitle: 'Corran Minerals — quarterly activities and cash flow report',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/crnm-4c.pdf',
+      isAudited: false,
+      daysAgo: 33,
+    }),
+    // Marketing copy. The only place Ashby's holdings claims appear, which is
+    // why the register holds none of them.
+    ashbyNews: doc(anchor, {
+      documentId: 'doc-ashm-web-news',
+      documentTitle: 'Ashby Media Group — news page',
+      sourceClass: 'company_web',
+      sourceUrl: '/fixtures/docs/ashm-news.html',
+      isAudited: false,
+      daysAgo: 25,
+    }),
+    ashbyAnnual: doc(anchor, {
+      documentId: 'doc-ashm-annual',
+      documentTitle: 'Ashby Media Group — annual report',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/ashm-annual.pdf',
+      isAudited: true,
+      daysAgo: 95,
+    }),
+    wexfordAcquisition: doc(anchor, {
+      documentId: 'doc-wxfs-ann-001',
+      documentTitle: 'Wexford Semiconductor — treasury acquisition',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/wxfs-ann-001.pdf',
+      isAudited: false,
+      daysAgo: 500,
+    }),
+    wexfordDisposal: doc(anchor, {
+      documentId: 'doc-wxfs-ann-002',
+      documentTitle: 'Wexford Semiconductor — treasury update',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/wxfs-ann-002.pdf',
+      isAudited: false,
+      daysAgo: 40,
+    }),
   };
 }
 
@@ -176,6 +226,10 @@ export function researchCompanyDocuments(anchor: Date): Record<string, Provenanc
     [RESEARCH_ENTITIES.nyala.id]: [d.nyalaAccounts],
     [RESEARCH_ENTITIES.tarra.id]: [d.tarraPolicy, d.tarraAnnual],
     [RESEARCH_ENTITIES.calder.id]: [d.calderMonthly],
+    [RESEARCH_ENTITIES.halden.id]: [d.haldenAnnouncement],
+    [RESEARCH_ENTITIES.corran.id]: [d.corranQuarterly],
+    [RESEARCH_ENTITIES.ashby.id]: [d.ashbyNews, d.ashbyAnnual],
+    [RESEARCH_ENTITIES.wexford.id]: [d.wexfordAcquisition, d.wexfordDisposal],
   };
 }
 
@@ -191,7 +245,7 @@ function identifiers(ids: Record<string, string | null>): CompanyIdentifier[] {
 }
 
 /**
- * The register, five records deep.
+ * The register, nine records deep.
  *
  * `listings` is current venues; `listingHistory` is every venue including the
  * one a record left. Keeping both is rule 3 made visible — a lookup keyed on
@@ -256,6 +310,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: true,
       clientCleared: true,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
     },
     {
       id: E.verrall.id,
@@ -303,6 +360,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: true,
       clientCleared: true,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
     },
     {
       id: E.nyala.id,
@@ -367,6 +427,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
       lastVerifiedAt: onDate(anchor, -20),
       isPublished: false,
       clientCleared: false,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
     },
     {
       id: E.tarra.id,
@@ -417,6 +480,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
       // proves is_published and client_cleared are different questions: an
       // adapter conflating them still passes every case where they agree.
       clientCleared: false,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
     },
     {
       id: E.calder.id,
@@ -460,12 +526,156 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'Committed to monthly treasury disclosure and has published nothing for three ' +
         'months. Identical silence to Tarra, opposite verdict, because staleness is ' +
         'measured against what the issuer said it would do rather than against a fixed ' +
-        'window.',
+        'window. Part of the holding is pledged against a loan, so its unencumbered ' +
+        'balance and its comparable total are different figures.',
       lastVerifiedAt: onDate(anchor, -95),
       isPublished: true,
       clientCleared: true,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
+    },
+    {
+      id: E.halden.id,
+      slug: E.halden.slug,
+      legalName: E.halden.legalName,
+      jurisdiction: 'AU',
+      tier: 'regional',
+      primaryArchetype: 'treasury_allocation',
+      selfDescribedArchetype: null,
+      reportingStandard: 'aasb',
+      expectedDisclosureCadence: 'episodic',
+      listings: [asxListing(anchor, E.halden, -2900)],
+      listingHistory: [asxListing(anchor, E.halden, -2900)],
+      formerNames: [],
+      identifiers: identifiers({ acn: E.halden.acn, abn: E.halden.abn, arbn: null, isin: E.halden.isin }),
+      operationalHq: 'South Australia',
+      functionalCurrency: 'AUD',
+      presentationCurrency: 'AUD',
+      financialYearEnd: '06-30',
+      marketCapBand: 'small',
+      fundingSource: 'operating_cash',
+      curatorNotes:
+        'Holds its exposure as units of a spot exchange-traded fund and has never stated ' +
+        'a coin count. The trackers list one, which is a third party converting a dollar ' +
+        'figure and is not stored. Rendered, and never summed into any total.',
+      lastVerifiedAt: onDate(anchor, -20),
+      isPublished: true,
+      clientCleared: false,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'active',
+      exitedOn: null,
+    },
+    {
+      id: E.corran.id,
+      slug: E.corran.slug,
+      legalName: E.corran.legalName,
+      jurisdiction: 'AU',
+      tier: 'regional',
+      primaryArchetype: 'treasury_allocation',
+      selfDescribedArchetype: null,
+      reportingStandard: 'aasb',
+      expectedDisclosureCadence: 'quarterly',
+      listings: [asxListing(anchor, E.corran, -1700)],
+      listingHistory: [asxListing(anchor, E.corran, -1700)],
+      formerNames: [],
+      identifiers: identifiers({ acn: E.corran.acn, abn: E.corran.abn, arbn: null, isin: E.corran.isin }),
+      operationalHq: 'Western Australia',
+      functionalCurrency: 'AUD',
+      presentationCurrency: 'AUD',
+      financialYearEnd: '06-30',
+      marketCapBand: 'micro',
+      fundingSource: 'equity_issuance',
+      curatorNotes:
+        'States its digital asset holding only as a dollar value in the quarterly report. ' +
+        'There is no coin count to record, and converting the dollar figure at a price ' +
+        'would invent one, so the record has no snapshot and says why.',
+      lastVerifiedAt: onDate(anchor, -20),
+      isPublished: true,
+      clientCleared: false,
+      ledgerAbsenceReason: 'no_stated_basis',
+      holdingStatus: null,
+      exitedOn: null,
+    },
+    {
+      id: E.ashby.id,
+      slug: E.ashby.slug,
+      legalName: E.ashby.legalName,
+      jurisdiction: 'AU',
+      tier: 'regional',
+      primaryArchetype: 'treasury_allocation',
+      selfDescribedArchetype: 'treasury_company',
+      reportingStandard: 'aasb',
+      expectedDisclosureCadence: 'episodic',
+      listings: [asxListing(anchor, E.ashby, -2200)],
+      listingHistory: [asxListing(anchor, E.ashby, -2200)],
+      formerNames: [],
+      identifiers: identifiers({ acn: E.ashby.acn, abn: E.ashby.abn, arbn: null, isin: E.ashby.isin }),
+      operationalHq: 'New South Wales',
+      functionalCurrency: 'AUD',
+      presentationCurrency: 'AUD',
+      financialYearEnd: '06-30',
+      marketCapBand: 'micro',
+      fundingSource: 'operating_cash',
+      curatorNotes:
+        'Every purchase it describes is on its own news page. None appears in an exchange ' +
+        'announcement or in the annual report, so the source-class gate refused each ' +
+        'claim and the ledger is empty for that reason rather than for want of looking.',
+      lastVerifiedAt: onDate(anchor, -20),
+      isPublished: true,
+      clientCleared: false,
+      ledgerAbsenceReason: 'source_class_refused',
+      holdingStatus: null,
+      exitedOn: null,
+    },
+    {
+      id: E.wexford.id,
+      slug: E.wexford.slug,
+      legalName: E.wexford.legalName,
+      jurisdiction: 'AU',
+      tier: 'regional',
+      primaryArchetype: 'treasury_allocation',
+      selfDescribedArchetype: null,
+      reportingStandard: 'aasb',
+      expectedDisclosureCadence: 'episodic',
+      listings: [asxListing(anchor, E.wexford, -3100)],
+      listingHistory: [asxListing(anchor, E.wexford, -3100)],
+      formerNames: [],
+      identifiers: identifiers({ acn: E.wexford.acn, abn: E.wexford.abn, arbn: null, isin: E.wexford.isin }),
+      operationalHq: 'Victoria',
+      functionalCurrency: 'AUD',
+      presentationCurrency: 'AUD',
+      financialYearEnd: '06-30',
+      marketCapBand: 'small',
+      fundingSource: 'operating_cash',
+      curatorNotes:
+        'Sold its whole holding and said so in one line, with no price, no proceeds and no ' +
+        'settlement date. The zero balance is an exit, recorded as one, which is a ' +
+        'different state from a record that has never disclosed a holding.',
+      lastVerifiedAt: onDate(anchor, -20),
+      isPublished: true,
+      clientCleared: false,
+      ledgerAbsenceReason: null,
+      holdingStatus: 'exited',
+      exitedOn: onDate(anchor, -40),
     },
   ];
+}
+
+/** A single current venue — the shape the four records added for the conformance cases share. */
+function asxListing(
+  anchor: Date,
+  entity: { legalName: string; ticker: string },
+  listedDaysAgo: number,
+): CompanyDossier['listings'][number] {
+  return {
+    venue: 'asx',
+    ticker: entity.ticker,
+    listingType: 'primary',
+    filingEntity: entity.legalName,
+    listedFrom: onDate(anchor, listedDaysAgo),
+    listedTo: null,
+  };
 }
 
 /** The register list. The same rows, narrowed to what a list renders. */
@@ -619,6 +829,51 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
     ],
 
     [E.verrall.id]: [
+      // Two months that leave the balance roughly where it was. A reader
+      // watching the holding alone sees nothing; the ledger shows the company
+      // bought and sold several times the net movement.
+      {
+        id: 'evt-vrdm-004',
+        companyId: E.verrall.id,
+        eventType: 'disposal',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -12),
+        quantity: 36.5,
+        considerationNative: 5840000,
+        nativeCurrency: 'AUD',
+        considerationAud: 5840000,
+        fxRateUsed: null,
+        feesIncluded: false,
+        headline: 'Sale disclosed in the monthly holdings statement',
+        detail:
+          'Proceeds are stated net of fees, the inverse of the convention the same ' +
+          'statement uses for purchases.',
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        provenance: d.verrallMonthly,
+      },
+      {
+        id: 'evt-vrdm-003',
+        companyId: E.verrall.id,
+        eventType: 'acquisition',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -42),
+        quantity: 40,
+        considerationNative: 6200000,
+        nativeCurrency: 'AUD',
+        considerationAud: 6200000,
+        fxRateUsed: null,
+        feesIncluded: true,
+        headline: 'Purchase disclosed in the quarterly report',
+        detail: 'Funded from the balance sheet rather than a capital raise.',
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        provenance: d.verrallQuarterly,
+      },
       {
         id: 'evt-vrdm-002',
         companyId: E.verrall.id,
@@ -761,6 +1016,52 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
         provenance: d.calderMonthly,
       },
     ],
+
+    [E.wexford.id]: [
+      {
+        id: 'evt-wxfs-002',
+        companyId: E.wexford.id,
+        eventType: 'disposal',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -40),
+        quantity: 150,
+        // The announcement states a quantity and nothing else: no price, no
+        // proceeds, no settlement date. Every field it did not state is null,
+        // and nothing downstream divides by one.
+        considerationNative: null,
+        nativeCurrency: null,
+        considerationAud: null,
+        fxRateUsed: null,
+        feesIncluded: null,
+        headline: 'Whole holding sold',
+        detail: 'One line in a treasury update. No price, proceeds or settlement date stated.',
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        provenance: d.wexfordDisposal,
+      },
+      {
+        id: 'evt-wxfs-001',
+        companyId: E.wexford.id,
+        eventType: 'acquisition',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -500),
+        quantity: 150,
+        considerationNative: 14100000,
+        nativeCurrency: 'AUD',
+        considerationAud: 14100000,
+        fxRateUsed: null,
+        feesIncluded: true,
+        headline: 'Treasury acquisition',
+        detail: 'A single purchase, inclusive of fees.',
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        provenance: d.wexfordAcquisition,
+      },
+    ],
   };
 }
 
@@ -782,6 +1083,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.meridianQuarterly,
       },
     ],
@@ -801,6 +1105,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.verrallMonthly,
       },
       {
@@ -814,6 +1121,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: 194.85,
         isRelatedPartyVehicle: true,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.verrallMonthly,
       },
       {
@@ -827,6 +1137,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.verrallMonthly,
       },
     ],
@@ -845,6 +1158,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.nyalaAccounts,
       },
       {
@@ -858,6 +1174,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: true,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.nyalaAccounts,
       },
     ],
@@ -874,6 +1193,9 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
         provenance: d.tarraAnnual,
       },
     ],
@@ -890,7 +1212,94 @@ export function researchPositions(anchor: Date): Record<string, PositionRow[]> {
         lookThroughBtcEquivalent: null,
         isRelatedPartyVehicle: false,
         includesCustomerAssets: false,
+        // Pledged, not sold: still direct spot, still comparable, and not free.
+        // What ranks ahead of a mid-market holding matters more than its size.
+        encumberedQuantity: 20,
+        encumbranceCounterparty: 'Secured term lender',
+        encumbranceObligation: 'A term loan drawn to fund an acquisition outside the treasury',
         provenance: d.calderMonthly,
+      },
+    ],
+
+    // ETF units, never coins. The quantity is units of the fund; the row
+    // renders, carries no look-through figure, and never enters a total.
+    [E.halden.id]: [
+      {
+        id: 'pos-hldf-etf',
+        asOfDate: onDate(anchor, -150),
+        asset: 'btc',
+        instrumentType: 'fund_units',
+        quantity: 18500,
+        basis: 'etf_wrapped',
+        basisComparable: false,
+        lookThroughBtcEquivalent: null,
+        isRelatedPartyVehicle: false,
+        includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
+        provenance: d.haldenAnnouncement,
+      },
+    ],
+
+    // Zero, and an exit. The status on the dossier says which kind of zero.
+    [E.wexford.id]: [
+      {
+        id: 'pos-wxfs-spot',
+        asOfDate: onDate(anchor, -40),
+        asset: 'btc',
+        instrumentType: 'spot',
+        quantity: 0,
+        basis: 'direct_spot',
+        basisComparable: true,
+        lookThroughBtcEquivalent: null,
+        isRelatedPartyVehicle: false,
+        includesCustomerAssets: false,
+        encumberedQuantity: null,
+        encumbranceCounterparty: null,
+        encumbranceObligation: null,
+        provenance: d.wexfordDisposal,
+      },
+    ],
+  };
+}
+
+// ── Tracker claims ─────────────────────────────────────────────────────────
+
+/**
+ * What the trackers said, as observed. Evidence of divergence, never a source:
+ * the repository measures each against the comparable position, and nothing
+ * here feeds a snapshot.
+ */
+export interface FixtureTrackerClaim {
+  sourceName: string;
+  sourceUrl: string | null;
+  claimedQuantity: number | null;
+  claimedAsOf: string | null;
+  observedAt: string;
+  note: string | null;
+}
+
+export function researchTrackerClaims(anchor: Date): Record<string, FixtureTrackerClaim[]> {
+  return {
+    // Verrall because its position mixes bases: a tracker has to be measured
+    // against the comparable total, not against the fund units beside it.
+    [E.verrall.id]: [
+      {
+        sourceName: 'Treasury tracker A',
+        sourceUrl: '/fixtures/docs/tracker-a.html',
+        claimedQuantity: 222.3,
+        claimedAsOf: onDate(anchor, -280),
+        observedAt: onDate(anchor, -10),
+        note: 'Stamped with a date nine months before the latest monthly statement.',
+      },
+      {
+        sourceName: 'Treasury tracker B',
+        sourceUrl: '/fixtures/docs/tracker-b.html',
+        claimedQuantity: 308.8,
+        claimedAsOf: onDate(anchor, -90),
+        observedAt: onDate(anchor, -10),
+        note: null,
       },
     ],
   };
@@ -998,6 +1407,16 @@ export function researchAbsences(anchor: Date): Record<string, StructuralAbsence
           'No treasury event has been disclosed since the single acquisition. The ' +
           'position is unchanged, which the annual report restates rather than revises.',
         provenance: d.tarraAnnual,
+      },
+    ],
+    [E.corran.id]: [
+      {
+        companyId: E.corran.id,
+        subject: 'holdings',
+        statement:
+          'The quarterly report states the digital asset holding as a dollar value with ' +
+          'no quantity, so there is no coin count to record and none is derived.',
+        provenance: d.corranQuarterly,
       },
     ],
     [E.calder.id]: [

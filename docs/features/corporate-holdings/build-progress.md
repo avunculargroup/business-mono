@@ -9,8 +9,9 @@ three records (session 5), then to twelve, with step 1 of
 [`schema-ingest-spec.md`](./schema-ingest-spec.md) built — sections and per-field source
 sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence and divergence
 (session 7). Step 5 is under way: the event key is computed rather than asked of the
-model, and the restated-ledger case is covered (session 8). The read-side conformance
-cases, the venue adapters and step 6 are not started. Two things still remain from
+model, and the restated-ledger case is covered (session 8), then the eight read-side
+conformance cases pass against both adapters (session 9). The venue adapters and step 6
+are not started. Two things still remain from
 session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-02
 
@@ -616,4 +617,84 @@ The part of step 5 the spec says must land before the first real run. An unstabl
 - Finding keys are still written by the model in the score step. The spec only named
   events, but the same drift applies.
 - Venue adapters, item-aware EDGAR parsing, the first real run.
+
+---
+
+## Session 9 — the read-side conformance cases
+
+The eight cases from [the spec's conformance table](./schema-ingest-spec.md#conformance-cases)
+that test what the company page reads. Each needed a field the repository did not
+return, so this is read-model work as much as test work.
+
+**Shipped.**
+
+- **Read model.** `CompanyDossier` gains `ledgerAbsenceReason`, `holdingStatus` and
+  `exitedOn`. `PositionRow` gains `encumberedQuantity`, `encumbranceCounterparty` and
+  `encumbranceObligation`. `PositionSummary` gains `unencumberedTotal`, decided by the
+  adapter like `comparableTotal` is. A new `getTrackerClaims` returns `secondary_claims`,
+  each measured against the comparable position. The measuring is done by
+  `measureTrackerClaim` in `@platform/data`, so both adapters apply one rule: signed
+  divergence relative to the sourced figure, material at or above `MATERIALITY_FLOOR`.
+- **`20261002100000_position_view_encumbrance.sql`.** `v_company_position` now selects the
+  three encumbrance columns. Session 7 added them to the snapshots table, but the view never
+  selected them. The definition is otherwise unchanged, with the new columns appended.
+- **Suite.** Nine new scenario slots and ten cases in
+  `packages/data/src/testing/corporateHoldings.ts`: the spec's eight, plus a control for
+  each of encumbrance and tracker divergence. Without the controls, an adapter flagging
+  everything would pass.
+- **Fixtures.** Four new demo records for states the first five could not show:
+  - Halden: ETF units.
+  - Corran: holdings stated only in currency.
+  - Ashby: claims only on its own website, refused by source class.
+  - Wexford: exited, with a disposal stating a quantity and nothing else.
+
+  On existing records:
+  - Verrall gains a purchase and a sale, and carries the tracker claims. It is the record
+    whose mixed bases make "measured against the comparable total" testable.
+  - Calder gains a pledge against a term loan.
+
+  The Supabase adapter's test dataset mirrors the same slugs.
+
+**Verified the way `CLAUDE.md` asks.** Each rule was broken deliberately, one at a time,
+to check the suite catches it:
+- **Fixture adapter and shared helper: eleven breakages.** These were:
+  - an unencumbered total that ignores the pledge;
+  - every claim material, and no claim material;
+  - ETF units summed into the total, or dropped from `excluded`;
+  - the absence reason dropped, or collapsed to one reason for every empty record;
+  - a zero balance read as active;
+  - disposals netted out of the ledger;
+  - a missing consideration filled with zero;
+  - a claim measured against every row.
+- **Supabase adapter's own mapping and select: eight breakages.**
+
+All nineteen go red. One did not at first: measuring a claim against every row passed
+while the claims sat on Meridian, whose position has a single row. Moving them to Verrall
+is what caught it.
+
+The view migration ran against live inside a self-aborting `DO` block. The column list
+before matched 20261001030000 exactly, the three columns were appended, and row count was
+unchanged (5 → 5). `pnpm test` (16 packages), `turbo typecheck` and `turbo lint` green.
+
+**Departures from the spec, and why.**
+
+- **"Raises a finding" is a computed divergence, not a `research_findings` row.** Nothing
+  writes `tracker_divergence` findings yet. The read model reports each claim with its
+  divergence and whether it clears the floor, which is what a finding would be written
+  from. Persisting one is ingest work, for when trackers are recorded during a run.
+- **`flowsReverseWhileStockIsFlat` asserts flows, not endpoints.** The position read returns only the
+  latest snapshot, so the case asserts what the ledger alone can show: gross purchases and
+  sales well beyond their net.
+
+**Not done.**
+
+- **None of the new fields render yet.** Absence reasons, holding status, encumbrance and
+  tracker claims are on the read model and on no page. That is step 6's panel work.
+  Tracker claims are internal-only by their nature and need no client path.
+- **Live data is thin.** Wexford-shaped and Halden-shaped states exist live (Sequans,
+  Goodfood). But no live snapshot carries an encumbrance yet, and `secondary_claims` is
+  empty: Panther's pledge and RUM Group's tracker figures are research entries still to
+  make.
+- **The four new fixture names have not been searched against a companies register**,
+  the same caveat `entities.ts` carries for the first five.
 

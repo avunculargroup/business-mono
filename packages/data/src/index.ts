@@ -118,6 +118,7 @@ export type {
 } from './repositories/content';
 export {
   ArchetypeMismatchError,
+  measureTrackerClaim,
 } from './repositories/corporateHoldings';
 export type {
   CompanyDossier,
@@ -135,6 +136,7 @@ export type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  TrackerClaim,
   WithheldField,
 } from './repositories/corporateHoldings';
 export type {
