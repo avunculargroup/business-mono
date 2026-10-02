@@ -10,8 +10,10 @@ three records (session 5), then to twelve, with step 1 of
 sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence and divergence
 (session 7). Step 5 is under way: the event key is computed rather than asked of the
 model, and the restated-ledger case is covered (session 8), then the eight read-side
-conformance cases pass against both adapters (session 9). The venue adapters and step 6
-are not started. Two things still remain from
+conformance cases pass against both adapters (session 9), then SEC filings are split by
+item and only accepted text reaches the extractor (session 10). What is left of step 5 is
+operational: the first real run and its trace bundle. Scheduling waits on step 6, which is
+not started. Two things still remain from
 session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-02
 
@@ -697,4 +699,97 @@ unchanged (5 → 5). `pnpm test` (16 packages), `turbo typecheck` and `turbo lin
   make.
 - **The four new fixture names have not been searched against a companies register**,
   the same caveat `entities.ts` carries for the first five.
+
+---
+
+## Session 10 — item-aware EDGAR parsing, and what the extractor may read
+
+The code that remained of step 5. The spec's "ingest adapters" turned out to be mostly
+not code:
+- Every SEC, LSE and TDnet document registered has its own URL and resolves today.
+- The documents that do not resolve are ASX and NZX announcements with no URL (DigitalX,
+  Locate, Block). The spec already says an ASX id is not derivable, so those need a
+  researcher to find each document's URL, not a URL template.
+- SEDAR+ blocks fetching outright and still needs its own adapter. No registered document
+  points at it.
+
+What did need building was the SEC side, and it turned up a blocker for the first run.
+
+**The blocker.** `commit_research_ingest` never passed `source_section_id`. So every
+ingested event was judged by its whole document's class, and the source-class trigger
+*raises* on a refused class rather than skipping the row. Two consequences:
+- Strategy's documents include a secondary news article, so one event Rex extracted from
+  it would have failed the whole commit.
+- An event read from a 10-K's MD&A would have been accepted, because the document is
+  classed `audited_accounts`.
+
+**Shipped.**
+
+- **`edgarSections.ts`** splits an 8-K, 10-K or 10-Q on its item headings, using
+  line-start string matching and no model.
+  - **8-K:** Items 2.02 and 7.01 are `furnished_release`; the rest are
+    `exchange_announcement`.
+  - **10-K:** Item 8 is `audited_accounts`; everything else is `filed_narrative`.
+  - **10-Q:** Part I Item 1 is `filed_financials`; MD&A and Part II are
+    `filed_narrative`.
+  - The table of contents is skipped by starting at the body's "PART I". The first
+    occurrence of each item in the body wins, so a running page header cannot hand the
+    start of the financial statements to Item 7A. The cover page and signature block are
+    excluded, which keeps the "June 29, 2026" signature-date trap away from the
+    extractor.
+- **`readingUnits.ts`** decides what Rex reads.
+  - Only documents at venue `sec` are split. A news article that mentions a Form 10-K is
+    never split into sections classed as filed.
+  - Splitting stores each item in `research_document_sections`. Rows already there are
+    left alone, so a hand classification wins.
+  - Only units whose class is in `field_source_classes` for `ledger_event` reach the
+    extractor. The set is read from the table the trigger reads, so the two cannot
+    disagree. An empty set fails the run rather than reading nothing and reporting a
+    quiet week.
+- **The workflow** gains a `split_sections` step and now has eleven steps. Each candidate
+  carries `source_section_id`, set from the unit being read, never by the model. Numeric
+  validation checks each figure against the item it was read from, not the whole filing.
+- **`20261002200000_commit_ingest_source_section.sql`** adds `source_section_id` to the
+  event insert and update. It is generated from 20260904000000's body, which matched
+  live byte for byte by md5 before the change.
+- `apps/agents/README.md` lists the new step and two more load-bearing rules: the
+  extractor reads only what the ledger accepts, and event keys are computed.
+
+**Verified.**
+
+- 15 splitter tests, built on markdown shaped as the HTML step emits EDGAR filings. They
+  cover the table of contents, a running header, a mid-sentence cross-reference, Part I
+  and Part II both having an Item 1, and the cover-page and signature traps. Plus 4
+  reading-unit tests and 4 workflow tests:
+  - only Item 8.01 of an 8-K is read, and the event cites it;
+  - the sections are upserted without overwriting existing rows;
+  - a secondary document is never read;
+  - an empty accepted set fails the run.
+- The migration was dry-run against live inside a self-aborting block. An event citing a
+  filed section stored that section id. An event citing a furnished section was refused
+  by the gate. The dry run replaced the function with its events loop only, which is the
+  part that changed; the rest of the migration's body is the original, unchanged.
+- `pnpm --filter @platform/agents test` (1,376), typecheck and lint green.
+
+**Not verified: real filing text.** This container's network policy refuses `sec.gov`,
+so the splitter has not seen a real EDGAR document. The heading patterns are EDGAR's
+standard layout as the HTML step converts it. The first real run is where that gets
+checked: a filing that yields no sections falls back to being read whole under its
+document's class, which is the behaviour before this session.
+
+**Not done, and why.**
+
+- **Scheduling is deliberately not added.** Strategy, Metaplanet, Locate and Sequans are
+  `client_cleared`. A scheduled run would commit model-extracted, Lex-classified rows
+  onto them with no human between extraction and the register. The spec puts scheduling
+  after the review queue ("once the above exists"), and that queue is step 6.
+- **The first real run has not happened.** It needs the agents server's model keys and
+  SEC access, neither of which this container has. Mastra serves registered workflows over
+  its API, so it can be started on Railway with
+  `POST /api/workflows/researchIngest/start-async` and a body of
+  `{ "inputData": { "companyId": "<uuid>" } }`. With `TRACE_RECORDER_TRACE_ID` set, the
+  same run produces the trace bundle.
+  - **Target RUM Group or Angel Studios, not Strategy.** Both have SEC 10-Qs and neither
+    is client-cleared. Strategy is client-cleared, so its first run belongs after
+    step 6.
 
