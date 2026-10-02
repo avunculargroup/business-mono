@@ -8,9 +8,11 @@ repository, and a record of what each session shipped. Same purpose as
 three records (session 5), then to twelve, with step 1 of
 [`schema-ingest-spec.md`](./schema-ingest-spec.md) built — sections and per-field source
 sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence and divergence
-(session 7). Steps 5 and 6 are not started. Two things still remain from
+(session 7). Step 5 is under way: the event key is computed rather than asked of the
+model, and the restated-ledger case is covered (session 8). The read-side conformance
+cases, the venue adapters and step 6 are not started. Two things still remain from
 session 2: the ingest run against real filings, and the recorded trace bundle.
-**Last updated:** 2026-10-01
+**Last updated:** 2026-10-02
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -540,4 +542,78 @@ Steps 2–4 of [`schema-ingest-spec.md`](./schema-ingest-spec.md), one migration
   tracker divergence. That is step 6's panel work.
 - Session 6's data follow-up still stands: sections for registered filings, and re-entry of
   the refused claims.
+
+---
+
+## Session 8 — the event key, computed
+
+The part of step 5 the spec says must land before the first real run. An unstable
+`natural_key` reconciles as new and duplicates the ledger row.
+
+**Shipped.**
+
+- **`researchIngest/naturalKey.ts`.** Rex now returns type, date and quantity, with no key.
+  The extract step builds `<slug>:<code>:<YYYY-MM-DD>` from the slug on the record and a
+  fixed code per event type (`EVENT_KEY_CODES`, the codes the seeded keys already use).
+  Restatements collapse: one type and date in several documents is one event. Only when a
+  single document states several same-type events on one date are they keyed apart, by a
+  short hash of the quantity, plus an ordinal where the quantity repeats too. Two
+  documents that disagree about one event keep the last one and log the conflict.
+  Reconcile then measures it against the committed row.
+- **Dates are checked before persist.** A candidate whose date is not a real `YYYY-MM-DD`
+  is dropped and logged. Before this it failed the `DATE` cast inside
+  `commit_research_ingest` and took the whole run's transaction down with it.
+- **The extraction prompt** states the date rule: the day the event happened, the last day
+  of the period for a period event, never the filing or signature date. Extracting every
+  row of a restated history table is expected.
+- **`20261002000000_canonical_event_natural_keys.sql`** rewrites the twelve committed keys
+  not already in that form: the `loc`, `hamak` and `panther` prefixes, two month-only dates
+  and `loc:accounting:aasb138`. It skips any row whose canonical key another event already
+  holds, and none does today.
+- **Tests.** `naturalKey.test.ts` covers the seeded Strategy keys reproduced exactly,
+  prefix drift, same-day pairs, restatement collapse and conflicts. It also carries the
+  spec's `restatedLedgerIsIdempotent` case: a sixty-row history (plus one same-day pair)
+  ingested from two notices commits nothing new and reads as a quiet run. The workflow
+  test asserts that a key the model offers is ignored, and that a bad date drops one row
+  rather than the run.
+
+**Departures from the spec, and why.**
+
+- **The hash covers quantity, not quantity plus source document.** With the document in the
+  key, every quarterly notice that republishes Metaplanet's history would give the same
+  purchase a new key. That is the duplication the case exists to prevent.
+- **Period events key on the period's last day.** The spec's date paragraph says "date of
+  earliest event reported", but every seeded period event is keyed on the period end
+  (`strategy:disp:2026-08-02` for 27 July – 2 August). A different rule would duplicate
+  them on the first run.
+- **No Strategy rounding test yet.** The stored totals (847,363 → 846,000 → 843,775 →
+  840,447 → 845,050) agree exactly with the stored flows, so the two off-by-one filed
+  figures are not in the database. They need reading from the 8-Ks rather than inventing.
+  `validateClaims` checks presence, not arithmetic, so it already accepts a filed
+  "approximately" total. What is missing is the test that says so with real numbers.
+- **No date check in `validateNumerics`.** The signature-date trap is a choice between two
+  dates that both appear in the text, so a presence check cannot catch it. It is handled
+  by the prompt rule above. A deterministic check would need the 8-K cover page's "Date
+  of Report" parsed, which belongs with the item-aware EDGAR parsing.
+
+**Verified.**
+
+- The migration ran against live inside a self-aborting `DO` block: twelve rows
+  rewritten, zero left outside `^<slug>:[a-z]+:YYYY-MM-DD$`, then rolled back.
+- `pnpm --filter @platform/agents test` (1,351) and `turbo typecheck lint` for the agents
+  package green.
+
+**Not done.**
+
+- **The eight read-side conformance cases.** These are `flowsReverseWhileStockIsFlat`,
+  `currencyOnlyDisclosureYieldsNoSnapshot`, `etfWrapperIsNotComparable`,
+  `encumberedPortionExcludedFromFreeBalance`, `refusedByClassIsDistinguishableFromAbsent`,
+  `trackerDivergenceRaisesFinding`, `exitedIsNotAbsent` and `disposalWithoutConsideration`.
+  `CorporateHoldingsRepository` does not yet return absence reasons, holding status,
+  encumbrance or secondary claims. Each case needs those fields in the read model, a
+  scenario slot, live and fixture data to satisfy it, and for tracker divergence a
+  computation that does not exist yet.
+- Finding keys are still written by the model in the score step. The spec only named
+  events, but the same drift applies.
+- Venue adapters, item-aware EDGAR parsing, the first real run.
 
