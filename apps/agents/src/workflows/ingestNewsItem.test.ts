@@ -304,6 +304,21 @@ describe('ingestNewsItem', () => {
     expect(insertedRows[0]['status']).toBe('extraction_failed');
   });
 
+  it('persists the paywall flag, and null when the caller did not check', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-8' }, error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-9' }, error: null },
+    ];
+    await ingestNewsItem({ ...baseInput(), paywalled: true });
+    await ingestNewsItem({ ...baseInput(), url: 'https://mail.local/gromen/other' });
+    expect(insertedRows[0]['paywalled']).toBe(true);
+    expect(insertedRows[1]['paywalled']).toBeNull();
+  });
+
   it('skips the ingestion_ref check for a source-less item and inserts a null source_id', async () => {
     responseQueue = [
       { data: [], error: null },               // url miss (ingestion_ref check skipped — no source id)

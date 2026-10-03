@@ -165,6 +165,8 @@ export interface NewsCurationStory {
   source_name: string;
   category: string;
   image_url?: string;
+  /** news_items.paywalled was true. Omitted for podcasts and unchecked items. */
+  paywalled?: boolean;
 }
 
 // Structured payload persisted under routines.last_result.metadata for news_curation.
