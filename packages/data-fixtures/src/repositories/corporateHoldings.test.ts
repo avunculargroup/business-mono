@@ -29,7 +29,7 @@ describeCorporateHoldingsContract<DemoDomain>({
   exitedSlug: RESEARCH_ENTITIES.wexford.slug,
   activeSlug: RESEARCH_ENTITIES.tarra.slug,
   disposalWithoutConsiderationSlug: RESEARCH_ENTITIES.wexford.slug,
-  draftSlug: RESEARCH_ENTITIES.wexford.slug,
+  draftSlug: RESEARCH_ENTITIES.brennock.slug,
 });
 
 const ctx = testReadContext();
@@ -45,6 +45,19 @@ describe('the register, as the demo stages it', () => {
       expect(company?.tier).toBe('bellwether');
       expect(company?.listings.some((l) => l.listingType === 'cdi_foreign_exempt')).toBe(true);
     });
+  });
+
+  it('lists every staged record except the one draft', async () => {
+    // The demo shows the reviewed register, so a record made a draft for the
+    // contract suite would silently vanish from it. Only Brennock, which exists
+    // to be the draft, is off the list.
+    const register = await repositories.corporateHoldings.listCompanies(ctx);
+    const listed = register.items.map((row) => row.slug);
+
+    for (const [key, entity] of Object.entries(RESEARCH_ENTITIES)) {
+      if (key === 'brennock') expect(listed).not.toContain(entity.slug);
+      else expect(listed).toContain(entity.slug);
+    }
   });
 
   it('carries a record whose self-description differs from its archetype', async () => {

@@ -198,8 +198,10 @@ const COMPANIES = [
   company('rc-wexford', 'demo-wexford-semiconductor', 'Wexford Semiconductor Limited', 'WXFS', {
     holding_status: 'exited',
     exited_on: '2026-08-14',
-    // Landed and unread. Its ledger rows are publishable, so only the review
-    // gate keeps them out of the publishable view below.
+  }),
+  // Landed and unread. Its ledger row is publishable, so only the review gate
+  // keeps it out of the publishable view below.
+  company('rc-brennock', 'demo-brennock-packaging', 'Brennock Packaging Limited', 'BRNP', {
     review_state: 'draft',
   }),
 ];
@@ -283,6 +285,7 @@ const LEDGER = [
     // Quantity and nothing else: no price, no proceeds, no settlement date.
     ledgerRow('evt-wxfs-002', 'rc-wexford', 'disposal', '2026-08-14', 150, null),
     ledgerRow('evt-wxfs-001', 'rc-wexford', 'acquisition', '2025-05-11', 150, 14100000),
+    ledgerRow('evt-brnp-001', 'rc-brennock', 'acquisition', '2026-09-27', 12, null),
   ],
 ];
 
@@ -623,7 +626,7 @@ describeCorporateHoldingsContract<RepositoryDomain>({
   exitedSlug: 'demo-wexford-semiconductor',
   activeSlug: 'demo-tarra-holdings',
   disposalWithoutConsiderationSlug: 'demo-wexford-semiconductor',
-  draftSlug: 'demo-wexford-semiconductor',
+  draftSlug: 'demo-brennock-packaging',
 });
 
 let client: FakeSupabaseClient;

@@ -846,8 +846,8 @@ one a human had read, and the ingest's approval gate set the same flag a seed di
   - **Supabase adapter (3):** no default filter, `reviewState` not mapped, and
     `clientSummary` not mapped.
 - The first choice of draft fixture, Nyala, failed the publishable case honestly. Its one
-  ledger row is internal, so an empty publishable read proved nothing. Wexford, which has
-  publishable rows, is the draft in both datasets.
+  ledger row is internal, so an empty publishable read proved nothing. The draft is now a
+  new record, Brennock Packaging, with one publishable row, in both datasets.
 - The final migration was dry-run against live inside self-aborting blocks.
   - **Records:** 6 internal and 6 draft, with 0 cleared.
   - **The view:** it carries `security_invoker=true` and returns 8 publishable rows,
@@ -865,9 +865,9 @@ one a human had read, and the ingest's approval gate set the same flag a seed di
   they did not fit side by side.
 - `pnpm test` (16 packages), `turbo typecheck lint` and the doc-link check are green.
 
-**Changed in passing: the demo register.** It reads the fixture adapter, so Nyala and
-Wexford, both drafts, no longer appear in its list. Their pages still resolve by slug.
-Before this, the demo did not filter on `isPublished` at all.
+**The demo register is unchanged.** It reads the fixture adapter, so making an existing
+record the draft would have removed it from the demo. Brennock exists only to be the
+draft, and a fixture test asserts that every other staged record stays on the list.
 
 **Not done.**
 

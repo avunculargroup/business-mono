@@ -192,6 +192,14 @@ function documents(anchor: Date) {
       isAudited: false,
       daysAgo: 40,
     }),
+    brennockAcquisition: doc(anchor, {
+      documentId: 'doc-brnp-ann-001',
+      documentTitle: 'Brennock Packaging — treasury acquisition',
+      sourceClass: 'exchange_announcement',
+      sourceUrl: '/fixtures/docs/brnp-ann-001.pdf',
+      isAudited: false,
+      daysAgo: 6,
+    }),
   };
 }
 
@@ -230,6 +238,7 @@ export function researchCompanyDocuments(anchor: Date): Record<string, Provenanc
     [RESEARCH_ENTITIES.corran.id]: [d.corranQuarterly],
     [RESEARCH_ENTITIES.ashby.id]: [d.ashbyNews, d.ashbyAnnual],
     [RESEARCH_ENTITIES.wexford.id]: [d.wexfordAcquisition, d.wexfordDisposal],
+    [RESEARCH_ENTITIES.brennock.id]: [d.brennockAcquisition],
   };
 }
 
@@ -431,7 +440,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'defensible and analytically worthless. Its headline position includes assets ' +
         'custodied for customers.',
       lastVerifiedAt: onDate(anchor, -20),
-      reviewState: 'draft',
+      reviewState: 'internal',
       clientCleared: false,
       clientSummary: null,
       ledgerAbsenceReason: null,
@@ -667,16 +676,45 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'settlement date. The zero balance is an exit, recorded as one, which is a ' +
         'different state from a record that has never disclosed a holding.',
       lastVerifiedAt: onDate(anchor, -20),
-      // Landed and unread, with publishable ledger rows: the record that
-      // proves the review gate, not the classification, keeps them out of
-      // the publishable read. Nyala is a draft too, but its one ledger row is
-      // internal, so it could not prove that.
-      reviewState: 'draft',
+      reviewState: 'internal',
       clientCleared: false,
       clientSummary: null,
       ledgerAbsenceReason: null,
       holdingStatus: 'exited',
       exitedOn: onDate(anchor, -40),
+    },
+    {
+      id: E.brennock.id,
+      slug: E.brennock.slug,
+      legalName: E.brennock.legalName,
+      jurisdiction: 'AU',
+      tier: 'regional',
+      primaryArchetype: 'treasury_allocation',
+      selfDescribedArchetype: null,
+      reportingStandard: 'aasb',
+      expectedDisclosureCadence: 'episodic',
+      listings: [asxListing(anchor, E.brennock, -2400)],
+      listingHistory: [asxListing(anchor, E.brennock, -2400)],
+      formerNames: [],
+      identifiers: identifiers({ acn: E.brennock.acn, abn: E.brennock.abn, arbn: null, isin: E.brennock.isin }),
+      operationalHq: 'South Australia',
+      functionalCurrency: 'AUD',
+      presentationCurrency: 'AUD',
+      financialYearEnd: '06-30',
+      marketCapBand: 'micro',
+      fundingSource: 'operating_cash',
+      curatorNotes: null,
+      lastVerifiedAt: null,
+      // Landed from an ingest run and not yet read, with a publishable ledger
+      // row: the record that proves the review gate, not the classification,
+      // keeps its rows out of the publishable read. Off the register, so the
+      // demo never lists it.
+      reviewState: 'draft',
+      clientCleared: false,
+      clientSummary: null,
+      ledgerAbsenceReason: null,
+      holdingStatus: null,
+      exitedOn: null,
     },
   ];
 }
@@ -1037,6 +1075,28 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
       },
     ],
 
+    [E.brennock.id]: [
+      {
+        id: 'evt-brnp-001',
+        companyId: E.brennock.id,
+        eventType: 'acquisition',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -6),
+        quantity: 12,
+        considerationNative: null,
+        nativeCurrency: null,
+        considerationAud: null,
+        fxRateUsed: null,
+        feesIncluded: null,
+        headline: 'First bitcoin purchase',
+        detail: null,
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        provenance: d.brennockAcquisition,
+      },
+    ],
     [E.wexford.id]: [
       {
         id: 'evt-wxfs-002',
