@@ -6211,7 +6211,6 @@ export type Database = {
           funding_source: string | null
           holding_status: string | null
           id: string
-          is_published: boolean
           jurisdiction: string | null
           jurisdiction_basis: string | null
           last_verified_at: string | null
@@ -6247,7 +6246,6 @@ export type Database = {
           funding_source?: string | null
           holding_status?: string | null
           id?: string
-          is_published?: boolean
           jurisdiction?: string | null
           jurisdiction_basis?: string | null
           last_verified_at?: string | null
@@ -6283,7 +6281,6 @@ export type Database = {
           funding_source?: string | null
           holding_status?: string | null
           id?: string
-          is_published?: boolean
           jurisdiction?: string | null
           jurisdiction_basis?: string | null
           last_verified_at?: string | null
