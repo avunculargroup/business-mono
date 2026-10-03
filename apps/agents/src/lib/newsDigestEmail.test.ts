@@ -146,6 +146,30 @@ describe('renderNewsDigestEmail', () => {
     expect(text).toContain('ABN 82683088173');
   });
 
+  it('marks a paywalled story with a "Paywall" badge in both parts, and only that story', () => {
+    const result = sampleResult();
+    const stories = (result.metadata as { stories: Array<Record<string, unknown>> }).stories;
+    stories[0]!['paywalled'] = true;
+    const { html, text } = renderNewsDigestEmail({ title: 'Daily news curation', result, date, company });
+    expect(html.match(/>Paywall</g)).toHaveLength(1);
+    expect(text).toContain('1. ASIC updates digital asset guidance (AFR) [Paywall]');
+    expect(text).not.toContain('Treasury special (What Bitcoin Did) [Paywall]');
+  });
+
+  it('renders no paywall badge when no story is paywalled', () => {
+    const { html, text } = renderNewsDigestEmail({ title: 'Daily news curation', result: sampleResult(), date, company });
+    expect(html).not.toContain('>Paywall<');
+    expect(text).not.toContain('[Paywall]');
+  });
+
+  it('carries the paywall flag through the sources[] fallback', () => {
+    const result: RoutineResult = {
+      sources: [{ url: 'https://x.example/a', title: 'A story', source: 'Some Paper', excerpt: '', retrieved_at: '', paywalled: true }],
+    };
+    const { html } = renderNewsDigestEmail({ title: 'X', result, date, company });
+    expect(html).toContain('>Paywall<');
+  });
+
   it('falls back to sources[] when metadata.stories is absent', () => {
     const result: RoutineResult = {
       summary: 'mood from summary',

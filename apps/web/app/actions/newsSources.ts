@@ -8,6 +8,7 @@ import { validateFeedUrl } from '@/lib/news/validateFeed';
 import { slugify, computeInboundAddress, parseSenderAllowlist } from '@/lib/news/emailSource';
 import { formBoolean } from '@/lib/formBoolean';
 import { humanizeError } from '@/lib/errors';
+import { normalizePaywalledDomain } from '@/lib/news/paywalledDomain';
 
 const REVALIDATE = '/news/sources';
 
@@ -250,6 +251,36 @@ export async function toggleNewsSourceActive(id: string, isActive: boolean) {
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
   const { error } = await supabase.from('news_sources').update({ is_active: isActive }).eq('id', id);
+  if (error) return { error: humanizeError(error) };
+  revalidatePath(REVALIDATE);
+  return { success: true };
+}
+
+export async function addPaywalledDomain(raw: string) {
+  const normalized = normalizePaywalledDomain(raw);
+  if ('error' in normalized) return { error: normalized.error };
+
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { data, error } = await supabase
+    .from('paywalled_domains')
+    .insert({ domain: normalized.domain })
+    .select('id, domain')
+    .single();
+  if (error) {
+    if (error.code === '23505') return { error: `${normalized.domain} is already on the list.` };
+    return { error: humanizeError(error) };
+  }
+  revalidatePath(REVALIDATE);
+  return { success: true, domain: data };
+}
+
+export async function removePaywalledDomain(id: string) {
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+  const { supabase } = auth;
+  const { error } = await supabase.from('paywalled_domains').delete().eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath(REVALIDATE);
   return { success: true };

@@ -6,6 +6,140 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-03 — `paywalled_domains`
+
+`20261003120100_add_paywalled_domains.sql` adds the list of publishers whose
+articles are marked paywalled without reading the page, edited from
+`/news/sources`.
+
+- **Why a list.** Our direct page fetch is blocked on every Bloomberg (558) and
+  FT (509) article in the last 60 days, so neither page signal from
+  `news_items.paywalled` ever fires for them. Being blocked is not itself evidence: The
+  Block, Reuters and CryptoSlate block the fetch too and are free. The publisher
+  has to be named.
+- **Metered counts.** SMH, The Age, Project Syndicate and similar are seeded
+  alongside the hard paywalls — a metered wall still stops a reader partway
+  through the month.
+- **Host or subdomain.** `ft.com` covers `markets.ft.com`. Stored bare and
+  lowercase (no `www.`), enforced by a CHECK; the web action normalises a pasted
+  URL down to its host first.
+- **Only ever adds the flag.** A listed domain sets `paywalled = true`; an
+  unlisted one falls back to the page and body signals. Removing a domain does
+  not clear the flag on articles already ingested.
+- **Alongside it, a wider body check.** Paywall wording is now looked for across
+  the whole fetched body, not the first 2,000 characters, and includes FT's
+  "Subscribe to unlock this article" — present in 453 of those 509 FT bodies,
+  about 12,000 characters in.
+- RLS: `is_team_member()`, one `FOR ALL` policy.
+
+---
+
+## 2026-10-03 — `news_items.paywalled`
+
+`20261003120000_add_news_item_paywalled.sql` adds a nullable **`paywalled
+BOOLEAN`** so the daily `news_curation` digest can mark stories a reader will hit
+a paywall on.
+
+- **Detected at ingestion, from the page we already fetch.** The web-page paths
+  (RSS scan, Tavily search ingest, newsletter followed links) fetch each article's
+  HTML for its og:image; `fetchPageMeta` reads the paywall signal from the same
+  response — schema.org `isAccessibleForFree: false` (the markup publishers give
+  Google for paywalled content) or `article:content_tier` of `locked`/`metered`.
+  A subscribe-to-continue stub in the Jina body also counts.
+- **Null is not false.** Null means nobody checked: rows from before this column,
+  email newsletter bodies (the subscription already paid for them), report PDFs,
+  and pages that could not be fetched. False means the page was read and carried
+  no paywall signal. The digest only marks `true`.
+- **No backfill.** Older rows stay null; the digest looks back 24 hours, so the
+  pill is accurate from the first run after deploy.
+
+---
+
+## 2026-10-03 — Security-definer functions anon could call
+
+`20261003020000_lock_security_definer_functions.sql`. Two earlier migrations restricted
+SECURITY DEFINER functions with `REVOKE … FROM PUBLIC` plus a narrow `GRANT`.
+Supabase grants EXECUTE on new `public` functions directly to `anon`, `authenticated`
+and `service_role`, so that revoke removed nothing. On live, `anon` could call:
+- `social_credential_token`, which decrypts a stored LinkedIn token;
+- `store_social_credential` and `delete_social_credential`;
+- `audit_permissive_policies`.
+
+No token was stored, so nothing was readable. But the account ids were in
+`v_campaign_matrix`, which anon could read until `20261003010000`.
+
+Now:
+- **Token:** service role only.
+- **Store and delete:** revoked from `anon`, and they check `is_team_member()` (or the
+  service role) inside, because `authenticated` also covers Minute subscribers.
+- **Policy audit:** revoked from `anon`.
+
+Checked on live inside a rolled-back transaction:
+- `anon` and a subscriber are refused.
+- A team member can store but not read a token.
+- The service role can read one.
+- RLS still answers anon with empty results, not errors.
+
+`packages/db/src/migrations.test.ts` fails on any SECURITY DEFINER function never
+revoked from `anon` by name, except a short allowlist with reasons.
+
+---
+
+## 2026-10-03 — Every view runs as the caller (security_invoker)
+
+`20261003010000_views_security_invoker.sql` — sets `security_invoker = true` on all 33
+views in `public`. The Supabase advisor flagged every one as a security-definer view
+(ERROR, lint 0010). A view without the option reads its tables with its owner's
+privileges, past RLS, and `anon` and `authenticated` hold SELECT on it through the
+default grants. The anon key ships in both apps' browser bundles, so with no session
+`/rest/v1/` returned the CRM (533 rows of `v_recent_interactions`, 25 of
+`v_contacts_overview`), the whole research ledger and the rest. A Minute subscriber
+could read the same.
+
+Measured on live inside a rolled-back transaction before shipping:
+- **Team member:** identical row counts on all 33 views.
+- **Anon:** zero rows on every one.
+- **Minute subscriber:** only what the client policies already admit.
+
+Nothing in `apps/client` reads a view, and `apps/agents` uses the service role, which
+bypasses RLS either way.
+
+`CREATE OR REPLACE VIEW` resets a view's options, so a later redefinition silently
+undoes this. Write every new or redefined view `WITH (security_invoker = true)`.
+`packages/db/src/migrations.test.ts` replays the migrations and fails if any view ends
+without the option. It replays filenames, so a view-redefining migration also needs a
+timestamp later than everything already on `main`.
+
+---
+
+## 2026-10-02 — Corporate holdings: the ingest records the filing item it read
+
+`20261002200000_commit_ingest_source_section.sql` — `commit_research_ingest` writes
+`source_section_id` on `treasury_events`, insert and update. The gate already judged a
+claim by its section's class when one was cited; the RPC never passed one, so every
+ingested event was judged by its whole document's class. The body is otherwise
+20260904000000's, unchanged.
+
+---
+
+## 2026-10-02 — Corporate holdings: encumbrance on the position view
+
+`20261002100000_position_view_encumbrance.sql` — `v_company_position` selects
+`encumbered_quantity`, `encumbrance_counterparty` and `encumbrance_obligation`, appended
+to 20261001030000's definition. The columns were added to the snapshots table in
+`20261001100100`, but the view never selected them.
+
+---
+
+## 2026-10-02 — Corporate holdings: canonical event natural keys
+
+`20261002000000_canonical_event_natural_keys.sql` — rewrites the twelve
+`treasury_events.natural_key` values not in the `<slug>:<code>:<YYYY-MM-DD>` form the
+ingest now computes. Otherwise the first real run would reconcile them as new and
+duplicate the rows. A row is skipped where its canonical key is already taken.
+
+---
+
 ## 2026-10-01 — Corporate holdings: drop the per-scheme identifier columns
 
 `20261001120000_drop_research_company_identifier_columns.sql` — the contract half of
