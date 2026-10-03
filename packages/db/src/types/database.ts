@@ -4069,6 +4069,7 @@ export type Database = {
           ingestion_ref: string | null
           key_points: Json
           knowledge_item_id: string | null
+          paywalled: boolean | null
           published_at: string | null
           relevance_reasoning: string | null
           relevance_score: number | null
@@ -4104,6 +4105,7 @@ export type Database = {
           ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
+          paywalled?: boolean | null
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null
@@ -4139,6 +4141,7 @@ export type Database = {
           ingestion_ref?: string | null
           key_points?: Json
           knowledge_item_id?: string | null
+          paywalled?: boolean | null
           published_at?: string | null
           relevance_reasoning?: string | null
           relevance_score?: number | null
@@ -4640,6 +4643,35 @@ export type Database = {
             columns: ["interview_id"]
             isOneToOne: false
             referencedRelation: "discovery_interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paywalled_domains: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          domain: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          domain: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          domain?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paywalled_domains_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]

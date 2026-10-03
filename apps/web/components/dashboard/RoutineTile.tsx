@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Card } from '@platform/ui/Card';
+import { StatusChip } from '@platform/ui/StatusChip';
 import { formatRelativeDate, formatTimeInTz } from '@/lib/utils';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import styles from './RoutineTile.module.css';
@@ -10,6 +11,7 @@ interface RoutineSource {
   excerpt?: string;
   source?: string;
   image_url?: string | null;
+  paywalled?: boolean;
 }
 
 interface RoutineResult {
@@ -75,6 +77,7 @@ export function RoutineTile({ routine }: RoutineTileProps) {
                     {s.title ? cleanNewsTitle(s.title) : s.url}
                   </a>
                   {s.source && <span className={styles.source}>{s.source}</span>}
+                  {s.paywalled && <StatusChip label="Paywall" className={styles.paywall} />}
                 </span>
                 {s.excerpt && <span className={styles.excerpt}>{s.excerpt}</span>}
               </div>
