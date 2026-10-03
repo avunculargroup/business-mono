@@ -8,8 +8,9 @@ const company: Row = {
   financial_year_end: '12-31', tier: 'large', expected_disclosure_cadence: null,
   market_cap_band: null, funding_source: null,
   curator_notes: "It's the holder's own figure", last_verified_at: '2026-09-21',
-  is_published: true, client_cleared: true, client_cleared_by: 'tm-1',
-  client_cleared_at: '2026-09-22', created_by: null, created_at: 'x', updated_at: 'x',
+  is_published: true, review_state: 'internal', reviewed_by: 'tm-1', reviewed_at: '2026-09-22',
+  client_cleared: true, client_cleared_by: 'tm-1', client_cleared_at: '2026-09-22',
+  client_summary: 'Holds bitcoin directly.', created_by: null, created_at: 'x', updated_at: 'x',
 };
 
 const doc: Row = {
@@ -49,10 +50,12 @@ function dump(children: Record<string, Row[]>, sections?: Row[]) {
 }
 
 describe('registerSeed', () => {
-  it('lands the company unpublished and never carries clearance', () => {
+  it('lands the company as a draft and never carries review or clearance', () => {
     const sql = emitCompany(company);
-    expect(sql).toMatch(/is_published\)\nSELECT[\s\S]*FALSE\nWHERE NOT EXISTS/);
+    expect(sql).toMatch(/review_state\)\nSELECT[\s\S]*'draft'\nWHERE NOT EXISTS/);
     expect(sql).not.toContain('client_cleared');
+    expect(sql).not.toContain('client_summary');
+    expect(sql).not.toContain('internal');
     expect(sql).not.toContain('tm-1');
   });
 
@@ -87,7 +90,7 @@ describe('registerSeed', () => {
   it('throws on a column it does not know, rather than dropping it', () => {
     expect(() => dump({ treasury_events: [{ ...event, review_state: 'draft' }], research_documents: [doc] }))
       .toThrow(/review_state/);
-    expect(() => emitCompany({ ...company, client_summary: 'draft' })).toThrow(/client_summary/);
+    expect(() => emitCompany({ ...company, review_notes: 'draft' })).toThrow(/review_notes/);
   });
 
   it('throws when a row is sourced to a document outside the record', () => {

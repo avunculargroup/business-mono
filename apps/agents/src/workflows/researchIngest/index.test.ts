@@ -465,22 +465,29 @@ describe('the approval gate', () => {
     committed: { events: { inserted: 1, updated: 0 } },
   };
 
-  it('publishes only after a director approves', async () => {
+  it('moves the record out of draft only after a director approves', async () => {
     await approvalGateStep.execute({
       inputData: gateInput,
-      resumeData: { approved: true, approvedBy: null },
+      resumeData: { approved: true, approvedBy: '2fcaea14-6d37-4def-b56d-467d61c92f36' },
       suspend: vi.fn(),
     } as never);
 
     expect(updates).toContainEqual(
       expect.objectContaining({
         table: 'research_companies',
-        values: expect.objectContaining({ is_published: true }),
+        values: expect.objectContaining({
+          review_state: 'internal',
+          reviewed_by: '2fcaea14-6d37-4def-b56d-467d61c92f36',
+        }),
       }),
+    );
+    // Approval is review, never clearance: a subscriber sees nothing yet.
+    expect(updates).not.toContainEqual(
+      expect.objectContaining({ values: expect.objectContaining({ client_cleared: true }) }),
     );
   });
 
-  it('leaves the record unpublished when the director rejects', async () => {
+  it('leaves the record in draft when the director rejects', async () => {
     const result = (await approvalGateStep.execute({
       inputData: gateInput,
       resumeData: { approved: false, approvedBy: null },
@@ -489,7 +496,7 @@ describe('the approval gate', () => {
 
     expect(result.published).toBe(false);
     expect(updates).not.toContainEqual(
-      expect.objectContaining({ values: expect.objectContaining({ is_published: true }) }),
+      expect.objectContaining({ values: expect.objectContaining({ review_state: 'internal' }) }),
     );
   });
 });
