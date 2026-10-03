@@ -54,7 +54,7 @@ import { shouldDropForRelevance } from './newsRelevance.js';
 import { verifyMoodSummary } from './newsCurationVerify.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
-import { normalizeNewsUrl, dedupeShortlistIndices } from './newsDedup.js';
+import { normalizeNewsUrl, dedupeShortlistIndices, isListingPageUrl } from './newsDedup.js';
 import { fetchOgImage, fetchPageMeta } from '../lib/fetchOgImage.js';
 import { resolvePaywalled } from '../lib/paywalledDomains.js';
 import { decodeHtmlEntities, isEmailSafeImage } from '../lib/emailImage.js';
@@ -970,6 +970,7 @@ async function runNewsIngest(
       const data = await res.json() as { results?: Array<{ url: string; title: string; content: string; score: number; published_date?: string; source?: string }> };
       for (const r of data.results ?? []) {
         const url = normalizeNewsUrl(r.url);
+        if (isListingPageUrl(url)) continue;
         if (!seen.has(url)) {
           seen.add(url);
           tavilyCandidates.push({
