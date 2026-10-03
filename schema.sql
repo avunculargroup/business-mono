@@ -3036,7 +3036,7 @@ CREATE TABLE report_segments (
 --   the divergence is the case study), reporting_standard,
 --   functional/presentation currency, tier, expected_disclosure_cadence,
 --   market_cap_band + funding_source (the peer-shape matching inputs, columns
---   so the criteria stay visible), curator_notes, is_published. Registration
+--   so the criteria stay visible), curator_notes. Registration
 --   numbers live in company_identifiers; the acn/abn/arbn/isin/lei columns were
 --   dropped in 20261001120000.
 --   From 20261001100000–20261001100200: jurisdiction is nullable, with
@@ -3048,6 +3048,11 @@ CREATE TABLE report_segments (
 --   exited_on set exactly when exited; ledger_absence_reason (no_stated_basis |
 --   source_class_refused | primary_not_located | filing_system_unreachable |
 --   no_holding).
+--   From 20261003200000: review_state (draft | internal | retired, default
+--   draft), reviewed_by, reviewed_at, and client_summary, the hand-written text
+--   a subscriber reads. CHECK client_clearance_needs_review: a cleared record is
+--   internal with a non-blank summary. is_published, which review_state
+--   replaced, was dropped in 20261003210000.
 -- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
 --   UNIQUE (scheme, value) — entity resolution runs here, and a registration
 --   number names one company. Open scheme vocabulary: a company can hold two CIKs.
@@ -3147,7 +3152,8 @@ CREATE TABLE report_segments (
 --     the fact that beat it. conflicting_* is non-null exactly where two
 --     documents disagreed.
 --   v_research_publishable — the only view a client-facing surface may read.
---     Both gates: the company is published AND the field is publishable.
+--     Both gates: the company is reviewed (review_state = 'internal') AND the
+--     field is publishable.
 
 -- Seed: 20260904010000_seed_locate_technologies.sql hand-enters the first real
 --   record from its discovery dossier. is_published FALSE, nothing approved.

@@ -571,6 +571,7 @@ type RegisterRow = {
   legal_name: string | null;
   jurisdiction: string | null;
   tier: string | null;
+  client_summary: string | null;
   company_listings: Array<{ ticker: string | null }> | null;
   research_company_facts: Array<{
     field_key: string | null;
@@ -589,7 +590,7 @@ type RegisterRow = {
 };
 
 const REGISTER_COLUMNS =
-  'slug, legal_name, jurisdiction, tier, company_listings(ticker), research_company_facts(field_key, label, value, as_of, is_superseded), treasury_events(event_date, headline, detail, basis, disclosure_venue)';
+  'slug, legal_name, jurisdiction, tier, client_summary, company_listings(ticker), research_company_facts(field_key, label, value, as_of, is_superseded), treasury_events(event_date, headline, detail, basis, disclosure_venue)';
 
 /**
  * Field keys whose facts describe how an entity implemented something.
@@ -675,6 +676,7 @@ function toRegisterEntry(
       .map((l) => l.ticker)
       .filter((t): t is string => Boolean(t)),
     tier: row.tier ?? 'unclassified',
+    summary: row.client_summary?.trim() || null,
     position,
     ledger,
     statedAbsences,

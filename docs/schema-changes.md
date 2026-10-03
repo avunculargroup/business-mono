@@ -6,6 +6,15 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-03 — Corporate holdings: `is_published` dropped
+
+`20261003210000_drop_research_companies_is_published.sql` drops
+`research_companies.is_published`. It is the contract half of `20261003200000`, which
+replaced it with `review_state`. Nothing on live depended on it (no view, policy, function
+or index), and no code read it. `jurisdiction_notes.is_published` is unaffected.
+
+---
+
 ## 2026-10-03 — Corporate holdings: `review_state` and the subscriber summary
 
 `20261003200000_research_review_state.sql` adds `review_state`

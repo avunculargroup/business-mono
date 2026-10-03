@@ -50,6 +50,14 @@
 }
 
 /* Detail view */
+.summary {
+  max-width: 68ch;
+  margin: 0 0 var(--space-8);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
 .facts {
   list-style: none;
   margin: 0 0 var(--space-8);
