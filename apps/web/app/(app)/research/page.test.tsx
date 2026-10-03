@@ -113,6 +113,47 @@ describe('ResearchRegisterPage', () => {
     expect(screen.getByText(/seeded by hand/)).toBeInTheDocument();
   });
 
+  it('keeps a draft off the register and counts it on the review tab', async () => {
+    repositories = createFakeRepositories({
+      register: [
+        fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' }),
+        fakeRegisterEntry({ id: '2', slug: 'b', legalName: 'Wexford', reviewState: 'draft' }),
+      ],
+    });
+
+    render(await ResearchRegisterPage());
+
+    expect(screen.getByText('Meridian Freight')).toBeInTheDocument();
+    expect(screen.queryByText('Wexford')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /To review/ })).toHaveTextContent('1');
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('lists only drafts in the review view', async () => {
+    repositories = createFakeRepositories({
+      register: [
+        fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' }),
+        fakeRegisterEntry({ id: '2', slug: 'b', legalName: 'Wexford', reviewState: 'draft' }),
+      ],
+    });
+
+    render(await ResearchRegisterPage({ searchParams: Promise.resolve({ view: 'review' }) }));
+
+    expect(screen.getByText('Wexford')).toBeInTheDocument();
+    expect(screen.queryByText('Meridian Freight')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /To review/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('says the queue is empty rather than that the register is', async () => {
+    render(await ResearchRegisterPage({ searchParams: Promise.resolve({ view: 'review' }) }));
+
+    expect(screen.getByText(/Nothing is waiting for review/)).toBeInTheDocument();
+    expect(screen.queryByText(/seeded by hand/)).not.toBeInTheDocument();
+  });
+
   it('links each record to its own page by slug', async () => {
     repositories = createFakeRepositories({
       register: [

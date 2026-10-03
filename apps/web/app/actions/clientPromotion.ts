@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
+import { ReviewState } from '@platform/shared';
 
 /**
  * The three gates between internal knowledge and a paying subscriber.
@@ -55,15 +56,50 @@ export async function setClientNote(changeId: string, note: string) {
 }
 
 /**
- * Clear a register entry for subscribers.
+ * Move a register record between draft, internal and retired.
  *
- * Distinct from `is_published`, which is whether the internal register shows
- * it. Those are different questions with different answers, and collapsing them
- * would make the second unaskable.
+ * `draft` is where an agent-created record lands; `internal` means a human has
+ * read it, which is what puts it on the internal register. Only an `internal`
+ * record can be cleared for subscribers (`client_clearance_needs_review`), so
+ * leaving `internal` withholds it in the same write: the safe direction, and
+ * the alternative is a constraint error the person cannot act on.
  */
-export async function setRegisterClearance(companyId: string, cleared: boolean) {
+export async function setReviewState(companyId: string, state: ReviewState) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
+
+  const { error } = await auth.supabase
+    .from('research_companies')
+    .update({
+      review_state: state,
+      reviewed_by: auth.user.id,
+      reviewed_at: new Date().toISOString(),
+      ...(state === ReviewState.INTERNAL ? {} : { client_cleared: false }),
+    })
+    .eq('id', companyId);
+
+  if (error) return { error: humanizeError(error) };
+
+  revalidatePath('/research');
+  return { success: true };
+}
+
+/**
+ * Clear a register entry for subscribers, with the summary they read.
+ *
+ * Distinct from `review_state`, which is whether a human has read it. The
+ * summary is required here with a better message than the constraint would
+ * give, and it is written for a subscriber, never copied from `curator_notes`.
+ * Withholding leaves the summary in place, so clearing again starts from it.
+ */
+export async function setRegisterClearance(companyId: string, cleared: boolean, summary = '') {
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+
+  const trimmed = summary.trim();
+  if (cleared && !trimmed) {
+    return { error: 'Write the summary subscribers will read before clearing the entry.' };
+  }
 
   const { error } = await auth.supabase
     .from('research_companies')
@@ -73,6 +109,7 @@ export async function setRegisterClearance(companyId: string, cleared: boolean) 
             client_cleared: true,
             client_cleared_by: auth.user.id,
             client_cleared_at: new Date().toISOString(),
+            client_summary: trimmed,
           }
         : { client_cleared: false },
     )

@@ -15,7 +15,12 @@ vi.mock('@/lib/action', () => ({
   ),
 }));
 
-import { classifyProduct, setClientNote, setRegisterClearance } from './clientPromotion';
+import {
+  classifyProduct,
+  setClientNote,
+  setRegisterClearance,
+  setReviewState,
+} from './clientPromotion';
 
 function patch(table: string): Record<string, unknown> {
   return supabase.__buildersFor(table)[0]!.update.mock.calls[0]![0] as Record<string, unknown>;
@@ -54,26 +59,75 @@ describe('setClientNote', () => {
   });
 });
 
+describe('setReviewState', () => {
+  it('records who reviewed the record and when', async () => {
+    const result = await setReviewState('co-1', 'internal');
+
+    expect(result).toEqual({ success: true });
+    expect(patch('research_companies')).toMatchObject({
+      review_state: 'internal',
+      reviewed_by: 'director-1',
+    });
+    expect(patch('research_companies')).toHaveProperty('reviewed_at');
+  });
+
+  it('leaves clearance alone when marking a record reviewed', async () => {
+    await setReviewState('co-1', 'internal');
+
+    expect(patch('research_companies')).not.toHaveProperty('client_cleared');
+  });
+
+  it.each(['draft', 'retired'] as const)(
+    'withholds from subscribers in the same write when moving to %s',
+    async (state) => {
+      // Only a reviewed record can be cleared. Leaving `internal` while cleared
+      // would otherwise fail the constraint with nothing the person can do.
+      await setReviewState('co-1', state);
+
+      expect(patch('research_companies')).toMatchObject({
+        review_state: state,
+        client_cleared: false,
+      });
+    },
+  );
+
+  it('refuses when nobody is signed in', async () => {
+    authed = false;
+
+    expect(await setReviewState('co-1', 'internal')).toEqual({
+      error: 'You need to be signed in to do that.',
+    });
+  });
+});
+
 describe('setRegisterClearance', () => {
-  it('records the approver when clearing', async () => {
-    await setRegisterClearance('co-1', true);
+  it('records the approver and the subscriber summary when clearing', async () => {
+    await setRegisterClearance('co-1', true, '  Holds bitcoin directly.  ');
 
     expect(patch('research_companies')).toMatchObject({
       client_cleared: true,
       client_cleared_by: 'director-1',
+      client_summary: 'Holds bitcoin directly.',
     });
   });
 
-  it('only flips the flag when un-clearing', async () => {
+  it('refuses to clear without a summary, ahead of the constraint', async () => {
+    const result = await setRegisterClearance('co-1', true, '   ');
+
+    expect(result.error).toMatch(/summary/);
+    expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
+  });
+
+  it('only flips the flag when un-clearing, keeping the summary', async () => {
     await setRegisterClearance('co-1', false);
 
     expect(patch('research_companies')).toEqual({ client_cleared: false });
   });
 
-  it('does not touch is_published, which is a different question', async () => {
-    await setRegisterClearance('co-1', true);
+  it('does not touch review_state, which is a different question', async () => {
+    await setRegisterClearance('co-1', true, 'x');
 
-    expect(patch('research_companies')).not.toHaveProperty('is_published');
+    expect(patch('research_companies')).not.toHaveProperty('review_state');
   });
 });
 
