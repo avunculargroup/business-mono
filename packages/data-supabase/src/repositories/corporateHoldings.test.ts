@@ -50,7 +50,9 @@ const BASE_COMPANIES = [
     funding_source: 'operating_cash',
     curator_notes: 'Two venues, two filing entities.',
     last_verified_at: '2026-08-15',
-    is_published: true,
+    review_state: 'internal',
+    client_cleared: true,
+    client_summary: 'Moved its primary listing from the ASX to the NZX.',
     // The venue it left is still in the history, which is where half its
     // filings are. Rule 3, as data.
     company_listings: [listing('asx', 'MFGX', '2025-12-17'), listing('nzx', 'MFGX', null)],
@@ -75,7 +77,9 @@ const BASE_COMPANIES = [
     funding_source: 'balance_sheet',
     curator_notes: 'Holds units in a fund it manages.',
     last_verified_at: '2026-08-15',
-    is_published: true,
+    review_state: 'internal',
+    client_cleared: false,
+    client_summary: null,
     company_listings: [listing('asx', 'VRDM', null)],
     company_former_names: [],
     company_identifiers: [],
@@ -98,7 +102,9 @@ const BASE_COMPANIES = [
     funding_source: 'operating_cash',
     curator_notes: 'A policy, one acquisition, then nothing.',
     last_verified_at: '2026-08-15',
-    is_published: true,
+    review_state: 'internal',
+    client_cleared: false,
+    client_summary: null,
     company_listings: [listing('asx', 'TARH', null)],
     company_former_names: [],
     company_identifiers: [],
@@ -121,7 +127,9 @@ const BASE_COMPANIES = [
     funding_source: 'equity_issuance',
     curator_notes: 'Committed to monthly disclosure and went quiet.',
     last_verified_at: '2026-05-14',
-    is_published: true,
+    review_state: 'internal',
+    client_cleared: false,
+    client_summary: null,
     company_listings: [listing('asx', 'CLDR', null)],
     company_former_names: [],
     company_identifiers: [],
@@ -138,6 +146,7 @@ const company = (
     ledger_absence_reason?: string | null;
     holding_status?: string | null;
     exited_on?: string | null;
+    review_state?: string;
   },
 ) => ({
   id,
@@ -157,7 +166,9 @@ const company = (
   funding_source: 'operating_cash',
   curator_notes: null,
   last_verified_at: '2026-08-15',
-  is_published: true,
+  review_state: 'internal',
+  client_cleared: false,
+  client_summary: null,
   ledger_absence_reason: null,
   holding_status: null,
   exited_on: null,
@@ -187,6 +198,11 @@ const COMPANIES = [
   company('rc-wexford', 'demo-wexford-semiconductor', 'Wexford Semiconductor Limited', 'WXFS', {
     holding_status: 'exited',
     exited_on: '2026-08-14',
+  }),
+  // Landed and unread. Its ledger row is publishable, so only the review gate
+  // keeps it out of the publishable view below.
+  company('rc-brennock', 'demo-brennock-packaging', 'Brennock Packaging Limited', 'BRNP', {
+    review_state: 'draft',
   }),
 ];
 
@@ -269,6 +285,7 @@ const LEDGER = [
     // Quantity and nothing else: no price, no proceeds, no settlement date.
     ledgerRow('evt-wxfs-002', 'rc-wexford', 'disposal', '2026-08-14', 150, null),
     ledgerRow('evt-wxfs-001', 'rc-wexford', 'acquisition', '2025-05-11', 150, 14100000),
+    ledgerRow('evt-brnp-001', 'rc-brennock', 'acquisition', '2026-09-27', 12, null),
   ],
 ];
 
@@ -569,10 +586,14 @@ function seed(): FakeSupabaseClient {
   client.__setDataset('research_companies', COMPANIES);
   client.__setDataset('v_research_ledger', LEDGER);
   // The publishable view is a different query, not a filter over the same
-  // rows — so it is a different dataset here, and the covenant row is not in it.
+  // rows — so it is a different dataset here, and neither the covenant row nor
+  // the draft company's rows are in it. Both gates, as the view applies them.
+  const reviewed = new Set(
+    COMPANIES.filter((row) => row.review_state === 'internal').map((row) => row.id),
+  );
   client.__setDataset(
     'v_research_publishable',
-    LEDGER.filter((row) => row.classification === 'publishable'),
+    LEDGER.filter((row) => row.classification === 'publishable' && reviewed.has(row.company_id)),
   );
   client.__setDataset('v_company_position', POSITIONS);
   client.__setDataset('v_research_freshness', FRESHNESS);
@@ -605,6 +626,7 @@ describeCorporateHoldingsContract<RepositoryDomain>({
   exitedSlug: 'demo-wexford-semiconductor',
   activeSlug: 'demo-tarra-holdings',
   disposalWithoutConsiderationSlug: 'demo-wexford-semiconductor',
+  draftSlug: 'demo-brennock-packaging',
 });
 
 let client: FakeSupabaseClient;
@@ -637,13 +659,17 @@ describe('query wiring', () => {
     const [builder] = client.__buildersFor('research_companies');
     expect(builder.eq).toHaveBeenCalledWith('tier', 'regional');
     expect(builder.eq).toHaveBeenCalledWith('primary_archetype', 'native_exposure');
+    // Unasked, the register is the reviewed one. A draft reaches it only
+    // through the review queue's explicit filter.
+    expect(builder.eq).toHaveBeenCalledWith('review_state', 'internal');
   });
 
   it('reports the register total separately from the page', async () => {
     const page = await corporateHoldings().listCompanies(ctx, undefined, { limit: 2 });
 
     expect(page.items).toHaveLength(2);
-    expect(page.total).toBe(COMPANIES.length);
+    // The reviewed register's total: the draft is not on it.
+    expect(page.total).toBe(COMPANIES.filter((row) => row.review_state === 'internal').length);
     expect(page.hasMore).toBe(true);
   });
 

@@ -5,6 +5,7 @@ import type {
   InstrumentType,
   LedgerAbsenceReason,
   ListingType,
+  ReviewState,
   ReportingStandard,
   ResearchArchetype,
   ResearchClassification,
@@ -104,6 +105,11 @@ export interface RegisterEntry {
   expectedDisclosureCadence: DisclosureCadence;
   /** Current venues only. The register lists where a company trades today. */
   listings: CompanyListing[];
+  /**
+   * `draft` until a human has read it; only an `internal` record is on the
+   * internal register by default, and only an `internal` one can be cleared.
+   */
+  reviewState: ReviewState;
 }
 
 /** A company's own page. */
@@ -119,16 +125,20 @@ export interface CompanyDossier extends RegisterEntry {
   /** Why the record exists and which retrieval traps it carries. Internal. */
   curatorNotes: string | null;
   lastVerifiedAt: string | null;
-  isPublished: boolean;
   /**
    * Whether a Minute subscriber may see this entry.
    *
-   * A different question from `isPublished`, which is whether the internal
-   * register shows it, and collapsing the two would make the second unaskable.
-   * No default of true anywhere: an entry reaches a paying subscriber because
-   * someone said so, and `client_clearance_needs_approver` records who.
+   * A different question from `reviewState`, which is whether a human has
+   * read it. No default of true anywhere: an entry reaches a paying subscriber
+   * because someone said so, and `client_clearance_needs_approver` records
+   * who. Only an `internal` record with a summary can be cleared.
    */
   clientCleared: boolean;
+  /**
+   * What a subscriber reads, hand-written and cleared with the entry. Never
+   * composed from `curatorNotes`, which are internal and often outcome-shaped.
+   */
+  clientSummary: string | null;
   formerNames: FormerName[];
   /** Every venue, including ones it has left. */
   listingHistory: CompanyListing[];
@@ -382,6 +392,12 @@ export interface RegisterFilter {
   tier?: ResearchTier;
   archetype?: ResearchArchetype;
   jurisdiction?: string;
+  /**
+   * Defaults to `internal`. The review queue is this list filtered to
+   * `draft`, so a record an agent created is never on the register until a
+   * human has read it.
+   */
+  reviewState?: ReviewState;
 }
 
 /**
@@ -416,10 +432,10 @@ export interface CorporateHoldingsRepository {
    * The ledger, newest event first.
    *
    * `publishableOnly` reads the publishable view, which applies both gates:
-   * the company is published AND Lex classified the field publishable. It is a
-   * different query, not a filter over the same rows, so a client-facing
-   * surface cannot accidentally receive an internal row it then declines to
-   * render.
+   * a human has reviewed the company (`internal`) AND Lex classified the
+   * field publishable. It is a different query, not a filter over the same
+   * rows, so a client-facing surface cannot accidentally receive an internal
+   * row it then declines to render.
    */
   getLedger(
     ctx: ReadContext,

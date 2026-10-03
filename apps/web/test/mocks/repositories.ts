@@ -19,7 +19,9 @@ import type {
   NewsItemDetail,
   PositionSummary,
   PublishGate,
+  QueryOptions,
   RegisterEntry,
+  RegisterFilter,
   RepositoryBundle,
 } from '@platform/data';
 
@@ -135,9 +137,14 @@ export function createFakeRepositories(
       promoteToVoiceSnippet: vi.fn(async () => undefined),
     },
     corporateHoldings: {
-      listCompanies: vi.fn(async () => {
-        const register = overrides.register ?? [];
-        return { items: register, total: register.length, hasMore: false };
+      // Honours the review filter the way both adapters do, so a page that
+      // forgets to ask for the review queue gets the reviewed register.
+      listCompanies: vi.fn(async (_ctx, filter?: RegisterFilter, opts?: QueryOptions) => {
+        const register = (overrides.register ?? []).filter(
+          (entry) => entry.reviewState === (filter?.reviewState ?? 'internal'),
+        );
+        const items = register.slice(0, opts?.limit ?? register.length);
+        return { items, total: register.length, hasMore: items.length < register.length };
       }),
       getCompany: vi.fn(async () =>
         overrides.dossier === undefined ? fakeCompanyDossier() : overrides.dossier,
@@ -289,8 +296,9 @@ export function fakeCompanyDossier(overrides: Partial<CompanyDossier> = {}): Com
     fundingSource: null,
     curatorNotes: null,
     lastVerifiedAt: null,
-    isPublished: false,
+    reviewState: 'internal',
     clientCleared: false,
+    clientSummary: null,
     ledgerAbsenceReason: null,
     holdingStatus: null,
     exitedOn: null,

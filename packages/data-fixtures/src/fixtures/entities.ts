@@ -277,4 +277,15 @@ export const RESEARCH_ENTITIES = {
     abn: '00 000 000 009',
     isin: 'XX0000000009',
   },
+  // Landed and unread. The only draft in the demo, so the register it shows is
+  // the reviewed one and every other record stays on it.
+  brennock: {
+    id: 'rc-brennock',
+    slug: 'demo-brennock-packaging',
+    legalName: 'Brennock Packaging Limited',
+    ticker: 'BRNP',
+    acn: '000 000 010',
+    abn: '00 000 000 010',
+    isin: 'XX0000000010',
+  },
 } as const satisfies Record<string, FixtureResearchEntity>;

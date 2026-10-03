@@ -46,9 +46,11 @@ export const COMPANY_SPEC = {
     'curator_notes', 'last_verified_at',
   ],
   // Visibility is an environment decision, not a property of the research:
-  // seeded records land unpublished and uncleared.
+  // seeded records land as drafts, unreviewed and uncleared. `is_published`
+  // stays listed until the migration that drops it.
   ignored: [
-    'id', 'is_published', 'client_cleared', 'client_cleared_by', 'client_cleared_at',
+    'id', 'is_published', 'review_state', 'reviewed_by', 'reviewed_at',
+    'client_cleared', 'client_cleared_by', 'client_cleared_at', 'client_summary',
     'created_by', 'created_at', 'updated_at',
   ],
 } as const;
@@ -244,10 +246,10 @@ export function emitCompany(company: Row): string {
   assertKnownColumns('research_companies', company, [...COMPANY_SPEC.columns, ...COMPANY_SPEC.ignored]);
   const values = COMPANY_SPEC.columns.map((c) => sqlLiteral(company[c]));
   return [
-    `INSERT INTO research_companies (${COMPANY_SPEC.columns.join(', ')}, is_published)`,
+    `INSERT INTO research_companies (${COMPANY_SPEC.columns.join(', ')}, review_state)`,
     `SELECT`,
     `  ${values.join(',\n  ')},`,
-    `  FALSE`,
+    `  'draft'`,
     `WHERE NOT EXISTS (SELECT 1 FROM research_companies WHERE slug = ${sqlLiteral(company['slug'])});`,
   ].join('\n');
 }
@@ -382,8 +384,8 @@ export function emitMigration(dumps: RecordDump[], generatedOn: string): string 
     '-- freely between environments. Against the database these were dumped',
     '-- from, the whole file is a no-op.',
     '--',
-    '-- Records land with is_published = FALSE and no clearance. Visibility is',
-    '-- promoted in the target environment, not baked into the seed.',
+    '-- Records land as review_state = \'draft\' with no clearance. Review and',
+    '-- clearance happen in the target environment, not baked into the seed.',
     '--',
     '-- Document full_text is not included; it is re-fetchable and large.',
     '-- ============================================================',

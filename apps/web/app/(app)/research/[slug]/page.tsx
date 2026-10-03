@@ -47,7 +47,12 @@ export default async function ResearchCompanyPage({
       {/* Above the record rather than buried in it: whether a paying subscriber
           sees this entry is a decision about the whole page, not a field on it. */}
       <div className={styles.gateWrap}>
-        <RegisterClearance companyId={company.id} cleared={company.clientCleared} />
+        <RegisterClearance
+          companyId={company.id}
+          reviewState={company.reviewState}
+          cleared={company.clientCleared}
+          clientSummary={company.clientSummary}
+        />
       </div>
       <CompanyRecord
         company={company}

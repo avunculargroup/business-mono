@@ -214,6 +214,17 @@ export const HoldingStatus = {
 } as const;
 export type HoldingStatus = (typeof HoldingStatus)[keyof typeof HoldingStatus];
 
+// Where a register record stands. `draft` is where an agent-created record
+// lands, unread; a human moves it to `internal`; only an `internal` record can
+// be cleared for subscribers. Replaces `is_published`, which read as outward
+// and meant inward.
+export const ReviewState = {
+  DRAFT:    'draft',
+  INTERNAL: 'internal',
+  RETIRED:  'retired',
+} as const;
+export type ReviewState = (typeof ReviewState)[keyof typeof ReviewState];
+
 // Why a record has no ledger. Also a work queue: `primary_not_located` is
 // research, `filing_system_unreachable` is engineering.
 export const LedgerAbsenceReason = {

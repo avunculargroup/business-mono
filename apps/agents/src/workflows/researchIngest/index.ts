@@ -718,7 +718,13 @@ const approvalGateStep = createStep({
       if (resumeData.approved) {
         await db
           .from('research_companies')
-          .update({ is_published: true })
+          // Approval is the review: the record leaves draft and joins the
+          // internal register. Subscriber clearance stays a separate decision.
+          .update({
+            review_state: 'internal',
+            reviewed_by: resumeData.approvedBy,
+            reviewed_at: new Date().toISOString(),
+          })
           .eq('id', inputData.companyId);
       }
       return { ...summary, published: resumeData.approved };

@@ -41,10 +41,10 @@ export default async function RegisterPage() {
 
       {entries.length === 0 ? (
         <EmptyDay
-          headline="No entries are cleared for distribution"
+          headline="No entries yet"
           detail={
-            'The register holds entries, and none has yet been cleared for distribution to '
-            + 'subscribers. Clearing is a human decision taken per entry.'
+            'Each entry is reviewed before it is published, one at a time. No entry has '
+            + 'cleared review yet.'
           }
         />
       ) : (

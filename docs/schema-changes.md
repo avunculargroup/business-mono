@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-03 — Corporate holdings: `review_state` and the subscriber summary
+
+`20261003200000_research_review_state.sql` adds `review_state`
+(`draft`/`internal`/`retired`), `reviewed_by`, `reviewed_at` and `client_summary` to
+`research_companies`.
+
+- **Why.** `is_published` meant "on the internal register" and could not tell a record an
+  agent had created from one a human had read.
+- **Backfill.** The three hand-seeded records and every client-cleared one become
+  `internal`; the rest stay `draft`.
+- **Six clearances revoked.** `client_clearance_needs_review` requires a cleared record
+  to be `internal` with a non-blank summary. No cleared record had a summary, so Locate,
+  DigitalX, Block, Strategy, Metaplanet and Sequans are withheld from Minute until one is
+  written.
+- **Policies and view.** The four client read policies and `v_research_publishable` gate
+  on `review_state = 'internal'`. The view is restated with `security_invoker = true`.
+- **Expand only.** `is_published` is left in place, and a later migration drops it.
+
+---
+
 ## 2026-10-03 — `paywalled_domains`
 
 `20261003120100_add_paywalled_domains.sql` adds the list of publishers whose

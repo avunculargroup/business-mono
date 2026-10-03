@@ -12,10 +12,11 @@ sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence an
 model, and the restated-ledger case is covered (session 8), then the eight read-side
 conformance cases pass against both adapters (session 9), then SEC filings are split by
 item and only accepted text reaches the extractor (session 10). What is left of step 5 is
-operational: the first real run and its trace bundle. Scheduling waits on step 6, which is
-not started. Two things still remain from
-session 2: the ingest run against real filings, and the recorded trace bundle.
-**Last updated:** 2026-10-02
+operational: the first real run and its trace bundle. Step 6 is under way: record-level
+`review_state`, the review queue and the subscriber summary (session 11). Row-level review
+and notifications are not started, and scheduling waits on them. Two things still remain
+from session 2: the ingest run against real filings, and the recorded trace bundle.
+**Last updated:** 2026-10-03
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -793,3 +794,89 @@ document's class, which is the behaviour before this session.
     is client-cleared. Strategy is client-cleared, so its first run belongs after
     step 6.
 
+## Session 11 — review state on records, and the summary a subscriber reads
+
+The record-level half of step 6. `is_published` read as outward and meant inward: it put a
+record on the internal register. Nothing separated a record an agent had just created from
+one a human had read, and the ingest's approval gate set the same flag a seed did.
+
+**Shipped.**
+
+- **`20261003200000_research_review_state.sql`** (expand only; `is_published` stays until
+  a later migration drops it).
+  - Adds `review_state` (`draft` → `internal` → `retired`, default `draft`),
+    `reviewed_by`, `reviewed_at` and `client_summary` to `research_companies`.
+  - Backfills the twelve records. The three hand-seeded ones (Locate, DigitalX, Block)
+    and every client-cleared one become `internal`. The other six stay `draft`.
+  - **Revokes six clearances.** Clearance now needs a written summary, and none of the
+    six cleared records had one: Locate, DigitalX, Block, Strategy, Metaplanet and
+    Sequans. They are withheld from Minute until someone writes one.
+  - `client_clearance_needs_review` enforces it in the schema: a cleared record is
+    `internal` with a non-blank summary.
+  - The four client read policies and `v_research_publishable` read
+    `review_state = 'internal'` instead of `is_published`. The view is restated
+    `WITH (security_invoker = true)`, because `CREATE OR REPLACE VIEW` drops it. The
+    timestamp sorts after everything on `main`, so the guard in `migrations.test.ts`
+    sees the redefinition last.
+- **Read model.** `RegisterEntry.reviewState`, `CompanyDossier.clientSummary` (replacing
+  `isPublished`), and `RegisterFilter.reviewState`, which defaults to `internal`. The
+  review queue is the register filtered to `draft`. Both adapters push the filter down.
+  Minute's register repository reads `review_state = 'internal'`.
+- **Four contract cases**, against a new `draftSlug` scenario slot:
+  - the default register lists only reviewed records;
+  - the draft filter returns only drafts;
+  - a draft's publishable read is empty while its full ledger carries publishable rows;
+  - every cleared record is `internal` with a summary.
+- **`/research`** has a To review view with its count on the tab. A company page shows
+  the review control first. The subscriber gate appears only on a reviewed record, and
+  clearing asks for the summary. `setReviewState` records who reviewed it. Moving a record
+  out of `internal` withholds it in the same write: that is the safe direction, and the
+  alternative is a constraint error the person cannot act on.
+- **The ingest approval gate** writes `review_state = 'internal'` with the approver, never
+  clearance. The seed dumper lands records as `draft` and never carries review state,
+  clearance or summary.
+- Minute's empty register no longer says "cleared for distribution". Distribution is the
+  wrong word for a register that reports.
+
+**Verified.**
+
+- The conformance suite was broken deliberately, seven ways, and caught each one:
+  - **Fixture adapter (4):** no default filter, draft filter ignored, the publishable
+    read ignoring review, and a cleared record with no summary.
+  - **Supabase adapter (3):** no default filter, `reviewState` not mapped, and
+    `clientSummary` not mapped.
+- The first choice of draft fixture, Nyala, failed the publishable case honestly. Its one
+  ledger row is internal, so an empty publishable read proved nothing. The draft is now a
+  new record, Brennock Packaging, with one publishable row, in both datasets.
+- The final migration was dry-run against live inside self-aborting blocks.
+  - **Records:** 6 internal and 6 draft, with 0 cleared.
+  - **The view:** it carries `security_invoker=true` and returns 8 publishable rows,
+    none from a draft.
+  - **Reads by role:** anon sees no records, and the Minute subscriber sees none either,
+    because every clearance was revoked. A team member sees all 12.
+  - **The review-then-clear path:** a team member reviewing RUM Group and clearing it
+    with a summary makes it the one record the subscriber sees. Returning it to draft
+    while cleared is refused.
+  - **How the policies were tested:** with `ALTER POLICY` and the same `USING`
+    expressions, because the SQL tool holds any statement containing `DROP` for a
+    confirmation.
+- The control was rendered at 375px and 320px. There is no horizontal scroll and every
+  target is 44px. `ClientGate`'s buttons gained the 44px rule and wrap, since at 320px
+  they did not fit side by side.
+- `pnpm test` (16 packages), `turbo typecheck lint` and the doc-link check are green.
+
+**The demo register is unchanged.** It reads the fixture adapter, so making an existing
+record the draft would have removed it from the demo. Brennock exists only to be the
+draft, and a fixture test asserts that every other staged record stays on the list.
+
+**Not done.**
+
+- Row-level `review_state` on events and findings, and the queue for them.
+- Notifications when a draft lands.
+- Minute does not yet show `client_summary`. That is a change to the client contract and
+  both of its adapters.
+- The migration that drops `is_published` from `research_companies`. It runs after this
+  one is deployed and nothing reads the column. The seed dumper's ignore list drops it in
+  the same change.
+- The ingest workflow still names its gate `publish` and its flag `promoteToPublished`.
+  Renaming them changes the resume payload of any suspended run.

@@ -43,9 +43,24 @@ const TIER_HEADINGS: Record<string, { title: string; blurb: string }> = {
 
 const TIER_ORDER = ['regional', 'peer_shaped', 'bellwether'] as const;
 
-export default async function ResearchRegisterPage() {
+/**
+ * `?view=review` is the review queue: the same list, filtered to records an
+ * agent created that nobody has read yet. Its count is on the tab either way,
+ * so a draft is never somewhere you have to remember to look.
+ */
+export default async function ResearchRegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const reviewing = (await searchParams).view === 'review';
   const { corporateHoldings } = await getRepositories();
-  const { items } = await corporateHoldings.listCompanies(resolveReadContext());
+  const ctx = resolveReadContext();
+
+  const [{ items }, drafts] = await Promise.all([
+    corporateHoldings.listCompanies(ctx, reviewing ? { reviewState: 'draft' } : undefined),
+    corporateHoldings.listCompanies(ctx, { reviewState: 'draft' }, { limit: 1 }),
+  ]);
 
   return (
     <>
@@ -56,6 +71,26 @@ export default async function ResearchRegisterPage() {
           A register of companies holding bitcoin on their balance sheet. It states what was
           disclosed and where it came from. It does not state what it was worth.
         </p>
+
+        <nav className={styles.views} aria-label="Register views">
+          <Link
+            href="/research"
+            className={styles.view}
+            aria-current={reviewing ? undefined : 'page'}
+          >
+            Register
+          </Link>
+          <Link
+            href="/research?view=review"
+            className={styles.view}
+            aria-current={reviewing ? 'page' : undefined}
+          >
+            To review
+            <span className={styles.count}>
+              {drafts.total}
+            </span>
+          </Link>
+        </nav>
 
         {TIER_ORDER.map((tier) => {
           const rows = items.filter((company) => company.tier === tier);
@@ -108,7 +143,14 @@ export default async function ResearchRegisterPage() {
           );
         })}
 
-        {items.length === 0 ? (
+        {items.length === 0 && reviewing ? (
+          <p className={styles.empty}>
+            Nothing is waiting for review. A record an agent creates lands here, off the
+            register, until someone has read it.
+          </p>
+        ) : null}
+
+        {items.length === 0 && !reviewing ? (
           <p className={styles.empty}>
             No company has been entered yet. The regional register is seeded by hand — start
             with an entity whose offer document or scheme booklet you can obtain.

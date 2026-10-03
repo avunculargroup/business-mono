@@ -32,6 +32,7 @@ import type {
   ResearchArchetype,
   ResearchClassification,
   ResearchTier,
+  ReviewState,
   SourceClass,
   TreasuryEventType,
 } from '@platform/shared';
@@ -72,7 +73,7 @@ const COMPANY_COLUMNS =
   'id, slug, legal_name, jurisdiction, tier, primary_archetype, self_described_archetype, ' +
   'reporting_standard, expected_disclosure_cadence, operational_hq, ' +
   'functional_currency, presentation_currency, financial_year_end, market_cap_band, ' +
-  'funding_source, curator_notes, last_verified_at, is_published, client_cleared, ' +
+  'funding_source, curator_notes, last_verified_at, review_state, client_cleared, client_summary, ' +
   'ledger_absence_reason, holding_status, exited_on, ' +
   'company_listings(venue, ticker, listing_type, filing_entity, listed_from, listed_to), ' +
   'company_former_names(name, used_to), ' +
@@ -123,8 +124,9 @@ type CompanyRow = {
   funding_source: string | null;
   curator_notes: string | null;
   last_verified_at: string | null;
-  is_published: boolean;
+  review_state: ReviewState;
   client_cleared: boolean;
+  client_summary: string | null;
   ledger_absence_reason: LedgerAbsenceReason | null;
   holding_status: HoldingStatus | null;
   exited_on: string | null;
@@ -299,8 +301,9 @@ function toDossier(row: CompanyRow): CompanyDossier {
     fundingSource: row.funding_source,
     curatorNotes: row.curator_notes,
     lastVerifiedAt: row.last_verified_at,
-    isPublished: row.is_published,
+    reviewState: row.review_state,
     clientCleared: row.client_cleared,
+    clientSummary: row.client_summary,
     ledgerAbsenceReason: row.ledger_absence_reason,
     holdingStatus: row.holding_status,
     exitedOn: row.exited_on,
@@ -319,6 +322,7 @@ function toRegisterEntry(company: CompanyDossier): RegisterEntry {
     reportingStandard: company.reportingStandard,
     expectedDisclosureCadence: company.expectedDisclosureCadence,
     listings: company.listings,
+    reviewState: company.reviewState,
   };
 }
 
@@ -466,6 +470,7 @@ export function createCorporateHoldingsRepository(
       if (filter?.tier) query = query.eq('tier', filter.tier);
       if (filter?.archetype) query = query.eq('primary_archetype', filter.archetype);
       if (filter?.jurisdiction) query = query.eq('jurisdiction', filter.jurisdiction);
+      query = query.eq('review_state', filter?.reviewState ?? 'internal');
 
       const { data, count, error } = await query.range(offset, offset + limit - 1);
       if (error) throw error;
