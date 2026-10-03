@@ -55,6 +55,36 @@ a paywall on.
 
 ---
 
+## 2026-10-03 — Security-definer functions anon could call
+
+`20261003020000_lock_security_definer_functions.sql`. Two earlier migrations restricted
+SECURITY DEFINER functions with `REVOKE … FROM PUBLIC` plus a narrow `GRANT`.
+Supabase grants EXECUTE on new `public` functions directly to `anon`, `authenticated`
+and `service_role`, so that revoke removed nothing. On live, `anon` could call:
+- `social_credential_token`, which decrypts a stored LinkedIn token;
+- `store_social_credential` and `delete_social_credential`;
+- `audit_permissive_policies`.
+
+No token was stored, so nothing was readable. But the account ids were in
+`v_campaign_matrix`, which anon could read until `20261003010000`.
+
+Now:
+- **Token:** service role only.
+- **Store and delete:** revoked from `anon`, and they check `is_team_member()` (or the
+  service role) inside, because `authenticated` also covers Minute subscribers.
+- **Policy audit:** revoked from `anon`.
+
+Checked on live inside a rolled-back transaction:
+- `anon` and a subscriber are refused.
+- A team member can store but not read a token.
+- The service role can read one.
+- RLS still answers anon with empty results, not errors.
+
+`packages/db/src/migrations.test.ts` fails on any SECURITY DEFINER function never
+revoked from `anon` by name, except a short allowlist with reasons.
+
+---
+
 ## 2026-10-03 — Every view runs as the caller (security_invoker)
 
 `20261003010000_views_security_invoker.sql` — sets `security_invoker = true` on all 33
