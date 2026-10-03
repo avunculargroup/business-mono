@@ -6,6 +6,61 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-03 — Every view runs as the caller (security_invoker)
+
+`20261003010000_views_security_invoker.sql` — sets `security_invoker = true` on all 33
+views in `public`. The Supabase advisor flagged every one as a security-definer view
+(ERROR, lint 0010). A view without the option reads its tables with its owner's
+privileges, past RLS, and `anon` and `authenticated` hold SELECT on it through the
+default grants. The anon key ships in both apps' browser bundles, so with no session
+`/rest/v1/` returned the CRM (533 rows of `v_recent_interactions`, 25 of
+`v_contacts_overview`), the whole research ledger and the rest. A Minute subscriber
+could read the same.
+
+Measured on live inside a rolled-back transaction before shipping:
+- **Team member:** identical row counts on all 33 views.
+- **Anon:** zero rows on every one.
+- **Minute subscriber:** only what the client policies already admit.
+
+Nothing in `apps/client` reads a view, and `apps/agents` uses the service role, which
+bypasses RLS either way.
+
+`CREATE OR REPLACE VIEW` resets a view's options, so a later redefinition silently
+undoes this. Write every new or redefined view `WITH (security_invoker = true)`.
+`packages/db/src/migrations.test.ts` replays the migrations and fails if any view ends
+without the option. It replays filenames, so a view-redefining migration also needs a
+timestamp later than everything already on `main`.
+
+---
+
+## 2026-10-02 — Corporate holdings: the ingest records the filing item it read
+
+`20261002200000_commit_ingest_source_section.sql` — `commit_research_ingest` writes
+`source_section_id` on `treasury_events`, insert and update. The gate already judged a
+claim by its section's class when one was cited; the RPC never passed one, so every
+ingested event was judged by its whole document's class. The body is otherwise
+20260904000000's, unchanged.
+
+---
+
+## 2026-10-02 — Corporate holdings: encumbrance on the position view
+
+`20261002100000_position_view_encumbrance.sql` — `v_company_position` selects
+`encumbered_quantity`, `encumbrance_counterparty` and `encumbrance_obligation`, appended
+to 20261001030000's definition. The columns were added to the snapshots table in
+`20261001100100`, but the view never selected them.
+
+---
+
+## 2026-10-02 — Corporate holdings: canonical event natural keys
+
+`20261002000000_canonical_event_natural_keys.sql` — rewrites the twelve
+`treasury_events.natural_key` values not in the `<slug>:<code>:<YYYY-MM-DD>` form the
+ingest now computes. Otherwise the first real run would reconcile them as new and
+duplicate the rows. A row is skipped where its canonical key is already taken.
+
+---
+
 ## 2026-10-01 — Corporate holdings: drop the per-scheme identifier columns
 
 `20261001120000_drop_research_company_identifier_columns.sql` — the contract half of
