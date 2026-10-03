@@ -14,6 +14,8 @@ vi.mock('@/lib/repositories', () => ({
 
 import ResearchRegisterPage from './page';
 
+const registerView = { searchParams: Promise.resolve({}) };
+
 beforeEach(() => {
   repositories = createFakeRepositories();
 });
@@ -29,7 +31,7 @@ describe('ResearchRegisterPage', () => {
       ],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByRole('heading', { name: 'Regional register' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Bellwethers' })).toBeInTheDocument();
@@ -45,7 +47,7 @@ describe('ResearchRegisterPage', () => {
       register: [fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' })],
     });
 
-    const { container } = render(await ResearchRegisterPage());
+    const { container } = render(await ResearchRegisterPage(registerView));
 
     expect(container.textContent).not.toMatch(/\d+(\.\d+)?\s?(btc|bitcoin)\b/i);
   });
@@ -63,7 +65,7 @@ describe('ResearchRegisterPage', () => {
       ],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByText(/describes itself as/)).toBeInTheDocument();
   });
@@ -92,7 +94,7 @@ describe('ResearchRegisterPage', () => {
       ],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByText(/foreign exempt/)).toBeInTheDocument();
   });
@@ -102,13 +104,13 @@ describe('ResearchRegisterPage', () => {
       register: [fakeRegisterEntry({ id: '1', slug: 'a', tier: 'regional' })],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.queryByRole('heading', { name: 'Bellwethers' })).not.toBeInTheDocument();
   });
 
   it('says what to do next when the register is empty', async () => {
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByText(/seeded by hand/)).toBeInTheDocument();
   });
@@ -121,7 +123,7 @@ describe('ResearchRegisterPage', () => {
       ],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByText('Meridian Freight')).toBeInTheDocument();
     expect(screen.queryByText('Wexford')).not.toBeInTheDocument();
@@ -161,7 +163,7 @@ describe('ResearchRegisterPage', () => {
       ],
     });
 
-    render(await ResearchRegisterPage());
+    render(await ResearchRegisterPage(registerView));
 
     const link = screen.getByRole('link', { name: /Meridian/ });
     expect(link).toHaveAttribute('href', '/research/demo-meridian-freight');

@@ -51,9 +51,9 @@ const TIER_ORDER = ['regional', 'peer_shaped', 'bellwether'] as const;
 export default async function ResearchRegisterPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string }>;
-} = {}) {
-  const reviewing = (await searchParams)?.view === 'review';
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const reviewing = (await searchParams).view === 'review';
   const { corporateHoldings } = await getRepositories();
   const ctx = resolveReadContext();
 
