@@ -144,7 +144,10 @@ CREATE POLICY "company_listings_client_read" ON company_listings
     )
   );
 
-CREATE OR REPLACE VIEW v_research_publishable AS
+-- WITH (security_invoker = true): CREATE OR REPLACE VIEW resets a view's
+-- options, and without it this view reads past RLS and anon can select it
+-- (20261003010000).
+CREATE OR REPLACE VIEW v_research_publishable WITH (security_invoker = true) AS
   SELECT l.*
   FROM v_research_ledger l
   JOIN research_companies c ON c.id = l.company_id
