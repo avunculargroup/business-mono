@@ -693,7 +693,7 @@ export function createClientRegisterRepository(
         adapter.client
           .from('research_companies')
           .select(REGISTER_COLUMNS)
-          .eq('is_published', true)
+          .eq('review_state', 'internal')
           .eq('client_cleared', true)
           .order('legal_name'),
         implementationFactKeys(adapter),
@@ -709,7 +709,7 @@ export function createClientRegisterRepository(
         adapter.client
           .from('research_companies')
           .select(REGISTER_COLUMNS)
-          .eq('is_published', true)
+          .eq('review_state', 'internal')
           .eq('client_cleared', true)
           .eq('slug', slug)
           .maybeSingle(),

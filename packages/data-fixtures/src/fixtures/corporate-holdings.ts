@@ -308,8 +308,11 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'contradicts the offer document on custody. The offer document wins, and the ' +
         'conflict is shown rather than resolved out of sight.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: true,
+      clientSummary:
+        'Holds bitcoin directly alongside its operating business. Moved its primary listing ' +
+        'from the ASX to the NZX, so its disclosures sit under two filing entities.',
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -358,8 +361,11 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'debt at all, which is why the covenant panel has to be able to state an absence ' +
         'rather than render empty. Not comparable with an operating business.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: true,
+      clientSummary:
+        'Holds bitcoin both directly and through units in a fund it manages itself, and ' +
+        'reports the two separately. Carries no debt.',
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -425,8 +431,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'defensible and analytically worthless. Its headline position includes assets ' +
         'custodied for customers.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: false,
+      reviewState: 'draft',
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -475,11 +482,12 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'page. It is also the control for the freshness rule: the same silence that ' +
         'flags Calder as overdue is unremarkable here.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
-      // Published internally and NOT cleared for subscribers. The pair that
-      // proves is_published and client_cleared are different questions: an
-      // adapter conflating them still passes every case where they agree.
+      reviewState: 'internal',
+      // Reviewed and NOT cleared for subscribers. The pair that proves
+      // review_state and client_cleared are different questions: an adapter
+      // conflating them still passes every case where they agree.
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -529,8 +537,11 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'window. Part of the holding is pledged against a loan, so its unencumbered ' +
         'balance and its comparable total are different figures.',
       lastVerifiedAt: onDate(anchor, -95),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: true,
+      clientSummary:
+        'Committed to monthly treasury disclosure. Part of its holding is pledged as ' +
+        'security for a loan, and it reports the pledged amount separately.',
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -560,8 +571,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'a coin count. The trackers list one, which is a third party converting a dollar ' +
         'figure and is not stored. Rendered, and never summed into any total.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: null,
       holdingStatus: 'active',
       exitedOn: null,
@@ -591,8 +603,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'There is no coin count to record, and converting the dollar figure at a price ' +
         'would invent one, so the record has no snapshot and says why.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: 'no_stated_basis',
       holdingStatus: null,
       exitedOn: null,
@@ -622,8 +635,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'announcement or in the annual report, so the source-class gate refused each ' +
         'claim and the ledger is empty for that reason rather than for want of looking.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      reviewState: 'internal',
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: 'source_class_refused',
       holdingStatus: null,
       exitedOn: null,
@@ -653,8 +667,13 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'settlement date. The zero balance is an exit, recorded as one, which is a ' +
         'different state from a record that has never disclosed a holding.',
       lastVerifiedAt: onDate(anchor, -20),
-      isPublished: true,
+      // Landed and unread, with publishable ledger rows: the record that
+      // proves the review gate, not the classification, keeps them out of
+      // the publishable read. Nyala is a draft too, but its one ledger row is
+      // internal, so it could not prove that.
+      reviewState: 'draft',
       clientCleared: false,
+      clientSummary: null,
       ledgerAbsenceReason: null,
       holdingStatus: 'exited',
       exitedOn: onDate(anchor, -40),
@@ -691,6 +710,7 @@ export function researchRegister(anchor: Date): RegisterEntry[] {
     reportingStandard: company.reportingStandard,
     expectedDisclosureCadence: company.expectedDisclosureCadence,
     listings: company.listings,
+    reviewState: company.reviewState,
   }));
 }
 

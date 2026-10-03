@@ -79,6 +79,7 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
         .filter((row) =>
           filter?.jurisdiction ? row.jurisdiction === filter.jurisdiction : true,
         )
+        .filter((row) => row.reviewState === (filter?.reviewState ?? 'internal'))
         .sort((a, b) => a.legalName.localeCompare(b.legalName));
 
       return paginate(rows, opts);
@@ -98,11 +99,11 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
 
       const rows = (researchLedger(ctx.asOf)[found.id] ?? [])
         .filter((entry) =>
-          // Both gates, mirroring v_research_publishable: the company is
-          // published AND the field is classified publishable. Applying only
-          // the second would leak an unpublished company's rows.
+          // Both gates, mirroring v_research_publishable: a human has reviewed
+          // the company AND the field is classified publishable. Applying only
+          // the second would leak a draft company's rows.
           opts?.publishableOnly
-            ? found.isPublished && entry.classification === 'publishable'
+            ? found.reviewState === 'internal' && entry.classification === 'publishable'
             : true,
         )
         .sort((a, b) => b.eventDate.localeCompare(a.eventDate));

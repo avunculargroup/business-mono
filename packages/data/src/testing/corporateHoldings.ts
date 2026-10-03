@@ -68,6 +68,11 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
   activeSlug: string;
   /** A disposal with a quantity and no date of settlement, price or proceeds (Sequans). */
   disposalWithoutConsiderationSlug: string;
+  /**
+   * Landed and unread (`review_state = 'draft'`), with publishable ledger
+   * rows, so the review gate is the only thing keeping them out.
+   */
+  draftSlug: string;
 }
 
 export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
@@ -252,6 +257,55 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       expect(published.items.length).toBeLessThan(all.items.length);
       for (const entry of published.items) {
         expect(entry.classification).toBe('publishable');
+      }
+    });
+
+    it('lists only reviewed records on the register by default', async () => {
+      const draft = await bySlug(scenario.draftSlug);
+      const register = await (await repo()).listCompanies(ctx);
+
+      expect(register.items.length).toBeGreaterThan(0);
+      expect(register.items.map((entry) => entry.slug)).not.toContain(draft.slug);
+      for (const entry of register.items) {
+        expect(entry.reviewState).toBe('internal');
+      }
+    });
+
+    it('returns the review queue when the register is filtered to draft', async () => {
+      const draft = await bySlug(scenario.draftSlug);
+      const queue = await (await repo()).listCompanies(ctx, { reviewState: 'draft' });
+
+      expect(queue.items.map((entry) => entry.slug)).toContain(draft.slug);
+      for (const entry of queue.items) {
+        expect(entry.reviewState).toBe('draft');
+      }
+    });
+
+    it('returns no publishable rows for a record nobody has reviewed', async () => {
+      const draft = await bySlug(scenario.draftSlug);
+      const repository = await repo();
+
+      // The full ledger must carry publishable rows, or the empty read below
+      // proves nothing about the review gate.
+      const all = await repository.getLedger(ctx, draft.id);
+      expect(all.items.some((entry) => entry.classification === 'publishable')).toBe(true);
+
+      const published = await repository.getLedger(ctx, draft.id, { publishableOnly: true });
+      expect(published.items).toEqual([]);
+    });
+
+    it('clears only reviewed records that carry a subscriber summary', async () => {
+      const repository = await repo();
+      const slugs = [
+        ...(await repository.listCompanies(ctx)).items,
+        ...(await repository.listCompanies(ctx, { reviewState: 'draft' })).items,
+      ].map((entry) => entry.slug);
+      const cleared = (await Promise.all(slugs.map(bySlug))).filter((c) => c.clientCleared);
+
+      expect(cleared.length).toBeGreaterThan(0);
+      for (const company of cleared) {
+        expect(company.reviewState).toBe('internal');
+        expect(company.clientSummary?.trim()).toBeTruthy();
       }
     });
 
