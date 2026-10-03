@@ -6198,6 +6198,7 @@ export type Database = {
           client_cleared: boolean
           client_cleared_at: string | null
           client_cleared_by: string | null
+          client_summary: string | null
           cost_basis_convention: string | null
           created_at: string
           created_by: string | null
@@ -6221,6 +6222,9 @@ export type Database = {
           presentation_currency: string | null
           primary_archetype: string
           reporting_standard: string | null
+          review_state: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           self_described_archetype: string | null
           slug: string
           tier: string
@@ -6230,6 +6234,7 @@ export type Database = {
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          client_summary?: string | null
           cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
@@ -6253,6 +6258,9 @@ export type Database = {
           presentation_currency?: string | null
           primary_archetype: string
           reporting_standard?: string | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           self_described_archetype?: string | null
           slug: string
           tier?: string
@@ -6262,6 +6270,7 @@ export type Database = {
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          client_summary?: string | null
           cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
@@ -6285,6 +6294,9 @@ export type Database = {
           presentation_currency?: string | null
           primary_archetype?: string
           reporting_standard?: string | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           self_described_archetype?: string | null
           slug?: string
           tier?: string
@@ -6301,6 +6313,13 @@ export type Database = {
           {
             foreignKeyName: "research_companies_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_companies_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "team_members"
             referencedColumns: ["id"]
@@ -8706,6 +8725,7 @@ export type Database = {
           slug: string | null
           source_class: string | null
           source_document_id: string | null
+          source_filing_item: string | null
           source_is_audited: boolean | null
           source_published_at: string | null
           source_rank: number | null
