@@ -455,6 +455,35 @@ describe('the client adapter beyond the conformance suite', () => {
     expect(labels).not.toContain('Funding runway');
   });
 
+  it('serves the summary written when the entry was cleared', async () => {
+    const client = createFakeSupabase();
+    seed(client, true);
+    client.__setResponse('research_companies', {
+      data: [
+        {
+          slug: 'an-entity',
+          legal_name: 'An Entity Ltd',
+          jurisdiction: 'Australia',
+          tier: 'tier-1',
+          client_summary: '  Holds bitcoin directly, with a third-party custodian.  ',
+          company_listings: [],
+          treasury_events: [],
+          research_company_facts: [],
+        },
+      ],
+      error: null,
+    });
+    const repos = createClientRepositories(client as unknown as ClientSupabaseClient, principal);
+
+    const [entry] = await repos.register.list(ctx);
+
+    expect(entry!.summary).toBe('Holds bitcoin directly, with a third-party custodian.');
+    const builder = client.__buildersFor('research_companies').at(0)!;
+    expect(builder.select.mock.calls[0]![0]).toContain('client_summary');
+    // Selected by name, never the internal notes it must not be composed from.
+    expect(builder.select.mock.calls[0]![0]).not.toContain('curator_notes');
+  });
+
   it('drops a fact whose key nobody has classified yet', async () => {
     // Silent exclusion is the safe direction. A key coined by the research
     // pipeline reaches subscribers when someone classifies it, not before.

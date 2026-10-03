@@ -288,6 +288,9 @@ export function registerEntries(anchor: Date): ClientRegisterEntry[] {
       // Display only, and an entity may have none.
       tickers: ['SHL'],
       tier: 'listed',
+      summary:
+        'Holds bitcoin on its balance sheet under a board-approved treasury policy, ' +
+        'with a third-party qualified custodian.',
       position: [
         // Implementation facts only. No current value, no unrealised gain, no
         // share price since announcement — see ClientRegisterEntry's doc

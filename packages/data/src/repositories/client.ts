@@ -276,6 +276,12 @@ export interface ClientRegisterEntry {
   /** Ticker is never a key. Display only, and may be an empty array. */
   tickers: string[];
   tier: string;
+  /**
+   * The summary a person wrote when clearing the entry. Never composed from
+   * internal notes. Every served entry has one, because clearance requires it
+   * (`client_clearance_needs_review`); `null` only if that ever stops holding.
+   */
+  summary: string | null;
   position: Array<{ label: string; value: string; asAt: string }>;
   ledger: Array<{ eventDate: string; description: string; provenance: ClientProvenance }>;
   /** Explicitly stated absences. Rendered, not hidden. */

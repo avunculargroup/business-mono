@@ -13,8 +13,9 @@ model, and the restated-ledger case is covered (session 8), then the eight read-
 conformance cases pass against both adapters (session 9), then SEC filings are split by
 item and only accepted text reaches the extractor (session 10). What is left of step 5 is
 operational: the first real run and its trace bundle. Step 6 is under way: record-level
-`review_state`, the review queue and the subscriber summary (session 11). Row-level review
-and notifications are not started, and scheduling waits on them. Two things still remain
+`review_state`, the review queue and the subscriber summary (session 11), then Minute
+shows the summary and `is_published` is dropped (session 12). Row-level review and
+notifications are not started, and scheduling waits on them. Two things still remain
 from session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-03
 
@@ -880,3 +881,30 @@ draft, and a fixture test asserts that every other staged record stays on the li
   the same change.
 - The ingest workflow still names its gate `publish` and its flag `promoteToPublished`.
   Renaming them changes the resume payload of any suspended run.
+
+## Session 12 — Minute shows the summary, and `is_published` goes
+
+Two follow-ups from session 11.
+
+**Shipped.**
+
+- **Minute shows the summary.**
+  - `ClientRegisterEntry.summary` carries `client_summary`. The live adapter selects the
+    column by name, and the internal `curator_notes` are never selected.
+  - The entry page opens with the summary, under the name. An entry without one renders
+    nothing in its place.
+  - The client fixture carries an implementation-facts summary, so the fixture adapter
+    serves the same shape.
+- **`20261003210000_drop_research_companies_is_published.sql`** is the contract half of
+  `20261003200000`. Before writing it, I checked live: no view, policy, function or index
+  depended on the column, and no code read it. `jurisdiction_notes.is_published` is a
+  different column and stays. The seed dumper no longer lists the column, and `schema.sql`
+  describes `review_state`.
+
+**Not a contract case.** "Every served entry has a summary" would pass vacuously against
+the live adapter's contract run, whose register is empty. So it is an adapter test that
+seeds a row and checks both the mapping and the selected columns.
+
+**Not done.** The ingest drafting the summary for a human to edit (decided 29 September,
+see [`schema-ingest-spec.md`](./schema-ingest-spec.md)). Until it exists, every summary is
+written from scratch on the record's page.

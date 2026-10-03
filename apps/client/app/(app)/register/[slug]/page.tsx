@@ -52,6 +52,11 @@ export default async function RegisterEntryPage({
         </p>
       </header>
 
+      {/* Written by a person when the entry was cleared, never composed from
+          internal notes. It says how the entity holds and discloses, not how
+          the holding has gone. */}
+      {entry.summary ? <p className={styles.summary}>{entry.summary}</p> : null}
+
       <section className={page.section}>
         <h2 className={page.sectionTitle}>How they did it</h2>
         <p className={styles.sectionNote}>

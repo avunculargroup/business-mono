@@ -8,7 +8,7 @@ const company: Row = {
   financial_year_end: '12-31', tier: 'large', expected_disclosure_cadence: null,
   market_cap_band: null, funding_source: null,
   curator_notes: "It's the holder's own figure", last_verified_at: '2026-09-21',
-  is_published: true, review_state: 'internal', reviewed_by: 'tm-1', reviewed_at: '2026-09-22',
+  review_state: 'internal', reviewed_by: 'tm-1', reviewed_at: '2026-09-22',
   client_cleared: true, client_cleared_by: 'tm-1', client_cleared_at: '2026-09-22',
   client_summary: 'Holds bitcoin directly.', created_by: null, created_at: 'x', updated_at: 'x',
 };
