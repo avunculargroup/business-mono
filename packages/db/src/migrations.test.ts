@@ -140,3 +140,75 @@ describe('views', () => {
   });
 });
 
+/**
+ * No security-definer function is callable by anon unless it has to be.
+ *
+ * Supabase grants EXECUTE on every new function in `public` to anon,
+ * authenticated and service_role directly. `REVOKE … FROM PUBLIC` therefore
+ * removes nothing, and two migrations relied on it: until 20261003020000 the
+ * anon key could decrypt a stored LinkedIn token. A definer function runs past
+ * RLS, so the grant is the only thing standing between it and the internet.
+ *
+ * Statically, then: every function a migration declares SECURITY DEFINER is
+ * revoked from anon by name in some migration, or sits on the list below with
+ * the reason it must stay callable.
+ */
+describe('security-definer functions', () => {
+  const files = readdirSync(MIGRATIONS)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+  const all = files
+    .map((file) =>
+      readFileSync(`${MIGRATIONS}/${file}`, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/--[^\n]*/g, ''),
+    )
+    .join('\n');
+
+  /** Callable by anon on purpose. Each needs its reason. */
+  const ANON_CALLABLE: Record<string, string> = {
+    is_team_member: 'RLS policies call it, and a policy runs as the querying role',
+    current_client_account_id: 'RLS policies call it, and a policy runs as the querying role',
+    client_invite_details: 'the invite page reads it before sign-in',
+    redeem_client_invite: 'refuses any call without a signed-in session',
+    assert_not_client_user: 'a trigger function; fails when called directly',
+    assert_not_team_member: 'a trigger function; fails when called directly',
+  };
+
+  /** Names of functions any migration declares SECURITY DEFINER. */
+  function definers(): string[] {
+    const names = new Set<string>();
+    const fn = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?(\w+)"?\s*\(/gi;
+    for (const match of all.matchAll(fn)) {
+      // The header runs to the body's opening dollar quote.
+      const rest = all.slice(match.index ?? 0);
+      const header = rest.slice(0, rest.search(/\bAS\s+\$\w*\$/i));
+      if (/SECURITY\s+DEFINER/i.test(header)) names.add(match[1].toLowerCase());
+    }
+    return [...names].sort();
+  }
+
+  function revokedFromAnon(name: string): boolean {
+    const revoke = new RegExp(
+      String.raw`REVOKE\s+(?:ALL|EXECUTE)[^;]*?ON\s+FUNCTION\s+(?:public\.)?"?${name}"?\s*\([^;]*?FROM\s+[^;]*\banon\b`,
+      'i',
+    );
+    return revoke.test(all);
+  }
+
+  it('finds the security-definer functions, so the case below asserts something', () => {
+    expect(definers()).toEqual(expect.arrayContaining(['social_credential_token', 'is_team_member']));
+  });
+
+  it('revokes every one from anon, or says why it stays callable', () => {
+    const open = definers().filter((name) => !(name in ANON_CALLABLE) && !revokedFromAnon(name));
+
+    expect(
+      open,
+      'These SECURITY DEFINER functions are still executable by anon. REVOKE … FROM PUBLIC does '
+        + 'not remove Supabase\'s direct grant — revoke FROM anon by name, or add the function to '
+        + 'ANON_CALLABLE with the reason it must stay callable.',
+    ).toEqual([]);
+  });
+});
+
