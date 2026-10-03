@@ -308,7 +308,7 @@ Reply to action either.
 
 ## Web App
 
-Surfaces inside the existing news/content area, not a new top-level section. Everything here follows `DESIGN_BRIEF.md`: warm off-white surfaces, Playfair for headings, `JetBrains Mono` for every number, gold used sparingly and *earned*, Lucide icons at `stroke-width: 1.5`, skeleton loaders over spinners, no exclamation marks in copy.
+Surfaces inside the existing news/content area, not a new top-level section. Everything here follows the `bts-design` skill (this spec originally cited `DESIGN_BRIEF.md`, now legacy): warm off-white surfaces, Playfair for headings, `JetBrains Mono` for every number, gold used sparingly and *earned*, Lucide icons at `stroke-width: 1.5`, skeleton loaders over spinners, no exclamation marks in copy.
 
 Two pieces of net-new work, plus the existing episode views.
 

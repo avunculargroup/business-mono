@@ -57,6 +57,17 @@ describe('fetchOgImage', () => {
     expect(await fetchOgImage('https://example.com/news/story')).toBe('https://example.com/img/c.jpg');
   });
 
+  it('decodes HTML entities in the image URL', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response(page('<meta property="og:image" content="https://cdn.example.com/d.jpg?w=1920&amp;h=1080">')),
+      ),
+    );
+
+    expect(await fetchOgImage('https://example.com/story')).toBe('https://cdn.example.com/d.jpg?w=1920&h=1080');
+  });
+
   it('returns null when no image meta tag is present', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(page('<title>No image</title>'))));
 

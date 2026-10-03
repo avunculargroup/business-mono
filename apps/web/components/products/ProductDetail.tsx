@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, X, Link as LinkIcon } from 'lucide-react';
+import { Package, Plus, X } from 'lucide-react';
 import { Button } from '@platform/ui/Button';
 import { SlideOver } from '@platform/ui/SlideOver';
 import { StatusChip } from '@platform/ui/StatusChip';
@@ -16,6 +16,8 @@ import { WatchesCard } from '@/components/ecosystem/WatchesCard';
 import { ChangesCard, type EntityChange } from '@/components/ecosystem/ChangesCard';
 import type { WatchRow } from '@/components/ecosystem/EcosystemWatchForm';
 import { formatDate } from '@/lib/utils';
+import type { ProductImage } from '@/lib/products/images';
+import { ProductGallery } from './ProductGallery';
 import styles from '@/app/(app)/products/[id]/product-detail.module.css';
 
 const categoryLabels: Record<string, string> = {
@@ -53,7 +55,7 @@ type Product = {
   australian_owned: boolean;
   description: string | null;
   logo_url: string | null;
-  product_image_url: string | null;
+  featured_image_id: string | null;
   company_id: string | null;
   key_relationship_id: string | null;
   companies: { id: string; name: string } | null;
@@ -94,6 +96,7 @@ interface ProductDetailProps {
   companies: { id: string; name: string }[];
   teamMembers: { id: string; full_name: string }[];
   allContacts: { id: string; first_name: string; last_name: string; email: string | null }[];
+  images: ProductImage[];
 }
 
 export function ProductDetail({
@@ -106,6 +109,7 @@ export function ProductDetail({
   companies,
   teamMembers,
   allContacts,
+  images,
 }: ProductDetailProps) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -220,16 +224,6 @@ export function ProductDetail({
           </div>
         )}
 
-        {product.product_image_url && (
-          <div className={styles.field}>
-            <span className={styles.label}>Product image</span>
-            <a href={product.product_image_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 14 }}>
-              <LinkIcon size={14} strokeWidth={1.5} />
-              View image
-            </a>
-          </div>
-        )}
-
         <div className={styles.actions}>
           <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowDelete(true)}>Delete</Button>
@@ -238,6 +232,14 @@ export function ProductDetail({
 
       {/* Right: sections */}
       <div className={styles.main}>
+        {/* Images */}
+        <ProductGallery
+          productId={product.id}
+          productName={product.name}
+          images={images}
+          featuredImageId={product.featured_image_id}
+        />
+
         {/* Key contacts */}
         <div className={styles.card}>
           <div className={styles.cardHeader}>

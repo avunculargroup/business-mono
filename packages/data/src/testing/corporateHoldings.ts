@@ -13,6 +13,7 @@
  * lying about the shape of the data.
  */
 import { describe, expect, it } from 'vitest';
+import { MATERIALITY_FLOOR } from '@platform/shared';
 import type { Bundle, RepositoryDomain } from '../bundle';
 import { ArchetypeMismatchError } from '../repositories/corporateHoldings';
 import { testReadContext } from './contract';
@@ -45,6 +46,28 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
   mixedClassificationSlug: string;
   /** A company whose About page and offer document disagree about custody. */
   sourceConflictSlug: string;
+
+  // The pathologies records 4–12 supplied. Each is something that happened.
+  // Spec: docs/features/corporate-holdings/schema-ingest-spec.md#conformance-cases
+
+  /** Sales and purchases whose net is small next to their gross (Strategy). */
+  flowsSlug: string;
+  /** Holdings stated only in currency: no snapshot, and the reason recorded (333D). */
+  currencyOnlySlug: string;
+  /** A position held as ETF units (Goodfood). */
+  etfWrappedSlug: string;
+  /** A comparable position with part of it pledged (Panther). */
+  encumberedSlug: string;
+  /** No ledger because the source-class gate refused its claims (Angel Studios). */
+  refusedByClassSlug: string;
+  /** A tracker figure materially off the sourced position (RUM Group). */
+  trackerDivergenceSlug: string;
+  /** Exited: a zero snapshot and a dated exit (Sequans). */
+  exitedSlug: string;
+  /** Holding a positive balance, with status `active`. */
+  activeSlug: string;
+  /** A disposal with a quantity and no date of settlement, price or proceeds (Sequans). */
+  disposalWithoutConsiderationSlug: string;
 }
 
 export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
@@ -78,10 +101,10 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       }
     });
 
-    it('sources every ledger entry from an exchange announcement or better', async () => {
+    it('sources every ledger entry from a class the ledger accepts', async () => {
       // Rule 2, seen from the read side. The DB trigger enforces it on write;
       // this catches an adapter reading a view that joined the wrong document.
-      const belowMinimum = ['investor_presentation', 'company_web', 'secondary'];
+      const belowMinimum = ['filed_narrative', 'furnished_release', 'company_web', 'secondary'];
       const company = await bySlug(scenario.mixedClassificationSlug);
       const ledger = await (await repo()).getLedger(ctx, company.id);
 
@@ -243,6 +266,161 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
     it('reports null for a company it cannot find, rather than throwing', async () => {
       const repository = await repo();
       await expect(repository.getCompany(ctx, 'no-such-company')).resolves.toBeNull();
+    });
+
+    it('flowsReverseWhileStockIsFlat: reports the flows, not just the endpoints', async () => {
+      // 847,363 to 845,050 reads as flat; in between, 6,916 sold and 4,603
+      // bought. A ledger that only carried net movement would hide both.
+      const company = await bySlug(scenario.flowsSlug);
+      const ledger = await (await repo()).getLedger(ctx, company.id);
+      const total = (type: string) =>
+        ledger.items
+          .filter((entry) => entry.eventType === type)
+          .reduce((sum, entry) => sum + (entry.quantity ?? 0), 0);
+
+      const bought = total('acquisition');
+      const sold = total('disposal');
+      expect(bought).toBeGreaterThan(0);
+      expect(sold).toBeGreaterThan(0);
+      expect(bought + sold).toBeGreaterThan(Math.abs(bought - sold) * 2);
+    });
+
+    it('currencyOnlyDisclosureYieldsNoSnapshot: no figure, no basis, and a stated reason', async () => {
+      // A holding disclosed only as a dollar amount has no coin count to
+      // store. Converting it at a price would invent one.
+      const company = await bySlug(scenario.currencyOnlySlug);
+      const position = await (await repo()).getPosition(ctx, company.id);
+
+      expect(position.rows).toEqual([]);
+      expect(position.comparableTotal).toBe(0);
+      expect(company.ledgerAbsenceReason).toBe('no_stated_basis');
+    });
+
+    it('etfWrapperIsNotComparable: ETF units never enter an aggregate', async () => {
+      const company = await bySlug(scenario.etfWrappedSlug);
+      const position = await (await repo()).getPosition(ctx, company.id);
+      const wrapped = position.rows.filter((row) => row.basis === 'etf_wrapped');
+
+      expect(wrapped.length).toBeGreaterThan(0);
+      for (const row of wrapped) {
+        expect(row.basisComparable).toBe(false);
+        expect(position.excluded.map((r) => r.id)).toContain(row.id);
+        // A tracker's coin count derived from a dollar figure is a third
+        // party's arithmetic, not a disclosure, and is not stored.
+        expect(row.lookThroughBtcEquivalent).toBeNull();
+      }
+      const comparable = position.rows
+        .filter((row) => row.basisComparable && row.asset === position.asset)
+        .reduce((sum, row) => sum + row.quantity, 0);
+      expect(position.comparableTotal).toBeCloseTo(comparable, 8);
+    });
+
+    it('encumberedPortionExcludedFromFreeBalance: a pledge is shown and never counted as free', async () => {
+      const company = await bySlug(scenario.encumberedSlug);
+      const position = await (await repo()).getPosition(ctx, company.id);
+      const pledged = position.rows.filter((row) => (row.encumberedQuantity ?? 0) > 0);
+
+      expect(pledged.length).toBeGreaterThan(0);
+      for (const row of pledged) {
+        // Encumbrance is a flag, not a basis: the row stays comparable.
+        expect(row.basisComparable).toBe(true);
+        expect(row.encumberedQuantity).toBeLessThanOrEqual(row.quantity);
+        // A bare number is what the 29 September decision rejected.
+        expect(row.encumbranceObligation).toBeTruthy();
+      }
+
+      const encumbered = position.rows
+        .filter((row) => row.basisComparable && row.asset === position.asset)
+        .reduce((sum, row) => sum + (row.encumberedQuantity ?? 0), 0);
+      expect(encumbered).toBeGreaterThan(0);
+      expect(position.unencumberedTotal).toBeCloseTo(position.comparableTotal - encumbered, 8);
+      expect(position.unencumberedTotal).toBeLessThan(position.comparableTotal);
+    });
+
+    it('carries no encumbrance on a position nothing is pledged against', async () => {
+      // Without this the case above passes for an adapter that reports
+      // every holding as pledged.
+      const company = await bySlug(scenario.activeSlug);
+      const position = await (await repo()).getPosition(ctx, company.id);
+
+      expect(position.rows.every((row) => (row.encumberedQuantity ?? 0) === 0)).toBe(true);
+      expect(position.unencumberedTotal).toBe(position.comparableTotal);
+    });
+
+    it('refusedByClassIsDistinguishableFromAbsent: two empty records, two explanations', async () => {
+      const repository = await repo();
+      const refused = await bySlug(scenario.refusedByClassSlug);
+      const noBasis = await bySlug(scenario.currencyOnlySlug);
+
+      expect((await repository.getLedger(ctx, refused.id)).items).toEqual([]);
+      expect((await repository.getLedger(ctx, noBasis.id)).items).toEqual([]);
+      expect(refused.ledgerAbsenceReason).toBe('source_class_refused');
+      expect(noBasis.ledgerAbsenceReason).not.toBe(refused.ledgerAbsenceReason);
+    });
+
+    it('trackerDivergenceRaisesFinding: a tracker figure off the sourced position is material', async () => {
+      const repository = await repo();
+      const company = await bySlug(scenario.trackerDivergenceSlug);
+      const claims = await repository.getTrackerClaims(ctx, company.id);
+      const position = await repository.getPosition(ctx, company.id);
+
+      const material = claims.filter((claim) => claim.isMaterial);
+      expect(material.length).toBeGreaterThan(0);
+      for (const claim of material) {
+        expect(claim.sourcedQuantity).toBe(position.comparableTotal);
+        expect(Math.abs(claim.divergence ?? 0)).toBeGreaterThanOrEqual(MATERIALITY_FLOOR);
+      }
+    });
+
+    it('treats a tracker figure within the floor as agreement', async () => {
+      // Without this the case above passes for an adapter that flags every claim.
+      const company = await bySlug(scenario.trackerDivergenceSlug);
+      const claims = await (await repo()).getTrackerClaims(ctx, company.id);
+
+      expect(claims.some((claim) => claim.divergence !== null && !claim.isMaterial)).toBe(true);
+    });
+
+    it('exitedIsNotAbsent: exited, never disclosed and holding are three states', async () => {
+      // No inference: the zero snapshot alone does not say the company left.
+      const repository = await repo();
+      const exited = await bySlug(scenario.exitedSlug);
+      const absent = await bySlug(scenario.currencyOnlySlug);
+      const active = await bySlug(scenario.activeSlug);
+
+      const exitedPosition = await repository.getPosition(ctx, exited.id);
+      expect(exited.holdingStatus).toBe('exited');
+      expect(exited.exitedOn).toBeTruthy();
+      expect(exitedPosition.rows.length).toBeGreaterThan(0);
+      expect(exitedPosition.comparableTotal).toBe(0);
+
+      const absentPosition = await repository.getPosition(ctx, absent.id);
+      expect(absentPosition.rows).toEqual([]);
+      expect(absent.holdingStatus).not.toBe('exited');
+      expect(absent.exitedOn).toBeNull();
+
+      const activePosition = await repository.getPosition(ctx, active.id);
+      expect(active.holdingStatus).toBe('active');
+      expect(active.exitedOn).toBeNull();
+      expect(activePosition.comparableTotal).toBeGreaterThan(0);
+    });
+
+    it('disposalWithoutConsideration: a quantity and nothing else persists and reads', async () => {
+      const company = await bySlug(scenario.disposalWithoutConsiderationSlug);
+      const ledger = await (await repo()).getLedger(ctx, company.id);
+      const bare = ledger.items.filter(
+        (entry) =>
+          entry.eventType === 'disposal' &&
+          entry.quantity !== null &&
+          entry.considerationNative === null,
+      );
+
+      expect(bare.length).toBeGreaterThan(0);
+      for (const entry of bare) {
+        // Nothing to convert, so nothing converted: no AUD figure and no rate.
+        expect(entry.considerationAud).toBeNull();
+        expect(entry.fxRateUsed).toBeNull();
+        expect(entry.nativeCurrency).toBeNull();
+      }
     });
 
     it('resolves a company by a former name it no longer files under', async () => {

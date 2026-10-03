@@ -1,5 +1,6 @@
 import type {
   CompanyDossier,
+  CompanyIdentifier,
   CompanyFact,
   CompanyListing,
   CorporateHoldingsRepository,
@@ -16,13 +17,16 @@ import type {
   RegisterEntry,
   RegisterFilter,
   StructuralAbsence,
+  TrackerClaim,
   WithheldField,
 } from '@platform/data';
-import { ArchetypeMismatchError } from '@platform/data';
+import { ArchetypeMismatchError, measureTrackerClaim } from '@platform/data';
 import type {
   DisclosureCadence,
   HoldingBasis,
+  HoldingStatus,
   InstrumentType,
+  LedgerAbsenceReason,
   ListingType,
   ReportingStandard,
   ResearchArchetype,
@@ -57,6 +61,7 @@ const ABSENCES_VIEW = 'v_research_absences' as never;
 const NOTES_TABLE = 'jurisdiction_notes' as never;
 const FACTS_VIEW = 'v_company_facts' as never;
 const CLASSIFICATIONS_TABLE = 'research_classifications' as never;
+const SECONDARY_CLAIMS_TABLE = 'secondary_claims' as never;
 
 /** The page size the register list uses. The register is under twenty records. */
 const LIST_LIMIT = 50;
@@ -65,11 +70,13 @@ const LEDGER_LIMIT = 200;
 
 const COMPANY_COLUMNS =
   'id, slug, legal_name, jurisdiction, tier, primary_archetype, self_described_archetype, ' +
-  'reporting_standard, expected_disclosure_cadence, acn, abn, arbn, isin, operational_hq, ' +
+  'reporting_standard, expected_disclosure_cadence, operational_hq, ' +
   'functional_currency, presentation_currency, financial_year_end, market_cap_band, ' +
   'funding_source, curator_notes, last_verified_at, is_published, client_cleared, ' +
+  'ledger_absence_reason, holding_status, exited_on, ' +
   'company_listings(venue, ticker, listing_type, filing_entity, listed_from, listed_to), ' +
-  'company_former_names(name, used_to)';
+  'company_former_names(name, used_to), ' +
+  'company_identifiers(scheme, value, valid_from, valid_to)';
 
 const LEDGER_COLUMNS =
   'id, company_id, event_type, asset_class, event_date, quantity, consideration_native, ' +
@@ -80,7 +87,8 @@ const LEDGER_COLUMNS =
 const POSITION_COLUMNS =
   'snapshot_id, company_id, as_of_date, asset, instrument_type, quantity, basis, ' +
   'basis_comparable, look_through_btc_equivalent, is_related_party_vehicle, ' +
-  'includes_customer_assets, source_document_id, source_title, source_class, source_url, ' +
+  'includes_customer_assets, encumbered_quantity, encumbrance_counterparty, ' +
+  'encumbrance_obligation, source_document_id, source_title, source_class, source_url, ' +
   'source_published_at';
 
 const NOTE_COLUMNS =
@@ -101,16 +109,12 @@ type CompanyRow = {
   id: string;
   slug: string;
   legal_name: string;
-  jurisdiction: string;
+  jurisdiction: string | null;
   tier: ResearchTier;
   primary_archetype: ResearchArchetype;
   self_described_archetype: ResearchArchetype | null;
   reporting_standard: ReportingStandard | null;
   expected_disclosure_cadence: DisclosureCadence;
-  acn: string | null;
-  abn: string | null;
-  arbn: string | null;
-  isin: string | null;
   operational_hq: string | null;
   functional_currency: string | null;
   presentation_currency: string | null;
@@ -121,8 +125,19 @@ type CompanyRow = {
   last_verified_at: string | null;
   is_published: boolean;
   client_cleared: boolean;
+  ledger_absence_reason: LedgerAbsenceReason | null;
+  holding_status: HoldingStatus | null;
+  exited_on: string | null;
   company_listings: ListingRow[] | null;
   company_former_names: { name: string; used_to: string | null }[] | null;
+  company_identifiers: IdentifierRow[] | null;
+};
+
+type IdentifierRow = {
+  scheme: string;
+  value: string;
+  valid_from: string | null;
+  valid_to: string | null;
 };
 
 type LedgerRow = {
@@ -163,11 +178,23 @@ type PositionViewRow = {
   look_through_btc_equivalent: number | null;
   is_related_party_vehicle: boolean;
   includes_customer_assets: boolean;
+  encumbered_quantity: number | null;
+  encumbrance_counterparty: string | null;
+  encumbrance_obligation: string | null;
   source_document_id: string;
   source_title: string;
   source_class: SourceClass;
   source_url: string | null;
   source_published_at: string | null;
+};
+
+type SecondaryClaimRow = {
+  source_name: string;
+  source_url: string | null;
+  claimed_quantity: number | null;
+  claimed_as_of: string | null;
+  observed_at: string;
+  note: string | null;
 };
 
 type FreshnessViewRow = {
@@ -237,6 +264,10 @@ function toListing(row: ListingRow): CompanyListing {
   };
 }
 
+function toIdentifier(row: IdentifierRow): CompanyIdentifier {
+  return { scheme: row.scheme, value: row.value, validFrom: row.valid_from, validTo: row.valid_to };
+}
+
 function toFormerName(row: { name: string; used_to: string | null }): FormerName {
   return { name: row.name, usedTo: row.used_to };
 }
@@ -259,10 +290,7 @@ function toDossier(row: CompanyRow): CompanyDossier {
     listings: listings.filter((listing) => listing.listedTo === null),
     listingHistory: listings,
     formerNames: (row.company_former_names ?? []).map(toFormerName),
-    acn: row.acn,
-    abn: row.abn,
-    arbn: row.arbn,
-    isin: row.isin,
+    identifiers: (row.company_identifiers ?? []).map(toIdentifier),
     operationalHq: row.operational_hq,
     functionalCurrency: row.functional_currency,
     presentationCurrency: row.presentation_currency,
@@ -273,6 +301,9 @@ function toDossier(row: CompanyRow): CompanyDossier {
     lastVerifiedAt: row.last_verified_at,
     isPublished: row.is_published,
     clientCleared: row.client_cleared,
+    ledgerAbsenceReason: row.ledger_absence_reason,
+    holdingStatus: row.holding_status,
+    exitedOn: row.exited_on,
   };
 }
 
@@ -344,6 +375,9 @@ function toPositionRow(row: PositionViewRow): PositionRow {
     lookThroughBtcEquivalent: row.look_through_btc_equivalent,
     isRelatedPartyVehicle: row.is_related_party_vehicle,
     includesCustomerAssets: row.includes_customer_assets,
+    encumberedQuantity: row.encumbered_quantity,
+    encumbranceCounterparty: row.encumbrance_counterparty,
+    encumbranceObligation: row.encumbrance_obligation,
     provenance: toProvenance(row),
   };
 }
@@ -382,6 +416,35 @@ export function createCorporateHoldingsRepository(
 
     if (error) throw error;
     return data ? toDossier(data as unknown as CompanyRow) : null;
+  }
+
+  async function loadPosition(companyId: string): Promise<PositionSummary> {
+    const { data, error } = await client
+      .from(POSITION_VIEW)
+      .select(POSITION_COLUMNS)
+      .eq('company_id', companyId)
+      .order('as_of_date', { ascending: false });
+
+    if (error) throw error;
+
+    const rows = ((data ?? []) as unknown as PositionViewRow[]).map(toPositionRow);
+    const asset = 'btc';
+    const inAsset = rows.filter((row) => row.asset === asset);
+    const comparable = inAsset.filter((row) => row.basisComparable);
+    const comparableTotal = comparable.reduce((sum, row) => sum + row.quantity, 0);
+
+    // The aggregate is decided here rather than by the caller. Handing back
+    // rows and trusting three components to filter them the same way is how
+    // a look-through position ends up inside a total.
+    return {
+      companyId,
+      asset,
+      comparableTotal,
+      unencumberedTotal:
+        comparableTotal - comparable.reduce((sum, row) => sum + (row.encumberedQuantity ?? 0), 0),
+      rows,
+      excluded: inAsset.filter((row) => !row.basisComparable),
+    };
   }
 
   return {
@@ -447,32 +510,7 @@ export function createCorporateHoldingsRepository(
       return { items, total, hasMore: offset + items.length < total };
     },
 
-    async getPosition(_ctx: ReadContext, companyId: string): Promise<PositionSummary> {
-      const { data, error } = await client
-        .from(POSITION_VIEW)
-        .select(POSITION_COLUMNS)
-        .eq('company_id', companyId)
-        .order('as_of_date', { ascending: false });
-
-      if (error) throw error;
-
-      const rows = ((data ?? []) as unknown as PositionViewRow[]).map(toPositionRow);
-      const asset = 'btc';
-      const inAsset = rows.filter((row) => row.asset === asset);
-
-      // The aggregate is decided here rather than by the caller. Handing back
-      // rows and trusting three components to filter them the same way is how
-      // a look-through position ends up inside a total.
-      return {
-        companyId,
-        asset,
-        comparableTotal: inAsset
-          .filter((row) => row.basisComparable)
-          .reduce((sum, row) => sum + row.quantity, 0),
-        rows,
-        excluded: inAsset.filter((row) => !row.basisComparable),
-      };
-    },
+    getPosition: (_ctx: ReadContext, companyId: string) => loadPosition(companyId),
 
     async getJurisdictionNotes(
       _ctx: ReadContext,
@@ -616,6 +654,45 @@ export function createCorporateHoldingsRepository(
         statement: row.detail ?? row.headline,
         provenance: toProvenance(row),
       }));
+    },
+
+    async getTrackerClaims(_ctx: ReadContext, companyId: string): Promise<TrackerClaim[]> {
+      const { data, error } = await client
+        .from(SECONDARY_CLAIMS_TABLE)
+        .select('source_name, source_url, claimed_quantity, claimed_as_of, observed_at, note')
+        .eq('company_id', companyId)
+        .order('observed_at', { ascending: false });
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as unknown as SecondaryClaimRow[];
+      if (rows.length === 0) return [];
+
+      // Measured against the comparable total only. A tracker's figure set
+      // beside a look-through or customer-asset number would be compared with
+      // something the register itself refuses to aggregate.
+      const position = await loadPosition(companyId);
+      const comparable = position.rows.filter(
+        (row) => row.basisComparable && row.asset === position.asset,
+      );
+      const sourced =
+        comparable.length === 0
+          ? null
+          : { quantity: position.comparableTotal, asOf: comparable[0].asOfDate };
+
+      return rows.map((row) =>
+        measureTrackerClaim(
+          {
+            sourceName: row.source_name,
+            sourceUrl: row.source_url,
+            claimedQuantity: row.claimed_quantity,
+            claimedAsOf: row.claimed_as_of,
+            observedAt: row.observed_at,
+            note: row.note,
+          },
+          sourced,
+        ),
+      );
     },
 
     async compareCompanies(_ctx: ReadContext, slugs: string[]): Promise<CompanyDossier[]> {

@@ -1356,6 +1356,61 @@ export type Database = {
           },
         ]
       }
+      company_identifiers: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          scheme: string
+          valid_from: string | null
+          valid_to: string | null
+          value: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          scheme: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          scheme?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_listings: {
         Row: {
           company_id: string
@@ -1365,6 +1420,7 @@ export type Database = {
           listed_to: string | null
           listing_type: string
           note: string | null
+          security_class: string | null
           ticker: string
           venue: string
         }
@@ -1376,6 +1432,7 @@ export type Database = {
           listed_to?: string | null
           listing_type: string
           note?: string | null
+          security_class?: string | null
           ticker: string
           venue: string
         }
@@ -1387,6 +1444,7 @@ export type Database = {
           listed_to?: string | null
           listing_type?: string
           note?: string | null
+          security_class?: string | null
           ticker?: string
           venue?: string
         }
@@ -3071,55 +3129,74 @@ export type Database = {
           },
         ]
       }
+      field_source_classes: {
+        Row: {
+          field_key: string
+          source_class: string
+        }
+        Insert: {
+          field_key: string
+          source_class: string
+        }
+        Update: {
+          field_key?: string
+          source_class?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_source_classes_field_key_fkey"
+            columns: ["field_key"]
+            isOneToOne: false
+            referencedRelation: "field_source_minimums"
+            referencedColumns: ["field_key"]
+          },
+          {
+            foreignKeyName: "field_source_classes_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "field_source_classes_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "field_source_classes_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "field_source_classes_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_class"]
+          },
+        ]
+      }
       field_source_minimums: {
         Row: {
           client_fact_class: string | null
           field_key: string
-          min_source_rank: number
           rationale: string | null
         }
         Insert: {
           client_fact_class?: string | null
           field_key: string
-          min_source_rank: number
           rationale?: string | null
         }
         Update: {
           client_fact_class?: string | null
           field_key?: string
-          min_source_rank?: number
           rationale?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
-            columns: ["min_source_rank"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["rank"]
-          },
-          {
-            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
-            columns: ["min_source_rank"]
-            isOneToOne: false
-            referencedRelation: "v_company_facts"
-            referencedColumns: ["source_rank"]
-          },
-          {
-            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
-            columns: ["min_source_rank"]
-            isOneToOne: false
-            referencedRelation: "v_research_ledger"
-            referencedColumns: ["source_rank"]
-          },
-          {
-            foreignKeyName: "field_source_minimums_min_source_rank_fkey"
-            columns: ["min_source_rank"]
-            isOneToOne: false
-            referencedRelation: "v_research_publishable"
-            referencedColumns: ["source_rank"]
-          },
-        ]
+        Relationships: []
       }
       finding_divergence_pairs: {
         Row: {
@@ -5258,6 +5335,75 @@ export type Database = {
           },
         ]
       }
+      product_images: {
+        Row: {
+          alt_text: string | null
+          byte_size: number | null
+          created_at: string
+          created_by: string | null
+          filename: string | null
+          focal_x: number
+          focal_y: number
+          height: number | null
+          id: string
+          mime_type: string | null
+          product_service_id: string
+          sort_order: number
+          storage_path: string
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          byte_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          filename?: string | null
+          focal_x?: number
+          focal_y?: number
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          product_service_id: string
+          sort_order?: number
+          storage_path: string
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          byte_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          filename?: string | null
+          focal_x?: number
+          focal_y?: number
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          product_service_id?: string
+          sort_order?: number
+          storage_path?: string
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_images_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_key_contacts: {
         Row: {
           contact_id: string
@@ -5362,6 +5508,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          featured_image_id: string | null
           id: string
           is_financial_product: boolean | null
           key_relationship_id: string | null
@@ -5382,6 +5529,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          featured_image_id?: string | null
           id?: string
           is_financial_product?: boolean | null
           key_relationship_id?: string | null
@@ -5402,6 +5550,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          featured_image_id?: string | null
           id?: string
           is_financial_product?: boolean | null
           key_relationship_id?: string | null
@@ -5433,6 +5582,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team_members"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_services_featured_image_fkey"
+            columns: ["featured_image_id", "id"]
+            isOneToOne: false
+            referencedRelation: "product_images"
+            referencedColumns: ["id", "product_service_id"]
           },
           {
             foreignKeyName: "products_services_key_relationship_id_fkey"
@@ -6039,26 +6195,27 @@ export type Database = {
       }
       research_companies: {
         Row: {
-          abn: string | null
-          acn: string | null
-          arbn: string | null
           client_cleared: boolean
           client_cleared_at: string | null
           client_cleared_by: string | null
+          cost_basis_convention: string | null
           created_at: string
           created_by: string | null
           curator_notes: string | null
+          exited_on: string | null
           expected_disclosure_cadence: string
           financial_year_end: string | null
+          fiscal_calendar_type: string | null
           functional_currency: string | null
           funding_source: string | null
+          holding_status: string | null
           id: string
           is_published: boolean
-          isin: string | null
-          jurisdiction: string
+          jurisdiction: string | null
+          jurisdiction_basis: string | null
           last_verified_at: string | null
+          ledger_absence_reason: string | null
           legal_name: string
-          lei: string | null
           market_cap_band: string | null
           operational_hq: string | null
           presentation_currency: string | null
@@ -6070,26 +6227,27 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          abn?: string | null
-          acn?: string | null
-          arbn?: string | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
+          exited_on?: string | null
           expected_disclosure_cadence?: string
           financial_year_end?: string | null
+          fiscal_calendar_type?: string | null
           functional_currency?: string | null
           funding_source?: string | null
+          holding_status?: string | null
           id?: string
           is_published?: boolean
-          isin?: string | null
-          jurisdiction: string
+          jurisdiction?: string | null
+          jurisdiction_basis?: string | null
           last_verified_at?: string | null
+          ledger_absence_reason?: string | null
           legal_name: string
-          lei?: string | null
           market_cap_band?: string | null
           operational_hq?: string | null
           presentation_currency?: string | null
@@ -6101,26 +6259,27 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          abn?: string | null
-          acn?: string | null
-          arbn?: string | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
+          cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
           curator_notes?: string | null
+          exited_on?: string | null
           expected_disclosure_cadence?: string
           financial_year_end?: string | null
+          fiscal_calendar_type?: string | null
           functional_currency?: string | null
           funding_source?: string | null
+          holding_status?: string | null
           id?: string
           is_published?: boolean
-          isin?: string | null
-          jurisdiction?: string
+          jurisdiction?: string | null
+          jurisdiction_basis?: string | null
           last_verified_at?: string | null
+          ledger_absence_reason?: string | null
           legal_name?: string
-          lei?: string | null
           market_cap_band?: string | null
           operational_hq?: string | null
           presentation_currency?: string | null
@@ -6159,6 +6318,7 @@ export type Database = {
           label: string
           natural_key: string
           source_document_id: string
+          source_section_id: string | null
           superseded_by: string | null
           updated_at: string
           value: string
@@ -6173,6 +6333,7 @@ export type Database = {
           label: string
           natural_key: string
           source_document_id: string
+          source_section_id?: string | null
           superseded_by?: string | null
           updated_at?: string
           value: string
@@ -6187,6 +6348,7 @@ export type Database = {
           label?: string
           natural_key?: string
           source_document_id?: string
+          source_section_id?: string | null
           superseded_by?: string | null
           updated_at?: string
           value?: string
@@ -6263,6 +6425,13 @@ export type Database = {
             referencedColumns: ["source_document_id"]
           },
           {
+            foreignKeyName: "research_company_facts_source_section_id_fkey"
+            columns: ["source_section_id"]
+            isOneToOne: false
+            referencedRelation: "research_document_sections"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "research_company_facts_superseded_by_fkey"
             columns: ["superseded_by"]
             isOneToOne: false
@@ -6275,6 +6444,107 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_company_facts"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_document_sections: {
+        Row: {
+          created_at: string
+          document_id: string
+          filing_item: string
+          id: string
+          is_filed: boolean | null
+          notes: string | null
+          source_class: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          filing_item: string
+          id?: string
+          is_filed?: boolean | null
+          notes?: string | null
+          source_class: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          filing_item?: string
+          id?: string
+          is_filed?: boolean | null
+          notes?: string | null
+          source_class?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "research_document_sections_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "source_classes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "research_document_sections_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_document_sections_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_document_sections_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_class"]
           },
         ]
       }
@@ -6292,6 +6562,7 @@ export type Database = {
           page_count: number | null
           pdf_url: string | null
           published_at: string | null
+          resolution_status: string | null
           retrieval_error: string | null
           retrieved_at: string | null
           source_class: string
@@ -6311,6 +6582,7 @@ export type Database = {
           page_count?: number | null
           pdf_url?: string | null
           published_at?: string | null
+          resolution_status?: string | null
           retrieval_error?: string | null
           retrieved_at?: string | null
           source_class: string
@@ -6330,6 +6602,7 @@ export type Database = {
           page_count?: number | null
           pdf_url?: string | null
           published_at?: string | null
+          resolution_status?: string | null
           retrieval_error?: string | null
           retrieved_at?: string | null
           source_class?: string
@@ -6364,6 +6637,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "source_classes"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_class"]
           },
         ]
       }
@@ -6506,6 +6800,27 @@ export type Database = {
           },
         ]
       }
+      restricted_metrics: {
+        Row: {
+          aliases: string[]
+          code: string
+          label: string
+          reason: string
+        }
+        Insert: {
+          aliases?: string[]
+          code: string
+          label: string
+          reason: string
+        }
+        Update: {
+          aliases?: string[]
+          code?: string
+          label?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       risk_register: {
         Row: {
           created_at: string
@@ -6632,6 +6947,64 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      secondary_claims: {
+        Row: {
+          claimed_as_of: string | null
+          claimed_quantity: number | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          observed_at: string
+          source_name: string
+          source_url: string | null
+        }
+        Insert: {
+          claimed_as_of?: string | null
+          claimed_quantity?: number | null
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          observed_at: string
+          source_name: string
+          source_url?: string | null
+        }
+        Update: {
+          claimed_as_of?: string | null
+          claimed_quantity?: number | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          observed_at?: string
+          source_name?: string
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
           },
         ]
@@ -7126,6 +7499,7 @@ export type Database = {
           natural_key: string
           quantity: number | null
           source_document_id: string
+          source_section_id: string | null
           updated_at: string
         }
         Insert: {
@@ -7146,6 +7520,7 @@ export type Database = {
           natural_key: string
           quantity?: number | null
           source_document_id: string
+          source_section_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7166,6 +7541,7 @@ export type Database = {
           natural_key?: string
           quantity?: number | null
           source_document_id?: string
+          source_section_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -7239,6 +7615,13 @@ export type Database = {
             referencedRelation: "v_research_publishable"
             referencedColumns: ["source_document_id"]
           },
+          {
+            foreignKeyName: "treasury_events_source_section_id_fkey"
+            columns: ["source_section_id"]
+            isOneToOne: false
+            referencedRelation: "research_document_sections"
+            referencedColumns: ["id"]
+          },
         ]
       }
       treasury_holdings_snapshots: {
@@ -7248,6 +7631,9 @@ export type Database = {
           basis: string
           company_id: string
           created_at: string
+          encumbered_quantity: number | null
+          encumbrance_counterparty: string | null
+          encumbrance_obligation: string | null
           id: string
           includes_customer_assets: boolean
           instrument_type: string
@@ -7257,6 +7643,7 @@ export type Database = {
           natural_key: string
           quantity: number
           source_document_id: string
+          source_section_id: string | null
           value_native: number | null
         }
         Insert: {
@@ -7265,6 +7652,9 @@ export type Database = {
           basis: string
           company_id: string
           created_at?: string
+          encumbered_quantity?: number | null
+          encumbrance_counterparty?: string | null
+          encumbrance_obligation?: string | null
           id?: string
           includes_customer_assets?: boolean
           instrument_type?: string
@@ -7274,6 +7664,7 @@ export type Database = {
           natural_key: string
           quantity: number
           source_document_id: string
+          source_section_id?: string | null
           value_native?: number | null
         }
         Update: {
@@ -7282,6 +7673,9 @@ export type Database = {
           basis?: string
           company_id?: string
           created_at?: string
+          encumbered_quantity?: number | null
+          encumbrance_counterparty?: string | null
+          encumbrance_obligation?: string | null
           id?: string
           includes_customer_assets?: boolean
           instrument_type?: string
@@ -7291,6 +7685,7 @@ export type Database = {
           natural_key?: string
           quantity?: number
           source_document_id?: string
+          source_section_id?: string | null
           value_native?: number | null
         }
         Relationships: [
@@ -7363,6 +7758,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_publishable"
             referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_source_section_id_fkey"
+            columns: ["source_section_id"]
+            isOneToOne: false
+            referencedRelation: "research_document_sections"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -7652,6 +8054,7 @@ export type Database = {
           slug: string | null
           source_class: string | null
           source_document_id: string | null
+          source_filing_item: string | null
           source_is_audited: boolean | null
           source_published_at: string | null
           source_rank: number | null
@@ -7688,20 +8091,6 @@ export type Database = {
             referencedRelation: "field_source_minimums"
             referencedColumns: ["field_key"]
           },
-          {
-            foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["source_class"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["conflicting_source_class"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["code"]
-          },
         ]
       }
       v_company_position: {
@@ -7711,6 +8100,9 @@ export type Database = {
           basis: string | null
           basis_comparable: boolean | null
           company_id: string | null
+          encumbered_quantity: number | null
+          encumbrance_counterparty: string | null
+          encumbrance_obligation: string | null
           includes_customer_assets: boolean | null
           instrument_type: string | null
           is_related_party_vehicle: boolean | null
@@ -7722,18 +8114,12 @@ export type Database = {
           snapshot_id: string | null
           source_class: string | null
           source_document_id: string | null
+          source_filing_item: string | null
           source_published_at: string | null
           source_title: string | null
           source_url: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["source_class"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["code"]
-          },
           {
             foreignKeyName: "treasury_holdings_snapshots_basis_fkey"
             columns: ["basis"]
@@ -8174,6 +8560,27 @@ export type Database = {
             referencedColumns: ["code"]
           },
           {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_class"]
+          },
+          {
+            foreignKeyName: "research_documents_source_class_fkey"
+            columns: ["source_class"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_class"]
+          },
+          {
             foreignKeyName: "research_findings_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -8236,6 +8643,7 @@ export type Database = {
           slug: string | null
           source_class: string | null
           source_document_id: string | null
+          source_filing_item: string | null
           source_is_audited: boolean | null
           source_published_at: string | null
           source_rank: number | null
@@ -8243,13 +8651,6 @@ export type Database = {
           source_url: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["source_class"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["code"]
-          },
           {
             foreignKeyName: "treasury_events_basis_fkey"
             columns: ["basis"]
@@ -8313,13 +8714,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "research_documents_source_class_fkey"
-            columns: ["source_class"]
-            isOneToOne: false
-            referencedRelation: "source_classes"
-            referencedColumns: ["code"]
-          },
-          {
             foreignKeyName: "treasury_events_basis_fkey"
             columns: ["basis"]
             isOneToOne: false
@@ -8382,8 +8776,8 @@ export type Database = {
         Args: { p_id: string }
         Returns: undefined
       }
-      assert_source_minimum: {
-        Args: { doc_id: string; target_field: string }
+      assert_source_accepted: {
+        Args: { doc_id: string; section_id: string; target_field: string }
         Returns: undefined
       }
       audit_permissive_policies: {

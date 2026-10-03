@@ -20,6 +20,15 @@ describeCorporateHoldingsContract<DemoDomain>({
   quietSlug: RESEARCH_ENTITIES.tarra.slug,
   mixedClassificationSlug: RESEARCH_ENTITIES.meridian.slug,
   sourceConflictSlug: RESEARCH_ENTITIES.meridian.slug,
+  flowsSlug: RESEARCH_ENTITIES.verrall.slug,
+  currencyOnlySlug: RESEARCH_ENTITIES.corran.slug,
+  etfWrappedSlug: RESEARCH_ENTITIES.halden.slug,
+  encumberedSlug: RESEARCH_ENTITIES.calder.slug,
+  refusedByClassSlug: RESEARCH_ENTITIES.ashby.slug,
+  trackerDivergenceSlug: RESEARCH_ENTITIES.verrall.slug,
+  exitedSlug: RESEARCH_ENTITIES.wexford.slug,
+  activeSlug: RESEARCH_ENTITIES.tarra.slug,
+  disposalWithoutConsiderationSlug: RESEARCH_ENTITIES.wexford.slug,
 });
 
 const ctx = testReadContext();
@@ -105,7 +114,8 @@ describe('the register, as the demo stages it', () => {
         expect(listing.ticker).toHaveLength(4);
       }
       const dossier = await repositories.corporateHoldings.getCompany(ctx, entry.slug);
-      expect(dossier?.isin?.startsWith('XX')).toBe(true);
+      const isin = dossier?.identifiers.find((id) => id.scheme === 'isin');
+      expect(isin?.value.startsWith('XX')).toBe(true);
     }
   });
 

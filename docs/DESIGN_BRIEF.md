@@ -1,5 +1,7 @@
 # Design Brief — BTS Internal Platform
 
+> **Legacy — do not use.** This brief is out of date and is kept for history only. Use the `bts-design` skill (`.claude/skills/bts-design/`) for all design work; it is the source of truth for visual identity, tokens, components and mobile rules. If the skill turns out to be missing something, add it to the skill — don't come back here for it.
+
 **Company:** Bitcoin Treasury Solutions (BTS)  
 **Platform:** Internal Operations Platform  
 **Audience:** Internal team only (founders)  

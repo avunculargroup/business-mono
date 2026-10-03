@@ -35,7 +35,7 @@ All free, from two keyless providers: **mempool.space** (mining, fees, pools, di
 > Session 1 needs, not files you can open. They are shown unlinked for that reason.
 
 Repo root: [`../../../CLAUDE.md`](../../../CLAUDE.md) · [`../../../schema.sql`](../../../schema.sql) ·
-[`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md).
+[`../../DESIGN_BRIEF.md`](../../DESIGN_BRIEF.md) (legacy — use the `bts-design` skill).
 Dashboard component reference: `../economic-indicators/prototype/macro-indicators-panel.html`.
 
 -----

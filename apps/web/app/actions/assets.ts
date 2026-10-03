@@ -41,7 +41,7 @@ export async function getAsset(id: string): Promise<AssetRow | null> {
 export async function createUploadSignedUrl(
   filename: string,
   _mimeType: string,
-): Promise<{ error: string } | { success: true; signedUrl: string; path: string; assetId: string }> {
+): Promise<{ error: string } | { success: true; token: string; path: string; assetId: string }> {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
@@ -55,7 +55,7 @@ export async function createUploadSignedUrl(
     .createSignedUploadUrl(path);
 
   if (error) return { error: humanizeError(error) };
-  return { success: true, signedUrl: data.signedUrl, path, assetId };
+  return { success: true, token: data.token, path, assetId };
 }
 
 export async function registerUploadedAsset(params: {

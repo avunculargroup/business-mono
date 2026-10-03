@@ -8,6 +8,8 @@ import { Button } from '@platform/ui/Button';
 import { SlideOver } from '@platform/ui/SlideOver';
 import { StatusChip } from '@platform/ui/StatusChip';
 import { ProductForm } from './ProductForm';
+import { ProductImageFrame } from './ProductImageFrame';
+import type { ProductImage } from '@/lib/products/images';
 import styles from '@/app/(app)/products/products.module.css';
 
 type ProductRow = {
@@ -22,6 +24,8 @@ type ProductRow = {
   key_relationship_id: string | null;
   companies: { name: string } | null;
   team_members: { full_name: string } | null;
+  /** Absent on a row just created in this session; it has no images yet. */
+  featured_image?: ProductImage | null;
 };
 
 interface ProductsViewProps {
@@ -69,6 +73,14 @@ export function ProductsView({ products: initialProducts, companies, teamMembers
             {products.map((product) => (
               <Link key={product.id} href={`/products/${product.slug}`} className={styles.cardLink}>
                 <Card hoverable padding="md">
+                  {product.featured_image && (
+                    <ProductImageFrame
+                      image={product.featured_image}
+                      shape="wide"
+                      label={product.name}
+                      className={styles.cardImage}
+                    />
+                  )}
                   <div className={styles.cardTopRow}>
                     <div className={styles.logoWrap}>
                       {product.logo_url ? (

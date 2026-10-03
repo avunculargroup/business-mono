@@ -22,6 +22,10 @@
   color: inherit;
 }
 
+.cardImage {
+  margin-bottom: var(--space-3);
+}
+
 .cardTopRow {
   display: flex;
   align-items: flex-start;

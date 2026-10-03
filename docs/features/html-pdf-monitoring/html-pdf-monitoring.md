@@ -635,5 +635,5 @@ Suggested follow-up sessions:
 3. `extractText` → `assessQuality` — the waterfall, with a scanned PDF fixture
 4. `chunkAndEmbed` → `createNewsItem` → Rex scoring
 5. `search_segments()` retrieval surface and a `/research/search` page
-6. `/research/sources` report-watch form with the Test detection action (read `DESIGN_BRIEF.md` first)
+6. `/research/sources` report-watch form with the Test detection action (invoke the `bts-design` skill first; `DESIGN_BRIEF.md` is legacy)
 7. Source health panel and Simon's alert step

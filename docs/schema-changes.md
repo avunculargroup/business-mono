@@ -6,15 +6,15 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
-## 2026-09-23 — `paywalled_domains`
+## 2026-10-03 — `paywalled_domains`
 
-`20260923000000_add_paywalled_domains.sql` adds the list of publishers whose
+`20261003120100_add_paywalled_domains.sql` adds the list of publishers whose
 articles are marked paywalled without reading the page, edited from
 `/news/sources`.
 
 - **Why a list.** Our direct page fetch is blocked on every Bloomberg (558) and
   FT (509) article in the last 60 days, so neither page signal from
-  `2026-09-22` ever fires for them. Being blocked is not itself evidence: The
+  `news_items.paywalled` ever fires for them. Being blocked is not itself evidence: The
   Block, Reuters and CryptoSlate block the fetch too and are free. The publisher
   has to be named.
 - **Metered counts.** SMH, The Age, Project Syndicate and similar are seeded
@@ -34,9 +34,9 @@ articles are marked paywalled without reading the page, edited from
 
 ---
 
-## 2026-09-22 — `news_items.paywalled`
+## 2026-10-03 — `news_items.paywalled`
 
-`20260922000000_add_news_item_paywalled.sql` adds a nullable **`paywalled
+`20261003120000_add_news_item_paywalled.sql` adds a nullable **`paywalled
 BOOLEAN`** so the daily `news_curation` digest can mark stories a reader will hit
 a paywall on.
 
@@ -52,6 +52,167 @@ a paywall on.
   no paywall signal. The digest only marks `true`.
 - **No backfill.** Older rows stay null; the digest looks back 24 hours, so the
   pill is accurate from the first run after deploy.
+
+---
+
+## 2026-10-03 — Every view runs as the caller (security_invoker)
+
+`20261003010000_views_security_invoker.sql` — sets `security_invoker = true` on all 33
+views in `public`. The Supabase advisor flagged every one as a security-definer view
+(ERROR, lint 0010). A view without the option reads its tables with its owner's
+privileges, past RLS, and `anon` and `authenticated` hold SELECT on it through the
+default grants. The anon key ships in both apps' browser bundles, so with no session
+`/rest/v1/` returned the CRM (533 rows of `v_recent_interactions`, 25 of
+`v_contacts_overview`), the whole research ledger and the rest. A Minute subscriber
+could read the same.
+
+Measured on live inside a rolled-back transaction before shipping:
+- **Team member:** identical row counts on all 33 views.
+- **Anon:** zero rows on every one.
+- **Minute subscriber:** only what the client policies already admit.
+
+Nothing in `apps/client` reads a view, and `apps/agents` uses the service role, which
+bypasses RLS either way.
+
+`CREATE OR REPLACE VIEW` resets a view's options, so a later redefinition silently
+undoes this. Write every new or redefined view `WITH (security_invoker = true)`.
+`packages/db/src/migrations.test.ts` replays the migrations and fails if any view ends
+without the option. It replays filenames, so a view-redefining migration also needs a
+timestamp later than everything already on `main`.
+
+---
+
+## 2026-10-02 — Corporate holdings: the ingest records the filing item it read
+
+`20261002200000_commit_ingest_source_section.sql` — `commit_research_ingest` writes
+`source_section_id` on `treasury_events`, insert and update. The gate already judged a
+claim by its section's class when one was cited; the RPC never passed one, so every
+ingested event was judged by its whole document's class. The body is otherwise
+20260904000000's, unchanged.
+
+---
+
+## 2026-10-02 — Corporate holdings: encumbrance on the position view
+
+`20261002100000_position_view_encumbrance.sql` — `v_company_position` selects
+`encumbered_quantity`, `encumbrance_counterparty` and `encumbrance_obligation`, appended
+to 20261001030000's definition. The columns were added to the snapshots table in
+`20261001100100`, but the view never selected them.
+
+---
+
+## 2026-10-02 — Corporate holdings: canonical event natural keys
+
+`20261002000000_canonical_event_natural_keys.sql` — rewrites the twelve
+`treasury_events.natural_key` values not in the `<slug>:<code>:<YYYY-MM-DD>` form the
+ingest now computes. Otherwise the first real run would reconcile them as new and
+duplicate the rows. A row is skipped where its canonical key is already taken.
+
+---
+
+## 2026-10-01 — Corporate holdings: drop the per-scheme identifier columns
+
+`20261001120000_drop_research_company_identifier_columns.sql` — the contract half of
+`20261001100000`. Drops `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` and their
+partial unique indexes, after refusing to run if any value exists only in those
+columns. Their guarantee, that no two companies share a registration number, moves to
+a unique index on `company_identifiers(scheme, value)`.
+
+---
+
+## 2026-10-01 — Corporate holdings: identity, holdings vocabulary, absence and divergence
+
+Steps 2–4 of `docs/features/corporate-holdings/schema-ingest-spec.md`, one migration each.
+
+- **`20261001100000_research_identity_and_calendars.sql`** — `company_identifiers`
+  (scheme/value, with validity dates), backfilled from `acn`/`abn`/`arbn`/`isin`/`lei`.
+  Those columns stay for now: migrations apply on merge, before the apps redeploy,
+  so dropping a column the deployed app still selects would break it. A later
+  migration drops them. `jurisdiction` becomes nullable with `jurisdiction_basis`
+  and a check that a NULL jurisdiction says `unknown` (Hamak, RUM Group, which held
+  the string `unknown`). `company_listings.security_class`. `fiscal_calendar_type`,
+  with Goodfood's week-based sentence moved out of `financial_year_end`.
+  `reporting_standard` admits `jgaap` (Metaplanet, was `other`).
+- **`20261001100100_research_holdings_vocabulary.sql`** — `etf_wrapped` basis
+  (not comparable). Encumbrance columns on snapshots, as a flag rather than a basis
+  per the 29 September decision, so there is no `pledged_collateral` basis.
+  `cost_basis_convention` (Strategy inclusive, Metaplanet net). `holding_status` +
+  `exited_on` (Sequans exited 24 September 2026). `restricted_metrics`, seeded with
+  six issuer metrics. No `asset_class` on snapshots: they already carry `asset`.
+- **`20261001100200_research_absence_and_divergence.sql`** — `ledger_absence_reason`,
+  backfilled for the seven records without a ledger. `research_documents.resolution_status`,
+  which the ingest now maintains. `secondary_claims`. `tracker_divergence` finding type.
+
+---
+
+## 2026-10-01 — Corporate holdings: rank by filing item, per-field source sets
+
+`20261001030000_source_sections_and_allowed_classes.sql` replaces the source
+gate's single rank threshold. Spec: `docs/features/corporate-holdings/schema-ingest-spec.md`
+(Decisions 1 and 2, and the 29 September decisions).
+
+- **`field_source_classes`** — each field accepts a set of source classes.
+  `field_source_minimums.min_source_rank` is dropped; the table keeps the field
+  catalogue, rationale and `client_fact_class`. A threshold could not say that
+  custody may come from a 10-K's business description while the ledger may not.
+- **`source_classes`** — `filed_financials` (10-Q statements and notes) and
+  `filed_narrative` (10-K/10-Q Items 1–7, MD&A) added; `investor_presentation`
+  renamed `furnished_release` and its documents moved across. `rank` is now
+  display order only.
+- **`research_document_sections`** — a claim may cite one section of a
+  document; facts, events and snapshots gain a nullable `source_section_id`. The
+  gate uses the section's class when one is cited, and refuses a section from a
+  different document.
+- **`assert_source_accepted(doc, section, field)`** replaces
+  `assert_source_minimum(doc, field)`. `v_research_ledger`, `v_company_facts`
+  and `v_company_position` report the cited section's class and append
+  `source_filing_item`.
+- **Data:** the six 10-Qs registered as `audited_accounts` with
+  `is_audited = false` (Angel Studios, RUM Group) become `filed_financials`.
+- Every set contains everything the old threshold admitted, and the migration
+  re-checks every stored claim and fails if any would now be refused.
+
+---
+
+## 2026-10-01 — Corporate holdings register records 4–12
+
+`20261001010949_seed_register_records_4_to_12.sql`, generated by
+`packages/db/src/seeds/dump-register-seed.ts`, puts the nine records written
+directly to the live database (Strategy, Metaplanet, 333D, Hamak Strategy,
+Panther Metals, Angel Studios, RUM Group, Goodfood, Sequans) into the migration
+history, so a reset or a branch reproduces all twelve. Every statement is
+`INSERT … WHERE NOT EXISTS` on the row's natural key, so against live it is a
+no-op. Records land unpublished and uncleared.
+
+---
+
+## 2026-09-23 — Product image gallery with a featured image and focal point
+
+`20260923000000_product_images.sql` lets a product or service carry several
+uploaded images instead of one pasted URL.
+
+- **`product_images`** — one row per uploaded file in the new private
+  `product-images` bucket (10 MB, image types only). Rows cascade with the
+  product; `deleteProduct` removes the files, which do not.
+- **The featured image is a pointer on the parent**, `products_services.featured_image_id`,
+  not an `is_featured` flag on the child. One column can only name one image, so
+  two featured images is unrepresentable rather than guarded. The key is composite
+  — `(featured_image_id, id) → product_images(id, product_service_id)` — so it
+  cannot name another product's image, and deleting the featured image clears only
+  the pointer (PG15 column-list `SET NULL`). With no pointer the app falls back to
+  the first image in gallery order.
+- **One focal point per image, not one crop per shape.** `focal_x`/`focal_y` are
+  percentages fed straight to CSS `object-position` under `object-fit: cover`, so the
+  same stored point keeps the subject in frame for a square tile and a 16:9
+  banner. The default 50/50 is exactly what `cover` does with no position, so an
+  untouched image renders as it always would have.
+- **Storage policies use `is_team_member()`**, not the `authenticated` role the
+  `platform-files` policies still carry.
+- **`product_image_url` is retired, not dropped.** The web app no longer reads or
+  writes it — the gallery replaces the URL field on the product forms. It held an
+  external link, not a stored file, so there was nothing to migrate, and dropping
+  the column would discard links already entered. Drop it in a later migration
+  once nobody needs them.
 
 ---
 

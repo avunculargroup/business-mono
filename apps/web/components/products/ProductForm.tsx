@@ -88,8 +88,6 @@ export function ProductForm({ companies, teamMembers, onSuccess, onPendingChange
 
       <FormField label="Logo URL" name="logo_url" type="url" placeholder="https://" />
 
-      <FormField label="Product image URL" name="product_image_url" type="url" placeholder="https://" />
-
       {state?.error && <FormError>{state.error}</FormError>}
     </form>
   );

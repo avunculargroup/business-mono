@@ -1,3 +1,4 @@
+import { decodeHtmlEntities } from './emailImage.js';
 import { fetchText } from './fetchFeed.js';
 
 // A browser-like User-Agent gets past UA-based bot blocks on most news sites,
@@ -44,7 +45,7 @@ function findOgImage(html: string, url: string): string | null {
   if (!raw) return null;
 
   try {
-    return new URL(raw, url).toString();
+    return new URL(decodeHtmlEntities(raw), url).toString();
   } catch {
     return null;
   }

@@ -16,13 +16,15 @@ export type HoldingBasis =
   | 'direct_spot'
   | 'look_through'
   | 'includes_customer_assets'
-  | 'stated_unreconciled';
+  | 'stated_unreconciled'
+  | 'etf_wrapped';
 
 const LABELS: Record<HoldingBasis, string> = {
   direct_spot: 'Direct spot',
   look_through: 'Look-through',
   includes_customer_assets: 'Includes customer assets',
   stated_unreconciled: 'Stated, unreconciled',
+  etf_wrapped: 'ETF-wrapped',
 };
 
 const WHY: Record<HoldingBasis, string> = {
@@ -36,6 +38,9 @@ const WHY: Record<HoldingBasis, string> = {
   stated_unreconciled:
     'The issuer stated a figure with no determinable basis. Rendered as stated, and excluded '
     + 'from every comparison.',
+  etf_wrapped:
+    'Held as units of an exchange-traded fund, not as coins. A coin count derived from it is a '
+    + 'third party\'s estimate, so it never enters a total.',
 };
 
 export function BasisChip({

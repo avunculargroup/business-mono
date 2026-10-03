@@ -58,6 +58,7 @@ export const ReportingStandard = {
   US_GAAP: 'us_gaap',
   SFRS:    'sfrs',
   IFRS:    'ifrs',
+  JGAAP:   'jgaap',
   OTHER:   'other',
 } as const;
 export type ReportingStandard = (typeof ReportingStandard)[keyof typeof ReportingStandard];
@@ -111,13 +112,16 @@ export type InstrumentType = (typeof InstrumentType)[keyof typeof InstrumentType
 
 // ── Sources and bases (lookup tables, typed for the seeded set) ─────────────
 
-// Ordered strongest first. The rank, not the name, is what the ingest gate
-// compares, and it lives in the `source_classes` table.
+// In `source_classes.rank` order, which is display order only. The ingest
+// gate checks membership in each field's set in `field_source_classes`, not
+// a rank — custody accepts filed narrative where the ledger does not.
 export const SOURCE_CLASS_CODES = [
   'regulated_disclosure',
   'exchange_announcement',
   'audited_accounts',
-  'investor_presentation',
+  'filed_financials',
+  'filed_narrative',
+  'furnished_release',
   'company_web',
   'secondary',
 ] as const;
@@ -128,6 +132,7 @@ export const HOLDING_BASIS_CODES = [
   'look_through',
   'includes_customer_assets',
   'stated_unreconciled',
+  'etf_wrapped',
 ] as const;
 export type HoldingBasis = (typeof HOLDING_BASIS_CODES)[number];
 
@@ -155,9 +160,79 @@ export const ResearchFindingType = {
   LISTING_CHANGE:         'listing_change',
   ACCOUNTING_ELECTION:    'accounting_election',
   STRUCTURAL_ABSENCE:     'structural_absence',
+  // A tracker's figure disagrees with the latest sourced snapshot by more
+  // than the materiality floor. The divergence is the finding; the tracker
+  // figure is never a source.
+  TRACKER_DIVERGENCE:     'tracker_divergence',
 } as const;
 export type ResearchFindingType =
   (typeof ResearchFindingType)[keyof typeof ResearchFindingType];
+
+// ── Identity, holdings and absence (20261001100000–20261001100200) ─────────
+
+// How a jurisdiction was established. `unknown` is the only basis allowed
+// beside a NULL jurisdiction: a sentinel in a country column gets read as a
+// country.
+export const JurisdictionBasis = {
+  STATED_IN_FILING:      'stated_in_filing',
+  INFERRED_FROM_LISTING: 'inferred_from_listing',
+  UNKNOWN:               'unknown',
+} as const;
+export type JurisdictionBasis = (typeof JurisdictionBasis)[keyof typeof JurisdictionBasis];
+
+// What a listing line is, beside `listingType`'s where and how it is quoted.
+export const SecurityClass = {
+  COMMON:              'common',
+  PREFERRED:           'preferred',
+  DEPOSITARY_INTEREST: 'depositary_interest',
+  CDI:                 'cdi',
+  OTHER:               'other',
+} as const;
+export type SecurityClass = (typeof SecurityClass)[keyof typeof SecurityClass];
+
+export const FiscalCalendarType = {
+  CALENDAR_DATE:    'calendar_date',
+  WEEK_BASED_52_53: 'week_based_52_53',
+} as const;
+export type FiscalCalendarType = (typeof FiscalCalendarType)[keyof typeof FiscalCalendarType];
+
+// Whether a stated aggregate cost includes fees. Two conventions are two
+// measurements, and ranking across them compares unlike things.
+export const CostBasisConvention = {
+  INCLUSIVE_OF_FEES: 'inclusive_of_fees',
+  NET_OF_FEES:       'net_of_fees',
+  UNSTATED:          'unstated',
+} as const;
+export type CostBasisConvention = (typeof CostBasisConvention)[keyof typeof CostBasisConvention];
+
+// A zero snapshot with `exited` is a different statement from a zero with
+// `active`, and both differ from no snapshot at all.
+export const HoldingStatus = {
+  ACTIVE:     'active',
+  EXITED:     'exited',
+  NEVER_HELD: 'never_held',
+} as const;
+export type HoldingStatus = (typeof HoldingStatus)[keyof typeof HoldingStatus];
+
+// Why a record has no ledger. Also a work queue: `primary_not_located` is
+// research, `filing_system_unreachable` is engineering.
+export const LedgerAbsenceReason = {
+  NO_STATED_BASIS:           'no_stated_basis',
+  SOURCE_CLASS_REFUSED:      'source_class_refused',
+  PRIMARY_NOT_LOCATED:       'primary_not_located',
+  FILING_SYSTEM_UNREACHABLE: 'filing_system_unreachable',
+  NO_HOLDING:                'no_holding',
+} as const;
+export type LedgerAbsenceReason = (typeof LedgerAbsenceReason)[keyof typeof LedgerAbsenceReason];
+
+export const DocumentResolutionStatus = {
+  RESOLVED:     'resolved',
+  NO_URL:       'no_url',
+  UNFETCHABLE:  'unfetchable',
+  FETCH_FAILED: 'fetch_failed',
+} as const;
+export type DocumentResolutionStatus =
+  (typeof DocumentResolutionStatus)[keyof typeof DocumentResolutionStatus];
 
 // Reconciliation deltas below this fraction of the reference quantity are
 // logged and suppressed. Calibrated against a restatement of shares on issue

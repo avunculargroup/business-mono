@@ -36,7 +36,7 @@ Read these before changing anything they cover.
 | [`webhooks.md`](./webhooks.md) | Telnyx, Zoom and Deepgram payloads, authentication, handler logic |
 | [`schema-changes.md`](./schema-changes.md) | Changelog of intentional deviations from the original schema |
 | [`agent-naming-spec.md`](./agent-naming-spec.md) | The persona/file/export naming convention (Approved) |
-| `DESIGN_BRIEF.md` | Backing data for the `bts-design` skill. **Invoke the skill** — do not read this file directly; the skill is the implementation source of truth. |
+| `DESIGN_BRIEF.md` | **Legacy**, kept for history. **Invoke the `bts-design` skill** — it is the design source of truth. If the skill is missing something, add it to the skill later rather than relying on this file. |
 
 Schema itself lives outside this folder: `supabase/migrations/` executes,
 [`../packages/db/MIGRATIONS.md`](../packages/db/MIGRATIONS.md) explains the workflow, and

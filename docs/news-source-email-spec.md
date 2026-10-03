@@ -879,7 +879,7 @@ Suggested follow-up sessions:
 1. `inbound-rss-ingestion` workflow
 1. `inbound-podcast-ingestion` workflow
 1. Manual ingestion API route
-1. `/research` feed page + cards (read `DESIGN_BRIEF.md` first)
+1. `/research` feed page + cards (invoke the `bts-design` skill first; `DESIGN_BRIEF.md` is legacy)
 1. `/research/[id]` detail page
 1. `/research/sources` management
 1. `/research/calibration`

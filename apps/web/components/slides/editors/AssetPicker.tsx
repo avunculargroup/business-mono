@@ -41,7 +41,7 @@ export function AssetPicker({ selectedAssetId, onSelect }: AssetPickerProps) {
       const supabase = createClient();
       const { error: uploadErr } = await supabase.storage
         .from('slide-assets')
-        .uploadToSignedUrl(urlRes.path, urlRes.signedUrl, file);
+        .uploadToSignedUrl(urlRes.path, urlRes.token, file);
       if (uploadErr) { toast.error(uploadErr.message); return; }
 
       // Measure dimensions if image

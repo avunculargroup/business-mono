@@ -4,10 +4,29 @@ Reconciliation of the [`corporate-holdings`](./README.md) spec bundle against th
 repository, and a record of what each session shipped. Same purpose as
 [`docs/features/demo-app/build-progress.md`](../demo-app/build-progress.md).
 
-**Status:** All three sessions complete, one production fix (session 4), and the register
-seeded to three records (session 5). Two things remain, both needing network access to real
-filings: the ingest run against Locate's own documents, and the recorded trace bundle.
-**Last updated:** 2026-09-11
+**Status:** Sessions 1–3 complete, one production fix (session 4), the register seeded to
+three records (session 5), then to twelve, with step 1 of
+[`schema-ingest-spec.md`](./schema-ingest-spec.md) built — sections and per-field source
+sets (session 6) — then steps 2–4: identity, holdings vocabulary, absence and divergence
+(session 7). Step 5 is under way: the event key is computed rather than asked of the
+model, and the restated-ledger case is covered (session 8), then the eight read-side
+conformance cases pass against both adapters (session 9), then SEC filings are split by
+item and only accepted text reaches the extractor (session 10). What is left of step 5 is
+operational: the first real run and its trace bundle. Scheduling waits on step 6, which is
+not started. Two things still remain from
+session 2: the ingest run against real filings, and the recorded trace bundle.
+**Last updated:** 2026-10-02
+
+
+> **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
+> Panther Metals, Angel Studios, RUM Group, Goodfood, Sequans) produced ~20 structural
+> findings and a set of decisions taken on 29 September 2026 — per-field source
+> allow-lists, `review_state` on records and rows, encumbrance, discovery via
+> `reportWatch`, deterministic `natural_key`, and the Minute visibility bug. Those are
+> in [`schema-ingest-spec.md`](./schema-ingest-spec.md), which is the current plan. Read it before
+> this file. Sessions 1–5 below describe the state as at 11 September; session 6 is the
+> first built against that spec.
+
 
 ---
 
@@ -398,3 +417,379 @@ documents, the recorded `TraceBundle`, and a `routines` row to schedule it. This
 moved none of them — it removed the reason the register was empty while they wait. The
 local Postgres harness stubs pgvector, which the container lacks; no vector column is
 touched by this seed.
+
+---
+
+## Session 6 — records 4–12 seeded, and the gate ranks by filing item
+
+Built against [`schema-ingest-spec.md`](./schema-ingest-spec.md): its "do this first" seed
+migration, and step 1 (Decisions 1 and 2). Branch `claude/corporate-schema-ingest`.
+
+**Shipped.**
+
+- **The spec, corrected.** Renamed from `corporate-schema-injest-spec.md.md`. Decisions 1–2
+  marked as superseded by the per-field sets, the record counts fixed (twelve, not eleven),
+  the claim that nothing writes `is_published` corrected (the `researchIngest` resume
+  branch does), and the AR licensing premise removed — BTS holds no AFS authorisation.
+- **The dump script, fixed before first use.** Moved to `packages/db/src/seeds/`, with the
+  SQL emission split into a pure, tested `registerSeed.ts`. Against the live schema the
+  uploaded version would have failed outright — its `company_listings` `ON CONFLICT` named
+  no matching constraint, since the unique key includes `listed_from` — and silently
+  dropped `research_findings.event_id`, which Strategy and Metaplanet both use. It now
+  emits `INSERT … WHERE NOT EXISTS` with NULL-safe keys, resolves documents, sections and
+  events by natural key, and throws on any column it does not know about rather than
+  dropping it. `tsx` added to `packages/db`, which `seed:brand-voice` also lacked.
+- **`20261001010949_seed_register_records_4_to_12.sql`** — generated from the live database:
+  138 inserts across nine records, matching live table by table. A no-op against live.
+- **`20261001030000_source_sections_and_allowed_classes.sql`** — `field_source_classes`
+  replaces `min_source_rank` with a set per field; `filed_financials` and `filed_narrative`
+  added and kept apart (decided 1 October), so the ledger accepts a 10-Q's notes and refuses
+  10-K prose while custody accepts both; `investor_presentation` becomes
+  `furnished_release`; `research_document_sections` plus a nullable `source_section_id` on
+  facts, events and snapshots, with the gate using the cited section's class and refusing a
+  section from another document; the three views report it. The six forced-fit 10-Qs
+  (Angel Studios, RUM Group) become `filed_financials`.
+- `ProvenanceRail` flags against the ledger's set rather than `rank > 2`, so audited accounts
+  stop reading as below the ledger's class. The conformance case and the SQL acceptance test
+  follow the rename, and the acceptance test gains criterion 4 for sections.
+
+**Session 5's open question, answered.** Audited accounts are now in
+`accounting_treatment`'s set, so Block's ASU 2023-08 election is storable. It has not been
+re-entered — see below.
+
+**Verified.**
+
+- The seed: replayed into a fresh database (twelve records, counts and checksums identical
+  to live) and re-run to insert nothing.
+- The source migration: run against the live database inside one `DO` block that ends in a
+  deliberate exception, so it could not commit. The acceptance test passed all four
+  criteria, every stored claim on the twelve records passed the new sets, and the
+  reclassification landed as expected. A follow-up read confirmed live was unchanged. Not
+  yet replayed on a fresh database after the seed.
+- `pnpm test` (16 packages), `turbo typecheck` and `turbo lint` green.
+
+**Not done.**
+
+- `jgaap`, the `jurisdiction_notes` seeds and `restricted_metrics`, which the spec puts in
+  step 1's migration. Small; they go in their own.
+- Sections for the registered 10-Ks, 10-Qs and 8-Ks, and re-entry of the refused claims in
+  Decision 1's table. Both are live-database writes and need the migration applied first.
+  Several 10-Q titles still say "class is a forced fit", which is no longer true.
+- Regenerating `packages/db/src/types/database.ts` once the migration is applied.
+- Steps 2–6 of the spec. Three questions are open before 5 and 6: row-level `review_state`
+  as specified passes visibility into a repository read, which `ReadContext` forbids —
+  internal and client visibility need to be separate bundles; where a company binding
+  lives for discovery, since `report_watch_sources` does not exist and reportWatch reads
+  `news_sources`; and Sequans' 817 BTC encumbered against "holds none".
+
+---
+
+## Session 7 — identity, holdings vocabulary, absence and divergence
+
+Steps 2–4 of [`schema-ingest-spec.md`](./schema-ingest-spec.md), one migration each. Session
+6's merge (#392) applied cleanly; its types regeneration landed on `main` separately.
+
+**Shipped.**
+
+- **`20261001100000_research_identity_and_calendars.sql`** — `company_identifiers`,
+  backfilled from the five Australian-shaped columns (one ABN, one ARBN, one ISIN across the
+  register). `jurisdiction` nullable with `jurisdiction_basis`; Hamak and RUM Group move from
+  the string `unknown` to NULL with basis `unknown`. `company_listings.security_class`,
+  `fiscal_calendar_type` (Goodfood's sentence leaves `financial_year_end`), `jgaap`
+  (Metaplanet).
+- **`20261001100100_research_holdings_vocabulary.sql`** — `etf_wrapped`; encumbrance as three
+  snapshot columns; `cost_basis_convention`; `holding_status` + `exited_on` (Sequans);
+  `restricted_metrics`.
+- **`20261001100200_research_absence_and_divergence.sql`** — `ledger_absence_reason` for the
+  seven records without a ledger; `research_documents.resolution_status`; `secondary_claims`;
+  `tracker_divergence`.
+- **Read model.** `CompanyDossier.identifiers` replaces `acn`/`abn`/`arbn`/`isin`, and
+  `RegisterEntry.jurisdiction` is nullable. Both adapters, the web record page (all
+  identifiers, superseded ones dated), the register lists and `BasisChip` follow. The ingest
+  writes `resolution_status`, distinguishing a document with no URL from a failed fetch.
+- **Dump script** knows every new column, dumps `company_identifiers` and `secondary_claims`,
+  and leaves the deprecated identifier columns behind.
+
+**Departures from the spec, and why.**
+
+- **Expand, then contract.** The identifier columns are copied, not dropped. Migrations apply
+  on merge, before Vercel and Railway redeploy, so dropping a column the running app still
+  selects breaks it for the length of the deploy. Nothing reads them after this PR; a later
+  migration drops them.
+- **No `pledged_collateral` basis.** The 29 September decision made encumbrance a flag. The
+  step-3 list predates it.
+- **No `asset_class` on snapshots.** They already carry `asset`, defaulting to `btc`.
+- **Metaplanet's long URL is `resolved`, not `unfetchable`.** The 250-character limit the spec
+  cites belonged to the research tool; the ingest's fetcher has none.
+- **`jurisdiction_notes` seeds not written.** They are accounting and listing-rule claims
+  (Japanese GAAP against AASB 136, ASX LR 11.1, the ASU 2023-08 principal market, UK
+  depositary interests) and need a researcher's primary sources, not a migration author's.
+
+**Verified.**
+
+- All three migrations run against live inside one self-aborting `DO` block, with checks that
+  each new constraint refuses what it should and accepts what it should. That run caught a
+  real bug: the jurisdiction check was `jurisdiction_basis = 'unknown'`, which is NULL — and so
+  passes — when both columns are NULL. Fixed to `IS NOT DISTINCT FROM`. Every backfill landed
+  on the intended rows, and a follow-up read confirmed live was unchanged.
+- `pnpm test` (16 packages), `turbo typecheck` (17) and `turbo lint` green.
+
+**Not done.**
+
+- ~~Drop `research_companies.acn`/`abn`/`arbn`/`isin`/`lei` once this has deployed.~~ Done in
+  `20261001120000`, which also moves their no-two-companies guarantee to a unique index on
+  `company_identifiers(scheme, value)`.
+- `security_class` on existing listings, `holding_status` beyond Sequans, CIKs and other
+  identifiers for records 4–12 — all research data, entered against sources.
+- Surfacing the new fields on the pages: absence reasons, holding status, encumbrance,
+  tracker divergence. That is step 6's panel work.
+- Session 6's data follow-up still stands: sections for registered filings, and re-entry of
+  the refused claims.
+
+---
+
+## Session 8 — the event key, computed
+
+The part of step 5 the spec says must land before the first real run. An unstable
+`natural_key` reconciles as new and duplicates the ledger row.
+
+**Shipped.**
+
+- **`researchIngest/naturalKey.ts`.** Rex now returns type, date and quantity, with no key.
+  The extract step builds `<slug>:<code>:<YYYY-MM-DD>` from the slug on the record and a
+  fixed code per event type (`EVENT_KEY_CODES`, the codes the seeded keys already use).
+  Restatements collapse: one type and date in several documents is one event. Only when a
+  single document states several same-type events on one date are they keyed apart, by a
+  short hash of the quantity, plus an ordinal where the quantity repeats too. Two
+  documents that disagree about one event keep the last one and log the conflict.
+  Reconcile then measures it against the committed row.
+- **Dates are checked before persist.** A candidate whose date is not a real `YYYY-MM-DD`
+  is dropped and logged. Before this it failed the `DATE` cast inside
+  `commit_research_ingest` and took the whole run's transaction down with it.
+- **The extraction prompt** states the date rule: the day the event happened, the last day
+  of the period for a period event, never the filing or signature date. Extracting every
+  row of a restated history table is expected.
+- **`20261002000000_canonical_event_natural_keys.sql`** rewrites the twelve committed keys
+  not already in that form: the `loc`, `hamak` and `panther` prefixes, two month-only dates
+  and `loc:accounting:aasb138`. It skips any row whose canonical key another event already
+  holds, and none does today.
+- **Tests.** `naturalKey.test.ts` covers the seeded Strategy keys reproduced exactly,
+  prefix drift, same-day pairs, restatement collapse and conflicts. It also carries the
+  spec's `restatedLedgerIsIdempotent` case: a sixty-row history (plus one same-day pair)
+  ingested from two notices commits nothing new and reads as a quiet run. The workflow
+  test asserts that a key the model offers is ignored, and that a bad date drops one row
+  rather than the run.
+
+**Departures from the spec, and why.**
+
+- **The hash covers quantity, not quantity plus source document.** With the document in the
+  key, every quarterly notice that republishes Metaplanet's history would give the same
+  purchase a new key. That is the duplication the case exists to prevent.
+- **Period events key on the period's last day.** The spec's date paragraph says "date of
+  earliest event reported", but every seeded period event is keyed on the period end
+  (`strategy:disp:2026-08-02` for 27 July – 2 August). A different rule would duplicate
+  them on the first run.
+- **No Strategy rounding test yet.** The stored totals (847,363 → 846,000 → 843,775 →
+  840,447 → 845,050) agree exactly with the stored flows, so the two off-by-one filed
+  figures are not in the database. They need reading from the 8-Ks rather than inventing.
+  `validateClaims` checks presence, not arithmetic, so it already accepts a filed
+  "approximately" total. What is missing is the test that says so with real numbers.
+- **No date check in `validateNumerics`.** The signature-date trap is a choice between two
+  dates that both appear in the text, so a presence check cannot catch it. It is handled
+  by the prompt rule above. A deterministic check would need the 8-K cover page's "Date
+  of Report" parsed, which belongs with the item-aware EDGAR parsing.
+
+**Verified.**
+
+- The migration ran against live inside a self-aborting `DO` block: twelve rows
+  rewritten, zero left outside `^<slug>:[a-z]+:YYYY-MM-DD$`, then rolled back.
+- `pnpm --filter @platform/agents test` (1,351) and `turbo typecheck lint` for the agents
+  package green.
+
+**Not done.**
+
+- **The eight read-side conformance cases.** These are `flowsReverseWhileStockIsFlat`,
+  `currencyOnlyDisclosureYieldsNoSnapshot`, `etfWrapperIsNotComparable`,
+  `encumberedPortionExcludedFromFreeBalance`, `refusedByClassIsDistinguishableFromAbsent`,
+  `trackerDivergenceRaisesFinding`, `exitedIsNotAbsent` and `disposalWithoutConsideration`.
+  `CorporateHoldingsRepository` does not yet return absence reasons, holding status,
+  encumbrance or secondary claims. Each case needs those fields in the read model, a
+  scenario slot, live and fixture data to satisfy it, and for tracker divergence a
+  computation that does not exist yet.
+- Finding keys are still written by the model in the score step. The spec only named
+  events, but the same drift applies.
+- Venue adapters, item-aware EDGAR parsing, the first real run.
+
+---
+
+## Session 9 — the read-side conformance cases
+
+The eight cases from [the spec's conformance table](./schema-ingest-spec.md#conformance-cases)
+that test what the company page reads. Each needed a field the repository did not
+return, so this is read-model work as much as test work.
+
+**Shipped.**
+
+- **Read model.** `CompanyDossier` gains `ledgerAbsenceReason`, `holdingStatus` and
+  `exitedOn`. `PositionRow` gains `encumberedQuantity`, `encumbranceCounterparty` and
+  `encumbranceObligation`. `PositionSummary` gains `unencumberedTotal`, decided by the
+  adapter like `comparableTotal` is. A new `getTrackerClaims` returns `secondary_claims`,
+  each measured against the comparable position. The measuring is done by
+  `measureTrackerClaim` in `@platform/data`, so both adapters apply one rule: signed
+  divergence relative to the sourced figure, material at or above `MATERIALITY_FLOOR`.
+- **`20261002100000_position_view_encumbrance.sql`.** `v_company_position` now selects the
+  three encumbrance columns. Session 7 added them to the snapshots table, but the view never
+  selected them. The definition is otherwise unchanged, with the new columns appended.
+- **Suite.** Nine new scenario slots and ten cases in
+  `packages/data/src/testing/corporateHoldings.ts`: the spec's eight, plus a control for
+  each of encumbrance and tracker divergence. Without the controls, an adapter flagging
+  everything would pass.
+- **Fixtures.** Four new demo records for states the first five could not show:
+  - Halden: ETF units.
+  - Corran: holdings stated only in currency.
+  - Ashby: claims only on its own website, refused by source class.
+  - Wexford: exited, with a disposal stating a quantity and nothing else.
+
+  On existing records:
+  - Verrall gains a purchase and a sale, and carries the tracker claims. It is the record
+    whose mixed bases make "measured against the comparable total" testable.
+  - Calder gains a pledge against a term loan.
+
+  The Supabase adapter's test dataset mirrors the same slugs.
+
+**Verified the way `CLAUDE.md` asks.** Each rule was broken deliberately, one at a time,
+to check the suite catches it:
+- **Fixture adapter and shared helper: eleven breakages.** These were:
+  - an unencumbered total that ignores the pledge;
+  - every claim material, and no claim material;
+  - ETF units summed into the total, or dropped from `excluded`;
+  - the absence reason dropped, or collapsed to one reason for every empty record;
+  - a zero balance read as active;
+  - disposals netted out of the ledger;
+  - a missing consideration filled with zero;
+  - a claim measured against every row.
+- **Supabase adapter's own mapping and select: eight breakages.**
+
+All nineteen go red. One did not at first: measuring a claim against every row passed
+while the claims sat on Meridian, whose position has a single row. Moving them to Verrall
+is what caught it.
+
+The view migration ran against live inside a self-aborting `DO` block. The column list
+before matched 20261001030000 exactly, the three columns were appended, and row count was
+unchanged (5 → 5). `pnpm test` (16 packages), `turbo typecheck` and `turbo lint` green.
+
+**Departures from the spec, and why.**
+
+- **"Raises a finding" is a computed divergence, not a `research_findings` row.** Nothing
+  writes `tracker_divergence` findings yet. The read model reports each claim with its
+  divergence and whether it clears the floor, which is what a finding would be written
+  from. Persisting one is ingest work, for when trackers are recorded during a run.
+- **`flowsReverseWhileStockIsFlat` asserts flows, not endpoints.** The position read returns only the
+  latest snapshot, so the case asserts what the ledger alone can show: gross purchases and
+  sales well beyond their net.
+
+**Not done.**
+
+- **None of the new fields render yet.** Absence reasons, holding status, encumbrance and
+  tracker claims are on the read model and on no page. That is step 6's panel work.
+  Tracker claims are internal-only by their nature and need no client path.
+- **Live data is thin.** Wexford-shaped and Halden-shaped states exist live (Sequans,
+  Goodfood). But no live snapshot carries an encumbrance yet, and `secondary_claims` is
+  empty: Panther's pledge and RUM Group's tracker figures are research entries still to
+  make.
+- **The four new fixture names have not been searched against a companies register**,
+  the same caveat `entities.ts` carries for the first five.
+
+---
+
+## Session 10 — item-aware EDGAR parsing, and what the extractor may read
+
+The code that remained of step 5. The spec's "ingest adapters" turned out to be mostly
+not code:
+- Every SEC, LSE and TDnet document registered has its own URL and resolves today.
+- The documents that do not resolve are ASX and NZX announcements with no URL (DigitalX,
+  Locate, Block). The spec already says an ASX id is not derivable, so those need a
+  researcher to find each document's URL, not a URL template.
+- SEDAR+ blocks fetching outright and still needs its own adapter. No registered document
+  points at it.
+
+What did need building was the SEC side, and it turned up a blocker for the first run.
+
+**The blocker.** `commit_research_ingest` never passed `source_section_id`. So every
+ingested event was judged by its whole document's class, and the source-class trigger
+*raises* on a refused class rather than skipping the row. Two consequences:
+- Strategy's documents include a secondary news article, so one event Rex extracted from
+  it would have failed the whole commit.
+- An event read from a 10-K's MD&A would have been accepted, because the document is
+  classed `audited_accounts`.
+
+**Shipped.**
+
+- **`edgarSections.ts`** splits an 8-K, 10-K or 10-Q on its item headings, using
+  line-start string matching and no model.
+  - **8-K:** Items 2.02 and 7.01 are `furnished_release`; the rest are
+    `exchange_announcement`.
+  - **10-K:** Item 8 is `audited_accounts`; everything else is `filed_narrative`.
+  - **10-Q:** Part I Item 1 is `filed_financials`; MD&A and Part II are
+    `filed_narrative`.
+  - The table of contents is skipped by starting at the body's "PART I". The first
+    occurrence of each item in the body wins, so a running page header cannot hand the
+    start of the financial statements to Item 7A. The cover page and signature block are
+    excluded, which keeps the "June 29, 2026" signature-date trap away from the
+    extractor.
+- **`readingUnits.ts`** decides what Rex reads.
+  - Only documents at venue `sec` are split. A news article that mentions a Form 10-K is
+    never split into sections classed as filed.
+  - Splitting stores each item in `research_document_sections`. Rows already there are
+    left alone, so a hand classification wins.
+  - Only units whose class is in `field_source_classes` for `ledger_event` reach the
+    extractor. The set is read from the table the trigger reads, so the two cannot
+    disagree. An empty set fails the run rather than reading nothing and reporting a
+    quiet week.
+- **The workflow** gains a `split_sections` step and now has eleven steps. Each candidate
+  carries `source_section_id`, set from the unit being read, never by the model. Numeric
+  validation checks each figure against the item it was read from, not the whole filing.
+- **`20261002200000_commit_ingest_source_section.sql`** adds `source_section_id` to the
+  event insert and update. It is generated from 20260904000000's body, which matched
+  live byte for byte by md5 before the change.
+- `apps/agents/README.md` lists the new step and two more load-bearing rules: the
+  extractor reads only what the ledger accepts, and event keys are computed.
+
+**Verified.**
+
+- 15 splitter tests, built on markdown shaped as the HTML step emits EDGAR filings. They
+  cover the table of contents, a running header, a mid-sentence cross-reference, Part I
+  and Part II both having an Item 1, and the cover-page and signature traps. Plus 4
+  reading-unit tests and 4 workflow tests:
+  - only Item 8.01 of an 8-K is read, and the event cites it;
+  - the sections are upserted without overwriting existing rows;
+  - a secondary document is never read;
+  - an empty accepted set fails the run.
+- The migration was dry-run against live inside a self-aborting block. An event citing a
+  filed section stored that section id. An event citing a furnished section was refused
+  by the gate. The dry run replaced the function with its events loop only, which is the
+  part that changed; the rest of the migration's body is the original, unchanged.
+- `pnpm --filter @platform/agents test` (1,376), typecheck and lint green.
+
+**Not verified: real filing text.** This container's network policy refuses `sec.gov`,
+so the splitter has not seen a real EDGAR document. The heading patterns are EDGAR's
+standard layout as the HTML step converts it. The first real run is where that gets
+checked: a filing that yields no sections falls back to being read whole under its
+document's class, which is the behaviour before this session.
+
+**Not done, and why.**
+
+- **Scheduling is deliberately not added.** Strategy, Metaplanet, Locate and Sequans are
+  `client_cleared`. A scheduled run would commit model-extracted, Lex-classified rows
+  onto them with no human between extraction and the register. The spec puts scheduling
+  after the review queue ("once the above exists"), and that queue is step 6.
+- **The first real run has not happened.** It needs the agents server's model keys and
+  SEC access, neither of which this container has. Mastra serves registered workflows over
+  its API, so it can be started on Railway with
+  `POST /api/workflows/researchIngest/start-async` and a body of
+  `{ "inputData": { "companyId": "<uuid>" } }`. With `TRACE_RECORDER_TRACE_ID` set, the
+  same run produces the trace bundle.
+  - **Target RUM Group or Angel Studios, not Strategy.** Both have SEC 10-Qs and neither
+    is client-cleared. Strategy is client-cleared, so its first run belongs after
+    step 6.
+

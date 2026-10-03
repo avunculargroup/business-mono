@@ -1565,7 +1565,7 @@ CREATE INDEX IF NOT EXISTS news_items_source_idx ON news_items (source_id);
 -- Publishers behind a hard or metered paywall, edited from /news/sources. A web
 -- article whose host is one of these (or a subdomain) is ingested with
 -- news_items.paywalled = true — the fallback for sites that block the page
--- fetch. (migration: 20260923000000; RLS: is_team_member())
+-- fetch. (migration: 20261003120100; RLS: is_team_member())
 CREATE TABLE paywalled_domains (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   domain      TEXT        NOT NULL UNIQUE,              -- bare lowercase host, no www.
@@ -1618,7 +1618,8 @@ CREATE TABLE IF NOT EXISTS products_services (
                        )),
   description          TEXT,
   logo_url             TEXT,
-  product_image_url    TEXT,
+  product_image_url    TEXT,        -- retired: no longer read or written; uploaded images live in product_images
+  featured_image_id    UUID,        -- FK (featured_image_id, id) → product_images(id, product_service_id), added below
   key_relationship_id  UUID        REFERENCES team_members(id) ON DELETE SET NULL,
   created_by           UUID        REFERENCES team_members(id) ON DELETE SET NULL,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1640,6 +1641,34 @@ CREATE TABLE IF NOT EXISTS product_referral_agreements (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Child: uploaded images (bucket: product-images, private). focal_x/focal_y are
+-- percentages fed to CSS object-position, so one file crops to square or wide.
+CREATE TABLE IF NOT EXISTS product_images (
+  id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_service_id UUID         NOT NULL REFERENCES products_services(id) ON DELETE CASCADE,
+  storage_path       TEXT         NOT NULL UNIQUE,
+  filename           TEXT,
+  mime_type          TEXT,
+  byte_size          BIGINT,
+  width              INTEGER,
+  height             INTEGER,
+  alt_text           TEXT,
+  focal_x            NUMERIC(5,2) NOT NULL DEFAULT 50 CHECK (focal_x BETWEEN 0 AND 100),
+  focal_y            NUMERIC(5,2) NOT NULL DEFAULT 50 CHECK (focal_y BETWEEN 0 AND 100),
+  sort_order         INTEGER      NOT NULL DEFAULT 0,
+  created_by         UUID         REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (id, product_service_id)
+);
+
+-- One featured image per product, and only one of its own.
+ALTER TABLE products_services
+  ADD CONSTRAINT products_services_featured_image_fkey
+  FOREIGN KEY (featured_image_id, id)
+  REFERENCES product_images(id, product_service_id)
+  ON DELETE SET NULL (featured_image_id);
 
 -- Junction: key contacts
 CREATE TABLE IF NOT EXISTS product_key_contacts (
@@ -2984,36 +3013,66 @@ CREATE TABLE report_segments (
 -- empirically, and a fifth is expected.
 --   holding_bases(code PK, label, description, comparable BOOLEAN)
 --     seeded: direct_spot (comparable), look_through, includes_customer_assets,
---     stated_unreconciled
---   source_classes(code PK, rank UNIQUE, label, is_audited) — rank 1 strongest
---     seeded: regulated_disclosure 1, exchange_announcement 2, audited_accounts 3,
---     investor_presentation 4, company_web 5, secondary 6
---   field_source_minimums(field_key PK, min_source_rank → source_classes.rank,
---     rationale) — custody/accounting_treatment/mandate/covenants/ledger_event
---     require rank ≤ 2; operating_metric ≤ 4; identity ≤ 5
+--     stated_unreconciled, etf_wrapped (20261001100100; spot ETF units, never a coin count)
+--   restricted_metrics(code PK, label, aliases[], reason) — issuer metrics that
+--     cannot reach a subscriber even from a primary filing: BTC Yield, BTC Gain,
+--     BTC ¥ Gain, effective net acquisition cost, mNAV, BTC per share
+--   source_classes(code PK, rank UNIQUE, label, is_audited) — rank is display
+--     order only (20261001030000): regulated_disclosure 1, exchange_announcement 2
+--     (incl. TDnet, RNS, SEDAR+, filed 8-K items, 6-K), audited_accounts 3 (incl.
+--     20-F), filed_financials 4 (10-Q statements and notes), filed_narrative 5
+--     (10-K/10-Q Items 1–7, MD&A), furnished_release 6 (was investor_presentation;
+--     8-K Ex 99, decks), company_web 7, secondary 8
+--   field_source_minimums(field_key PK, rationale, client_fact_class) — the
+--     field catalogue. Its min_source_rank threshold was dropped in favour of:
+--   field_source_classes(field_key, source_class) PK both — the SET of classes
+--     each field accepts. ledger_event and accounting_treatment: regulated,
+--     exchange, audited, filed_financials. custody/mandate/covenants: those plus
+--     filed_narrative. operating_metric: plus furnished_release. identity: plus
+--     company_web. Never secondary.
 
--- research_companies — slug UNIQUE, legal_name, acn/abn/arbn/isin/lei,
+-- research_companies — slug UNIQUE, legal_name,
 --   jurisdiction, primary_archetype and self_described_archetype (kept apart:
 --   the divergence is the case study), reporting_standard,
 --   functional/presentation currency, tier, expected_disclosure_cadence,
 --   market_cap_band + funding_source (the peer-shape matching inputs, columns
---   so the criteria stay visible), curator_notes, is_published.
---   Partial unique indexes on acn/abn/arbn/isin WHERE NOT NULL, so the many
---   NULLs do not collide.
+--   so the criteria stay visible), curator_notes, is_published. Registration
+--   numbers live in company_identifiers; the acn/abn/arbn/isin/lei columns were
+--   dropped in 20261001120000.
+--   From 20261001100000–20261001100200: jurisdiction is nullable, with
+--   jurisdiction_basis (stated_in_filing | inferred_from_listing | unknown) and a
+--   CHECK that a NULL jurisdiction carries 'unknown'; fiscal_calendar_type
+--   (calendar_date | week_based_52_53), financial_year_end for the date case only;
+--   reporting_standard admits jgaap; cost_basis_convention (inclusive_of_fees |
+--   net_of_fees | unstated); holding_status (active | exited | never_held) with
+--   exited_on set exactly when exited; ledger_absence_reason (no_stated_basis |
+--   source_class_refused | primary_not_located | filing_system_unreachable |
+--   no_holding).
+-- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
+--   UNIQUE (scheme, value) — entity resolution runs here, and a registration
+--   number names one company. Open scheme vocabulary: a company can hold two CIKs.
 -- company_former_names(company_id, name, used_from, used_to) — a table, not
 --   JSONB, because it is a lookup path during ingest.
 -- company_listings(company_id, venue, ticker, listing_type, filing_entity,
 --   listed_from, listed_to) — listing_type gates regional-register membership
 --   rather than annotating it; a cdi_foreign_exempt quotation is exempt from
---   most listing rules.
+--   most listing rules. security_class (common | preferred | depositary_interest |
+--   cdi | other) says what the line is: Strategy has five primary Nasdaq lines.
 
 -- research_documents — every fact traces here by a NOT NULL FK. document_type,
 --   source_class → source_classes, announcement_id (resolves to the PDF URL),
 --   content_sha256 UNIQUE WHERE NOT NULL for re-fetch dedupe, and
 --   retrieval_error: a failed fetch is recorded, never discarded.
+--   resolution_status (resolved | no_url | unfetchable | fetch_failed) separates
+--   a document never attempted from one that failed; the ingest maintains it.
 -- document_chunks(document_id, chunk_index, page_from/to, content,
 --   embedding VECTOR(1536), HNSW vector_cosine_ops) — whole-document chunks,
 --   never section-keyed.
+-- research_document_sections(document_id, filing_item, source_class, is_filed,
+--   notes) UNIQUE (document_id, filing_item) — a filing is not uniform inside
+--   itself (8-K Item 8.01 is filed, its Exhibit 99.1 furnished), so a claim may
+--   cite a section and is gated on the section's class. Facts, events and
+--   snapshots carry a nullable source_section_id; NULL means the whole document.
 
 -- treasury_events — event_type, asset_class (not bitcoin-only), event_date,
 --   quantity, consideration_native + native_currency + fees_included,
@@ -3021,7 +3080,9 @@ CREATE TABLE report_segments (
 --   natural_key with UNIQUE (company_id, natural_key) for idempotent re-ingest.
 -- treasury_holdings_snapshots — same shape plus instrument_type,
 --   look_through_btc_equivalent, is_related_party_vehicle,
---   includes_customer_assets. basis is NOT NULL here, unlike on events: a
+--   includes_customer_assets, and encumbered_quantity + encumbrance_counterparty
+--   + encumbrance_obligation (≤ quantity; an encumbrance names what it secures).
+--   basis is NOT NULL here, unlike on events: a
 --   holdings row without a basis is the bug rule 1 exists to prevent, while an
 --   event with no quantity legitimately has no basis to state.
 -- fx_rates(rate_date, base_currency, quote_currency, rate, source) — AUD is
@@ -3038,7 +3099,11 @@ CREATE TABLE report_segments (
 --   on metric series and has no subject columns. is_absence + subject carry
 --   structural absence, which is a stated fact rather than an empty panel;
 --   materiality is nullable because the deterministic payload commits before
---   any narration runs.
+--   any narration runs. finding_type admits tracker_divergence.
+-- secondary_claims(company_id, source_name, source_url, claimed_quantity,
+--   claimed_as_of, observed_at, note) UNIQUE (company_id, source_name,
+--   observed_at) — tracker figures, recorded as evidence of divergence and never
+--   as a source.
 
 -- research_company_facts — the qualitative fields (custody, mandate,
 --   accounting_treatment, covenants, operating_metric), each with the document
@@ -3049,7 +3114,10 @@ CREATE TABLE report_segments (
 --   against an offer document naming a third-party custodian is the finding,
 --   not a data-quality problem to resolve silently.
 
--- Triggers: assert_source_minimum(doc_id, field) is the shared assertion.
+-- Triggers: assert_source_accepted(doc_id, section_id, field) is the shared
+--   assertion: the cited section's class (else the document's) must be in
+--   field_source_classes for the field, and the section must belong to the
+--   document.
 --   enforce_source_minimum() passes TG_ARGV[0] and is attached to
 --   treasury_events and treasury_holdings_snapshots for 'ledger_event';
 --   enforce_source_minimum_for_row() reads NEW.field_key and is attached to
