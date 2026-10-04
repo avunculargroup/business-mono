@@ -85,6 +85,39 @@ export async function setReviewState(companyId: string, state: ReviewState) {
 }
 
 /**
+ * Approve every draft row on a record: its ledger events, findings and facts.
+ *
+ * Row-level, and separate from the record's own state. A settled record that
+ * gains one ingested event keeps its state while the event waits here, and a
+ * draft row reaches no subscriber whatever the record's state. Approving per
+ * ingest run, against the run that produced the rows, comes with the run-based
+ * queue.
+ */
+export async function approveDraftRows(companyId: string) {
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+
+  const reviewed = {
+    review_state: ReviewState.INTERNAL,
+    reviewed_by: auth.user.id,
+    reviewed_at: new Date().toISOString(),
+  };
+
+  for (const table of ['treasury_events', 'research_findings', 'research_company_facts'] as const) {
+    const { error } = await auth.supabase
+      .from(table)
+      .update(reviewed)
+      .eq('company_id', companyId)
+      .eq('review_state', ReviewState.DRAFT);
+
+    if (error) return { error: humanizeError(error) };
+  }
+
+  revalidatePath('/research');
+  return { success: true };
+}
+
+/**
  * Clear a register entry for subscribers, with the summary they read.
  *
  * Distinct from `review_state`, which is whether a human has read it. The

@@ -6333,6 +6333,9 @@ export type Database = {
           is_superseded: boolean
           label: string
           natural_key: string
+          review_state: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           source_document_id: string
           source_section_id: string | null
           superseded_by: string | null
@@ -6348,6 +6351,9 @@ export type Database = {
           is_superseded?: boolean
           label: string
           natural_key: string
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id: string
           source_section_id?: string | null
           superseded_by?: string | null
@@ -6363,6 +6369,9 @@ export type Database = {
           is_superseded?: boolean
           label?: string
           natural_key?: string
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id?: string
           source_section_id?: string | null
           superseded_by?: string | null
@@ -6691,6 +6700,9 @@ export type Database = {
           materiality: number | null
           natural_key: string
           occurred_on: string | null
+          review_state: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           source_document_id: string | null
           subject: string | null
           suppressed_reason: string | null
@@ -6708,6 +6720,9 @@ export type Database = {
           materiality?: number | null
           natural_key: string
           occurred_on?: string | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id?: string | null
           subject?: string | null
           suppressed_reason?: string | null
@@ -6725,6 +6740,9 @@ export type Database = {
           materiality?: number | null
           natural_key?: string
           occurred_on?: string | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id?: string | null
           subject?: string | null
           suppressed_reason?: string | null
@@ -7514,6 +7532,9 @@ export type Database = {
           native_currency: string | null
           natural_key: string
           quantity: number | null
+          review_state: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           source_document_id: string
           source_section_id: string | null
           updated_at: string
@@ -7535,6 +7556,9 @@ export type Database = {
           native_currency?: string | null
           natural_key: string
           quantity?: number | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id: string
           source_section_id?: string | null
           updated_at?: string
@@ -7556,6 +7580,9 @@ export type Database = {
           native_currency?: string | null
           natural_key?: string
           quantity?: number | null
+          review_state?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_document_id?: string
           source_section_id?: string | null
           updated_at?: string

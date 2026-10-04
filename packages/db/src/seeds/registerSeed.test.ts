@@ -87,9 +87,21 @@ describe('registerSeed', () => {
     expect(sql).not.toContain('content_sha256');
   });
 
+  it('lands rows as drafts, never carrying a review from the source database', () => {
+    const sql = dump({
+      treasury_events: [{ ...event, review_state: 'internal', reviewed_by: 'tm-1', reviewed_at: 'x' }],
+      research_documents: [doc],
+    });
+    const events = sql.slice(sql.indexOf('INSERT INTO treasury_events'));
+    expect(events).toContain('INSERT INTO treasury_events');
+    expect(events).not.toContain('review_state');
+    expect(events).not.toContain('reviewed_');
+    expect(sql).not.toContain('tm-1');
+  });
+
   it('throws on a column it does not know, rather than dropping it', () => {
-    expect(() => dump({ treasury_events: [{ ...event, review_state: 'draft' }], research_documents: [doc] }))
-      .toThrow(/review_state/);
+    expect(() => dump({ treasury_events: [{ ...event, review_notes: 'draft' }], research_documents: [doc] }))
+      .toThrow(/review_notes/);
     expect(() => emitCompany({ ...company, review_notes: 'draft' })).toThrow(/review_notes/);
   });
 

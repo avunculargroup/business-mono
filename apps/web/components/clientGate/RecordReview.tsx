@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Archive, CircleCheck, CircleDashed } from 'lucide-react';
 import type { ReviewState } from '@platform/shared';
-import { setReviewState } from '@/app/actions/clientPromotion';
+import { approveDraftRows, setReviewState } from '@/app/actions/clientPromotion';
 import styles from './RecordReview.module.css';
 
 /**
@@ -53,19 +53,22 @@ export function RecordReview({
   companyId,
   reviewState,
   cleared,
+  draftRows = 0,
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
+  /** Ledger, fact and absence rows on this record that nobody has reviewed. */
+  draftRows?: number;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { label, description, icon: Icon } = STATES[reviewState];
 
-  function move(to: ReviewState) {
+  function run(action: () => Promise<{ error?: string; success?: boolean }>) {
     setError(null);
     startTransition(async () => {
-      const result = await setReviewState(companyId, to);
+      const result = await action();
       if (result.error) setError(result.error);
     });
   }
@@ -83,6 +86,24 @@ export function RecordReview({
           : null}
       </p>
 
+      {draftRows > 0 ? (
+        <div className={styles.rows}>
+          <p className={styles.description}>
+            {draftRows === 1 ? 'One row' : `${draftRows} rows`} on this record{' '}
+            {draftRows === 1 ? 'is a draft' : 'are drafts'}, marked below. A draft row reaches
+            no subscriber, whatever the record&rsquo;s state.
+          </p>
+          <button
+            type="button"
+            className={styles.ghostButton}
+            onClick={() => run(() => approveDraftRows(companyId))}
+            disabled={pending}
+          >
+            Approve {draftRows === 1 ? 'the draft row' : `${draftRows} draft rows`}
+          </button>
+        </div>
+      ) : null}
+
       {error && (
         <p className={styles.error} role="alert">
           {error}
@@ -95,7 +116,7 @@ export function RecordReview({
             key={action.to}
             type="button"
             className={action.primary ? styles.primaryButton : styles.ghostButton}
-            onClick={() => move(action.to)}
+            onClick={() => run(() => setReviewState(companyId, action.to))}
             disabled={pending}
           >
             {action.label}

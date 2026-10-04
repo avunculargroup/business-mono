@@ -6,6 +6,24 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-03 — Corporate holdings: review state on rows
+
+`20261003220000_row_review_state.sql` adds `review_state` (default `draft`), `reviewed_by`
+and `reviewed_at` to `treasury_events`, `research_findings` and `research_company_facts`.
+Existing rows inherit their company's state.
+
+- **Policies:** the client read policies on events and facts check the row as well as
+  the record.
+- **Views:** `v_research_publishable` requires a reviewed row. `v_research_ledger`,
+  `v_company_facts` and `v_research_absences` carry `review_state` and drop retired
+  rows. The new `v_research_review_queue` lists every record with a draft record or
+  draft rows. All are `security_invoker`.
+- **Ingest:** `commit_research_ingest` sends a row back to draft, taking the new
+  headline and detail, only when one of its facts changed. An unchanged re-read keeps
+  the row's state and its reviewed wording.
+
+---
+
 ## 2026-10-03 — Corporate holdings: `is_published` dropped
 
 `20261003210000_drop_research_companies_is_published.sql` drops

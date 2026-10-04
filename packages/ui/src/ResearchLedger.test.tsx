@@ -101,6 +101,12 @@ describe('ResearchLedger', () => {
     expect(screen.getByText(/does not reach a client-facing surface/)).toBeInTheDocument();
   });
 
+  it('marks a row nobody has reviewed, and only that row', () => {
+    renderLedger([{ ...acquisition, id: 'evt-3', draft: true }, acquisition]);
+
+    expect(screen.getAllByText(/Draft — not yet reviewed/)).toHaveLength(1);
+  });
+
   it('says so plainly when an event discloses no figure', () => {
     renderLedger([
       {

@@ -160,6 +160,15 @@ describe('FactPanel', () => {
     expect(screen.getByText(/Marketing copy cannot populate a controls field/)).toBeInTheDocument();
   });
 
+  it('marks a fact nobody has reviewed', () => {
+    const { unmount } = withRail(<FactPanel fact={{ ...custody, draft: true }} />);
+    expect(screen.getByText(/Draft — not yet reviewed/)).toBeInTheDocument();
+    unmount();
+
+    withRail(<FactPanel fact={custody} />);
+    expect(screen.queryByText(/Draft — not yet reviewed/)).not.toBeInTheDocument();
+  });
+
   it('renders no conflict block on an undisputed fact', () => {
     withRail(<FactPanel fact={{ ...custody, conflicting: null }} />);
 

@@ -716,16 +716,24 @@ const approvalGateStep = createStep({
 
     if (resumeData) {
       if (resumeData.approved) {
-        await db
-          .from('research_companies')
-          // Approval is the review: the record leaves draft and joins the
-          // internal register. Subscriber clearance stays a separate decision.
-          .update({
-            review_state: 'internal',
-            reviewed_by: resumeData.approvedBy,
-            reviewed_at: new Date().toISOString(),
-          })
-          .eq('id', inputData.companyId);
+        const reviewed = {
+          review_state: 'internal',
+          reviewed_by: resumeData.approvedBy,
+          reviewed_at: new Date().toISOString(),
+        };
+        // Approval is the review: the record leaves draft and joins the
+        // internal register. Subscriber clearance stays a separate decision.
+        await db.from('research_companies').update(reviewed).eq('id', inputData.companyId);
+        // And the rows the run wrote, which land as drafts. Every draft row on
+        // the record, for now: rows carry no run id yet, so approving exactly
+        // what this run produced comes with the run-based queue.
+        for (const table of ['treasury_events', 'research_findings'] as const) {
+          await db
+            .from(table)
+            .update(reviewed)
+            .eq('company_id', inputData.companyId)
+            .eq('review_state', 'draft');
+        }
       }
       return { ...summary, published: resumeData.approved };
     }

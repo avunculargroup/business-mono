@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { ReviewQueueEntry } from '@platform/data';
 
 import {
   createFakeRepositories,
@@ -15,6 +16,18 @@ vi.mock('@/lib/repositories', () => ({
 import ResearchRegisterPage from './page';
 
 const registerView = { searchParams: Promise.resolve({}) };
+
+const queued = (overrides: Partial<ReviewQueueEntry>): ReviewQueueEntry => ({
+  companyId: overrides.slug ?? 'x',
+  slug: 'x',
+  legalName: 'Queued Co',
+  tier: 'regional',
+  companyReviewState: 'internal',
+  draftEvents: 0,
+  draftFindings: 0,
+  draftFacts: 0,
+  ...overrides,
+});
 
 beforeEach(() => {
   repositories = createFakeRepositories();
@@ -115,34 +128,35 @@ describe('ResearchRegisterPage', () => {
     expect(screen.getByText(/seeded by hand/)).toBeInTheDocument();
   });
 
-  it('keeps a draft off the register and counts it on the review tab', async () => {
+  it('counts every record with something waiting on the review tab', async () => {
     repositories = createFakeRepositories({
-      register: [
-        fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' }),
-        fakeRegisterEntry({ id: '2', slug: 'b', legalName: 'Wexford', reviewState: 'draft' }),
-      ],
+      register: [fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' })],
+      reviewQueue: [queued({ slug: 'b', legalName: 'Wexford' }), queued({ slug: 'a' })],
     });
 
     render(await ResearchRegisterPage(registerView));
 
     expect(screen.getByText('Meridian Freight')).toBeInTheDocument();
     expect(screen.queryByText('Wexford')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /To review/ })).toHaveTextContent('1');
+    expect(screen.getByRole('link', { name: /To review/ })).toHaveTextContent('2');
     expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('lists only drafts in the review view', async () => {
+  it('lists the queue in the review view, saying what each record waits on', async () => {
     repositories = createFakeRepositories({
-      register: [
-        fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' }),
-        fakeRegisterEntry({ id: '2', slug: 'b', legalName: 'Wexford', reviewState: 'draft' }),
+      register: [fakeRegisterEntry({ id: '1', slug: 'a', legalName: 'Meridian Freight' })],
+      reviewQueue: [
+        queued({ slug: 'b', legalName: 'Wexford', companyReviewState: 'draft' }),
+        queued({ slug: 'a', legalName: 'Meridian Freight', draftEvents: 1, draftFacts: 2 }),
       ],
     });
 
     render(await ResearchRegisterPage({ searchParams: Promise.resolve({ view: 'review' }) }));
 
-    expect(screen.getByText('Wexford')).toBeInTheDocument();
-    expect(screen.queryByText('Meridian Freight')).not.toBeInTheDocument();
+    // A new record and one new row on a settled record are both work.
+    expect(screen.getByText('New record')).toBeInTheDocument();
+    expect(screen.getByText('1 draft ledger event · 2 draft facts')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Wexford/ })).toHaveAttribute('href', '/research/b');
     expect(screen.getByRole('link', { name: /To review/ })).toHaveAttribute(
       'aria-current',
       'page',
