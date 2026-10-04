@@ -750,8 +750,9 @@ describe('query wiring', () => {
 
     for (const view of ['v_research_ledger', 'v_research_absences']) {
       const [builder] = client.__buildersFor(view);
-      expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('review_state'));
-      expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('ingest_run_id'));
+      const columns = builder!.select.mock.calls[0]![0] as string;
+      expect(columns).toContain('review_state');
+      expect(columns).toContain('ingest_run_id');
     }
   });
 
