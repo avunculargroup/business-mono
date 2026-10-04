@@ -8682,6 +8682,7 @@ export type Database = {
           detail: string | null
           headline: string | null
           id: string | null
+          ingest_run_id: string | null
           occurred_on: string | null
           review_state: string | null
           slug: string | null
@@ -8786,6 +8787,7 @@ export type Database = {
           fx_rate_used: number | null
           headline: string | null
           id: string | null
+          ingest_run_id: string | null
           legal_name: string | null
           native_currency: string | null
           quantity: number | null
