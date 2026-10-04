@@ -40,6 +40,36 @@ export function normalizeNewsUrl(raw: string): string {
   }
 }
 
+// Path segments that introduce a taxonomy listing rather than an article —
+// `/type/fraud-scams`, `/category/crypto-news`, `/tag/bitcoin`. Tavily's news
+// search returns these section pages, and the snippet it pulls from them reads
+// like an article, so the judge curates them. The listing then rolls over (or
+// the section is retired) and the digest link lands on a different story or a
+// 404. `archive` is deliberately absent: `/bytes/archive/<slug>` is an article.
+const LISTING_SEGMENTS = new Set([
+  'type', 'tag', 'tags', 'category', 'categories', 'topic', 'topics',
+  'section', 'sections', 'author', 'authors',
+]);
+
+// True when a URL points at a listing page — a site homepage, a taxonomy page
+// (`/category/<slug>`, or the bare `/category`), or a paginated listing
+// (`…/page/2`). A taxonomy segment deeper in the path doesn't count:
+// `/insights/topics/economy/outlook/weekly-update.html` is an article.
+export function isListingPageUrl(raw: string): boolean {
+  let segments: string[];
+  try {
+    segments = new URL(raw).pathname.split('/').filter(Boolean).map((s) => s.toLowerCase());
+  } catch {
+    return false;
+  }
+  if (segments.length === 0) return true;
+  const last = segments[segments.length - 1]!;
+  const prev = segments[segments.length - 2];
+  if (LISTING_SEGMENTS.has(last)) return true;
+  if (prev !== undefined && LISTING_SEGMENTS.has(prev)) return true;
+  return prev === 'page' && /^\d+$/.test(last);
+}
+
 // Drop repeated indices from the LLM ranking judge's shortlist while preserving
 // order. The judge schema doesn't enforce unique indices, so a repeated one
 // would otherwise map the same candidate into the shortlist twice — inserting
