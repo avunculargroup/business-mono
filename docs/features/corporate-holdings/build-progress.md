@@ -1047,6 +1047,10 @@ review queue").
   caught now.
 - `pnpm test` passes in every package; typecheck and lint are green. The grouped control
   renders at 375px and 320px with no horizontal scroll and 44px targets.
+- The first CI run on the PR failed in `researchMailListener.test.ts`, which this session
+  does not touch. One test hit vitest's 10-second timeout, and the next read its leftover
+  calls. The same file passed on `main` and three times in a row locally. If it recurs,
+  it is a flake in that listener's tests to investigate on its own.
 
 **Not done.**
 
