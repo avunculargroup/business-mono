@@ -1354,6 +1354,13 @@ export type Database = {
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "company_former_names_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       company_identifiers: {
@@ -1408,6 +1415,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_identifiers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -1469,6 +1483,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_listings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -6401,11 +6422,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "research_company_facts_field_key_fkey"
             columns: ["field_key"]
             isOneToOne: false
             referencedRelation: "field_source_minimums"
             referencedColumns: ["field_key"]
+          },
+          {
+            foreignKeyName: "research_company_facts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "research_company_facts_source_document_id_fkey"
@@ -6657,6 +6692,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "research_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "research_documents_source_class_fkey"
             columns: ["source_class"]
             isOneToOne: false
@@ -6770,6 +6812,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "research_findings_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
@@ -6788,6 +6837,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "v_research_publishable"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_findings_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
           {
@@ -7040,6 +7096,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secondary_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -7617,6 +7680,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "treasury_events_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "treasury_events_source_document_id_fkey"
             columns: ["source_document_id"]
             isOneToOne: false
@@ -7759,6 +7836,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_holdings_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
           {
             foreignKeyName: "treasury_holdings_snapshots_source_document_id_fkey"
@@ -8094,6 +8178,7 @@ export type Database = {
           field_key: string | null
           id: string | null
           label: string | null
+          review_state: string | null
           slug: string | null
           source_class: string | null
           source_document_id: string | null
@@ -8126,6 +8211,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_company_facts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
           {
             foreignKeyName: "research_company_facts_field_key_fkey"
@@ -8585,6 +8677,7 @@ export type Database = {
           headline: string | null
           id: string | null
           occurred_on: string | null
+          review_state: string | null
           slug: string | null
           source_class: string | null
           source_document_id: string | null
@@ -8644,6 +8737,13 @@ export type Database = {
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "research_findings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       v_research_freshness: {
@@ -8683,6 +8783,7 @@ export type Database = {
           legal_name: string | null
           native_currency: string | null
           quantity: number | null
+          review_state: string | null
           slug: string | null
           source_class: string | null
           source_document_id: string | null
@@ -8721,6 +8822,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
         ]
       }
@@ -8746,6 +8854,7 @@ export type Database = {
           legal_name: string | null
           native_currency: string | null
           quantity: number | null
+          review_state: string | null
           slug: string | null
           source_class: string | null
           source_document_id: string | null
@@ -8785,7 +8894,47 @@ export type Database = {
             referencedRelation: "v_research_freshness"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "treasury_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
         ]
+      }
+      v_research_review_queue: {
+        Row: {
+          company_id: string | null
+          company_review_state: string | null
+          draft_events: number | null
+          draft_facts: number | null
+          draft_findings: number | null
+          legal_name: string | null
+          slug: string | null
+          tier: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          company_review_state?: string | null
+          draft_events?: never
+          draft_facts?: never
+          draft_findings?: never
+          legal_name?: string | null
+          slug?: string | null
+          tier?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          company_review_state?: string | null
+          draft_events?: never
+          draft_facts?: never
+          draft_findings?: never
+          legal_name?: string | null
+          slug?: string | null
+          tier?: string | null
+        }
+        Relationships: []
       }
       v_unresolved_capacity_gaps: {
         Row: {
