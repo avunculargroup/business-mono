@@ -55,6 +55,11 @@ export const COMPANY_SPEC = {
 } as const;
 
 const ROW_AUDIT = ['id', 'company_id', 'created_at'] as const;
+/**
+ * Review state is an environment decision, like the record's: seeded rows land
+ * as drafts (the column default) and are reviewed where they land.
+ */
+const ROW_REVIEW = ['review_state', 'reviewed_by', 'reviewed_at'] as const;
 
 /** In dependency order: documents before anything sourced to them, events before findings. */
 export const CHILD_TABLES: readonly TableSpec[] = [
@@ -103,7 +108,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     refs: { source_document_id: 'document', source_section_id: 'section' },
     // superseded_by is checked in emitChildRows: a self-reference would need
     // ordering this emitter does not do, and no record uses it yet.
-    ignored: [...ROW_AUDIT, 'updated_at', 'superseded_by'],
+    ignored: [...ROW_AUDIT, ...ROW_REVIEW, 'updated_at', 'superseded_by'],
   },
   {
     table: 'treasury_events',
@@ -115,7 +120,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     key: ['natural_key'],
     orderBy: 'natural_key',
     refs: { source_document_id: 'document', source_section_id: 'section' },
-    ignored: [...ROW_AUDIT, 'updated_at'],
+    ignored: [...ROW_AUDIT, ...ROW_REVIEW, 'updated_at'],
   },
   {
     table: 'treasury_holdings_snapshots',
@@ -139,7 +144,7 @@ export const CHILD_TABLES: readonly TableSpec[] = [
     key: ['natural_key'],
     orderBy: 'natural_key',
     refs: { source_document_id: 'document', event_id: 'event' },
-    ignored: [...ROW_AUDIT],
+    ignored: [...ROW_AUDIT, ...ROW_REVIEW],
   },
   {
     table: 'secondary_claims',

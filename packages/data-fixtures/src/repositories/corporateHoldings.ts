@@ -11,6 +11,8 @@ import type {
   ReadContext,
   RegisterEntry,
   RegisterFilter,
+  ReviewQueueEntry,
+  ReviewReadOptions,
   StructuralAbsence,
   TrackerClaim,
   WithheldField,
@@ -32,6 +34,11 @@ import {
 } from '../fixtures';
 
 const MS_PER_DAY = 86_400_000;
+
+/** Mirrors the live adapter: reviewed rows, plus drafts when asked; never retired. */
+function readable(row: { reviewState: string }, opts?: ReviewReadOptions): boolean {
+  return row.reviewState === 'internal' || (opts?.includeDrafts === true && row.reviewState === 'draft');
+}
 
 /** Whole days between a `YYYY-MM-DD` and the anchor. */
 function daysSince(anchor: Date, isoDate: string): number {
@@ -92,19 +99,22 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
     async getLedger(
       ctx: ReadContext,
       companyId: string,
-      opts?: { publishableOnly?: boolean } & QueryOptions,
+      opts?: { publishableOnly?: boolean } & ReviewReadOptions & QueryOptions,
     ): Promise<Paginated<LedgerEntry>> {
       const found = company(ctx.asOf, companyId);
       if (!found) return paginate([], opts);
 
       const rows = (researchLedger(ctx.asOf)[found.id] ?? [])
         .filter((entry) =>
-          // Both gates, mirroring v_research_publishable: a human has reviewed
-          // the company AND the field is classified publishable. Applying only
-          // the second would leak a draft company's rows.
+          // Three gates, mirroring v_research_publishable: a human has reviewed
+          // the company AND the row AND the field is classified publishable.
+          // Applying only the last would leak a draft company's rows; skipping
+          // the row would leak a draft event on a reviewed record.
           opts?.publishableOnly
-            ? found.reviewState === 'internal' && entry.classification === 'publishable'
-            : true,
+            ? found.reviewState === 'internal' &&
+              entry.reviewState === 'internal' &&
+              entry.classification === 'publishable'
+            : readable(entry, opts),
         )
         .sort((a, b) => b.eventDate.localeCompare(a.eventDate));
 
@@ -162,9 +172,15 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
       };
     },
 
-    async getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]> {
+    async getCompanyFacts(
+      ctx: ReadContext,
+      companyId: string,
+      opts?: ReviewReadOptions,
+    ): Promise<CompanyFact[]> {
       const found = company(ctx.asOf, companyId);
-      return found ? (researchFacts(ctx.asOf)[found.id] ?? []) : [];
+      return found
+        ? (researchFacts(ctx.asOf)[found.id] ?? []).filter((row) => readable(row, opts))
+        : [];
     },
 
     async getWithheldFields(ctx: ReadContext, companyId: string): Promise<WithheldField[]> {
@@ -176,9 +192,40 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
     async getStructuralAbsences(
       ctx: ReadContext,
       companyId: string,
+      opts?: ReviewReadOptions,
     ): Promise<StructuralAbsence[]> {
       const found = company(ctx.asOf, companyId);
-      return found ? (researchAbsences(ctx.asOf)[found.id] ?? []) : [];
+      return found
+        ? (researchAbsences(ctx.asOf)[found.id] ?? []).filter((row) => readable(row, opts))
+        : [];
+    },
+
+    async getReviewQueue(ctx: ReadContext): Promise<ReviewQueueEntry[]> {
+      const ledger = researchLedger(ctx.asOf);
+      const facts = researchFacts(ctx.asOf);
+      const absences = researchAbsences(ctx.asOf);
+      const drafts = <T extends { reviewState: string }>(rows: T[] | undefined) =>
+        (rows ?? []).filter((row) => row.reviewState === 'draft').length;
+
+      return researchCompanies(ctx.asOf)
+        .map((row) => ({
+          companyId: row.id,
+          slug: row.slug,
+          legalName: row.legalName,
+          tier: row.tier,
+          companyReviewState: row.reviewState,
+          draftEvents: drafts(ledger[row.id]),
+          // The fixtures hold absences only, which is all of the findings a
+          // page reads; the live view counts every unsuppressed finding.
+          draftFindings: drafts(absences[row.id]),
+          draftFacts: drafts(facts[row.id]),
+        }))
+        .filter(
+          (row) =>
+            row.companyReviewState === 'draft' ||
+            row.draftEvents + row.draftFindings + row.draftFacts > 0,
+        )
+        .sort((a, b) => a.legalName.localeCompare(b.legalName));
     },
 
     async getTrackerClaims(ctx: ReadContext, companyId: string): Promise<TrackerClaim[]> {

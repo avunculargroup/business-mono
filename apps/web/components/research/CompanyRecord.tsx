@@ -76,6 +76,7 @@ export function CompanyRecord({
     basis: entry.basis,
     basisComparable: entry.basisComparable,
     classification: entry.classification,
+    draft: entry.reviewState === 'draft',
     provenance: entry.provenance,
   }));
 
@@ -208,7 +209,12 @@ export function CompanyRecord({
                   company with no debt look identical on a screen, and only one of them is an
                   answer.
                 </p>
-                <AbsencePanel absences={absences} />
+                <AbsencePanel
+                  absences={absences.map((absence) => ({
+                    ...absence,
+                    draft: absence.reviewState === 'draft',
+                  }))}
+                />
               </section>
             ) : null}
           </main>
@@ -216,7 +222,7 @@ export function CompanyRecord({
           <aside className={styles.aside}>
             {facts.map((fact) => (
               <section key={fact.id} className={styles.section}>
-                <FactPanel fact={fact} />
+                <FactPanel fact={{ ...fact, draft: fact.reviewState === 'draft' }} />
               </section>
             ))}
 

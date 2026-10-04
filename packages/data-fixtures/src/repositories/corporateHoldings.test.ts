@@ -30,6 +30,7 @@ describeCorporateHoldingsContract<DemoDomain>({
   activeSlug: RESEARCH_ENTITIES.tarra.slug,
   disposalWithoutConsiderationSlug: RESEARCH_ENTITIES.wexford.slug,
   draftSlug: RESEARCH_ENTITIES.brennock.slug,
+  draftRowSlug: RESEARCH_ENTITIES.meridian.slug,
 });
 
 const ctx = testReadContext();

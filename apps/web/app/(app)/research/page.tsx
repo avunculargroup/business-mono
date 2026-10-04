@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { RegisterEntry, ReviewQueueEntry } from '@platform/data';
 import { getRepositories } from '@/lib/repositories';
 import { resolveReadContext } from '@platform/data-supabase';
 import { PageHeader } from '@/components/app-shell/PageHeader';
@@ -44,10 +45,25 @@ const TIER_HEADINGS: Record<string, { title: string; blurb: string }> = {
 const TIER_ORDER = ['regional', 'peer_shaped', 'bellwether'] as const;
 
 /**
- * `?view=review` is the review queue: the same list, filtered to records an
- * agent created that nobody has read yet. Its count is on the tab either way,
- * so a draft is never somewhere you have to remember to look.
+ * `?view=review` is the review queue: every record with something waiting,
+ * whether the record itself is a draft or it is a settled record with new
+ * draft rows. Its count is on the tab either way, so a draft is never
+ * somewhere you have to remember to look.
  */
+/** What a queued record is waiting on, in words: a new record, or which rows. */
+function waitingOn(entry: ReviewQueueEntry): string {
+  const rows = [
+    [entry.draftEvents, 'ledger event'],
+    [entry.draftFacts, 'fact'],
+    [entry.draftFindings, 'finding'],
+  ] as const;
+  const parts = rows
+    .filter(([count]) => count > 0)
+    .map(([count, noun]) => `${count} draft ${noun}${count === 1 ? '' : 's'}`);
+  const record = entry.companyReviewState === 'draft' ? 'New record' : null;
+  return [record, ...parts].filter(Boolean).join(' · ');
+}
+
 export default async function ResearchRegisterPage({
   searchParams,
 }: {
@@ -57,9 +73,11 @@ export default async function ResearchRegisterPage({
   const { corporateHoldings } = await getRepositories();
   const ctx = resolveReadContext();
 
-  const [{ items }, drafts] = await Promise.all([
-    corporateHoldings.listCompanies(ctx, reviewing ? { reviewState: 'draft' } : undefined),
-    corporateHoldings.listCompanies(ctx, { reviewState: 'draft' }, { limit: 1 }),
+  const [queue, { items }] = await Promise.all([
+    corporateHoldings.getReviewQueue(ctx),
+    reviewing
+      ? Promise.resolve({ items: [] as RegisterEntry[] })
+      : corporateHoldings.listCompanies(ctx),
   ]);
 
   return (
@@ -86,11 +104,24 @@ export default async function ResearchRegisterPage({
             aria-current={reviewing ? 'page' : undefined}
           >
             To review
-            <span className={styles.count}>
-              {drafts.total}
-            </span>
+            <span className={styles.count}>{queue.length}</span>
           </Link>
         </nav>
+
+        {reviewing && queue.length > 0 ? (
+          <ul className={styles.records}>
+            {queue.map((entry) => (
+              <li key={entry.companyId} className={styles.record}>
+                <Link href={`/research/${entry.slug}`} className={styles.recordLink}>
+                  <span className={styles.name}>{entry.legalName}</span>
+                  <span className={styles.meta}>
+                    <span>{waitingOn(entry)}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         {TIER_ORDER.map((tier) => {
           const rows = items.filter((company) => company.tier === tier);
@@ -143,10 +174,10 @@ export default async function ResearchRegisterPage({
           );
         })}
 
-        {items.length === 0 && reviewing ? (
+        {queue.length === 0 && reviewing ? (
           <p className={styles.empty}>
-            Nothing is waiting for review. A record an agent creates lands here, off the
-            register, until someone has read it.
+            Nothing is waiting for review. A record an agent creates, and any new row on a
+            settled record, lands here until someone has read it.
           </p>
         ) : null}
 

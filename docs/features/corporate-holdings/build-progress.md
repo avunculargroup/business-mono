@@ -14,8 +14,9 @@ conformance cases pass against both adapters (session 9), then SEC filings are s
 item and only accepted text reaches the extractor (session 10). What is left of step 5 is
 operational: the first real run and its trace bundle. Step 6 is under way: record-level
 `review_state`, the review queue and the subscriber summary (session 11), then Minute
-shows the summary and `is_published` is dropped (session 12). Row-level review and
-notifications are not started, and scheduling waits on them. Two things still remain
+shows the summary and `is_published` is dropped (session 12), then review state on
+the rows themselves (session 13). The run-based queue, notifications and scheduling are
+next. Two things still remain
 from session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-03
 
@@ -908,3 +909,81 @@ seeds a row and checks both the mapping and the selected columns.
 **Not done.** The ingest drafting the summary for a human to edit (decided 29 September,
 see [`schema-ingest-spec.md`](./schema-ingest-spec.md)). Until it exists, every summary is
 written from scratch on the record's page.
+
+## Session 13 — review state on the rows
+
+The row-level half of step 6, as decided on 29 September. A record-level flag can't say
+that one new event on a settled record is unread. Either the whole record drops back to
+draft, hiding everything because one row arrived, or the row is served unreviewed.
+
+**Shipped.**
+
+- **`20261003220000_row_review_state.sql`**:
+  - Adds `review_state` (default `draft`), `reviewed_by` and `reviewed_at` to
+    `treasury_events`, `research_findings` and `research_company_facts`. Existing rows
+    inherit their company's state.
+  - The client read policies on events and facts check the row as well as the record.
+  - `v_research_publishable` requires a reviewed row. The internal views carry
+    `review_state` and drop retired rows.
+  - `v_research_review_queue` lists every record with something waiting.
+  - All five views are restated `WITH (security_invoker = true)`.
+- **`commit_research_ingest` sends a row back to draft only when a fact in it
+  changed**: type, asset, date, quantity, consideration, currency, fees or basis
+  (for findings, their own factual columns). Every run re-sends every validated event,
+  so resetting on any update would demote the whole ledger weekly.
+  - An unchanged re-read also keeps the reviewed headline and detail, because the
+    model rewords them on every run, and that rewording must not reach a subscriber
+    unreviewed.
+  - A changed row takes the new text and needs reviewing again.
+- **Read model:**
+  - `LedgerEntry`, `CompanyFact` and `StructuralAbsence` carry `reviewState`.
+  - `getLedger`, `getCompanyFacts` and `getStructuralAbsences` take `includeDrafts`,
+    and return reviewed rows by default. Retired rows are never returned.
+  - `getReviewQueue` lists what is waiting, with draft counts per record.
+- **Three contract cases**, against a new `draftRowSlug` slot (Meridian: a reviewed,
+  cleared record with a draft row Lex classified publishable):
+  - reviewed rows by default, and drafts only when asked;
+  - no draft row in the publishable read;
+  - the queue lists every record with something waiting, and nothing else.
+- **`/research`:**
+  - The company page reads the reviewer's view and marks draft rows. The marker is a
+    dashed rule, in `@platform/ui`'s ledger and fact and absence panels.
+  - `approveDraftRows` approves them all, recording who did.
+  - The To review tab lists the queue and says what each record waits on: "New
+    record", or "1 draft ledger event · 2 draft facts".
+- **Ingest approval gate:** also approves the record's draft events and findings.
+- **Seed dumper:** ignores the row review columns, so seeded rows land as drafts.
+- **Generated types:** `packages/db/src/types/database.ts` gains the nine new columns,
+  hand-added so the web action typechecks before the migrate workflow regenerates
+  the file.
+
+**Verified.**
+
+- **Dry run on live**, inside a self-aborting block:
+  - Backfill: 26 events, 7 findings and 24 facts became `internal`. 3 events,
+    4 findings and 14 facts stayed draft.
+  - Publishable rows stayed at 8, and the queue listed the 6 draft records.
+  - Re-sending Sequans' disposal unchanged, with a reworded headline, kept it
+    `internal` with its reviewed headline. Re-sending it with a changed quantity sent it
+    to draft with the new text, and put Sequans in the queue.
+  - With Sequans cleared, a Minute subscriber saw its one reviewed event and not the
+    draft.
+  - Policies were tested with `ALTER POLICY` and the same expressions, because the SQL
+    tool holds back statements containing `DROP`. The function was trimmed to its events
+    loop for the dry run; the findings loop follows the same pattern.
+- **Deliberate breaks:** I broke the adapters nine ways, and the suite caught eight.
+  The one it missed was the Supabase adapter's own internal-only filter on the
+  publishable read. Its test data mirrors the view, which already applies that filter,
+  so the contract could not see the adapter's copy. An adapter wiring test now checks
+  that query, and catches the same break.
+- The control renders at 375px and 320px with no horizontal scroll and 44px targets.
+
+**Not done.**
+
+- **Approval is per record, not per run.** Rows carry no run id, so approving a run
+  approves every draft row on its record. The spec's run-based queue, backed by
+  `agent_activity` and approving exactly what a run produced, comes next.
+- **The workflow still ends in `suspend()`.** Persist-and-stop, notifications and
+  scheduling follow the queue.
+- **Positions (`treasury_holdings_snapshots`) carry no review state.** The spec names the
+  three row tables only.

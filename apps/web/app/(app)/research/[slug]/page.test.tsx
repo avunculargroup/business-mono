@@ -110,14 +110,22 @@ describe('ResearchCompanyPage', () => {
     expect(repositories.corporateHoldings.getWithheldFields).toHaveBeenCalled();
   });
 
-  it('reads the ledger unfiltered, because this surface is internal', async () => {
+  it('reads the reviewer\'s view: unclassified rows and draft rows, marked', async () => {
     // `publishableOnly` is for a client-facing surface. The internal register
-    // shows internal rows, marked.
+    // shows internal rows, marked, and the drafts a reviewer is there to read.
     await ResearchCompanyPage({ params });
 
-    expect(repositories.corporateHoldings.getLedger).toHaveBeenCalledWith(
+    const { corporateHoldings } = repositories;
+    expect(corporateHoldings.getLedger).toHaveBeenCalledWith(expect.anything(), 'rc-1', {
+      includeDrafts: true,
+    });
+    expect(corporateHoldings.getCompanyFacts).toHaveBeenCalledWith(expect.anything(), 'rc-1', {
+      includeDrafts: true,
+    });
+    expect(corporateHoldings.getStructuralAbsences).toHaveBeenCalledWith(
       expect.anything(),
       'rc-1',
+      { includeDrafts: true },
     );
   });
 

@@ -31,6 +31,8 @@ export interface LedgerRow {
   basis: HoldingBasis | null;
   basisComparable: boolean | null;
   classification: 'publishable' | 'internal' | 'restricted';
+  /** Not yet reviewed. Only a reviewer's view of a record carries draft rows. */
+  draft?: boolean;
   provenance: ProvenanceSource;
 }
 
@@ -86,6 +88,11 @@ export function ResearchLedger({ rows, className }: { rows: LedgerRow[]; classNa
             <p className={styles.eventType}>{EVENT_LABELS[row.eventType] ?? row.eventType}</p>
             <h3 className={styles.headline}>{row.headline}</h3>
             {row.detail ? <p className={styles.detail}>{row.detail}</p> : null}
+            {row.draft ? (
+              <p className={styles.draft}>
+                Draft — not yet reviewed. It reaches no subscriber until it is approved.
+              </p>
+            ) : null}
             {row.classification !== 'publishable' ? (
               <p className={styles.internal}>
                 Internal — this row states a disclosed fact whose natural reading is a view on

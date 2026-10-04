@@ -481,6 +481,15 @@ describe('the approval gate', () => {
         }),
       }),
     );
+    // The run's rows land as drafts, so approving the run approves them too.
+    for (const table of ['treasury_events', 'research_findings']) {
+      expect(updates).toContainEqual(
+        expect.objectContaining({
+          table,
+          values: expect.objectContaining({ review_state: 'internal' }),
+        }),
+      );
+    }
     // Approval is review, never clearance: a subscriber sees nothing yet.
     expect(updates).not.toContainEqual(
       expect.objectContaining({ values: expect.objectContaining({ client_cleared: true }) }),

@@ -10,6 +10,7 @@ import type {
   StructuralAbsence,
   WithheldField,
 } from '@platform/data';
+import type { ReviewState } from '@platform/shared';
 import { onDate } from './anchor';
 import { RESEARCH_ENTITIES } from './entities';
 
@@ -735,6 +736,29 @@ function asxListing(
   };
 }
 
+/** A row as written below: its review state defaults to its company's. */
+type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState'> & {
+  reviewState?: ReviewState;
+};
+
+/**
+ * Rows inherit their company's state unless they say otherwise, which is what
+ * the migration did to every existing row. The few that say otherwise are the
+ * ones the review cases are about.
+ */
+function withRowState<T extends { reviewState: ReviewState }>(
+  anchor: Date,
+  rows: Record<string, RowInput<T>[]>,
+): Record<string, T[]> {
+  const states = new Map(researchCompanies(anchor).map((c) => [c.id, c.reviewState]));
+  return Object.fromEntries(
+    Object.entries(rows).map(([companyId, list]) => [
+      companyId,
+      list.map((row) => ({ ...row, reviewState: row.reviewState ?? states.get(companyId) ?? 'draft' }) as T),
+    ]),
+  );
+}
+
 /** The register list. The same rows, narrowed to what a list renders. */
 export function researchRegister(anchor: Date): RegisterEntry[] {
   return researchCompanies(anchor).map((company) => ({
@@ -762,8 +786,55 @@ export function researchRegister(anchor: Date): RegisterEntry[] {
 export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
   const d = documents(anchor);
 
-  return {
+  return withRowState<LedgerEntry>(anchor, {
     [E.meridian.id]: [
+      // Landed from an ingest run and not yet read, on a record that is
+      // reviewed and cleared. Classified publishable, so the row's own state is
+      // the only thing keeping it out of the publishable read and off Minute.
+      {
+        id: 'evt-mfg-006',
+        companyId: E.meridian.id,
+        eventType: 'acquisition',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -3),
+        quantity: 4,
+        considerationNative: null,
+        nativeCurrency: null,
+        considerationAud: null,
+        fxRateUsed: null,
+        feesIncluded: null,
+        headline: 'Further acquisition under the treasury policy',
+        detail: null,
+        disclosureVenue: 'nzx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        reviewState: 'draft',
+        provenance: d.meridianTreasuryUpdate,
+      },
+      // Superseded by a restatement and retired rather than deleted: the
+      // record of what was believed stays in the table, and no read returns it.
+      {
+        id: 'evt-mfg-000',
+        companyId: E.meridian.id,
+        eventType: 'acquisition',
+        assetClass: 'btc',
+        eventDate: onDate(anchor, -300),
+        quantity: 11,
+        considerationNative: null,
+        nativeCurrency: null,
+        considerationAud: null,
+        fxRateUsed: null,
+        feesIncluded: null,
+        headline: 'Acquisition as first reported, since restated',
+        detail: null,
+        disclosureVenue: 'asx',
+        basis: 'direct_spot',
+        basisComparable: true,
+        classification: 'publishable',
+        reviewState: 'retired',
+        provenance: d.meridianTreasuryUpdate,
+      },
       {
         id: 'evt-mfg-005',
         companyId: E.meridian.id,
@@ -1142,7 +1213,7 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
         provenance: d.wexfordAcquisition,
       },
     ],
-  };
+  });
 }
 
 // ── Positions ──────────────────────────────────────────────────────────────
@@ -1399,7 +1470,7 @@ export function researchTrackerClaims(anchor: Date): Record<string, FixtureTrack
 export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
   const d = documents(anchor);
 
-  return {
+  return withRowState<CompanyFact>(anchor, {
     [E.meridian.id]: [
       {
         id: 'fact-mfg-custody',
@@ -1453,7 +1524,7 @@ export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
         conflicting: null,
       },
     ],
-  };
+  });
 }
 
 // ── Structural absences ────────────────────────────────────────────────────
@@ -1467,7 +1538,7 @@ export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
 export function researchAbsences(anchor: Date): Record<string, StructuralAbsence[]> {
   const d = documents(anchor);
 
-  return {
+  return withRowState<StructuralAbsence>(anchor, {
     [E.verrall.id]: [
       {
         companyId: E.verrall.id,
@@ -1509,7 +1580,7 @@ export function researchAbsences(anchor: Date): Record<string, StructuralAbsence
         provenance: d.calderMonthly,
       },
     ],
-  };
+  });
 }
 
 // ── Withheld ───────────────────────────────────────────────────────────────

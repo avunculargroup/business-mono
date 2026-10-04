@@ -22,6 +22,7 @@ import type {
   QueryOptions,
   RegisterEntry,
   RegisterFilter,
+  ReviewQueueEntry,
   RepositoryBundle,
 } from '@platform/data';
 
@@ -65,6 +66,7 @@ export function createFakeRepositories(
     ledger?: LedgerEntry[];
     position?: PositionSummary;
     facts?: CompanyFact[];
+    reviewQueue?: ReviewQueueEntry[];
     company?: CompanyDetail | null;
     companyContacts?: CompanyContact[];
     marketReports?: MarketReportSummary[];
@@ -171,6 +173,7 @@ export function createFakeRepositories(
       getStructuralAbsences: vi.fn(async () => []),
       getTrackerClaims: vi.fn(async () => []),
       compareCompanies: vi.fn(async () => []),
+      getReviewQueue: vi.fn(async () => overrides.reviewQueue ?? []),
     },
     companies: {
       listCompanies: vi.fn(async () => {

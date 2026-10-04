@@ -148,6 +148,8 @@ export interface FactView {
   label: string;
   value: string;
   asOf: string | null;
+  /** Not yet reviewed. Only a reviewer's view of a record carries draft facts. */
+  draft?: boolean;
   provenance: ProvenanceSource;
   conflicting: {
     value: string;
@@ -173,6 +175,12 @@ export function FactPanel({ fact, className }: { fact: FactView; className?: str
         <h3 className={styles.factLabel}>{fact.label}</h3>
         <SourceBadge sourceClass={fact.provenance.sourceClass} />
       </div>
+
+      {fact.draft ? (
+        <p className={styles.draft}>
+          Draft — not yet reviewed. It reaches no subscriber until it is approved.
+        </p>
+      ) : null}
 
       {fact.value.split('\n\n').map((paragraph, index) => (
         <p key={index} className={styles.factValue}>
@@ -215,6 +223,8 @@ export function FactPanel({ fact, className }: { fact: FactView; className?: str
 export interface AbsenceView {
   subject: string;
   statement: string;
+  /** Not yet reviewed. */
+  draft?: boolean;
   provenance: ProvenanceSource;
 }
 
@@ -239,6 +249,9 @@ export function AbsencePanel({
         {absences.map((absence) => (
           <li key={absence.subject} className={styles.absence}>
             <Cited fact={<span>{absence.statement}</span>} source={absence.provenance} />
+            {absence.draft ? (
+              <p className={styles.draft}>Draft — not yet reviewed.</p>
+            ) : null}
           </li>
         ))}
       </ul>

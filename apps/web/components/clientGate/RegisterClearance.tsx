@@ -21,15 +21,22 @@ export function RegisterClearance({
   reviewState,
   cleared,
   clientSummary,
+  draftRows = 0,
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
   clientSummary: string | null;
+  draftRows?: number;
 }) {
   return (
     <div className={styles.stack}>
-      <RecordReview companyId={companyId} reviewState={reviewState} cleared={cleared} />
+      <RecordReview
+        companyId={companyId}
+        reviewState={reviewState}
+        cleared={cleared}
+        draftRows={draftRows}
+      />
       {reviewState === 'internal' ? (
         <ClientGate
           cleared={cleared}

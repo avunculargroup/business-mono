@@ -16,6 +16,7 @@ vi.mock('@/lib/action', () => ({
 }));
 
 import {
+  approveDraftRows,
   classifyProduct,
   setClientNote,
   setRegisterClearance,
@@ -28,7 +29,14 @@ function patch(table: string): Record<string, unknown> {
 
 beforeEach(() => {
   supabase = createFakeSupabase();
-  for (const t of ['ecosystem_changes', 'research_companies', 'products_services']) {
+  for (const t of [
+    'ecosystem_changes',
+    'research_companies',
+    'products_services',
+    'treasury_events',
+    'research_findings',
+    'research_company_facts',
+  ]) {
     supabase.__setResponse(t, { data: null, error: null });
   }
   authed = true;
@@ -97,6 +105,30 @@ describe('setReviewState', () => {
     expect(await setReviewState('co-1', 'internal')).toEqual({
       error: 'You need to be signed in to do that.',
     });
+  });
+});
+
+describe('approveDraftRows', () => {
+  it('approves the draft rows on all three row tables, and records who did', async () => {
+    const result = await approveDraftRows('co-1');
+
+    expect(result).toEqual({ success: true });
+    for (const table of ['treasury_events', 'research_findings', 'research_company_facts']) {
+      const [builder] = supabase.__buildersFor(table);
+      expect(builder!.update.mock.calls[0]![0]).toMatchObject({
+        review_state: 'internal',
+        reviewed_by: 'director-1',
+      });
+      expect(builder!.eq).toHaveBeenCalledWith('company_id', 'co-1');
+      // Drafts only: a retired row stays retired.
+      expect(builder!.eq).toHaveBeenCalledWith('review_state', 'draft');
+    }
+  });
+
+  it('leaves the record itself alone', async () => {
+    await approveDraftRows('co-1');
+
+    expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
   });
 });
 

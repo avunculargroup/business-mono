@@ -187,6 +187,8 @@ export interface LedgerEntry {
   /** Whether this basis may enter an aggregate. Read off the lookup, not inferred. */
   basisComparable: boolean | null;
   classification: ResearchClassification;
+  /** Retired rows never reach a read; draft ones only when asked for. */
+  reviewState: ReviewState;
   provenance: Provenance;
 }
 
@@ -292,6 +294,7 @@ export interface StructuralAbsence {
   companyId: string;
   subject: 'covenants' | 'debt' | 'holdings' | 'policy';
   statement: string;
+  reviewState: ReviewState;
   provenance: Provenance;
 }
 
@@ -313,6 +316,7 @@ export interface CompanyFact {
   /** Markdown. */
   value: string;
   asOf: string | null;
+  reviewState: ReviewState;
   provenance: Provenance;
   /** Non-null only where a weaker source claimed otherwise. */
   conflicting: {
@@ -388,6 +392,30 @@ export function measureTrackerClaim(
   };
 }
 
+/**
+ * How a row-level read treats rows nobody has reviewed.
+ *
+ * Every ledger, fact and absence row carries its own review state. Reads
+ * return `internal` rows by default; `includeDrafts` adds the `draft` ones for
+ * the reviewer's view of a record. `retired` rows are never returned: they
+ * stay in the tables as the record of what was believed and when.
+ */
+export interface ReviewReadOptions {
+  includeDrafts?: boolean;
+}
+
+/** One record with something waiting: a draft record, or draft rows under a reviewed one. */
+export interface ReviewQueueEntry {
+  companyId: string;
+  slug: string;
+  legalName: string;
+  tier: ResearchTier;
+  companyReviewState: ReviewState;
+  draftEvents: number;
+  draftFindings: number;
+  draftFacts: number;
+}
+
 export interface RegisterFilter {
   tier?: ResearchTier;
   archetype?: ResearchArchetype;
@@ -435,12 +463,13 @@ export interface CorporateHoldingsRepository {
    * a human has reviewed the company (`internal`) AND Lex classified the
    * field publishable. It is a different query, not a filter over the same
    * rows, so a client-facing surface cannot accidentally receive an internal
-   * row it then declines to render.
+   * row it then declines to render. The view requires a reviewed row as well
+   * as a reviewed company, so `includeDrafts` has no effect there.
    */
   getLedger(
     ctx: ReadContext,
     companyId: string,
-    opts?: { publishableOnly?: boolean } & QueryOptions,
+    opts?: { publishableOnly?: boolean } & ReviewReadOptions & QueryOptions,
   ): Promise<Paginated<LedgerEntry>>;
 
   /** The current position with the aggregate already decided. */
@@ -470,7 +499,11 @@ export interface CorporateHoldingsRepository {
    * job, and a page that had to rank source classes itself would be a page that
    * could get it wrong.
    */
-  getCompanyFacts(ctx: ReadContext, companyId: string): Promise<CompanyFact[]>;
+  getCompanyFacts(
+    ctx: ReadContext,
+    companyId: string,
+    opts?: ReviewReadOptions,
+  ): Promise<CompanyFact[]>;
 
   /**
    * What Lex withheld at the company level, for the panel that shows it.
@@ -482,7 +515,18 @@ export interface CorporateHoldingsRepository {
   getWithheldFields(ctx: ReadContext, companyId: string): Promise<WithheldField[]>;
 
   /** Facts the register states because they are absent. Empty is a valid answer. */
-  getStructuralAbsences(ctx: ReadContext, companyId: string): Promise<StructuralAbsence[]>;
+  getStructuralAbsences(
+    ctx: ReadContext,
+    companyId: string,
+    opts?: ReviewReadOptions,
+  ): Promise<StructuralAbsence[]>;
+
+  /**
+   * Every record with something waiting for a reviewer, by name. A new record
+   * and one new event on a settled record are both work, and the counts say
+   * which.
+   */
+  getReviewQueue(ctx: ReadContext): Promise<ReviewQueueEntry[]>;
 
   /**
    * What the trackers claim, each measured against the comparable position.

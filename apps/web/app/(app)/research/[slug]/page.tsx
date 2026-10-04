@@ -28,10 +28,11 @@ export default async function ResearchCompanyPage({
   if (!company) notFound();
 
   const [ledger, position, facts, absences, withheld, freshness, notes] = await Promise.all([
-    corporateHoldings.getLedger(ctx, company.id),
+    // The reviewer's view: draft rows included, and marked as drafts.
+    corporateHoldings.getLedger(ctx, company.id, { includeDrafts: true }),
     corporateHoldings.getPosition(ctx, company.id),
-    corporateHoldings.getCompanyFacts(ctx, company.id),
-    corporateHoldings.getStructuralAbsences(ctx, company.id),
+    corporateHoldings.getCompanyFacts(ctx, company.id, { includeDrafts: true }),
+    corporateHoldings.getStructuralAbsences(ctx, company.id, { includeDrafts: true }),
     corporateHoldings.getWithheldFields(ctx, company.id),
     corporateHoldings.getFreshness(ctx, company.id),
     corporateHoldings.getJurisdictionNotes(ctx, {
@@ -52,6 +53,10 @@ export default async function ResearchCompanyPage({
           reviewState={company.reviewState}
           cleared={company.clientCleared}
           clientSummary={company.clientSummary}
+          draftRows={
+            [...ledger.items, ...facts, ...absences].filter((row) => row.reviewState === 'draft')
+              .length
+          }
         />
       </div>
       <CompanyRecord

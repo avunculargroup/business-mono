@@ -306,3 +306,13 @@
   font-size: var(--text-xs);
   white-space: nowrap;
 }
+
+/* Dashed rather than solid: a row waiting to be read, not a decision made. */
+.draft {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-3);
+  border-left: 3px dashed var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary);
+}
