@@ -43,6 +43,7 @@ import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { runMarketReport } from '../lib/report/runMarketReport.js';
 import { runReportWatchScan } from '../lib/reportWatch/index.js';
+import { runResearchIngestRoutine } from './researchIngest/run.js';
 import { runSocialPost } from './socialPost/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
@@ -284,6 +285,8 @@ const runRoutine = createStep({
           outcomes.push(await runMarketReport(routine));
         } else if (routine.action_type === 'report_watch_scan') {
           outcomes.push(await runReportWatch(routine));
+        } else if (routine.action_type === 'research_ingest') {
+          outcomes.push(await runResearchIngest(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -1556,6 +1559,26 @@ async function runNewsSourceScan(
 // shape (a thin wrapper over a lib entry point) rather than runNewsSourceScan's
 // (the whole pipeline inline), because the pipeline here is large enough to
 // deserve its own directory and its own tests.
+
+async function runResearchIngest(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const { summary, result } = await runResearchIngestRoutine({ id: routine.id, title: routine.name });
+
+  return {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'research_ingest' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+    // A record whose run failed is named in the summary, not a failed routine:
+    // the other records ingested, and a retry would re-run all of them.
+    status: 'success',
+    result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
+    error: null,
+  };
+}
 
 async function runReportWatch(
   routine: z.infer<typeof routineSchema>,

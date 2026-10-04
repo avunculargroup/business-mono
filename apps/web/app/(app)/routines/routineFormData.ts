@@ -80,6 +80,7 @@ export function valuesToFormData(v: RoutineFormValues): FormData {
       fd.set('max_acquisitions_per_run', String(cfg['max_acquisitions_per_run'] ?? 10));
       break;
     case 'market_report':
+    case 'research_ingest':
       break;
   }
   return fd;

@@ -30,4 +30,30 @@ describe('RoutineTile', () => {
     const open = screen.getByRole('link', { name: 'Open story' }).closest('li');
     expect(open).not.toHaveTextContent('Paywall');
   });
+
+  it('links its footer where the routine says, labelled as it says', () => {
+    render(
+      <RoutineTile
+        routine={{
+          id: 'r2',
+          name: 'Weekly corporate research ingest',
+          dashboard_title: 'Corporate research review',
+          last_run_at: null,
+          timezone: 'Australia/Melbourne',
+          last_result: {
+            summary: '4 rows waiting for review on 2 records: Strategy Inc, Metaplanet Inc.',
+            sources: [],
+            metadata: { link_url: '/research?view=review', link_label: 'Review queue' },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/4 rows waiting for review/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Review queue →' })).toHaveAttribute(
+      'href',
+      '/research?view=review',
+    );
+    expect(screen.queryByRole('link', { name: /View routine/ })).not.toBeInTheDocument();
+  });
 });

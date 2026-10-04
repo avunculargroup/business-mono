@@ -22,6 +22,9 @@ interface RoutineResult {
     mood_summary?: string;
     more_news_url?: string;
     headline_image_url?: string;
+    /** Where the footer link goes and what it says, for a routine with its own page. */
+    link_url?: string;
+    link_label?: string;
   };
 }
 
@@ -42,6 +45,8 @@ export function RoutineTile({ routine }: RoutineTileProps) {
   const sources = result?.sources ?? [];
   const mood = result?.metadata?.mood_summary;
   const moreNewsUrl = result?.metadata?.more_news_url;
+  const linkUrl = result?.metadata?.link_url;
+  const linkLabel = result?.metadata?.link_label;
   const headlineImage = result?.metadata?.headline_image_url;
 
   return (
@@ -94,6 +99,10 @@ export function RoutineTile({ routine }: RoutineTileProps) {
         {moreNewsUrl ? (
           <Link href={moreNewsUrl} className={styles.viewLink}>
             More news →
+          </Link>
+        ) : linkUrl && linkLabel ? (
+          <Link href={linkUrl} className={styles.viewLink}>
+            {linkLabel} →
           </Link>
         ) : (
           <Link href="/routines" className={styles.viewLink}>

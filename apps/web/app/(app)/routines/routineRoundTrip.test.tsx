@@ -190,6 +190,13 @@ const FIXTURES: Fixture[] = [
     expected: { max_acquisitions_per_run: 10 },
   },
   {
+    name: 'Weekly corporate research ingest',
+    agent_name: 'rex',
+    action_type: 'research_ingest',
+    stored: {},
+    expected: {},
+  },
+  {
     name: 'Social posts — Carolyn Crawford',
     agent_name: 'charlie',
     action_type: 'social_post_from_news',

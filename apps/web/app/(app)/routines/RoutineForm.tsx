@@ -96,6 +96,7 @@ function defaultConfigFor(actionType: RoutineActionTypeT): Record<string, unknow
     case RoutineActionType.REPORT_WATCH_SCAN:
       return { max_acquisitions_per_run: 10 };
     case RoutineActionType.MARKET_REPORT:
+    case RoutineActionType.RESEARCH_INGEST:
       return {};
   }
 }
@@ -276,6 +277,7 @@ export function RoutineForm({
         return submitWith({ max_acquisitions_per_run: numOr(cfg['max_acquisitions_per_run'], 10) });
 
       case RoutineActionType.MARKET_REPORT:
+      case RoutineActionType.RESEARCH_INGEST:
         return submitWith({});
 
       case RoutineActionType.RESEARCH_DIGEST:
@@ -769,6 +771,15 @@ export function RoutineForm({
           <span className={styles.hint}>
             No settings — the report covers every displayed on-chain metric and every active macro
             indicator, and emails the team.
+          </span>
+        </div>
+      )}
+
+      {values.action_type === RoutineActionType.RESEARCH_INGEST && (
+        <div className={styles.field}>
+          <span className={styles.hint}>
+            No settings: each run ingests every register record that is not retired. New or changed
+            rows wait as drafts on the research pages, and the team is emailed when any are waiting.
           </span>
         </div>
       )}
