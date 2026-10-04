@@ -133,6 +133,7 @@ describe('RoutineForm — action type coverage', () => {
     ['onchain_poll', { backfill_days: 2600 }],
     ['market_report', {}],
     ['report_watch_scan', {}],
+    ['research_ingest', {}],
   ] as const)('shows %s as the selected type and saves it unchanged', async (actionType, config) => {
     const onSubmit = renderForm(
       routine({ action_type: actionType, action_config: { ...config } }),

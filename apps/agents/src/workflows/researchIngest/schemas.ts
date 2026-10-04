@@ -174,3 +174,4 @@ export const researchIngestOutputSchema = z.object({
   /** Draft rows this run left for review. Zero on a quiet run. */
   queuedRows: z.number(),
 });
+export type ResearchIngestOutput = z.infer<typeof researchIngestOutputSchema>;

@@ -166,6 +166,11 @@ const marketReportConfig = z.object({
   action_type: z.literal('market_report'),
 });
 
+// No knobs: every record that is not retired is ingested.
+const researchIngestConfig = z.object({
+  action_type: z.literal('research_ingest'),
+});
+
 const baseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().default(''),
@@ -194,6 +199,7 @@ const createSchema = z
     baseSchema.merge(indicatorPollConfig),
     baseSchema.merge(onchainPollConfig),
     baseSchema.merge(marketReportConfig),
+    baseSchema.merge(researchIngestConfig),
     baseSchema.merge(reportWatchScanConfig),
   ])
   .superRefine((data, ctx) => {
@@ -279,6 +285,7 @@ function buildActionConfig(input: z.infer<typeof createSchema>): Json {
     case 'report_watch_scan':
       return { max_acquisitions_per_run: input.max_acquisitions_per_run };
     case 'market_report':
+    case 'research_ingest':
       return {};
   }
 }

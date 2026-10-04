@@ -58,6 +58,7 @@ export const RoutineActionType = {
   SOCIAL_POST_FROM_NEWS: 'social_post_from_news',
   MARKET_REPORT:         'market_report',
   REPORT_WATCH_SCAN:     'report_watch_scan',
+  RESEARCH_INGEST:       'research_ingest',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -77,6 +78,7 @@ export const ROUTINE_ACTION_LABELS: Record<RoutineActionType, string> = {
   social_post_from_news: 'Social posts from news',
   market_report:         'Market report',
   report_watch_scan:     'Report watch scan',
+  research_ingest:       'Corporate research ingest',
 };
 
 export const RoutineStatus = {
@@ -327,6 +329,23 @@ export interface MarketReportResult {
   stale_metrics?: string[];
 }
 
+// action_config shape for a 'research_ingest' routine. No knobs: it runs the
+// researchIngest workflow once for every record that is not retired, in
+// sequence, and emails the team the records it left draft rows on.
+export type ResearchIngestConfig = Record<string, never>;
+
+// Structured payload persisted under routines.last_result.metadata for research_ingest.
+export interface ResearchIngestRoutineResult {
+  companies_run: number;
+  companies_failed: string[];
+  queued_rows: number;
+  queued: Array<{ slug: string; legal_name: string; queued_rows: number }>;
+  emailed: boolean;
+  // Where the dashboard tile's footer link goes, and what it says.
+  link_url: string;
+  link_label: string;
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
@@ -337,7 +356,8 @@ export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.ONCHAIN_POLL } & OnchainPollConfig)
   | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig)
   | ({ action_type: typeof RoutineActionType.MARKET_REPORT } & MarketReportConfig)
-  | ({ action_type: typeof RoutineActionType.REPORT_WATCH_SCAN } & ReportWatchScanConfig);
+  | ({ action_type: typeof RoutineActionType.REPORT_WATCH_SCAN } & ReportWatchScanConfig)
+  | ({ action_type: typeof RoutineActionType.RESEARCH_INGEST } & ResearchIngestConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

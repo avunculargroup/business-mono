@@ -16,7 +16,8 @@ operational: the first real run and its trace bundle. Step 6 is under way: recor
 `review_state`, the review queue and the subscriber summary (session 11), then Minute
 shows the summary and `is_published` is dropped (session 12), then review state on
 the rows themselves (session 13), then approval per ingest run and persist-and-stop
-(session 14). Notifications and scheduling are next. Two things still remain
+(session 14), then the weekly routine and its email (session 15). The first real run
+is next. Two things still remain
 from session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-03
 
@@ -1057,3 +1058,54 @@ review queue").
 - Notifications (the dashboard card and the `sendReviewQueueDigest` email).
 - Scheduling: the `routines` row and `researchIngest/run.ts`.
 - The first real run, which needs the agents server's model keys and SEC access.
+
+## Session 15 — the weekly routine, and the email when something is waiting
+
+The two items left after session 14. With them, every part of step 6's queue design is
+built.
+
+**Shipped.**
+
+- **`20261004010000_research_ingest_routine.sql`** adds `research_ingest` to
+  `routines.action_type` and seeds "Weekly corporate research ingest" (weekly, 06:45
+  Melbourne, `rex`, dashboard title "Corporate research review").
+  - It is seeded **inactive**. No run has fetched a real filing yet, so the first run is
+    started by hand and watched, and the schedule is switched on from `/routines`.
+- **`researchIngest/run.ts`:**
+  - `startResearchIngestRun` starts one run and waits for it, loading Mastra lazily as
+    `variant/run.ts` does.
+  - `runResearchIngestRoutine` runs every record that is not retired, in sequence.
+  - A record whose run throws or doesn't finish is named in the summary and skipped.
+    The rest still run, and the routine still succeeds.
+- **The email**, `sendReviewQueueDigest` and `reviewQueueEmail.ts`:
+  - One message per routine run, through the shared `deliverTeamEmail` transport, to
+    the same recipients as the news digest.
+  - It names each record with draft rows, links each one, and links the queue.
+  - It carries no figure from the rows, which are unread drafts. Nothing is sent when
+    nothing is waiting.
+- **The dashboard card** is the routine's own tile.
+  - The result's summary reads, for example, "4 rows waiting for review on 2 records:
+    …".
+  - `RoutineTile` gained a generic `metadata.link_url` / `link_label` footer link,
+    pointing at `/research?view=review`.
+  - The dashboard lists active routines with a result, so the card appears after the
+    first scheduled run.
+- **The routines form and server action** accept the type, which has no settings.
+
+**Not built.** Signal alerts for the two interrupting cases the spec names: a numeric
+validation failure, and a reconcile delta on a record already cleared to subscribers.
+
+**Verified.** Tests cover:
+- the renderer (subject, links, escaping, no figures);
+- the sender (silent when nothing is waiting, and only the waiting records named);
+- the routine (every record in order, a failure skipped and named, an unfinished run
+  counted as failed, the quiet summary, and a legal name's own full stop not doubled);
+- the tile's link;
+- the form round trip for the new type.
+
+`pnpm test` passes in every package, and typecheck and lint are green.
+
+**Not done.** The first real run. It needs the agents server's model keys and SEC
+access. Start it on Railway with `POST /api/workflows/researchIngest/start-async`,
+body `{ "inputData": { "companyId": "<uuid>" } }`, against RUM Group or Angel Studios.
+Then read the drafts on `/research` and switch the routine on.

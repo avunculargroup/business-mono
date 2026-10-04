@@ -6,6 +6,17 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-04 — Corporate holdings: the weekly ingest routine
+
+`20261004010000_research_ingest_routine.sql` extends `routines.action_type` with
+`'research_ingest'` and seeds "Weekly corporate research ingest".
+
+- It is seeded inactive, so the first run is started by hand.
+- Each firing runs the ingest once per record that is not retired, and emails the team
+  when draft rows are waiting.
+
+---
+
 ## 2026-10-04 — Corporate holdings: the run that wrote a row
 
 `20261004000000_ingest_run_id.sql` adds `ingest_run_id` to `treasury_events` and

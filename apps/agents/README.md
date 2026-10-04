@@ -87,6 +87,11 @@ Six things about it are load-bearing and easy to undo by accident:
   run's rows from the record's page. The run is logged to `agent_activity` as `auto`, not
   `pending`, so it never appears in the generic approvals list, whose approve button
   would not touch the rows. A quiet run writes no draft, so it queues nothing.
+- **Scheduled as the `research_ingest` routine.** `run.ts` runs the workflow once per
+  record that is not retired, in sequence. It then emails the team, through the shared
+  `deliverTeamEmail` transport, the records left draft rows (`sendReviewQueueDigest`).
+  Nothing is sent on a week where nothing is waiting. The routine is seeded inactive,
+  and is switched on from `/routines`.
 - **The extractor reads only what the ledger accepts.** An SEC filing (venue `sec`) is
   split on its item headings by `edgarSections.ts` — string work, never a model — and each
   item stored in `research_document_sections` with its own class; other documents are read
