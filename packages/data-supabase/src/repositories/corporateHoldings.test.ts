@@ -681,6 +681,18 @@ beforeEach(() => {
 });
 
 describe('query wiring', () => {
+  it('asks the publishable view for reviewed rows even when drafts are requested', async () => {
+    // The view already requires a reviewed row. This is the second lock, and
+    // the dataset mirrors the view, so only the query can show it is there.
+    await corporateHoldings().getLedger(ctx, 'rc-meridian', {
+      publishableOnly: true,
+      includeDrafts: true,
+    });
+
+    const [builder] = client.__buildersFor('v_research_publishable');
+    expect(builder.in).toHaveBeenCalledWith('review_state', ['internal']);
+  });
+
   it('reads the publishable view rather than filtering the ledger view', async () => {
     await corporateHoldings().getLedger(ctx, 'rc-meridian', { publishableOnly: true });
 
