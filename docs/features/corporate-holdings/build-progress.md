@@ -15,8 +15,8 @@ item and only accepted text reaches the extractor (session 10). What is left of 
 operational: the first real run and its trace bundle. Step 6 is under way: record-level
 `review_state`, the review queue and the subscriber summary (session 11), then Minute
 shows the summary and `is_published` is dropped (session 12), then review state on
-the rows themselves (session 13). The run-based queue, notifications and scheduling are
-next. Two things still remain
+the rows themselves (session 13), then approval per ingest run and persist-and-stop
+(session 14). Notifications and scheduling are next. Two things still remain
 from session 2: the ingest run against real filings, and the recorded trace bundle.
 **Last updated:** 2026-10-03
 
@@ -987,3 +987,73 @@ draft, hiding everything because one row arrived, or the row is served unreviewe
   scheduling follow the queue.
 - **Positions (`treasury_holdings_snapshots`) carry no review state.** The spec names the
   three row tables only.
+
+## Session 14 — approve a run, and stop instead of suspending
+
+Session 13 left approval per record: rows carried no run id, so approving a run approved
+every draft row on its record. This session closes that gap, and replaces the workflow's
+suspend gate with persist-and-stop, as the spec asks ("Replace the suspend gate with a
+review queue").
+
+**Shipped.**
+
+- **`20261004000000_ingest_run_id.sql`** adds `ingest_run_id` to `treasury_events` and
+  `research_findings`.
+  - `commit_research_ingest` stamps it from `payload.run_id`.
+  - A row whose facts a later run changes takes that run's id along with its draft
+    state: the run that changed it owns its review. An unchanged re-read keeps the row's
+    run, state and wording.
+  - `v_research_ledger` and `v_research_absences` carry the column, restated
+    `security_invoker`. Facts get no run id, because the ingest writes none.
+- **Read model:** `LedgerEntry` and `StructuralAbsence` carry `ingestRunId`.
+  - A contract case: the draft row on `draftRowSlug` names its run, and every row carries
+    the field.
+  - An adapter wiring test checks the select names `review_state` and `ingest_run_id`.
+    The fake returns whole rows whatever is selected, so the data cases cannot see a
+    dropped column.
+- **The workflow persists and stops.** The `approval_gate` step and `promoteToPublished`
+  are gone, replaced by `record_run`.
+  - Persist passes the Mastra `runId` as the payload's `run_id`.
+  - `record_run` counts the draft rows stamped with its run, and returns them as
+    `queuedRows`. The commit's own tallies count unchanged re-reads as updates, so they
+    could not say what is waiting.
+  - It logs the run to `agent_activity` as `rex` / `research_ingest`, with status
+    `auto`.
+- **Why `auto`, when the spec suggested `agent_activity` as the queue's backing table:**
+  a `pending` row would appear in the generic approvals list, and its approve button only
+  changes the activity's status. The rows would stay drafts, and two approve paths for
+  one run would disagree. The run id on the rows gives the queue its run identity
+  instead. The activity row stays the audit trail, and approving the run on `/research`
+  marks it `approved` with who and when.
+- **`/research`:** a record's draft rows are grouped by run, "Ingest run 3f9c2a1b · 4
+  rows", each with its own approve. Hand-written rows, including every draft fact, form
+  their own group.
+  - `approveDraftRows(companyId, runId)` approves one group. For a run, it also marks
+    that run's activity row approved.
+- **Generated types:** `ingest_run_id` is hand-added to `database.ts` until the migrate
+  workflow regenerates it.
+
+**Verified.**
+
+- **Dry run on live**, inside a self-aborting block, with the function trimmed for the
+  run:
+  - A changed fact under run A went to draft, owned by A.
+  - An unchanged re-read under run B kept it owned by A.
+  - A new event and a new finding under B were drafts owned by B.
+  - A call with no run id wrote NULL.
+  - Both views still run as the caller, and publishable rows stayed at 8.
+- **Deliberate breaks:** three. The suite caught two. The third, dropping the column from
+  the select, was invisible to the fake until the wiring test above was added; it is
+  caught now.
+- `pnpm test` passes in every package; typecheck and lint are green. The grouped control
+  renders at 375px and 320px with no horizontal scroll and 44px targets.
+- The first CI run on the PR failed in `researchMailListener.test.ts`, which this session
+  does not touch. One test hit vitest's 10-second timeout, and the next read its leftover
+  calls. The same file passed on `main` and three times in a row locally. If it recurs,
+  it is a flake in that listener's tests to investigate on its own.
+
+**Not done.**
+
+- Notifications (the dashboard card and the `sendReviewQueueDigest` email).
+- Scheduling: the `routines` row and `researchIngest/run.ts`.
+- The first real run, which needs the agents server's model keys and SEC access.

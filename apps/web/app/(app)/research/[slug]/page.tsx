@@ -15,6 +15,20 @@ import { RegisterClearance } from '@/components/clientGate/RegisterClearance';
  * in `CompanyRecord`, which is a client component; this stays a data-wiring
  * shell so its test asserts the reads rather than the toggle.
  */
+/** Draft rows grouped by the run that wrote them, hand-written ones last. */
+function groupDrafts(
+  rows: Array<{ reviewState: string; ingestRunId: string | null }>,
+): Array<{ runId: string | null; rows: number }> {
+  const counts = new Map<string | null, number>();
+  for (const row of rows) {
+    if (row.reviewState !== 'draft') continue;
+    counts.set(row.ingestRunId, (counts.get(row.ingestRunId) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([runId, count]) => ({ runId, rows: count }))
+    .sort((a, b) => (a.runId === null ? 1 : b.runId === null ? -1 : a.runId.localeCompare(b.runId)));
+}
+
 export default async function ResearchCompanyPage({
   params,
 }: {
@@ -53,10 +67,12 @@ export default async function ResearchCompanyPage({
           reviewState={company.reviewState}
           cleared={company.clientCleared}
           clientSummary={company.clientSummary}
-          draftRows={
-            [...ledger.items, ...facts, ...absences].filter((row) => row.reviewState === 'draft')
-              .length
-          }
+          draftGroups={groupDrafts([
+            ...ledger.items,
+            ...absences,
+            // The ingest writes no facts, so a draft fact is always by hand.
+            ...facts.map((fact) => ({ ...fact, ingestRunId: null })),
+          ])}
         />
       </div>
       <CompanyRecord

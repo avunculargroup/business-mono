@@ -69,7 +69,7 @@ Supabase Realtime subscription.
 
 `src/workflows/researchIngest/`. Eleven steps over the corporate holdings register:
 resolve → fetch → chunk and embed → split and admit → **extract (Rex)** → validate →
-reconcile → **score (Rex)** → **classify (Lex)** → persist → approval gate. Spec:
+reconcile → **score (Rex)** → **classify (Lex)** → persist → record run. Spec:
 [`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md),
 amended by [`schema-ingest-spec.md`](../../docs/features/corporate-holdings/schema-ingest-spec.md).
 
@@ -82,9 +82,11 @@ Six things about it are load-bearing and easy to undo by accident:
 - **Deterministic before LLM.** Facts commit before anything narrates them, so a model
   being slow, down, or wrong costs a narration rather than a ledger. All three agent steps
   fall back to "nothing" rather than throwing.
-- **The gate is at publication, not ingest.** Ingest runs unattended; only
-  `promoteToPublished` suspends. A pipeline that stops for approval on every quarterly
-  stops running.
+- **Persist and stop; review happens on `/research`.** Nothing suspends. Every row a run
+  writes or changes lands as a draft stamped with the run's id, and a person approves that
+  run's rows from the record's page. The run is logged to `agent_activity` as `auto`, not
+  `pending`, so it never appears in the generic approvals list, whose approve button
+  would not touch the rows. A quiet run writes no draft, so it queues nothing.
 - **The extractor reads only what the ledger accepts.** An SEC filing (venue `sec`) is
   split on its item headings by `edgarSections.ts` — string work, never a model — and each
   item stored in `research_document_sections` with its own class; other documents are read

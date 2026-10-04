@@ -76,7 +76,7 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
   /**
    * A reviewed record carrying a draft ledger row that Lex classified
    * publishable, so the row's own state is all that keeps it out of the
-   * publishable read.
+   * publishable read. The row was written by an ingest run, and names it.
    */
   draftRowSlug: string;
 }
@@ -317,6 +317,18 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       // reviewed rows are all still there.
       for (const entry of withDrafts.items) expect(entry.reviewState).not.toBe('retired');
       expect(withDrafts.items.length).toBe(reviewed.items.length + drafts.length);
+    });
+
+    it('names the ingest run that wrote a draft row, so the run can be approved alone', async () => {
+      const company = await bySlug(scenario.draftRowSlug);
+      const withDrafts = await (await repo()).getLedger(ctx, company.id, { includeDrafts: true });
+      const drafts = withDrafts.items.filter((entry) => entry.reviewState === 'draft');
+
+      expect(drafts.length).toBeGreaterThan(0);
+      for (const entry of drafts) expect(entry.ingestRunId).toEqual(expect.any(String));
+      // Every row carries the field, run or not: absent and hand-written must
+      // not read the same.
+      for (const entry of withDrafts.items) expect(entry).toHaveProperty('ingestRunId');
     });
 
     it('keeps a draft row out of the publishable read on a reviewed record', async () => {

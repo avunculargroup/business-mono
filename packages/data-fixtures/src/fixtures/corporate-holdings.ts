@@ -736,9 +736,13 @@ function asxListing(
   };
 }
 
-/** A row as written below: its review state defaults to its company's. */
-type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState'> & {
+/**
+ * A row as written below: its review state defaults to its company's, and its
+ * ingest run to none (a hand-written row).
+ */
+type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState' | 'ingestRunId'> & {
   reviewState?: ReviewState;
+  ingestRunId?: string | null;
 };
 
 /**
@@ -749,12 +753,21 @@ type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState'> &
 function withRowState<T extends { reviewState: ReviewState }>(
   anchor: Date,
   rows: Record<string, RowInput<T>[]>,
+  /** Facts carry no run id: the ingest does not write them. */
+  options: { runIds: boolean } = { runIds: true },
 ): Record<string, T[]> {
   const states = new Map(researchCompanies(anchor).map((c) => [c.id, c.reviewState]));
   return Object.fromEntries(
     Object.entries(rows).map(([companyId, list]) => [
       companyId,
-      list.map((row) => ({ ...row, reviewState: row.reviewState ?? states.get(companyId) ?? 'draft' }) as T),
+      list.map(
+        (row) =>
+          ({
+            ...row,
+            reviewState: row.reviewState ?? states.get(companyId) ?? 'draft',
+            ...(options.runIds ? { ingestRunId: row.ingestRunId ?? null } : {}),
+          }) as T,
+      ),
     ]),
   );
 }
@@ -810,6 +823,7 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
         basisComparable: true,
         classification: 'publishable',
         reviewState: 'draft',
+        ingestRunId: 'run-fixture-meridian',
         provenance: d.meridianTreasuryUpdate,
       },
       // Superseded by a restatement and retired rather than deleted: the
@@ -1524,7 +1538,7 @@ export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
         conflicting: null,
       },
     ],
-  });
+  }, { runIds: false });
 }
 
 // ── Structural absences ────────────────────────────────────────────────────

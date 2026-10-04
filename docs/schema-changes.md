@@ -6,6 +6,19 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-04 — Corporate holdings: the run that wrote a row
+
+`20261004000000_ingest_run_id.sql` adds `ingest_run_id` to `treasury_events` and
+`research_findings`, so a reviewer can approve exactly what one ingest run produced.
+
+- `commit_research_ingest` stamps it from `payload.run_id`. A later run that changes a
+  row's facts takes over its run id with its draft state; an unchanged re-read keeps
+  both.
+- `v_research_ledger` and `v_research_absences` carry the column, restated
+  `security_invoker`.
+
+---
+
 ## 2026-10-03 — Corporate holdings: review state on rows
 
 `20261003220000_row_review_state.sql` adds `review_state` (default `draft`), `reviewed_by`

@@ -16,6 +16,7 @@ const embedTextsMock = vi.fn();
 const tables = new Map<string, unknown[]>();
 const updates: Array<{ table: string; values: Record<string, unknown> }> = [];
 const upserts: Array<{ table: string; values: unknown; options: unknown }> = [];
+const inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
 
 vi.mock('../../agents/researcher/index.js', () => ({ rex: { generate: rexGenerate } }));
 vi.mock('../../agents/compliance/index.js', () => ({ lex: { generate: lexGenerate } }));
@@ -43,11 +44,19 @@ function builder(table: string) {
     updates.push({ table, values });
     return chain;
   });
+  chain['insert'] = vi.fn((values: Record<string, unknown>) => {
+    inserts.push({ table, values });
+    return Promise.resolve({ error: null });
+  });
   chain['maybeSingle'] = vi.fn(() =>
     Promise.resolve({ data: (tables.get(table) ?? [])[0] ?? null, error: null }),
   );
   chain['then'] = (onFulfilled: (value: unknown) => unknown) =>
-    Promise.resolve({ data: tables.get(table) ?? [], error: null }).then(onFulfilled);
+    Promise.resolve({
+      data: tables.get(table) ?? [],
+      error: null,
+      count: (tables.get(table) ?? []).length,
+    }).then(onFulfilled);
   return chain;
 }
 
@@ -58,7 +67,7 @@ vi.mock('@platform/db', () => ({
   },
 }));
 
-const { approvalGateStep, researchIngestWorkflow } = await import('./index.js');
+const { researchIngestWorkflow } = await import('./index.js');
 
 const COMPANY = '00000000-0000-4000-8000-000000000001';
 
@@ -87,7 +96,7 @@ const ACQUISITION_KEY = 'locate-technologies:acq:2025-06-04';
 async function run(input: Record<string, unknown> = {}) {
   const instance = await researchIngestWorkflow.createRun();
   return instance.start({
-    inputData: { companyId: COMPANY, promoteToPublished: false, requestedBy: null, ...input },
+    inputData: { companyId: COMPANY, requestedBy: null, ...input },
   });
 }
 
@@ -95,6 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   tables.clear();
   updates.length = 0;
+  inserts.length = 0;
   upserts.length = 0;
 
   tables.set('research_documents', [
@@ -168,7 +178,7 @@ describe('the happy path', () => {
       eventsCommitted: 1,
       rejectedClaims: 0,
       quiet: false,
-      published: false,
+      queuedRows: expect.any(Number),
     });
   });
 
@@ -432,80 +442,56 @@ describe('failed retrieval', () => {
   });
 });
 
-describe('the approval gate', () => {
-  it('runs straight through on ingest', async () => {
-    // Ingest is unattended. A pipeline that stops for approval on every
-    // quarterly stops running.
+describe('persist and stop', () => {
+  it('runs to the end without waiting for anyone', async () => {
+    // A suspended run holds workflow state open. The review happens on
+    // /research, against rows already committed as drafts.
     const result = await run();
 
     expect(result.status).toBe('success');
   });
 
-  it('suspends when the run proposes the record for publication', async () => {
-    const result = await run({ promoteToPublished: true });
+  it('stamps every row it commits with its own run id', async () => {
+    await run();
 
-    expect(result.status).toBe('suspended');
+    const [, args] = rpcMock.mock.calls.find(([name]) => name === 'commit_research_ingest')!;
+    expect((args as { payload: { run_id?: string } }).payload.run_id).toEqual(expect.any(String));
   });
 
-  // Resuming through the engine needs a storage-backed Mastra instance, which
-  // this suite deliberately does not build. The two resume branches are a
-  // property of the step, so they are exercised on the step.
-  const gateInput = {
-    companyId: COMPANY,
-    promoteToPublished: true,
-    requestedBy: null,
-    fetch: { fetched: 1, unchanged: 0, failed: 0, documents: [] },
-    validated: [],
-    rejected: [],
-    created: [],
-    deltas: [],
-    quiet: false,
-    findings: [],
-    classifications: [],
-    committed: { events: { inserted: 1, updated: 0 } },
-  };
+  it('logs the run to agent_activity as handled, not as a pending approval', async () => {
+    // A pending row would sit in the generic approvals list, whose approve
+    // button does not touch the rows: two approve paths for one run.
+    await run();
 
-  it('moves the record out of draft only after a director approves', async () => {
-    await approvalGateStep.execute({
-      inputData: gateInput,
-      resumeData: { approved: true, approvedBy: '2fcaea14-6d37-4def-b56d-467d61c92f36' },
-      suspend: vi.fn(),
-    } as never);
-
-    expect(updates).toContainEqual(
-      expect.objectContaining({
-        table: 'research_companies',
-        values: expect.objectContaining({
-          review_state: 'internal',
-          reviewed_by: '2fcaea14-6d37-4def-b56d-467d61c92f36',
-        }),
-      }),
-    );
-    // The run's rows land as drafts, so approving the run approves them too.
-    for (const table of ['treasury_events', 'research_findings']) {
-      expect(updates).toContainEqual(
-        expect.objectContaining({
-          table,
-          values: expect.objectContaining({ review_state: 'internal' }),
-        }),
-      );
-    }
-    // Approval is review, never clearance: a subscriber sees nothing yet.
-    expect(updates).not.toContainEqual(
-      expect.objectContaining({ values: expect.objectContaining({ client_cleared: true }) }),
-    );
+    const logged = inserts.find((row) => row.table === 'agent_activity');
+    expect(logged?.values).toMatchObject({
+      agent_name: 'rex',
+      action: 'research_ingest',
+      status: 'auto',
+      entity_type: 'research_companies',
+      entity_id: COMPANY,
+    });
+    expect(logged?.values['workflow_run_id']).toEqual(expect.any(String));
   });
 
-  it('leaves the record in draft when the director rejects', async () => {
-    const result = (await approvalGateStep.execute({
-      inputData: gateInput,
-      resumeData: { approved: false, approvedBy: null },
-      suspend: vi.fn(),
-    } as never)) as { published: boolean };
+  it('reports the draft rows it left, counted from the rows themselves', async () => {
+    tables.set('treasury_events', [{ id: 'e1' }, { id: 'e2' }]);
+    tables.set('research_findings', [{ id: 'f1' }]);
 
-    expect(result.published).toBe(false);
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect((result as { result: { queuedRows: number } }).result.queuedRows).toBe(3);
+  });
+
+  it('never approves anything itself', async () => {
+    await run();
+
     expect(updates).not.toContainEqual(
       expect.objectContaining({ values: expect.objectContaining({ review_state: 'internal' }) }),
+    );
+    expect(updates).not.toContainEqual(
+      expect.objectContaining({ values: expect.objectContaining({ client_cleared: true }) }),
     );
   });
 });

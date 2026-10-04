@@ -94,7 +94,7 @@ const LEDGER_COLUMNS =
   'id, company_id, event_type, asset_class, event_date, quantity, consideration_native, ' +
   'native_currency, consideration_aud, fx_rate_used, fees_included, headline, detail, ' +
   'disclosure_venue, basis, basis_comparable, classification, source_document_id, ' +
-  'source_title, source_class, source_url, source_published_at, source_is_audited, review_state';
+  'source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id';
 
 const POSITION_COLUMNS =
   'snapshot_id, company_id, as_of_date, asset, instrument_type, quantity, basis, ' +
@@ -172,6 +172,7 @@ type LedgerRow = {
   basis_comparable: boolean | null;
   classification: ResearchClassification;
   review_state: ReviewState;
+  ingest_run_id: string | null;
   source_document_id: string;
   source_title: string;
   source_class: SourceClass;
@@ -235,6 +236,7 @@ type ReviewQueueRow = {
 type AbsenceRow = {
   company_id: string;
   review_state: ReviewState;
+  ingest_run_id: string | null;
   subject: StructuralAbsence['subject'];
   headline: string;
   detail: string | null;
@@ -389,6 +391,7 @@ function toLedgerEntry(row: LedgerRow): LedgerEntry {
     basisComparable: row.basis_comparable,
     classification: row.classification,
     reviewState: row.review_state,
+    ingestRunId: row.ingest_run_id,
     provenance: toProvenance(row),
   };
 }
@@ -682,7 +685,7 @@ export function createCorporateHoldingsRepository(
       const { data, error } = await client
         .from(ABSENCES_VIEW)
         .select(
-          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, review_state',
+          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id',
         )
         .eq('company_id', companyId)
         .in('review_state', readableStates(opts));
@@ -695,6 +698,7 @@ export function createCorporateHoldingsRepository(
         // The detail carries the citation; the headline is the panel's label.
         statement: row.detail ?? row.headline,
         reviewState: row.review_state,
+        ingestRunId: row.ingest_run_id,
         provenance: toProvenance(row),
       }));
     },
