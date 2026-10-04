@@ -585,7 +585,12 @@ const NOTES = [
 // absent because the views drop them; the datasets are what the views return.
 const companyState = new Map(COMPANIES.map((row) => [row.id, row.review_state]));
 const withState = <T extends { company_id: string }>(rows: T[]) =>
-  rows.map((row) => ({ ...row, review_state: companyState.get(row.company_id) ?? 'draft' }));
+  rows.map((row) => ({
+    ...row,
+    review_state: companyState.get(row.company_id) ?? 'draft',
+    // Every seeded row was written by hand.
+    ingest_run_id: null as string | null,
+  }));
 
 const LEDGER_ROWS = [
   ...withState(LEDGER),
@@ -594,6 +599,7 @@ const LEDGER_ROWS = [
   {
     ...ledgerRow('evt-mfg-006', 'rc-meridian', 'acquisition', '2026-09-30', 4, null),
     review_state: 'draft',
+    ingest_run_id: 'run-fixture-meridian',
   },
 ];
 
@@ -734,6 +740,19 @@ describe('query wiring', () => {
     const [builder] = client.__buildersFor('v_company_position');
     expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('encumbered_quantity'));
     expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('encumbrance_obligation'));
+  });
+
+  it('selects the review columns from the ledger and absence views', async () => {
+    // The fake returns whole rows whatever is selected, so only the select
+    // shows the columns are asked for at all.
+    await corporateHoldings().getLedger(ctx, 'rc-meridian');
+    await corporateHoldings().getStructuralAbsences(ctx, 'rc-verrall');
+
+    for (const view of ['v_research_ledger', 'v_research_absences']) {
+      const [builder] = client.__buildersFor(view);
+      expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('review_state'));
+      expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('ingest_run_id'));
+    }
   });
 
   it('reads tracker claims from secondary_claims and nowhere else feeds them', async () => {

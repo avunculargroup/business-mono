@@ -189,6 +189,11 @@ export interface LedgerEntry {
   classification: ResearchClassification;
   /** Retired rows never reach a read; draft ones only when asked for. */
   reviewState: ReviewState;
+  /**
+   * The ingest run that last changed this row's facts, and so owns its review.
+   * Null for a row written by hand.
+   */
+  ingestRunId: string | null;
   provenance: Provenance;
 }
 
@@ -295,6 +300,8 @@ export interface StructuralAbsence {
   subject: 'covenants' | 'debt' | 'holdings' | 'policy';
   statement: string;
   reviewState: ReviewState;
+  /** The ingest run that wrote it; null for one written by hand. */
+  ingestRunId: string | null;
   provenance: Provenance;
 }
 
