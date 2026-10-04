@@ -201,7 +201,6 @@ const fetchDocumentsStep = createStep({
 
     return {
       companyId: inputData.companyId,
-      promoteToPublished: inputData.promoteToPublished,
       requestedBy: inputData.requestedBy,
       fetch: { fetched, unchanged, failed, documents },
     };
@@ -413,7 +412,6 @@ ${unit.text.slice(0, MAX_DOCUMENT_CHARS)}`;
     log.info({ companyId: inputData.companyId, candidates: candidates.length }, 'events extracted');
     return {
       companyId: inputData.companyId,
-      promoteToPublished: inputData.promoteToPublished,
       requestedBy: inputData.requestedBy,
       fetch: inputData.fetch,
       units: inputData.units,
@@ -463,7 +461,6 @@ const validateNumericsStep = createStep({
 
     return {
       companyId: inputData.companyId,
-      promoteToPublished: inputData.promoteToPublished,
       requestedBy: inputData.requestedBy,
       fetch: inputData.fetch,
       validated,
@@ -647,11 +644,14 @@ const persistStep = createStep({
   id: 'persist',
   inputSchema: classifiedSchema,
   outputSchema: persistedSchema,
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, runId }) => {
     const suppressed: Delta[] = inputData.deltas.filter((delta) => delta.suppressed);
 
     const payload = {
       company_id: inputData.companyId,
+      // Stamped on every row this run writes or changes, so a reviewer can
+      // approve exactly what this run produced.
+      run_id: runId,
       events: inputData.validated,
       findings: [
         ...inputData.findings,
@@ -677,27 +677,43 @@ const persistStep = createStep({
   },
 });
 
-// ── 11. Approval gate ────────────────────────────────────────────────────────
-// The only human gate, and it is about publication rather than ingest. A run
-// that is not promoting anything passes straight through — which is most runs.
-const approvalGateStep = createStep({
-  id: 'approval_gate',
+// ── 11. Record the run ───────────────────────────────────────────────────────
+// Persist-and-stop. The run's rows are already in the database as drafts,
+// stamped with this run's id, and the review queue on /research is where a
+// person reads and approves them. Nothing here waits: a suspended run holds
+// workflow state open and needs storage-backed context to survive a restart,
+// which is the wrong shape for something that runs unattended.
+//
+// The run is logged to agent_activity as the audit trail, as `auto` rather
+// than `pending`. A pending row would appear in the generic approvals list,
+// whose approve button only changes the activity's status; the rows would stay
+// drafts, and two approve paths for one run would disagree. Approving on
+// /research marks this row approved too.
+const recordRunStep = createStep({
+  id: 'record_run',
   inputSchema: persistedSchema,
   outputSchema: researchIngestOutputSchema,
-  resumeSchema: z.object({
-    approved: z.boolean(),
-    approvedBy: z.string().uuid().nullable().default(null),
-  }),
-  suspendSchema: z.object({
-    gate: z.literal('publish'),
-    companyId: z.string(),
-    message: z.string(),
-  }),
-  execute: async ({ inputData, resumeData, suspend }) => {
+  execute: async ({ inputData, runId }) => {
     const committed = (inputData.committed ?? {}) as Record<
       string,
       { inserted?: number; updated?: number }
     >;
+
+    // Counted from the rows rather than the commit's tallies: the commit counts
+    // an unchanged re-read as an update, and only a changed or new row is a
+    // draft waiting for someone. A quiet run queues nothing because it writes
+    // no draft, not because it is skipped here.
+    let queuedRows = 0;
+    for (const table of ['treasury_events', 'research_findings'] as const) {
+      const { count } = await db
+        .from(table)
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', inputData.companyId)
+        .eq('ingest_run_id', runId)
+        .eq('review_state', 'draft');
+      queuedRows += count ?? 0;
+    }
+
     const summary = {
       companyId: inputData.companyId,
       documentsFetched: inputData.fetch.fetched,
@@ -708,65 +724,30 @@ const approvalGateStep = createStep({
       rejectedClaims: inputData.rejected.length,
       suppressedDeltas: inputData.deltas.filter((delta) => delta.suppressed).length,
       quiet: inputData.quiet,
+      queuedRows,
     };
 
-    if (!inputData.promoteToPublished) {
-      return { ...summary, published: false };
-    }
-
-    if (resumeData) {
-      if (resumeData.approved) {
-        const reviewed = {
-          review_state: 'internal',
-          reviewed_by: resumeData.approvedBy,
-          reviewed_at: new Date().toISOString(),
-        };
-        // Approval is the review: the record leaves draft and joins the
-        // internal register. Subscriber clearance stays a separate decision.
-        await db.from('research_companies').update(reviewed).eq('id', inputData.companyId);
-        // And the rows the run wrote, which land as drafts. Every draft row on
-        // the record, for now: rows carry no run id yet, so approving exactly
-        // what this run produced comes with the run-based queue.
-        for (const table of ['treasury_events', 'research_findings'] as const) {
-          await db
-            .from(table)
-            .update(reviewed)
-            .eq('company_id', inputData.companyId)
-            .eq('review_state', 'draft');
-        }
-      }
-      return { ...summary, published: resumeData.approved };
-    }
-
-    const { data } = await db
-      .from('research_companies')
-      .select('legal_name')
-      .eq('id', inputData.companyId)
-      .maybeSingle();
-    const name = (data as { legal_name: string } | null)?.legal_name ?? inputData.companyId;
-
-    await suspend({
-      gate: 'publish' as const,
-      companyId: inputData.companyId,
-      message:
-        `${name} is proposed for the client-facing register.\n\n` +
-        `${summary.eventsCommitted} new events, ${summary.findingsCommitted} findings, ` +
-        `${summary.rejectedClaims} extracted figures rejected as not present in source.\n\n` +
-        'Only fields Lex classified publishable will render. Approve or reject.',
+    const { error } = await db.from('agent_activity').insert({
+      agent_name: 'rex',
+      action: 'research_ingest',
+      status: 'auto',
+      trigger_type: inputData.requestedBy ? 'manual' : 'scheduled',
+      trigger_ref: inputData.requestedBy,
+      workflow_run_id: runId,
+      entity_type: 'research_companies',
+      entity_id: inputData.companyId,
+      notes:
+        queuedRows > 0
+          ? `${queuedRows} rows waiting for review on /research.`
+          : 'Nothing to review: no new or changed rows.',
     });
+    // The rows are committed whatever happens here, and the queue reads them,
+    // not this log. A failed audit write is logged rather than failing the run.
+    if (error) log.error({ err: error, runId }, 'run not logged to agent_activity');
 
-    // Unreachable: suspend resolves the run, and the resumed pass re-enters
-    // execute with resumeData set.
-    return { ...summary, published: false };
+    return summary;
   },
 });
-
-/**
- * Exported for its own tests. Resuming a suspended run needs a storage-backed
- * Mastra instance; the gate's two branches are a property of this step and are
- * tested by calling it directly.
- */
-export { approvalGateStep };
 
 export const researchIngestWorkflow = createWorkflow({
   id: 'researchIngest',
@@ -783,5 +764,5 @@ export const researchIngestWorkflow = createWorkflow({
   .then(scoreStep)
   .then(classifyStep)
   .then(persistStep)
-  .then(approvalGateStep)
+  .then(recordRunStep)
   .commit();

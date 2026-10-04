@@ -19,15 +19,6 @@ import {
 
 export const researchIngestInputSchema = z.object({
   companyId: z.string().uuid(),
-  /**
-   * Whether this run is proposing the record for a client-facing surface.
-   *
-   * False is the normal path and runs unattended end to end. The suspend gate
-   * sits at publication, never at ingest: facts arriving in the register is not
-   * a decision a director needs to make, and a pipeline that stops for approval
-   * on every quarterly stops running.
-   */
-  promoteToPublished: z.boolean().default(false),
   requestedBy: z.string().uuid().nullable().default(null),
 });
 export type ResearchIngestInput = z.infer<typeof researchIngestInputSchema>;
@@ -180,5 +171,6 @@ export const researchIngestOutputSchema = z.object({
   suppressedDeltas: z.number(),
   /** True when nothing material happened. A valid, common outcome. */
   quiet: z.boolean(),
-  published: z.boolean(),
+  /** Draft rows this run left for review. Zero on a quiet run. */
+  queuedRows: z.number(),
 });
