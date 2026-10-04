@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { CompanyFact, LedgerEntry } from '@platform/data';
 
 import {
   createFakeRepositories,
@@ -127,6 +128,28 @@ describe('ResearchCompanyPage', () => {
       'rc-1',
       { includeDrafts: true },
     );
+  });
+
+  it('groups draft rows by the run that wrote them, hand-written ones together', async () => {
+    const row = (id: string, reviewState: string, ingestRunId: string | null) =>
+      ({ id, reviewState, ingestRunId }) as unknown as LedgerEntry;
+    repositories = createFakeRepositories({
+      ledger: [
+        row('e1', 'draft', 'run-aaaaaaaa1'),
+        row('e2', 'draft', 'run-aaaaaaaa1'),
+        row('e3', 'draft', null),
+        row('e4', 'internal', 'run-bbbbbbbb2'),
+      ],
+      facts: [{ id: 'f1', reviewState: 'draft' } as unknown as CompanyFact],
+    });
+
+    render(await ResearchCompanyPage({ params }));
+
+    expect(screen.getByText(/Ingest run run-aaaa · 2 rows/)).toBeInTheDocument();
+    // The hand-written event and the draft fact: the ingest writes no facts.
+    expect(screen.getByText(/Entered by hand · 2 rows/)).toBeInTheDocument();
+    // A reviewed row is in no group.
+    expect(screen.queryByText(/run-bbbb/)).not.toBeInTheDocument();
   });
 
   it('404s on a slug that resolves to nothing', async () => {

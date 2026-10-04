@@ -3,7 +3,7 @@
 import type { ReviewState } from '@platform/shared';
 import { setRegisterClearance } from '@/app/actions/clientPromotion';
 import { ClientGate } from './ClientGate';
-import { RecordReview } from './RecordReview';
+import { RecordReview, type DraftGroup } from './RecordReview';
 import styles from './RegisterClearance.module.css';
 
 /**
@@ -21,13 +21,13 @@ export function RegisterClearance({
   reviewState,
   cleared,
   clientSummary,
-  draftRows = 0,
+  draftGroups = [],
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
   clientSummary: string | null;
-  draftRows?: number;
+  draftGroups?: DraftGroup[];
 }) {
   return (
     <div className={styles.stack}>
@@ -35,7 +35,7 @@ export function RegisterClearance({
         companyId={companyId}
         reviewState={reviewState}
         cleared={cleared}
-        draftRows={draftRows}
+        draftGroups={draftGroups}
       />
       {reviewState === 'internal' ? (
         <ClientGate

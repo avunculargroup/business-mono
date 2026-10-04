@@ -85,31 +85,53 @@ export async function setReviewState(companyId: string, state: ReviewState) {
 }
 
 /**
- * Approve every draft row on a record: its ledger events, findings and facts.
+ * Approve one group of draft rows on a record.
  *
- * Row-level, and separate from the record's own state. A settled record that
- * gains one ingested event keeps its state while the event waits here, and a
- * draft row reaches no subscriber whatever the record's state. Approving per
- * ingest run, against the run that produced the rows, comes with the run-based
- * queue.
+ * Rows are grouped by the ingest run that wrote them, so a reviewer approves
+ * exactly what one run produced and nothing else. `runId: null` is the group
+ * written by hand: events and findings with no run, and every draft fact (the
+ * ingest writes no facts). Row-level, and separate from the record's own state:
+ * a draft row reaches no subscriber whatever the record's state.
+ *
+ * Approving a run also marks its `agent_activity` row approved, so the audit
+ * trail says who read it and when.
  */
-export async function approveDraftRows(companyId: string) {
+export async function approveDraftRows(companyId: string, runId: string | null) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
 
+  const reviewedAt = new Date().toISOString();
   const reviewed = {
     review_state: ReviewState.INTERNAL,
     reviewed_by: auth.user.id,
-    reviewed_at: new Date().toISOString(),
+    reviewed_at: reviewedAt,
   };
 
-  for (const table of ['treasury_events', 'research_findings', 'research_company_facts'] as const) {
-    const { error } = await auth.supabase
+  for (const table of ['treasury_events', 'research_findings'] as const) {
+    let query = auth.supabase
       .from(table)
       .update(reviewed)
       .eq('company_id', companyId)
       .eq('review_state', ReviewState.DRAFT);
+    query = runId === null ? query.is('ingest_run_id', null) : query.eq('ingest_run_id', runId);
 
+    const { error } = await query;
+    if (error) return { error: humanizeError(error) };
+  }
+
+  if (runId === null) {
+    const { error } = await auth.supabase
+      .from('research_company_facts')
+      .update(reviewed)
+      .eq('company_id', companyId)
+      .eq('review_state', ReviewState.DRAFT);
+    if (error) return { error: humanizeError(error) };
+  } else {
+    const { error } = await auth.supabase
+      .from('agent_activity')
+      .update({ status: 'approved', approved_by: auth.user.id, approved_at: reviewedAt })
+      .eq('workflow_run_id', runId)
+      .eq('action', 'research_ingest');
     if (error) return { error: humanizeError(error) };
   }
 

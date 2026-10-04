@@ -36,6 +36,7 @@ beforeEach(() => {
     'treasury_events',
     'research_findings',
     'research_company_facts',
+    'agent_activity',
   ]) {
     supabase.__setResponse(t, { data: null, error: null });
   }
@@ -109,24 +110,50 @@ describe('setReviewState', () => {
 });
 
 describe('approveDraftRows', () => {
-  it('approves the draft rows on all three row tables, and records who did', async () => {
-    const result = await approveDraftRows('co-1');
+  it("approves exactly one run's draft events and findings, and records who did", async () => {
+    const result = await approveDraftRows('co-1', 'run-abc');
 
     expect(result).toEqual({ success: true });
-    for (const table of ['treasury_events', 'research_findings', 'research_company_facts']) {
+    for (const table of ['treasury_events', 'research_findings']) {
       const [builder] = supabase.__buildersFor(table);
       expect(builder!.update.mock.calls[0]![0]).toMatchObject({
         review_state: 'internal',
         reviewed_by: 'director-1',
       });
       expect(builder!.eq).toHaveBeenCalledWith('company_id', 'co-1');
+      expect(builder!.eq).toHaveBeenCalledWith('ingest_run_id', 'run-abc');
       // Drafts only: a retired row stays retired.
       expect(builder!.eq).toHaveBeenCalledWith('review_state', 'draft');
     }
+    // The ingest writes no facts, so a run's approval does not touch them.
+    expect(supabase.__buildersFor('research_company_facts')).toHaveLength(0);
+  });
+
+  it("marks the run's audit row approved", async () => {
+    await approveDraftRows('co-1', 'run-abc');
+
+    const [builder] = supabase.__buildersFor('agent_activity');
+    expect(builder!.update.mock.calls[0]![0]).toMatchObject({
+      status: 'approved',
+      approved_by: 'director-1',
+    });
+    expect(builder!.eq).toHaveBeenCalledWith('workflow_run_id', 'run-abc');
+  });
+
+  it('approves the hand-written group: rows with no run, and draft facts', async () => {
+    await approveDraftRows('co-1', null);
+
+    for (const table of ['treasury_events', 'research_findings']) {
+      const [builder] = supabase.__buildersFor(table);
+      expect(builder!.is).toHaveBeenCalledWith('ingest_run_id', null);
+    }
+    const [facts] = supabase.__buildersFor('research_company_facts');
+    expect(facts!.update.mock.calls[0]![0]).toMatchObject({ review_state: 'internal' });
+    expect(supabase.__buildersFor('agent_activity')).toHaveLength(0);
   });
 
   it('leaves the record itself alone', async () => {
-    await approveDraftRows('co-1');
+    await approveDraftRows('co-1', 'run-abc');
 
     expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
   });

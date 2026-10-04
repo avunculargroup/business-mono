@@ -6737,6 +6737,7 @@ export type Database = {
           finding_type: string
           headline: string
           id: string
+          ingest_run_id: string | null
           is_absence: boolean
           is_suppressed: boolean
           materiality: number | null
@@ -6757,6 +6758,7 @@ export type Database = {
           finding_type: string
           headline: string
           id?: string
+          ingest_run_id?: string | null
           is_absence?: boolean
           is_suppressed?: boolean
           materiality?: number | null
@@ -6777,6 +6779,7 @@ export type Database = {
           finding_type?: string
           headline?: string
           id?: string
+          ingest_run_id?: string | null
           is_absence?: boolean
           is_suppressed?: boolean
           materiality?: number | null
@@ -7592,6 +7595,7 @@ export type Database = {
           filing_entity: string | null
           headline: string
           id: string
+          ingest_run_id: string | null
           native_currency: string | null
           natural_key: string
           quantity: number | null
@@ -7616,6 +7620,7 @@ export type Database = {
           filing_entity?: string | null
           headline: string
           id?: string
+          ingest_run_id?: string | null
           native_currency?: string | null
           natural_key: string
           quantity?: number | null
@@ -7640,6 +7645,7 @@ export type Database = {
           filing_entity?: string | null
           headline?: string
           id?: string
+          ingest_run_id?: string | null
           native_currency?: string | null
           natural_key?: string
           quantity?: number | null

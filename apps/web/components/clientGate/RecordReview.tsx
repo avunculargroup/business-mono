@@ -6,6 +6,11 @@ import type { ReviewState } from '@platform/shared';
 import { approveDraftRows, setReviewState } from '@/app/actions/clientPromotion';
 import styles from './RecordReview.module.css';
 
+export interface DraftGroup {
+  runId: string | null;
+  rows: number;
+}
+
 /**
  * `research_companies.review_state`, as a control.
  *
@@ -53,13 +58,16 @@ export function RecordReview({
   companyId,
   reviewState,
   cleared,
-  draftRows = 0,
+  draftGroups = [],
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
-  /** Ledger, fact and absence rows on this record that nobody has reviewed. */
-  draftRows?: number;
+  /**
+   * Draft rows on this record, grouped by the ingest run that wrote them.
+   * `runId: null` is the group written by hand.
+   */
+  draftGroups?: DraftGroup[];
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -86,21 +94,31 @@ export function RecordReview({
           : null}
       </p>
 
-      {draftRows > 0 ? (
+      {draftGroups.length > 0 ? (
         <div className={styles.rows}>
           <p className={styles.description}>
-            {draftRows === 1 ? 'One row' : `${draftRows} rows`} on this record{' '}
-            {draftRows === 1 ? 'is a draft' : 'are drafts'}, marked below. A draft row reaches
-            no subscriber, whatever the record&rsquo;s state.
+            Draft rows are marked below. A draft row reaches no subscriber, whatever the
+            record&rsquo;s state. Each group is approved on its own.
           </p>
-          <button
-            type="button"
-            className={styles.ghostButton}
-            onClick={() => run(() => approveDraftRows(companyId))}
-            disabled={pending}
-          >
-            Approve {draftRows === 1 ? 'the draft row' : `${draftRows} draft rows`}
-          </button>
+          <ul className={styles.groups}>
+            {draftGroups.map((group) => (
+              <li key={group.runId ?? 'by-hand'} className={styles.group}>
+                <span className={styles.groupLabel}>
+                  {group.runId === null ? 'Entered by hand' : `Ingest run ${group.runId.slice(0, 8)}`}
+                  {' · '}
+                  {group.rows === 1 ? '1 row' : `${group.rows} rows`}
+                </span>
+                <button
+                  type="button"
+                  className={styles.ghostButton}
+                  onClick={() => run(() => approveDraftRows(companyId, group.runId))}
+                  disabled={pending}
+                >
+                  {group.runId === null ? 'Approve these rows' : 'Approve this run'}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

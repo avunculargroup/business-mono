@@ -55,26 +55,34 @@ describe('RegisterClearance', () => {
     expect(setRegisterClearance).toHaveBeenCalledWith('c1', true, 'Holds bitcoin directly.');
   });
 
-  it('offers to approve the draft rows on a record, by count', async () => {
+  it('offers each run its own approval, and the hand-written rows theirs', async () => {
     render(
       <RegisterClearance
         companyId="c1"
         reviewState="internal"
         cleared
         clientSummary="x"
-        draftRows={3}
+        draftGroups={[
+          { runId: 'run-abcdef123456', rows: 3 },
+          { runId: null, rows: 1 },
+        ]}
       />,
     );
 
-    expect(screen.getByText(/3 rows on this record are drafts/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Approve 3 draft rows' }));
-    expect(approveDraftRows).toHaveBeenCalledWith('c1');
+    expect(screen.getByText(/Ingest run run-abcd · 3 rows/)).toBeInTheDocument();
+    expect(screen.getByText(/Entered by hand · 1 row/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Approve this run' }));
+    expect(approveDraftRows).toHaveBeenCalledWith('c1', 'run-abcdef123456');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Approve these rows' }));
+    expect(approveDraftRows).toHaveBeenCalledWith('c1', null);
   });
 
   it('says nothing about rows when none are drafts', () => {
     render(<RegisterClearance companyId="c1" reviewState="internal" cleared clientSummary="x" />);
 
-    expect(screen.queryByRole('button', { name: /draft row/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve this run|Approve these rows/ })).not.toBeInTheDocument();
   });
 
   it('says leaving review withholds a cleared entry', () => {
