@@ -73,6 +73,12 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
    * rows, so the review gate is the only thing keeping them out.
    */
   draftSlug: string;
+  /**
+   * A reviewed record carrying a draft ledger row that Lex classified
+   * publishable, so the row's own state is all that keeps it out of the
+   * publishable read.
+   */
+  draftRowSlug: string;
 }
 
 export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
@@ -286,12 +292,66 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       const repository = await repo();
 
       // The full ledger must carry publishable rows, or the empty read below
-      // proves nothing about the review gate.
-      const all = await repository.getLedger(ctx, draft.id);
+      // proves nothing about the review gate. A draft record's rows are drafts
+      // too, so they are only there when asked for.
+      const all = await repository.getLedger(ctx, draft.id, { includeDrafts: true });
       expect(all.items.some((entry) => entry.classification === 'publishable')).toBe(true);
 
       const published = await repository.getLedger(ctx, draft.id, { publishableOnly: true });
       expect(published.items).toEqual([]);
+    });
+
+    it('returns only reviewed rows unless drafts are asked for', async () => {
+      const company = await bySlug(scenario.draftRowSlug);
+      const repository = await repo();
+
+      const reviewed = await repository.getLedger(ctx, company.id);
+      const withDrafts = await repository.getLedger(ctx, company.id, { includeDrafts: true });
+
+      expect(reviewed.items.length).toBeGreaterThan(0);
+      for (const entry of reviewed.items) expect(entry.reviewState).toBe('internal');
+
+      const drafts = withDrafts.items.filter((entry) => entry.reviewState === 'draft');
+      expect(drafts.length).toBeGreaterThan(0);
+      // Asking for drafts adds them and nothing else: no retired row, and the
+      // reviewed rows are all still there.
+      for (const entry of withDrafts.items) expect(entry.reviewState).not.toBe('retired');
+      expect(withDrafts.items.length).toBe(reviewed.items.length + drafts.length);
+    });
+
+    it('keeps a draft row out of the publishable read on a reviewed record', async () => {
+      const company = await bySlug(scenario.draftRowSlug);
+      const repository = await repo();
+
+      const withDrafts = await repository.getLedger(ctx, company.id, { includeDrafts: true });
+      const draftPublishable = withDrafts.items.filter(
+        (entry) => entry.reviewState === 'draft' && entry.classification === 'publishable',
+      );
+      // Otherwise the empty intersection below proves nothing.
+      expect(draftPublishable.length).toBeGreaterThan(0);
+
+      const published = await repository.getLedger(ctx, company.id, {
+        publishableOnly: true,
+        includeDrafts: true,
+      });
+      for (const entry of published.items) expect(entry.reviewState).toBe('internal');
+    });
+
+    it('queues every record with something waiting, and nothing else', async () => {
+      const repository = await repo();
+      const queue = await repository.getReviewQueue(ctx);
+      const slugs = queue.map((entry) => entry.slug);
+
+      // A new record, and one new row on a settled record, are both work.
+      expect(slugs).toContain((await bySlug(scenario.draftSlug)).slug);
+      const rowEntry = queue.find((entry) => entry.slug === scenario.draftRowSlug);
+      expect(rowEntry?.companyReviewState).toBe('internal');
+      expect(rowEntry?.draftEvents).toBeGreaterThan(0);
+
+      for (const entry of queue) {
+        const waiting = entry.draftEvents + entry.draftFindings + entry.draftFacts;
+        expect(entry.companyReviewState === 'draft' || waiting > 0).toBe(true);
+      }
     });
 
     it('clears only reviewed records that carry a subscriber summary', async () => {

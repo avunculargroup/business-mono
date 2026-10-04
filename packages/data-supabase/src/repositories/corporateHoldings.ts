@@ -16,6 +16,8 @@ import type {
   ReadContext,
   RegisterEntry,
   RegisterFilter,
+  ReviewQueueEntry,
+  ReviewReadOptions,
   StructuralAbsence,
   TrackerClaim,
   WithheldField,
@@ -63,6 +65,15 @@ const NOTES_TABLE = 'jurisdiction_notes' as never;
 const FACTS_VIEW = 'v_company_facts' as never;
 const CLASSIFICATIONS_TABLE = 'research_classifications' as never;
 const SECONDARY_CLAIMS_TABLE = 'secondary_claims' as never;
+const REVIEW_QUEUE_VIEW = 'v_research_review_queue' as never;
+
+/**
+ * The row states a read returns. The views already drop retired rows; this is
+ * the line between a reviewed read and a reviewer's one.
+ */
+function readableStates(opts?: ReviewReadOptions): ReviewState[] {
+  return opts?.includeDrafts ? ['internal', 'draft'] : ['internal'];
+}
 
 /** The page size the register list uses. The register is under twenty records. */
 const LIST_LIMIT = 50;
@@ -83,7 +94,7 @@ const LEDGER_COLUMNS =
   'id, company_id, event_type, asset_class, event_date, quantity, consideration_native, ' +
   'native_currency, consideration_aud, fx_rate_used, fees_included, headline, detail, ' +
   'disclosure_venue, basis, basis_comparable, classification, source_document_id, ' +
-  'source_title, source_class, source_url, source_published_at, source_is_audited';
+  'source_title, source_class, source_url, source_published_at, source_is_audited, review_state';
 
 const POSITION_COLUMNS =
   'snapshot_id, company_id, as_of_date, asset, instrument_type, quantity, basis, ' +
@@ -160,6 +171,7 @@ type LedgerRow = {
   basis: HoldingBasis | null;
   basis_comparable: boolean | null;
   classification: ResearchClassification;
+  review_state: ReviewState;
   source_document_id: string;
   source_title: string;
   source_class: SourceClass;
@@ -209,8 +221,20 @@ type FreshnessViewRow = {
   is_stale: boolean;
 };
 
+type ReviewQueueRow = {
+  company_id: string;
+  slug: string;
+  legal_name: string;
+  tier: ResearchTier;
+  company_review_state: ReviewState;
+  draft_events: number | string;
+  draft_findings: number | string;
+  draft_facts: number | string;
+};
+
 type AbsenceRow = {
   company_id: string;
+  review_state: ReviewState;
   subject: StructuralAbsence['subject'];
   headline: string;
   detail: string | null;
@@ -224,6 +248,7 @@ type AbsenceRow = {
 
 type FactRow = {
   id: string;
+  review_state: ReviewState;
   field_key: string;
   label: string;
   value: string;
@@ -363,6 +388,7 @@ function toLedgerEntry(row: LedgerRow): LedgerEntry {
     basis: row.basis,
     basisComparable: row.basis_comparable,
     classification: row.classification,
+    reviewState: row.review_state,
     provenance: toProvenance(row),
   };
 }
@@ -490,7 +516,7 @@ export function createCorporateHoldingsRepository(
     async getLedger(
       _ctx: ReadContext,
       companyId: string,
-      opts?: { publishableOnly?: boolean } & QueryOptions,
+      opts?: { publishableOnly?: boolean } & ReviewReadOptions & QueryOptions,
     ): Promise<Paginated<LedgerEntry>> {
       const limit = opts?.limit ?? LEDGER_LIMIT;
       const offset = opts?.offset ?? 0;
@@ -504,6 +530,9 @@ export function createCorporateHoldingsRepository(
         .from(view)
         .select(LEDGER_COLUMNS, { count: 'exact' })
         .eq('company_id', companyId)
+        // The publishable view already requires a reviewed row; a draft never
+        // reaches it whatever is asked.
+        .in('review_state', opts?.publishableOnly ? ['internal'] : readableStates(opts))
         .order('event_date', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -579,16 +608,21 @@ export function createCorporateHoldingsRepository(
       };
     },
 
-    async getCompanyFacts(_ctx: ReadContext, companyId: string): Promise<CompanyFact[]> {
+    async getCompanyFacts(
+      _ctx: ReadContext,
+      companyId: string,
+      opts?: ReviewReadOptions,
+    ): Promise<CompanyFact[]> {
       // The view has already resolved which document wins and attached the
       // claim that lost, so the adapter maps rather than ranks. Ranking here
       // would put the source hierarchy in two places.
       const { data, error } = await client
         .from(FACTS_VIEW)
         .select(
-          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url',
+          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url, review_state',
         )
         .eq('company_id', companyId)
+        .in('review_state', readableStates(opts))
         .order('field_key');
 
       if (error) throw error;
@@ -599,6 +633,7 @@ export function createCorporateHoldingsRepository(
         label: row.label,
         value: row.value,
         asOf: row.as_of,
+        reviewState: row.review_state,
         provenance: toProvenance(row),
         conflicting:
           row.conflicting_value === null
@@ -642,13 +677,15 @@ export function createCorporateHoldingsRepository(
     async getStructuralAbsences(
       _ctx: ReadContext,
       companyId: string,
+      opts?: ReviewReadOptions,
     ): Promise<StructuralAbsence[]> {
       const { data, error } = await client
         .from(ABSENCES_VIEW)
         .select(
-          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited',
+          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, review_state',
         )
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .in('review_state', readableStates(opts));
 
       if (error) throw error;
 
@@ -657,7 +694,30 @@ export function createCorporateHoldingsRepository(
         subject: row.subject,
         // The detail carries the citation; the headline is the panel's label.
         statement: row.detail ?? row.headline,
+        reviewState: row.review_state,
         provenance: toProvenance(row),
+      }));
+    },
+
+    async getReviewQueue(_ctx: ReadContext): Promise<ReviewQueueEntry[]> {
+      const { data, error } = await client
+        .from(REVIEW_QUEUE_VIEW)
+        .select(
+          'company_id, slug, legal_name, tier, company_review_state, draft_events, draft_findings, draft_facts',
+        )
+        .order('legal_name');
+
+      if (error) throw error;
+
+      return ((data ?? []) as unknown as ReviewQueueRow[]).map((row) => ({
+        companyId: row.company_id,
+        slug: row.slug,
+        legalName: row.legal_name,
+        tier: row.tier,
+        companyReviewState: row.company_review_state,
+        draftEvents: Number(row.draft_events),
+        draftFindings: Number(row.draft_findings),
+        draftFacts: Number(row.draft_facts),
       }));
     },
 

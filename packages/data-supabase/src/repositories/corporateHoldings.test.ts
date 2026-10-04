@@ -581,24 +581,63 @@ const NOTES = [
   },
 ];
 
+// Rows inherit their company's state, as the migration did. Retired rows are
+// absent because the views drop them; the datasets are what the views return.
+const companyState = new Map(COMPANIES.map((row) => [row.id, row.review_state]));
+const withState = <T extends { company_id: string }>(rows: T[]) =>
+  rows.map((row) => ({ ...row, review_state: companyState.get(row.company_id) ?? 'draft' }));
+
+const LEDGER_ROWS = [
+  ...withState(LEDGER),
+  // Landed and unread on a reviewed record, classified publishable: the row's
+  // own state is all that keeps it out of the publishable view.
+  {
+    ...ledgerRow('evt-mfg-006', 'rc-meridian', 'acquisition', '2026-09-30', 4, null),
+    review_state: 'draft',
+  },
+];
+
 function seed(): FakeSupabaseClient {
   const client = createFakeSupabase();
   client.__setDataset('research_companies', COMPANIES);
-  client.__setDataset('v_research_ledger', LEDGER);
+  client.__setDataset('v_research_ledger', LEDGER_ROWS);
   // The publishable view is a different query, not a filter over the same
-  // rows — so it is a different dataset here, and neither the covenant row nor
-  // the draft company's rows are in it. Both gates, as the view applies them.
-  const reviewed = new Set(
-    COMPANIES.filter((row) => row.review_state === 'internal').map((row) => row.id),
-  );
+  // rows — so it is a different dataset here, holding only what the view's
+  // three gates pass: a reviewed company, a reviewed row, a publishable field.
   client.__setDataset(
     'v_research_publishable',
-    LEDGER.filter((row) => row.classification === 'publishable' && reviewed.has(row.company_id)),
+    LEDGER_ROWS.filter(
+      (row) =>
+        row.classification === 'publishable' &&
+        row.review_state === 'internal' &&
+        companyState.get(row.company_id) === 'internal',
+    ),
+  );
+  const facts = withState(FACTS);
+  const absences = withState(ABSENCES);
+  const drafts = (rows: Array<{ company_id: string; review_state: string }>, id: string) =>
+    rows.filter((row) => row.company_id === id && row.review_state === 'draft').length;
+  client.__setDataset(
+    'v_research_review_queue',
+    COMPANIES.map((row) => ({
+      company_id: row.id,
+      slug: row.slug,
+      legal_name: row.legal_name,
+      tier: row.tier,
+      company_review_state: row.review_state,
+      draft_events: drafts(LEDGER_ROWS, row.id),
+      draft_findings: drafts(absences, row.id),
+      draft_facts: drafts(facts, row.id),
+    })).filter(
+      (row) =>
+        row.company_review_state === 'draft' ||
+        row.draft_events + row.draft_findings + row.draft_facts > 0,
+    ),
   );
   client.__setDataset('v_company_position', POSITIONS);
   client.__setDataset('v_research_freshness', FRESHNESS);
-  client.__setDataset('v_research_absences', ABSENCES);
-  client.__setDataset('v_company_facts', FACTS);
+  client.__setDataset('v_research_absences', absences);
+  client.__setDataset('v_company_facts', facts);
   client.__setDataset('research_classifications', WITHHELD);
   client.__setDataset('jurisdiction_notes', NOTES);
   client.__setDataset('secondary_claims', TRACKER_CLAIMS);
@@ -627,6 +666,7 @@ describeCorporateHoldingsContract<RepositoryDomain>({
   activeSlug: 'demo-tarra-holdings',
   disposalWithoutConsiderationSlug: 'demo-wexford-semiconductor',
   draftSlug: 'demo-brennock-packaging',
+  draftRowSlug: 'demo-meridian-freight',
 });
 
 let client: FakeSupabaseClient;

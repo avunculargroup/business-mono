@@ -135,6 +135,8 @@ export type {
   Provenance,
   RegisterEntry,
   RegisterFilter,
+  ReviewQueueEntry,
+  ReviewReadOptions,
   StructuralAbsence,
   TrackerClaim,
   WithheldField,
