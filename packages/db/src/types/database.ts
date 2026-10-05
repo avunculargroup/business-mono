@@ -6253,7 +6253,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
@@ -6290,7 +6290,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
@@ -6373,7 +6373,7 @@ export type Database = {
         }
         Insert: {
           as_of?: string | null
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id: string
           content_updated_at?: string | null
           created_at?: string
@@ -6393,7 +6393,7 @@ export type Database = {
         }
         Update: {
           as_of?: string | null
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id?: string
           content_updated_at?: string | null
           created_at?: string
@@ -6765,7 +6765,7 @@ export type Database = {
           suppressed_reason: string | null
         }
         Insert: {
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id: string
           content_updated_at?: string | null
           created_at?: string
@@ -6788,7 +6788,7 @@ export type Database = {
           suppressed_reason?: string | null
         }
         Update: {
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id?: string
           content_updated_at?: string | null
           created_at?: string
@@ -7632,7 +7632,7 @@ export type Database = {
         Insert: {
           asset_class?: string
           basis?: string | null
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id: string
           consideration_native?: number | null
           content_updated_at?: string | null
@@ -7659,7 +7659,7 @@ export type Database = {
         Update: {
           asset_class?: string
           basis?: string | null
-          changed_since_review?: never
+          changed_since_review?: boolean | null
           company_id?: string
           consideration_native?: number | null
           content_updated_at?: string | null
