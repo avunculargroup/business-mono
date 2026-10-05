@@ -428,13 +428,15 @@ export async function toggleRoutineActive(id: string, isActive: boolean) {
   return { success: true };
 }
 
+// Runs the routine once at the scheduler's next check (every 5 minutes),
+// whether or not it is switched on. Its schedule is left as it was.
 export async function runRoutineNow(id: string) {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
   const { supabase } = auth;
   const { error } = await supabase
     .from('routines')
-    .update({ next_run_at: new Date().toISOString() })
+    .update({ run_requested_at: new Date().toISOString() })
     .eq('id', id);
   if (error) return { error: humanizeError(error) };
   revalidatePath('/routines');

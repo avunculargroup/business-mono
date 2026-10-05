@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-05 — Routines: "Run now" works on a switched-off routine
+
+`20261005000000_routines_run_requested_at.sql` adds `routines.run_requested_at`.
+
+- "Run now" used to set `next_run_at` to now, but the scheduler selects only active
+  routines, so a switched-off routine never ran while the page said it was queued.
+- "Run now" now sets `run_requested_at`. The scheduler runs any routine with one, active
+  or not, claims it by clearing the request, and leaves `is_active` and `next_run_at`
+  alone.
+
+---
+
 ## 2026-10-04 — Corporate holdings: the weekly ingest routine
 
 `20261004010000_research_ingest_routine.sql` extends `routines.action_type` with

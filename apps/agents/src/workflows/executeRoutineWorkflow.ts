@@ -126,6 +126,19 @@ const curationMoodSchema = z.object({
     ),
 });
 
+function toClaimedRoutine(r: Record<string, unknown>): z.infer<typeof routineSchema> {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    agent_name: r.agent_name as string,
+    action_type: r.action_type as string,
+    action_config: (r.action_config as Record<string, unknown>) ?? {},
+    frequency: r.frequency as string,
+    time_of_day: r.time_of_day as string,
+    timezone: r.timezone as string,
+  };
+}
+
 /**
  * Selects every due routine and atomically claims each before returning it.
  *
@@ -142,6 +155,12 @@ const curationMoodSchema = z.object({
  * second's `next_run_at <= now` predicate no longer matches, so it claims
  * nothing and skips the routine. Each due routine therefore runs at most once
  * per slot regardless of overlap.
+ *
+ * A routine with `run_requested_at` set ("Run now") is selected too, whether or
+ * not it is active, and claimed the same way by clearing the request. Its
+ * schedule is left alone, so a switched-off routine can be run once without
+ * switching it on. A scheduled claim clears a pending request as well, because
+ * the run it starts answers it.
  */
 export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof routineSchema>>> {
   const nowIso = new Date().toISOString();
@@ -173,7 +192,7 @@ export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof 
     // result means a concurrent tick already claimed it — skip so we don't re-run.
     const { data: won, error: claimError } = await supabase
       .from('routines')
-      .update({ next_run_at: nextRunAt.toISOString() })
+      .update({ next_run_at: nextRunAt.toISOString(), run_requested_at: null })
       .eq('id', r.id as string)
       .lte('next_run_at', nowIso)
       .select('id');
@@ -182,16 +201,36 @@ export async function selectAndClaimDueRoutines(): Promise<Array<z.infer<typeof 
       continue;
     }
     if (!won || won.length === 0) continue;
-    claimed.push({
-      id: r.id as string,
-      name: r.name as string,
-      agent_name: r.agent_name as string,
-      action_type: r.action_type as string,
-      action_config: (r.action_config as Record<string, unknown>) ?? {},
-      frequency: r.frequency as string,
-      time_of_day: r.time_of_day as string,
-      timezone: r.timezone as string,
-    });
+    claimed.push(toClaimedRoutine(r));
+  }
+
+  const { data: requested, error: requestedError } = await supabase
+    .from('routines')
+    .select('id, name, agent_name, action_type, action_config, frequency, time_of_day, timezone')
+    .not('run_requested_at', 'is', null)
+    .order('run_requested_at', { ascending: true })
+    .limit(10);
+  if (requestedError) {
+    log.warn({ error: requestedError.message }, 'requested routines lookup failed — skipping this tick');
+    return claimed;
+  }
+
+  for (const r of requested ?? []) {
+    if (claimed.some((c) => c.id === r.id)) continue;
+    // Same atomic claim, keyed on the request: clearing it only while it is
+    // still set means a concurrent tick cannot run the request twice.
+    const { data: won, error: claimError } = await supabase
+      .from('routines')
+      .update({ run_requested_at: null })
+      .eq('id', r.id as string)
+      .not('run_requested_at', 'is', null)
+      .select('id');
+    if (claimError) {
+      log.warn({ id: r.id, error: claimError.message }, 'request claim failed — skipping routine this tick');
+      continue;
+    }
+    if (!won || won.length === 0) continue;
+    claimed.push(toClaimedRoutine(r));
   }
 
   return claimed;

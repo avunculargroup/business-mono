@@ -9,7 +9,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => client),
 }));
 
-import { createRoutine, updateRoutine } from './routines';
+import { createRoutine, runRoutineNow, updateRoutine } from './routines';
 
 function formData(fields: Record<string, string>): FormData {
   const fd = new FormData();
@@ -383,5 +383,16 @@ describe('blank numeric fields', () => {
       max_items_per_source: 25,
       lookback_days: 14,
     });
+  });
+});
+
+describe('runRoutineNow', () => {
+  it('requests a run without touching the schedule, so a switched-off routine runs too', async () => {
+    const result = await runRoutineNow('r-6');
+
+    expect(result).toEqual({ success: true });
+    const patch = updateCall('routines')!;
+    expect(Object.keys(patch)).toEqual(['run_requested_at']);
+    expect(Number.isNaN(Date.parse(patch['run_requested_at'] as string))).toBe(false);
   });
 });

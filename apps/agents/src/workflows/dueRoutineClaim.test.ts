@@ -94,6 +94,77 @@ describe('selectAndClaimDueRoutines', () => {
     expect(claimed.map((r) => r.id)).toEqual(['r1']);
   });
 
+  it('clears a pending run request when it claims a scheduled run', async () => {
+    fakeSupabase.__setResponses('routines', [
+      { data: [dueRoutineRow('r1', 'Daily news curation')], error: null },
+      { data: [{ id: 'r1' }], error: null },
+      { data: [], error: null },
+    ]);
+
+    await selectAndClaimDueRoutines();
+
+    const patch = fakeSupabase.__buildersFor('routines')[1]!.update.mock.calls[0]![0];
+    expect(patch).toMatchObject({ run_requested_at: null });
+  });
+
+  it('runs a requested routine whether or not it is active, claiming it by clearing the request', async () => {
+    // 1st = scheduled SELECT (nothing due); 2nd = requested SELECT; 3rd = request claim (won).
+    fakeSupabase.__setResponses('routines', [
+      { data: [], error: null },
+      { data: [dueRoutineRow('r2', 'Weekly corporate research ingest')], error: null },
+      { data: [{ id: 'r2' }], error: null },
+    ]);
+
+    const claimed = await selectAndClaimDueRoutines();
+
+    expect(claimed.map((r) => r.id)).toEqual(['r2']);
+    const [scheduled, requested, claim] = fakeSupabase.__buildersFor('routines');
+    expect(scheduled!.eq).toHaveBeenCalledWith('is_active', true);
+    // The requested lookup does not filter on is_active.
+    expect(requested!.eq).not.toHaveBeenCalledWith('is_active', true);
+    expect(requested!.not).toHaveBeenCalledWith('run_requested_at', 'is', null);
+    // The claim clears only the request and leaves the schedule alone.
+    expect(claim!.update).toHaveBeenCalledWith({ run_requested_at: null });
+    expect(claim!.eq).toHaveBeenCalledWith('id', 'r2');
+    expect(claim!.not).toHaveBeenCalledWith('run_requested_at', 'is', null);
+  });
+
+  it('skips a request a concurrent tick already claimed', async () => {
+    fakeSupabase.__setResponses('routines', [
+      { data: [], error: null },
+      { data: [dueRoutineRow('r2', 'B')], error: null },
+      { data: [], error: null },
+    ]);
+
+    await expect(selectAndClaimDueRoutines()).resolves.toEqual([]);
+  });
+
+  it('does not run a routine twice when it is both due and requested', async () => {
+    fakeSupabase.__setResponses('routines', [
+      { data: [dueRoutineRow('r1', 'A')], error: null },
+      { data: [{ id: 'r1' }], error: null },
+      { data: [dueRoutineRow('r1', 'A')], error: null },
+    ]);
+
+    const claimed = await selectAndClaimDueRoutines();
+
+    expect(claimed.map((r) => r.id)).toEqual(['r1']);
+    // No request claim was attempted for r1.
+    expect(fakeSupabase.__buildersFor('routines')).toHaveLength(3);
+  });
+
+  it('keeps the scheduled claims when the requested lookup fails', async () => {
+    fakeSupabase.__setResponses('routines', [
+      { data: [dueRoutineRow('r1', 'A')], error: null },
+      { data: [{ id: 'r1' }], error: null },
+      { data: null, error: { message: 'column "run_requested_at" does not exist' } },
+    ]);
+
+    const claimed = await selectAndClaimDueRoutines();
+
+    expect(claimed.map((r) => r.id)).toEqual(['r1']);
+  });
+
   it('returns nothing (and does not throw) when the routines table is missing', async () => {
     fakeSupabase.__setResponse('routines', {
       data: null,

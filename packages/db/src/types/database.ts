@@ -6985,6 +6985,7 @@ export type Database = {
           last_status: string | null
           name: string
           next_run_at: string
+          run_requested_at: string | null
           show_on_dashboard: boolean
           time_of_day: string
           timezone: string
@@ -7007,6 +7008,7 @@ export type Database = {
           last_status?: string | null
           name: string
           next_run_at: string
+          run_requested_at?: string | null
           show_on_dashboard?: boolean
           time_of_day?: string
           timezone?: string
@@ -7029,6 +7031,7 @@ export type Database = {
           last_status?: string | null
           name?: string
           next_run_at?: string
+          run_requested_at?: string | null
           show_on_dashboard?: boolean
           time_of_day?: string
           timezone?: string

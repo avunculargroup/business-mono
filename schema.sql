@@ -744,6 +744,7 @@ CREATE TABLE routines (
   time_of_day       TIME NOT NULL DEFAULT '07:00',
   timezone          TEXT NOT NULL DEFAULT 'Australia/Melbourne',
   next_run_at       TIMESTAMPTZ NOT NULL,
+  run_requested_at  TIMESTAMPTZ,  -- set by "Run now"; runs once even when inactive
   last_run_at       TIMESTAMPTZ,
   last_result       JSONB,
   last_status       TEXT CHECK (last_status IN ('success','failed','running')),
