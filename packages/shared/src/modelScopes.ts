@@ -270,6 +270,15 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'researchIngest',
     fallbackAgent: 'lex',
   },
+  {
+    key: 'researchIngest.draft_summary',
+    type: 'workflow_step',
+    label: 'Draft subscriber summary',
+    description:
+      'Rex drafts the summary a subscriber reads, from implementation facts only. Filtered for advice and outcome language, and never cleared until a person edits it',
+    workflow: 'researchIngest',
+    fallbackAgent: 'rex',
+  },
 
   // ── Variant generation workflow steps ─────────────────────────────────────
   {

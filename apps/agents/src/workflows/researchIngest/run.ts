@@ -48,6 +48,7 @@ export async function runResearchIngestRoutine(
 
   const queued: ResearchIngestRoutineResult['queued'] = [];
   const failed: string[] = [];
+  const drafted: Array<{ slug: string; legal_name: string }> = [];
 
   for (const company of companies) {
     try {
@@ -59,6 +60,7 @@ export async function runResearchIngestRoutine(
       }
       const rows = run.result?.queuedRows ?? 0;
       if (rows > 0) queued.push({ slug: company.slug, legal_name: company.legal_name, queued_rows: rows });
+      if (run.result?.summaryDrafted) drafted.push({ slug: company.slug, legal_name: company.legal_name });
     } catch (err) {
       failed.push(company.slug);
       log.error({ err, slug: company.slug }, 'ingest run failed');
@@ -82,6 +84,10 @@ export async function runResearchIngestRoutine(
         // A legal name can end in its own full stop ("Inc."); don't add a second.
         `${queued.map((entry) => entry.legal_name).join(', ')}`.replace(/\.?$/, '.')
       : `Nothing to review: ${records(companies.length - failed.length)} ingested, nothing new or changed.`) +
+    (drafted.length > 0
+      ? ` Subscriber summary drafted for ${records(drafted.length)}: ` +
+        `${drafted.map((entry) => entry.legal_name).join(', ')}`.replace(/\.?$/, '.')
+      : '') +
     (failed.length > 0 ? ` ${records(failed.length)} failed: ${failed.join(', ')}.` : '');
 
   return {
@@ -91,6 +97,7 @@ export async function runResearchIngestRoutine(
       companies_failed: failed,
       queued_rows: queuedRows,
       queued,
+      summaries_drafted: drafted.map((entry) => entry.slug),
       emailed: (delivery?.sent ?? 0) > 0,
       link_url: '/research?view=review',
       link_label: 'Review queue',

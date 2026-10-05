@@ -2864,6 +2864,11 @@ CREATE TABLE ecosystem_changes (
 --   crawl_delay_seconds INT 5, max_candidates_per_run INT 25
 -- source_type CHECK widened to include 'report_watch'; news_sources_feed_required
 -- gains an OR branch for it (its URLs live in detection_config, not feed_url).
+-- From 20261006010000: research_company_id → research_companies. A bound source
+-- registers its finds in research_documents instead of acquiring them; CHECK
+-- news_sources_research_binding makes it EDGAR only, and EDGAR only bound.
+-- report_candidates admits discovery_method 'edgar' and status 'registered',
+-- and gains research_document_id → research_documents.
 
 -- Every URL discovery has ever surfaced, INCLUDING rejections — without a memory
 -- of what was rejected, every run re-evaluates the same sitemap rubbish.
@@ -3061,6 +3066,11 @@ CREATE TABLE report_segments (
 --   (or reviewed_at NULL). The same pair is on treasury_events,
 --   research_findings and research_company_facts. It flags a reviewed row or
 --   record, never demotes it; v_research_review_queue lists both.
+--   From 20261006000000: research_summary_drafts(company_id PK, body,
+--   drafted_at, ingest_run_id, facts_as_of), team-only. The draft researchIngest
+--   writes for a person to edit; never a column here, because a subscriber can
+--   read a cleared row and RLS is per row. Trigger
+--   refuse_unedited_summary_draft refuses clearance on an unedited draft.
 -- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
 --   UNIQUE (scheme, value) — entity resolution runs here, and a registration
 --   number names one company. Open scheme vocabulary: a company can hold two CIKs.
@@ -3078,6 +3088,9 @@ CREATE TABLE report_segments (
 --   retrieval_error: a failed fetch is recorded, never discarded.
 --   resolution_status (resolved | no_url | unfetchable | fetch_failed) separates
 --   a document never attempted from one that failed; the ingest maintains it.
+--   From 20261006010000: UNIQUE (company_id, venue, announcement_id) WHERE
+--   announcement_id IS NOT NULL — one registration per filing, since EDGAR
+--   discovery registers rows here as well as the hand-curation pass.
 -- document_chunks(document_id, chunk_index, page_from/to, content,
 --   embedding VECTOR(1536), HNSW vector_cosine_ops) — whole-document chunks,
 --   never section-keyed.

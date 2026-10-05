@@ -125,6 +125,9 @@ export interface NewsSourceRecord {
   ocr_page_limit: number;
   crawl_delay_seconds: number;
   max_candidates_per_run: number;
+  // Set on a report_watch source that discovers one research company's filings
+  // (EDGAR). Managed with the register, not on /news/sources.
+  research_company_id: string | null;
   // Email source fields. slug is the plus-address suffix + URL slug;
   // inbound_address is the computed research+{slug}@<domain>; sender_allowlist
   // is the approved From addresses/domains (may be empty pre-onboarding).

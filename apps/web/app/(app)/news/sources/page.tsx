@@ -10,7 +10,14 @@ export default async function NewsSourcesPage() {
   const supabase = await createClient();
 
   const [{ data: sources }, { data: episodes }, { data: health }, { data: paywalled }] = await Promise.all([
-    supabase.from('news_sources').select('*').order('name', { ascending: true }),
+    // A source bound to a research company discovers that company's filings
+    // for /research, never for the feed, and this form cannot edit its
+    // binding. It still appears in the health panel below.
+    supabase
+      .from('news_sources')
+      .select('*')
+      .is('research_company_id', null)
+      .order('name', { ascending: true }),
     // Per-source episode + transcript-coverage counts for the feed list. Small
     // data set (pre-revenue), so aggregate in JS rather than via an RPC.
     supabase.from('podcast_episodes').select('source_id, transcript_status'),

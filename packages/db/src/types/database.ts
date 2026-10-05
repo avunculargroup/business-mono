@@ -4253,6 +4253,7 @@ export type Database = {
           preferred_transcript_lang: string
           redistribution_default: string
           relevance_threshold: number
+          research_company_id: string | null
           sender_allowlist: string[]
           site_url: string | null
           slug: string | null
@@ -4290,6 +4291,7 @@ export type Database = {
           preferred_transcript_lang?: string
           redistribution_default?: string
           relevance_threshold?: number
+          research_company_id?: string | null
           sender_allowlist?: string[]
           site_url?: string | null
           slug?: string | null
@@ -4327,6 +4329,7 @@ export type Database = {
           preferred_transcript_lang?: string
           redistribution_default?: string
           relevance_threshold?: number
+          research_company_id?: string | null
           sender_allowlist?: string[]
           site_url?: string | null
           slug?: string | null
@@ -5780,6 +5783,7 @@ export type Database = {
           published_at_hint: string | null
           raw_url: string
           report_id: string | null
+          research_document_id: string | null
           skip_reason: string | null
           source_id: string
           status: string
@@ -5805,6 +5809,7 @@ export type Database = {
           published_at_hint?: string | null
           raw_url: string
           report_id?: string | null
+          research_document_id?: string | null
           skip_reason?: string | null
           source_id: string
           status?: string
@@ -5830,6 +5835,7 @@ export type Database = {
           published_at_hint?: string | null
           raw_url?: string
           report_id?: string | null
+          research_document_id?: string | null
           skip_reason?: string | null
           source_id?: string
           status?: string
@@ -6908,6 +6914,38 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_research_publishable"
             referencedColumns: ["source_document_id"]
+          },
+        ]
+      }
+      research_summary_drafts: {
+        Row: {
+          body: string
+          company_id: string
+          drafted_at: string
+          facts_as_of: string | null
+          ingest_run_id: string | null
+        }
+        Insert: {
+          body: string
+          company_id: string
+          drafted_at?: string
+          facts_as_of?: string | null
+          ingest_run_id?: string | null
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          drafted_at?: string
+          facts_as_of?: string | null
+          ingest_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "research_summary_drafts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
           },
         ]
       }

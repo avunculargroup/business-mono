@@ -22,7 +22,8 @@ export type ReportWatchTable =
   | 'reports'
   | 'report_segments'
   | 'news_sources'
-  | 'news_items';
+  | 'news_items'
+  | 'research_documents';
 
 export type DbResponse<T> = { data: T; error: { message: string; code?: string } | null };
 

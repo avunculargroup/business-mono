@@ -508,3 +508,120 @@ describe('compliance defaults', () => {
     expect((args as { payload: { classifications: unknown[] } }).payload.classifications).toEqual([]);
   });
 });
+
+describe('the subscriber summary draft', () => {
+  const DRAFT_KEY = 'researchIngest.draft_summary';
+  const draftCalls = () =>
+    rexGenerate.mock.calls.filter(
+      ([, opts]) => (opts as { requestContext: { key: string } }).requestContext.key === DRAFT_KEY,
+    ) as unknown as Array<[Array<{ content: string }>]>;
+
+  function withFacts(draft: string | string[]) {
+    tables.set('field_source_minimums', [{ field_key: 'custody' }, { field_key: 'mandate' }]);
+    tables.set('research_company_facts', [
+      {
+        field_key: 'custody',
+        label: 'Custody',
+        value: 'Held with a third-party custodian.',
+        as_of: '2026-06-30',
+        updated_at: '2026-09-01T00:00:00Z',
+        review_state: 'internal',
+        is_superseded: false,
+      },
+      {
+        // Outcome, not implementation: never read into a subscriber summary.
+        field_key: 'operating_metric',
+        label: 'Funding runway',
+        value: 'Eighteen months of runway.',
+        as_of: null,
+        updated_at: '2026-09-01T00:00:00Z',
+        review_state: 'internal',
+        is_superseded: false,
+      },
+    ]);
+    tables.set('restricted_metrics', [{ label: 'mNAV', aliases: ['mNAV'] }]);
+    const drafts = Array.isArray(draft) ? [...draft] : [draft];
+    const base = rexGenerate.getMockImplementation()!;
+    rexGenerate.mockImplementation((messages: unknown, opts: { requestContext: { key: string } }) =>
+      opts.requestContext.key === DRAFT_KEY
+        ? Promise.resolve({ object: { summary: drafts.length > 1 ? drafts.shift() : drafts[0] } })
+        : base(messages, opts),
+    );
+  }
+
+  it('drafts from implementation facts only, into the team-only table', async () => {
+    withFacts('Holds bitcoin with a third-party custodian.');
+
+    const result = await run();
+
+    expect(result.status === 'success' && result.result.summaryDrafted).toBe(true);
+    const [[messages]] = draftCalls();
+    expect(messages[0].content).toContain('Held with a third-party custodian.');
+    expect(messages[0].content).not.toContain('runway');
+    expect(upserts).toContainEqual({
+      table: 'research_summary_drafts',
+      values: expect.objectContaining({
+        company_id: COMPANY,
+        body: 'Holds bitcoin with a third-party custodian.',
+        ingest_run_id: expect.any(String),
+        facts_as_of: '2026-09-01T00:00:00Z',
+      }),
+      options: { onConflict: 'company_id' },
+    });
+    // The draft never touches the summary a subscriber reads.
+    expect(updates).not.toContainEqual(
+      expect.objectContaining({ values: expect.objectContaining({ client_summary: expect.anything() }) }),
+    );
+  });
+
+  it('retries a draft the filter refuses, telling the model why', async () => {
+    withFacts(['Investors should note it trades at an mNAV of 1.2.', 'Holds bitcoin with a custodian.']);
+
+    await run();
+
+    const calls = draftCalls();
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0][0].content).toContain('"should", "mNAV"');
+    expect(upserts).toContainEqual(
+      expect.objectContaining({
+        table: 'research_summary_drafts',
+        values: expect.objectContaining({ body: 'Holds bitcoin with a custodian.' }),
+      }),
+    );
+  });
+
+  it('stores nothing when both attempts are refused, and the run still succeeds', async () => {
+    withFacts('It is the best bitcoin treasury company.');
+
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect(result.status === 'success' && result.result.summaryDrafted).toBe(false);
+    expect(draftCalls()).toHaveLength(2);
+    expect(upserts.filter((u) => u.table === 'research_summary_drafts')).toEqual([]);
+  });
+
+  it('does not draft over a summary a person has written', async () => {
+    withFacts('Holds bitcoin with a custodian.');
+    tables.set('research_companies', [
+      { slug: 'locate-technologies', legal_name: 'Locate Technologies Limited', client_summary: 'Written.' },
+    ]);
+
+    await run();
+
+    expect(draftCalls()).toHaveLength(0);
+  });
+
+  it('keeps the run when the model fails outright', async () => {
+    withFacts('unused');
+    const base = rexGenerate.getMockImplementation()!;
+    rexGenerate.mockImplementation((messages: unknown, opts: { requestContext: { key: string } }) =>
+      opts.requestContext.key === DRAFT_KEY ? Promise.reject(new Error('model down')) : base(messages, opts),
+    );
+
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect(result.status === 'success' && result.result.summaryDrafted).toBe(false);
+  });
+});

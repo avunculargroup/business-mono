@@ -183,6 +183,20 @@ export async function setRegisterClearance(companyId: string, cleared: boolean, 
     return { error: 'Write the summary subscribers will read before clearing the entry.' };
   }
 
+  if (cleared) {
+    // The database refuses this too (refuse_unedited_summary_draft); checked
+    // here first for a message that says what to do.
+    const { data: draft, error: draftError } = await auth.supabase
+      .from('research_summary_drafts')
+      .select('body')
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (draftError) return { error: humanizeError(draftError) };
+    if (draft && collapse(draft.body) === collapse(trimmed)) {
+      return { error: 'This is still the drafted summary, unedited. Read it against the record and edit it before clearing.' };
+    }
+  }
+
   const { error } = await auth.supabase
     .from('research_companies')
     .update(
@@ -201,6 +215,11 @@ export async function setRegisterClearance(companyId: string, cleared: boolean, 
 
   revalidatePath('/research');
   return { success: true };
+}
+
+/** Whitespace-insensitive, as the database compares a summary to its draft. */
+function collapse(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
 }
 
 /**

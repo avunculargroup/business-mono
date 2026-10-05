@@ -19,6 +19,7 @@ import type {
   ReviewQueueEntry,
   ReviewReadOptions,
   StructuralAbsence,
+  SummaryDraft,
   TrackerClaim,
   WithheldField,
 } from '@platform/data';
@@ -780,6 +781,30 @@ export function createCorporateHoldingsRepository(
           sourced,
         ),
       );
+    },
+
+    async getSummaryDraft(_ctx: ReadContext, companyId: string): Promise<SummaryDraft | null> {
+      const { data, error } = await client
+        .from('research_summary_drafts')
+        .select('company_id, body, drafted_at, ingest_run_id')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (error) throw error;
+      const row = data as unknown as {
+        company_id: string;
+        body: string;
+        drafted_at: string;
+        ingest_run_id: string | null;
+      } | null;
+      if (!row) return null;
+
+      return {
+        companyId: row.company_id,
+        body: row.body,
+        draftedAt: row.drafted_at,
+        ingestRunId: row.ingest_run_id,
+      };
     },
 
     async compareCompanies(_ctx: ReadContext, slugs: string[]): Promise<CompanyDossier[]> {

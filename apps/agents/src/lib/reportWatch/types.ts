@@ -37,6 +37,25 @@ export interface DiscoveredCandidate {
    * found a page rather than an artefact. Acquisition follows exactly one hop.
    */
   landingUrl?: string | null;
+  /**
+   * What a filing venue states about the document, when the strategy reads a
+   * venue's own index (EDGAR). Registration classifies the document by it, so
+   * nothing is guessed from a URL or a scraped title.
+   */
+  filing?: FilingMeta;
+}
+
+export interface FilingMeta {
+  /** As the venue states it, e.g. '8-K', '10-Q', '6-K'. */
+  form: string;
+  /** The venue's identity for the filing — the SEC accession number. */
+  accession: string;
+  /** 8-K item numbers, e.g. ['7.01', '8.01']. Empty where the form has none. */
+  items: string[];
+  /** The period or event date the filing reports on, where stated. */
+  reportDate: string | null;
+  /** The filer's name as the venue holds it today. */
+  filerName: string | null;
 }
 
 export interface ReportAdapterError {

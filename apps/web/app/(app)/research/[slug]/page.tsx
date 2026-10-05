@@ -9,7 +9,7 @@ import { RegisterClearance } from '@/components/clientGate/RegisterClearance';
 /**
  * One company's record.
  *
- * Every read the page makes is a repository call, and all eight run in parallel
+ * Every read the page makes is a repository call, and all nine run in parallel
  * — they are independent, and serialising them would make the page as slow as
  * their sum for no reason. The interactive parts (the provenance toggle) live
  * in `CompanyRecord`, which is a client component; this stays a data-wiring
@@ -41,7 +41,7 @@ export default async function ResearchCompanyPage({
   const company = await corporateHoldings.getCompany(ctx, slug);
   if (!company) notFound();
 
-  const [ledger, position, facts, absences, withheld, freshness, notes] = await Promise.all([
+  const [ledger, position, facts, absences, withheld, freshness, notes, summaryDraft] = await Promise.all([
     // The reviewer's view: draft rows included, and marked as drafts.
     corporateHoldings.getLedger(ctx, company.id, { includeDrafts: true }),
     corporateHoldings.getPosition(ctx, company.id),
@@ -54,6 +54,7 @@ export default async function ResearchCompanyPage({
       venue: company.listings[0]?.venue,
       listingType: company.listings[0]?.listingType,
     }),
+    corporateHoldings.getSummaryDraft(ctx, company.id),
   ]);
 
   return (
@@ -74,6 +75,7 @@ export default async function ResearchCompanyPage({
             ...facts.map((fact) => ({ ...fact, ingestRunId: null })),
           ])}
           changedSinceReview={company.changedSinceReview}
+          summaryDraft={summaryDraft}
           changedRows={
             [...ledger.items, ...absences, ...facts].filter((row) => row.changedSinceReview).length
           }

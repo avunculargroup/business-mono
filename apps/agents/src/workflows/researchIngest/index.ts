@@ -34,6 +34,13 @@ import { admitUnits, sectionsFor, unitsFor, type ReadingUnit, type StoredSection
 import { claimsForEvent, validateClaims } from './numerics.js';
 import { isQuietRun, materialDeltas, reconcile, type CommittedEvent } from './reconcile.js';
 import {
+  factsAsOf,
+  needsDraft,
+  summaryPrompt,
+  summaryViolations,
+  type SummaryFact,
+} from './summaryDraft.js';
+import {
   classificationsSchema,
   extractionSchema,
   fetchSummarySchema,
@@ -43,6 +50,7 @@ import {
   researchIngestInputSchema,
   researchIngestOutputSchema,
   scoringSchema,
+  summaryDraftSchema,
   candidateEventSchema,
   deltaSchema,
   findingSchema,
@@ -75,6 +83,7 @@ const classifiedSchema = scoredSchema.extend({
   classifications: z.array(classificationSchema),
 });
 const persistedSchema = classifiedSchema.extend({ committed: z.any() });
+const draftedSchema = persistedSchema.extend({ summaryDrafted: z.boolean() });
 
 type Delta = z.infer<typeof deltaSchema>;
 
@@ -677,7 +686,132 @@ const persistStep = createStep({
   },
 });
 
-// ── 11. Record the run ───────────────────────────────────────────────────────
+// ── 11. Draft the subscriber summary (Rex) ──────────────────────────────────
+// After persist, so a model being slow, down or wrong costs a draft and never
+// a ledger. Only for a record with no summary yet, and only when its facts
+// have moved since the last draft. Composed from implementation facts only;
+// the draft lands in research_summary_drafts, which no subscriber can read,
+// and clearance refuses it until a person has edited it.
+//
+// Never fails the run: the rows are committed whatever happens here.
+const draftSummaryStep = createStep({
+  id: 'draft_summary',
+  inputSchema: persistedSchema,
+  outputSchema: draftedSchema,
+  execute: async ({ inputData, runId }) => {
+    try {
+      return { ...inputData, summaryDrafted: await draftSummary(inputData.companyId, runId) };
+    } catch (err) {
+      log.error({ err, companyId: inputData.companyId }, 'summary draft failed');
+      return { ...inputData, summaryDrafted: false };
+    }
+  },
+});
+
+/** Two attempts: a draft that trips the filter is retried once, told why. */
+const SUMMARY_ATTEMPTS = 2;
+
+async function draftSummary(companyId: string, runId: string): Promise<boolean> {
+  const { data: company, error: companyError } = await db
+    .from('research_companies')
+    .select('legal_name, client_summary')
+    .eq('id', companyId)
+    .maybeSingle();
+  if (companyError) throw companyError;
+  if (!company) return false;
+  const { legal_name: legalName, client_summary: clientSummary } = company as {
+    legal_name: string;
+    client_summary: string | null;
+  };
+  if (clientSummary?.trim()) return false;
+
+  // Implementation facts only, read from the classification the client read
+  // policy uses, so the draft and the subscriber's view agree about what an
+  // implementation fact is. An unclassified key is left out.
+  const { data: classes, error: classesError } = await db
+    .from('field_source_minimums')
+    .select('field_key')
+    .eq('client_fact_class', 'implementation');
+  if (classesError) throw classesError;
+  const implementation = new Set(
+    ((classes ?? []) as Array<{ field_key: string }>).map((row) => row.field_key),
+  );
+
+  const { data: factRows, error: factsError } = await db
+    .from('research_company_facts')
+    .select('field_key, label, value, as_of, updated_at, review_state, is_superseded')
+    .eq('company_id', companyId);
+  if (factsError) throw factsError;
+  const facts = ((factRows ?? []) as Array<SummaryFact & { review_state: string; is_superseded: boolean }>)
+    .filter((fact) => implementation.has(fact.field_key))
+    .filter((fact) => !fact.is_superseded && fact.review_state !== 'retired')
+    .map(({ field_key, label, value, as_of, updated_at }) => ({ field_key, label, value, as_of, updated_at }));
+
+  const { data: existing, error: existingError } = await db
+    .from('research_summary_drafts')
+    .select('facts_as_of')
+    .eq('company_id', companyId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (!needsDraft({ clientSummary, facts, existing: existing as { facts_as_of: string | null } | null })) {
+    return false;
+  }
+
+  const { data: metrics, error: metricsError } = await db
+    .from('restricted_metrics')
+    .select('label, aliases');
+  if (metricsError) throw metricsError;
+  const restricted = ((metrics ?? []) as Array<{ label: string; aliases: string[] | null }>).flatMap(
+    (metric) => [metric.label, ...(metric.aliases ?? [])],
+  );
+
+  let rejected: string[] = [];
+  for (let attempt = 0; attempt < SUMMARY_ATTEMPTS; attempt += 1) {
+    const response = await rex.generate(
+      [{ role: 'user', content: summaryPrompt({ legalName, facts, rejected }) }],
+      {
+        requestContext: stepRequestContext('researchIngest.draft_summary'),
+        structuredOutput: {
+          schema: summaryDraftSchema,
+          errorStrategy: 'fallback',
+          fallbackValue: { summary: '' },
+        },
+      },
+    );
+
+    const parsed = summaryDraftSchema.safeParse(response.object);
+    const body = parsed.success ? parsed.data.summary.trim() : '';
+    if (!body) {
+      log.warn({ companyId }, 'summary draft came back empty');
+      return false;
+    }
+
+    rejected = summaryViolations(body, restricted);
+    if (rejected.length > 0) {
+      log.warn({ companyId, attempt, terms: rejected }, 'summary draft refused by the filter');
+      continue;
+    }
+
+    const { error } = await db.from('research_summary_drafts').upsert(
+      {
+        company_id: companyId,
+        body,
+        drafted_at: new Date().toISOString(),
+        ingest_run_id: runId,
+        facts_as_of: factsAsOf(facts),
+      },
+      { onConflict: 'company_id' },
+    );
+    if (error) throw error;
+    log.info({ companyId }, 'summary drafted');
+    return true;
+  }
+
+  return false;
+}
+
+// ── 12. Record the run ───────────────────────────────────────────────────────
 // Persist-and-stop. The run's rows are already in the database as drafts,
 // stamped with this run's id, and the review queue on /research is where a
 // person reads and approves them. Nothing here waits: a suspended run holds
@@ -691,7 +825,7 @@ const persistStep = createStep({
 // /research marks this row approved too.
 const recordRunStep = createStep({
   id: 'record_run',
-  inputSchema: persistedSchema,
+  inputSchema: draftedSchema,
   outputSchema: researchIngestOutputSchema,
   execute: async ({ inputData, runId }) => {
     const committed = (inputData.committed ?? {}) as Record<
@@ -725,6 +859,7 @@ const recordRunStep = createStep({
       suppressedDeltas: inputData.deltas.filter((delta) => delta.suppressed).length,
       quiet: inputData.quiet,
       queuedRows,
+      summaryDrafted: inputData.summaryDrafted,
     };
 
     const { error } = await db.from('agent_activity').insert({
@@ -737,9 +872,10 @@ const recordRunStep = createStep({
       entity_type: 'research_companies',
       entity_id: inputData.companyId,
       notes:
-        queuedRows > 0
+        (queuedRows > 0
           ? `${queuedRows} rows waiting for review on /research.`
-          : 'Nothing to review: no new or changed rows.',
+          : 'Nothing to review: no new or changed rows.') +
+        (inputData.summaryDrafted ? ' Subscriber summary drafted for editing.' : ''),
     });
     // The rows are committed whatever happens here, and the queue reads them,
     // not this log. A failed audit write is logged rather than failing the run.
@@ -764,5 +900,6 @@ export const researchIngestWorkflow = createWorkflow({
   .then(scoreStep)
   .then(classifyStep)
   .then(persistStep)
+  .then(draftSummaryStep)
   .then(recordRunStep)
   .commit();

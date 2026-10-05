@@ -138,6 +138,7 @@ export type {
   ReviewQueueEntry,
   ReviewReadOptions,
   StructuralAbsence,
+  SummaryDraft,
   TrackerClaim,
   WithheldField,
 } from './repositories/corporateHoldings';

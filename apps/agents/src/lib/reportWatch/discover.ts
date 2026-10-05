@@ -23,7 +23,7 @@ import { reportDb } from './db.js';
 import { createLogger } from '../logger.js';
 import { adapterFor } from './registry.js';
 import { normalizeReportUrl, urlHash, passesUrlFilters } from './normalize.js';
-import type { DiscoveredCandidate } from './types.js';
+import type { DiscoveredCandidate, FilingMeta } from './types.js';
 
 const log = createLogger('report-watch-discover');
 
@@ -46,6 +46,8 @@ export interface EvaluatedCandidate {
   titleHint: string | null;
   publishedAtHint: string | null;
   landingUrl: string | null;
+  /** The venue's own description of a filing, where the strategy read one. */
+  filing: FilingMeta | null;
   /** null = accepted. Set = persisted as `skipped` with this reason. */
   skipReason: ReportSkipReason | null;
 }
@@ -102,6 +104,7 @@ export function evaluateCandidates(
       landingUrl: cand.landingUrl
         ? normalizeReportUrl(cand.landingUrl, siteUrl ?? undefined)
         : null,
+      filing: cand.filing ?? null,
       skipReason: passesUrlFilters(url, config.url_filters) ? null : 'filter_mismatch',
     });
   }

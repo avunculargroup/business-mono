@@ -67,9 +67,10 @@ Supabase Realtime subscription.
 
 ### `researchIngest` — the corporate research pipeline
 
-`src/workflows/researchIngest/`. Eleven steps over the corporate holdings register:
+`src/workflows/researchIngest/`. Twelve steps over the corporate holdings register:
 resolve → fetch → chunk and embed → split and admit → **extract (Rex)** → validate →
-reconcile → **score (Rex)** → **classify (Lex)** → persist → record run. Spec:
+reconcile → **score (Rex)** → **classify (Lex)** → persist → **draft summary (Rex)** →
+record run. Spec:
 [`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md),
 amended by [`schema-ingest-spec.md`](../../docs/features/corporate-holdings/schema-ingest-spec.md).
 
@@ -105,9 +106,17 @@ Six things about it are load-bearing and easy to undo by accident:
 - **Persist goes through the `commit_research_ingest` RPC.** PostgREST has no
   transactions, and four sequential inserts can half-succeed — leaving events committed
   with the classifications that gate them missing.
+- **The summary draft is inert.** For a record with no `client_summary`, Rex drafts one
+  from implementation facts only (never `curator_notes`), filtered by `summaryDraft.ts`
+  for the prohibited words and the `restricted_metrics` table, and retried once if the
+  filter refuses it. It lands in the team-only `research_summary_drafts` table, never in
+  `client_summary`, and a trigger refuses clearance on an unedited draft.
 
-It resolves registered documents to URLs; it does **not** discover them. Documents are
-registered in `research_documents` by the hand-curation pass. No venue announcement-URL
+It resolves registered documents to URLs; it does **not** discover them. Discovery is
+reportWatch's job: a `report_watch` source bound to a research company
+(`news_sources.research_company_id`, EDGAR only) registers the filings it finds in
+`research_documents` through `lib/reportWatch/registerFiling.ts`, on the daily
+`report_watch_scan` routine. Every other venue is still registered by hand. No venue announcement-URL
 templates ship: set `RESEARCH_PDF_BASE_<VENUE>` (with `{id}` for the announcement id) to
 configure one, and a venue without a configured base resolves as unresolved rather than
 being sent to a guessed address.
