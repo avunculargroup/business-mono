@@ -17,6 +17,18 @@ import { createLogger } from '../../logger.js';
 
 const log = createLogger('report-watch-pdf');
 
+// pdf.js 5 (bundled by unpdf) calls Math.sumPrecise, which Node 22 lacks. Each
+// embedded CFF/Type1 font then logs "TypeError: Math.sumPrecise is not a
+// function" while pdf.js rebuilds it. The call sites sum byte lengths and glyph
+// or column widths, where a plain sum's rounding is immaterial.
+if (typeof (Math as { sumPrecise?: unknown }).sumPrecise !== 'function') {
+  (Math as unknown as { sumPrecise: (xs: Iterable<number>) => number }).sumPrecise = (xs) => {
+    let sum = 0;
+    for (const x of xs) sum += x;
+    return sum;
+  };
+}
+
 export interface PdfExtraction {
   ok: true;
   /** One entry per page, in order. Empty strings preserved — a blank page is a fact. */
