@@ -262,7 +262,7 @@ function identifiers(ids: Record<string, string | null>): CompanyIdentifier[] {
  * the current ticker loses everything filed under the old one.
  */
 export function researchCompanies(anchor: Date): CompanyDossier[] {
-  return [
+  const companies: Array<Omit<CompanyDossier, 'changedSinceReview'> & { changedSinceReview?: boolean }> = [
     {
       id: E.meridian.id,
       slug: E.meridian.slug,
@@ -372,6 +372,9 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
         'rather than render empty. Not comparable with an operating business.',
       lastVerifiedAt: onDate(anchor, -20),
       reviewState: 'internal',
+      // Reviewed, then its curator notes were rewritten in the database. It
+      // stays on the register, and the queue lists it until it is read again.
+      changedSinceReview: true,
       clientCleared: true,
       clientSummary:
         'Holds bitcoin both directly and through units in a fund it manages itself, and ' +
@@ -718,6 +721,7 @@ export function researchCompanies(anchor: Date): CompanyDossier[] {
       exitedOn: null,
     },
   ];
+  return companies.map((company) => ({ ...company, changedSinceReview: company.changedSinceReview ?? false }));
 }
 
 /** A single current venue — the shape the four records added for the conformance cases share. */
@@ -740,9 +744,13 @@ function asxListing(
  * A row as written below: its review state defaults to its company's, and its
  * ingest run to none (a hand-written row).
  */
-type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState' | 'ingestRunId'> & {
+type RowInput<T extends { reviewState: ReviewState; changedSinceReview: boolean }> = Omit<
+  T,
+  'reviewState' | 'ingestRunId' | 'changedSinceReview'
+> & {
   reviewState?: ReviewState;
   ingestRunId?: string | null;
+  changedSinceReview?: boolean;
 };
 
 /**
@@ -750,7 +758,7 @@ type RowInput<T extends { reviewState: ReviewState }> = Omit<T, 'reviewState' | 
  * the migration did to every existing row. The few that say otherwise are the
  * ones the review cases are about.
  */
-function withRowState<T extends { reviewState: ReviewState }>(
+function withRowState<T extends { reviewState: ReviewState; changedSinceReview: boolean }>(
   anchor: Date,
   rows: Record<string, RowInput<T>[]>,
   /** Facts carry no run id: the ingest does not write them. */
@@ -765,6 +773,7 @@ function withRowState<T extends { reviewState: ReviewState }>(
           ({
             ...row,
             reviewState: row.reviewState ?? states.get(companyId) ?? 'draft',
+            changedSinceReview: row.changedSinceReview ?? false,
             ...(options.runIds ? { ingestRunId: row.ingestRunId ?? null } : {}),
           }) as T,
       ),
@@ -995,6 +1004,9 @@ export function researchLedger(anchor: Date): Record<string, LedgerEntry[]> {
         basis: 'direct_spot',
         basisComparable: true,
         classification: 'publishable',
+        // Its detail was edited after review: still reviewed, still served,
+        // and on the queue until someone reads it again.
+        changedSinceReview: true,
         provenance: d.verrallMonthly,
       },
       {
@@ -1534,6 +1546,7 @@ export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
           + 'A funds manager discloses its product custody and its treasury custody '
           + 'barely at all.',
         asOf: onDate(anchor, -42),
+        changedSinceReview: true,
         provenance: d.verrallQuarterly,
         conflicting: null,
       },

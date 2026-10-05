@@ -300,6 +300,7 @@ export function fakeCompanyDossier(overrides: Partial<CompanyDossier> = {}): Com
     curatorNotes: null,
     lastVerifiedAt: null,
     reviewState: 'internal',
+    changedSinceReview: false,
     clientCleared: false,
     clientSummary: null,
     ledgerAbsenceReason: null,

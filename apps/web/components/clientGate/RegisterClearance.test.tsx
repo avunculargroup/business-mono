@@ -2,15 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { setReviewState, setRegisterClearance, approveDraftRows } = vi.hoisted(() => ({
-  setReviewState: vi.fn(async () => ({ success: true })),
-  setRegisterClearance: vi.fn(async () => ({ success: true })),
-  approveDraftRows: vi.fn(async () => ({ success: true })),
-}));
+const { setReviewState, setRegisterClearance, approveDraftRows, reviewChangedRows } = vi.hoisted(
+  () => ({
+    setReviewState: vi.fn(async () => ({ success: true })),
+    setRegisterClearance: vi.fn(async () => ({ success: true })),
+    approveDraftRows: vi.fn(async () => ({ success: true })),
+    reviewChangedRows: vi.fn(async () => ({ success: true })),
+  }),
+);
 vi.mock('@/app/actions/clientPromotion', () => ({
   setReviewState,
   setRegisterClearance,
   approveDraftRows,
+  reviewChangedRows,
 }));
 
 import { RegisterClearance } from './RegisterClearance';
@@ -27,6 +31,51 @@ describe('RegisterClearance', () => {
 
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Subscriber visibility' })).not.toBeInTheDocument();
+  });
+
+  it('badges a record changed since review, and reviews it again in place', async () => {
+    render(
+      <RegisterClearance
+        companyId="c1"
+        reviewState="internal"
+        cleared
+        clientSummary="Holds bitcoin directly."
+        changedSinceReview
+      />,
+    );
+
+    expect(screen.getByText('Changed since review')).toBeInTheDocument();
+    // Flag, not demotion: the gate is still offered and the state still reads reviewed.
+    expect(screen.getByText('Reviewed')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark reviewed again' }));
+
+    expect(setReviewState).toHaveBeenCalledWith('c1', 'internal');
+  });
+
+  it('offers no re-review on a record nobody has edited since review', () => {
+    render(
+      <RegisterClearance companyId="c1" reviewState="internal" cleared={false} clientSummary={null} />,
+    );
+
+    expect(screen.queryByText('Changed since review')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mark reviewed again' })).not.toBeInTheDocument();
+  });
+
+  it('reviews changed rows again as one group', async () => {
+    render(
+      <RegisterClearance
+        companyId="c1"
+        reviewState="internal"
+        cleared={false}
+        clientSummary={null}
+        changedRows={2}
+      />,
+    );
+
+    expect(screen.getByText(/Changed since review · 2 rows/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark these reviewed again' }));
+
+    expect(reviewChangedRows).toHaveBeenCalledWith('c1');
   });
 
   it('marks a draft reviewed', async () => {

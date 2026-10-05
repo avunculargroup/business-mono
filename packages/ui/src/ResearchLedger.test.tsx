@@ -107,6 +107,13 @@ describe('ResearchLedger', () => {
     expect(screen.getAllByText(/Draft — not yet reviewed/)).toHaveLength(1);
   });
 
+  it('marks a row edited since review apart from a draft', () => {
+    renderLedger([{ ...acquisition, id: 'evt-3', changed: true }, acquisition]);
+
+    expect(screen.getAllByText(/Changed since review/)).toHaveLength(1);
+    expect(screen.queryByText(/Draft — not yet reviewed/)).not.toBeInTheDocument();
+  });
+
   it('says so plainly when an event discloses no figure', () => {
     renderLedger([
       {

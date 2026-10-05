@@ -206,6 +206,8 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
       const absences = researchAbsences(ctx.asOf);
       const drafts = <T extends { reviewState: string }>(rows: T[] | undefined) =>
         (rows ?? []).filter((row) => row.reviewState === 'draft').length;
+      const changed = <T extends { changedSinceReview: boolean }>(rows: T[] | undefined) =>
+        (rows ?? []).filter((row) => row.changedSinceReview).length;
 
       return researchCompanies(ctx.asOf)
         .map((row) => ({
@@ -219,11 +221,17 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
           // page reads; the live view counts every unsuppressed finding.
           draftFindings: drafts(absences[row.id]),
           draftFacts: drafts(facts[row.id]),
+          companyChangedSinceReview: row.changedSinceReview,
+          changedEvents: changed(ledger[row.id]),
+          changedFindings: changed(absences[row.id]),
+          changedFacts: changed(facts[row.id]),
         }))
         .filter(
           (row) =>
             row.companyReviewState === 'draft' ||
-            row.draftEvents + row.draftFindings + row.draftFacts > 0,
+            row.companyChangedSinceReview ||
+            row.draftEvents + row.draftFindings + row.draftFacts > 0 ||
+            row.changedEvents + row.changedFindings + row.changedFacts > 0,
         )
         .sort((a, b) => a.legalName.localeCompare(b.legalName));
     },

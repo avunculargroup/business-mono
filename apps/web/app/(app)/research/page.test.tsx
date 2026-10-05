@@ -26,6 +26,10 @@ const queued = (overrides: Partial<ReviewQueueEntry>): ReviewQueueEntry => ({
   draftEvents: 0,
   draftFindings: 0,
   draftFacts: 0,
+  companyChangedSinceReview: false,
+  changedEvents: 0,
+  changedFindings: 0,
+  changedFacts: 0,
   ...overrides,
 });
 
@@ -161,6 +165,26 @@ describe('ResearchRegisterPage', () => {
       'aria-current',
       'page',
     );
+  });
+
+  it('says when a reviewed record or its rows changed since review', async () => {
+    repositories = createFakeRepositories({
+      reviewQueue: [
+        queued({
+          slug: 'a',
+          legalName: 'Verrall Dam',
+          companyChangedSinceReview: true,
+          changedEvents: 1,
+          changedFacts: 1,
+        }),
+      ],
+    });
+
+    render(await ResearchRegisterPage({ searchParams: Promise.resolve({ view: 'review' }) }));
+
+    expect(
+      screen.getByText('Record changed since review · 2 rows changed since review'),
+    ).toBeInTheDocument();
   });
 
   it('says the queue is empty rather than that the register is', async () => {

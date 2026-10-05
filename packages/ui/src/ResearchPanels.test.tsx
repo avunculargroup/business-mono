@@ -169,6 +169,15 @@ describe('FactPanel', () => {
     expect(screen.queryByText(/Draft — not yet reviewed/)).not.toBeInTheDocument();
   });
 
+  it('marks a fact edited since review', () => {
+    const { unmount } = withRail(<FactPanel fact={{ ...custody, changed: true }} />);
+    expect(screen.getByText(/Changed since review/)).toBeInTheDocument();
+    unmount();
+
+    withRail(<FactPanel fact={custody} />);
+    expect(screen.queryByText(/Changed since review/)).not.toBeInTheDocument();
+  });
+
   it('renders no conflict block on an undisputed fact', () => {
     withRail(<FactPanel fact={{ ...custody, conflicting: null }} />);
 

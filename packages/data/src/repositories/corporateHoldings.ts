@@ -139,6 +139,12 @@ export interface CompanyDossier extends RegisterEntry {
    * composed from `curatorNotes`, which are internal and often outcome-shaped.
    */
   clientSummary: string | null;
+  /**
+   * Reviewed, and its content edited since: by an ingest that kept its state,
+   * or by hand in the database. Set by a trigger, never by a read. Always
+   * false for a draft or retired row, which nothing vouches for.
+   */
+  changedSinceReview: boolean;
   formerNames: FormerName[];
   /** Every venue, including ones it has left. */
   listingHistory: CompanyListing[];
@@ -189,6 +195,8 @@ export interface LedgerEntry {
   classification: ResearchClassification;
   /** Retired rows never reach a read; draft ones only when asked for. */
   reviewState: ReviewState;
+  /** Reviewed, and edited since. See `CompanyDossier.changedSinceReview`. */
+  changedSinceReview: boolean;
   /**
    * The ingest run that last changed this row's facts, and so owns its review.
    * Null for a row written by hand.
@@ -300,6 +308,8 @@ export interface StructuralAbsence {
   subject: 'covenants' | 'debt' | 'holdings' | 'policy';
   statement: string;
   reviewState: ReviewState;
+  /** Reviewed, and edited since. See `CompanyDossier.changedSinceReview`. */
+  changedSinceReview: boolean;
   /** The ingest run that wrote it; null for one written by hand. */
   ingestRunId: string | null;
   provenance: Provenance;
@@ -324,6 +334,8 @@ export interface CompanyFact {
   value: string;
   asOf: string | null;
   reviewState: ReviewState;
+  /** Reviewed, and edited since. See `CompanyDossier.changedSinceReview`. */
+  changedSinceReview: boolean;
   provenance: Provenance;
   /** Non-null only where a weaker source claimed otherwise. */
   conflicting: {
@@ -411,7 +423,10 @@ export interface ReviewReadOptions {
   includeDrafts?: boolean;
 }
 
-/** One record with something waiting: a draft record, or draft rows under a reviewed one. */
+/**
+ * One record with something waiting: a draft record, draft rows under a
+ * reviewed one, or a reviewed record or row whose content changed since.
+ */
 export interface ReviewQueueEntry {
   companyId: string;
   slug: string;
@@ -421,6 +436,10 @@ export interface ReviewQueueEntry {
   draftEvents: number;
   draftFindings: number;
   draftFacts: number;
+  companyChangedSinceReview: boolean;
+  changedEvents: number;
+  changedFindings: number;
+  changedFacts: number;
 }
 
 export interface RegisterFilter {

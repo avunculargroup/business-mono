@@ -33,6 +33,8 @@ export interface LedgerRow {
   classification: 'publishable' | 'internal' | 'restricted';
   /** Not yet reviewed. Only a reviewer's view of a record carries draft rows. */
   draft?: boolean;
+  /** Reviewed, then edited. Still served as reviewed until it is read again. */
+  changed?: boolean;
   provenance: ProvenanceSource;
 }
 
@@ -93,6 +95,7 @@ export function ResearchLedger({ rows, className }: { rows: LedgerRow[]; classNa
                 Draft — not yet reviewed. It reaches no subscriber until it is approved.
               </p>
             ) : null}
+            {row.changed ? <p className={styles.changed}>Changed since review — edited after it was reviewed, and still served as reviewed until someone reads it again.</p> : null}
             {row.classification !== 'publishable' ? (
               <p className={styles.internal}>
                 Internal — this row states a disclosed fact whose natural reading is a view on

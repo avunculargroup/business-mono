@@ -77,6 +77,7 @@ export function CompanyRecord({
     basisComparable: entry.basisComparable,
     classification: entry.classification,
     draft: entry.reviewState === 'draft',
+    changed: entry.changedSinceReview,
     provenance: entry.provenance,
   }));
 
@@ -213,6 +214,7 @@ export function CompanyRecord({
                   absences={absences.map((absence) => ({
                     ...absence,
                     draft: absence.reviewState === 'draft',
+                    changed: absence.changedSinceReview,
                   }))}
                 />
               </section>
@@ -222,7 +224,13 @@ export function CompanyRecord({
           <aside className={styles.aside}>
             {facts.map((fact) => (
               <section key={fact.id} className={styles.section}>
-                <FactPanel fact={{ ...fact, draft: fact.reviewState === 'draft' }} />
+                <FactPanel
+                  fact={{
+                    ...fact,
+                    draft: fact.reviewState === 'draft',
+                    changed: fact.changedSinceReview,
+                  }}
+                />
               </section>
             ))}
 

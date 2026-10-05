@@ -50,18 +50,26 @@ const TIER_ORDER = ['regional', 'peer_shaped', 'bellwether'] as const;
  * draft rows. Its count is on the tab either way, so a draft is never
  * somewhere you have to remember to look.
  */
-/** What a queued record is waiting on, in words: a new record, or which rows. */
+/**
+ * What a queued record is waiting on, in words: a new record, which rows are
+ * drafts, and what changed since it was reviewed.
+ */
 function waitingOn(entry: ReviewQueueEntry): string {
-  const rows = [
-    [entry.draftEvents, 'ledger event'],
-    [entry.draftFacts, 'fact'],
-    [entry.draftFindings, 'finding'],
-  ] as const;
-  const parts = rows
-    .filter(([count]) => count > 0)
-    .map(([count, noun]) => `${count} draft ${noun}${count === 1 ? '' : 's'}`);
-  const record = entry.companyReviewState === 'draft' ? 'New record' : null;
-  return [record, ...parts].filter(Boolean).join(' · ');
+  const count = (n: number, noun: string, state: string) =>
+    n > 0 ? `${n} ${state} ${noun}${n === 1 ? '' : 's'}` : null;
+  const changedRows = entry.changedEvents + entry.changedFacts + entry.changedFindings;
+  return [
+    entry.companyReviewState === 'draft' ? 'New record' : null,
+    count(entry.draftEvents, 'ledger event', 'draft'),
+    count(entry.draftFacts, 'fact', 'draft'),
+    count(entry.draftFindings, 'finding', 'draft'),
+    entry.companyChangedSinceReview ? 'Record changed since review' : null,
+    changedRows > 0
+      ? `${changedRows} row${changedRows === 1 ? '' : 's'} changed since review`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export default async function ResearchRegisterPage({
@@ -176,8 +184,9 @@ export default async function ResearchRegisterPage({
 
         {queue.length === 0 && reviewing ? (
           <p className={styles.empty}>
-            Nothing is waiting for review. A record an agent creates, and any new row on a
-            settled record, lands here until someone has read it.
+            Nothing is waiting for review. A record an agent creates, any new row on a settled
+            record, and anything edited after it was reviewed, lands here until someone has
+            read it.
           </p>
         ) : null}
 

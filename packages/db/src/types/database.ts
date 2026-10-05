@@ -6216,10 +6216,12 @@ export type Database = {
       }
       research_companies: {
         Row: {
+          changed_since_review: boolean | null
           client_cleared: boolean
           client_cleared_at: string | null
           client_cleared_by: string | null
           client_summary: string | null
+          content_updated_at: string | null
           cost_basis_convention: string | null
           created_at: string
           created_by: string | null
@@ -6251,10 +6253,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          changed_since_review?: never
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
           client_summary?: string | null
+          content_updated_at?: string | null
           cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
@@ -6286,10 +6290,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          changed_since_review?: never
           client_cleared?: boolean
           client_cleared_at?: string | null
           client_cleared_by?: string | null
           client_summary?: string | null
+          content_updated_at?: string | null
           cost_basis_convention?: string | null
           created_at?: string
           created_by?: string | null
@@ -6347,7 +6353,9 @@ export type Database = {
       research_company_facts: {
         Row: {
           as_of: string | null
+          changed_since_review: boolean | null
           company_id: string
+          content_updated_at: string | null
           created_at: string
           field_key: string
           id: string
@@ -6365,7 +6373,9 @@ export type Database = {
         }
         Insert: {
           as_of?: string | null
+          changed_since_review?: never
           company_id: string
+          content_updated_at?: string | null
           created_at?: string
           field_key: string
           id?: string
@@ -6383,7 +6393,9 @@ export type Database = {
         }
         Update: {
           as_of?: string | null
+          changed_since_review?: never
           company_id?: string
+          content_updated_at?: string | null
           created_at?: string
           field_key?: string
           id?: string
@@ -6730,7 +6742,9 @@ export type Database = {
       }
       research_findings: {
         Row: {
+          changed_since_review: boolean | null
           company_id: string
+          content_updated_at: string | null
           created_at: string
           detail: string | null
           event_id: string | null
@@ -6751,7 +6765,9 @@ export type Database = {
           suppressed_reason: string | null
         }
         Insert: {
+          changed_since_review?: never
           company_id: string
+          content_updated_at?: string | null
           created_at?: string
           detail?: string | null
           event_id?: string | null
@@ -6772,7 +6788,9 @@ export type Database = {
           suppressed_reason?: string | null
         }
         Update: {
+          changed_since_review?: never
           company_id?: string
+          content_updated_at?: string | null
           created_at?: string
           detail?: string | null
           event_id?: string | null
@@ -7587,8 +7605,10 @@ export type Database = {
         Row: {
           asset_class: string
           basis: string | null
+          changed_since_review: boolean | null
           company_id: string
           consideration_native: number | null
+          content_updated_at: string | null
           created_at: string
           detail: string | null
           disclosure_venue: string | null
@@ -7612,8 +7632,10 @@ export type Database = {
         Insert: {
           asset_class?: string
           basis?: string | null
+          changed_since_review?: never
           company_id: string
           consideration_native?: number | null
+          content_updated_at?: string | null
           created_at?: string
           detail?: string | null
           disclosure_venue?: string | null
@@ -7637,8 +7659,10 @@ export type Database = {
         Update: {
           asset_class?: string
           basis?: string | null
+          changed_since_review?: never
           company_id?: string
           consideration_native?: number | null
+          content_updated_at?: string | null
           created_at?: string
           detail?: string | null
           disclosure_venue?: string | null
@@ -8179,6 +8203,7 @@ export type Database = {
       v_company_facts: {
         Row: {
           as_of: string | null
+          changed_since_review: boolean | null
           company_id: string | null
           conflicting_source_class: string | null
           conflicting_source_title: string | null
@@ -8681,6 +8706,7 @@ export type Database = {
       }
       v_research_absences: {
         Row: {
+          changed_since_review: boolean | null
           company_id: string | null
           detail: string | null
           headline: string | null
@@ -8776,6 +8802,7 @@ export type Database = {
           asset_class: string | null
           basis: string | null
           basis_comparable: boolean | null
+          changed_since_review: boolean | null
           classification: string | null
           company_id: string | null
           consideration_aud: number | null
@@ -8848,6 +8875,7 @@ export type Database = {
           asset_class: string | null
           basis: string | null
           basis_comparable: boolean | null
+          changed_since_review: boolean | null
           classification: string | null
           company_id: string | null
           consideration_aud: number | null
@@ -8862,6 +8890,7 @@ export type Database = {
           fx_rate_used: number | null
           headline: string | null
           id: string | null
+          ingest_run_id: string | null
           legal_name: string | null
           native_currency: string | null
           quantity: number | null
@@ -8916,6 +8945,10 @@ export type Database = {
       }
       v_research_review_queue: {
         Row: {
+          changed_events: number | null
+          changed_facts: number | null
+          changed_findings: number | null
+          company_changed_since_review: boolean | null
           company_id: string | null
           company_review_state: string | null
           draft_events: number | null
@@ -8926,6 +8959,10 @@ export type Database = {
           tier: string | null
         }
         Insert: {
+          changed_events?: never
+          changed_facts?: never
+          changed_findings?: never
+          company_changed_since_review?: boolean | null
           company_id?: string | null
           company_review_state?: string | null
           draft_events?: never
@@ -8936,6 +8973,10 @@ export type Database = {
           tier?: string | null
         }
         Update: {
+          changed_events?: never
+          changed_facts?: never
+          changed_findings?: never
+          company_changed_since_review?: boolean | null
           company_id?: string | null
           company_review_state?: string | null
           draft_events?: never

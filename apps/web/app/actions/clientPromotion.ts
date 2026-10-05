@@ -140,6 +140,33 @@ export async function approveDraftRows(companyId: string, runId: string | null) 
 }
 
 /**
+ * Review again every row on a record whose content changed since its review.
+ *
+ * `changed_since_review` is a generated column the database keeps from
+ * `content_updated_at`, which a trigger sets on any content edit, by hand in
+ * SQL included. Writing `reviewed_at` clears it. The rows are already
+ * `internal`, so this changes who vouches for them and when, not their state.
+ */
+export async function reviewChangedRows(companyId: string) {
+  const auth = await getAuthedClient();
+  if (!auth.ok) return { error: auth.error };
+
+  const reviewed = { reviewed_by: auth.user.id, reviewed_at: new Date().toISOString() };
+
+  for (const table of ['treasury_events', 'research_findings', 'research_company_facts'] as const) {
+    const { error } = await auth.supabase
+      .from(table)
+      .update(reviewed)
+      .eq('company_id', companyId)
+      .eq('changed_since_review', true);
+    if (error) return { error: humanizeError(error) };
+  }
+
+  revalidatePath('/research');
+  return { success: true };
+}
+
+/**
  * Clear a register entry for subscribers, with the summary they read.
  *
  * Distinct from `review_state`, which is whether a human has read it. The

@@ -22,12 +22,16 @@ export function RegisterClearance({
   cleared,
   clientSummary,
   draftGroups = [],
+  changedSinceReview = false,
+  changedRows = 0,
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
   clientSummary: string | null;
   draftGroups?: DraftGroup[];
+  changedSinceReview?: boolean;
+  changedRows?: number;
 }) {
   return (
     <div className={styles.stack}>
@@ -36,6 +40,8 @@ export function RegisterClearance({
         reviewState={reviewState}
         cleared={cleared}
         draftGroups={draftGroups}
+        changedSinceReview={changedSinceReview}
+        changedRows={changedRows}
       />
       {reviewState === 'internal' ? (
         <ClientGate
