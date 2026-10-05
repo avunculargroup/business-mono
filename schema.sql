@@ -3054,6 +3054,13 @@ CREATE TABLE report_segments (
 --   a subscriber reads. CHECK client_clearance_needs_review: a cleared record is
 --   internal with a non-blank summary. is_published, which review_state
 --   replaced, was dropped in 20261003210000.
+--   From 20261005100000: content_updated_at, set by the
+--   *_content_updated_at trigger only when a column outside the review,
+--   clearance and audit columns changes, and changed_since_review, a stored
+--   generated column: internal, and content_updated_at later than reviewed_at
+--   (or reviewed_at NULL). The same pair is on treasury_events,
+--   research_findings and research_company_facts. It flags a reviewed row or
+--   record, never demotes it; v_research_review_queue lists both.
 -- company_identifiers(company_id, scheme, value, valid_from, valid_to, note)
 --   UNIQUE (scheme, value) — entity resolution runs here, and a registration
 --   number names one company. Open scheme vocabulary: a company can hold two CIKs.

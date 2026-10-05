@@ -178,6 +178,10 @@ const company = (
   company_identifiers: [],
 });
 
+// Reviewed, then edited: Verrall's own content, one event and its custody
+// fact. The generated column the views read is what these rows carry.
+const CHANGED_SINCE_REVIEW = new Set(['rc-verrall', 'evt-vrdm-004', 'fact-vrdm-custody']);
+
 const COMPANIES = [
   ...BASE_COMPANIES.map((row) => ({
     ledger_absence_reason: null,
@@ -204,7 +208,7 @@ const COMPANIES = [
   company('rc-brennock', 'demo-brennock-packaging', 'Brennock Packaging Limited', 'BRNP', {
     review_state: 'draft',
   }),
-];
+].map((row) => ({ ...row, changed_since_review: CHANGED_SINCE_REVIEW.has(row.id) }));
 
 const source = (id: string, title: string, sourceClass: string, audited = false) => ({
   source_document_id: id,
@@ -584,10 +588,11 @@ const NOTES = [
 // Rows inherit their company's state, as the migration did. Retired rows are
 // absent because the views drop them; the datasets are what the views return.
 const companyState = new Map(COMPANIES.map((row) => [row.id, row.review_state]));
-const withState = <T extends { company_id: string }>(rows: T[]) =>
+const withState = <T extends { company_id: string; id?: string }>(rows: T[]) =>
   rows.map((row) => ({
     ...row,
     review_state: companyState.get(row.company_id) ?? 'draft',
+    changed_since_review: CHANGED_SINCE_REVIEW.has(row.id ?? ''),
     // Every seeded row was written by hand.
     ingest_run_id: null as string | null,
   }));
@@ -599,6 +604,7 @@ const LEDGER_ROWS = [
   {
     ...ledgerRow('evt-mfg-006', 'rc-meridian', 'acquisition', '2026-09-30', 4, null),
     review_state: 'draft',
+    changed_since_review: false,
     ingest_run_id: 'run-fixture-meridian',
   },
 ];
@@ -623,6 +629,8 @@ function seed(): FakeSupabaseClient {
   const absences = withState(ABSENCES);
   const drafts = (rows: Array<{ company_id: string; review_state: string }>, id: string) =>
     rows.filter((row) => row.company_id === id && row.review_state === 'draft').length;
+  const changed = (rows: Array<{ company_id: string; changed_since_review: boolean }>, id: string) =>
+    rows.filter((row) => row.company_id === id && row.changed_since_review).length;
   client.__setDataset(
     'v_research_review_queue',
     COMPANIES.map((row) => ({
@@ -634,10 +642,16 @@ function seed(): FakeSupabaseClient {
       draft_events: drafts(LEDGER_ROWS, row.id),
       draft_findings: drafts(absences, row.id),
       draft_facts: drafts(facts, row.id),
+      company_changed_since_review: row.changed_since_review,
+      changed_events: changed(LEDGER_ROWS, row.id),
+      changed_findings: changed(absences, row.id),
+      changed_facts: changed(facts, row.id),
     })).filter(
       (row) =>
         row.company_review_state === 'draft' ||
-        row.draft_events + row.draft_findings + row.draft_facts > 0,
+        row.company_changed_since_review ||
+        row.draft_events + row.draft_findings + row.draft_facts > 0 ||
+        row.changed_events + row.changed_findings + row.changed_facts > 0,
     ),
   );
   client.__setDataset('v_company_position', POSITIONS);
@@ -673,6 +687,7 @@ describeCorporateHoldingsContract<RepositoryDomain>({
   disposalWithoutConsiderationSlug: 'demo-wexford-semiconductor',
   draftSlug: 'demo-brennock-packaging',
   draftRowSlug: 'demo-meridian-freight',
+  changedSlug: 'demo-verrall-dam',
 });
 
 let client: FakeSupabaseClient;
@@ -753,6 +768,38 @@ describe('query wiring', () => {
       const columns = builder!.select.mock.calls[0]![0] as string;
       expect(columns).toContain('review_state');
       expect(columns).toContain('ingest_run_id');
+    }
+  });
+
+  it('selects changed_since_review from every read that carries it', async () => {
+    // Same blind spot as above: a dropped column would read as undefined and
+    // the flag would quietly never show.
+    await corporateHoldings().getCompany(ctx, 'demo-verrall-dam');
+    await corporateHoldings().getLedger(ctx, 'rc-verrall');
+    await corporateHoldings().getLedger(ctx, 'rc-verrall', { publishableOnly: true });
+    await corporateHoldings().getCompanyFacts(ctx, 'rc-verrall');
+    await corporateHoldings().getStructuralAbsences(ctx, 'rc-verrall');
+    await corporateHoldings().getReviewQueue(ctx);
+
+    for (const table of [
+      'research_companies',
+      'v_research_ledger',
+      'v_research_publishable',
+      'v_company_facts',
+      'v_research_absences',
+    ]) {
+      const [builder] = client.__buildersFor(table);
+      expect(builder!.select.mock.calls[0]![0]).toContain('changed_since_review');
+    }
+    const [queue] = client.__buildersFor('v_research_review_queue');
+    const columns = queue!.select.mock.calls[0]![0] as string;
+    for (const column of [
+      'company_changed_since_review',
+      'changed_events',
+      'changed_findings',
+      'changed_facts',
+    ]) {
+      expect(columns).toContain(column);
     }
   });
 

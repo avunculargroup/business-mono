@@ -18,6 +18,7 @@ vi.mock('@/lib/action', () => ({
 import {
   approveDraftRows,
   classifyProduct,
+  reviewChangedRows,
   setClientNote,
   setRegisterClearance,
   setReviewState,
@@ -154,6 +155,30 @@ describe('approveDraftRows', () => {
 
   it('leaves the record itself alone', async () => {
     await approveDraftRows('co-1', 'run-abc');
+
+    expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
+  });
+});
+
+describe('reviewChangedRows', () => {
+  it("re-reviews the record's changed rows in all three tables, and records who did", async () => {
+    const result = await reviewChangedRows('co-1');
+
+    expect(result).toEqual({ success: true });
+    for (const table of ['treasury_events', 'research_findings', 'research_company_facts']) {
+      const [builder] = supabase.__buildersFor(table);
+      const update = builder!.update.mock.calls[0]![0] as Record<string, unknown>;
+      expect(update).toMatchObject({ reviewed_by: 'director-1' });
+      expect(update.reviewed_at).toEqual(expect.any(String));
+      // The rows are already reviewed: this restamps the review, never the state.
+      expect(update).not.toHaveProperty('review_state');
+      expect(builder!.eq).toHaveBeenCalledWith('company_id', 'co-1');
+      expect(builder!.eq).toHaveBeenCalledWith('changed_since_review', true);
+    }
+  });
+
+  it('leaves the record itself alone', async () => {
+    await reviewChangedRows('co-1');
 
     expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
   });

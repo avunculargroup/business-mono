@@ -49,6 +49,7 @@ export const COMPANY_SPEC = {
   // seeded records land as drafts, unreviewed and uncleared.
   ignored: [
     'id', 'review_state', 'reviewed_by', 'reviewed_at',
+    'content_updated_at', 'changed_since_review',
     'client_cleared', 'client_cleared_by', 'client_cleared_at', 'client_summary',
     'created_by', 'created_at', 'updated_at',
   ],
@@ -59,7 +60,9 @@ const ROW_AUDIT = ['id', 'company_id', 'created_at'] as const;
  * Review state is an environment decision, like the record's: seeded rows land
  * as drafts (the column default) and are reviewed where they land.
  */
-const ROW_REVIEW = ['review_state', 'reviewed_by', 'reviewed_at'] as const;
+const ROW_REVIEW = [
+  'review_state', 'reviewed_by', 'reviewed_at', 'content_updated_at', 'changed_since_review',
+] as const;
 
 /** In dependency order: documents before anything sourced to them, events before findings. */
 export const CHILD_TABLES: readonly TableSpec[] = [

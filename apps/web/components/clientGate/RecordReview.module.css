@@ -23,6 +23,7 @@
 .draft { color: var(--color-warning); }
 .internal { color: var(--color-text-primary); }
 .retired { color: var(--color-text-tertiary); }
+.changed { color: var(--color-warning); }
 
 .rows {
   display: flex;

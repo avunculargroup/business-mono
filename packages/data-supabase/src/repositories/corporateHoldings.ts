@@ -84,7 +84,7 @@ const COMPANY_COLUMNS =
   'id, slug, legal_name, jurisdiction, tier, primary_archetype, self_described_archetype, ' +
   'reporting_standard, expected_disclosure_cadence, operational_hq, ' +
   'functional_currency, presentation_currency, financial_year_end, market_cap_band, ' +
-  'funding_source, curator_notes, last_verified_at, review_state, client_cleared, client_summary, ' +
+  'funding_source, curator_notes, last_verified_at, review_state, changed_since_review, client_cleared, client_summary, ' +
   'ledger_absence_reason, holding_status, exited_on, ' +
   'company_listings(venue, ticker, listing_type, filing_entity, listed_from, listed_to), ' +
   'company_former_names(name, used_to), ' +
@@ -94,7 +94,8 @@ const LEDGER_COLUMNS =
   'id, company_id, event_type, asset_class, event_date, quantity, consideration_native, ' +
   'native_currency, consideration_aud, fx_rate_used, fees_included, headline, detail, ' +
   'disclosure_venue, basis, basis_comparable, classification, source_document_id, ' +
-  'source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id';
+  'source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id, ' +
+  'changed_since_review';
 
 const POSITION_COLUMNS =
   'snapshot_id, company_id, as_of_date, asset, instrument_type, quantity, basis, ' +
@@ -136,6 +137,7 @@ type CompanyRow = {
   curator_notes: string | null;
   last_verified_at: string | null;
   review_state: ReviewState;
+  changed_since_review: boolean;
   client_cleared: boolean;
   client_summary: string | null;
   ledger_absence_reason: LedgerAbsenceReason | null;
@@ -172,6 +174,7 @@ type LedgerRow = {
   basis_comparable: boolean | null;
   classification: ResearchClassification;
   review_state: ReviewState;
+  changed_since_review: boolean;
   ingest_run_id: string | null;
   source_document_id: string;
   source_title: string;
@@ -231,11 +234,16 @@ type ReviewQueueRow = {
   draft_events: number | string;
   draft_findings: number | string;
   draft_facts: number | string;
+  company_changed_since_review: boolean;
+  changed_events: number | string;
+  changed_findings: number | string;
+  changed_facts: number | string;
 };
 
 type AbsenceRow = {
   company_id: string;
   review_state: ReviewState;
+  changed_since_review: boolean;
   ingest_run_id: string | null;
   subject: StructuralAbsence['subject'];
   headline: string;
@@ -251,6 +259,7 @@ type AbsenceRow = {
 type FactRow = {
   id: string;
   review_state: ReviewState;
+  changed_since_review: boolean;
   field_key: string;
   label: string;
   value: string;
@@ -329,6 +338,7 @@ function toDossier(row: CompanyRow): CompanyDossier {
     curatorNotes: row.curator_notes,
     lastVerifiedAt: row.last_verified_at,
     reviewState: row.review_state,
+    changedSinceReview: row.changed_since_review,
     clientCleared: row.client_cleared,
     clientSummary: row.client_summary,
     ledgerAbsenceReason: row.ledger_absence_reason,
@@ -391,6 +401,7 @@ function toLedgerEntry(row: LedgerRow): LedgerEntry {
     basisComparable: row.basis_comparable,
     classification: row.classification,
     reviewState: row.review_state,
+    changedSinceReview: row.changed_since_review,
     ingestRunId: row.ingest_run_id,
     provenance: toProvenance(row),
   };
@@ -622,7 +633,7 @@ export function createCorporateHoldingsRepository(
       const { data, error } = await client
         .from(FACTS_VIEW)
         .select(
-          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url, review_state',
+          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url, review_state, changed_since_review',
         )
         .eq('company_id', companyId)
         .in('review_state', readableStates(opts))
@@ -637,6 +648,7 @@ export function createCorporateHoldingsRepository(
         value: row.value,
         asOf: row.as_of,
         reviewState: row.review_state,
+        changedSinceReview: row.changed_since_review,
         provenance: toProvenance(row),
         conflicting:
           row.conflicting_value === null
@@ -685,7 +697,7 @@ export function createCorporateHoldingsRepository(
       const { data, error } = await client
         .from(ABSENCES_VIEW)
         .select(
-          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id',
+          'company_id, subject, headline, detail, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, review_state, ingest_run_id, changed_since_review',
         )
         .eq('company_id', companyId)
         .in('review_state', readableStates(opts));
@@ -698,6 +710,7 @@ export function createCorporateHoldingsRepository(
         // The detail carries the citation; the headline is the panel's label.
         statement: row.detail ?? row.headline,
         reviewState: row.review_state,
+        changedSinceReview: row.changed_since_review,
         ingestRunId: row.ingest_run_id,
         provenance: toProvenance(row),
       }));
@@ -707,7 +720,8 @@ export function createCorporateHoldingsRepository(
       const { data, error } = await client
         .from(REVIEW_QUEUE_VIEW)
         .select(
-          'company_id, slug, legal_name, tier, company_review_state, draft_events, draft_findings, draft_facts',
+          'company_id, slug, legal_name, tier, company_review_state, draft_events, draft_findings, draft_facts, ' +
+            'company_changed_since_review, changed_events, changed_findings, changed_facts',
         )
         .order('legal_name');
 
@@ -722,6 +736,10 @@ export function createCorporateHoldingsRepository(
         draftEvents: Number(row.draft_events),
         draftFindings: Number(row.draft_findings),
         draftFacts: Number(row.draft_facts),
+        companyChangedSinceReview: row.company_changed_since_review,
+        changedEvents: Number(row.changed_events),
+        changedFindings: Number(row.changed_findings),
+        changedFacts: Number(row.changed_facts),
       }));
     },
 

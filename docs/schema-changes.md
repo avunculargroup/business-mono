@@ -6,6 +6,30 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-05 — Corporate holdings: content changed since review
+
+`20261005100000_content_changed_since_review.sql` adds `content_updated_at` and
+`changed_since_review` to `research_companies`, `treasury_events`,
+`research_company_facts` and `research_findings`.
+
+- A reviewed record kept saying "reviewed" after direct SQL rewrote its content. On
+  333D the curator notes, tier and summary changed with the old `reviewed_at` intact.
+- `updated_at > reviewed_at` would have flagged records nobody edited, because a
+  clearance or any other workflow write bumps `updated_at`.
+- A `BEFORE UPDATE` trigger, `stamp_content_updated_at`, sets `content_updated_at` when a
+  column outside its exclusion list changes. The list covers review, clearance, audit and
+  run columns, so a new column counts as content by default. A client summary written in
+  the same update as a clearance is covered by that clearance.
+- `changed_since_review` is a stored generated column. It is true for an `internal` row
+  whose `content_updated_at` is later than `reviewed_at`, or whose `reviewed_at` is NULL
+  (every row the 20261003 backfills made `internal`).
+- It flags and does not demote. `v_research_review_queue` lists changed records and rows
+  with their counts. The ledger, publishable, facts and absences views carry the column.
+- `v_research_publishable` also gains `ingest_run_id`, which the internal app's shared
+  ledger column list already selected.
+
+---
+
 ## 2026-10-05 — Routines: "Run now" works on a switched-off routine
 
 `20261005000000_routines_run_requested_at.sql` adds `routines.run_requested_at`.

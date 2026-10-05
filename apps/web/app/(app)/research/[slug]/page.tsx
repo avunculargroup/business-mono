@@ -73,6 +73,10 @@ export default async function ResearchCompanyPage({
             // The ingest writes no facts, so a draft fact is always by hand.
             ...facts.map((fact) => ({ ...fact, ingestRunId: null })),
           ])}
+          changedSinceReview={company.changedSinceReview}
+          changedRows={
+            [...ledger.items, ...absences, ...facts].filter((row) => row.changedSinceReview).length
+          }
         />
       </div>
       <CompanyRecord

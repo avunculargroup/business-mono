@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Archive, CircleCheck, CircleDashed } from 'lucide-react';
+import { Archive, CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
 import type { ReviewState } from '@platform/shared';
-import { approveDraftRows, setReviewState } from '@/app/actions/clientPromotion';
+import { approveDraftRows, reviewChangedRows, setReviewState } from '@/app/actions/clientPromotion';
 import styles from './RecordReview.module.css';
 
 export interface DraftGroup {
@@ -59,10 +59,16 @@ export function RecordReview({
   reviewState,
   cleared,
   draftGroups = [],
+  changedSinceReview = false,
+  changedRows = 0,
 }: {
   companyId: string;
   reviewState: ReviewState;
   cleared: boolean;
+  /** The record's own content was edited after its review. */
+  changedSinceReview?: boolean;
+  /** Reviewed rows on this record whose content was edited after their review. */
+  changedRows?: number;
   /**
    * Draft rows on this record, grouped by the ingest run that wrote them.
    * `runId: null` is the group written by hand.
@@ -87,10 +93,19 @@ export function RecordReview({
         <Icon size={16} strokeWidth={1.5} aria-hidden />
         {label}
       </span>
+      {changedSinceReview ? (
+        <span className={`${styles.state} ${styles.changed}`}>
+          <CircleAlert size={16} strokeWidth={1.5} aria-hidden />
+          Changed since review
+        </span>
+      ) : null}
       <p className={styles.description}>
         {description}
         {reviewState === 'internal' && cleared
           ? ' Returning it to draft or retiring it also withholds it from subscribers.'
+          : null}
+        {changedSinceReview
+          ? ' Its content was edited after it was reviewed. It stays where it is, cleared or not, until someone reads it again.'
           : null}
       </p>
 
@@ -122,6 +137,28 @@ export function RecordReview({
         </div>
       ) : null}
 
+      {changedRows > 0 ? (
+        <div className={styles.rows}>
+          <p className={styles.description}>
+            Rows marked changed were edited after they were reviewed. They are still served as
+            reviewed until someone reads them again.
+          </p>
+          <div className={styles.group}>
+            <span className={styles.groupLabel}>
+              Changed since review · {changedRows === 1 ? '1 row' : `${changedRows} rows`}
+            </span>
+            <button
+              type="button"
+              className={styles.ghostButton}
+              onClick={() => run(() => reviewChangedRows(companyId))}
+              disabled={pending}
+            >
+              Mark these reviewed again
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {error && (
         <p className={styles.error} role="alert">
           {error}
@@ -129,6 +166,16 @@ export function RecordReview({
       )}
 
       <div className={styles.actions}>
+        {changedSinceReview ? (
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => run(() => setReviewState(companyId, 'internal'))}
+            disabled={pending}
+          >
+            Mark reviewed again
+          </button>
+        ) : null}
         {ACTIONS[reviewState].map((action) => (
           <button
             key={action.to}

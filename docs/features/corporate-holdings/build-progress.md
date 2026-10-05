@@ -16,10 +16,10 @@ operational: the first real run and its trace bundle. Step 6 is under way: recor
 `review_state`, the review queue and the subscriber summary (session 11), then Minute
 shows the summary and `is_published` is dropped (session 12), then review state on
 the rows themselves (session 13), then approval per ingest run and persist-and-stop
-(session 14), then the weekly routine and its email (session 15). The first real run
-is next. Two things still remain
+(session 14), then the weekly routine and its email (session 15), then "changed since
+review" on records and rows (session 16). The first real run is next. Two things still remain
 from session 2: the ingest run against real filings, and the recorded trace bundle.
-**Last updated:** 2026-10-03
+**Last updated:** 2026-10-05
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -1109,3 +1109,101 @@ validation failure, and a reconcile delta on a record already cleared to subscri
 access. Start it on Railway with `POST /api/workflows/researchIngest/start-async`,
 body `{ "inputData": { "companyId": "<uuid>" } }`, against RUM Group or Angel Studios.
 Then read the drafts on `/research` and switch the routine on.
+
+## Session 16 — changed since review
+
+A reviewed record kept saying "reviewed" after its content was edited. On 5 October,
+direct SQL rewrote 333D's curator notes, tier and client summary. The record stayed
+`internal` with its old `reviewed_at`, so its badge vouched for text nobody had read.
+The rows have the same exposure. The rule: a substantive edit after review shows as
+"changed since review", and review and clearance actions do not trigger it.
+
+**Decided:** flag, not auto-demote. A changed record or row keeps its state and stays on
+the register, cleared or not, until someone reads it again. Demoting would also have to
+revoke clearance in the same write, or `client_clearance_needs_review` rejects the edit.
+
+**Shipped.**
+
+- **`20261005100000_content_changed_since_review.sql`**:
+  - `content_updated_at` on `research_companies`, `treasury_events`,
+    `research_company_facts` and `research_findings`. It starts NULL: no edit before
+    this migration is known.
+  - A `BEFORE UPDATE` trigger per table, `stamp_content_updated_at`. It compares the
+    whole row minus an exclusion list, passed as trigger arguments: the review,
+    clearance, audit and `ingest_run_id` columns. Anything else is content, including
+    columns added later.
+  - A client summary written in the same update as a clearance is covered by that
+    clearance, so clearing a record with its first summary does not flag it. A summary
+    rewritten later does.
+  - `changed_since_review`, a stored generated column on each table: `internal`, and
+    `content_updated_at` later than `reviewed_at`. Every row the 20261003 backfills made
+    `internal` has a NULL `reviewed_at`, so for those any edit after this migration
+    counts.
+  - `v_research_review_queue` lists changed records and rows, with
+    `company_changed_since_review` and `changed_events` / `_findings` / `_facts`. The
+    ledger, publishable, facts and absences views carry the column. All five are restated
+    `security_invoker`.
+  - `v_research_publishable` also gains `ingest_run_id`. The internal app's
+    `LEDGER_COLUMNS` has selected it from that view since session 14, and live never had
+    it. No production code calls `publishableOnly`, which is why nothing broke.
+- **Read model:** `CompanyDossier`, `LedgerEntry`, `CompanyFact` and `StructuralAbsence`
+  carry `changedSinceReview`. `ReviewQueueEntry` carries the four counts.
+- **Two contract cases**, against a new `changedSlug` slot (Verrall: the record, one
+  event and its custody fact):
+  - a changed record stays `internal` and on the register, and its rows and queue entry
+    are flagged;
+  - a draft row is never flagged as changed.
+  - An adapter wiring test checks that every read selects the new columns.
+- **`@platform/ui`:** ledger, fact and absence panels take `changed`. It is a solid rule
+  in `--color-warning`, set against the draft's dashed grey: this row was read, then moved.
+- **`/research`:**
+  - The review control badges a changed record and offers "Mark reviewed again". That
+    calls `setReviewState(…, 'internal')`, which restamps `reviewed_at` and keeps
+    clearance.
+  - Changed rows form one group with "Mark these reviewed again", via the new
+    `reviewChangedRows`.
+  - The To review tab says, for example, "Record changed since review · 2 rows changed
+    since review".
+- **Seed dumper:** ignores both new columns.
+- **Generated types:** hand-added to `database.ts` until the migrate workflow
+  regenerates them.
+
+**Verified.**
+
+- **Dry run on live**, inside a self-aborting block, with the trigger, columns and views
+  applied:
+  - Review: not flagged.
+  - Clearance with a new summary: not flagged.
+  - Withholding: not flagged.
+  - A curator-notes edit: flagged, and queued.
+  - Re-review: cleared.
+  - A summary rewritten without clearing: flagged.
+  - Writing an event's headline and quantity back unchanged: not flagged. This is how
+    an unchanged ingest re-read writes a row.
+  - An edit to an event's headline: flagged in `v_research_ledger`, and counted in
+    `changed_events`.
+  - Edits to a finding and to a fact: flagged.
+  - A fact sent back to draft: not flagged.
+  - Publishable rows stayed at 8, and all four views still run as the caller.
+- `now()` is fixed inside one transaction, so the dry run set `reviewed_at` an interval
+  either side of it to stand in for later wall-clock time.
+- **Deliberate breaks:** five, all caught. Supabase adapter: the ledger flag mapped to
+  false, the column dropped from the company select, and the queue's record flag dropped.
+  Fixture adapter: the changed counts zeroed, and the record flag dropped.
+- `pnpm test` passes in every package; typecheck and lint are green.
+- The review control, with a changed record and a changed-rows group, renders at 375px
+  and 320px with no horizontal scroll and 44px targets.
+
+**Not done.**
+
+- **333D is not caught retroactively.** Its edit predates the trigger, and it is
+  already back in draft on live, so it is in the queue anyway.
+- **Ingest re-reads move citations.** On an unchanged re-read, `commit_research_ingest`
+  rewrites `source_document_id`, `disclosure_venue` and the like. When a later filing
+  restates a reviewed event, the row flags as changed, because what it cites has moved.
+  That is deliberate, but it may be noisy once the weekly routine runs.
+- **The weekly email** (`sendReviewQueueDigest`) counts each run's draft rows, not
+  rows changed since review.
+- **Pre-existing:** the seed dumper lists no `ingest_run_id` on events or findings, so
+  dumping either table from live throws in `assertKnownColumns`.
+

@@ -79,6 +79,11 @@ export interface CorporateHoldingsScenario<K extends RepositoryDomain> {
    * publishable read. The row was written by an ingest run, and names it.
    */
   draftRowSlug: string;
+  /**
+   * A reviewed record whose own content, one ledger row and one fact were
+   * edited after review. Still `internal`: the edit flags it, never demotes it.
+   */
+  changedSlug: string;
 }
 
 export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
@@ -361,9 +366,50 @@ export function describeCorporateHoldingsContract<K extends RepositoryDomain>(
       expect(rowEntry?.draftEvents).toBeGreaterThan(0);
 
       for (const entry of queue) {
-        const waiting = entry.draftEvents + entry.draftFindings + entry.draftFacts;
-        expect(entry.companyReviewState === 'draft' || waiting > 0).toBe(true);
+        const waiting =
+          entry.draftEvents + entry.draftFindings + entry.draftFacts +
+          entry.changedEvents + entry.changedFindings + entry.changedFacts;
+        expect(
+          entry.companyReviewState === 'draft' || entry.companyChangedSinceReview || waiting > 0,
+        ).toBe(true);
       }
+    });
+
+    it('flags content changed since review, and queues it, without demoting it', async () => {
+      const repository = await repo();
+      const company = await bySlug(scenario.changedSlug);
+
+      expect(company.reviewState).toBe('internal');
+      expect(company.changedSinceReview).toBe(true);
+      // Still on the register: the flag is not a demotion.
+      const register = (await repository.listCompanies(ctx)).items.map((entry) => entry.slug);
+      expect(register).toContain(company.slug);
+
+      // The changed rows are reviewed rows, returned by the default read.
+      const ledger = await repository.getLedger(ctx, company.id);
+      const changedEvents = ledger.items.filter((entry) => entry.changedSinceReview);
+      expect(changedEvents.length).toBeGreaterThan(0);
+      for (const entry of changedEvents) expect(entry.reviewState).toBe('internal');
+      const facts = await repository.getCompanyFacts(ctx, company.id);
+      expect(facts.some((fact) => fact.changedSinceReview)).toBe(true);
+
+      const queued = (await repository.getReviewQueue(ctx)).find(
+        (entry) => entry.slug === company.slug,
+      );
+      expect(queued?.companyChangedSinceReview).toBe(true);
+      expect(queued?.changedEvents).toBe(changedEvents.length);
+      expect(queued?.changedFacts).toBeGreaterThan(0);
+    });
+
+    it('never flags a draft row as changed since review', async () => {
+      // Nothing vouches for a draft, so there is no review for it to have
+      // changed since. Otherwise the queue would count one row twice.
+      const company = await bySlug(scenario.draftRowSlug);
+      const ledger = await (await repo()).getLedger(ctx, company.id, { includeDrafts: true });
+      const drafts = ledger.items.filter((entry) => entry.reviewState === 'draft');
+
+      expect(drafts.length).toBeGreaterThan(0);
+      for (const entry of drafts) expect(entry.changedSinceReview).toBe(false);
     });
 
     it('clears only reviewed records that carry a subscriber summary', async () => {
