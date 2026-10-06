@@ -661,6 +661,14 @@ function seed(): FakeSupabaseClient {
   client.__setDataset('research_classifications', WITHHELD);
   client.__setDataset('jurisdiction_notes', NOTES);
   client.__setDataset('secondary_claims', TRACKER_CLAIMS);
+  client.__setDataset('research_summary_drafts', [
+    {
+      company_id: 'rc-verrall',
+      body: 'Holds bitcoin directly, with a third-party custodian.',
+      drafted_at: '2026-10-05T00:00:00Z',
+      ingest_run_id: 'run-1',
+    },
+  ]);
   return client;
 }
 
@@ -821,6 +829,19 @@ describe('query wiring', () => {
   it('does not read the position for a company no tracker has claimed', async () => {
     await expect(corporateHoldings().getTrackerClaims(ctx, 'rc-tarra')).resolves.toEqual([]);
     expect(client.__buildersFor('v_company_position')).toHaveLength(0);
+  });
+
+  it('reads the summary draft from its team-only table, by company', async () => {
+    await expect(corporateHoldings().getSummaryDraft(ctx, 'rc-verrall')).resolves.toEqual({
+      companyId: 'rc-verrall',
+      body: 'Holds bitcoin directly, with a third-party custodian.',
+      draftedAt: '2026-10-05T00:00:00Z',
+      ingestRunId: 'run-1',
+    });
+    const [builder] = client.__buildersFor('research_summary_drafts');
+    expect(builder.eq).toHaveBeenCalledWith('company_id', 'rc-verrall');
+
+    await expect(corporateHoldings().getSummaryDraft(ctx, 'rc-tarra')).resolves.toBeNull();
   });
 
   it('splits current listings from the venues a company has left', async () => {

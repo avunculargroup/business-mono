@@ -15,6 +15,9 @@ export const ReportDetectionStrategy = {
   RSS:        'rss',
   SITEMAP:    'sitemap',
   INDEX_PAGE: 'index_page',
+  // A research company's SEC filings. Only on a source bound to a company,
+  // whose finds go to research_documents rather than the news feed.
+  EDGAR:      'edgar',
 } as const;
 export type ReportDetectionStrategy =
   (typeof ReportDetectionStrategy)[keyof typeof ReportDetectionStrategy];
@@ -27,6 +30,7 @@ export const ReportDiscoveryMethod = {
   INDEX_PAGE:       'index_page',
   MANUAL:           'manual',
   EMAIL_ATTACHMENT: 'email_attachment',
+  EDGAR:            'edgar',
 } as const;
 export type ReportDiscoveryMethod =
   (typeof ReportDiscoveryMethod)[keyof typeof ReportDiscoveryMethod];
@@ -57,6 +61,17 @@ export interface IndexPageDetectionConfig {
   pdf_link_selector?: string;
 }
 
+export interface EdgarDetectionConfig {
+  /** The filer's SEC Central Index Key, unpadded. */
+  cik: string;
+  /** Form types to register, e.g. '8-K', '10-Q'. Anything else is never fetched. */
+  forms?: string[];
+  /** 8-K items to keep, e.g. '8.01'. An 8-K with none of them is never registered. */
+  items_8k?: string[];
+  /** YYYY-MM-DD. Filings before this date are ignored. Defaults to 90 days back. */
+  since?: string;
+}
+
 /** Regex strings applied to the normalised URL, after strategy-specific filtering. */
 export interface ReportUrlFilters {
   must_match?: string[];
@@ -67,6 +82,7 @@ export interface ReportDetectionConfig {
   rss?: RssDetectionConfig;
   sitemap?: SitemapDetectionConfig;
   index_page?: IndexPageDetectionConfig;
+  edgar?: EdgarDetectionConfig;
   url_filters?: ReportUrlFilters;
 }
 
@@ -80,6 +96,8 @@ export const ReportCandidateStatus = {
   SKIPPED:   'skipped',
   FAILED:    'failed',
   DUPLICATE: 'duplicate',
+  // Handed to research_documents by a company-bound source. Terminal.
+  REGISTERED: 'registered',
 } as const;
 export type ReportCandidateStatus =
   (typeof ReportCandidateStatus)[keyof typeof ReportCandidateStatus];
@@ -269,6 +287,8 @@ export interface ReportWatchScanResult {
   reports_failed: number;
   segments_embedded: number;
   news_items_created: number;
+  /** Filings a company-bound source registered in research_documents. */
+  documents_registered: number;
   /** Names of sources whose discovery run errored this tick. */
   failed_sources: string[];
   /** Sources that returned zero candidates — the silent-failure signal. */

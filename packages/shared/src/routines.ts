@@ -340,6 +340,8 @@ export interface ResearchIngestRoutineResult {
   companies_failed: string[];
   queued_rows: number;
   queued: Array<{ slug: string; legal_name: string; queued_rows: number }>;
+  // Slugs of the records this run drafted a subscriber summary for.
+  summaries_drafted: string[];
   emailed: boolean;
   // Where the dashboard tile's footer link goes, and what it says.
   link_url: string;

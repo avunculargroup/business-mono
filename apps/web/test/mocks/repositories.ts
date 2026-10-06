@@ -172,6 +172,7 @@ export function createFakeRepositories(
       getWithheldFields: vi.fn(async () => []),
       getStructuralAbsences: vi.fn(async () => []),
       getTrackerClaims: vi.fn(async () => []),
+      getSummaryDraft: vi.fn(async () => null),
       compareCompanies: vi.fn(async () => []),
       getReviewQueue: vi.fn(async () => overrides.reviewQueue ?? []),
     },

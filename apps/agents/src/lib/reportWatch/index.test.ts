@@ -39,12 +39,19 @@ const markAcquiredMock = vi.fn(async () => undefined);
 const markDuplicateMock = vi.fn(async () => undefined);
 const markSkippedMock = vi.fn(async () => undefined);
 const markAttemptFailedMock = vi.fn(async () => 'new' as const);
+const markRegisteredMock = vi.fn(async () => undefined);
 vi.mock('./candidateStatus.js', () => ({
+  markRegistered: (...a: unknown[]) => markRegisteredMock(...(a as [])),
   markAcquired: (...a: unknown[]) => markAcquiredMock(...(a as [])),
   markDuplicate: (...a: unknown[]) => markDuplicateMock(...(a as [])),
   markSkipped: (...a: unknown[]) => markSkippedMock(...(a as [])),
   markAttemptFailed: (...a: unknown[]) => markAttemptFailedMock(...(a as [])),
   recordHead: async () => undefined,
+}));
+
+const registerMock = vi.fn();
+vi.mock('./registerFiling.js', () => ({
+  registerFiling: (...args: unknown[]) => registerMock(...args),
 }));
 
 const { runReportWatchScan } = await import('./index.js');
@@ -130,7 +137,8 @@ function withCandidate(status = 'new', attempts = 0) {
 beforeEach(() => {
   fakeSupabase = createFakeSupabase();
   for (const m of [discoverMock, acquireMock, extractMock, persistMock, feedMock,
-    markAcquiredMock, markDuplicateMock, markSkippedMock, markAttemptFailedMock, recordHealthMock]) {
+    markAcquiredMock, markDuplicateMock, markSkippedMock, markAttemptFailedMock, recordHealthMock,
+    markRegisteredMock, registerMock]) {
     m.mockClear();
   }
   fakeSupabase.__setResponse('news_sources', { data: [sourceRow()], error: null });
@@ -268,6 +276,68 @@ describe('runReportWatchScan', () => {
       agent_name: 'rex',
       action: 'Report watch scan',
       status: 'auto',
+    });
+  });
+
+  describe('a source bound to a research company', () => {
+    const filing = {
+      form: '8-K',
+      accession: '0001193125-26-401111',
+      items: ['8.01'],
+      reportDate: '2026-09-29',
+      filerName: 'Strategy Inc',
+    };
+
+    beforeEach(() => {
+      fakeSupabase.__setResponse('news_sources', {
+        data: [sourceRow({ name: 'EDGAR filings — Strategy Inc', detection_strategies: ['edgar'], research_company_id: 'co-strategy' })],
+        error: null,
+      });
+      discoverMock.mockResolvedValue(
+        discovery({ strategyUsed: 'edgar', queued: [{ ...queued(), discoveryMethod: 'edgar', filing }] }),
+      );
+      registerMock.mockResolvedValue({ ok: true, documentId: 'doc-1', created: true });
+    });
+
+    it('registers what it finds in research_documents, and never acquires it for the feed', async () => {
+      const result = await runReportWatchScan({}, null, NOW);
+
+      expect(registerMock).toHaveBeenCalledWith({
+        companyId: 'co-strategy',
+        url: 'https://river.com/files/a.pdf',
+        filing,
+        publishedAt: '2026-07-01',
+      });
+      expect(markRegisteredMock).toHaveBeenCalledWith('c1', 'doc-1');
+      expect(result.documents_registered).toBe(1);
+      expect(acquireMock).not.toHaveBeenCalled();
+      expect(feedMock).not.toHaveBeenCalled();
+    });
+
+    it('does not count a filing that was already registered by hand', async () => {
+      registerMock.mockResolvedValue({ ok: true, documentId: 'doc-by-hand', created: false });
+
+      const result = await runReportWatchScan({}, null, NOW);
+
+      expect(markRegisteredMock).toHaveBeenCalledWith('c1', 'doc-by-hand');
+      expect(result.documents_registered).toBe(0);
+    });
+
+    it('spends a retry attempt when registration fails', async () => {
+      registerMock.mockResolvedValue({ ok: false, error: 'research_documents insert: boom' });
+
+      const result = await runReportWatchScan({}, null, NOW);
+
+      expect(markAttemptFailedMock).toHaveBeenCalledWith('c1', 0, 'research_documents insert: boom');
+      expect(result.reports_failed).toBe(1);
+    });
+
+    it('leaves a candidate it already registered alone', async () => {
+      withCandidate('registered');
+
+      await runReportWatchScan({}, null, NOW);
+
+      expect(registerMock).not.toHaveBeenCalled();
     });
   });
 });

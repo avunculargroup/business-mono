@@ -38,6 +38,7 @@ beforeEach(() => {
     'research_findings',
     'research_company_facts',
     'agent_activity',
+    'research_summary_drafts',
   ]) {
     supabase.__setResponse(t, { data: null, error: null });
   }
@@ -200,6 +201,31 @@ describe('setRegisterClearance', () => {
 
     expect(result.error).toMatch(/summary/);
     expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
+  });
+
+  it('refuses to clear the drafted summary unedited, ahead of the trigger', async () => {
+    supabase.__setResponse('research_summary_drafts', {
+      data: { body: 'Holds bitcoin directly,\n with a custodian.' },
+      error: null,
+    });
+
+    // Re-flowing the draft's whitespace is not an edit.
+    const result = await setRegisterClearance('co-1', true, ' Holds bitcoin  directly, with a custodian. ');
+
+    expect(result.error).toMatch(/drafted summary, unedited/);
+    expect(supabase.__buildersFor('research_companies')).toHaveLength(0);
+  });
+
+  it('clears an edited draft', async () => {
+    supabase.__setResponse('research_summary_drafts', {
+      data: { body: 'Holds bitcoin directly, with a custodian.' },
+      error: null,
+    });
+
+    const result = await setRegisterClearance('co-1', true, 'Holds bitcoin directly, with Coinbase as custodian.');
+
+    expect(result).toEqual({ success: true });
+    expect(patch('research_companies')).toMatchObject({ client_cleared: true });
   });
 
   it('only flips the flag when un-clearing, keeping the summary', async () => {

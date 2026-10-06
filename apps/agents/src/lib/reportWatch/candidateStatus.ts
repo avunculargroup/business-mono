@@ -5,6 +5,8 @@
  * place, so the status machine is readable as a machine rather than inferred
  * from scattered `.update()` calls.
  *
+ *   new ──> registered                       (a company-bound source: handed to
+ *                                             research_documents, never fetched here)
  *   new ──> queued ──> fetching ──┬─> acquired   (report row written)
  *                                 ├─> duplicate  (content_hash already known)
  *                                 ├─> skipped    (a deliberate no, with a reason)
@@ -91,6 +93,17 @@ export async function markAcquired(candidateId: string, reportId: string): Promi
   await patch(candidateId, {
     status: 'acquired',
     report_id: reportId,
+    skip_reason: null,
+    last_error: null,
+    last_attempt_at: new Date().toISOString(),
+  });
+}
+
+/** A company-bound source's find, now a row in research_documents. Terminal. */
+export async function markRegistered(candidateId: string, researchDocumentId: string): Promise<void> {
+  await patch(candidateId, {
+    status: 'registered',
+    research_document_id: researchDocumentId,
     skip_reason: null,
     last_error: null,
     last_attempt_at: new Date().toISOString(),

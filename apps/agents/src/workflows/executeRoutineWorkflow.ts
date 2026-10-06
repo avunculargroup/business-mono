@@ -1640,6 +1640,9 @@ async function runReportWatch(
     `(${result.candidates_new} new), ${result.reports_acquired} report(s) acquired ` +
     `(${result.segments_embedded} segments, ${result.news_items_created} feed item(s)), ` +
     `${result.reports_duplicate} duplicate, ${result.reports_failed} failed.` +
+    (result.documents_registered > 0
+      ? ` ${result.documents_registered} filing(s) registered for corporate research.`
+      : '') +
     `${failSuffix}${emptySuffix}`;
 
   return {

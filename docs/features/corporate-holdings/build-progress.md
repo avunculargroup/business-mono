@@ -17,9 +17,11 @@ operational: the first real run and its trace bundle. Step 6 is under way: recor
 shows the summary and `is_published` is dropped (session 12), then review state on
 the rows themselves (session 13), then approval per ingest run and persist-and-stop
 (session 14), then the weekly routine and its email (session 15), then "changed since
-review" on records and rows (session 16). The first real run is next. Two things still remain
-from session 2: the ingest run against real filings, and the recorded trace bundle.
-**Last updated:** 2026-10-05
+review" on records and rows (session 16), then the ingest drafting the subscriber summary
+and EDGAR discovery into `research_documents` (session 17). The routine's first real run
+went on 4 October and left 53 draft rows on five records. Still remaining from session 2:
+the recorded trace bundle.
+**Last updated:** 2026-10-06
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -1207,3 +1209,134 @@ revoke clearance in the same write, or `client_clearance_needs_review` rejects t
 - **Pre-existing:** the seed dumper lists no `ingest_run_id` on events or findings, so
   dumping either table from live throws in `assertKnownColumns`.
 
+## Session 17 — the summary draft, and discovery
+
+The routine's first real run, on 4 October, left 53 draft rows on five records and no
+summary drafts. That was expected from the code, not a fault in the run: the drafting step
+decided on 29 September had never been built (session 12, "Not done"). Discovery was the
+other unbuilt part of the spec.
+
+### The summary draft
+
+**Decided:** the draft goes in its own team-only table, not a column on
+`research_companies`. A subscriber's session can read a cleared record's row, and RLS is
+per row, not per column. A column would also count as content to
+`stamp_content_updated_at`, so every redraft would flag a reviewed record.
+
+**Shipped.**
+
+- **`20261006000000_research_summary_drafts.sql`:**
+  - `research_summary_drafts`: one row per company, holding the body, the run id, and
+    `facts_as_of`.
+  - `refuse_unedited_summary_draft`, a `BEFORE UPDATE` trigger on `research_companies`. It
+    refuses clearance when `client_summary` is the draft with only whitespace changed, and
+    refuses a cleared summary rewritten back to it.
+- **`draft_summary`, step 11 of `researchIngest`:**
+  - It runs after persist, so it never costs a ledger. A failure is logged and the run
+    still succeeds.
+  - It drafts only for a record with no `client_summary`, and only when there is no draft
+    yet or a fact has changed since the last one.
+  - It reads implementation facts only: keys whose `client_fact_class` is
+    `implementation`, not superseded, not retired. It never reads `curator_notes`.
+  - `summaryDraft.ts` filters the draft. The filter covers the naming.md prohibited words
+    as whole words (so "Coinbase" is not "coin"), the outcome phrases the classify step
+    restricts, every label and alias in `restricted_metrics`, and exclamation marks. A
+    refused draft is retried once with the refused terms named, then dropped.
+  - `researchIngest.draft_summary` is in `MODEL_SCOPES`, with Rex as its fallback agent.
+  - The routine summary names the records it drafted for, and `agent_activity` notes say so.
+- **Read model:** `CorporateHoldingsRepository.getSummaryDraft`. The live adapter reads the
+  table. The fixture adapter always returns null, because the demo is public and a model's
+  unedited draft is the one thing the register never shows outside the team.
+- **`/research/[slug]`:**
+  - The record page shows the draft above the record, with a dashed grey rule like a
+    draft row, even before the record is reviewed.
+  - The clearance form starts from the draft.
+  - `setRegisterClearance` refuses the unedited draft with a message, ahead of the
+    trigger.
+  - The draft is hidden once a summary has been written.
+
+### Discovery
+
+**Decided:** the company binding lives on `news_sources`, because that is the table
+reportWatch reads (`report_watch_sources` does not exist; see session 6's open question). A
+bound source is managed with the register, so `/news/sources` lists only unbound ones. The
+health panel still shows every source.
+
+**Shipped.**
+
+- **`20261006010000_research_filing_discovery.sql`:**
+  - `news_sources.research_company_id`, with a CHECK that a bound source is EDGAR only and
+    EDGAR is only bound.
+  - `report_candidates` admits method `edgar` and status `registered`, and gains
+    `research_document_id`.
+  - A partial unique index on `research_documents (company_id, venue, announcement_id)`.
+  - Seeds four active EDGAR sources (Strategy, Sequans, RUM Group, Angel Studios),
+    starting from 1 September. Each CIK comes from the record's own filing URLs and is
+    also stored as a `sec_cik` identifier.
+- **`adapters/edgar.ts`:**
+  - Reads `data.sec.gov/submissions/CIK##########.json`, the SEC's per-filer index, not
+    the Atom feed. Only the index carries form types and 8-K items, which is what lets
+    discovery filter at the source.
+  - The filter defaults are 8-K, 10-Q, 10-K, 6-K, 20-F and 40-F (with amendments), and
+    8-K items 1.01, 2.02, 7.01 and 8.01. Form 4s, prospectus supplements and board-change
+    8-Ks never arrive.
+  - The user agent carries a contact address, as the SEC's fair-access policy asks.
+- **`registerFiling.ts`:**
+  - Classes each filing by form, the way the hand-entered SEC rows were classed:
+    8-K and 6-K → `exchange_announcement`, 10-Q → `filed_financials`, 10-K, 20-F and
+    40-F → `audited_accounts`.
+  - Recognises a filing already registered by accession number and leaves it as written.
+  - Nothing is downloaded at this stage. The next ingest run fetches the filing, splits
+    it into sections and applies the gate.
+- **The scan:**
+  - A bound source's queued candidates are registered, not acquired. Registration does
+    not spend the acquisition budget.
+  - The routine summary counts registered filings.
+
+**Verified.**
+
+- Tests:
+  - the filter: whole words, metrics from the table, retry, and drop;
+  - the staleness rule;
+  - the workflow step: implementation facts only, never over a written summary, and a
+    model failure keeps the run;
+  - the routine summary;
+  - the adapter, against a recorded-shape index: forms, items, `since`, the 90-day
+    default, CIK validation, and an unparseable body reported as a failure rather than
+    as quiet;
+  - registration: class by form, hand entries left alone, the insert race, and unknown
+    forms refused;
+  - the scan's bound-source branch;
+  - the live adapter's draft read;
+  - the server action, the record page and the panel.
+- **Both migrations dry-run on live** inside a rolled-back transaction:
+  - an unedited draft is refused, whitespace re-flowed or not;
+  - an edited one clears;
+  - an unrelated edit to a cleared record passes;
+  - a cleared summary rewritten to the draft is refused;
+  - inserting a draft does not flag the record;
+  - an unbound EDGAR source and a bound RSS source are refused;
+  - a second registration of an accession already on Strategy's record is refused;
+  - an `edgar`/`registered` candidate is admitted;
+  - the four sources and four identifiers seed;
+  - the 97 existing sources stay unbound.
+- `pnpm test` passes in every package; typecheck and lint are green.
+- The draft panel renders at 375px and 320px with no horizontal scroll and 44px buttons.
+
+**Not done.**
+
+- **No discovery adapter for ASX, NZX, LSE, TDnet or SEDAR+.** Those cover eight of the
+  twelve records, including Goodfood's blocker and the 333D and Panther gaps. None of
+  those venues has a verified machine-readable feed yet. Each is a new adapter plus a
+  `registerFiling` venue, not an ingest change.
+- **No UI for bound sources.** Adding one is SQL for now, in the pattern of the seed.
+- **A quiet SEC filer counts as an empty source.** An EDGAR filer with nothing new since
+  `since` adds to `detection_consecutive_empty`, the same as a scraper returning nothing.
+  The adapter reports an index it cannot parse as a failure, so the counter only ever
+  measures quiet.
+- **No contract case for `getSummaryDraft`.** Only the live adapter can hold a draft, so a
+  shared case would pass vacuously against the fixtures. It has an adapter test instead.
+- **The review queue and the weekly email do not list waiting drafts.** The routine
+  summary names them, and the record page shows them.
+- **Generated types:** hand-added to `database.ts` until the migrate workflow regenerates
+  them.

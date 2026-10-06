@@ -139,4 +139,57 @@ describe('RegisterClearance', () => {
 
     expect(screen.getByText(/also withholds it from subscribers/)).toBeInTheDocument();
   });
+
+  describe('the drafted summary', () => {
+    const summaryDraft = {
+      body: 'Holds bitcoin directly, with a third-party custodian.',
+      draftedAt: '2026-10-05T03:00:00Z',
+    };
+
+    it('shows the draft on a record with no summary, even before review', () => {
+      render(
+        <RegisterClearance
+          companyId="c1"
+          reviewState="draft"
+          cleared={false}
+          clientSummary={null}
+          summaryDraft={summaryDraft}
+        />,
+      );
+
+      const panel = screen.getByRole('region', { name: 'Drafted subscriber summary' });
+      expect(panel).toHaveTextContent(summaryDraft.body);
+      expect(panel).toHaveTextContent('an unedited draft cannot be cleared');
+    });
+
+    it('starts the clearance form from the draft, for a person to edit', async () => {
+      render(
+        <RegisterClearance
+          companyId="c1"
+          reviewState="internal"
+          cleared={false}
+          clientSummary={null}
+          summaryDraft={summaryDraft}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Change' }));
+
+      expect(screen.getByLabelText('Subscriber summary')).toHaveValue(summaryDraft.body);
+    });
+
+    it('hides the draft once a summary has been written', () => {
+      render(
+        <RegisterClearance
+          companyId="c1"
+          reviewState="internal"
+          cleared
+          clientSummary="Written by a person."
+          summaryDraft={summaryDraft}
+        />,
+      );
+
+      expect(screen.queryByRole('region', { name: 'Drafted subscriber summary' })).not.toBeInTheDocument();
+    });
+  });
 });

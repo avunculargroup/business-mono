@@ -14,6 +14,7 @@ import type {
   ReviewQueueEntry,
   ReviewReadOptions,
   StructuralAbsence,
+  SummaryDraft,
   TrackerClaim,
   WithheldField,
 } from '@platform/data';
@@ -255,6 +256,12 @@ export function createCorporateHoldingsRepository(): CorporateHoldingsRepository
       return claims
         .map((claim) => measureTrackerClaim(claim, sourced))
         .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+    },
+
+    // The demo is public, and a model's unedited draft is the one thing the
+    // register never shows outside the team. So the fixtures hold none.
+    async getSummaryDraft(_ctx: ReadContext, _companyId: string): Promise<SummaryDraft | null> {
+      return null;
     },
 
     async compareCompanies(ctx: ReadContext, slugs: string[]): Promise<CompanyDossier[]> {

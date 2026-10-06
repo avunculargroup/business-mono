@@ -1,5 +1,6 @@
 'use client';
 
+import { PenLine } from 'lucide-react';
 import type { ReviewState } from '@platform/shared';
 import { setRegisterClearance } from '@/app/actions/clientPromotion';
 import { ClientGate } from './ClientGate';
@@ -24,6 +25,7 @@ export function RegisterClearance({
   draftGroups = [],
   changedSinceReview = false,
   changedRows = 0,
+  summaryDraft = null,
 }: {
   companyId: string;
   reviewState: ReviewState;
@@ -32,7 +34,13 @@ export function RegisterClearance({
   draftGroups?: DraftGroup[];
   changedSinceReview?: boolean;
   changedRows?: number;
+  /** What the ingest drafted, shown while no summary has been written. */
+  summaryDraft?: { body: string; draftedAt: string } | null;
 }) {
+  // Once someone has written a summary the draft is history, and showing it
+  // beside the real one would invite reading the wrong text.
+  const draft = clientSummary?.trim() ? null : summaryDraft;
+
   return (
     <div className={styles.stack}>
       <RecordReview
@@ -43,6 +51,22 @@ export function RegisterClearance({
         changedSinceReview={changedSinceReview}
         changedRows={changedRows}
       />
+      {draft ? (
+        <section className={styles.draft} aria-label="Drafted subscriber summary">
+          <p className={styles.draftHead}>
+            <PenLine size={16} strokeWidth={1.5} aria-hidden />
+            <span>
+              Drafted summary · Rex ·{' '}
+              <time dateTime={draft.draftedAt}>{formatDate(draft.draftedAt)}</time>
+            </span>
+          </p>
+          <p className={styles.draftBody}>{draft.body}</p>
+          <p className={styles.draftHint}>
+            Composed from this record&apos;s implementation facts. Edit it before clearing the
+            entry: an unedited draft cannot be cleared.
+          </p>
+        </section>
+      ) : null}
       {reviewState === 'internal' ? (
         <ClientGate
           cleared={cleared}
@@ -51,11 +75,15 @@ export function RegisterClearance({
           requireNote={{
             label: 'Subscriber summary',
             hint: 'What a subscriber reads at the top of the entry. How the entity holds bitcoin and how it discloses it — never how the holding has performed.',
-            initial: clientSummary ?? '',
+            initial: clientSummary?.trim() ? clientSummary : (draft?.body ?? ''),
           }}
           onChange={(next, summary) => setRegisterClearance(companyId, next, summary)}
         />
       ) : null}
     </div>
   );
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }

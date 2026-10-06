@@ -32,7 +32,15 @@ import { RobotsCache } from './robots.js';
 import { extractReport } from './extract/index.js';
 import { persistReport } from './persistReport.js';
 import { reportToNewsItem } from './toNewsItem.js';
-import { markAcquired, markDuplicate, markSkipped, markAttemptFailed, recordHead } from './candidateStatus.js';
+import {
+  markAcquired,
+  markDuplicate,
+  markRegistered,
+  markSkipped,
+  markAttemptFailed,
+  recordHead,
+} from './candidateStatus.js';
+import { registerFiling } from './registerFiling.js';
 
 const log = createLogger('report-watch-scan');
 
@@ -48,6 +56,7 @@ const EMPTY: ReportWatchScanResult = {
   reports_failed: 0,
   segments_embedded: 0,
   news_items_created: 0,
+  documents_registered: 0,
   failed_sources: [],
   empty_sources: [],
 };
@@ -59,12 +68,13 @@ interface SourceRow extends ReportWatchSource {
   ocr_page_limit: number;
   redistribution_default: ReportRedistribution;
   licence_notes: string | null;
+  research_company_id: string | null;
 }
 
 const SOURCE_COLUMNS =
   'id, name, site_url, tier, detection_strategies, detection_config, ' +
   'crawl_delay_seconds, ocr_enabled, ocr_page_limit, max_candidates_per_run, ' +
-  'redistribution_default, licence_notes';
+  'redistribution_default, licence_notes, research_company_id';
 
 async function loadActiveSources(): Promise<SourceRow[]> {
   const { data, error } = await reportDb
@@ -154,6 +164,32 @@ export async function runReportWatchScan(
         continue;
       }
       if (discovery.found === 0) result.empty_sources.push(source.name);
+
+      // ── Phase B, for a research company: register ──────────────────────────
+      // A bound source's finds become research_documents rows for the next
+      // ingest run to fetch. Nothing is downloaded here, so registration does
+      // not spend the acquisition budget.
+      if (source.research_company_id) {
+        for (const candidate of discovery.queued) {
+          const row = await loadCandidateRow(source.id, candidate.urlHash);
+          if (!row || (row.status !== 'new' && row.status !== 'queued')) continue;
+
+          const registered = await registerFiling({
+            companyId: source.research_company_id,
+            url: candidate.url,
+            filing: candidate.filing,
+            publishedAt: candidate.publishedAtHint,
+          });
+          if (!registered.ok) {
+            await markAttemptFailed(row.id, row.attempts, registered.error);
+            result.reports_failed += 1;
+            continue;
+          }
+          await markRegistered(row.id, registered.documentId);
+          if (registered.created) result.documents_registered += 1;
+        }
+        continue;
+      }
 
       // ── Phase B: acquire ───────────────────────────────────────────────────
       for (const candidate of discovery.queued) {
@@ -270,6 +306,7 @@ export async function runReportWatchScan(
         duplicates: result.reports_duplicate,
         failures: result.reports_failed,
         segments: result.segments_embedded,
+        registered: result.documents_registered,
       },
       'report watch scan complete',
     );

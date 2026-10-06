@@ -388,6 +388,21 @@ export interface TrackerClaim {
 }
 
 /**
+ * A subscriber summary the ingest drafted for a person to edit.
+ *
+ * Internal only, and inert: it is never the summary. Clearance refuses it
+ * word for word, so a person has to have edited it before a subscriber reads
+ * anything built from it. Composed from implementation facts only.
+ */
+export interface SummaryDraft {
+  companyId: string;
+  body: string;
+  draftedAt: string;
+  /** The ingest run that wrote it. */
+  ingestRunId: string | null;
+}
+
+/**
  * The divergence rule, written once so both adapters apply the same one.
  *
  * Measured against the sourced figure rather than the claim: the register's
@@ -560,6 +575,12 @@ export interface CorporateHoldingsRepository {
    * client surface. Newest observation first.
    */
   getTrackerClaims(ctx: ReadContext, companyId: string): Promise<TrackerClaim[]>;
+
+  /**
+   * The summary the ingest drafted, or null. Internal only: a public or client
+   * surface never reads a model's unedited prose.
+   */
+  getSummaryDraft(ctx: ReadContext, companyId: string): Promise<SummaryDraft | null>;
 
   /**
    * The companies a comparison would render, or `ArchetypeMismatchError`.

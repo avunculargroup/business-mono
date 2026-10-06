@@ -160,6 +160,9 @@ export const classificationsSchema = z.object({
   classifications: z.array(classificationSchema),
 });
 
+/** What the summary-drafting step asks the model for. */
+export const summaryDraftSchema = z.object({ summary: z.string() });
+
 export const researchIngestOutputSchema = z.object({
   companyId: z.string(),
   documentsFetched: z.number(),
@@ -173,5 +176,7 @@ export const researchIngestOutputSchema = z.object({
   quiet: z.boolean(),
   /** Draft rows this run left for review. Zero on a quiet run. */
   queuedRows: z.number(),
+  /** Whether this run drafted a subscriber summary for a person to edit. */
+  summaryDrafted: z.boolean(),
 });
 export type ResearchIngestOutput = z.infer<typeof researchIngestOutputSchema>;

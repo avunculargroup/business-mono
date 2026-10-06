@@ -66,6 +66,20 @@ describe('runResearchIngestRoutine', () => {
     expect(result).toMatchObject({ queued_rows: 4, emailed: true, link_url: '/research?view=review' });
   });
 
+  it('names the records it drafted a subscriber summary for', async () => {
+    const start = vi.fn(async (id: string) => ({
+      runId: 'run-x',
+      status: 'success',
+      result: { queuedRows: 0, summaryDrafted: id !== 'c1' } as never,
+    }));
+
+    const { summary, result } = await runResearchIngestRoutine(routine, start);
+
+    expect(result.summaries_drafted).toEqual(['sequans', 'metaplanet']);
+    expect(summary).toContain('Subscriber summary drafted for 2 records: Sequans, Metaplanet Inc.');
+    expect(summary).not.toContain('Inc..');
+  });
+
   it('names a failed record and keeps going with the rest', async () => {
     const start = vi.fn(async (id: string) => {
       if (id === 'c2') throw new Error('SEC unreachable');

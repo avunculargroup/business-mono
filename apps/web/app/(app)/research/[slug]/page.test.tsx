@@ -152,6 +152,26 @@ describe('ResearchCompanyPage', () => {
     expect(screen.queryByText(/run-bbbb/)).not.toBeInTheDocument();
   });
 
+  it('shows the summary the ingest drafted, for the record it belongs to', async () => {
+    repositories.corporateHoldings.getSummaryDraft.mockResolvedValueOnce({
+      companyId: 'rc-1',
+      body: 'Holds bitcoin directly, with a third-party custodian.',
+      draftedAt: '2026-10-05T03:00:00Z',
+      ingestRunId: 'run-1',
+    });
+
+    render(await ResearchCompanyPage({ params }));
+
+    const company = await repositories.corporateHoldings.getCompany.mock.results[0]!.value;
+    expect(repositories.corporateHoldings.getSummaryDraft).toHaveBeenCalledWith(
+      expect.anything(),
+      company!.id,
+    );
+    expect(screen.getByRole('region', { name: 'Drafted subscriber summary' })).toHaveTextContent(
+      'Holds bitcoin directly, with a third-party custodian.',
+    );
+  });
+
   it('404s on a slug that resolves to nothing', async () => {
     repositories = createFakeRepositories({ dossier: null });
 

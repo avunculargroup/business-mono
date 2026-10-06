@@ -6,6 +6,40 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-06 — Corporate holdings: discovery into `research_documents`
+
+`20261006010000_research_filing_discovery.sql` gives a `report_watch` source a company
+binding, so filings it finds are registered for the research ingest instead of acquired
+for the news feed.
+
+- `news_sources.research_company_id`. A CHECK makes a bound source EDGAR only, and EDGAR
+  bound only: an unbound 8-K feed would reach the news feed, and a bound RSS feed would
+  register documents with no form type to class them by.
+- `report_candidates` admits discovery method `edgar` and status `registered`, and gains
+  `research_document_id`.
+- A partial unique index on `research_documents (company_id, venue, announcement_id)`, so
+  one filing is never registered twice. Live had no duplicates.
+- Seeds an EDGAR source for each SEC filer on the register (Strategy, Sequans, RUM Group,
+  Angel Studios), from filings dated 1 September onward, with 8-K items 1.01, 2.02, 7.01
+  and 8.01. The CIKs come from each record's hand-entered filing URLs and also go into
+  `company_identifiers` as `sec_cik`.
+
+---
+
+## 2026-10-06 — Corporate holdings: the ingest drafts the subscriber summary
+
+`20261006000000_research_summary_drafts.sql` adds `research_summary_drafts` and a trigger
+on `research_companies`.
+
+- A table of its own rather than a column on `research_companies`. A subscriber's session
+  can read a cleared record's row, and RLS is per row, not per column. As a column, every
+  redraft would also flag the record "changed since review".
+- Team-only RLS through `is_team_member()`.
+- `refuse_unedited_summary_draft` refuses clearance (or a cleared summary rewritten)
+  when `client_summary` matches the draft, whitespace collapsed.
+
+---
+
 ## 2026-10-05 — Corporate holdings: content changed since review
 
 `20261005100000_content_changed_since_review.sql` adds `content_updated_at` and
