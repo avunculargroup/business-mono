@@ -4347,6 +4347,34 @@ export type Database = {
             referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "news_sources_research_company_id_fkey"
+            columns: ["research_company_id"]
+            isOneToOne: false
+            referencedRelation: "research_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_sources_research_company_id_fkey"
+            columns: ["research_company_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "news_sources_research_company_id_fkey"
+            columns: ["research_company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "news_sources_research_company_id_fkey"
+            columns: ["research_company_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
+          },
         ]
       }
       newsletter_runs: {
@@ -5860,6 +5888,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "research_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_facts"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_company_position"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_absences"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_ledger"
+            referencedColumns: ["source_document_id"]
+          },
+          {
+            foreignKeyName: "report_candidates_research_document_id_fkey"
+            columns: ["research_document_id"]
+            isOneToOne: false
+            referencedRelation: "v_research_publishable"
+            referencedColumns: ["source_document_id"]
+          },
+          {
             foreignKeyName: "report_candidates_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
@@ -6946,6 +7016,27 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "research_companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_summary_drafts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "v_company_position"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "research_summary_drafts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "v_research_freshness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "research_summary_drafts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "v_research_review_queue"
+            referencedColumns: ["company_id"]
           },
         ]
       }
