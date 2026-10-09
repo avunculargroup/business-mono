@@ -104,24 +104,46 @@ describe('parseRbaCsv', () => {
     expect(res.ok).toBe(true);
   });
 
-  it('regression: data rows use DD/MM/YYYY, not the D-Mon-YYYY format of the Publication date row', () => {
-    // Confirmed against a live fetch of f1.1 and d3 — every data row is
-    // '30/06/2026' style, never '30-Jun-2026'. Mistaking the metadata
-    // preamble's own date format for the data-row format silently produced
-    // zero observations for every RBA-sourced indicator in production,
-    // with no error (parseRbaCsv previously returned ok:true, observations: []).
-    const dashDated =
+  it('reads data-row dates in both RBA formats, and never the Publication date row', () => {
+    // f1.1/d3 use DD/MM/YYYY; some daily tables use DD-Mon-YYYY. Accepting only
+    // one of them once silently produced zero observations for every RBA indicator.
+    const mixed =
       '"Title","Cash Rate Target"\n' +
       '"Publication date","01-Jun-2026"\n' +
       '"Series ID","FIRMMCRT"\n' +
-      '"31-Mar-2026","4.10"\n' + // wrong format — must NOT parse
-      '"31/03/2026","4.10"\n'; // right format — must parse
-    const res = parseRbaCsv(dashDated, 'FIRMMCRT');
+      '"31-Mar-2026","4.10"\n' +
+      '"30/04/2026","4.35"\n';
+    const res = parseRbaCsv(mixed, 'FIRMMCRT');
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.observations).toEqual([
-      { periodDate: '2026-03-01', value: 4.1, releasedAt: null, raw: { date: '31/03/2026', value: '4.10', column: 'FIRMMCRT' } },
+      { periodDate: '2026-03-01', value: 4.1, releasedAt: null, raw: { date: '31-Mar-2026', value: '4.10', column: 'FIRMMCRT' } },
+      { periodDate: '2026-04-01', value: 4.35, releasedAt: null, raw: { date: '30/04/2026', value: '4.35', column: 'FIRMMCRT' } },
     ]);
+  });
+
+  it('collapses a daily table to the LAST value of each month, not an average', () => {
+    // Regression: F1.1's FIRMMCRT is the monthly average of the target, so the
+    // 29 Sep 2026 hike to 4.60 (effective 30 Sep) was stored as 4.36. F1 is
+    // daily; the month must take the target standing at its last row.
+    const daily =
+      '"Title","Cash Rate Target","Interbank Overnight Cash Rate"\n' +
+      '"Series ID","FIRMMCRTD","FIRMMCRID"\n' +
+      '"28/08/2026","4.35","4.35"\n' +
+      '"29/09/2026","4.35","4.35"\n' +
+      '"30/09/2026","4.60","4.59"\n' +
+      '"01/10/2026","4.60","4.60"\n' +
+      '"08/10/2026","4.60","4.61"\n';
+    expect(parseTableRef('F1')).toEqual({ table: 'f1', columnMatch: 'FIRMMCRTD' });
+    const res = parseRbaCsv(daily, 'FIRMMCRTD');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations.map((o) => [o.periodDate, o.value])).toEqual([
+      ['2026-08-01', 4.35],
+      ['2026-09-01', 4.6],
+      ['2026-10-01', 4.6],
+    ]);
+    expect(res.observations[1].raw).toEqual({ date: '30/09/2026', value: '4.60', column: 'FIRMMCRTD' });
   });
 
   it('errors (does not silently succeed) when the matched column is blank on every row', () => {

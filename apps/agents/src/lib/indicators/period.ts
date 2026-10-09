@@ -36,17 +36,28 @@ export function toFirstOfQuarterISO(date: Date): string {
 }
 
 /**
- * Parse an RBA-style date cell ('30/06/2026', '31/12/2025' — DD/MM/YYYY, the
- * format RBA's statistical-table CSVs actually use) and normalise to the
- * first of that month. Returns null if it can't be parsed.
+ * Parse an RBA data-row date cell to its exact day, ISO 'YYYY-MM-DD'. RBA tables
+ * use two formats: DD/MM/YYYY ('30/06/2026' — f1.1, d3) and DD-Mon-YYYY
+ * ('30-Jun-2026' — some daily tables). Returns null if it can't be parsed.
  */
-export function parseRbaDateToFirstOfMonth(cell: string): string | null {
-  const m = cell.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const month = Number(m[2]);
-  if (month < 1 || month > 12) return null;
-  return isoDate(Number(m[3]), month - 1, 1);
+export function parseRbaDate(cell: string): string | null {
+  const v = cell.trim();
+  const slash = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const dash = v.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  let day: number, month: number, year: number;
+  if (slash) {
+    [day, month, year] = [Number(slash[1]), Number(slash[2]), Number(slash[3])];
+  } else if (dash) {
+    month = MONTHS.indexOf(dash[2].toLowerCase()) + 1;
+    [day, year] = [Number(dash[1]), Number(dash[3])];
+  } else {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return isoDate(year, month - 1, day);
 }
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /**
  * Parse an SDMX `TIME_PERIOD` value and normalise it to the first day of its

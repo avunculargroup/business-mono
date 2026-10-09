@@ -6,6 +6,16 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-09 — RBA cash rate reads the daily target
+
+`20261009000000_rba_cash_rate_daily_table.sql` repoints the `RBA Cash Rate Target` indicator
+from F1.1 to `F1:FIRMMCRTD`. F1.1's FIRMMCRT is the target's monthly average, so the
+29 September hike to 4.60 was stored as 4.36. The RBA adapter now keeps the last daily value
+of each month. The averaged observations are marked `is_current = false`, not deleted, and
+the next indicator poll backfills the series from F1.
+
+---
+
 ## 2026-10-06 — Corporate holdings: discovery into `research_documents`
 
 `20261006010000_research_filing_discovery.sql` gives a `report_watch` source a company
