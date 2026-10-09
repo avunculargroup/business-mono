@@ -13,15 +13,21 @@
  * hard-coded index — RBA occasionally reorders columns between revisions and
  * label-matching survives that.
  *
- * Data-row dates are DD/MM/YYYY (e.g. '30/06/2026'), NOT the 'D-Mon-YYYY'
- * format the metadata preamble's own 'Publication date' row uses — confirmed
- * against a live fetch of f1.1 and d3. Confusing these two is exactly what
- * silently zeroed out every RBA observation before this was checked against
- * real data (see period.ts).
+ * Data-row dates in f1.1 and d3 are DD/MM/YYYY (e.g. '30/06/2026') — confirmed
+ * against a live fetch. Some daily tables use DD-Mon-YYYY instead, so both are
+ * accepted (see parseRbaDate in period.ts). Accepting only the wrong one is
+ * exactly what silently zeroed out every RBA observation once.
+ *
+ * Daily tables (F1) carry one row per business day. Each month keeps its LAST
+ * row — the value standing at month end, or today for the current month — so a
+ * daily level series collapses to the first-of-month convention without
+ * averaging. Averaging is why the cash rate used to read wrong: F1.1's
+ * FIRMMCRT is the target's monthly average, so a hike late in a month showed
+ * as a fraction of a hike (Sep 2026: 4.36 rather than 4.60).
  *
  * providerTableRef may carry an explicit column matcher after a colon, e.g.
- * 'D3:Broad money' or 'F1.1:FIRMMCRTD'. Without one, a sensible default per table
- * is used (see DEFAULT_COLUMN) — FIRMMCRT / DMABMS, confirmed against a live fetch.
+ * 'D3:Broad money' or 'F1:FIRMMCRTD'. Without one, a sensible default per table
+ * is used (see DEFAULT_COLUMN).
  *
  * See docs/features/economic-indicators/adapter-contract.md.
  */
@@ -33,11 +39,14 @@ import type {
   ProviderAdapter,
   RawObservation,
 } from '../types.js';
-import { parseRbaDateToFirstOfMonth } from '../period.js';
+import { parseRbaDate } from '../period.js';
 
 // Best-guess defaults — CONFIRM against the live CSV at build (see seed notes).
 const DEFAULT_COLUMN: Record<string, string> = {
-  'f1.1': 'FIRMMCRT', // Cash Rate Target series ID (confirmed against live F1.1 CSV)
+  // Cash Rate Target, daily. The registry row points here — F1.1's FIRMMCRT is
+  // a monthly AVERAGE of the target, not the target.
+  f1: 'FIRMMCRTD',
+  'f1.1': 'FIRMMCRT', // Cash Rate Target, monthly average (confirmed against live F1.1 CSV)
   // D3 carries TWO broad-money columns — "Broad money" (Original, DMABMN) and
   // "Broad money: Seasonally adjusted" (DMABMS). The label "Broad money" is a
   // substring of both and matches the Original first; target the SA Series ID
@@ -82,9 +91,6 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-// Data-row dates are DD/MM/YYYY (e.g. '30/06/2026') — see the file-header note above.
-const DATE_CELL = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-
 /** Pure parse step — exported for fixture tests (no network). */
 export function parseRbaCsv(text: string, columnMatch: string | null): AdapterResult {
   if (!columnMatch) {
@@ -115,22 +121,27 @@ export function parseRbaCsv(text: string, columnMatch: string | null): AdapterRe
     return { ok: false, error: { kind: 'parse', message: `RBA CSV: column "${columnMatch}" not found` } };
   }
 
-  const out: RawObservation[] = [];
+  // periodDate → the latest day seen in that month, and its observation.
+  const byMonth = new Map<string, { day: string; obs: RawObservation }>();
   for (const r of rows) {
     const dateCell = (r[0] ?? '').trim();
-    if (!DATE_CELL.test(dateCell)) continue; // skip preamble / blank rows
+    const day = parseRbaDate(dateCell);
+    if (!day) continue; // skip preamble / blank rows
     const cell = (r[col] ?? '').trim();
     if (cell === '') continue; // no observation for this period — skip, don't zero
     const value = Number.parseFloat(cell);
     if (Number.isNaN(value)) {
       return { ok: false, error: { kind: 'parse', message: `RBA CSV: non-numeric value "${cell}" at ${dateCell}` } };
     }
-    const periodDate = parseRbaDateToFirstOfMonth(dateCell);
-    if (!periodDate) {
-      return { ok: false, error: { kind: 'parse', message: `RBA CSV: unparseable date "${dateCell}"` } };
-    }
-    out.push({ periodDate, value, releasedAt: null, raw: { date: dateCell, value: cell, column: columnMatch } });
+    const periodDate = `${day.slice(0, 8)}01`;
+    const held = byMonth.get(periodDate);
+    if (held && held.day > day) continue;
+    byMonth.set(periodDate, {
+      day,
+      obs: { periodDate, value, releasedAt: null, raw: { date: dateCell, value: cell, column: columnMatch } },
+    });
   }
+  const out = [...byMonth.values()].map((m) => m.obs);
 
   // Unlike FRED (a windowed server-side fetch, where [] legitimately means "no
   // new print"), this parses the FULL historical CSV every call. A matched
