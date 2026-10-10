@@ -6,6 +6,18 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-10 — `podcast_episodes` joins the Realtime publication
+
+`20261010000000_enable_realtime_podcast_episodes.sql` adds `podcast_episodes` to
+`supabase_realtime`. The `/news/podcasts` per-row actions write `pending_action` for
+`podcastActionListener`, but the table was never published, so those writes emitted no
+event and only ran when the listener's 5-minute reconcile sweep found them. Replica identity
+stays DEFAULT: the handler reads only `id` and `pending_action`, and FULL would log the old
+`transcript_text` to WAL on every update. Applied to live by hand first; the migration is
+guarded on `duplicate_object`, so the push is a no-op.
+
+---
+
 ## 2026-10-09 — RBA cash rate reads the daily target
 
 `20261009000000_rba_cash_rate_daily_table.sql` repoints the `RBA Cash Rate Target` indicator
