@@ -16,7 +16,8 @@ a licence a named person has not approved, or for one its own location does not 
 copy, licence decision, abstract or venue policy changes. Third, publishing needs Lex, peer
 review, a relevant tier, a slug, a summary and an accepted venue. The publisher abstract has
 its own table, so a venue's `summary_only` policy is an RLS rule a direct REST read cannot get
-around. Every licence is seeded unapproved. Where this differs from the spec's reference DDL,
+around. The seed approves CC BY, BY-SA, CC0, public domain and BY-ND (decided by Chris Pollard);
+every NC licence stays link-out. Where this differs from the spec's reference DDL,
 and why: `docs/features/client-app/library-papers-build-progress.md`.
 
 ---
