@@ -8,17 +8,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ## 2026-10-10 — Minute library: peer-reviewed papers (data layer)
 
-`20261010100000_library_papers.sql` adds the twelve `paper_*` tables behind `/library/papers`,
+`20261010100000_library_papers.sql` adds the thirteen `paper_*` tables behind `/library/papers`,
 the private `papers` storage bucket, `pg_trgm` (in `extensions`), and four `security_invoker`
-views. Three rules are enforced in the schema, not in code. First, no stored PDF can exist for
+views. Four rules are enforced in the schema, not in code. First, no stored PDF can exist for
 a licence a named person has not approved, or for one its own location does not carry. Second,
 `access_tier` is derived by `refresh_paper_access()` and logged to `paper_events` whenever a
-copy, licence decision, abstract or venue policy changes. Third, publishing needs Lex, peer
-review, a relevant tier, a slug, a summary and an accepted venue. The publisher abstract has
-its own table, so a venue's `summary_only` policy is an RLS rule a direct REST read cannot get
-around. The seed approves CC BY, BY-SA, CC0, public domain and BY-ND (decided by Chris Pollard);
-every NC licence stays link-out. Where this differs from the spec's reference DDL,
-and why: `docs/features/client-app/library-papers-build-progress.md`.
+copy, licence decision, abstract or publisher decision changes. Third, publishing needs Lex,
+peer review, a relevant tier, a slug, a summary and an accepted venue. Fourth, a publisher's
+abstract is shown verbatim only on a permission signal (an open licence on the paper, a
+recorded publisher decision, or I4OA plus a Crossref deposit), via
+`paper_abstract_displayable()`. The abstract has its own table, so that rule is RLS, and a
+direct REST read cannot get around it. `paper_publishers` records the decision like a licence,
+and a takedown is one row and one event. The seed approves CC BY, BY-SA, CC0, public domain
+and BY-ND (decided by Chris Pollard); every NC licence stays link-out. Where this differs from
+the spec's reference DDL, and why: `docs/features/client-app/library-papers-build-progress.md`.
 
 ---
 
