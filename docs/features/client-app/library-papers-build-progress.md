@@ -23,7 +23,7 @@ went live.
 
 | # | Spec said | Problem | What was built |
 |---|---|---|---|
-| 1 | `abstract` is a column on `papers`; `v_minute_papers` nulls it under `summary_only` | `papers` is readable by subscribers directly through RLS, so `/rest/v1/papers` bypasses the view and returns the abstract. That is exactly the licensing exposure the per-venue policy is meant to prevent. | `paper_abstracts` is its own table, and its subscriber policy enforces `abstract_policy = 'display'` |
+| 1 | `abstract` is a column on `papers`; `v_minute_papers` nulls it under `summary_only` | `papers` is readable by subscribers directly through RLS, so `/rest/v1/papers` bypasses the view and returns the abstract. That is exactly the licensing exposure the abstract policy is meant to prevent. | `paper_abstracts` is its own table, and its subscriber policy calls `paper_abstract_displayable()` (see [The abstract policy](#the-abstract-policy)) |
 | 2 | The `paper_files` trigger checks `NEW.licence` is approved | The licence is whatever the inserting code claims. A pipeline bug could label an arXiv-default PDF `cc-by` and store it. | The trigger also requires an open location for the same paper with the **same licence and version**. Withdrawing a file always succeeds; un-withdrawing runs the gate again |
 | 3 | "The reader gets a short-lived signed URL from a route that checks the subscription first" | Creating a signed URL without a service-role key needs a storage `SELECT` policy for the subscriber, and `apps/client` [never holds a service-role key](./build-progress.md#what-040-changed-and-what-it-cost). Built as written, the route would need that key, or could not sign anything. | `papers_objects_client_select` admits only objects named by a `paper_files` row the subscriber can see: live, under a licence that is still approved, on a published paper |
 
@@ -34,7 +34,7 @@ went live.
 | 4 | The route is `/library/papers/[slug]`, but `papers` had no slug | `slug`, unique, kebab-case, required to publish |
 | 5 | "Gold dot on papers added since your last visit", but the only timestamp was `created_at`, which records discovery (often months before publication) | `published_at`, set on first publication |
 | 6 | Trigram index on `title`, but `pg_trgm` is not installed on `bts-internal` (checked live) | `CREATE EXTENSION pg_trgm WITH SCHEMA extensions`, with the opclass schema-qualified |
-| 7 | "The tier moves up automatically and the change is logged", but nothing did either | `refresh_paper_access()` derives the tier. Triggers on locations, abstracts, a paper's venue, a venue's abstract policy and a licence decision call it. Every tier or licence change writes a `paper_events` row |
+| 7 | "The tier moves up automatically and the change is logged", but nothing did either | `refresh_paper_access()` derives the tier. Triggers on locations, abstracts, a paper's venue, a venue's publisher, a publisher's abstract decision and a licence decision call it. Every tier or licence change writes a `paper_events` row |
 | 8 | `UNIQUE (paper_id, landing_url)`, but OpenAlex reports some copies with only a PDF URL, and NULLs never collide | Unique on `(paper_id, COALESCE(landing_url, pdf_url))`, and every location needs at least one URL |
 | 9 | DOI "lowercased, no URL prefix", but only as a comment, while deduplication depends on it | `CHECK`s on DOI, OpenAlex ID (`W…`) and versionless arXiv ID |
 
@@ -82,7 +82,7 @@ went live.
   `v_licence_audit` lists it in the meantime. Deleting files automatically on a single click
   seemed worse.
 - `paper_chunks` stays team-only. Subscriber search arrives with the Session 5 search RPC, which
-  must apply the same rules as the policies here: no `abstract` chunks under `summary_only`, and
+  must apply the same rules as the policies here: no `abstract` chunks unless `paper_abstract_displayable()` allows them, and
   `full_text` chunks only for `read_here`.
 
 ---
@@ -94,11 +94,11 @@ None of these are code, and Session 2 depends on all of them.
 1. **Licences: decided 2026-10-10.** CC BY, BY-SA, CC0, public domain and BY-ND (PDF only) are
    approved in the seed, decided by Chris Pollard.
 2. **CC NC is settled: never rehosted.** Minute is a paid product, which is exactly the
-   commercial use NC excludes, so the NC rows stay unapproved and link out. Counsel is still
-   needed on one question: displaying publisher abstracts for paywalled papers. That decides
-   whether `abstract_policy` defaults to `display`, as now, or to `summary_only`.
-3. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
-4. **Hand-label the 40-paper golden set** covering every relevance tier and access tier.
+   commercial use NC excludes, so the NC rows stay unapproved and link out.
+3. **The abstract policy is decided** (see [The abstract policy](#the-abstract-policy)). Counsel
+   confirms it once, as a policy. That is the only counsel item left.
+4. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
+5. **Hand-label the 40-paper golden set** covering every relevance tier and access tier.
 
 ---
 
@@ -106,19 +106,57 @@ None of these are code, and Session 2 depends on all of them.
 
 ### Session 1 — data layer
 
-The migration creates twelve tables. That is the spec's ten, with authors and authorships as
-two tables, plus `paper_abstracts`. It also adds the licence and publication gates, the derived
+The migration creates thirteen tables. That is the spec's ten, with authors and authorships as
+two tables, plus `paper_abstracts` and `paper_publishers`. It also adds the licence and publication gates, the derived
 access tier, RLS, the private `papers` bucket (PDF only, 50 MB) and four `security_invoker`
 views.
 
-The spec's three acceptance checks pass, along with 35 more covering the gates above:
+The spec's three acceptance checks pass, along with 50 more covering the gates above and the abstract policy:
 
 - A `paper_files` row with `cc-by-nc` raises.
 - `v_minute_papers` returns nothing for a draft.
 - A subscriber session cannot select `candidate` rows.
 
-To confirm the suite catches failures, three rules were broken one at a time: the file and
-location match, the abstract policy, and the venue gate. The suite failed each time.
+To confirm the suite catches failures, seven rules were broken one at a time: the file and
+location match, the venue gate, the review guard, the abstract RLS rule, and three parts of the
+abstract policy (the licence signal, the Crossref condition, and a decision beating I4OA). The
+suite failed each time. One of those runs exposed a bug in the test helper: it treated a NULL
+result as a pass. The helper is fixed, and the suite has been rerun with the fix.
+
+### The abstract policy
+
+The policy is in the spec under
+[Abstract policy for paywalled papers](./library-papers-spec.md#abstract-policy-for-paywalled-papers).
+Here is how it was built:
+
+- **`paper_publishers` replaces the venue's `abstract_policy`**, with `decided_by`,
+  `decided_at` and `reason`. The policy's table is used as given, plus two `CHECK`s. A decision
+  needs all three of name, date and reason. `display` needs a decision, so only a person can
+  open a publisher up. `paper_venues.publisher` (free text) became `publisher_id`, because two
+  fields for one thing drift apart.
+- **`paper_abstract_displayable(paper, source)` is the one place the rule lives.** RLS on
+  `paper_abstracts`, the access tier and `v_minute_papers` all call it. It takes the abstract's
+  source as an argument rather than reading `paper_abstracts`, because that table's own policy
+  calls it and reading the table would recurse.
+- **Precedence had to be chosen, and the policy text left it open.** An open licence on the
+  paper always wins, because the licence is the permission and a takedown cannot withdraw it.
+  Any publisher decision beats the I4OA signal, which is what makes a takedown a single row.
+  The I4OA signal only counts while a publisher is undecided, and only for a Crossref abstract.
+  The table in the spec spells this out.
+- **A takedown is one row and one event.** `paper_events` can now be about a publisher instead
+  of a paper (exactly one of the two is set). A policy change logs one `abstract_policy_changed`
+  event against the publisher. Each affected paper's tier still moves and is logged against
+  that paper, as every tier change is.
+- **`v_minute_papers` gained `abstract_displayable`.** `false` tells the page to show "Read the
+  abstract at the publisher" instead of the abstract.
+- **The overlap linter and scorer are built.** `abstractOverlap()` in
+  [`packages/shared/src/papers.ts`](../../../packages/shared/src/papers.ts) finds every run of
+  six or more words shared with the abstract. It ignores case and punctuation, skips anything
+  inside straight or curly double quotes, and never joins a run across a quotation or across two
+  summary fields. The Session 3 linter blocks on any run. The scorer,
+  [`evals/scorers/abstractOverlap.ts`](../../../apps/agents/evals/scorers/abstractOverlap.ts),
+  reports the copied share, where lower is better. It is unit-tested, but it has nothing to run
+  over until the golden set and Charlie's summary step exist.
 
 ### Checking it locally
 

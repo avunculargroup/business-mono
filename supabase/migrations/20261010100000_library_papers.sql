@@ -14,17 +14,18 @@
 --      paper_licences. A paper_files row is refused for any licence not
 --      approved, and for any licence its own location does not carry.
 --   2. Access tier is derived, not written. refresh_paper_access() computes
---      it from locations, licence decisions, the abstract and the venue's
---      abstract policy, and runs whenever any of those change — so an
+--      it from locations, licence decisions, the abstract and whether it may
+--      be displayed, and runs whenever any of those change — so an
 --      embargo lifting moves a paper up a tier and logs it, with nothing
 --      for a person to remember.
 --   3. Publication needs Lex, peer review, a relevant tier, an accepted
 --      venue, a slug and a summary. Editing the reviewed text clears the
 --      review, so a published summary cannot change under its review.
---   4. The publisher abstract lives in its own table, so a venue's
---      summary_only policy is an RLS rule. On papers it would be a view
---      filter, and a subscriber could read the column past the view
---      through /rest/v1/papers.
+--   4. A publisher's abstract is shown verbatim only on a permission
+--      signal (see paper_abstract_displayable), decided per publisher and
+--      recorded like a licence. The abstract lives in its own table so that
+--      rule is RLS. On papers it would be a view filter, and a subscriber
+--      could read the column past the view through /rest/v1/papers.
 --
 -- Where this differs from the spec's reference DDL, the build-progress doc
 -- says what and why.
@@ -98,6 +99,40 @@ UPDATE paper_licences
 
 
 -- ------------------------------------------------------------
+-- paper_publishers — abstract policy, decided like a licence
+-- ------------------------------------------------------------
+-- Policy: docs/features/client-app/library-papers-spec.md#abstract-policy-for-paywalled-papers
+--
+-- A new publisher starts at summary_only and undecided. While undecided,
+-- I4OA membership plus a Crossref deposit is a permission signal on its own.
+-- A decision, either way, overrides that signal, which is what makes a
+-- takedown one row: set summary_only with a reason, and every affected
+-- paper's tier recomputes and the change is logged once, against the
+-- publisher.
+-- ------------------------------------------------------------
+
+CREATE TABLE paper_publishers (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             TEXT NOT NULL UNIQUE,
+  openalex_id      TEXT UNIQUE CHECK (openalex_id ~ '^P[0-9]+$'),
+  crossref_member  TEXT,
+  joined_i4oa      BOOLEAN NOT NULL DEFAULT FALSE,
+  abstract_policy  TEXT NOT NULL DEFAULT 'summary_only'
+                   CHECK (abstract_policy IN ('display','summary_only')),
+  decided_by       UUID REFERENCES team_members(id),
+  decided_at       TIMESTAMPTZ,
+  reason           TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- A decision has a name, a date and a reason, or it is not a decision.
+  CONSTRAINT paper_publishers_decision_complete CHECK (
+    (decided_by IS NULL AND decided_at IS NULL)
+    OR (decided_by IS NOT NULL AND decided_at IS NOT NULL AND reason IS NOT NULL)),
+  CONSTRAINT paper_publishers_display_is_decided CHECK (
+    abstract_policy = 'summary_only' OR decided_at IS NOT NULL)
+);
+
+
+-- ------------------------------------------------------------
 -- paper_venues
 -- ------------------------------------------------------------
 
@@ -108,7 +143,7 @@ CREATE TABLE paper_venues (
   issns               TEXT[],
   name                TEXT NOT NULL,
   venue_type          TEXT NOT NULL CHECK (venue_type IN ('journal','conference','book_series','repository','other')),
-  publisher           TEXT,
+  publisher_id        UUID REFERENCES paper_publishers(id),
   is_in_doaj          BOOLEAN,
   homepage_url        TEXT,
   feed_url            TEXT,                          -- OJS/RSS for early detection
@@ -117,8 +152,6 @@ CREATE TABLE paper_venues (
   reputation          TEXT NOT NULL DEFAULT 'unreviewed'
                       CHECK (reputation IN ('unreviewed','accepted','watch','rejected')),
   reputation_notes    TEXT,
-  abstract_policy     TEXT NOT NULL DEFAULT 'display'
-                      CHECK (abstract_policy IN ('display','summary_only')),
   first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -127,6 +160,8 @@ CREATE TABLE paper_venues (
 CREATE TRIGGER paper_venues_updated_at
   BEFORE UPDATE ON paper_venues
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE INDEX idx_paper_venues_publisher ON paper_venues (publisher_id);
 
 
 -- ------------------------------------------------------------
@@ -267,7 +302,7 @@ CREATE TRIGGER papers_publish_gate
 -- ------------------------------------------------------------
 -- paper_abstracts — the publisher's abstract, verbatim
 -- ------------------------------------------------------------
--- Its own table so the venue's abstract_policy can be enforced by RLS.
+-- Its own table so paper_abstract_displayable() can be enforced by RLS.
 -- The BTS summary on papers is always ours and always displayable; this
 -- text may be the publisher's or the author's copyright.
 -- ------------------------------------------------------------
@@ -417,19 +452,25 @@ CREATE TABLE paper_relations (
 
 CREATE INDEX idx_paper_relations_to ON paper_relations (to_paper_id, relation);
 
+-- About one paper, or about one publisher: a publisher's abstract decision
+-- is one event however many papers it moves. The papers' own tier changes
+-- are still logged against each of them by refresh_paper_access().
 CREATE TABLE paper_events (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  paper_id     UUID NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
+  paper_id     UUID REFERENCES papers(id) ON DELETE CASCADE,
+  publisher_id UUID REFERENCES paper_publishers(id) ON DELETE CASCADE,
   event_type   TEXT NOT NULL CHECK (event_type IN ('discovered','tier_changed','access_changed','licence_changed',
                  'published_version_found','retracted','corrected','concern_raised','summary_published',
-                 'file_withdrawn')),
+                 'file_withdrawn','abstract_policy_changed')),
   from_value   TEXT,
   to_value     TEXT,
   source       TEXT NOT NULL,
-  occurred_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  occurred_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT paper_events_one_subject CHECK ((paper_id IS NULL) <> (publisher_id IS NULL))
 );
 
 CREATE INDEX idx_paper_events_paper ON paper_events (paper_id, occurred_at DESC);
+CREATE INDEX idx_paper_events_publisher ON paper_events (publisher_id, occurred_at DESC);
 CREATE INDEX idx_paper_events_recent ON paper_events (occurred_at DESC);
 
 
@@ -438,10 +479,38 @@ CREATE INDEX idx_paper_events_recent ON paper_events (occurred_at DESC);
 -- ------------------------------------------------------------
 --   read_here       an open published or accepted copy under an approved licence
 --   read_at_source  any other open copy
---   abstract_only   closed, with an abstract the venue lets us display
+--   abstract_only   closed, with an abstract we may display
 --   metadata_only   closed, and no displayable abstract
 -- Published version beats accepted manuscript; publisher beats repository.
 -- ------------------------------------------------------------
+
+-- Whether the publisher's abstract may be shown verbatim. Only on a
+-- permission signal:
+--   1. some copy of the paper carries CC BY, BY-SA, CC0 or public domain,
+--      which licenses the abstract with the article. No publisher decision
+--      overrides this: the licence is the permission;
+--   2. the publisher has decided 'display', with a name and a reason;
+--   3. the publisher is undecided, has joined I4OA, and this abstract came
+--      from its Crossref deposit.
+-- Everything else is summary_only: the BTS summary, and a link to the
+-- abstract at the publisher.
+--
+-- It takes the abstract's source rather than reading paper_abstracts,
+-- because paper_abstracts' own RLS policy calls it: reading the table from
+-- here would recurse.
+CREATE OR REPLACE FUNCTION paper_abstract_displayable(p_paper_id UUID, p_abstract_source TEXT)
+RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM paper_locations l
+                  WHERE l.paper_id = p_paper_id
+                    AND l.licence IN ('cc-by', 'cc-by-sa', 'cc0', 'public-domain'))
+      OR EXISTS (
+           SELECT 1 FROM papers p
+             JOIN paper_venues v ON v.id = p.venue_id
+             JOIN paper_publishers pub ON pub.id = v.publisher_id
+            WHERE p.id = p_paper_id
+              AND ((pub.decided_at IS NOT NULL AND pub.abstract_policy = 'display')
+                OR (pub.decided_at IS NULL AND pub.joined_i4oa AND p_abstract_source = 'crossref')));
+$$;
 
 CREATE OR REPLACE FUNCTION refresh_paper_access(p_paper_id UUID, p_source TEXT DEFAULT 'derived')
 RETURNS TEXT AS $$
@@ -480,10 +549,7 @@ BEGIN
   IF new_tier IS NULL THEN
     new_tier := CASE WHEN EXISTS (
         SELECT 1 FROM paper_abstracts a
-          JOIN papers p ON p.id = a.paper_id
-          LEFT JOIN paper_venues v ON v.id = p.venue_id
-         WHERE a.paper_id = p_paper_id
-           AND COALESCE(v.abstract_policy, 'display') = 'display')
+         WHERE a.paper_id = p_paper_id AND paper_abstract_displayable(p_paper_id, a.source))
       THEN 'abstract_only' ELSE 'metadata_only' END;
   END IF;
 
@@ -533,15 +599,36 @@ CREATE TRIGGER papers_refresh_access
   AFTER UPDATE OF venue_id ON papers
   FOR EACH ROW EXECUTE FUNCTION paper_access_on_paper_venue();
 
-CREATE OR REPLACE FUNCTION paper_access_on_venue_policy() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION paper_access_on_venue_publisher() RETURNS TRIGGER AS $$
 BEGIN
   PERFORM refresh_paper_access(p.id, 'paper_venues') FROM papers p WHERE p.venue_id = NEW.id;
   RETURN NULL;
 END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER paper_venues_refresh_access
-  AFTER UPDATE OF abstract_policy ON paper_venues
-  FOR EACH ROW EXECUTE FUNCTION paper_access_on_venue_policy();
+  AFTER UPDATE OF publisher_id ON paper_venues
+  FOR EACH ROW EXECUTE FUNCTION paper_access_on_venue_publisher();
+
+-- A publisher decision (or its I4OA status) changing: one event against the
+-- publisher, then every paper in its venues recomputes.
+CREATE OR REPLACE FUNCTION paper_access_on_publisher_policy() RETURNS TRIGGER AS $$
+BEGIN
+  IF (NEW.abstract_policy, NEW.decided_at IS NULL) IS DISTINCT FROM (OLD.abstract_policy, OLD.decided_at IS NULL) THEN
+    INSERT INTO paper_events (publisher_id, event_type, from_value, to_value, source)
+    VALUES (NEW.id, 'abstract_policy_changed',
+            OLD.abstract_policy || CASE WHEN OLD.decided_at IS NULL THEN ' (undecided)' ELSE '' END,
+            NEW.abstract_policy || CASE WHEN NEW.decided_at IS NULL THEN ' (undecided)' ELSE '' END,
+            COALESCE(NEW.reason, 'paper_publishers'));
+  END IF;
+  PERFORM refresh_paper_access(p.id, 'paper_publishers')
+     FROM papers p JOIN paper_venues v ON v.id = p.venue_id
+    WHERE v.publisher_id = NEW.id;
+  RETURN NULL;
+END; $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER paper_publishers_refresh_access
+  AFTER UPDATE OF abstract_policy, joined_i4oa, decided_at ON paper_publishers
+  FOR EACH ROW EXECUTE FUNCTION paper_access_on_publisher_policy();
 
 -- Approving or revoking a licence moves every paper with a copy under it.
 -- Revoking does not withdraw stored files: v_licence_audit lists them, and
@@ -568,6 +655,7 @@ CREATE TRIGGER paper_licences_refresh_access
 -- ------------------------------------------------------------
 
 ALTER TABLE paper_licences    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paper_publishers  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paper_venues      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paper_watches     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE papers            ENABLE ROW LEVEL SECURITY;
@@ -581,6 +669,7 @@ ALTER TABLE paper_relations   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paper_events      ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "paper_licences_team"    ON paper_licences    FOR ALL USING (is_team_member());
+CREATE POLICY "paper_publishers_team"  ON paper_publishers  FOR ALL USING (is_team_member());
 CREATE POLICY "paper_venues_team"      ON paper_venues      FOR ALL USING (is_team_member());
 CREATE POLICY "paper_watches_team"     ON paper_watches     FOR ALL USING (is_team_member());
 CREATE POLICY "papers_team"            ON papers            FOR ALL USING (is_team_member());
@@ -604,17 +693,22 @@ CREATE POLICY "paper_venues_client_read" ON paper_venues
     current_client_account_id() IS NOT NULL
     AND EXISTS (SELECT 1 FROM papers p WHERE p.venue_id = paper_venues.id AND p.status = 'published'));
 
--- The venue's abstract policy, enforced where a direct REST read cannot
--- step around it.
-CREATE POLICY "paper_abstracts_client_read" ON paper_abstracts
+-- The abstract policy, enforced where a direct REST read cannot step
+-- around it.
+-- Readable by subscribers so paper_abstract_displayable() can see a
+-- published paper's publisher decision, and so the page can name it.
+CREATE POLICY "paper_publishers_client_read" ON paper_publishers
   FOR SELECT USING (
     current_client_account_id() IS NOT NULL
     AND EXISTS (
-      SELECT 1 FROM papers p
-        JOIN paper_venues v ON v.id = p.venue_id
-       WHERE p.id = paper_abstracts.paper_id
-         AND p.status = 'published'
-         AND v.abstract_policy = 'display'));
+      SELECT 1 FROM paper_venues v JOIN papers p ON p.venue_id = v.id
+       WHERE v.publisher_id = paper_publishers.id AND p.status = 'published'));
+
+CREATE POLICY "paper_abstracts_client_read" ON paper_abstracts
+  FOR SELECT USING (
+    current_client_account_id() IS NOT NULL
+    AND EXISTS (SELECT 1 FROM papers p WHERE p.id = paper_abstracts.paper_id AND p.status = 'published')
+    AND paper_abstract_displayable(paper_abstracts.paper_id, paper_abstracts.source));
 
 CREATE POLICY "paper_locations_client_read" ON paper_locations
   FOR SELECT USING (
@@ -694,25 +788,30 @@ CREATE POLICY "papers_objects_client_select" ON storage.objects
 -- ------------------------------------------------------------
 
 -- The only object Minute reads. The CHECK on papers already guarantees a
--- published row is peer-reviewed and core or substantial; the abstract is
--- nulled under summary_only here as well as hidden by RLS, so the view is
--- right for team sessions too. is_retracted is always exposed.
+-- published row is peer-reviewed and core or substantial. abstract is NULL
+-- whenever the effective policy is summary_only, here as well as hidden by
+-- RLS, so the view is right for team sessions too; abstract_displayable
+-- false is the page's cue to link to the abstract at the publisher instead.
+-- is_retracted is always exposed.
 CREATE VIEW v_minute_papers WITH (security_invoker = true) AS
   SELECT
     p.id, p.slug, p.title, p.doi, p.openalex_id, p.arxiv_id,
-    v.name AS venue_name, v.venue_type, v.publisher,
+    v.name AS venue_name, v.venue_type, pub.name AS publisher,
     p.publication_date, p.publication_year, p.volume, p.issue, p.pages, p.language,
     p.peer_review_basis, p.relevance_tier,
     p.access_tier, p.best_licence, l.name AS licence_name, l.url AS licence_url, p.best_oa_url,
-    CASE WHEN v.abstract_policy = 'display' THEN a.abstract END AS abstract,
-    CASE WHEN v.abstract_policy = 'display' THEN a.source END AS abstract_source,
+    CASE WHEN ad.displayable THEN a.abstract END AS abstract,
+    CASE WHEN ad.displayable THEN a.source END AS abstract_source,
+    COALESCE(ad.displayable, FALSE) AS abstract_displayable,
     p.summary, p.summary_plain, p.curator_note, p.topics,
     p.funders, p.conflict_disclosure,
     p.is_retracted, p.cited_by_count, p.cited_by_count_at,
     p.published_at, p.updated_at
   FROM papers p
   JOIN paper_venues v ON v.id = p.venue_id
+  LEFT JOIN paper_publishers pub ON pub.id = v.publisher_id
   LEFT JOIN paper_abstracts a ON a.paper_id = p.id
+  LEFT JOIN LATERAL (SELECT paper_abstract_displayable(p.id, a.source) AS displayable) ad ON a.paper_id IS NOT NULL
   LEFT JOIN paper_licences l ON l.code = p.best_licence
   WHERE p.status = 'published';
 
@@ -737,9 +836,11 @@ CREATE VIEW v_paper_review_queue WITH (security_invoker = true) AS
 -- The "new journal" watch.
 CREATE VIEW v_new_venues WITH (security_invoker = true) AS
   SELECT
-    v.id, v.name, v.venue_type, v.publisher, v.is_in_doaj, v.reputation, v.first_seen_at,
+    v.id, v.name, v.venue_type, pub.name AS publisher, pub.joined_i4oa, pub.abstract_policy,
+    v.is_in_doaj, v.reputation, v.first_seen_at,
     (SELECT count(*) FROM papers p WHERE p.venue_id = v.id AND p.relevance_tier = 'core') AS core_papers
   FROM paper_venues v
+  LEFT JOIN paper_publishers pub ON pub.id = v.publisher_id
   WHERE v.first_seen_at > NOW() - INTERVAL '90 days'
     AND EXISTS (SELECT 1 FROM papers p WHERE p.venue_id = v.id AND p.relevance_tier = 'core')
   ORDER BY v.first_seen_at DESC;
