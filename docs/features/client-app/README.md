@@ -71,6 +71,7 @@ Read in this order.
 | [`client-app-mvp-spec.md`](./client-app-mvp-spec.md) | The main spec. Personas, product architecture, the security finding, data model, eight routes. |
 | [`prepare-feature-spec.md`](./prepare-feature-spec.md) | `/prepare` in full — the differentiator. Template format, fact injection contract, six artefact outlines, local-only storage model. |
 | [`library-papers-spec.md`](./library-papers-spec.md) | `/library/papers` — the peer-reviewed bitcoin papers register. **Draft.** Licence-gated hosting, access tiers, the daily watch, Minute and HQ surfaces. |
+| [`library-papers-build-progress.md`](./library-papers-build-progress.md) | **Read before the papers spec.** What the spec's DDL got wrong, what Session 1 built, and the Session 0 decisions still open. |
 | [`sessions.md`](./sessions.md) | Three-session build plan with definitions of done. |
 | [`../../../supabase/migrations/`](../../../supabase/migrations/) | The migrations. Execution source of truth, applied on push to `main` — see [`packages/db/MIGRATIONS.md`](../../../packages/db/MIGRATIONS.md). |
 | [`.claude/skills/bts-design/references/naming.md`](../../../.claude/skills/bts-design/references/naming.md) | Naming rules, in the design skill where the `bts-design` skill points at them. |

@@ -6,6 +6,21 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-10 — Minute library: peer-reviewed papers (data layer)
+
+`20261010100000_library_papers.sql` adds the twelve `paper_*` tables behind `/library/papers`,
+the private `papers` storage bucket, `pg_trgm` (in `extensions`), and four `security_invoker`
+views. Three rules are enforced in the schema, not in code. First, no stored PDF can exist for
+a licence a named person has not approved, or for one its own location does not carry. Second,
+`access_tier` is derived by `refresh_paper_access()` and logged to `paper_events` whenever a
+copy, licence decision, abstract or venue policy changes. Third, publishing needs Lex, peer
+review, a relevant tier, a slug, a summary and an accepted venue. The publisher abstract has
+its own table, so a venue's `summary_only` policy is an RLS rule a direct REST read cannot get
+around. Every licence is seeded unapproved. Where this differs from the spec's reference DDL,
+and why: `docs/features/client-app/library-papers-build-progress.md`.
+
+---
+
 ## 2026-10-10 — `podcast_episodes` joins the Realtime publication
 
 `20261010000000_enable_realtime_podcast_episodes.sql` adds `podcast_episodes` to
