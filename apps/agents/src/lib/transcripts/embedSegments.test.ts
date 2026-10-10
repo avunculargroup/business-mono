@@ -1,6 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { buildSegments } from './embedSegments.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createFakeSupabase } from '../../../test/mocks/supabase.js';
 import type { TimedSegment } from './parsers.js';
+
+const fake = createFakeSupabase();
+vi.mock('@platform/db', () => ({ get supabase() { return fake; } }));
+vi.mock('../contentEmbeddings.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contentEmbeddings.js')>()),
+  embedTexts: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2])),
+}));
+
+const { buildSegments, embedEpisodeSegments } = await import('./embedSegments.js');
 
 describe('buildSegments', () => {
   it('preserves first-start / last-end across a packed window', () => {
@@ -54,5 +63,52 @@ describe('buildSegments', () => {
     const timed: TimedSegment[] = [{ start: null, end: null, speaker: null, text: 'no times here' }];
     const drafts = buildSegments(timed, 'no times here');
     expect(drafts[0]!.startSeconds).toBeNull();
+  });
+});
+
+describe('embedEpisodeSegments', () => {
+  const drafts = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      segmentIndex: i,
+      startSeconds: i,
+      endSeconds: i + 1,
+      speaker: null,
+      content: `segment ${i}`,
+      tokenCount: 3,
+    }));
+
+  beforeEach(() => {
+    fake.__builders.length = 0;
+    fake.__setResponse('transcript_segments', { data: null, error: null });
+  });
+
+  it('inserts in batches of 25 so a long episode never sends one huge statement', async () => {
+    await expect(embedEpisodeSegments('ep-1', drafts(60))).resolves.toEqual({ segments: 60 });
+
+    const inserts = fake
+      .__buildersFor('transcript_segments')
+      .filter((b) => b.insert.mock.calls.length > 0)
+      .map((b) => (b.insert.mock.calls[0]![0] as unknown[]).length);
+    expect(inserts).toEqual([25, 25, 10]);
+  });
+
+  it('clears prior rows before inserting', async () => {
+    await embedEpisodeSegments('ep-1', drafts(3));
+    const [first] = fake.__buildersFor('transcript_segments');
+    expect(first!.delete).toHaveBeenCalled();
+    expect(first!.eq).toHaveBeenCalledWith('episode_id', 'ep-1');
+  });
+
+  it('throws on a failed batch and stops inserting', async () => {
+    fake.__setResponses('transcript_segments', [
+      { data: null, error: null }, // delete
+      { data: null, error: null }, // batch 1
+      { data: null, error: { message: 'canceling statement due to statement timeout' } },
+    ]);
+    await expect(embedEpisodeSegments('ep-1', drafts(60))).rejects.toThrow(
+      'transcript_segments insert failed: canceling statement due to statement timeout',
+    );
+    const inserts = fake.__buildersFor('transcript_segments').filter((b) => b.insert.mock.calls.length > 0);
+    expect(inserts).toHaveLength(2);
   });
 });

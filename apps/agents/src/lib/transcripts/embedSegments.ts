@@ -8,6 +8,11 @@ import type { TimedSegment } from './parsers.js';
 const CHARS_PER_CHUNK = 600 * 4;
 const CHARS_PER_TOKEN = 4;
 
+// Rows per transcript_segments INSERT. Each row carries a 1536-dim vector and
+// an HNSW index update; a ~110-minute episode's ~100+ rows in one statement
+// hit Postgres's statement timeout during the October 2026 Deepgram backfill.
+const INSERT_BATCH_SIZE = 25;
+
 export interface SegmentDraft {
   segmentIndex: number;
   startSeconds: number | null;
@@ -105,7 +110,9 @@ export function buildSegments(timed: TimedSegment[] | null, plainText: string): 
 /**
  * (Re)embed one episode's transcript segments. Idempotent: clears prior rows for
  * the episode first so a re-resolve doesn't leave stale vectors. Batch-embeds in
- * one OpenAI call. Returns the number of segments written.
+ * one OpenAI call, then inserts in INSERT_BATCH_SIZE chunks. A failed chunk
+ * leaves earlier chunks in place; the next run's delete clears them. Returns the
+ * number of segments written.
  */
 export async function embedEpisodeSegments(
   episodeId: string,
@@ -133,8 +140,12 @@ export async function embedEpisodeSegments(
     embedding: embeddings[i] ?? [],
   }));
 
-  const { error: insError } = await client.from('transcript_segments').insert(rows);
-  if (insError) throw new Error(`transcript_segments insert failed: ${insError.message}`);
+  for (let i = 0; i < rows.length; i += INSERT_BATCH_SIZE) {
+    const { error: insError } = await client
+      .from('transcript_segments')
+      .insert(rows.slice(i, i + INSERT_BATCH_SIZE));
+    if (insError) throw new Error(`transcript_segments insert failed: ${insError.message}`);
+  }
 
   return { segments: rows.length };
 }
