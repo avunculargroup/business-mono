@@ -97,9 +97,10 @@ None of these are code, and Session 2 depends on all of them.
       SET rehost_in_paid_product = true, decided_by = '<your team_members.id>', decided_at = now()
     WHERE code IN ('cc-by', 'cc-by-sa', 'cc0', 'public-domain');
    ```
-2. **Get counsel's view** on CC NC licences inside a paid product, and on displaying publisher
-   abstracts for paywalled papers. The second decides whether `abstract_policy` defaults to
-   `display`, as now, or to `summary_only`.
+2. **CC NC is settled: never rehosted.** Minute is a paid product, which is exactly the
+   commercial use NC excludes, so the NC rows stay unapproved and link out. Counsel is still
+   needed on one question: displaying publisher abstracts for paywalled papers. That decides
+   whether `abstract_policy` defaults to `display`, as now, or to `summary_only`.
 3. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
 4. **Hand-label the 40-paper golden set** covering every relevance tier and access tier.
 
