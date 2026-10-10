@@ -39,10 +39,9 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
 -- Codes follow OpenAlex's licence vocabulary, plus arxiv-default for
 -- arXiv's non-exclusive distribution licence.
 --
--- Every row is seeded NOT approved. Rehosting is a human decision with a
--- name on it (the CHECK below requires one), and Session 0 of the spec is
--- where it is made. Until a founder approves the CC BY family, no paper is
--- read_here and no file can be stored — the fail-closed direction.
+-- Rehosting is a human decision with a name on it (the CHECK below requires
+-- one). Every row is seeded unapproved, then the Session 0 decision is
+-- applied below with its decider. A code not listed there stays link-out.
 -- ------------------------------------------------------------
 
 CREATE TABLE paper_licences (
@@ -61,15 +60,15 @@ CREATE TABLE paper_licences (
 
 INSERT INTO paper_licences (code, name, url, allows_adaptation, requires_attribution, notes) VALUES
   ('cc-by',       'CC BY',       'https://creativecommons.org/licenses/by/4.0/',       TRUE,  TRUE,
-   'Spec recommends approving: permits commercial redistribution with attribution.'),
+   'Permits commercial redistribution with attribution.'),
   ('cc-by-sa',    'CC BY-SA',    'https://creativecommons.org/licenses/by-sa/4.0/',    TRUE,  TRUE,
-   'Spec recommends approving: permits commercial redistribution with attribution.'),
+   'Permits commercial redistribution with attribution.'),
   ('cc0',         'CC0',         'https://creativecommons.org/publicdomain/zero/1.0/', TRUE,  FALSE,
-   'Spec recommends approving: no rights reserved.'),
+   'No rights reserved.'),
   ('public-domain','Public domain', NULL,                                              TRUE,  FALSE,
-   'Spec recommends approving.'),
+   'No rights reserved.'),
   ('cc-by-nd',    'CC BY-ND',    'https://creativecommons.org/licenses/by-nd/4.0/',    FALSE, TRUE,
-   'Verbatim PDF permitted commercially. Approve for the PDF only; no reflowed reader.'),
+   'Verbatim PDF permitted commercially. Approved for the PDF as published; no reflowed reader.'),
   ('cc-by-nc',    'CC BY-NC',    'https://creativecommons.org/licenses/by-nc/4.0/',    TRUE,  TRUE,
    'Never rehost: Minute is a paid product, which is the commercial use NC excludes. Link out.'),
   ('cc-by-nc-sa', 'CC BY-NC-SA', 'https://creativecommons.org/licenses/by-nc-sa/4.0/', TRUE,  TRUE,
@@ -85,6 +84,17 @@ INSERT INTO paper_licences (code, name, url, allows_adaptation, requires_attribu
    'Free to read is not free to copy. Link out.'),
   ('other-oa',    'Other open licence', NULL,                                          FALSE, TRUE,
    'Unrecognised open licence. Link out until someone reads it.');
+
+-- Session 0 decision, 2026-10-10, Chris Pollard. CC BY, BY-SA, CC0 and public
+-- domain permit commercial redistribution with attribution. BY-ND permits it
+-- verbatim only: allows_adaptation = false is what tells the reader to show
+-- the PDF as published rather than reflow it. NC is never approved, because
+-- Minute is the commercial use it excludes.
+UPDATE paper_licences
+   SET rehost_in_paid_product = TRUE,
+       decided_by = '2fcaea14-6d37-4def-b56d-467d61c92f36',
+       decided_at = '2026-10-10T00:00:00Z'
+ WHERE code IN ('cc-by', 'cc-by-sa', 'cc0', 'public-domain', 'cc-by-nd');
 
 
 -- ------------------------------------------------------------

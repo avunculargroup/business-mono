@@ -11,6 +11,8 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
 
 CREATE TABLE team_members (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), auth_id uuid);
+-- The founder the migration's licence seed names as decider.
+INSERT INTO team_members (id) VALUES ('2fcaea14-6d37-4def-b56d-467d61c92f36');
 CREATE TABLE client_accounts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), client_type text);
 CREATE TABLE client_users (id uuid PRIMARY KEY, account_id uuid, status text);
 

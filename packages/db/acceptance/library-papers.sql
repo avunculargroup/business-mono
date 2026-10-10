@@ -29,8 +29,14 @@ SELECT pg_temp.raises($$INSERT INTO papers (doi, title) VALUES ('https://doi.org
 SELECT pg_temp.raises($$INSERT INTO papers (arxiv_id, title) VALUES ('2101.00001v2', 'x')$$,
   'arxiv_id_check', 'versioned arXiv id rejected');
 SELECT pg_temp.raises($$INSERT INTO papers (title) VALUES ('x')$$, 'papers_has_identifier', 'identifier required');
-SELECT pg_temp.raises($$UPDATE paper_licences SET rehost_in_paid_product = true WHERE code = 'cc-by'$$,
+SELECT pg_temp.expect((SELECT array_agg(code ORDER BY code) FROM paper_licences WHERE rehost_in_paid_product)
+  = ARRAY['cc-by','cc-by-nd','cc-by-sa','cc0','public-domain'], 'seed approves exactly the Session 0 set');
+SELECT pg_temp.expect(NOT EXISTS (SELECT 1 FROM paper_licences WHERE code LIKE '%-nc%' AND rehost_in_paid_product),
+  'no NC licence approved');
+SELECT pg_temp.raises($$UPDATE paper_licences SET rehost_in_paid_product = true WHERE code = 'cc-by-nc'$$,
   'rehost_is_decided', 'approval needs a named decider');
+-- The tier checks below walk cc-by from unapproved to approved, so start it unapproved.
+UPDATE paper_licences SET rehost_in_paid_product = false WHERE code = 'cc-by';
 \set P1 '\'00000000-0000-0000-0000-0000000000b1\''
 \set P2 '\'00000000-0000-0000-0000-0000000000b2\''
 \set P3 '\'00000000-0000-0000-0000-0000000000b3\''

@@ -65,12 +65,12 @@ went live.
   value in the `routines` CHECK with no handler in `executeRoutineWorkflow` lets someone
   schedule a routine that can only fail. Add `paper_watch` and `paper_recheck` in Session 2
   together with their handlers, `RoutineActionType` and `ROUTINE_ACTION_LABELS`.
-- **The licence seed is not approved.** Session 0 says to seed `paper_licences` "from those
-  decisions", and none have been made. Every row is seeded with `rehost_in_paid_product =
-  false`, and a `CHECK` means approving one needs `decided_by` and `decided_at`. Each row's
-  `notes` field records the spec's recommendation. Until a founder approves the CC BY family,
-  nothing is `read_here` and no file can be stored. That is deliberate: failing closed is safer
-  here.
+- **The licence seed carries the Session 0 decision.** Session 0 says to seed
+  `paper_licences` "from those decisions", so it does. CC BY, BY-SA, CC0, public domain and
+  BY-ND are approved, with Chris Pollard as `decided_by`, and every other code stays link-out.
+  A `CHECK` means no licence can be approved without a named decider. BY-ND covers the PDF as
+  published and nothing more. Its `allows_adaptation = false` is what the Session 5 reader must
+  check before offering anything but the PDF viewer.
 
 ### Accepted, with eyes open
 
@@ -91,12 +91,8 @@ went live.
 
 None of these are code, and Session 2 depends on all of them.
 
-1. **Approve the CC BY family.** Run this once, as a founder:
-   ```sql
-   UPDATE paper_licences
-      SET rehost_in_paid_product = true, decided_by = '<your team_members.id>', decided_at = now()
-    WHERE code IN ('cc-by', 'cc-by-sa', 'cc0', 'public-domain');
-   ```
+1. **Licences: decided 2026-10-10.** CC BY, BY-SA, CC0, public domain and BY-ND (PDF only) are
+   approved in the seed, decided by Chris Pollard.
 2. **CC NC is settled: never rehosted.** Minute is a paid product, which is exactly the
    commercial use NC excludes, so the NC rows stay unapproved and link out. Counsel is still
    needed on one question: displaying publisher abstracts for paywalled papers. That decides
