@@ -15,9 +15,9 @@ Acceptance, from the spec's build sequence:
 | | Count |
 | --- | --- |
 | `read_here` / `read_at_source` / `abstract_only` / `metadata_only` | 21 / 8 / 3 / 8 |
-| `core` / `substantial` / `peripheral` / `excluded` | 24 / 6 / 5 / 5 |
+| `core` / `substantial` / `peripheral` / `excluded` | 24 / 7 / 4 / 5 |
 | `peer_reviewed` / `preprint` / `not_peer_reviewed` | 35 / 1 / 4 |
-| Would publish (peer reviewed and `core` or `substantial`) | 26 |
+| Would publish (peer reviewed and `core` or `substantial`) | 27 |
 
 The `read_here` half is mostly *Ledger* (CC BY 4.0), plus PLOS ONE, Frontiers, MDPI, SAGE Open,
 Royal Society Open Science and Financial Innovation.
@@ -43,7 +43,9 @@ version. Preprints, working papers, editorials and student-edited law journals a
 a tiebreak:
 
 - `core`: bitcoin is the object of study.
-- `substantial`: bitcoin is one of a few subjects and has its own findings.
+- `substantial`: bitcoin is one of a few subjects and has its own findings. Also crypto-generic papers
+  whose findings apply directly to holding or using bitcoin: accounting, tax, regulation, custody,
+  security (decided 11 October 2026; gs-08 and gs-17).
 - `peripheral`: bitcoin is one item among many, or is mentioned only in passing.
 - `excluded`: bitcoin is absent from the abstract, or the paper is altcoin-only.
 
@@ -80,10 +82,3 @@ Two licences are inferred rather than read from the article page:
 - gs-20: the co-publisher's metadata states CC BY 3.0.
 
 Both carry a `licenceNote`.
-
-## Open decision
-
-gs-17 is a crypto-generic accounting paper. Bitcoin is not named in its abstract, but the treatment
-applies to bitcoin holdings. It is labelled `substantial` and carries `needsDecision`, because the tier
-table as written would make it `peripheral`. Whichever way that goes, the same call applies to every
-accounting and regulation paper like it.

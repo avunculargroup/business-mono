@@ -270,7 +270,7 @@
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
-      "relevanceTier": "peripheral",
+      "relevanceTier": "substantial",
       "accessTier": "read_here",
       "bestLicence": "cc-by",
       "isRetracted": false
@@ -291,7 +291,8 @@
         "url": "https://ledger.pitt.edu/ojs/ledger/article/view/121"
       }
     ],
-    "rationale": "Token classification framework for cryptocurrencies generally; bitcoin is not named in the abstract.",
+    "rationale": "Token classification framework for assessing cryptocurrencies, including forks and supply; bitcoin is not named in the abstract. Substantial under the applies-to-bitcoin rule: the framework classifies bitcoin as a crypto-transaction token and its assessment applies to it.",
+    "hardCase": true,
     "tags": [
       "correction"
     ],
@@ -639,9 +640,7 @@
         "licence": "cc-by"
       }
     ],
-    "rationale": "Accounting treatment (IAS 38 / IAS 2) of cryptocurrencies generally; bitcoin is not named in the abstract. Labelled substantial because the treatment applies directly to bitcoin holdings, which is the question a CFO brings.",
-    "hardCase": true,
-    "needsDecision": "Do crypto-generic accounting and regulation papers that apply to bitcoin count as substantial? The tier definitions as written would say peripheral.",
+    "rationale": "Accounting treatment (IAS 38 / IAS 2) of cryptocurrencies generally; bitcoin is not named in the abstract. Substantial under the applies-to-bitcoin rule: the treatment applies directly to bitcoin holdings.",
     "tags": [
       "accounting"
     ],

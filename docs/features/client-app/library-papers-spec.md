@@ -83,7 +83,7 @@ A paper enters the register if it is peer-reviewed and bitcoin is a substantive 
 | Tier | Test | In Minute? | Example |
 | --- | --- | --- | --- |
 | `core` | Bitcoin is the object of study | Yes | Accounting for bitcoin holdings under IFRS |
-| `substantial` | Bitcoin is one of a few compared subjects, with its own findings | Yes | Bitcoin vs gold as a hedge across crises |
+| `substantial` | Bitcoin is one of a few compared subjects, with its own findings — or the paper covers cryptocurrencies generally and its findings apply directly to holding or using bitcoin (accounting, tax, regulation, custody, security) | Yes | Bitcoin vs gold as a hedge across crises; IAS 38 treatment of cryptocurrencies |
 | `peripheral` | Bitcoin is one series among many, or a passing mention | No — internal only | ML forecasting benchmark using 30 assets |
 | `excluded` | False positive ("bit coin", altcoin-only) | No | — |
 
