@@ -458,7 +458,7 @@ The strongest idea here is the sample-period timeline: most contradictions in th
 
 Five sessions, extending the usual data → ingest → panel pattern with an enrichment session in the middle and the Minute surface last. Session 0 is decisions, not code.
 
-1. **Session 0 — decisions and fixtures.** Counsel view on CC NC licences and on publisher abstracts in a paid product. Seed `paper_licences` from those decisions. Register an OpenAlex API key. Hand-label a golden set of 40 papers covering every relevance tier and access tier; Ledger's back catalogue is the clean `read_here` half.
+1. **Session 0 — decisions and fixtures.** Counsel view on CC NC licences and on publisher abstracts in a paid product. Seed `paper_licences` from those decisions. Register an OpenAlex API key. Hand-label a golden set of 40 papers covering every relevance tier and access tier; Ledger's back catalogue is the clean `read_here` half. Done: [`golden-set.json`](../../../apps/agents/evals/library-papers/golden-set.json), with labelling rules in its [README](../../../apps/agents/evals/library-papers/README.md).
 2. **Session 1 — data layer.** Migrations for all tables, the licence trigger, views, RLS, the private `papers` bucket, and new `routines.action_type` values (`paper_watch`, `paper_resolve`, `paper_licence_recheck`).
    - Acceptance: inserting a `paper_files` row with `cc-by-nc` raises; `v_minute_papers` returns nothing for a `draft`; a subscriber session cannot select `candidate` rows.
 3. **Session 2 — discovery and resolution.** `paperBackfill` (OpenAlex S3 snapshot), `paperWatch`, `paperResolve`, deterministic tiering, Rex confirmation, retraction sync.
