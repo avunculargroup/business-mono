@@ -1,0 +1,1599 @@
+[
+  {
+    "id": "gs-01",
+    "title": "Quantum Attacks on Bitcoin, and How to Protect Against Them",
+    "authors": [
+      "Divesh Aggarwal",
+      "Gavin Brennen",
+      "Troy Lee",
+      "Miklos Santha",
+      "Marco Tomamichel"
+    ],
+    "year": 2018,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2018.127"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/127"
+      }
+    ],
+    "rationale": "Bitcoin's proof-of-work and signature scheme are the object of study.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/127",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-02",
+    "title": "Bitcoin Average Dormancy: A Measure of Turnover and Trading Activity",
+    "authors": [
+      "Reginald D. Smith"
+    ],
+    "year": 2018,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2018.99"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/99"
+      }
+    ],
+    "rationale": "Derives a bitcoin-specific on-chain measure (bitcoin-days destroyed).",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/99",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-03",
+    "title": "Bitcoin Mining as a Contest",
+    "authors": [
+      "Nicola Dimitri"
+    ],
+    "year": 2017,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2017.96"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/96"
+      }
+    ],
+    "rationale": "Models bitcoin mining as an all-pay contest.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/96",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-04",
+    "title": "Data Insertion in Bitcoin's Blockchain",
+    "authors": [
+      "Andrew Sward",
+      "Ivy Vecna",
+      "Forrest Stonedahl"
+    ],
+    "year": 2018,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2018.101"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/101"
+      }
+    ],
+    "rationale": "Review article on methods of embedding data in the Bitcoin blockchain.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/101",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-05",
+    "title": "Transaction Fees, Block Size Limit, and Auctions in Bitcoin",
+    "authors": [
+      "Nicola Dimitri"
+    ],
+    "year": 2019,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2019.145"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/145"
+      }
+    ],
+    "rationale": "Models bitcoin fees as an auction for block space.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/145",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-06",
+    "title": "Bitcoin and Venezuela's Unofficial Exchange Rate",
+    "authors": [
+      "Jackie Johnson"
+    ],
+    "year": 2019,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2019.170"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/170"
+      }
+    ],
+    "rationale": "Uses LocalBitcoins bolivar prices to estimate an unofficial exchange rate; bitcoin is the instrument studied.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/170",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-07",
+    "title": "Cryptocurrency Competition and Market Concentration in the Presence of Network Effects",
+    "authors": [
+      "Konstantinos Stylianou",
+      "Leonhard Spiegelberg",
+      "Maurice Herlihy",
+      "Nic Carter"
+    ],
+    "year": 2021,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2021.226"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/226"
+      }
+    ],
+    "rationale": "Six cryptocurrencies studied; bitcoin is discussed in the abstract alongside the others, not alone.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/226",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-08",
+    "title": "Developing a Cryptocurrency Assessment Framework: Function over Form",
+    "authors": [
+      "Andrew Burnie",
+      "James Burnie",
+      "Andrew Henderson"
+    ],
+    "year": 2018,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2018.121"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "peripheral",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "expectedRelations": [
+      {
+        "relation": "correction_of",
+        "from": "10.5195/ledger.2018.151",
+        "to": "gs-08",
+        "note": "Erratum published as a separate item; the page also serves a corrected PDF."
+      }
+    ],
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/121"
+      }
+    ],
+    "rationale": "Token classification framework for cryptocurrencies generally; bitcoin is not named in the abstract.",
+    "tags": [
+      "correction"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/121",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-09",
+    "title": "A Taxonomy of Blockchain Technologies: Principles of Identification and Classification",
+    "authors": [
+      "Paolo Tasca",
+      "Claudio J. Tessone"
+    ],
+    "year": 2019,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2019.140"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "peripheral",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/140"
+      }
+    ],
+    "rationale": "Taxonomy across many blockchain systems; bitcoin is one system among several and absent from the abstract.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/140",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-10",
+    "title": "From Smileys to Smileycoins: Using a Cryptocurrency in Education",
+    "authors": [
+      "Gunnar Stefansson",
+      "Jamie Lentin"
+    ],
+    "year": 2017,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2017.103"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "excluded",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/103"
+      }
+    ],
+    "rationale": "About the SMLY altcoin in education; bitcoin appears only in the reference list.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/103",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-11",
+    "title": "What Diplomacy in the Ancient Near East Can Tell Us About Blockchain Technology",
+    "authors": [
+      "Chris Berg"
+    ],
+    "year": 2017,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2017.104"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "excluded",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/104"
+      }
+    ],
+    "rationale": "Generic blockchain and protocol economics; bitcoin not in the abstract.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/104",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-12",
+    "title": "The Economics of Distributed Ledger Technology for Securities Settlement",
+    "authors": [
+      "Evangelos Benos",
+      "Rodney Garratt",
+      "Pedro Gurrola-Perez"
+    ],
+    "year": 2019,
+    "venue": "Ledger",
+    "venueType": "journal",
+    "publisher": "University Library System, University of Pittsburgh",
+    "identifiers": {
+      "doi": "10.5195/ledger.2019.144"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "excluded",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://ledger.pitt.edu/ojs/ledger/article/view/144"
+      }
+    ],
+    "rationale": "Distributed ledgers for securities settlement; bitcoin not in the abstract.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ledger.pitt.edu/ojs/ledger/article/view/144",
+      "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
+    ]
+  },
+  {
+    "id": "gs-13",
+    "title": "What Are the Main Drivers of the Bitcoin Price? Evidence from Wavelet Coherence Analysis",
+    "authors": [
+      "Ladislav Kristoufek"
+    ],
+    "year": 2015,
+    "venue": "PLOS ONE",
+    "venueType": "journal",
+    "publisher": "PLOS",
+    "identifiers": {
+      "doi": "10.1371/journal.pone.0123923"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      },
+      {
+        "host": "repository",
+        "source": "WRAP (Warwick)",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://wrap.warwick.ac.uk/67266/"
+      }
+    ],
+    "rationale": "Drivers of the bitcoin price; bitcoin is the object of study.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://wrap.warwick.ac.uk/67266/"
+    ]
+  },
+  {
+    "id": "gs-14",
+    "title": "Grandpa, Grandpa, Tell Me the One About Bitcoin Being a Safe Haven: New Evidence From the COVID-19 Pandemic",
+    "authors": [
+      "Ladislav Kristoufek"
+    ],
+    "year": 2020,
+    "venue": "Frontiers in Physics",
+    "venueType": "journal",
+    "publisher": "Frontiers",
+    "identifiers": {
+      "doi": "10.3389/fphy.2020.00296"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      }
+    ],
+    "rationale": "Tests bitcoin's safe-haven claim against the S&P 500 and VIX, with gold as benchmark; bitcoin is the object. Sample 2014-09-16 to 2020-04-17.",
+    "tags": [
+      "sample-period"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://www.frontiersin.org/journals/physics/articles/10.3389/fphy.2020.00296/full"
+    ]
+  },
+  {
+    "id": "gs-15",
+    "title": "The Ascent of Bitcoin: Bibliometric Analysis of Bitcoin Research",
+    "authors": [
+      "Ahmet Faruk Aysan",
+      "Hüseyin Bedir Demirtaş",
+      "Mustafa Saraç"
+    ],
+    "year": 2021,
+    "venue": "Journal of Risk and Financial Management",
+    "venueType": "journal",
+    "publisher": "MDPI",
+    "identifiers": {
+      "doi": "10.3390/jrfm14090427"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "expectedRelations": [
+      {
+        "relation": "published_version_of",
+        "from": "gs-15",
+        "to": "gs-37"
+      }
+    ],
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      }
+    ],
+    "rationale": "Bibliometric study of bitcoin research; bitcoin is the subject. Published version of the preprint gs-37.",
+    "tags": [
+      "version-pair"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://www.mdpi.com/1911-8074/14/9/427/reprints",
+      "https://mdpi.com/openaccess"
+    ]
+  },
+  {
+    "id": "gs-16",
+    "title": "Can Bitcoin Glitter More Than Gold for Investment Styles?",
+    "authors": [
+      "Muhammad Abubakr Naeem",
+      "Mudassar Hasan",
+      "Muhammad Arif",
+      "Syed Jawad Hussain Shahzad"
+    ],
+    "year": 2020,
+    "venue": "SAGE Open",
+    "venueType": "journal",
+    "publisher": "SAGE",
+    "identifiers": {
+      "doi": "10.1177/2158244020926508"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      },
+      {
+        "host": "repository",
+        "source": "Massey Research Online",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://mro.massey.ac.nz/handle/10179/70229"
+      }
+    ],
+    "rationale": "Compares gold and bitcoin as hedge, safe haven and diversifier; bitcoin is one of two subjects with its own findings.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://mro.massey.ac.nz/handle/10179/70229",
+      "https://doaj.org/article/a346e98323a6459fa290b1d3aa188f84"
+    ]
+  },
+  {
+    "id": "gs-17",
+    "title": "Determining the Appropriate Accounting Treatment of Cryptocurrencies Based on Accounting Theory",
+    "authors": [
+      "Nicolette Klopper",
+      "Sophia Magaretha Brink"
+    ],
+    "year": 2023,
+    "venue": "Journal of Risk and Financial Management",
+    "venueType": "journal",
+    "publisher": "MDPI",
+    "identifiers": {
+      "doi": "10.3390/jrfm16090379"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      }
+    ],
+    "rationale": "Accounting treatment (IAS 38 / IAS 2) of cryptocurrencies generally; bitcoin is not named in the abstract. Labelled substantial because the treatment applies directly to bitcoin holdings, which is the question a CFO brings.",
+    "hardCase": true,
+    "needsDecision": "Do crypto-generic accounting and regulation papers that apply to bitcoin count as substantial? The tier definitions as written would say peripheral.",
+    "tags": [
+      "accounting"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/gam/jjrfmx/v16y2023i9p379-d1223578.html",
+      "https://www.citedrive.com/en/discovery/determining-the-appropriate-accounting-treatment-of-cryptocurrencies-based-on-accounting-theory",
+      "https://mdpi.com/openaccess"
+    ]
+  },
+  {
+    "id": "gs-18",
+    "title": "Bitcoin as a financial asset: a survey",
+    "authors": [
+      "Daeyun Kang",
+      "Doojin Ryu",
+      "Robert I. Webb"
+    ],
+    "year": 2025,
+    "venue": "Financial Innovation",
+    "venueType": "journal",
+    "publisher": "Springer Nature (SpringerOpen)",
+    "identifiers": {
+      "doi": "10.1186/s40854-025-00773-0"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      }
+    ],
+    "rationale": "Survey of bitcoin as speculative and safe-haven asset; bitcoin is the subject.",
+    "licenceNote": "Financial Innovation is a fully open-access, DOAJ-listed SpringerOpen journal; the article-level licence page could not be fetched on the check date.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/spr/fininn/v11y2025i1d10.1186_s40854-025-00773-0.html",
+      "https://www.doaj.org/toc/2199-4730"
+    ]
+  },
+  {
+    "id": "gs-19",
+    "title": "Evolutionary dynamics of the cryptocurrency market",
+    "authors": [
+      "Abeer ElBahrawy",
+      "Laura Alessandretti",
+      "Anne Kandler",
+      "Romualdo Pastor-Satorras",
+      "Andrea Baronchelli"
+    ],
+    "year": 2017,
+    "venue": "Royal Society Open Science",
+    "venueType": "journal",
+    "publisher": "The Royal Society",
+    "identifiers": {
+      "doi": "10.1098/rsos.170623"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "peripheral",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by"
+      },
+      {
+        "host": "repository",
+        "source": "City Research Online",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://openaccess.city.ac.uk/id/eprint/17657/"
+      }
+    ],
+    "rationale": "Whole-market study of 1,469 cryptocurrencies; the abstract mentions bitcoin only as the focus of earlier research.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://openaccess.city.ac.uk/id/eprint/17657/"
+    ]
+  },
+  {
+    "id": "gs-20",
+    "title": "Characterizing and Detecting Gas-Inefficient Patterns in Smart Contracts",
+    "authors": [
+      "Que-Ping Kong",
+      "Zi-Yan Wang",
+      "Yuan Huang",
+      "Xiang-Ping Chen",
+      "Xiao-Cong Zhou",
+      "Zi-Bin Zheng",
+      "Gang Huang"
+    ],
+    "year": 2022,
+    "venue": "Journal of Computer Science and Technology",
+    "venueType": "journal",
+    "publisher": "Springer Nature / Science Press",
+    "identifiers": {
+      "doi": "10.1007/s11390-021-1674-4"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "excluded",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://jcst.ict.ac.cn/article/doi/10.1007/s11390-021-1674-4"
+      }
+    ],
+    "rationale": "Ethereum smart-contract gas patterns; bitcoin not in the abstract. A likely false positive for a broad crypto query.",
+    "licenceNote": "The co-publisher page's metadata lists CC BY 3.0; treat as cc-by for tiering.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://jcst.ict.ac.cn/article/doi/10.1007/s11390-021-1674-4"
+    ]
+  },
+  {
+    "id": "gs-21",
+    "title": "The Inefficiency of Bitcoin",
+    "authors": [
+      "Andrew Urquhart"
+    ],
+    "year": 2016,
+    "venue": "Economics Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.econlet.2016.09.019"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      },
+      {
+        "host": "repository",
+        "source": "University of Southampton ePrints",
+        "version": "acceptedVersion",
+        "licence": null,
+        "url": "https://eprints.soton.ac.uk/400597"
+      }
+    ],
+    "rationale": "Tests bitcoin market efficiency; core. Free accepted manuscript with no stated licence: link out, do not host.",
+    "tags": [
+      "green-no-licence"
+    ],
+    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://eprints.soton.ac.uk/400597"
+    ]
+  },
+  {
+    "id": "gs-22",
+    "title": "Is Bitcoin really more than a diversifier? A pre- and post-COVID-19 analysis",
+    "authors": [
+      "Yingying Huang",
+      "Kun Duan",
+      "Tapas Mishra"
+    ],
+    "year": 2021,
+    "venue": "Finance Research Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.frl.2021.102016"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      },
+      {
+        "host": "repository",
+        "source": "University of Southampton ePrints",
+        "version": "acceptedVersion",
+        "licence": null,
+        "url": "https://eprints.soton.ac.uk/447739"
+      }
+    ],
+    "rationale": "Bitcoin's diversifier and hedge role before and after COVID-19; core. Accepted manuscript, no stated licence.",
+    "tags": [
+      "green-no-licence"
+    ],
+    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://eprints.soton.ac.uk/447739"
+    ]
+  },
+  {
+    "id": "gs-23",
+    "title": "Cryptocurrencies as a financial asset: A systematic analysis",
+    "authors": [
+      "Shaen Corbet",
+      "Brian Lucey",
+      "Andrew Urquhart",
+      "Larisa Yarovaya"
+    ],
+    "year": 2019,
+    "venue": "International Review of Financial Analysis",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.irfa.2018.09.003"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      },
+      {
+        "host": "repository",
+        "source": "University of Southampton ePrints",
+        "version": "acceptedVersion",
+        "licence": null,
+        "url": "https://eprints.soton.ac.uk/425053"
+      }
+    ],
+    "rationale": "Systematic review of cryptocurrencies as an asset class; bitcoin is the main but not sole subject.",
+    "tags": [
+      "green-no-licence"
+    ],
+    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://eprints.soton.ac.uk/425053",
+      "https://ideas.repec.org/a/eee/finana/v62y2019icp182-199.html"
+    ]
+  },
+  {
+    "id": "gs-24",
+    "title": "Trading and arbitrage in cryptocurrency markets",
+    "authors": [
+      "Igor Makarov",
+      "Antoinette Schoar"
+    ],
+    "year": 2020,
+    "venue": "Journal of Financial Economics",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.jfineco.2019.07.001"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_at_source",
+      "bestLicence": "cc-by-nc-nd",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      },
+      {
+        "host": "repository",
+        "source": "LSE Research Online",
+        "version": "acceptedVersion",
+        "licence": "cc-by-nc-nd",
+        "url": "https://eprints.lse.ac.uk/100409"
+      }
+    ],
+    "rationale": "Arbitrage across cryptocurrency exchanges; bitcoin is one of a few markets studied. The only free copy is CC BY-NC-ND, which is not approved for a paid product.",
+    "tags": [
+      "non-commercial-licence"
+    ],
+    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://eprints.lse.ac.uk/100409"
+    ]
+  },
+  {
+    "id": "gs-25",
+    "title": "Risks and Returns of Cryptocurrency",
+    "authors": [
+      "Yukun Liu",
+      "Aleh Tsyvinski"
+    ],
+    "year": 2021,
+    "venue": "The Review of Financial Studies",
+    "venueType": "journal",
+    "publisher": "Oxford University Press",
+    "identifiers": {
+      "doi": "10.1093/rfs/hhaa113"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "substantial",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": true,
+        "oaStatus": "bronze",
+        "note": "Editor's Choice: free to read at OUP, no open licence."
+      }
+    ],
+    "rationale": "Risk and return of bitcoin, ripple and ethereum; bitcoin is one of a few subjects. Free to read but not licensed for reuse (bronze). The NBER working paper is a separate, non-peer-reviewed work.",
+    "tags": [
+      "bronze"
+    ],
+    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/oup/rfinst/v34y2021i6p2689-2727..html",
+      "https://sfs.org/editors-choice-346/"
+    ]
+  },
+  {
+    "id": "gs-26",
+    "title": "Accounting for the Bitcoin: accountability, neoliberalism and a correspondence analysis",
+    "authors": [
+      "A. Ram",
+      "W. Maroun",
+      "R. Garnett"
+    ],
+    "year": 2016,
+    "venue": "Meditari Accountancy Research",
+    "venueType": "journal",
+    "publisher": "Emerald",
+    "identifiers": {
+      "doi": "10.1108/MEDAR-07-2015-0035"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "abstract_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": true,
+    "rationale": "Accounting for bitcoin; core. Closed, and Emerald supports I4OA, so the publisher abstract is displayable.",
+    "tags": [
+      "accounting"
+    ],
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://emeraldinsight.com/doi/full/10.1108/MEDAR-07-2015-0035",
+      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
+    ]
+  },
+  {
+    "id": "gs-27",
+    "title": "Quantile analysis of Bitcoin returns: uncovering market dynamics",
+    "authors": [
+      "Monia Antar"
+    ],
+    "year": 2024,
+    "venue": "The Journal of Risk Finance",
+    "venueType": "journal",
+    "publisher": "Emerald",
+    "identifiers": {
+      "doi": "10.1108/JRF-05-2024-0154"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "abstract_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": true,
+    "rationale": "Drivers of bitcoin returns across quantiles; core. Closed, Emerald supports I4OA.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eme/jrfpps/jrf-05-2024-0154.html",
+      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
+    ]
+  },
+  {
+    "id": "gs-28",
+    "title": "Monopoly without a Monopolist: An Economic Analysis of the Bitcoin Payment System",
+    "authors": [
+      "Gur Huberman",
+      "Jacob D. Leshno",
+      "Ciamac Moallemi"
+    ],
+    "year": 2021,
+    "venue": "The Review of Economic Studies",
+    "venueType": "journal",
+    "publisher": "Oxford University Press",
+    "identifiers": {
+      "doi": "10.1093/restud/rdab014"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "abstract_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": true,
+    "rationale": "Economics of the bitcoin fee market; core. Closed at OUP (I4OA). The CEPR and Bank of Finland working papers are separate works and do not change the tier.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/oup/restud/v88y2021i6p3011-3040..html",
+      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
+    ]
+  },
+  {
+    "id": "gs-29",
+    "title": "Bitcoin, gold and the dollar – A GARCH volatility analysis",
+    "authors": [
+      "Anne Haubo Dyhrberg"
+    ],
+    "year": 2016,
+    "venue": "Finance Research Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.frl.2015.10.008"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "expectedRelations": [
+      {
+        "relation": "published_version_of",
+        "from": "gs-29",
+        "to": "gs-38"
+      }
+    ],
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Bitcoin's volatility and hedging properties against gold and the dollar; bitcoin is the object. Closed, and Elsevier has not joined I4OA. The UCD working paper (gs-38) is an earlier, non-peer-reviewed version and must not lift this record's tier.",
+    "tags": [
+      "version-pair"
+    ],
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eee/finlet/v16y2016icp85-92.html",
+      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
+    ]
+  },
+  {
+    "id": "gs-30",
+    "title": "RETRACTED ARTICLE: Big data analytics to identify illegal activities on Bitcoin Blockchain for IoMT",
+    "authors": [
+      "Ajay Kumar",
+      "Kumar Abhishek",
+      "Pranav Nerurkar",
+      "Mohammad R. Khosravi",
+      "Muhammad Rukunuddin Ghalib",
+      "Achyut Shankar"
+    ],
+    "year": 2024,
+    "venue": "Personal and Ubiquitous Computing",
+    "venueType": "journal",
+    "publisher": "Springer Nature",
+    "identifiers": {
+      "doi": "10.1007/s00779-021-01562-z"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": true
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Illicit-activity detection on the bitcoin blockchain; core by topic. Retracted on 2023-10-24 after the publisher lost confidence in the results. Online 2021, issue dated 2024.",
+    "tags": [
+      "retraction"
+    ],
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://link.springer.com/article/10.1007/s00779-021-01562-z"
+    ]
+  },
+  {
+    "id": "gs-31",
+    "title": "Volatile safe-haven asset: Evidence from Bitcoin",
+    "authors": [
+      "James Yae",
+      "George Zhe Tian"
+    ],
+    "year": 2024,
+    "venue": "Journal of Financial Stability",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.jfs.2024.101285"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Bitcoin returns and their correlation with the S&P 500; core. Closed, no other versions listed on RePEc.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eee/finsta/v73y2024ics1572308924000706.html"
+    ]
+  },
+  {
+    "id": "gs-32",
+    "title": "Forecasting Bitcoin realized volatility by measuring the spillover effect among cryptocurrencies",
+    "authors": [
+      "Yue Qiu",
+      "Yifan Wang",
+      "Tian Xie"
+    ],
+    "year": 2021,
+    "venue": "Economics Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.econlet.2021.110092"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Forecasts bitcoin realized volatility; other cryptocurrencies are inputs, bitcoin is the target. Closed.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eee/ecolet/v208y2021ics0165176521003694.html"
+    ]
+  },
+  {
+    "id": "gs-33",
+    "title": "Semi-strong efficiency of Bitcoin",
+    "authors": [
+      "David Vidal-Tomás",
+      "Ana Ibañez"
+    ],
+    "year": 2018,
+    "venue": "Finance Research Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.frl.2018.03.013"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Bitcoin price response to bitcoin events and monetary policy news (Bitstamp, Mt.Gox); core. Closed.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eee/finlet/v27y2018icp259-265.html"
+    ]
+  },
+  {
+    "id": "gs-34",
+    "title": "Forecasting cryptocurrency volatility",
+    "authors": [
+      "Leopoldo Catania",
+      "Stefano Grassi"
+    ],
+    "year": 2022,
+    "venue": "International Journal of Forecasting",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.ijforecast.2021.06.005"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "peripheral",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Volatility models across 606 cryptocurrencies; bitcoin is named only as the most prominent example.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org:443/a/eee/intfor/v38y2022i3p878-894.html"
+    ]
+  },
+  {
+    "id": "gs-35",
+    "title": "Price determinants of non-fungible tokens in the digital art market",
+    "authors": [
+      "Florian Horky",
+      "Carolina Rachel",
+      "Jarko Fidrmuc"
+    ],
+    "year": 2022,
+    "venue": "Finance Research Letters",
+    "venueType": "journal",
+    "publisher": "Elsevier",
+    "identifiers": {
+      "doi": "10.1016/j.frl.2022.103007"
+    },
+    "expected": {
+      "peerReviewStatus": "peer_reviewed",
+      "relevanceTier": "excluded",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "NFT pricing; bitcoin not in the abstract. False positive for a crypto query.",
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/eee/finlet/v48y2022ics1544612322002495.html"
+    ]
+  },
+  {
+    "id": "gs-36",
+    "title": "Cryptocurrency research: future directions",
+    "authors": [
+      "Andrew Urquhart",
+      "Larisa Yarovaya"
+    ],
+    "year": 2024,
+    "venue": "The European Journal of Finance",
+    "venueType": "journal",
+    "publisher": "Taylor & Francis",
+    "identifiers": {
+      "doi": "10.1080/1351847X.2023.2284186"
+    },
+    "expected": {
+      "peerReviewStatus": "not_peer_reviewed",
+      "relevanceTier": "peripheral",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": false
+      }
+    ],
+    "publisherJoinedI4OA": false,
+    "rationale": "Introduction to a special issue reviewing cryptocurrency research; an editorial, not a refereed research article. Bitcoin appears only as historical context.",
+    "hardCase": true,
+    "tags": [
+      "editorial"
+    ],
+    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://ideas.repec.org/a/taf/eurjfi/v30y2024i16p1849-1854.html"
+    ]
+  },
+  {
+    "id": "gs-37",
+    "title": "The Ascent of Bitcoin: Bibliometric Analysis of Bitcoin Research (preprint)",
+    "authors": [
+      "Ahmet Faruk Aysan",
+      "Hüseyin Bedir Demirtaş",
+      "Mustafa Saraç"
+    ],
+    "year": 2021,
+    "venue": "Preprints.org",
+    "venueType": "repository",
+    "publisher": "MDPI",
+    "identifiers": {
+      "doi": "10.20944/preprints202108.0555.v1"
+    },
+    "expected": {
+      "peerReviewStatus": "preprint",
+      "relevanceTier": "core",
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "preprint_server",
+        "version": "submittedVersion",
+        "licence": "cc-by",
+        "url": "https://www.preprints.org/manuscript/202108.0555"
+      }
+    ],
+    "rationale": "Preprint of gs-15; the page states it is not peer reviewed. Tracked internally, never published in Minute; the pipeline should link it to gs-15.",
+    "tags": [
+      "version-pair"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://www.preprints.org/manuscript/202108.0555"
+    ]
+  },
+  {
+    "id": "gs-38",
+    "title": "Bitcoin, Gold and the Dollar – a GARCH Volatility Analysis (working paper)",
+    "authors": [
+      "Anne Haubo Dyhrberg"
+    ],
+    "year": 2015,
+    "venue": "UCD Centre for Economic Research Working Paper Series",
+    "venueType": "repository",
+    "publisher": "University College Dublin",
+    "identifiers": {
+      "handle": "10197/7168"
+    },
+    "expected": {
+      "peerReviewStatus": "not_peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_at_source",
+      "bestLicence": "cc-by-nc-nd",
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "repository",
+        "source": "UCD Research Repository",
+        "version": "submittedVersion",
+        "licence": "cc-by-nc-nd",
+        "url": "https://researchrepository.ucd.ie/entities/publication/8eb9f816-95c1-4072-a0b4-1e7e4f0ba80c"
+      }
+    ],
+    "rationale": "Working paper WP2015/20 that became gs-29; the repository marks it not peer reviewed. Has no DOI, so it also tests the papers_has_identifier rule.",
+    "hardCase": true,
+    "tags": [
+      "version-pair",
+      "no-doi"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://researchrepository.ucd.ie/entities/publication/8eb9f816-95c1-4072-a0b4-1e7e4f0ba80c"
+    ]
+  },
+  {
+    "id": "gs-39",
+    "title": "Bitcoin: An Innovative Alternative Digital Currency",
+    "authors": [
+      "Reuben Grinberg"
+    ],
+    "year": 2012,
+    "venue": "Hastings Science & Technology Law Journal",
+    "venueType": "journal",
+    "publisher": "UC Law San Francisco",
+    "identifiers": {
+      "url": "https://repository.uclawsf.edu/hastings_science_technology_law_journal/vol4/iss1/3"
+    },
+    "expected": {
+      "peerReviewStatus": "not_peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "publisher",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": true,
+        "url": "https://repository.uclawsf.edu/hastings_science_technology_law_journal/vol4/iss1/3"
+      }
+    ],
+    "rationale": "Early legal analysis of bitcoin. US law journals are generally student-edited, not peer reviewed, so a venue-type rule will call this peer reviewed. Free to read, copyright UC Law SF, no open licence.",
+    "hardCase": true,
+    "tags": [
+      "law-journal",
+      "no-doi"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://repository.uclawsf.edu/hastings_science_technology_law_journal/vol4/iss1/3"
+    ]
+  },
+  {
+    "id": "gs-40",
+    "title": "Bitcoin: A Peer-to-Peer Electronic Cash System",
+    "authors": [
+      "Satoshi Nakamoto"
+    ],
+    "year": 2008,
+    "venue": null,
+    "venueType": "other",
+    "publisher": null,
+    "identifiers": {
+      "url": "https://bitcoin.org/bitcoin.pdf"
+    },
+    "expected": {
+      "peerReviewStatus": "not_peer_reviewed",
+      "relevanceTier": "core",
+      "accessTier": "read_at_source",
+      "bestLicence": null,
+      "isRetracted": false
+    },
+    "copies": [
+      {
+        "host": "other",
+        "version": "publishedVersion",
+        "licence": null,
+        "isOa": true
+      }
+    ],
+    "rationale": "The whitepaper. Foundational but never peer reviewed; it belongs on the separate 'Foundational, not peer-reviewed' shelf, never in Papers.",
+    "tags": [
+      "no-doi"
+    ],
+    "checkedOn": "2026-10-11",
+    "sources": [
+      "https://www.metzdowd.com/pipermail/cryptography/2008-October/014810.html"
+    ]
+  }
+]
