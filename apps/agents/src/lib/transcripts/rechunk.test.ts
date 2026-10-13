@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { alignUtterances, nullSpeakerPct, parseTranscriptLines } from './rechunk.js';
+import { alignUtterances, dedupeSegments, nullSpeakerPct, parseTranscriptLines } from './rechunk.js';
 
 const text = ['[Jeff] Hello and welcome.', '[Lance] Thanks for having me.', 'ad read', '[Jeff] Let us start.'].join(
   '\n',
@@ -55,6 +55,10 @@ describe('alignUtterances', () => {
     expect(alignUtterances(lines, bad).ok).toBe(false);
   });
 
+  it('names an episode with no segments rather than counting leftover lines', () => {
+    expect(alignUtterances(lines, [])).toEqual({ ok: false, reason: 'no segments' });
+  });
+
   it('skips the episode when lines are left after the last segment', () => {
     expect(alignUtterances(lines, segments.slice(0, 1))).toEqual({
       ok: false,
@@ -67,5 +71,48 @@ describe('nullSpeakerPct', () => {
   it('rounds to one decimal and handles no segments', () => {
     expect(nullSpeakerPct([{ speaker: null }, { speaker: 'A' }, { speaker: 'A' }])).toBe(33.3);
     expect(nullSpeakerPct([])).toBe(0);
+  });
+});
+
+describe('dedupeSegments', () => {
+  const seg = (i: number, content: string, start = i * 10) => ({
+    segment_index: i,
+    start_seconds: start,
+    end_seconds: start + 10,
+    content,
+  });
+
+  it('keeps one of each identical copy, in index order', () => {
+    // Ordered by segment_index, copies interleave: 0, 0, 1, 1.
+    const r = dedupeSegments([seg(0, 'a'), seg(0, 'a'), seg(1, 'b'), seg(1, 'b'), seg(1, 'b')]);
+    expect(r).toEqual({ ok: true, segments: [seg(0, 'a'), seg(1, 'b')], duplicates: 3 });
+  });
+
+  it('passes a clean episode through unchanged', () => {
+    expect(dedupeSegments([seg(0, 'a'), seg(1, 'b')])).toEqual({
+      ok: true,
+      segments: [seg(0, 'a'), seg(1, 'b')],
+      duplicates: 0,
+    });
+  });
+
+  it('fails when copies of a segment disagree', () => {
+    expect(dedupeSegments([seg(0, 'a'), seg(0, 'a different')])).toEqual({
+      ok: false,
+      reason: 'segment 0 has conflicting copies',
+    });
+    expect(dedupeSegments([seg(0, 'a'), seg(0, 'a', 5)]).ok).toBe(false);
+  });
+
+  it('lets deduped copies align', () => {
+    const lines = parseTranscriptLines('[A] one two\n[B] three');
+    const r = dedupeSegments([
+      seg(0, 'one two'),
+      seg(0, 'one two'),
+      seg(1, 'three'),
+      seg(1, 'three'),
+    ]);
+    if (!r.ok) throw new Error(r.reason);
+    expect(alignUtterances(lines, r.segments).ok).toBe(true);
   });
 });

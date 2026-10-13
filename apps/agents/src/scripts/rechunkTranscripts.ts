@@ -2,6 +2,7 @@ import { supabase } from '@platform/db';
 import { buildSegments, embedEpisodeSegments } from '../lib/transcripts/embedSegments.js';
 import {
   alignUtterances,
+  dedupeSegments,
   nullSpeakerPct,
   parseTranscriptLines,
   toTimedSegments,
@@ -121,19 +122,27 @@ async function rechunkEpisode(ep: { id: string; title: string }, dryRun: boolean
   if (epErr) throw new Error(`episode read failed: ${epErr.message}`);
   const { data: segs, error: segErr } = await db
     .from('transcript_segments')
-    .select('start_seconds, end_seconds, speaker, content')
+    .select('segment_index, start_seconds, end_seconds, speaker, content')
     .eq('episode_id', ep.id)
     .order('segment_index');
   if (segErr) throw new Error(`segments read failed: ${segErr.message}`);
 
   const text = row.transcript_text as string;
-  const oldSegments = (segs ?? []) as Array<OldSegment & { speaker: string | null }>;
+  const deduped = dedupeSegments(
+    (segs ?? []) as Array<OldSegment & { segment_index: number; speaker: string | null }>,
+  );
+  if (!deduped.ok) {
+    log.warn({ episodeId: ep.id, title: ep.title, alignment: 'skip', reason: deduped.reason }, 'episode skipped');
+    return false;
+  }
+  const oldSegments = deduped.segments;
   const lines = parseTranscriptLines(text);
   const aligned = alignUtterances(lines, oldSegments);
   const base = {
     episodeId: ep.id,
     title: ep.title,
     oldSegments: oldSegments.length,
+    duplicateRows: deduped.duplicates,
     oldNullPct: nullSpeakerPct(oldSegments),
     textSpeakers: distinct(lines.map((l) => l.speaker)),
     oldSegmentSpeakers: distinct(oldSegments.map((s) => s.speaker)),

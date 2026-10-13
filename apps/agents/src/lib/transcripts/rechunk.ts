@@ -32,6 +32,36 @@ export function parseTranscriptLines(transcriptText: string): ParsedLine[] {
     });
 }
 
+export type DedupeResult<T> =
+  | { ok: true; segments: T[]; duplicates: number }
+  | { ok: false; reason: string };
+
+/**
+ * Collapse duplicate copies of a segment to one. Some episodes hold two to four
+ * identical copies of every segment, left when the embed step ran more than
+ * once at the same time for one episode. Identical copies are dropped; copies
+ * that disagree mean the stored boundaries can't be trusted, so the episode
+ * fails and is skipped.
+ */
+export function dedupeSegments<T extends OldSegment & { segment_index: number }>(
+  segments: T[],
+): DedupeResult<T> {
+  const byIndex = new Map<number, T>();
+  for (const seg of segments) {
+    const kept = byIndex.get(seg.segment_index);
+    if (!kept) byIndex.set(seg.segment_index, seg);
+    else if (
+      kept.content !== seg.content ||
+      kept.start_seconds !== seg.start_seconds ||
+      kept.end_seconds !== seg.end_seconds
+    ) {
+      return { ok: false, reason: `segment ${seg.segment_index} has conflicting copies` };
+    }
+  }
+  const unique = [...byIndex.values()].sort((x, y) => x.segment_index - y.segment_index);
+  return { ok: true, segments: unique, duplicates: segments.length - unique.length };
+}
+
 export type AlignResult =
   | { ok: true; utterances: StoredUtterance[] }
   | { ok: false; reason: string };
@@ -43,6 +73,7 @@ export type AlignResult =
  * fails the whole episode so it is skipped and left untouched.
  */
 export function alignUtterances(lines: ParsedLine[], segments: OldSegment[]): AlignResult {
+  if (segments.length === 0) return { ok: false, reason: 'no segments' };
   const out: StoredUtterance[] = [];
   let li = 0;
 
