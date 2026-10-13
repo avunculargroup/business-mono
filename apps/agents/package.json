@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:eval": "vitest run --config vitest.eval.config.ts",
-    "seed:voice": "tsx src/seeds/seedVoice.ts"
+    "seed:voice": "tsx src/seeds/seedVoice.ts",
+    "backfill:rechunk": "tsx src/scripts/rechunkTranscripts.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.24",

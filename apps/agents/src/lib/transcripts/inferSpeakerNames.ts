@@ -68,14 +68,15 @@ export function applySpeakerNames(segments: TimedSegment[], map: Record<string, 
  * description + transcript, and relabel the segments in place. Best-effort: the
  * caller wraps this so any failure leaves the generic "Speaker N" labels intact
  * rather than demoting a good transcript. Returns the number of segments
- * relabelled (0 when there is nothing to do).
+ * relabelled and the label → name map applied (both empty when there is
+ * nothing to do), so the caller can persist the map alongside raw labels.
  */
 export async function inferAndApplySpeakerNames(
   episodeId: string,
   segments: TimedSegment[],
-): Promise<number> {
+): Promise<{ renamed: number; map: Record<string, string> }> {
   const labels = new Set(segments.map((s) => s.speaker).filter((s): s is string => !!s));
-  if (labels.size === 0) return 0;
+  if (labels.size === 0) return { renamed: 0, map: {} };
 
   // podcast_episodes isn't in the generated DB types until post-migration regen,
   // so this read goes through a boundary cast (same pattern as store.ts).
@@ -120,5 +121,5 @@ export async function inferAndApplySpeakerNames(
   if (renamed > 0) {
     log.info({ episodeId, mapped: Object.keys(map).length }, 'speakers relabelled');
   }
-  return renamed;
+  return { renamed, map };
 }

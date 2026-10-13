@@ -167,6 +167,30 @@ export function highlightText(text: string, query: string): { text: string; matc
   return parts.length > 0 ? parts : [{ text, match: false }];
 }
 
+export interface SpeakerTurn {
+  speaker: string | null;
+  text: string;
+}
+
+const TURN_MARKER = /^\[([^\]]+)\] (.*)$/;
+
+/**
+ * Split a mixed-speaker segment into turns. The chunker writes one turn per
+ * line prefixed `[Name] ` only when a window has more than one speaker, so a
+ * single-line segment (even one starting with a bracket, like `[Music]`) is
+ * returned as null and rendered as plain text. An unmarked line in a mixed
+ * segment is a turn with no speaker.
+ */
+export function parseSpeakerTurns(content: string): SpeakerTurn[] | null {
+  const lines = content.split('\n').filter((l) => l.trim());
+  if (lines.length < 2) return null;
+  const turns = lines.map((line) => {
+    const m = TURN_MARKER.exec(line);
+    return m ? { speaker: m[1]!, text: m[2]! } : { speaker: null, text: line };
+  });
+  return turns.some((t) => t.speaker) ? turns : null;
+}
+
 // ── Status + provenance presentation (spec §"Web App" token mapping) ──────────
 
 type ChipColor = 'neutral' | 'accent' | 'success' | 'warning' | 'destructive';

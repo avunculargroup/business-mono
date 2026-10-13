@@ -120,3 +120,38 @@ export async function storeAvailableTranscript(
   await updateEpisode(episodeId, { embedded_at: new Date().toISOString() });
   return { segments };
 }
+
+/** One utterance as stored in podcast_transcript_utterances.utterances. */
+export interface StoredUtterance {
+  start: number | null;
+  end: number | null;
+  /** Raw diarisation label (`Speaker 0`); for backfilled rows, the stored name. */
+  label: string | null;
+  /** Resolved name, or the raw label when naming left it generic. */
+  speaker: string | null;
+  text: string;
+}
+
+export interface UtteranceRecord {
+  timing: 'deepgram' | 'interpolated';
+  utterances: StoredUtterance[];
+  speakerMap: Record<string, string>;
+}
+
+/**
+ * Upsert an episode's utterances side-table row. Kept off podcast_episodes
+ * because that table is on realtime and this blob would ride every event.
+ */
+export async function upsertUtterances(episodeId: string, r: UtteranceRecord): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from('podcast_transcript_utterances').upsert(
+    {
+      episode_id: episodeId,
+      timing: r.timing,
+      utterances: r.utterances,
+      speaker_map: r.speakerMap,
+    },
+    { onConflict: 'episode_id' },
+  );
+  if (error) throw new Error(`podcast_transcript_utterances upsert failed: ${error.message}`);
+}

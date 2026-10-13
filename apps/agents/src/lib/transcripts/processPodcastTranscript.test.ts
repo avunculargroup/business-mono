@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const storeAvailableTranscript = vi.fn();
 const updateEpisode = vi.fn().mockResolvedValue(undefined);
+const upsertUtterances = vi.fn();
 vi.mock('./store.js', () => ({
   storeAvailableTranscript: (...args: unknown[]) => storeAvailableTranscript(...args),
   updateEpisode: (...args: unknown[]) => updateEpisode(...args),
+  upsertUtterances: (...args: unknown[]) => upsertUtterances(...args),
 }));
 
 const logActivityExecute = vi.fn();
@@ -31,7 +33,8 @@ describe('processPodcastTranscript', () => {
     storeAvailableTranscript.mockReset().mockResolvedValue({ segments: 2 });
     updateEpisode.mockReset().mockResolvedValue(undefined);
     logActivityExecute.mockReset().mockResolvedValue(undefined);
-    inferAndApplySpeakerNames.mockReset().mockResolvedValue(0);
+    upsertUtterances.mockReset().mockResolvedValue(undefined);
+    inferAndApplySpeakerNames.mockReset().mockResolvedValue({ renamed: 0, map: {} });
   });
 
   it('relabels the stored transcript text and segments with inferred names', async () => {
@@ -39,7 +42,7 @@ describe('processPodcastTranscript', () => {
     // flat text and embeds the segments AFTER it runs, so both pick up the name.
     inferAndApplySpeakerNames.mockImplementation((_id: string, segments: Array<{ speaker: string | null }>) => {
       for (const s of segments) if (s.speaker === 'Speaker 0') s.speaker = 'Obi-Wan';
-      return Promise.resolve(1);
+      return Promise.resolve({ renamed: 1, map: { 'Speaker 0': 'Obi-Wan' } });
     });
 
     await processPodcastTranscript('ep-1', results);
@@ -62,6 +65,34 @@ describe('processPodcastTranscript', () => {
     expect(stored.text).toContain('[Speaker 0] Hello there');
     // A best-effort naming failure must not demote the transcript to 'failed'.
     expect(updateEpisode).not.toHaveBeenCalled();
+  });
+
+  it('persists utterances with the raw label, the resolved name and the map', async () => {
+    inferAndApplySpeakerNames.mockImplementation((_id: string, segments: Array<{ speaker: string | null }>) => {
+      for (const s of segments) if (s.speaker === 'Speaker 0') s.speaker = 'Obi-Wan';
+      return Promise.resolve({ renamed: 1, map: { 'Speaker 0': 'Obi-Wan' } });
+    });
+
+    await processPodcastTranscript('ep-1', results);
+
+    expect(upsertUtterances).toHaveBeenCalledWith('ep-1', {
+      timing: 'deepgram',
+      utterances: [
+        { start: 0, end: 1, label: 'Speaker 0', speaker: 'Obi-Wan', text: 'Hello there' },
+        { start: 1, end: 2, label: 'Speaker 1', speaker: 'Speaker 1', text: 'General Kenobi' },
+      ],
+      speakerMap: { 'Speaker 0': 'Obi-Wan' },
+    });
+  });
+
+  it('does NOT demote a stored transcript when the utterance write throws', async () => {
+    upsertUtterances.mockRejectedValue(new Error('relation does not exist'));
+
+    await expect(processPodcastTranscript('ep-1', results)).resolves.toBeUndefined();
+
+    expect(storeAvailableTranscript).toHaveBeenCalledTimes(1);
+    expect(updateEpisode).not.toHaveBeenCalled();
+    expect(logActivityExecute).toHaveBeenCalledTimes(1);
   });
 
   it('stores the transcript with source deepgram and logs with an allowed trigger_type', async () => {

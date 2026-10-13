@@ -5176,6 +5176,48 @@ export type Database = {
           },
         ]
       }
+      podcast_transcript_utterances: {
+        Row: {
+          created_at: string
+          episode_id: string
+          speaker_map: Json
+          timing: string
+          updated_at: string
+          utterances: Json
+        }
+        Insert: {
+          created_at?: string
+          episode_id: string
+          speaker_map?: Json
+          timing: string
+          updated_at?: string
+          utterances: Json
+        }
+        Update: {
+          created_at?: string
+          episode_id?: string
+          speaker_map?: Json
+          timing?: string
+          updated_at?: string
+          utterances?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_transcript_utterances_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: true
+            referencedRelation: "podcast_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_transcript_utterances_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: true
+            referencedRelation: "v_episode_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_metrics: {
         Row: {
           clicks: number | null
@@ -7672,6 +7714,7 @@ export type Database = {
           id: string
           segment_index: number
           speaker: string | null
+          speakers: string[]
           start_seconds: number | null
           token_count: number | null
         }
@@ -7684,6 +7727,7 @@ export type Database = {
           id?: string
           segment_index: number
           speaker?: string | null
+          speakers?: string[]
           start_seconds?: number | null
           token_count?: number | null
         }
@@ -7696,6 +7740,7 @@ export type Database = {
           id?: string
           segment_index?: number
           speaker?: string | null
+          speakers?: string[]
           start_seconds?: number | null
           token_count?: number | null
         }

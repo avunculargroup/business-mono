@@ -426,6 +426,11 @@
   overflow-wrap: anywhere;
 }
 
+/* A turn label inside a mixed-speaker segment: sits inline before the text. */
+.turnSpeaker {
+  margin-right: var(--space-2);
+}
+
 .transcriptContent {
   position: relative;
 }

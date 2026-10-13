@@ -9,6 +9,7 @@ import {
   estimateDeepgramCost,
   formatAud,
   highlightText,
+  parseSpeakerTurns,
   DEEPGRAM_COST_PER_MINUTE_AUD,
 } from './podcasts';
 
@@ -269,5 +270,21 @@ describe('statusOptions', () => {
     const opts = statusOptions();
     expect(opts.length).toBeGreaterThan(0);
     expect(opts.every(([v, l]) => typeof v === 'string' && typeof l === 'string')).toBe(true);
+  });
+});
+
+describe('parseSpeakerTurns', () => {
+  it('splits a mixed segment into named turns', () => {
+    expect(parseSpeakerTurns('[Host] Welcome back.\n[Guest] Yeah.\nad read')).toEqual([
+      { speaker: 'Host', text: 'Welcome back.' },
+      { speaker: 'Guest', text: 'Yeah.' },
+      { speaker: null, text: 'ad read' },
+    ]);
+  });
+
+  it('returns null for single-speaker or unmarked content', () => {
+    expect(parseSpeakerTurns('One voice throughout.')).toBeNull();
+    expect(parseSpeakerTurns('[Music] intro plays')).toBeNull();
+    expect(parseSpeakerTurns('line one\nline two')).toBeNull();
   });
 });

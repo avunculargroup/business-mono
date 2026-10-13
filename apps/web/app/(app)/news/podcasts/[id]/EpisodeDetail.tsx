@@ -16,6 +16,7 @@ import {
   formatTimestamp,
   highlightText,
   htmlToText,
+  parseSpeakerTurns,
   TRANSCRIPT_STATUS_LABELS,
   TRANSCRIPT_STATUS_COLORS,
   TRANSCRIPT_SOURCE_LABELS,
@@ -70,12 +71,21 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
   // A takeaway timestamp can only deep-link when there's media to seek.
   const canSeek = Boolean(videoId || episode.audio_url);
 
+  // Mixed-speaker segments carry `[Name] ` turn markers; render them as labels.
+  const segmentTurns = useMemo(() => segments.map((s) => parseSpeakerTurns(s.content)), [segments]);
+
+  // Texts in render order, so the match count lines up with the <mark>s drawn
+  // (a turn's label is highlighted, its brackets are not rendered).
   const transcriptTexts = useMemo(
     () =>
       segments.length > 0
-        ? segments.map((s) => s.content)
+        ? segments.flatMap((s, i) =>
+            segmentTurns[i]
+              ? segmentTurns[i].flatMap((t) => (t.speaker ? [t.speaker, t.text] : [t.text]))
+              : [s.content],
+          )
         : (episode.transcript_text ?? '').split(/\n{2,}/),
-    [segments, episode.transcript_text],
+    [segments, segmentTurns, episode.transcript_text],
   );
   const matchCount = useMemo(() => {
     if (!searchActive) return 0;
@@ -438,7 +448,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
                     >
                       {segments.length > 0 ? (
                         <div className={styles.transcript}>
-                          {segments.map((s) => (
+                          {segments.map((s, i) => (
                             <div key={s.id} className={styles.segment}>
                               <div className={styles.segmentHead}>
                                 {s.start_seconds != null && (
@@ -451,7 +461,7 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
                                     {formatTimestamp(s.start_seconds)}
                                   </button>
                                 )}
-                                {s.speaker && <span className={styles.speaker}>{s.speaker}</span>}
+                                {s.speaker && !segmentTurns[i] && <span className={styles.speaker}>{s.speaker}</span>}
                                 <button
                                   type="button"
                                   className={styles.copyButton}
@@ -461,9 +471,22 @@ export function EpisodeDetail({ episode, segments, sourceName, initialSeek = nul
                                   <Copy size={13} strokeWidth={1.5} />
                                 </button>
                               </div>
-                              <p className={styles.segmentText}>
-                                <Highlighted text={s.content} query={query} />
-                              </p>
+                              {segmentTurns[i] ? (
+                                segmentTurns[i].map((t, j) => (
+                                  <p key={j} className={styles.segmentText}>
+                                    {t.speaker && (
+                                      <span className={`${styles.speaker} ${styles.turnSpeaker}`}>
+                                        <Highlighted text={t.speaker} query={query} />
+                                      </span>
+                                    )}
+                                    <Highlighted text={t.text} query={query} />
+                                  </p>
+                                ))
+                              ) : (
+                                <p className={styles.segmentText}>
+                                  <Highlighted text={s.content} query={query} />
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
