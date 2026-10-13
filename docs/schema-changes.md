@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-13 — Turn-aware transcript segments
+
+`20261013000000_turn_aware_transcript_segments.sql` adds `transcript_segments.speakers`
+(TEXT[], GIN-indexed) and the `podcast_transcript_utterances` side table. `buildSegments`
+used to keep a segment's `speaker` only when one voice held the whole ~600-token window, so
+75% of Deepgram segments had none. Windows now break on a speaker change once they hold 600
+chars, `speaker` means the primary speaker (75% of the chars), and `speakers` lists everyone.
+The utterance table keeps the raw Deepgram labels and the label → name map, so naming can be
+re-run without re-transcribing. It is not a column on `podcast_episodes` because that table is
+on realtime and a ~150 KB blob would ride every change event. Team-only RLS through
+`is_team_member()`. Spec: `docs/features/podcast-transcripts/turn-aware-chunking-spec.md`.
+
+---
+
 ## 2026-10-10 — `podcast_episodes` joins the Realtime publication
 
 `20261010000000_enable_realtime_podcast_episodes.sql` adds `podcast_episodes` to

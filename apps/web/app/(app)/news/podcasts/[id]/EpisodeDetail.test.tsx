@@ -276,6 +276,52 @@ describe('EpisodeDetail', () => {
     expect(writeText).toHaveBeenCalledWith('"Custody matters." — Guest, Sound money weekly @ 1:15');
   });
 
+  describe('mixed-speaker segments', () => {
+    const mixed = makeSegment({
+      content: '[Jeff Snider] Rates are the story.\n[Lance Roberts] Right.\n[Jeff Snider] And bitcoin follows.',
+      speaker: 'Jeff Snider',
+    });
+
+    it('renders turn markers as speaker labels, not raw brackets', () => {
+      render(
+        <EpisodeDetail episode={makeEpisode({ transcript_status: 'available' })} segments={[mixed]} sourceName={null} />,
+      );
+
+      expect(screen.queryByText(/\[Jeff Snider\]/)).not.toBeInTheDocument();
+      expect(screen.getAllByText('Jeff Snider')).toHaveLength(2);
+      expect(screen.getByText('Lance Roberts')).toBeInTheDocument();
+      expect(screen.getByText('Right.')).toBeInTheDocument();
+    });
+
+    it('keeps the match count in step with the highlights drawn', () => {
+      const { container } = render(
+        <EpisodeDetail episode={makeEpisode({ transcript_status: 'available' })} segments={[mixed]} sourceName={null} />,
+      );
+
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Find in transcript' }), {
+        target: { value: 'jeff' },
+      });
+
+      expect(container.querySelectorAll('mark')).toHaveLength(2);
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+
+    it('copies the segment with its turns and the primary speaker', () => {
+      render(
+        <EpisodeDetail
+          episode={makeEpisode({ transcript_status: 'available', title: 'Sound money weekly' })}
+          segments={[{ ...mixed, start_seconds: 75 }]}
+          sourceName={null}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy quote with citation' }));
+      expect(writeText).toHaveBeenCalledWith(
+        `"${mixed.content}" — Jeff Snider, Sound money weekly @ 1:15`,
+      );
+    });
+  });
+
   describe('episode brief', () => {
     beforeEach(() => {
       generateEpisodeBrief.mockClear();

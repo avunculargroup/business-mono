@@ -8,6 +8,14 @@ import type { TimedSegment } from './parsers.js';
 const CHARS_PER_CHUNK = 600 * 4;
 const CHARS_PER_TOKEN = 4;
 
+// Turn-aware windowing (docs/features/podcast-transcripts/turn-aware-chunking-spec.md).
+// A speaker change closes the window once it holds MIN_BREAK_CHARS (~150 tokens;
+// the median turn is 646 chars), so most windows carry one voice and short
+// interjections ride inside a neighbour instead of becoming their own vector.
+const MIN_BREAK_CHARS = 600;
+// Share of a window's characters one speaker must own to be its `speaker`.
+const PRIMARY_SHARE = 0.75;
+
 // Rows per transcript_segments INSERT. Each row carries a 1536-dim vector and
 // an HNSW index update; a ~110-minute episode's ~100+ rows in one statement
 // hit Postgres's statement timeout during the October 2026 Deepgram backfill.
@@ -18,6 +26,7 @@ export interface SegmentDraft {
   startSeconds: number | null;
   endSeconds: number | null;
   speaker: string | null;
+  speakers: string[];
   content: string;
   tokenCount: number;
 }
@@ -40,6 +49,7 @@ interface SegmentInsert {
   start_seconds: number | null;
   end_seconds: number | null;
   speaker: string | null;
+  speakers: string[];
   content: string;
   token_count: number;
   embedding: number[];
@@ -50,11 +60,15 @@ const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN
 /**
  * Pack transcript content into ~600-token chunks for embedding.
  *
- * Timestamped path (json/vtt/srt/deepgram): greedily accumulate consecutive
- * timed segments into windows, carrying the first member's start and the last
- * member's end so a retrieved chunk still deep-links to the right moment. The
- * speaker is kept only when the whole window shares one (else null — a mixed
- * window has no single speaker).
+ * Timestamped path (json/vtt/srt/deepgram): accumulate consecutive timed
+ * segments into windows, carrying the first member's start and the last
+ * member's end so a retrieved chunk still deep-links to the right moment. A
+ * window closes on a speaker change once it holds MIN_BREAK_CHARS, or before it
+ * would pass CHARS_PER_CHUNK. `speakers` lists everyone in the window in
+ * first-appearance order; `speaker` is the one owning PRIMARY_SHARE of its
+ * characters, else null. A window with more than one speaker puts each turn on
+ * its own line prefixed `[Name] `. With no speakers in the input (SRT, YouTube)
+ * the output is plain greedy packing, as before.
  *
  * Plain-text path (html/text, no timestamps): fall back to character windowing
  * with null timestamps/speaker.
@@ -68,6 +82,7 @@ export function buildSegments(timed: TimedSegment[] | null, plainText: string): 
       startSeconds: null,
       endSeconds: null,
       speaker: null,
+      speakers: [],
       content,
       tokenCount: estimateTokens(content),
     }));
@@ -79,13 +94,40 @@ export function buildSegments(timed: TimedSegment[] | null, plainText: string): 
 
   const flush = () => {
     if (buf.length === 0) return;
-    const content = buf.map((s) => s.text).join(' ').trim();
-    const speakers = new Set(buf.map((s) => s.speaker).filter((s): s is string => !!s));
+
+    // Same-speaker runs. A null-speaker utterance is its own run but never a
+    // marker and never in `speakers`.
+    const runs: { speaker: string | null; texts: string[] }[] = [];
+    const chars = new Map<string, number>();
+    let total = 0;
+    for (const seg of buf) {
+      const text = seg.text.trim();
+      const last = runs[runs.length - 1];
+      if (last && last.speaker === seg.speaker) last.texts.push(text);
+      else runs.push({ speaker: seg.speaker, texts: [text] });
+      total += text.length;
+      if (seg.speaker) chars.set(seg.speaker, (chars.get(seg.speaker) ?? 0) + text.length);
+    }
+    const speakers = [...chars.keys()];
+
+    const content =
+      speakers.length > 1
+        ? runs
+            .map((r) => {
+              const text = r.texts.join(' ');
+              return r.speaker ? `[${r.speaker}] ${text}` : text;
+            })
+            .join('\n')
+        : buf.map((s) => s.text).join(' ').trim();
+
+    const primary = speakers.find((sp) => total > 0 && chars.get(sp)! / total >= PRIMARY_SHARE);
+
     drafts.push({
       segmentIndex: drafts.length,
       startSeconds: buf[0]!.start,
       endSeconds: buf[buf.length - 1]!.end ?? buf[buf.length - 1]!.start,
-      speaker: speakers.size === 1 ? [...speakers][0]! : null,
+      speaker: primary ?? null,
+      speakers,
       content,
       tokenCount: estimateTokens(content),
     });
@@ -96,9 +138,12 @@ export function buildSegments(timed: TimedSegment[] | null, plainText: string): 
   for (const seg of timed!) {
     const text = seg.text.trim();
     if (!text) continue;
-    // Start a new window if appending would overflow (but always keep at least
-    // one segment per window, even if a single segment exceeds the target).
-    if (bufLen > 0 && bufLen + text.length > CHARS_PER_CHUNK) flush();
+    const turnChanged = bufLen > 0 && seg.speaker !== buf[buf.length - 1]!.speaker;
+    // Close the window on a speaker change once it is big enough, or if
+    // appending would overflow (but always keep at least one segment per
+    // window, even if a single segment exceeds the target).
+    if (turnChanged && bufLen >= MIN_BREAK_CHARS) flush();
+    else if (bufLen > 0 && bufLen + text.length > CHARS_PER_CHUNK) flush();
     buf.push(seg);
     bufLen += text.length + 1;
   }
@@ -135,6 +180,7 @@ export async function embedEpisodeSegments(
     start_seconds: d.startSeconds,
     end_seconds: d.endSeconds,
     speaker: d.speaker,
+    speakers: d.speakers,
     content: d.content,
     token_count: d.tokenCount,
     embedding: embeddings[i] ?? [],

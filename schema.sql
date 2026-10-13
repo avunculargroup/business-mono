@@ -2276,13 +2276,27 @@ CREATE TABLE transcript_segments (
   segment_index INT NOT NULL,
   start_seconds NUMERIC(10,2),
   end_seconds   NUMERIC(10,2),
-  speaker       TEXT,
-  content       TEXT NOT NULL,
+  speaker       TEXT,                       -- primary speaker: owns >= 75% of content chars
+  speakers      TEXT[] NOT NULL DEFAULT '{}', -- everyone in the segment, first-appearance order
+  content       TEXT NOT NULL,              -- mixed-speaker: one turn per line, `[Name] ` prefix
   token_count   INT,
   embedding     VECTOR(1536),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops).
+-- Indexes: btree on episode_id; HNSW (embedding vector_cosine_ops); GIN on speakers.
+
+-- Per-utterance transcript with raw diarisation labels and the label → name map
+-- (migration 20261013000000_turn_aware_transcript_segments). Off podcast_episodes
+-- because that table is on realtime. timing 'interpolated' marks backfilled rows
+-- whose inner timestamps are estimated from the old segment boundaries.
+CREATE TABLE podcast_transcript_utterances (
+  episode_id   UUID PRIMARY KEY REFERENCES podcast_episodes(id) ON DELETE CASCADE,
+  timing       TEXT NOT NULL CHECK (timing IN ('deepgram', 'interpolated')),
+  utterances   JSONB NOT NULL,                -- [{ start, end, label, speaker, text }]
+  speaker_map  JSONB NOT NULL DEFAULT '{}',   -- { "Speaker 0": "Jeff Snider" }
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- Views: v_podcast_ingestion_status (health dashboard),
 -- v_episodes_awaiting_action (stuck/errored episodes for Simon), and

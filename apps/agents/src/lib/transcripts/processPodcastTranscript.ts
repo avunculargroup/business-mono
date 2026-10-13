@@ -1,5 +1,5 @@
 import { logActivity } from '../../tools/activity.js';
-import { storeAvailableTranscript, updateEpisode } from './store.js';
+import { storeAvailableTranscript, updateEpisode, upsertUtterances } from './store.js';
 import { inferAndApplySpeakerNames } from './inferSpeakerNames.js';
 import type { TimedSegment } from './parsers.js';
 import { createLogger } from '../logger.js';
@@ -42,8 +42,11 @@ export async function processPodcastTranscript(
   results: DeepgramResults,
 ): Promise<void> {
   let embedded: number;
+  let segments: TimedSegment[];
+  let labels: Array<string | null>;
+  let speakerMap: Record<string, string> = {};
   try {
-    const segments = buildTimedSegments(results);
+    segments = buildTimedSegments(results);
     if (segments.length === 0) {
       await updateEpisode(episodeId, {
         transcript_status: 'failed',
@@ -52,12 +55,16 @@ export async function processPodcastTranscript(
       return;
     }
 
+    // Snapshot the raw diarisation labels before naming rewrites them, so the
+    // stored utterances keep both and naming can be re-run without Deepgram.
+    labels = segments.map((s) => s.speaker);
+
     // Relabel the generic "Speaker N" diarisation labels with inferred real names
     // (from the episode description + transcript) before the text is built and the
     // segments are embedded, so both stay consistent. Best-effort: a naming failure
     // must never demote a good transcript, so swallow it and keep the raw labels.
     try {
-      await inferAndApplySpeakerNames(episodeId, segments);
+      ({ map: speakerMap } = await inferAndApplySpeakerNames(episodeId, segments));
     } catch (err) {
       log.warn({ err, episodeId }, 'speaker-name inference failed (keeping generic labels)');
     }
@@ -81,6 +88,24 @@ export async function processPodcastTranscript(
       transcript_error: err instanceof Error ? err.message : String(err),
     });
     return;
+  }
+
+  // Best-effort, like the activity log below: the episode is already
+  // 'available', so a failed side-table write must never demote it.
+  try {
+    await upsertUtterances(episodeId, {
+      timing: 'deepgram',
+      utterances: segments.map((s, i) => ({
+        start: s.start,
+        end: s.end,
+        label: labels[i] ?? null,
+        speaker: s.speaker,
+        text: s.text,
+      })),
+      speakerMap,
+    });
+  } catch (err) {
+    log.warn({ err, episodeId }, 'utterance persist failed (transcript is stored)');
   }
 
   // The transcript is stored and embedded — the episode is already 'available'.

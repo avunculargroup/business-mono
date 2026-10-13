@@ -40,6 +40,7 @@ src/
   mastra/          # The Mastra instance — agent, workflow and API-route registration
   observability/   # Exporter wiring + span processors (agent_activity mirror, trace recorder)
   seeds/           # One-off seed scripts (seed:voice)
+  scripts/         # One-off backfills (backfill:rechunk — turn-aware transcript re-chunk)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
 ```

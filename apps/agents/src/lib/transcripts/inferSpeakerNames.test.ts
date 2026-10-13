@@ -77,9 +77,10 @@ describe('inferAndApplySpeakerNames', () => {
     });
     const segs = [seg('Speaker 0', 'hi'), seg('Speaker 1', 'yo')];
 
-    const renamed = await inferAndApplySpeakerNames('ep-1', segs);
+    const { renamed, map } = await inferAndApplySpeakerNames('ep-1', segs);
 
     expect(renamed).toBe(1);
+    expect(map).toEqual({ 'Speaker 0': 'Jane Doe' });
     expect(segs[0]!.speaker).toBe('Jane Doe');
     expect(segs[1]!.speaker).toBe('Speaker 1');
   });
@@ -90,14 +91,14 @@ describe('inferAndApplySpeakerNames', () => {
     });
     const segs = [seg('Speaker 0', 'hi')];
 
-    expect(await inferAndApplySpeakerNames('ep-1', segs)).toBe(0);
+    expect(await inferAndApplySpeakerNames('ep-1', segs)).toEqual({ renamed: 0, map: {} });
     expect(segs[0]!.speaker).toBe('Speaker 0');
   });
 
-  it('returns 0 without calling the model when no segments carry a speaker', async () => {
+  it('returns nothing renamed without calling the model when no segments carry a speaker', async () => {
     const segs = [seg(null, 'plain text')];
 
-    expect(await inferAndApplySpeakerNames('ep-1', segs)).toBe(0);
+    expect(await inferAndApplySpeakerNames('ep-1', segs)).toEqual({ renamed: 0, map: {} });
     expect(rogerGenerate).not.toHaveBeenCalled();
   });
 
