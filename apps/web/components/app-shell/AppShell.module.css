@@ -1,6 +1,11 @@
 .shell {
   display: flex;
   height: 100vh;
+  /* The visible viewport, not the largest one. `main` scrolls inside this box
+     and contains its overscroll, so the document never scrolls and mobile
+     browser toolbars never collapse — at 100vh the last ~80px of `main` sat
+     under the toolbar/bottom bar, reachable only mid-bounce. */
+  height: 100dvh;
 }
 
 .main {
