@@ -212,7 +212,9 @@ CREATE TABLE paper_locations (
   licence          TEXT REFERENCES paper_licences(code),
   oa_status        TEXT CHECK (oa_status IN ('diamond','gold','green','hybrid','bronze','closed')),
   is_oa            BOOLEAN NOT NULL DEFAULT FALSE,
-  reported_by      TEXT NOT NULL,                    -- 'openalex','crossref','arxiv','manual'
+  doi              TEXT,                             -- a copy with its own DOI: preprint, working paper (rule 4)
+  reported_by      TEXT NOT NULL,                    -- 'openalex','crossref','repository','arxiv','manual'
+  verified_at_host BOOLEAN NOT NULL DEFAULT FALSE,   -- rule 3: confirmed against the repository's own record
   last_checked_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (paper_id, landing_url)
 );
@@ -329,9 +331,22 @@ Everything that reaches the fork has already been deduplicated, classified for p
 | --- | --- | --- |
 | `paperBackfill` | Once, then on demand | Reads the OpenAlex CC0 snapshot from S3, filtered to works with bitcoin in title or abstract. Seeds the register without spending API budget |
 | `paperWatch` | Daily 06:00 AEST via a `routines` row | Runs each active `paper_watches` query from its high-water mark; Crossref by index date; venue RSS; arXiv listings. Inserts candidates and a `discovered` event |
-| `paperResolve` | Per candidate (`.foreach`, concurrency 5) | OpenAlex singleton lookups (free) plus Crossref for abstract, licence URLs and `update-to`. Computes peer-review status and relevance tier, calls Rex, then writes locations and access tier via a SQL function so the tier is reproducible |
+| `paperResolve` | Per candidate (`.foreach`, concurrency 5) | OpenAlex singleton lookups (free) plus Crossref for abstract, licence deposits and `update-to`. Reconciles the two under the rules below, computes peer-review status and relevance tier, calls Rex, then writes locations and access tier via a SQL function so the tier is reproducible |
 | `paperEnrich` | Per paper reaching `core` or `substantial` | Hosted branch: fetch PDF, hash, upload, insert `paper_files` (trigger re-checks the licence), extract text (reusing the news pipeline's OCR fallback), chunk by section, embed. Both branches: Charlie summary, linter, Lex, status `draft` |
 | `paperRecheck` | Weekly | Re-resolves locations for non-hosted papers to catch lifted embargoes; syncs retractions since last run; refreshes citation counts monthly |
+
+### Source reconciliation rules
+
+OpenAlex is the index, not the authority on licences or versions. The [golden-set recheck](../../../apps/agents/evals/library-papers/openalex-recheck.md) (2026-10-18) found OpenAlex wrong about a copy's version, access or identity on six of 40 papers (gs-22, gs-23, gs-24, gs-35, gs-37, gs-38), and the publishers' Crossref licence deposits corrected two hand labels (gs-28, gs-36). `paperResolve` applies these rules before computing the access tier.
+
+1. **Read the publisher's Crossref licence deposit.** Crossref `license[]` with `content-version: vor` is the publisher stating the licence of the version of record. The tier uses the union of OpenAlex locations and that deposit. This caught a CC BY-NC (gs-28) and a CC BY (gs-36) version of record that the hand labels missed.
+2. **SSRN never counts as a published or accepted version.** SSRN hosts working papers and preprints, whatever OpenAlex calls the location (gs-24, gs-35). Kept as a host rule in code, alongside any others found later.
+3. **Confirm repository copies at the repository.** OpenAlex's `is_oa` and `version` on repository locations can be wrong in both directions (gs-22, gs-23). Before a repository copy moves a paper up or down a tier, read the repository's own record: OAI-PMH or the EPrints/DSpace export, for `content`, `security`, `license` and embargo.
+4. **A different-DOI hit is a copy, not a paper.** When an OpenAlex lookup for DOI X returns a work whose DOI is Y, and Y is already in `papers`, X is recorded as a `paper_locations` row on that paper with its own `doi`, not as a second paper. OpenAlex merges preprints into published works this way (gs-37 into gs-15), and labels the preprint `acceptedVersion`; a preprint server's copy is always `submittedVersion`.
+5. **Never accept a title match on its own.** A title search for a record with no DOI can return its published namesake (gs-38 returned gs-29). Title, year and first author are not enough; a title-only candidate goes to the review queue unmatched.
+6. **Venue-template licence tags are not licences.** A `dc.rights` meta tag on a publisher page counts only if the publisher's Crossref deposit or the article's own licence statement agrees (gs-20).
+
+Each rule's input and verdict go into `paper_events`, so a tier can always be traced to the copy and the rule that set it.
 
 Following the Corporate Research decision, there is no interactive suspend: output lands as `draft` rows in the review queue, and promotion to `published` is a human action.
 
@@ -462,7 +477,7 @@ Five sessions, extending the usual data → ingest → panel pattern with an enr
 2. **Session 1 — data layer.** Migrations for all tables, the licence trigger, views, RLS, the private `papers` bucket, and new `routines.action_type` values (`paper_watch`, `paper_resolve`, `paper_licence_recheck`).
    - Acceptance: inserting a `paper_files` row with `cc-by-nc` raises; `v_minute_papers` returns nothing for a `draft`; a subscriber session cannot select `candidate` rows.
 3. **Session 2 — discovery and resolution.** `paperBackfill` (OpenAlex S3 snapshot), `paperWatch`, `paperResolve`, deterministic tiering, Rex confirmation, retraction sync.
-   - Acceptance: golden set lands with correct relevance tier on at least 36 of 40 and correct access tier on 40 of 40. Access tier is deterministic, so anything less is a bug. Re-running the watch creates zero duplicates.
+   - Acceptance: golden set lands with correct relevance tier on at least 36 of 40 and correct access tier on 40 of 40 under the [source reconciliation rules](#source-reconciliation-rules); every entry with a `knownSourceError` comes out right; gs-37 lands as a copy of gs-15, not a second paper. Re-running the watch creates zero duplicates.
 4. **Session 3 — files and enrichment.** `paperEnrich`: PDF fetch for `read_here`, text extraction, chunking and embedding, Charlie summaries, banned-phrase linter, Lex gate.
    - Acceptance: every finding in a full-text summary carries a locator that resolves to a real page; abstract-only summaries contain no claim absent from the abstract (Mastra scorer over the golden set).
 5. **Session 4 — HQ review UI.** Queue, watches, venues, licences, health strip, Simon digest.

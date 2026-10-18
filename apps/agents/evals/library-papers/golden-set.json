@@ -559,21 +559,22 @@
       "bestLicence": "cc-by",
       "isRetracted": false
     },
-    "expectedRelations": [
-      {
-        "relation": "published_version_of",
-        "from": "gs-15",
-        "to": "gs-37"
-      }
-    ],
     "copies": [
       {
         "host": "publisher",
         "version": "publishedVersion",
         "licence": "cc-by"
+      },
+      {
+        "host": "preprint_server",
+        "source": "Preprints.org",
+        "version": "submittedVersion",
+        "licence": "cc-by",
+        "doi": "10.20944/preprints202108.0555.v1",
+        "url": "https://www.preprints.org/manuscript/202108.0555"
       }
     ],
-    "rationale": "Bibliometric study of bitcoin research; bitcoin is the subject. Published version of the preprint gs-37.",
+    "rationale": "Bibliometric study of bitcoin research; bitcoin is the subject. OpenAlex holds the preprint gs-37 inside this record, so the preprint lands as a copy here.",
     "tags": [
       "version-pair"
     ],
@@ -774,23 +775,25 @@
     "expected": {
       "peerReviewStatus": "peer_reviewed",
       "relevanceTier": "excluded",
-      "accessTier": "read_here",
-      "bestLicence": "cc-by",
+      "accessTier": "metadata_only",
+      "bestLicence": null,
       "isRetracted": false
     },
     "copies": [
       {
         "host": "publisher",
         "version": "publishedVersion",
-        "licence": "cc-by",
-        "url": "https://jcst.ict.ac.cn/article/doi/10.1007/s11390-021-1674-4"
+        "licence": null,
+        "isOa": false
       }
     ],
-    "rationale": "Ethereum smart-contract gas patterns; bitcoin not in the abstract. A likely false positive for a broad crypto query.",
-    "licenceNote": "The co-publisher page's metadata lists CC BY 3.0; treat as cc-by for tiering.",
-    "checkedOn": "2026-10-11",
+    "publisherJoinedI4OA": false,
+    "rationale": "Ethereum smart-contract gas patterns; bitcoin not in the abstract. A likely false positive for a broad crypto query. Closed at Springer, which deposits abstracts only for its open-access content.",
+    "licenceNote": "The co-publisher page carries a CC BY 3.0 dc.rights meta tag, but its footer reads 'All Rights Reserved', Springer's Crossref deposit has only its TDM licence and OpenAlex lists one closed copy. The tag is treated as site template, not an article licence.",
+    "checkedOn": "2026-10-18",
     "sources": [
-      "https://jcst.ict.ac.cn/article/doi/10.1007/s11390-021-1674-4"
+      "https://jcst.ict.ac.cn/article/doi/10.1007/s11390-021-1674-4",
+      "https://api.crossref.org/works/10.1007/s11390-021-1674-4"
     ]
   },
   {
@@ -833,7 +836,6 @@
     "tags": [
       "green-no-licence"
     ],
-    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.soton.ac.uk/400597"
@@ -881,7 +883,7 @@
     "tags": [
       "green-no-licence"
     ],
-    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "knownSourceError": "OpenAlex marks the Southampton accepted manuscript closed; the repository export says public, no embargo.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.soton.ac.uk/447739"
@@ -889,7 +891,7 @@
   },
   {
     "id": "gs-23",
-    "title": "Cryptocurrencies as a financial asset: A systematic analysis",
+    "title": "RETRACTED: Cryptocurrencies as a financial asset: A systematic analysis",
     "authors": [
       "Shaen Corbet",
       "Brian Lucey",
@@ -908,8 +910,8 @@
       "peerReviewStatus": "peer_reviewed",
       "relevanceTier": "substantial",
       "accessTier": "read_at_source",
-      "bestLicence": null,
-      "isRetracted": false
+      "bestLicence": "cc-by-nc-nd",
+      "isRetracted": true
     },
     "copies": [
       {
@@ -922,19 +924,21 @@
         "host": "repository",
         "source": "University of Southampton ePrints",
         "version": "acceptedVersion",
-        "licence": null,
+        "licence": "cc-by-nc-nd",
         "url": "https://eprints.soton.ac.uk/425053"
       }
     ],
-    "rationale": "Systematic review of cryptocurrencies as an asset class; bitcoin is the main but not sole subject.",
+    "rationale": "Systematic review of cryptocurrencies as an asset class; bitcoin is the main but not sole subject. Retracted in February 2026 (notice 10.1016/j.irfa.2026.105078). The Southampton accepted manuscript is CC BY-NC-ND: link out, do not host.",
     "tags": [
-      "green-no-licence"
+      "retraction",
+      "non-commercial-licence"
     ],
-    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
-    "checkedOn": "2026-10-11",
+    "knownSourceError": "OpenAlex types the Southampton copy as submittedVersion; the repository export says accepted.",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.soton.ac.uk/425053",
-      "https://ideas.repec.org/a/eee/finana/v62y2019icp182-199.html"
+      "https://ideas.repec.org/a/eee/finana/v62y2019icp182-199.html",
+      "https://doi.org/10.1016/j.irfa.2026.105078"
     ]
   },
   {
@@ -978,7 +982,7 @@
     "tags": [
       "non-commercial-licence"
     ],
-    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
+    "knownSourceError": "OpenAlex treats an SSRN working paper (10.2139/ssrn.3171204) as the free publishedVersion and the LSE accepted versions as closed.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.lse.ac.uk/100409"
@@ -1020,7 +1024,6 @@
     "tags": [
       "bronze"
     ],
-    "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/oup/rfinst/v34y2021i6p2689-2727..html",
@@ -1063,7 +1066,6 @@
     "tags": [
       "accounting"
     ],
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://emeraldinsight.com/doi/full/10.1108/MEDAR-07-2015-0035",
@@ -1101,7 +1103,6 @@
     ],
     "publisherJoinedI4OA": true,
     "rationale": "Drivers of bitcoin returns across quantiles; core. Closed, Emerald supports I4OA.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eme/jrfpps/jrf-05-2024-0154.html",
@@ -1127,25 +1128,29 @@
     "expected": {
       "peerReviewStatus": "peer_reviewed",
       "relevanceTier": "core",
-      "accessTier": "abstract_only",
-      "bestLicence": null,
+      "accessTier": "read_at_source",
+      "bestLicence": "cc-by-nc",
       "isRetracted": false
     },
     "copies": [
       {
         "host": "publisher",
         "version": "publishedVersion",
-        "licence": null,
-        "isOa": false
+        "licence": "cc-by-nc",
+        "isOa": true,
+        "url": "https://academic.oup.com/restud/article-pdf/88/6/3011/41901340/rdab014.pdf"
       }
     ],
     "publisherJoinedI4OA": true,
-    "rationale": "Economics of the bitcoin fee market; core. Closed at OUP (I4OA). The CEPR and Bank of Finland working papers are separate works and do not change the tier.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "rationale": "Economics of the bitcoin fee market; core. OUP's version of record is CC BY-NC 4.0 (deposited in Crossref from 2021-03-13): free to read, not approved for a paid product. The CEPR and Bank of Finland working papers are separate works.",
+    "tags": [
+      "non-commercial-licence"
+    ],
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/oup/restud/v88y2021i6p3011-3040..html",
-      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
+      "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary",
+      "https://api.crossref.org/works/10.1093/restud/rdab014"
     ]
   },
   {
@@ -1189,7 +1194,6 @@
     "tags": [
       "version-pair"
     ],
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v16y2016icp85-92.html",
@@ -1235,7 +1239,6 @@
     "tags": [
       "retraction"
     ],
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://link.springer.com/article/10.1007/s00779-021-01562-z"
@@ -1273,7 +1276,6 @@
     ],
     "publisherJoinedI4OA": false,
     "rationale": "Bitcoin returns and their correlation with the S&P 500; core. Closed, no other versions listed on RePEc.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finsta/v73y2024ics1572308924000706.html"
@@ -1312,7 +1314,6 @@
     ],
     "publisherJoinedI4OA": false,
     "rationale": "Forecasts bitcoin realized volatility; other cryptocurrencies are inputs, bitcoin is the target. Closed.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/ecolet/v208y2021ics0165176521003694.html"
@@ -1350,7 +1351,6 @@
     ],
     "publisherJoinedI4OA": false,
     "rationale": "Bitcoin price response to bitcoin events and monetary policy news (Bitstamp, Mt.Gox); core. Closed.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v27y2018icp259-265.html"
@@ -1388,7 +1388,6 @@
     ],
     "publisherJoinedI4OA": false,
     "rationale": "Volatility models across 606 cryptocurrencies; bitcoin is named only as the most prominent example.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org:443/a/eee/intfor/v38y2022i3p878-894.html"
@@ -1427,7 +1426,7 @@
     ],
     "publisherJoinedI4OA": false,
     "rationale": "NFT pricing; bitcoin not in the abstract. False positive for a crypto query.",
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
+    "knownSourceError": "OpenAlex treats an SSRN preprint (10.2139/ssrn.4080372, Crossref type posted-content) as a free acceptedVersion.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v48y2022ics1544612322002495.html"
@@ -1451,28 +1450,35 @@
     "expected": {
       "peerReviewStatus": "not_peer_reviewed",
       "relevanceTier": "peripheral",
-      "accessTier": "metadata_only",
-      "bestLicence": null,
+      "accessTier": "read_here",
+      "bestLicence": "cc-by",
       "isRetracted": false
     },
     "copies": [
       {
         "host": "publisher",
         "version": "publishedVersion",
-        "licence": null,
-        "isOa": false
+        "licence": "cc-by",
+        "isOa": true
+      },
+      {
+        "host": "repository",
+        "source": "University of Birmingham Research Portal",
+        "version": "publishedVersion",
+        "licence": "cc-by",
+        "url": "https://research.birmingham.ac.uk/en/publications/cryptocurrency-research-future-directions/"
       }
     ],
-    "publisherJoinedI4OA": false,
-    "rationale": "Introduction to a special issue reviewing cryptocurrency research; an editorial, not a refereed research article. Bitcoin appears only as historical context.",
+    "rationale": "Introduction to a special issue reviewing cryptocurrency research; an editorial, not a refereed research article, so it never publishes. Bitcoin appears only as historical context. The version of record is CC BY 4.0.",
     "hardCase": true,
     "tags": [
       "editorial"
     ],
-    "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
-      "https://ideas.repec.org/a/taf/eurjfi/v30y2024i16p1849-1854.html"
+      "https://ideas.repec.org/a/taf/eurjfi/v30y2024i16p1849-1854.html",
+      "https://api.crossref.org/works/10.1080/1351847X.2023.2284186",
+      "https://research.birmingham.ac.uk/en/publications/cryptocurrency-research-future-directions/"
     ]
   },
   {
@@ -1497,6 +1503,11 @@
       "bestLicence": "cc-by",
       "isRetracted": false
     },
+    "expectedResolution": {
+      "mergeInto": "gs-15",
+      "as": "copy",
+      "note": "Its DOI resolves in OpenAlex to gs-15's record (W3198344353). The pipeline stores it as a submittedVersion copy of gs-15 with its own DOI, not as a second paper."
+    },
     "copies": [
       {
         "host": "preprint_server",
@@ -1505,11 +1516,12 @@
         "url": "https://www.preprints.org/manuscript/202108.0555"
       }
     ],
-    "rationale": "Preprint of gs-15; the page states it is not peer reviewed. Tracked internally, never published in Minute; the pipeline should link it to gs-15.",
+    "rationale": "Preprint of gs-15; the page states it is not peer reviewed. Never published in Minute.",
     "tags": [
       "version-pair"
     ],
-    "checkedOn": "2026-10-11",
+    "knownSourceError": "OpenAlex lists the Preprints.org copy as acceptedVersion; the page says it is not peer reviewed, so it is a submittedVersion.",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://www.preprints.org/manuscript/202108.0555"
     ]
@@ -1549,7 +1561,8 @@
       "version-pair",
       "no-doi"
     ],
-    "checkedOn": "2026-10-11",
+    "knownSourceError": "Not in OpenAlex. A title search returns gs-29's journal article with the same title, year (OpenAlex dates it 2015) and sole author; a title match must never be accepted on its own.",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://researchrepository.ucd.ie/entities/publication/8eb9f816-95c1-4072-a0b4-1e7e4f0ba80c"
     ]

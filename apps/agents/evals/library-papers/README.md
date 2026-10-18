@@ -7,14 +7,16 @@
 Acceptance, from the spec's build sequence:
 
 - relevance tier matches on at least 36 of 40;
-- access tier matches on 40 of 40 (it is deterministic, so a miss is a bug in the code or in a label);
+- access tier matches on 40 of 40, computed with the spec's
+  [source reconciliation rules](../../../../docs/features/client-app/library-papers-spec.md#source-reconciliation-rules),
+  so every entry with a `knownSourceError` comes out right despite OpenAlex;
 - no duplicates when the watch runs again over the same identifiers.
 
 ## What is in it
 
 | | Count |
 | --- | --- |
-| `read_here` / `read_at_source` / `abstract_only` / `metadata_only` | 21 / 8 / 3 / 8 |
+| `read_here` / `read_at_source` / `abstract_only` / `metadata_only` | 21 / 9 / 2 / 8 |
 | `core` / `substantial` / `peripheral` / `excluded` | 24 / 7 / 4 / 5 |
 | `peer_reviewed` / `preprint` / `not_peer_reviewed` | 35 / 1 / 4 |
 | Would publish (peer reviewed and `core` or `substantial`) | 27 |
@@ -24,12 +26,13 @@ Royal Society Open Science and Financial Innovation.
 
 Edge cases each have their own entry:
 
-- a version pair: preprint gs-37 → published gs-15;
+- a preprint OpenAlex has merged into its published version (gs-37 into gs-15; `expectedResolution`);
 - a working paper with a different licence from its published version (gs-38 → gs-29);
 - a correction (gs-08);
-- a retraction (gs-30);
+- two retractions, one closed (gs-30) and one with a free copy (gs-23);
 - a bronze free copy (gs-25);
-- a CC BY-NC-ND copy (gs-24);
+- non-commercial licences: CC BY-NC on the version of record (gs-28), CC BY-NC-ND on accepted
+  manuscripts (gs-23, gs-24);
 - a law journal (gs-39);
 - an editorial (gs-36);
 - three records with no DOI (gs-38, gs-39, gs-40).
@@ -62,23 +65,38 @@ A working paper or preprint is a separate work. It never lifts the tier of its p
 
 Rules 3 and 4 assume the abstract policy recommended on 10 October 2026: default to `summary_only`,
 and show an abstract verbatim only when the publisher supports I4OA. The spec branch still defaults
-`abstract_policy` to `display`. If that stays, the seven peer-reviewed `metadata_only` papers become
-`abstract_only`.
+`abstract_policy` to `display`. If that stays, the eight `metadata_only` papers become `abstract_only`
+wherever the publisher has an abstract.
 
 ## How each label was checked
 
-Each entry lists the pages it was checked against, with `checkedOn: 2026-10-11`. The check used
-publisher, repository and RePEc pages, because the OpenAlex and Crossref APIs were not reachable from the
-build session.
+Labels were first set on 2026-10-11 from publisher, repository and RePEc pages. On 2026-10-18 every
+entry with an identifier was looked up in OpenAlex, and every disagreement was settled by reading the copy
+itself or the publisher's Crossref licence deposit; see [`openalex-recheck.md`](./openalex-recheck.md).
+That recheck changed four labels:
 
-The 16 entries with a `recheck` field (gs-21 to gs-36) are the closed and non-CC BY papers. For those,
-"no free copy" or "no licence" means that none was found, not that none exists. Once the
-OpenAlex key is registered in Session 0, look each one up once by DOI. If OpenAlex disagrees, read the
-copy it reports before changing a label.
+- gs-20 became `metadata_only`: its CC BY tag was site template, not an article licence.
+- gs-23 is retracted, and its free copy is CC BY-NC-ND.
+- gs-28 became `read_at_source`: CC BY-NC on the version of record.
+- gs-36 became `read_here`: CC BY on the version of record.
 
-Two licences are inferred rather than read from the article page:
+gs-39 and gs-40 are not in OpenAlex and keep their 2026-10-11 check.
 
-- gs-18 (Financial Innovation): the journal is fully open access.
-- gs-20: the co-publisher's metadata states CC BY 3.0.
+## Known source errors
 
-Both carry a `licenceNote`.
+Six entries carry a `knownSourceError`: what OpenAlex reports and why the label differs. They are
+there so the pipeline is tested against OpenAlex as it really is, not as it should be.
+
+| Entry | OpenAlex error | Rule that handles it |
+| --- | --- | --- |
+| gs-22 | Calls a public repository accepted manuscript closed | Confirm repository copies at the repository |
+| gs-23 | Calls an accepted manuscript a submitted version | Confirm repository copies at the repository |
+| gs-24, gs-35 | Treats SSRN working papers and preprints as published or accepted copies | SSRN never counts as published or accepted |
+| gs-37 | Merges the preprint into its published work, as an accepted version | A different-DOI hit becomes a copy, not a paper |
+| gs-38 | Title search returns the journal article for the working paper | Never accept a title match on its own |
+
+gs-28 and gs-36 are not OpenAlex errors, but they are why the pipeline also reads the publisher's
+Crossref licence deposit: my original labels missed both.
+
+One licence is still inferred rather than read from the article page: gs-18 (Financial Innovation), from
+the journal being fully open access. It carries a `licenceNote`.
