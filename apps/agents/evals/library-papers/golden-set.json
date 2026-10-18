@@ -14,7 +14,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2018.127"
+      "doi": "10.5195/ledger.2018.127",
+      "openalexId": "W2766522683"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -32,7 +33,7 @@
       }
     ],
     "rationale": "Bitcoin's proof-of-work and signature scheme are the object of study.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/127",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -49,7 +50,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2018.99"
+      "doi": "10.5195/ledger.2018.99",
+      "openalexId": "W2684611407"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -67,7 +69,7 @@
       }
     ],
     "rationale": "Derives a bitcoin-specific on-chain measure (bitcoin-days destroyed).",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/99",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -84,7 +86,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2017.96"
+      "doi": "10.5195/ledger.2017.96",
+      "openalexId": "W2752685521"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -102,7 +105,7 @@
       }
     ],
     "rationale": "Models bitcoin mining as an all-pay contest.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/96",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -121,7 +124,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2018.101"
+      "doi": "10.5195/ledger.2018.101",
+      "openalexId": "W2737898592"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -139,7 +143,7 @@
       }
     ],
     "rationale": "Review article on methods of embedding data in the Bitcoin blockchain.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/101",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -156,7 +160,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2019.145"
+      "doi": "10.5195/ledger.2019.145",
+      "openalexId": "W2948297784"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -174,7 +179,7 @@
       }
     ],
     "rationale": "Models bitcoin fees as an auction for block space.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/145",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -191,7 +196,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2019.170"
+      "doi": "10.5195/ledger.2019.170",
+      "openalexId": "W2965460652"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -209,7 +215,7 @@
       }
     ],
     "rationale": "Uses LocalBitcoins bolivar prices to estimate an unofficial exchange rate; bitcoin is the instrument studied.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/170",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -229,7 +235,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2021.226"
+      "doi": "10.5195/ledger.2021.226",
+      "openalexId": "W3197440365"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -247,7 +254,7 @@
       }
     ],
     "rationale": "Six cryptocurrencies studied; bitcoin is discussed in the abstract alongside the others, not alone.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/226",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -266,7 +273,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2018.121"
+      "doi": "10.5195/ledger.2018.121",
+      "openalexId": "W2884644642"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -296,7 +304,7 @@
     "tags": [
       "correction"
     ],
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/121",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -314,7 +322,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2019.140"
+      "doi": "10.5195/ledger.2019.140",
+      "openalexId": "W2621187651"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -332,7 +341,7 @@
       }
     ],
     "rationale": "Taxonomy across many blockchain systems; bitcoin is one system among several and absent from the abstract.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/140",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -350,7 +359,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2017.103"
+      "doi": "10.5195/ledger.2017.103",
+      "openalexId": "W2780738242"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -368,7 +378,7 @@
       }
     ],
     "rationale": "About the SMLY altcoin in education; bitcoin appears only in the reference list.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/103",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -385,7 +395,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2017.104"
+      "doi": "10.5195/ledger.2017.104",
+      "openalexId": "W2778808321"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -403,7 +414,7 @@
       }
     ],
     "rationale": "Generic blockchain and protocol economics; bitcoin not in the abstract.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/104",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -422,7 +433,8 @@
     "venueType": "journal",
     "publisher": "University Library System, University of Pittsburgh",
     "identifiers": {
-      "doi": "10.5195/ledger.2019.144"
+      "doi": "10.5195/ledger.2019.144",
+      "openalexId": "W2748470613"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -440,7 +452,7 @@
       }
     ],
     "rationale": "Distributed ledgers for securities settlement; bitcoin not in the abstract.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ledger.pitt.edu/ojs/ledger/article/view/144",
       "https://ledger.pitt.edu/ojs/ledger/announcement/view/28"
@@ -457,7 +469,8 @@
     "venueType": "journal",
     "publisher": "PLOS",
     "identifiers": {
-      "doi": "10.1371/journal.pone.0123923"
+      "doi": "10.1371/journal.pone.0123923",
+      "openalexId": "W2162338668"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -481,7 +494,7 @@
       }
     ],
     "rationale": "Drivers of the bitcoin price; bitcoin is the object of study.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://wrap.warwick.ac.uk/67266/"
     ]
@@ -497,7 +510,8 @@
     "venueType": "journal",
     "publisher": "Frontiers",
     "identifiers": {
-      "doi": "10.3389/fphy.2020.00296"
+      "doi": "10.3389/fphy.2020.00296",
+      "openalexId": "W3014288492"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -517,7 +531,7 @@
     "tags": [
       "sample-period"
     ],
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://www.frontiersin.org/journals/physics/articles/10.3389/fphy.2020.00296/full"
     ]
@@ -535,7 +549,8 @@
     "venueType": "journal",
     "publisher": "MDPI",
     "identifiers": {
-      "doi": "10.3390/jrfm14090427"
+      "doi": "10.3390/jrfm14090427",
+      "openalexId": "W3198344353"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -562,7 +577,7 @@
     "tags": [
       "version-pair"
     ],
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://www.mdpi.com/1911-8074/14/9/427/reprints",
       "https://mdpi.com/openaccess"
@@ -582,7 +597,8 @@
     "venueType": "journal",
     "publisher": "SAGE",
     "identifiers": {
-      "doi": "10.1177/2158244020926508"
+      "doi": "10.1177/2158244020926508",
+      "openalexId": "W3029206523"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -606,7 +622,7 @@
       }
     ],
     "rationale": "Compares gold and bitcoin as hedge, safe haven and diversifier; bitcoin is one of two subjects with its own findings.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://mro.massey.ac.nz/handle/10179/70229",
       "https://doaj.org/article/a346e98323a6459fa290b1d3aa188f84"
@@ -624,7 +640,8 @@
     "venueType": "journal",
     "publisher": "MDPI",
     "identifiers": {
-      "doi": "10.3390/jrfm16090379"
+      "doi": "10.3390/jrfm16090379",
+      "openalexId": "W4386134162"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -644,7 +661,7 @@
     "tags": [
       "accounting"
     ],
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/gam/jjrfmx/v16y2023i9p379-d1223578.html",
       "https://www.citedrive.com/en/discovery/determining-the-appropriate-accounting-treatment-of-cryptocurrencies-based-on-accounting-theory",
@@ -664,7 +681,8 @@
     "venueType": "journal",
     "publisher": "Springer Nature (SpringerOpen)",
     "identifiers": {
-      "doi": "10.1186/s40854-025-00773-0"
+      "doi": "10.1186/s40854-025-00773-0",
+      "openalexId": "W4408597036"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -682,7 +700,7 @@
     ],
     "rationale": "Survey of bitcoin as speculative and safe-haven asset; bitcoin is the subject.",
     "licenceNote": "Financial Innovation is a fully open-access, DOAJ-listed SpringerOpen journal; the article-level licence page could not be fetched on the check date.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/spr/fininn/v11y2025i1d10.1186_s40854-025-00773-0.html",
       "https://www.doaj.org/toc/2199-4730"
@@ -703,7 +721,8 @@
     "venueType": "journal",
     "publisher": "The Royal Society",
     "identifiers": {
-      "doi": "10.1098/rsos.170623"
+      "doi": "10.1098/rsos.170623",
+      "openalexId": "W2768283313"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -727,7 +746,7 @@
       }
     ],
     "rationale": "Whole-market study of 1,469 cryptocurrencies; the abstract mentions bitcoin only as the focus of earlier research.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://openaccess.city.ac.uk/id/eprint/17657/"
     ]
@@ -749,7 +768,8 @@
     "venueType": "journal",
     "publisher": "Springer Nature / Science Press",
     "identifiers": {
-      "doi": "10.1007/s11390-021-1674-4"
+      "doi": "10.1007/s11390-021-1674-4",
+      "openalexId": "W4212832141"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -784,7 +804,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.econlet.2016.09.019"
+      "doi": "10.1016/j.econlet.2016.09.019",
+      "openalexId": "W2523675164"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -813,7 +834,7 @@
       "green-no-licence"
     ],
     "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.soton.ac.uk/400597"
     ]
@@ -831,7 +852,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.frl.2021.102016"
+      "doi": "10.1016/j.frl.2021.102016",
+      "openalexId": "W3138333603"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -860,7 +882,7 @@
       "green-no-licence"
     ],
     "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.soton.ac.uk/447739"
     ]
@@ -879,7 +901,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.irfa.2018.09.003"
+      "doi": "10.1016/j.irfa.2018.09.003",
+      "openalexId": "W2799345028"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -926,7 +949,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.jfineco.2019.07.001"
+      "doi": "10.1016/j.jfineco.2019.07.001",
+      "openalexId": "W2809373714"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -955,7 +979,7 @@
       "non-commercial-licence"
     ],
     "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://eprints.lse.ac.uk/100409"
     ]
@@ -972,7 +996,8 @@
     "venueType": "journal",
     "publisher": "Oxford University Press",
     "identifiers": {
-      "doi": "10.1093/rfs/hhaa113"
+      "doi": "10.1093/rfs/hhaa113",
+      "openalexId": "W3124611303"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -996,7 +1021,7 @@
       "bronze"
     ],
     "recheck": "Free copies were checked on the publisher page, RePEc and a web search; re-check against OpenAlex locations in Session 2. A CC BY copy found then moves the paper up a tier.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/oup/rfinst/v34y2021i6p2689-2727..html",
       "https://sfs.org/editors-choice-346/"
@@ -1015,7 +1040,8 @@
     "venueType": "journal",
     "publisher": "Emerald",
     "identifiers": {
-      "doi": "10.1108/MEDAR-07-2015-0035"
+      "doi": "10.1108/MEDAR-07-2015-0035",
+      "openalexId": "W2339420092"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1038,7 +1064,7 @@
       "accounting"
     ],
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://emeraldinsight.com/doi/full/10.1108/MEDAR-07-2015-0035",
       "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
@@ -1055,7 +1081,8 @@
     "venueType": "journal",
     "publisher": "Emerald",
     "identifiers": {
-      "doi": "10.1108/JRF-05-2024-0154"
+      "doi": "10.1108/JRF-05-2024-0154",
+      "openalexId": "W4405331752"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1075,7 +1102,7 @@
     "publisherJoinedI4OA": true,
     "rationale": "Drivers of bitcoin returns across quantiles; core. Closed, Emerald supports I4OA.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eme/jrfpps/jrf-05-2024-0154.html",
       "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
@@ -1094,7 +1121,8 @@
     "venueType": "journal",
     "publisher": "Oxford University Press",
     "identifiers": {
-      "doi": "10.1093/restud/rdab014"
+      "doi": "10.1093/restud/rdab014",
+      "openalexId": "W3138950545"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1131,7 +1159,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.frl.2015.10.008"
+      "doi": "10.1016/j.frl.2015.10.008",
+      "openalexId": "W2145501956"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1161,7 +1190,7 @@
       "version-pair"
     ],
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v16y2016icp85-92.html",
       "https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary"
@@ -1183,7 +1212,8 @@
     "venueType": "journal",
     "publisher": "Springer Nature",
     "identifiers": {
-      "doi": "10.1007/s00779-021-01562-z"
+      "doi": "10.1007/s00779-021-01562-z",
+      "openalexId": "W3161427439"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1206,7 +1236,7 @@
       "retraction"
     ],
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://link.springer.com/article/10.1007/s00779-021-01562-z"
     ]
@@ -1223,7 +1253,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.jfs.2024.101285"
+      "doi": "10.1016/j.jfs.2024.101285",
+      "openalexId": "W4399035645"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1243,7 +1274,7 @@
     "publisherJoinedI4OA": false,
     "rationale": "Bitcoin returns and their correlation with the S&P 500; core. Closed, no other versions listed on RePEc.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finsta/v73y2024ics1572308924000706.html"
     ]
@@ -1261,7 +1292,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.econlet.2021.110092"
+      "doi": "10.1016/j.econlet.2021.110092",
+      "openalexId": "W3201381514"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1281,7 +1313,7 @@
     "publisherJoinedI4OA": false,
     "rationale": "Forecasts bitcoin realized volatility; other cryptocurrencies are inputs, bitcoin is the target. Closed.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/ecolet/v208y2021ics0165176521003694.html"
     ]
@@ -1298,7 +1330,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.frl.2018.03.013"
+      "doi": "10.1016/j.frl.2018.03.013",
+      "openalexId": "W2793599258"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1318,7 +1351,7 @@
     "publisherJoinedI4OA": false,
     "rationale": "Bitcoin price response to bitcoin events and monetary policy news (Bitstamp, Mt.Gox); core. Closed.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v27y2018icp259-265.html"
     ]
@@ -1335,7 +1368,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.ijforecast.2021.06.005"
+      "doi": "10.1016/j.ijforecast.2021.06.005",
+      "openalexId": "W3193158160"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1355,7 +1389,7 @@
     "publisherJoinedI4OA": false,
     "rationale": "Volatility models across 606 cryptocurrencies; bitcoin is named only as the most prominent example.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org:443/a/eee/intfor/v38y2022i3p878-894.html"
     ]
@@ -1373,7 +1407,8 @@
     "venueType": "journal",
     "publisher": "Elsevier",
     "identifiers": {
-      "doi": "10.1016/j.frl.2022.103007"
+      "doi": "10.1016/j.frl.2022.103007",
+      "openalexId": "W4281249322"
     },
     "expected": {
       "peerReviewStatus": "peer_reviewed",
@@ -1393,7 +1428,7 @@
     "publisherJoinedI4OA": false,
     "rationale": "NFT pricing; bitcoin not in the abstract. False positive for a crypto query.",
     "recheck": "No free copy found on the publisher page, RePEc or web search on the check date; re-check against OpenAlex locations in Session 2.",
-    "checkedOn": "2026-10-11",
+    "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eee/finlet/v48y2022ics1544612322002495.html"
     ]
@@ -1410,7 +1445,8 @@
     "venueType": "journal",
     "publisher": "Taylor & Francis",
     "identifiers": {
-      "doi": "10.1080/1351847X.2023.2284186"
+      "doi": "10.1080/1351847X.2023.2284186",
+      "openalexId": "W4389670457"
     },
     "expected": {
       "peerReviewStatus": "not_peer_reviewed",
