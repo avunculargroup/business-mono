@@ -54,7 +54,8 @@ a tiebreak:
 
 **Access.** Taken from the copies listed on each entry:
 
-1. `read_here`: any copy carries CC BY, CC BY-SA or CC0.
+1. `read_here`: any published or accepted copy carries CC BY, CC BY-SA, CC0 or public domain (for a
+   preprint or working paper, any of its own copies).
 2. `read_at_source`: otherwise, any free copy of the published or accepted version, under any other licence
    or none.
 3. `metadata_only`: no free copy.

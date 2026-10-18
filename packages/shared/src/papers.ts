@@ -1,14 +1,15 @@
 // ============================================================
 // Library papers — keeping a summary apart from the abstract it was written from
 // ============================================================
-// An abstract-only summary of a paywalled paper is ours to display; the
-// publisher's abstract often is not. A summary that lifts the abstract's
-// sentences is the abstract under another name, so the paper linter blocks any
-// run of ABSTRACT_OVERLAP_RUN or more consecutive words shared with the
-// abstract, outside quotation marks. Quoting is how a summary cites the authors
-// and is allowed. The same measure, as a ratio, is the golden-set scorer in
-// apps/agents/evals/scorers/abstractOverlap.ts.
-// Policy: docs/features/client-app/library-papers-spec.md#abstract-policy-for-paywalled-papers
+// A summary of a closed paper is ours to display; the publisher's abstract
+// is not (it reaches a subscriber only for a read_here paper). A summary that
+// lifts the abstract's sentences is the abstract under another name, so the
+// paper linter blocks any run of ABSTRACT_OVERLAP_RUN or more consecutive
+// words shared with the abstract, outside quotation marks. Quoting is how a
+// summary cites the authors and is allowed. The same measure, as a ratio, is
+// the golden-set scorer in apps/agents/evals/scorers/abstractOverlap.ts.
+// Policy: docs/features/client-app/library-papers-spec.md#abstract-policy and
+// #rules-that-keep-the-summaries-honest
 
 export const ABSTRACT_OVERLAP_RUN = 6;
 

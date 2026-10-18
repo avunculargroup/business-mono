@@ -20,22 +20,24 @@ on realtime and a ~150 KB blob would ride every change event. Team-only RLS thro
 
 ---
 
-## 2026-10-10 — Minute library: peer-reviewed papers (data layer)
+## 2026-10-18 — Minute library: peer-reviewed papers (data layer)
 
-`20261010100000_library_papers.sql` adds the thirteen `paper_*` tables behind `/library/papers`,
-the private `papers` storage bucket, `pg_trgm` (in `extensions`), and four `security_invoker`
+`20261018100000_library_papers.sql` adds the twelve `paper_*` tables behind `/library/papers`,
+the private `papers` storage bucket, `pg_trgm` (in `extensions`), and five `security_invoker`
 views. Four rules are enforced in the schema, not in code. First, no stored PDF can exist for
-a licence a named person has not approved, or for one its own location does not carry. Second,
-`access_tier` is derived by `refresh_paper_access()` and logged to `paper_events` whenever a
-copy, licence decision, abstract or publisher decision changes. Third, publishing needs Lex,
-peer review, a relevant tier, a slug, a summary and an accepted venue. Fourth, a publisher's
-abstract is shown verbatim only on a permission signal (an open licence on the paper, a
-recorded publisher decision, or I4OA plus a Crossref deposit), via
-`paper_abstract_displayable()`. The abstract has its own table, so that rule is RLS, and a
-direct REST read cannot get around it. `paper_publishers` records the decision like a licence,
-and a takedown is one row and one event. The seed approves CC BY, BY-SA, CC0, public domain
-and BY-ND (decided by Chris Pollard); every NC licence stays link-out. Where this differs from
-the spec's reference DDL, and why: `docs/features/client-app/library-papers-build-progress.md`.
+a licence a named person has not approved, or for one its own confirmed location does not
+carry. Second, `access_tier` (`read_here`, `read_at_source`, `metadata_only`) is derived by
+`refresh_paper_access()` and logged to `paper_events` whenever a copy, licence decision or
+peer-review status changes; a preprint never lifts its published version, and a repository
+copy counts only once `verified_at_host`. Third, publishing needs Lex, peer review, a relevant
+tier, a slug, a summary and an accepted venue. Fourth, a publisher's abstract, and abstract and
+full-text chunks, reach a subscriber only for a `read_here` paper, by RLS on their own tables.
+The spec's source reconciliation rules that are facts about a copy are `CHECK`s: SSRN is never
+a published or accepted version, a preprint server's copy is a submitted version, and a copy's
+own DOI belongs to one paper. `papers.handle` and `papers.source_url` identify works with no
+DOI, OpenAlex or arXiv ID. The seed approves CC BY, BY-SA, CC0 and public domain (decided by
+Chris Pollard); everything else is link-out. Where this differs from the spec's reference DDL,
+and why: `docs/features/client-app/library-papers-build-progress.md`.
 
 ---
 

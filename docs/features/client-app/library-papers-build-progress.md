@@ -6,10 +6,12 @@ database, and records what has been built. It follows the shape of
 file: it was checked against the repo, and the spec was not.
 
 **Status:** Session 1 (data layer) is built and unapplied. It is one migration,
-[`20261010100000_library_papers.sql`](../../../supabase/migrations/20261010100000_library_papers.sql),
-and it applies when merged to `main`. Session 0 is still open, and Session 2 should not start
-until it closes (see [Session 0](#session-0-what-a-person-has-to-decide)).
-**Last updated:** 2026-10-10
+[`20261018100000_library_papers.sql`](../../../supabase/migrations/20261018100000_library_papers.sql),
+and it applies when merged to `main`. It follows the spec as revised on 18 October 2026: the
+conservative licence and abstract route, and the source reconciliation rules. Session 0 still
+needs an OpenAlex API key, and has [three questions](#questions-for-a-person) about the golden
+set.
+**Last updated:** 2026-10-18
 
 ---
 
@@ -23,8 +25,8 @@ went live.
 
 | # | Spec said | Problem | What was built |
 |---|---|---|---|
-| 1 | `abstract` is a column on `papers`; `v_minute_papers` nulls it under `summary_only` | `papers` is readable by subscribers directly through RLS, so `/rest/v1/papers` bypasses the view and returns the abstract. That is exactly the licensing exposure the abstract policy is meant to prevent. | `paper_abstracts` is its own table, and its subscriber policy calls `paper_abstract_displayable()` (see [The abstract policy](#the-abstract-policy)) |
-| 2 | The `paper_files` trigger checks `NEW.licence` is approved | The licence is whatever the inserting code claims. A pipeline bug could label an arXiv-default PDF `cc-by` and store it. | The trigger also requires an open location for the same paper with the **same licence and version**. Withdrawing a file always succeeds; un-withdrawing runs the gate again |
+| 1 | `abstract` is a column on `papers`, and `v_minute_papers` nulls it unless the paper is `read_here` | `papers` is readable by subscribers directly through RLS, so `/rest/v1/papers` bypasses the view and returns the abstract. That is exactly the licensing exposure the abstract policy is meant to prevent. | `paper_abstracts` is its own table, and its subscriber policy admits only a published `read_here` paper's abstract. `paper_chunks` gets the same rule for abstract and full-text chunks |
+| 2 | The `paper_files` trigger checks `NEW.licence` is approved | The licence is whatever the inserting code claims. A pipeline bug could label an arXiv-default PDF `cc-by` and store it. | The trigger also requires an open location for the same paper with the **same licence and version**, confirmed at the repository if it is a repository copy. Withdrawing a file always succeeds; un-withdrawing runs the gate again |
 | 3 | "The reader gets a short-lived signed URL from a route that checks the subscription first" | Creating a signed URL without a service-role key needs a storage `SELECT` policy for the subscriber, and `apps/client` [never holds a service-role key](./build-progress.md#what-040-changed-and-what-it-cost). Built as written, the route would need that key, or could not sign anything. | `papers_objects_client_select` admits only objects named by a `paper_files` row the subscriber can see: live, under a licence that is still approved, on a published paper |
 
 ### Would have stopped the feature working
@@ -34,9 +36,27 @@ went live.
 | 4 | The route is `/library/papers/[slug]`, but `papers` had no slug | `slug`, unique, kebab-case, required to publish |
 | 5 | "Gold dot on papers added since your last visit", but the only timestamp was `created_at`, which records discovery (often months before publication) | `published_at`, set on first publication |
 | 6 | Trigram index on `title`, but `pg_trgm` is not installed on `bts-internal` (checked live) | `CREATE EXTENSION pg_trgm WITH SCHEMA extensions`, with the opclass schema-qualified |
-| 7 | "The tier moves up automatically and the change is logged", but nothing did either | `refresh_paper_access()` derives the tier. Triggers on locations, abstracts, a paper's venue, a venue's publisher, a publisher's abstract decision and a licence decision call it. Every tier or licence change writes a `paper_events` row |
+| 7 | "The tier moves up automatically and the change is logged", but nothing did either | `refresh_paper_access()` derives the tier. Triggers on locations, a licence decision and a paper's peer-review status call it. Every tier or licence change writes a `paper_events` row |
 | 8 | `UNIQUE (paper_id, landing_url)`, but OpenAlex reports some copies with only a PDF URL, and NULLs never collide | Unique on `(paper_id, COALESCE(landing_url, pdf_url))`, and every location needs at least one URL |
-| 9 | DOI "lowercased, no URL prefix", but only as a comment, while deduplication depends on it | `CHECK`s on DOI, OpenAlex ID (`W…`) and versionless arXiv ID |
+| 9 | DOI "lowercased, no URL prefix", but only as a comment, while deduplication depends on it | `CHECK`s on DOI (on papers and on copies), OpenAlex ID (`W…`) and versionless arXiv ID |
+| 10 | A paper needs a DOI, an OpenAlex ID or an arXiv ID, but the golden set has three works with none of them: gs-38 has only a repository handle, and gs-39 and gs-40 only a URL. Session 2 could not have loaded them | `papers.handle` and `papers.source_url`, both unique and both accepted as identifiers. Neither is ever matched on a title (rule 5) |
+
+### The source reconciliation rules
+
+The spec's [six rules](./library-papers-spec.md#source-reconciliation-rules) are mostly pipeline
+work for Session 2. Four of them are facts about a copy, so they are constraints, and a pipeline
+that believes OpenAlex fails the insert instead of moving a tier:
+
+| Rule | In the schema |
+|---|---|
+| 2. SSRN is never a published or accepted version | A `CHECK` on `paper_locations` refuses either version on an `ssrn.com` URL or a `10.2139/ssrn.` DOI |
+| 3. Confirm repository copies at the repository | `verified_at_host`. A repository copy counts toward the tier, or can back a stored file, only once it is set |
+| 4. A different-DOI hit is a copy, and a preprint server's copy is a submitted version | `paper_locations.doi`, unique across all copies, so one preprint DOI belongs to one paper; a `CHECK` that a `preprint_server` copy is `submittedVersion` |
+| The README's "a preprint never lifts its published version" | `refresh_paper_access()` counts only published and accepted copies for a peer-reviewed paper. A work that is itself a preprint or working paper is judged on its own copies, as the golden-set README says, and changing `peer_review_status` recomputes the tier |
+
+Every rule's input and verdict go into `paper_events` as a `reconciled` event, whose `detail`
+must name the rule. Rules 1, 5 and 6 (read the Crossref licence deposit, never accept a title
+match, ignore template licence tags) are judgements about sources and stay in `paperResolve`.
 
 ### Tightened, because the spec's own text asked for it
 
@@ -65,40 +85,76 @@ went live.
   value in the `routines` CHECK with no handler in `executeRoutineWorkflow` lets someone
   schedule a routine that can only fail. Add `paper_watch` and `paper_recheck` in Session 2
   together with their handlers, `RoutineActionType` and `ROUTINE_ACTION_LABELS`.
-- **The licence seed carries the Session 0 decision.** Session 0 says to seed
-  `paper_licences` "from those decisions", so it does. CC BY, BY-SA, CC0, public domain and
-  BY-ND are approved, with Chris Pollard as `decided_by`, and every other code stays link-out.
-  A `CHECK` means no licence can be approved without a named decider. BY-ND covers the PDF as
-  published and nothing more. Its `allows_adaptation = false` is what the Session 5 reader must
-  check before offering anything but the PDF viewer.
+- **The licence seed carries the Session 0 decision.** CC BY, BY-SA, CC0 and public domain are
+  approved, with Chris Pollard as `decided_by`; everything else, CC BY-ND and every NC licence
+  included, is link-out. A `CHECK` means no licence can be approved without a named decider.
+  BY-ND was approved on 11 October and is not now, because the spec's 18 October Session 0
+  lists only the four.
 
 ### Accepted, with eyes open
 
 - Subscribers can read `papers.lex_notes` and `relevance_basis` directly, as they already can
   with `client_library_entries.lex_notes`. Neither carries anything a subscriber should not
   see, but anything written there is effectively published.
-- Revoking a licence lowers the tier of every affected paper straight away, and the file can no
-  longer be signed. The stored file itself stays until a person withdraws it, and
-  `v_licence_audit` lists it in the meantime. Deleting files automatically on a single click
-  seemed worse.
-- `paper_chunks` stays team-only. Subscriber search arrives with the Session 5 search RPC, which
-  must apply the same rules as the policies here: no `abstract` chunks unless `paper_abstract_displayable()` allows them, and
-  `full_text` chunks only for `read_here`.
+- Revoking a licence lowers the tier of every affected paper straight away. The file can no
+  longer be signed, and the abstract and full-text chunks drop out of reach with the tier. The
+  stored file itself stays until a person withdraws it, and `v_licence_audit` lists it in the
+  meantime. Deleting files automatically on a single click seemed worse.
 
 ---
 
-## Session 0: what a person has to decide
+## The golden set
 
-None of these are code, and Session 2 depends on all of them.
+[`golden-set.json`](../../../apps/agents/evals/library-papers/golden-set.json) was checked two
+ways: every entry's expected tier was recomputed from its own `copies[]` in Python, and the
+whole set was loaded into the schema and run through `refresh_paper_access()`
+(see [Checking it locally](#checking-it-locally)). The README's totals are right: 21 / 9 / 10 on
+access, 24 / 7 / 4 / 5 on relevance, 27 that would publish.
 
-1. **Licences: decided 2026-10-10.** CC BY, BY-SA, CC0, public domain and BY-ND (PDF only) are
-   approved in the seed, decided by Chris Pollard.
-2. **CC NC is settled: never rehosted.** Minute is a paid product, which is exactly the
-   commercial use NC excludes, so the NC rows stay unapproved and link out.
-3. **The abstract policy is decided** (see [The abstract policy](#the-abstract-policy)). Counsel
-   confirms it once, as a policy. That is the only counsel item left.
+### Fixed
+
+- **gs-21 and gs-22 did not support their own label.** Each is `read_at_source` only because of
+  its Southampton accepted manuscript, and neither copy said it was free (`isOa` was missing,
+  and there is no licence to imply it). Both now carry `isOa: true`, which the recheck's
+  evidence already established: Southampton's export says `security: public` for gs-22, and
+  OpenAlex agrees for gs-21. With that, the schema agrees with all 39 tier labels and all 39
+  licence labels, and gs-37 lands as a copy of gs-15.
+- **The recheck report reads as if nothing was applied.** It says its label changes are
+  "proposed, not applied" and that gs-23, gs-28 and gs-36 keep their 2026-10-11 check date until
+  then, but `golden-set.json` has all of them applied and dated 2026-10-18, and gs-20 is settled
+  as `metadata_only`. The report now opens with a status line saying so; its body is left as the
+  dated record it is.
+- **The README's access rule 1 was looser than the spec.** It said `read_here` is "any copy" under
+  CC BY, BY-SA or CC0. The spec counts only published and accepted copies of a peer-reviewed
+  paper and approves public domain too; the rule now says both.
+
+### Questions for a person
+
+1. **Preprints are handled two ways.** gs-37 (a preprint OpenAlex merged into gs-15) becomes a
+   *copy* of the published paper under rule 4. gs-38 (a working paper of gs-29, not in
+   OpenAlex) is a separate *paper* linked by `published_version_of`. They are the same kind of
+   thing, and the difference is only whether OpenAlex merged it. That matters because the daily
+   watch will usually find a preprint *before* its published version exists, as a paper row,
+   and rule 4 would then need that row turned into a copy. One rule for both would be simpler.
+   The schema supports either. My recommendation: always a separate paper with a
+   `published_version_of` edge, plus the preprint's copy on the published paper.
+2. **"Access tier on 40 of 40" cannot be met as written.** gs-37 never lands as a paper, so it
+   has no tier to score. The check that fits is 39 tiers plus gs-37 landing as a copy, which is
+   what the golden-set check here does.
+3. **The whitepaper (gs-40) would land in `papers`.** The spec puts it on a "Foundational, not
+   peer-reviewed" shelf *outside* `papers`. As a non-peer-reviewed row it can never publish, so
+   no harm is done, but it is worth deciding whether the watch should keep it at all.
+
+---
+
+## Session 0: what is left
+
+1. **Licences: decided 2026-10-18.** CC BY, BY-SA, CC0 and public domain are approved in the
+   seed, decided by Chris Pollard. Everything else is link-out. Revisit only with legal advice.
+2. **Abstracts: decided 2026-10-18.** Shown only for `read_here` papers. Revisit only with legal
+   advice.
+3. **Golden set: done**, with the [three questions](#questions-for-a-person) above.
 4. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
-5. **Hand-label the 40-paper golden set** covering every relevance tier and access tier.
 
 ---
 
@@ -106,76 +162,67 @@ None of these are code, and Session 2 depends on all of them.
 
 ### Session 1 — data layer
 
-The migration creates thirteen tables. That is the spec's ten, with authors and authorships as
-two tables, plus `paper_abstracts` and `paper_publishers`. It also adds the licence and publication gates, the derived
-access tier, RLS, the private `papers` bucket (PDF only, 50 MB) and four `security_invoker`
-views.
+The migration creates twelve tables: the spec's ten, with authors and authorships as two
+tables, plus `paper_abstracts`. It also adds the licence and publication gates, the derived
+access tier, the reconciliation constraints, RLS, the private `papers` bucket (PDF only, 50 MB)
+and five `security_invoker` views, including the spec's `v_minute_paper_chunks`.
 
-The spec's three acceptance checks pass, along with 50 more covering the gates above and the abstract policy:
+All four of the spec's Session 1 acceptance checks pass, along with 56 more covering the
+gates above:
 
 - A `paper_files` row with `cc-by-nc` raises.
 - `v_minute_papers` returns nothing for a draft.
 - A subscriber session cannot select `candidate` rows.
+- A published paper that is not `read_here` comes back with a NULL `abstract`, and a subscriber
+  session gets no `abstract` or `full_text` chunk for it.
 
-To confirm the suite catches failures, seven rules were broken one at a time: the file and
-location match, the venue gate, the review guard, the abstract RLS rule, and three parts of the
-abstract policy (the licence signal, the Crossref condition, and a decision beating I4OA). The
-suite failed each time. One of those runs exposed a bug in the test helper: it treated a NULL
-result as a pass. The helper is fixed, and the suite has been rerun with the fix.
+To confirm the suites catch failures, thirteen rules were broken one at a time: the version
+filter, repository confirmation, preprints judged on their own copies, the abstract and chunk
+RLS rules, the SSRN and preprint-server checks, unique copy DOIs, a BY-ND approval, the file and
+location match, the venue gate, the review guard, and the `reconciled` detail check. A suite
+failed each time. Two of those runs found real bugs: the test helper treated a NULL result as a
+pass, and the `reconciled` check passed when `detail` was NULL. Both are fixed.
 
-### The abstract policy
+### The overlap linter and scorer
 
-The policy is in the spec under
-[Abstract policy for paywalled papers](./library-papers-spec.md#abstract-policy-for-paywalled-papers).
-Here is how it was built:
-
-- **`paper_publishers` replaces the venue's `abstract_policy`**, with `decided_by`,
-  `decided_at` and `reason`. The policy's table is used as given, plus two `CHECK`s. A decision
-  needs all three of name, date and reason. `display` needs a decision, so only a person can
-  open a publisher up. `paper_venues.publisher` (free text) became `publisher_id`, because two
-  fields for one thing drift apart.
-- **`paper_abstract_displayable(paper, source)` is the one place the rule lives.** RLS on
-  `paper_abstracts`, the access tier and `v_minute_papers` all call it. It takes the abstract's
-  source as an argument rather than reading `paper_abstracts`, because that table's own policy
-  calls it and reading the table would recurse.
-- **Precedence had to be chosen, and the policy text left it open.** An open licence on the
-  paper always wins, because the licence is the permission and a takedown cannot withdraw it.
-  Any publisher decision beats the I4OA signal, which is what makes a takedown a single row.
-  The I4OA signal only counts while a publisher is undecided, and only for a Crossref abstract.
-  The table in the spec spells this out.
-- **A takedown is one row and one event.** `paper_events` can now be about a publisher instead
-  of a paper (exactly one of the two is set). A policy change logs one `abstract_policy_changed`
-  event against the publisher. Each affected paper's tier still moves and is logged against
-  that paper, as every tier change is.
-- **`v_minute_papers` gained `abstract_displayable`.** `false` tells the page to show "Read the
-  abstract at the publisher" instead of the abstract.
-- **The overlap linter and scorer are built.** `abstractOverlap()` in
-  [`packages/shared/src/papers.ts`](../../../packages/shared/src/papers.ts) finds every run of
-  six or more words shared with the abstract. It ignores case and punctuation, skips anything
-  inside straight or curly double quotes, and never joins a run across a quotation or across two
-  summary fields. The Session 3 linter blocks on any run. The scorer,
-  [`evals/scorers/abstractOverlap.ts`](../../../apps/agents/evals/scorers/abstractOverlap.ts),
-  reports the copied share, where lower is better. It is unit-tested, but it has nothing to run
-  over until the golden set and Charlie's summary step exist.
+The spec keeps the six-word rule under
+[Rules that keep the summaries honest](./library-papers-spec.md#rules-that-keep-the-summaries-honest).
+`abstractOverlap()` in [`packages/shared/src/papers.ts`](../../../packages/shared/src/papers.ts)
+finds every run of six or more words shared with the abstract. It ignores case and
+punctuation, skips anything inside straight or curly double quotes, and never joins a run across
+a quotation or across two summary fields. The Session 3 linter blocks on any run. The scorer,
+[`evals/scorers/abstractOverlap.ts`](../../../apps/agents/evals/scorers/abstractOverlap.ts),
+reports the copied share, where lower is better. It is unit-tested, and it has a golden set to
+run over once Charlie's summary step exists.
 
 ### Checking it locally
 
-The acceptance script is in [`packages/db/acceptance/`](../../../packages/db/acceptance/). It
-runs on a plain Postgres 16. `stubs.sql` stands in for `team_members`, the two RLS helpers,
-`auth.uid()` and `storage`. pgvector is not needed, because the column type is rewritten on
-the way in:
+Both checks are in [`packages/db/acceptance/`](../../../packages/db/acceptance/) and run on a
+plain Postgres 16. `stubs.sql` stands in for `team_members`, the two RLS helpers, `auth.uid()`
+and `storage`. pgvector is not needed, because the column type is rewritten on the way in:
 
 ```bash
 sed -e 's/vector(1536)/real[]/' -e '/USING hnsw/d' \
-  supabase/migrations/20261010100000_library_papers.sql > /tmp/papers.sql
+  supabase/migrations/20261018100000_library_papers.sql > /tmp/papers.sql
+
+# The acceptance script
 createdb papers_check
 psql -d papers_check -v ON_ERROR_STOP=1 -f packages/db/acceptance/stubs.sql
 psql -d papers_check -v ON_ERROR_STOP=1 -f /tmp/papers.sql
 psql -d papers_check -v ON_ERROR_STOP=1 -f packages/db/acceptance/library-papers.sql
+
+# The golden set, on a fresh database
+createdb papers_golden
+psql -d papers_golden -v ON_ERROR_STOP=1 -f packages/db/acceptance/stubs.sql
+psql -d papers_golden -v ON_ERROR_STOP=1 -f /tmp/papers.sql
+node packages/db/acceptance/golden-set-tiers.mjs | psql -d papers_golden -v ON_ERROR_STOP=1
 ```
 
-A clean run ends with `ALL ACCEPTANCE CHECKS PASSED`. CI does not run it, so run it by hand
-after any change to the migration.
+A clean run ends with `ALL ACCEPTANCE CHECKS PASSED` and `GOLDEN SET: all 79 checks agree`.
+The golden-set check loads each entry's copies as `paperResolve` should write them after
+reconciliation, so it tests the tier logic, not OpenAlex. It is not Session 2's acceptance,
+which runs the real pipeline. CI runs neither, so run both by hand after any change to the
+migration or the golden set.
 
 ### Not yet built
 
