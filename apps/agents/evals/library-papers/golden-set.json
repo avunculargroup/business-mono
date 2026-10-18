@@ -787,8 +787,7 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
-    "rationale": "Ethereum smart-contract gas patterns; bitcoin not in the abstract. A likely false positive for a broad crypto query. Closed at Springer, which deposits abstracts only for its open-access content.",
+    "rationale": "Ethereum smart-contract gas patterns; bitcoin not in the abstract. A likely false positive for a broad crypto query. Closed at Springer.",
     "licenceNote": "The co-publisher page carries a CC BY 3.0 dc.rights meta tag, but its footer reads 'All Rights Reserved', Springer's Crossref deposit has only its TDM licence and OpenAlex lists one closed copy. The tag is treated as site template, not an article licence.",
     "checkedOn": "2026-10-18",
     "sources": [
@@ -1049,7 +1048,7 @@
     "expected": {
       "peerReviewStatus": "peer_reviewed",
       "relevanceTier": "core",
-      "accessTier": "abstract_only",
+      "accessTier": "metadata_only",
       "bestLicence": null,
       "isRetracted": false
     },
@@ -1061,8 +1060,7 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": true,
-    "rationale": "Accounting for bitcoin; core. Closed, and Emerald supports I4OA, so the publisher abstract is displayable.",
+    "rationale": "Accounting for bitcoin; core. Closed, no free copy found.",
     "tags": [
       "accounting"
     ],
@@ -1089,7 +1087,7 @@
     "expected": {
       "peerReviewStatus": "peer_reviewed",
       "relevanceTier": "core",
-      "accessTier": "abstract_only",
+      "accessTier": "metadata_only",
       "bestLicence": null,
       "isRetracted": false
     },
@@ -1101,8 +1099,7 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": true,
-    "rationale": "Drivers of bitcoin returns across quantiles; core. Closed, Emerald supports I4OA.",
+    "rationale": "Drivers of bitcoin returns across quantiles; core. Closed, no free copy found.",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://ideas.repec.org/a/eme/jrfpps/jrf-05-2024-0154.html",
@@ -1141,7 +1138,6 @@
         "url": "https://academic.oup.com/restud/article-pdf/88/6/3011/41901340/rdab014.pdf"
       }
     ],
-    "publisherJoinedI4OA": true,
     "rationale": "Economics of the bitcoin fee market; core. OUP's version of record is CC BY-NC 4.0 (deposited in Crossref from 2021-03-13): free to read, not approved for a paid product. The CEPR and Bank of Finland working papers are separate works.",
     "tags": [
       "non-commercial-licence"
@@ -1189,8 +1185,7 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
-    "rationale": "Bitcoin's volatility and hedging properties against gold and the dollar; bitcoin is the object. Closed, and Elsevier has not joined I4OA. The UCD working paper (gs-38) is an earlier, non-peer-reviewed version and must not lift this record's tier.",
+    "rationale": "Bitcoin's volatility and hedging properties against gold and the dollar; bitcoin is the object. Closed. The UCD working paper (gs-38) is an earlier, non-peer-reviewed version and must not lift this record's tier.",
     "tags": [
       "version-pair"
     ],
@@ -1234,7 +1229,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "Illicit-activity detection on the bitcoin blockchain; core by topic. Retracted on 2023-10-24 after the publisher lost confidence in the results. Online 2021, issue dated 2024.",
     "tags": [
       "retraction"
@@ -1274,7 +1268,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "Bitcoin returns and their correlation with the S&P 500; core. Closed, no other versions listed on RePEc.",
     "checkedOn": "2026-10-18",
     "sources": [
@@ -1312,7 +1305,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "Forecasts bitcoin realized volatility; other cryptocurrencies are inputs, bitcoin is the target. Closed.",
     "checkedOn": "2026-10-18",
     "sources": [
@@ -1349,7 +1341,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "Bitcoin price response to bitcoin events and monetary policy news (Bitstamp, Mt.Gox); core. Closed.",
     "checkedOn": "2026-10-18",
     "sources": [
@@ -1386,7 +1377,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "Volatility models across 606 cryptocurrencies; bitcoin is named only as the most prominent example.",
     "checkedOn": "2026-10-18",
     "sources": [
@@ -1424,7 +1414,6 @@
         "isOa": false
       }
     ],
-    "publisherJoinedI4OA": false,
     "rationale": "NFT pricing; bitcoin not in the abstract. False positive for a crypto query.",
     "knownSourceError": "OpenAlex treats an SSRN preprint (10.2139/ssrn.4080372, Crossref type posted-content) as a free acceptedVersion.",
     "checkedOn": "2026-10-18",

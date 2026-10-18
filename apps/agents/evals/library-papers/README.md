@@ -16,7 +16,7 @@ Acceptance, from the spec's build sequence:
 
 | | Count |
 | --- | --- |
-| `read_here` / `read_at_source` / `abstract_only` / `metadata_only` | 21 / 9 / 2 / 8 |
+| `read_here` / `read_at_source` / `metadata_only` | 21 / 9 / 10 |
 | `core` / `substantial` / `peripheral` / `excluded` | 24 / 7 / 4 / 5 |
 | `peer_reviewed` / `preprint` / `not_peer_reviewed` | 35 / 1 / 4 |
 | Would publish (peer reviewed and `core` or `substantial`) | 27 |
@@ -57,16 +57,14 @@ a tiebreak:
 1. `read_here`: any copy carries CC BY, CC BY-SA or CC0.
 2. `read_at_source`: otherwise, any free copy of the published or accepted version, under any other licence
    or none.
-3. `abstract_only`: no free copy, and the publisher supports the
-   [Initiative for Open Abstracts](https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary).
-4. `metadata_only`: no free copy, and the publisher does not support it.
+3. `metadata_only`: no free copy.
 
 A working paper or preprint is a separate work. It never lifts the tier of its published version.
 
-Rules 3 and 4 follow the spec's
-[abstract policy](../../../../docs/features/client-app/library-papers-spec.md#abstract-policy): default to
-`summary_only`, and show an abstract verbatim only when the publisher supports I4OA and deposits it with
-Crossref.
+There is no `abstract_only` tier. Under the spec's
+[abstract policy](../../../../docs/features/client-app/library-papers-spec.md#abstract-policy) a publisher
+abstract is shown only for `read_here` papers, so a closed paper is always `metadata_only` (decided
+18 October 2026). gs-26 and gs-27 were `abstract_only` until then.
 
 ## How each label was checked
 
