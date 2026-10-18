@@ -52,7 +52,7 @@ OpenAlex classifies every copy as diamond, gold, green, hybrid, bronze or closed
 
 ### 4. Abstracts are not automatically free either
 
-OpenAlex [deliberately ships abstracts as an inverted index](https://docs.openalex.org/api-entities/works/work-object), not plaintext, for legal reasons. The Initiative for Open Abstracts notes that abstracts held by Crossref [may remain under publisher or author copyright](https://web-archive.nli.org.il/National_Library/20181105034639mp_/https://i4oa.org). Displaying the publisher's abstract for a paywalled paper is near-universal practice among indexes, but it is a judgement, not a right. The spec therefore separates the publisher abstract (displayed under a per-publisher policy) from a BTS-written factual summary (always ours, always displayable).
+OpenAlex [deliberately ships abstracts as an inverted index](https://docs.openalex.org/api-entities/works/work-object), not plaintext, for legal reasons. The Initiative for Open Abstracts notes that abstracts held by Crossref [may remain under publisher or author copyright](https://web-archive.nli.org.il/National_Library/20181105034639mp_/https://i4oa.org). Displaying the publisher's abstract for a paywalled paper is near-universal practice among indexes, but it is a judgement, not a right. The spec therefore separates the publisher abstract from a BTS-written factual summary (always ours, always displayable). The abstract is shown verbatim only where there is a clear permission signal; everywhere else the summary leads (see [Abstract policy](#abstract-policy)).
 
 ### 5. Peer review is not a field anyone publishes
 
@@ -96,20 +96,30 @@ Every paper lands in exactly one access tier, computed from the best licence fou
 | Access tier | Licence condition | What Minute shows |
 | --- | --- | --- |
 | `read_here` | CC BY, CC BY-SA, CC0, public domain on any copy (published or accepted version) | Hosted PDF, in-app reader, full-text search, abstract, BTS summary |
-| `read_at_source` | Open but not rehostable: CC NC variants (pending counsel), arXiv default, bronze, publisher-specific | Link to the free copy, abstract, BTS summary |
-| `abstract_only` | Closed | Abstract (per publisher policy), BTS summary, DOI link, any legal green copy |
-| `metadata_only` | Closed and the publisher abstract is not displayable | Title, authors, venue, BTS summary, DOI link |
+| `read_at_source` | Open but not rehostable: CC NC variants (pending counsel), arXiv default, bronze, publisher-specific | Link to the free copy, BTS summary, abstract where displayable |
+| `abstract_only` | Closed, and the abstract is displayable under the abstract policy | Abstract, BTS summary, DOI link |
+| `metadata_only` | Closed, and the abstract is not displayable | Title, authors, venue, BTS summary, DOI link, "Read the abstract at the publisher" |
+
+### Abstract policy
+
+A publisher's abstract is shown verbatim only when there is a clear permission signal. Counsel confirms this once, as a policy, in Session 0.
+
+- **The paper is `read_here`.** Its licence covers the abstract.
+- **Or the publisher is set to `display` and the abstract came from Crossref.** A person sets a publisher to `display`, normally once it supports the Initiative for Open Abstracts and deposits abstracts with Crossref. The [I4OA first-anniversary report](https://leidenmadtrics.nl/articles/the-initiative-for-open-abstracts-celebrating-our-first-anniversary) (2021) lists Emerald, OUP, Cambridge, SAGE, MDPI, the Royal Society and PLOS among its supporters; Elsevier, Springer Nature (outside its open-access content), Taylor & Francis and Wiley had not joined. Re-check a publisher's status when deciding it.
+
+Everyone else starts at `summary_only`: the paper page shows the BTS summary and links to the abstract at the publisher. The decision lives on `paper_publishers`, with who made it, when and why, so a takedown request changes one row and logs one `paper_events` entry. The same rule decides `abstract_only` versus `metadata_only`.
 
 When a version changes (an embargo lifts and the accepted manuscript appears in a repository under CC BY), the paper moves up a tier automatically and the change is logged.
 
 ## Data model
 
-Ten tables, with the licence decision made once in a lookup table and enforced by trigger: no file row can exist for a licence BTS has not approved for rehosting.
+Eleven tables, with the licence decision made once in a lookup table and enforced by trigger: no file row can exist for a licence BTS has not approved for rehosting.
 
 | Table | One row per | Key decisions |
 | --- | --- | --- |
 | `paper_licences` | Licence code (`cc-by`, `cc-by-nc`, `arxiv-default`…) | `rehost_in_paid_product` is a human decision with `decided_by` and `decided_at`; the trigger gate reads it |
-| `paper_venues` | Journal, proceedings series or repository | `reputation` is curated (`unreviewed`, `accepted`, `watch`, `rejected`); `abstract_policy` per venue or publisher |
+| `paper_publishers` | Publisher | `abstract_policy` (`display` or `summary_only`, default `summary_only`) is a human decision with `decided_by`, `decided_at` and `reason`; `joined_i4oa` recorded as found |
+| `paper_venues` | Journal, proceedings series or repository | `reputation` is curated (`unreviewed`, `accepted`, `watch`, `rejected`); belongs to a publisher |
 | `papers` | Work, deduplicated on DOI, then OpenAlex ID, then arXiv ID | DOI is never the only key — not every refereed paper has one. Relevance, access tier and status live here |
 | `paper_locations` | Copy of a work (publisher page, repository, arXiv) | Licence and version per copy, re-checked on a schedule |
 | `paper_files` | Hosted PDF in Supabase Storage | Trigger rejects any licence not approved for rehosting; licence snapshot frozen at retrieval |
@@ -133,6 +143,22 @@ CREATE TABLE paper_licences (
   decided_at              TIMESTAMPTZ
 );
 
+-- Abstract decisions, one per publisher: see Abstract policy
+CREATE TABLE paper_publishers (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             TEXT NOT NULL UNIQUE,
+  openalex_id      TEXT UNIQUE,
+  crossref_member  TEXT,
+  joined_i4oa      BOOLEAN NOT NULL DEFAULT FALSE,
+  abstract_policy  TEXT NOT NULL DEFAULT 'summary_only'
+                   CHECK (abstract_policy IN ('display','summary_only')),
+  decided_by       UUID REFERENCES team_members(id),
+  decided_at       TIMESTAMPTZ,
+  reason           TEXT,
+  CONSTRAINT paper_publishers_display_is_decided CHECK (
+    abstract_policy <> 'display' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL))
+);
+
 CREATE TABLE paper_venues (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   openalex_source_id  TEXT UNIQUE,
@@ -140,15 +166,13 @@ CREATE TABLE paper_venues (
   issns               TEXT[],
   name                TEXT NOT NULL,
   venue_type          TEXT NOT NULL CHECK (venue_type IN ('journal','conference','book_series','repository','other')),
-  publisher           TEXT,
+  publisher_id        UUID REFERENCES paper_publishers(id),
   is_in_doaj          BOOLEAN,
   homepage_url        TEXT,
   feed_url            TEXT,                          -- OJS/RSS for early detection
   reputation          TEXT NOT NULL DEFAULT 'unreviewed'
                       CHECK (reputation IN ('unreviewed','accepted','watch','rejected')),
   reputation_notes    TEXT,
-  abstract_policy     TEXT NOT NULL DEFAULT 'display'
-                      CHECK (abstract_policy IN ('display','summary_only')),
   first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -297,7 +321,7 @@ Authors and authorships follow the obvious shape and are omitted here. Indexes o
 
 ### Views and access
 
-- `v_minute_papers` — the only object Minute reads. Published, peer-reviewed, `core` or `substantial`, not archived. `abstract` is nulled when the venue's `abstract_policy` is `summary_only`. Exposes `is_retracted` so the UI can never hide it.
+- `v_minute_papers` — the only object Minute reads. Published, peer-reviewed, `core` or `substantial`, not archived. `abstract` is returned only under the [abstract policy](#abstract-policy): the paper is `read_here`, or its publisher is `display` and `abstract_source = 'crossref'`; otherwise it is NULL. Exposes `is_retracted` so the UI can never hide it.
 - `v_paper_review_queue` — drafts awaiting a human, ordered by relevance then citation velocity.
 - `v_new_venues` — venues first seen in the last 90 days with at least one `core` paper: the "new journal" watch.
 - `v_licence_audit` — files whose frozen licence no longer has `rehost_in_paid_product = true`, and `read_here` papers with no file.
@@ -319,7 +343,7 @@ flowchart TD
   R["paperResolve · classify<br/>peer-review status · relevance tier (Rex confirms)<br/>copies + licences → access tier"] --> X["Out of scope<br/>peripheral / excluded, kept"]
   R --> D{"Licence cleared<br/>for rehosting?"}
   D -- yes --> E["paperEnrich · full text<br/>fetch PDF (trigger re-checks licence)<br/>extract, chunk, embed<br/>Charlie summary, every finding with a page"]
-  D -- no --> A["Abstract path<br/>abstract per venue policy<br/>Charlie summary, abstract only, labelled<br/>link to publisher or legal free copy"]
+  D -- no --> A["Abstract path<br/>abstract per publisher policy<br/>Charlie summary, abstract only, labelled<br/>link to publisher or legal free copy"]
   E --> G["Linter, then Lex gate"]
   A --> G
   G --> P["Published in Minute<br/>only after a person clears the draft"]
@@ -385,6 +409,7 @@ No new agent. The pipeline is workflows end to end; existing agents are called a
 - **Basis is explicit.** `summary.basis` is `full_text` or `abstract_only`. An abstract-only summary may not contain anything the abstract doesn't, and Minute labels it "Summary based on the abstract".
 - **Every finding has a locator.** For `read_here` papers, each `findings[]` item carries a page or section reference, so a subscriber can check it in two clicks. A finding without a locator fails validation.
 - **Reported, not asserted.** Findings are phrased as what the authors report ("The authors find…", "In their 2014–2021 sample…"), never as facts about bitcoin. A deterministic linter runs before Lex and blocks words like *proves, should, recommend, safe, outperform* outside quotation.
+- **The summary is BTS's own words.** An abstract-only summary that tracks the abstract's sentences is still a copy, only reworded. The linter blocks any summary that repeats six or more consecutive words from the abstract outside quotation marks, and the structured fields (question, data, method, findings, limitations) keep it from following the abstract's order.
 - **No synthesis across papers in v1.** Each summary describes one paper. Cross-paper statements are where advice creeps in; see Extended ideas for how evidence maps can do it safely.
 - **Charlie never sees funding data when summarising.** Funders and conflict statements are deterministic fields shown beside the summary, not narrated in it.
 
@@ -424,7 +449,7 @@ The reading room of a good law library, not a search engine. Calm list, generous
 | Status strip | Retraction or correction notice, if any, above everything else | Crossref / Retraction Watch |
 | Summary | Question · Data · Method · Findings (each with a locator chip) · Limitations; labelled with its basis | Charlie, Lex-cleared |
 | Why it's here | The curator note: why a CFO or trustee might care, stated without conclusion | Human-edited |
-| Abstract | Publisher abstract verbatim with attribution, or omitted under venue policy | Crossref / publisher |
+| Abstract | Publisher abstract verbatim with attribution under the abstract policy; otherwise a "Read the abstract at the publisher" link | Crossref / publisher |
 | Read | `read_here`: in-app reader, locator chips scroll to the page. Otherwise a clear "Read at publisher" or "Free copy at arXiv" link | Storage / locations |
 | Disclosure | Funders and conflict-of-interest statement as published, or "No funding statement disclosed" | Deterministic |
 | Connections | Papers in the register this one cites and is cited by; published version of a preprint; related library entries and Register records | `paper_relations` |
@@ -448,7 +473,7 @@ Four screens under `/research/papers` on hq.btreasury.com.au, built for clearing
 - **Review queue** — drafts ordered by relevance tier, then citation velocity. Split view: summary and curator note on the left, source (PDF page or abstract) on the right, locator chips linked between them. Actions: edit, override tier (reason required), send to Lex, archive. Keyboard-first: `j/k` to move, `e` to edit, `l` to send to Lex.
 - **Watches** — each standing query with its last run, hits, and yield (hits that became `core` or `substantial`). A watch yielding under 2% for 90 days gets a warning chip: it is costing API credits and reviewer attention for nothing.
 - **Venues** — new venues from `v_new_venues` at the top with a reputation decision to make (DOAJ listing, publisher, indexing, editorial board, APC). Rejected venues stay in the table so they are never re-triaged.
-- **Licences** — the `paper_licences` table as a decision log: each code, whether it is approved for rehosting, who decided, when, and why. Plus the `v_licence_audit` exceptions.
+- **Licences and publishers** — `paper_licences` and `paper_publishers` as decision logs: each licence code and whether it is approved for rehosting, each publisher and its abstract policy, with who decided, when and why. New publishers arrive at `summary_only` with their I4OA status shown. Plus the `v_licence_audit` exceptions.
 
 Corpus health strip across the top: papers by status, share of published papers with a full-text summary, open retraction alerts, and API spend this month against the OpenAlex allowance.
 
@@ -475,11 +500,11 @@ Five sessions, extending the usual data → ingest → panel pattern with an enr
 
 1. **Session 0 — decisions and fixtures.** Counsel view on CC NC licences and on publisher abstracts in a paid product. Seed `paper_licences` from those decisions. Register an OpenAlex API key. Hand-label a golden set of 40 papers covering every relevance tier and access tier; Ledger's back catalogue is the clean `read_here` half. Done: [`golden-set.json`](../../../apps/agents/evals/library-papers/golden-set.json), with labelling rules in its [README](../../../apps/agents/evals/library-papers/README.md).
 2. **Session 1 — data layer.** Migrations for all tables, the licence trigger, views, RLS, the private `papers` bucket, and new `routines.action_type` values (`paper_watch`, `paper_resolve`, `paper_licence_recheck`).
-   - Acceptance: inserting a `paper_files` row with `cc-by-nc` raises; `v_minute_papers` returns nothing for a `draft`; a subscriber session cannot select `candidate` rows.
+   - Acceptance: inserting a `paper_files` row with `cc-by-nc` raises; `v_minute_papers` returns nothing for a `draft`; a subscriber session cannot select `candidate` rows; a published closed paper from a `summary_only` publisher comes back with a NULL `abstract`; setting a publisher to `display` without `decided_by` raises.
 3. **Session 2 — discovery and resolution.** `paperBackfill` (OpenAlex S3 snapshot), `paperWatch`, `paperResolve`, deterministic tiering, Rex confirmation, retraction sync.
    - Acceptance: golden set lands with correct relevance tier on at least 36 of 40 and correct access tier on 40 of 40 under the [source reconciliation rules](#source-reconciliation-rules); every entry with a `knownSourceError` comes out right; gs-37 lands as a copy of gs-15, not a second paper. Re-running the watch creates zero duplicates.
 4. **Session 3 — files and enrichment.** `paperEnrich`: PDF fetch for `read_here`, text extraction, chunking and embedding, Charlie summaries, banned-phrase linter, Lex gate.
-   - Acceptance: every finding in a full-text summary carries a locator that resolves to a real page; abstract-only summaries contain no claim absent from the abstract (Mastra scorer over the golden set).
+   - Acceptance: every finding in a full-text summary carries a locator that resolves to a real page; abstract-only summaries contain no claim absent from the abstract, and none repeats six or more consecutive words from it (Mastra scorers over the golden set).
 5. **Session 4 — HQ review UI.** Queue, watches, venues, licences, health strip, Simon digest.
 6. **Session 5 — Minute.** `/library/papers` index, paper page, in-app reader with signed URLs, Cite in a pack, edition copy.
    - Acceptance: a retracted paper shows its notice above the title on every surface, including inside an existing pack citation.
@@ -487,7 +512,7 @@ Five sessions, extending the usual data → ingest → panel pattern with an enr
 ## Open questions
 
 - [ ] **CC NC in a paid product.** Does a non-commercial licence permit display inside a subscription product if the paper itself is not sold? Default until answered: link out.
-- [ ] **Publisher abstracts.** Display verbatim for paywalled papers by default (`abstract_policy = 'display'`), or start at `summary_only` and open up per publisher? Australian fair dealing for research or review may not stretch to a commercial service.
+- [ ] **Abstract policy, counsel review.** Decided 10 October 2026: `summary_only` by default, verbatim only under the [abstract policy](#abstract-policy). Counsel to confirm the policy once, not paper by paper.
 - [ ] **Semantic Scholar.** Worth a commercial licence request for TLDRs and influential-citation counts, or is OpenAlex plus our own summaries enough? Recommendation: skip for v1.
 - [ ] **OpenAlex spend.** The backfill should come from the free S3 snapshot; the daily watch should sit well inside the $1/day allowance. Confirm once Session 2 measures real usage.
 - [ ] **Edition split.** Do Board and Trustee editions see the same corpus with different default topic filters, or one shared view?

@@ -63,10 +63,10 @@ a tiebreak:
 
 A working paper or preprint is a separate work. It never lifts the tier of its published version.
 
-Rules 3 and 4 assume the abstract policy recommended on 10 October 2026: default to `summary_only`,
-and show an abstract verbatim only when the publisher supports I4OA. The spec branch still defaults
-`abstract_policy` to `display`. If that stays, the eight `metadata_only` papers become `abstract_only`
-wherever the publisher has an abstract.
+Rules 3 and 4 follow the spec's
+[abstract policy](../../../../docs/features/client-app/library-papers-spec.md#abstract-policy): default to
+`summary_only`, and show an abstract verbatim only when the publisher supports I4OA and deposits it with
+Crossref.
 
 ## How each label was checked
 
