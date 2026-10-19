@@ -559,6 +559,13 @@
       "bestLicence": "cc-by",
       "isRetracted": false
     },
+    "expectedRelations": [
+      {
+        "relation": "published_version_of",
+        "from": "gs-15",
+        "to": "gs-37"
+      }
+    ],
     "copies": [
       {
         "host": "publisher",
@@ -828,6 +835,7 @@
         "source": "University of Southampton ePrints",
         "version": "acceptedVersion",
         "licence": null,
+        "isOa": true,
         "url": "https://eprints.soton.ac.uk/400597"
       }
     ],
@@ -875,6 +883,7 @@
         "source": "University of Southampton ePrints",
         "version": "acceptedVersion",
         "licence": null,
+        "isOa": true,
         "url": "https://eprints.soton.ac.uk/447739"
       }
     ],
@@ -1492,11 +1501,6 @@
       "bestLicence": "cc-by",
       "isRetracted": false
     },
-    "expectedResolution": {
-      "mergeInto": "gs-15",
-      "as": "copy",
-      "note": "Its DOI resolves in OpenAlex to gs-15's record (W3198344353). The pipeline stores it as a submittedVersion copy of gs-15 with its own DOI, not as a second paper."
-    },
     "copies": [
       {
         "host": "preprint_server",
@@ -1509,7 +1513,7 @@
     "tags": [
       "version-pair"
     ],
-    "knownSourceError": "OpenAlex lists the Preprints.org copy as acceptedVersion; the page says it is not peer reviewed, so it is a submittedVersion.",
+    "knownSourceError": "OpenAlex resolves this DOI to gs-15's record (W3198344353), merging the preprint into the published work, and lists the Preprints.org copy as acceptedVersion. The page says it is not peer reviewed, so it is a submittedVersion. The preprint is its own record with no OpenAlex id, linked to gs-15 by published_version_of (rule 4).",
     "checkedOn": "2026-10-18",
     "sources": [
       "https://www.preprints.org/manuscript/202108.0555"

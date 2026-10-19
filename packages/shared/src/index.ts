@@ -14,3 +14,4 @@ export * from './corporateHoldings.js';
 export * from './reportWatch.js';
 export * from './prepare.js';
 export * from './complianceDocument.js';
+export * from './papers.js';

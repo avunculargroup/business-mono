@@ -26,7 +26,7 @@ Royal Society Open Science and Financial Innovation.
 
 Edge cases each have their own entry:
 
-- a preprint OpenAlex has merged into its published version (gs-37 into gs-15; `expectedResolution`);
+- a preprint OpenAlex has merged into its published version (gs-37, linked to gs-15 by `expectedRelations`);
 - a working paper with a different licence from its published version (gs-38 → gs-29);
 - a correction (gs-08);
 - two retractions, one closed (gs-30) and one with a free copy (gs-23);
@@ -54,7 +54,8 @@ a tiebreak:
 
 **Access.** Taken from the copies listed on each entry:
 
-1. `read_here`: any copy carries CC BY, CC BY-SA or CC0.
+1. `read_here`: any published or accepted copy carries CC BY, CC BY-SA, CC0 or public domain (for a
+   preprint or working paper, any of its own copies).
 2. `read_at_source`: otherwise, any free copy of the published or accepted version, under any other licence
    or none.
 3. `metadata_only`: no free copy.
@@ -90,7 +91,7 @@ there so the pipeline is tested against OpenAlex as it really is, not as it shou
 | gs-22 | Calls a public repository accepted manuscript closed | Confirm repository copies at the repository |
 | gs-23 | Calls an accepted manuscript a submitted version | Confirm repository copies at the repository |
 | gs-24, gs-35 | Treats SSRN working papers and preprints as published or accepted copies | SSRN never counts as published or accepted |
-| gs-37 | Merges the preprint into its published work, as an accepted version | A different-DOI hit becomes a copy, not a paper |
+| gs-37 | Merges the preprint into its published work, as an accepted version | A draft is always its own record, linked to its published version |
 | gs-38 | Title search returns the journal article for the working paper | Never accept a title match on its own |
 
 gs-28 and gs-36 are not OpenAlex errors, but they are why the pipeline also reads the publisher's

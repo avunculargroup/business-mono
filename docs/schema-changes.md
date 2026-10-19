@@ -20,6 +20,27 @@ on realtime and a ~150 KB blob would ride every change event. Team-only RLS thro
 
 ---
 
+## 2026-10-18 — Minute library: peer-reviewed papers (data layer)
+
+`20261018100000_library_papers.sql` adds the twelve `paper_*` tables behind `/library/papers`,
+the private `papers` storage bucket, `pg_trgm` (in `extensions`), and five `security_invoker`
+views. Four rules are enforced in the schema, not in code. First, no stored PDF can exist for
+a licence a named person has not approved, or for one its own confirmed location does not
+carry. Second, `access_tier` (`read_here`, `read_at_source`, `metadata_only`) is derived by
+`refresh_paper_access()` and logged to `paper_events` whenever a copy, licence decision or
+peer-review status changes; a preprint never lifts its published version, and a repository
+copy counts only once `verified_at_host`. Third, publishing needs Lex, peer review, a relevant
+tier, a slug, a summary and an accepted venue. Fourth, a publisher's abstract, and abstract and
+full-text chunks, reach a subscriber only for a `read_here` paper, by RLS on their own tables.
+The spec's source reconciliation rules that are facts about a copy are `CHECK`s: SSRN is never
+a published or accepted version, and a preprint server's copy is a submitted version. A draft
+is its own paper, linked to its published version by `published_version_of`. `papers.handle` and `papers.source_url` identify works with no
+DOI, OpenAlex or arXiv ID. The seed approves CC BY, BY-SA, CC0 and public domain (decided by
+Chris Pollard); everything else is link-out. Where this differs from the spec's reference DDL,
+and why: `docs/features/client-app/library-papers-build-progress.md`.
+
+---
+
 ## 2026-10-10 — `podcast_episodes` joins the Realtime publication
 
 `20261010000000_enable_realtime_podcast_episodes.sql` adds `podcast_episodes` to

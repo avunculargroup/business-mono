@@ -1,6 +1,7 @@
 # OpenAlex recheck of the golden set
 
 **Date:** 2026-10-18
+**Status:** Applied. Every label change below, and the gs-20 decision (`metadata_only`), is in [`golden-set.json`](./golden-set.json), dated 2026-10-18. The rest of this report is the record as written before they were applied. gs-21 and gs-22 later gained `isOa: true` on their Southampton copies, which this report's evidence supports.
 **OpenAlex requests:** 42. That is 37 DOI lookups, 3 title searches (gs-38, gs-39, gs-40) and 2 rate-limit checks. All returned 200.
 **Credits used:** 30 of the 10,000 daily allowance. The three searches cost 10 each, and singleton lookups are free. 9,963 credits remained afterwards.
 
