@@ -4699,6 +4699,769 @@ export type Database = {
           },
         ]
       }
+      paper_abstracts: {
+        Row: {
+          abstract: string
+          paper_id: string
+          retrieved_at: string
+          source: string
+        }
+        Insert: {
+          abstract: string
+          paper_id: string
+          retrieved_at?: string
+          source: string
+        }
+        Update: {
+          abstract?: string
+          paper_id?: string
+          retrieved_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_abstracts_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: true
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_abstracts_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: true
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_abstracts_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: true
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_authors: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          openalex_author_id: string | null
+          orcid: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          openalex_author_id?: string | null
+          orcid?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          openalex_author_id?: string | null
+          orcid?: string | null
+        }
+        Relationships: []
+      }
+      paper_authorships: {
+        Row: {
+          author_id: string
+          author_position: number
+          is_corresponding: boolean
+          paper_id: string
+          raw_affiliation: string | null
+        }
+        Insert: {
+          author_id: string
+          author_position: number
+          is_corresponding?: boolean
+          paper_id: string
+          raw_affiliation?: string | null
+        }
+        Update: {
+          author_id?: string
+          author_position?: number
+          is_corresponding?: boolean
+          paper_id?: string
+          raw_affiliation?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_authorships_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "paper_authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_authorships_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_authorships_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_authorships_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_chunks: {
+        Row: {
+          chunk_index: number
+          chunk_kind: string
+          content: string
+          embedding: string | null
+          id: string
+          page_from: number | null
+          page_to: number | null
+          paper_id: string
+          section: string | null
+        }
+        Insert: {
+          chunk_index: number
+          chunk_kind: string
+          content: string
+          embedding?: string | null
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+          paper_id: string
+          section?: string | null
+        }
+        Update: {
+          chunk_index?: number
+          chunk_kind?: string
+          content?: string
+          embedding?: string | null
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+          paper_id?: string
+          section?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_events: {
+        Row: {
+          detail: Json | null
+          event_type: string
+          from_value: string | null
+          id: string
+          occurred_at: string
+          paper_id: string
+          source: string
+          to_value: string | null
+        }
+        Insert: {
+          detail?: Json | null
+          event_type: string
+          from_value?: string | null
+          id?: string
+          occurred_at?: string
+          paper_id: string
+          source: string
+          to_value?: string | null
+        }
+        Update: {
+          detail?: Json | null
+          event_type?: string
+          from_value?: string | null
+          id?: string
+          occurred_at?: string
+          paper_id?: string
+          source?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_events_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_events_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_events_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_files: {
+        Row: {
+          byte_size: number | null
+          content_sha256: string
+          extraction_method: string | null
+          full_text: string | null
+          id: string
+          licence: string
+          location_id: string
+          page_count: number | null
+          paper_id: string
+          retrieved_at: string
+          storage_path: string
+          version: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          byte_size?: number | null
+          content_sha256: string
+          extraction_method?: string | null
+          full_text?: string | null
+          id?: string
+          licence: string
+          location_id: string
+          page_count?: number | null
+          paper_id: string
+          retrieved_at?: string
+          storage_path: string
+          version: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          byte_size?: number | null
+          content_sha256?: string
+          extraction_method?: string | null
+          full_text?: string | null
+          id?: string
+          licence?: string
+          location_id?: string
+          page_count?: number | null
+          paper_id?: string
+          retrieved_at?: string
+          storage_path?: string
+          version?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_files_licence_fkey"
+            columns: ["licence"]
+            isOneToOne: false
+            referencedRelation: "paper_licences"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "paper_files_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "paper_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_files_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_files_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_files_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_licences: {
+        Row: {
+          allows_adaptation: boolean
+          code: string
+          decided_at: string | null
+          decided_by: string | null
+          name: string
+          notes: string | null
+          rehost_in_paid_product: boolean
+          requires_attribution: boolean
+          url: string | null
+        }
+        Insert: {
+          allows_adaptation?: boolean
+          code: string
+          decided_at?: string | null
+          decided_by?: string | null
+          name: string
+          notes?: string | null
+          rehost_in_paid_product?: boolean
+          requires_attribution?: boolean
+          url?: string | null
+        }
+        Update: {
+          allows_adaptation?: boolean
+          code?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          name?: string
+          notes?: string | null
+          rehost_in_paid_product?: boolean
+          requires_attribution?: boolean
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_licences_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_locations: {
+        Row: {
+          doi: string | null
+          host_type: string
+          id: string
+          is_oa: boolean
+          landing_url: string | null
+          last_checked_at: string
+          licence: string | null
+          oa_status: string | null
+          paper_id: string
+          pdf_url: string | null
+          reported_by: string
+          source_name: string | null
+          verified_at_host: boolean
+          version: string | null
+        }
+        Insert: {
+          doi?: string | null
+          host_type: string
+          id?: string
+          is_oa?: boolean
+          landing_url?: string | null
+          last_checked_at?: string
+          licence?: string | null
+          oa_status?: string | null
+          paper_id: string
+          pdf_url?: string | null
+          reported_by: string
+          source_name?: string | null
+          verified_at_host?: boolean
+          version?: string | null
+        }
+        Update: {
+          doi?: string | null
+          host_type?: string
+          id?: string
+          is_oa?: boolean
+          landing_url?: string | null
+          last_checked_at?: string
+          licence?: string | null
+          oa_status?: string | null
+          paper_id?: string
+          pdf_url?: string | null
+          reported_by?: string
+          source_name?: string | null
+          verified_at_host?: boolean
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_locations_licence_fkey"
+            columns: ["licence"]
+            isOneToOne: false
+            referencedRelation: "paper_licences"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "paper_locations_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_locations_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_locations_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_relations: {
+        Row: {
+          from_paper_id: string
+          relation: string
+          source: string
+          to_paper_id: string
+        }
+        Insert: {
+          from_paper_id: string
+          relation: string
+          source: string
+          to_paper_id: string
+        }
+        Update: {
+          from_paper_id?: string
+          relation?: string
+          source?: string
+          to_paper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_relations_from_paper_id_fkey"
+            columns: ["from_paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_relations_from_paper_id_fkey"
+            columns: ["from_paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_relations_from_paper_id_fkey"
+            columns: ["from_paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_relations_to_paper_id_fkey"
+            columns: ["to_paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_relations_to_paper_id_fkey"
+            columns: ["to_paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_relations_to_paper_id_fkey"
+            columns: ["to_paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paper_venues: {
+        Row: {
+          created_at: string
+          feed_url: string | null
+          first_seen_at: string
+          homepage_url: string | null
+          id: string
+          is_in_doaj: boolean | null
+          issn_l: string | null
+          issns: string[] | null
+          name: string
+          openalex_source_id: string | null
+          publisher: string | null
+          reputation: string
+          reputation_notes: string | null
+          updated_at: string
+          venue_type: string
+        }
+        Insert: {
+          created_at?: string
+          feed_url?: string | null
+          first_seen_at?: string
+          homepage_url?: string | null
+          id?: string
+          is_in_doaj?: boolean | null
+          issn_l?: string | null
+          issns?: string[] | null
+          name: string
+          openalex_source_id?: string | null
+          publisher?: string | null
+          reputation?: string
+          reputation_notes?: string | null
+          updated_at?: string
+          venue_type: string
+        }
+        Update: {
+          created_at?: string
+          feed_url?: string | null
+          first_seen_at?: string
+          homepage_url?: string | null
+          id?: string
+          is_in_doaj?: boolean | null
+          issn_l?: string | null
+          issns?: string[] | null
+          name?: string
+          openalex_source_id?: string | null
+          publisher?: string | null
+          reputation?: string
+          reputation_notes?: string | null
+          updated_at?: string
+          venue_type?: string
+        }
+        Relationships: []
+      }
+      paper_watches: {
+        Row: {
+          config: Json
+          created_at: string
+          high_water: string | null
+          hits_total: number
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          name: string
+          promoted_total: number
+          watch_type: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          high_water?: string | null
+          hits_total?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name: string
+          promoted_total?: number
+          watch_type: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          high_water?: string | null
+          hits_total?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name?: string
+          promoted_total?: number
+          watch_type?: string
+        }
+        Relationships: []
+      }
+      papers: {
+        Row: {
+          access_tier: string
+          arxiv_id: string | null
+          best_licence: string | null
+          best_oa_url: string | null
+          cited_by_count: number | null
+          cited_by_count_at: string | null
+          conflict_disclosure: string | null
+          created_at: string
+          curator_note: string | null
+          discovered_via: string | null
+          doi: string | null
+          funders: Json
+          handle: string | null
+          id: string
+          is_retracted: boolean
+          issue: string | null
+          language: string | null
+          lex_notes: string | null
+          lex_reviewed_at: string | null
+          lex_reviewed_by: string | null
+          openalex_id: string | null
+          pages: string | null
+          peer_review_basis: string | null
+          peer_review_status: string
+          publication_date: string | null
+          publication_year: number | null
+          published_at: string | null
+          relevance_basis: Json
+          relevance_tier: string
+          slug: string | null
+          source_url: string | null
+          status: string
+          summary: Json | null
+          summary_plain: string | null
+          title: string
+          topics: string[]
+          updated_at: string
+          venue_id: string | null
+          volume: string | null
+          work_type: string | null
+        }
+        Insert: {
+          access_tier?: string
+          arxiv_id?: string | null
+          best_licence?: string | null
+          best_oa_url?: string | null
+          cited_by_count?: number | null
+          cited_by_count_at?: string | null
+          conflict_disclosure?: string | null
+          created_at?: string
+          curator_note?: string | null
+          discovered_via?: string | null
+          doi?: string | null
+          funders?: Json
+          handle?: string | null
+          id?: string
+          is_retracted?: boolean
+          issue?: string | null
+          language?: string | null
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          openalex_id?: string | null
+          pages?: string | null
+          peer_review_basis?: string | null
+          peer_review_status?: string
+          publication_date?: string | null
+          publication_year?: number | null
+          published_at?: string | null
+          relevance_basis?: Json
+          relevance_tier?: string
+          slug?: string | null
+          source_url?: string | null
+          status?: string
+          summary?: Json | null
+          summary_plain?: string | null
+          title: string
+          topics?: string[]
+          updated_at?: string
+          venue_id?: string | null
+          volume?: string | null
+          work_type?: string | null
+        }
+        Update: {
+          access_tier?: string
+          arxiv_id?: string | null
+          best_licence?: string | null
+          best_oa_url?: string | null
+          cited_by_count?: number | null
+          cited_by_count_at?: string | null
+          conflict_disclosure?: string | null
+          created_at?: string
+          curator_note?: string | null
+          discovered_via?: string | null
+          doi?: string | null
+          funders?: Json
+          handle?: string | null
+          id?: string
+          is_retracted?: boolean
+          issue?: string | null
+          language?: string | null
+          lex_notes?: string | null
+          lex_reviewed_at?: string | null
+          lex_reviewed_by?: string | null
+          openalex_id?: string | null
+          pages?: string | null
+          peer_review_basis?: string | null
+          peer_review_status?: string
+          publication_date?: string | null
+          publication_year?: number | null
+          published_at?: string | null
+          relevance_basis?: Json
+          relevance_tier?: string
+          slug?: string | null
+          source_url?: string | null
+          status?: string
+          summary?: Json | null
+          summary_plain?: string | null
+          title?: string
+          topics?: string[]
+          updated_at?: string
+          venue_id?: string | null
+          volume?: string | null
+          work_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "papers_best_licence_fkey"
+            columns: ["best_licence"]
+            isOneToOne: false
+            referencedRelation: "paper_licences"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "papers_discovered_via_fkey"
+            columns: ["discovered_via"]
+            isOneToOne: false
+            referencedRelation: "paper_watches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "papers_lex_reviewed_by_fkey"
+            columns: ["lex_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "papers_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "paper_venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "papers_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "v_new_venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paywalled_domains: {
         Row: {
           created_at: string
@@ -8667,6 +9430,133 @@ export type Database = {
           },
         ]
       }
+      v_licence_audit: {
+        Row: {
+          file_id: string | null
+          issue: string | null
+          licence: string | null
+          paper_id: string | null
+          storage_path: string | null
+        }
+        Relationships: []
+      }
+      v_minute_paper_chunks: {
+        Row: {
+          chunk_index: number | null
+          chunk_kind: string | null
+          content: string | null
+          embedding: string | null
+          id: string | null
+          page_from: number | null
+          page_to: number | null
+          paper_id: string | null
+          section: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_minute_papers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paper_chunks_paper_id_fkey"
+            columns: ["paper_id"]
+            isOneToOne: false
+            referencedRelation: "v_paper_review_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_minute_papers: {
+        Row: {
+          abstract: string | null
+          abstract_source: string | null
+          access_tier: string | null
+          arxiv_id: string | null
+          best_licence: string | null
+          best_oa_url: string | null
+          cited_by_count: number | null
+          cited_by_count_at: string | null
+          conflict_disclosure: string | null
+          curator_note: string | null
+          doi: string | null
+          funders: Json | null
+          id: string | null
+          is_retracted: boolean | null
+          issue: string | null
+          language: string | null
+          licence_name: string | null
+          licence_url: string | null
+          openalex_id: string | null
+          pages: string | null
+          peer_review_basis: string | null
+          publication_date: string | null
+          publication_year: number | null
+          published_at: string | null
+          publisher: string | null
+          relevance_tier: string | null
+          slug: string | null
+          summary: Json | null
+          summary_plain: string | null
+          title: string | null
+          topics: string[] | null
+          updated_at: string | null
+          venue_name: string | null
+          venue_type: string | null
+          volume: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "papers_best_licence_fkey"
+            columns: ["best_licence"]
+            isOneToOne: false
+            referencedRelation: "paper_licences"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      v_new_venues: {
+        Row: {
+          core_papers: number | null
+          first_seen_at: string | null
+          id: string | null
+          is_in_doaj: boolean | null
+          name: string | null
+          publisher: string | null
+          reputation: string | null
+          venue_type: string | null
+        }
+        Insert: {
+          core_papers?: never
+          first_seen_at?: string | null
+          id?: string | null
+          is_in_doaj?: boolean | null
+          name?: string | null
+          publisher?: string | null
+          reputation?: string | null
+          venue_type?: string | null
+        }
+        Update: {
+          core_papers?: never
+          first_seen_at?: string | null
+          id?: string | null
+          is_in_doaj?: boolean | null
+          name?: string | null
+          publisher?: string | null
+          reputation?: string | null
+          venue_type?: string | null
+        }
+        Relationships: []
+      }
       v_onchain_dashboard: {
         Row: {
           change_since_prior: number | null
@@ -8733,6 +9623,23 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_paper_review_queue: {
+        Row: {
+          access_tier: string | null
+          citations_per_year: number | null
+          cited_by_count: number | null
+          created_at: string | null
+          id: string | null
+          publication_date: string | null
+          relevance_tier: string | null
+          status: string | null
+          summary_basis: string | null
+          title: string | null
+          venue_name: string | null
+          venue_reputation: string | null
+        }
+        Relationships: []
       }
       v_podcast_ingestion_status: {
         Row: {
@@ -9272,6 +10179,10 @@ export type Database = {
         }[]
       }
       redeem_client_invite: { Args: { invite_token: string }; Returns: string }
+      refresh_paper_access: {
+        Args: { p_paper_id: string; p_source?: string }
+        Returns: string
+      }
       search_segments: {
         Args: {
           match_count?: number
