@@ -5,12 +5,14 @@ database, and records what has been built. It follows the shape of
 [`build-progress.md`](./build-progress.md). Where this file and the spec disagree, trust this
 file: it was checked against the repo, and the spec was not.
 
-**Status:** Session 1 (data layer) is built and unapplied. It is one migration,
+**Status:** Session 0 is closed. Session 1 (data layer) is built and tested locally, and
+**not yet applied**: it is one migration,
 [`20261018100000_library_papers.sql`](../../../supabase/migrations/20261018100000_library_papers.sql),
-and it applies when merged to `main`. It follows the spec as revised on 18 October 2026: the
-conservative licence and abstract route, the source reconciliation rules, and the
-[19 October decisions](#decided-on-19-october) on drafts and the whitepaper. Session 0 still
-needs an OpenAlex API key.
+on branch `feat/library-papers-data-layer`, and it applies to `bts-internal` when merged to
+`main` (see [Session 1: to finish](#session-1-to-finish)). It follows the spec as revised on
+18 October 2026 (the conservative licence and abstract route, and the source reconciliation
+rules) and the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper.
+Sessions 2–5 are not started.
 **Last updated:** 2026-10-19
 
 ---
@@ -144,14 +146,17 @@ access, 24 / 7 / 4 / 5 on relevance, 27 that would publish.
 
 ---
 
-## Session 0: what is left
+## Session 0: closed
 
 1. **Licences: decided 2026-10-18.** CC BY, BY-SA, CC0 and public domain are approved in the
    seed, decided by Chris Pollard. Everything else is link-out. Revisit only with legal advice.
 2. **Abstracts: decided 2026-10-18.** Shown only for `read_here` papers. Revisit only with legal
    advice.
 3. **Golden set: done**, including the [19 October decisions](#decided-on-19-october).
-4. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
+4. **OpenAlex API key: held** (2026-10-19). It goes into the agents service on Railway as
+   `OPENALEX_API_KEY`, documented in [`apps/agents/.env.example`](../../../apps/agents/.env.example).
+   Nothing reads it until Session 2, so it only has to be in Railway before Session 2 runs for
+   real.
 
 ---
 
@@ -221,6 +226,24 @@ The golden-set check loads each entry's copies as `paperResolve` should write th
 reconciliation, so it tests the tier logic, not OpenAlex. It is not Session 2's acceptance,
 which runs the real pipeline. CI runs neither, so run both by hand after any change to the
 migration or the golden set.
+
+### Session 1: to finish
+
+Built and checked, but not done until it is live. In order:
+
+1. **Merge the branch to `main`**, squashed, so the superseded publisher-table commit does not
+   stay in history. The merge applies the migration to `bts-internal`; nothing else does.
+2. **Check the push applied it.** Look at the `supabase db push` run on `main`. A green merge
+   with a failed push leaves the schema unchanged; `packages/db/src/migrations.test.ts`
+   explains how that happened once already.
+3. **Run the spec's four acceptance checks on live**, as the
+   [verification block](../../../supabase/migrations/20261018100000_library_papers.sql) at the
+   end of the migration lists them, including a subscriber session for the last two. The local
+   scripts use stand-ins for `auth`, `storage` and pgvector, so these four are the only proof
+   on the real thing.
+4. **Confirm `audit_permissive_policies()` returns zero rows**, as for every new table.
+5. **Regenerate types** (`pnpm --filter @platform/db generate-types`) and commit them, so
+   Session 2 starts from typed tables.
 
 ### Not yet built
 
