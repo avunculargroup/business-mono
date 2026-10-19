@@ -3,6 +3,7 @@
 -- See docs/features/client-app/library-papers-build-progress.md#checking-it-locally
 DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE SCHEMA auth;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
   $$ SELECT nullif(current_setting('test.uid', true), '')::uuid $$;
@@ -31,5 +32,7 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated;
 GRANT ALL ON storage.objects TO anon, authenticated;
 
-CREATE TABLE routines (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), action_type text);
+CREATE TABLE routines (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text, description text,
+  agent_name text, action_type text, action_config jsonb, frequency text, time_of_day time, timezone text,
+  next_run_at timestamptz, show_on_dashboard boolean, dashboard_title text, is_active boolean);
 CREATE SCHEMA extensions;

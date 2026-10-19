@@ -171,6 +171,13 @@ const researchIngestConfig = z.object({
   action_type: z.literal('research_ingest'),
 });
 
+// One knob: the cap on works resolved per run, since each costs a Crossref
+// lookup and usually a Rex call. The watches themselves live in paper_watches.
+const paperWatchConfig = z.object({
+  action_type: z.literal('paper_watch'),
+  max_resolve_per_run: optionalInt(1, 1000, 100),
+});
+
 const baseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().default(''),
@@ -201,6 +208,7 @@ const createSchema = z
     baseSchema.merge(marketReportConfig),
     baseSchema.merge(researchIngestConfig),
     baseSchema.merge(reportWatchScanConfig),
+    baseSchema.merge(paperWatchConfig),
   ])
   .superRefine((data, ctx) => {
     if (data.action_type === 'news_ingest') {
@@ -284,6 +292,8 @@ function buildActionConfig(input: z.infer<typeof createSchema>): Json {
       return { backfill_days: input.backfill_days };
     case 'report_watch_scan':
       return { max_acquisitions_per_run: input.max_acquisitions_per_run };
+    case 'paper_watch':
+      return { max_resolve_per_run: input.max_resolve_per_run };
     case 'market_report':
     case 'research_ingest':
       return {};

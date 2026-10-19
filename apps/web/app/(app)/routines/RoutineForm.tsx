@@ -95,6 +95,8 @@ function defaultConfigFor(actionType: RoutineActionTypeT): Record<string, unknow
       return { backfill_days: 90 };
     case RoutineActionType.REPORT_WATCH_SCAN:
       return { max_acquisitions_per_run: 10 };
+    case RoutineActionType.PAPER_WATCH:
+      return { max_resolve_per_run: 100 };
     case RoutineActionType.MARKET_REPORT:
     case RoutineActionType.RESEARCH_INGEST:
       return {};
@@ -275,6 +277,9 @@ export function RoutineForm({
 
       case RoutineActionType.REPORT_WATCH_SCAN:
         return submitWith({ max_acquisitions_per_run: numOr(cfg['max_acquisitions_per_run'], 10) });
+
+      case RoutineActionType.PAPER_WATCH:
+        return submitWith({ max_resolve_per_run: numOr(cfg['max_resolve_per_run'], 100) });
 
       case RoutineActionType.MARKET_REPORT:
       case RoutineActionType.RESEARCH_INGEST:
@@ -762,6 +767,24 @@ export function RoutineForm({
           <span className={styles.hint}>
             Cap on reports downloaded across all watched sources each run. Sources are managed on the
             news sources page.
+          </span>
+        </label>
+      )}
+
+      {values.action_type === RoutineActionType.PAPER_WATCH && (
+        <label className={styles.field}>
+          <span className={styles.label}>Papers resolved per run</span>
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            className={styles.input}
+            value={String(cfg['max_resolve_per_run'] ?? 100)}
+            onChange={(e) => updateConfig({ max_resolve_per_run: e.target.value })}
+          />
+          <span className={styles.hint}>
+            Cap on new papers looked up and classified each run, across every active watch. Anything
+            over the cap waits for the next run. New papers land as candidates; nothing is published.
           </span>
         </label>
       )}

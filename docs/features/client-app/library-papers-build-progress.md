@@ -10,8 +10,9 @@ file: it was checked against the repo, and the spec was not.
 merged in #417 and is **live on `bts-internal`**, checked there on 2026-10-19 (see
 [Session 1: live check](#session-1-live-check)). It follows the spec as revised on 18 October
 2026 (the conservative licence and abstract route, and the source reconciliation rules) and
-the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper. Sessions 2–5
-are not started.
+the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper. **Session 2
+(discovery and resolution) is built and tested offline, not yet merged or run live** (see
+[Session 2](#session-2-discovery-and-resolution)). Sessions 3–5 are not started.
 **Last updated:** 2026-10-19
 
 ---
@@ -77,15 +78,15 @@ match, ignore template licence tags) are judgements about sources and stay in `p
 
 ### Corrections to names and plans
 
-- **There is no agent called Bruno.** The consumers table lists "Margot, Bruno, Charlie".
-  Margot (`apps/agents/src/agents/margot/`) and Charlie exist. Bruno does not, so Session 3
-  should drop the name or say who was meant.
+- **Bruno is the BA agent.** An earlier version of this file said there was no agent called
+  Bruno. That was wrong: Bruno is the BA (`apps/agents/src/agents/ba/`, `bruno` in
+  `MODEL_SCOPES`). The spec's "Margot, Bruno, Charlie" consumers list stands.
 - **The routine action types do not match the workflows.** Session 1 asks for `paper_watch`,
   `paper_resolve` and `paper_licence_recheck`. But `paperResolve` runs per candidate rather
   than on a schedule, and the weekly workflow is `paperRecheck`. They are **not** added yet: a
   value in the `routines` CHECK with no handler in `executeRoutineWorkflow` lets someone
-  schedule a routine that can only fail. Add `paper_watch` and `paper_recheck` in Session 2
-  together with their handlers, `RoutineActionType` and `ROUTINE_ACTION_LABELS`.
+  schedule a routine that can only fail. Session 2 added `paper_watch` with its handler;
+  `paper_recheck` waits for the weekly recheck workflow it would run.
 - **The licence seed carries the Session 0 decision.** CC BY, BY-SA, CC0 and public domain are
   approved, with Chris Pollard as `decided_by`; everything else, CC BY-ND and every NC licence
   included, is link-out. A `CHECK` means no licence can be approved without a named decider.
@@ -198,7 +199,7 @@ run over once Charlie's summary step exists.
 
 ### Checking it locally
 
-Both checks are in [`packages/db/acceptance/`](../../../packages/db/acceptance/) and run on a
+The checks are in [`packages/db/acceptance/`](../../../packages/db/acceptance/) and run on a
 plain Postgres 16. `stubs.sql` stands in for `team_members`, the two RLS helpers, `auth.uid()`
 and `storage`. pgvector is not needed, because the column type is rewritten on the way in:
 
@@ -217,10 +218,20 @@ createdb papers_golden
 psql -d papers_golden -v ON_ERROR_STOP=1 -f packages/db/acceptance/stubs.sql
 psql -d papers_golden -v ON_ERROR_STOP=1 -f /tmp/papers.sql
 node packages/db/acceptance/golden-set-tiers.mjs | psql -d papers_golden -v ON_ERROR_STOP=1
+
+# Session 2's commit_paper_resolve, on a fresh database with both migrations
+sed -e 's/vector(1536)/real[]/' -e '/USING hnsw/d' \
+  supabase/migrations/20261019100000_paper_resolve.sql > /tmp/resolve.sql
+createdb papers_resolve
+psql -d papers_resolve -v ON_ERROR_STOP=1 -f packages/db/acceptance/stubs.sql
+psql -d papers_resolve -v ON_ERROR_STOP=1 -f /tmp/papers.sql
+psql -d papers_resolve -v ON_ERROR_STOP=1 -f /tmp/resolve.sql
+psql -d papers_resolve -v ON_ERROR_STOP=1 -f packages/db/acceptance/paper-resolve.sql
 ```
 
-A clean run ends with `ALL ACCEPTANCE CHECKS PASSED` and `GOLDEN SET: all 82 checks agree`
-(tier and licence for all 40 entries, plus the two draft-to-published edges).
+A clean run ends with `ALL ACCEPTANCE CHECKS PASSED`, `GOLDEN SET: all 82 checks agree`
+(tier and licence for all 40 entries, plus the two draft-to-published edges) and
+`ALL RESOLVE CHECKS PASSED`.
 The golden-set check loads each entry's copies as `paperResolve` should write them after
 reconciliation, so it tests the tier logic, not OpenAlex. It is not Session 2's acceptance,
 which runs the real pipeline. CI runs neither, so run both by hand after any change to the
@@ -248,8 +259,84 @@ Run against `bts-internal` on 2026-10-19, after #417 merged:
   functions. None is `SECURITY DEFINER`, so it is left for whoever fixes that pattern
   repo-wide.
 
+### Session 2: discovery and resolution
+
+Built on `feat/library-papers-data-layer`, tested offline, **not yet merged, and not yet run
+against the real APIs**. This session's network policy blocks `api.openalex.org`,
+`api.crossref.org` and the repository hosts, so the live golden-set acceptance has not been
+run; see [To finish](#session-2-to-finish).
+
+What it is (inventory in [`apps/agents/README.md`](../../../apps/agents/README.md)):
+
+- **`src/workflows/papers/`.** The OpenAlex and Crossref clients, EPrints repository
+  confirmation, `normaliseWork`, `reconcile` (the six rules), `classifyPeerReview`,
+  `scoreRelevance`, Rex's confirmation (`paperResolve.confirm_relevance` in
+  `MODEL_SCOPES`), `resolvePaper` (also registered as the `paperResolve` workflow) and the
+  watch runner.
+- **[`20261019100000_paper_resolve.sql`](../../../supabase/migrations/20261019100000_paper_resolve.sql).**
+  `commit_paper_resolve(payload)` writes one result in one transaction. It is callable only
+  by the service role. The migration also adds `paper_watch` to `routines.action_type`,
+  seeds the daily watch routine inactive, and seeds the default watch ("bitcoin in title or
+  abstract").
+- **The `paper_watch` routine end to end:** shared types and labels, the `/routines` form
+  with a "papers resolved per run" knob, and the handler.
+- **`backfill:papers`.** A resumable script, with `--no-rex` and `--dry-run`.
+- **`evals/library-papers.eval.ts`.** The spec's Session 2 acceptance, run against the real
+  APIs and Rex.
+
+Decisions taken while building it:
+
+- **The backfill reads the API, not the S3 snapshot.** The snapshot is hundreds of gigabytes
+  to find the 8,000–15,000 works one filter returns. A full pass is about 75 list pages of
+  200. If, as the recheck suggests, a search filter costs 10 credits a page, that is about
+  750 credits, against the 10,000 daily allowance.
+- **The access tier is still only computed by the database.** `accessTier.ts` mirrors it for
+  the eval alone. Both the mirror and the SQL are tested against the 40 hand labels, so they
+  cannot drift apart silently.
+- **Rex sees everything but a clear exclude.** A work naming neither bitcoin nor
+  crypto-assets is excluded without a model call. If Rex fails or returns a malformed
+  answer, the deterministic band's tier stands, and `relevance_basis.rex_status` says
+  `unavailable`.
+- **A re-run never reclassifies a paper a person has touched.** Peer review and relevance
+  update only while a paper is a `candidate` without an `override`. Metadata, copies,
+  citations and retraction state always refresh. A retraction is one-way.
+- **Rule 3 reads EPrints only.** That covers Southampton, LSE, WRAP and City. Any other
+  repository's copy is recorded but counts for nothing until a person confirms it.
+- **Not built yet.** `paperRecheck` (the weekly embargo and retraction re-pass) has no
+  routine. Session 2's scope names retraction sync, and that runs on every resolve.
+  Watches of type `crossref_query` and `arxiv_category` are reported as skipped.
+
+Tested offline:
+
+- 108 unit tests over the clients, reconciliation, classification, resolve and the watch,
+  with hand-built API shapes (not recorded responses). Breaking a rule makes them fail.
+- The `/routines` form tests, including a round-trip of the seeded routine.
+- `paper-resolve.sql`: 38 checks on local Postgres, covering:
+  - zero duplicates on re-run (the spec's Session 2 criterion);
+  - deduplication on DOI then OpenAlex ID;
+  - the draft edge and its event;
+  - notices logged once;
+  - the classification lock;
+  - matching a moved copy by its DOI;
+  - service-role-only execution.
+
+  Six guards were broken one at a time, and the script failed each time.
+
+### Session 2: to finish
+
+1. **Run the golden-set eval where the network is allowed**, either locally or in a session
+   whose environment allows `api.openalex.org`, `api.crossref.org` and the repository hosts:
+   `pnpm --filter @platform/agents test:eval -- library-papers`. It needs
+   `OPENALEX_API_KEY` and a model key. The spec's acceptance has three parts: access tier
+   right on every resolvable entry, relevance on at least 90%, and gs-37 resolving as its own
+   record linked to gs-15. gs-38, gs-39 and gs-40 are not in OpenAlex and are entered by hand.
+2. **Merge.** The merge applies `20261019100000_paper_resolve.sql` to `bts-internal`.
+3. **Add `OPENALEX_API_KEY` to the agents service on Railway.**
+4. **Seed the register.** Run `backfill:papers --dry-run` to see the count, then a first pass
+   (with `--no-rex` for cost if wanted). Then run the routine once by hand from `/routines`,
+   watch it, and switch it on.
+
 ### Not yet built
 
-Sessions 2–5: the discovery and resolve workflows, enrichment and the linter, the HQ review
-UI, and the Minute surfaces. Generated types exist (above); repository interfaces do not,
-because nothing reads these tables yet. They arrive with the first code that does.
+Sessions 3–5: enrichment and the linter, the HQ review UI, and the Minute surfaces.
+Repository interfaces arrive with the first code that reads these tables.

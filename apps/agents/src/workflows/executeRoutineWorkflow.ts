@@ -44,6 +44,7 @@ import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { runMarketReport } from '../lib/report/runMarketReport.js';
 import { runReportWatchScan } from '../lib/reportWatch/index.js';
 import { runResearchIngestRoutine } from './researchIngest/run.js';
+import { runPaperWatchRoutine } from './papers/watch.js';
 import { runSocialPost } from './socialPost/index.js';
 import { rex } from '../agents/researcher/index.js';
 import { charlie } from '../agents/contentCreator/index.js';
@@ -326,6 +327,8 @@ const runRoutine = createStep({
           outcomes.push(await runReportWatch(routine));
         } else if (routine.action_type === 'research_ingest') {
           outcomes.push(await runResearchIngest(routine));
+        } else if (routine.action_type === 'paper_watch') {
+          outcomes.push(await runPaperWatch(routine));
         } else {
           outcomes.push({
             routine_id: routine.id,
@@ -1613,6 +1616,27 @@ async function runResearchIngest(
     timezone: routine.timezone,
     // A record whose run failed is named in the summary, not a failed routine:
     // the other records ingested, and a retry would re-run all of them.
+    status: 'success',
+    result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
+    error: null,
+  };
+}
+
+async function runPaperWatch(
+  routine: z.infer<typeof routineSchema>,
+): Promise<RoutineOutcome> {
+  const cfg = routine.action_config as { max_resolve_per_run?: number };
+  const { summary, result } = await runPaperWatchRoutine(cfg);
+
+  return {
+    routine_id: routine.id,
+    name: routine.name,
+    action_type: 'paper_watch' as RoutineActionType,
+    frequency: routine.frequency as RoutineFrequency,
+    time_of_day: routine.time_of_day,
+    timezone: routine.timezone,
+    // A work that failed to resolve is counted in the summary, not a failed
+    // routine: the high-water mark stays put, so the next run retries it.
     status: 'success',
     result: { summary, sources: [], metadata: result as unknown as Record<string, unknown> },
     error: null,
