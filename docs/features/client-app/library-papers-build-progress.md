@@ -5,14 +5,13 @@ database, and records what has been built. It follows the shape of
 [`build-progress.md`](./build-progress.md). Where this file and the spec disagree, trust this
 file: it was checked against the repo, and the spec was not.
 
-**Status:** Session 0 is closed. Session 1 (data layer) is built and tested locally, and
-**not yet applied**: it is one migration,
+**Status:** Sessions 0 and 1 are done. The data layer,
 [`20261018100000_library_papers.sql`](../../../supabase/migrations/20261018100000_library_papers.sql),
-on branch `feat/library-papers-data-layer`, and it applies to `bts-internal` when merged to
-`main` (see [Session 1: to finish](#session-1-to-finish)). It follows the spec as revised on
-18 October 2026 (the conservative licence and abstract route, and the source reconciliation
-rules) and the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper.
-Sessions 2–5 are not started.
+merged in #417 and is **live on `bts-internal`**, checked there on 2026-10-19 (see
+[Session 1: live check](#session-1-live-check)). It follows the spec as revised on 18 October
+2026 (the conservative licence and abstract route, and the source reconciliation rules) and
+the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper. Sessions 2–5
+are not started.
 **Last updated:** 2026-10-19
 
 ---
@@ -227,26 +226,30 @@ reconciliation, so it tests the tier logic, not OpenAlex. It is not Session 2's 
 which runs the real pipeline. CI runs neither, so run both by hand after any change to the
 migration or the golden set.
 
-### Session 1: to finish
+### Session 1: live check
 
-Built and checked, but not done until it is live. In order:
+Run against `bts-internal` on 2026-10-19, after #417 merged:
 
-1. **Merge the branch to `main`**, squashed, so the superseded publisher-table commit does not
-   stay in history. The merge applies the migration to `bts-internal`; nothing else does.
-2. **Check the push applied it.** Look at the `supabase db push` run on `main`. A green merge
-   with a failed push leaves the schema unchanged; `packages/db/src/migrations.test.ts`
-   explains how that happened once already.
-3. **Run the spec's four acceptance checks on live**, as the
-   [verification block](../../../supabase/migrations/20261018100000_library_papers.sql) at the
-   end of the migration lists them, including a subscriber session for the last two. The local
-   scripts use stand-ins for `auth`, `storage` and pgvector, so these four are the only proof
-   on the real thing.
-4. **Confirm `audit_permissive_policies()` returns zero rows**, as for every new table.
-5. **Regenerate types** (`pnpm --filter @platform/db generate-types`) and commit them, so
-   Session 2 starts from typed tables.
+- **Applied.** `20261018100000` is in `supabase_migrations.schema_migrations`.
+- **Shape.** Twelve `paper_*` tables, all with RLS; the five views all `security_invoker`;
+  the `papers` bucket private; `pg_trgm` in `extensions`; exactly CC BY, BY-SA, CC0 and public
+  domain approved.
+- **`audit_permissive_policies()` returns zero rows.**
+- **The spec's four acceptance checks pass on live**, in one transaction that raised at the end
+  so nothing persisted (the tables were empty afterwards). A `cc-by-nc` file raised; a fully
+  reviewed draft was absent from `v_minute_papers`; a subscriber session, as the one active
+  `client_users` account, saw no candidate or draft rows; and for a published `metadata_only`
+  paper it got a NULL abstract, no `paper_abstracts` row and no abstract or full-text chunk,
+  while still seeing its summary and curator note, with `v_minute_paper_chunks` agreeing.
+- **Types.** The `regenerate Supabase types` GitHub Action committed them on merge
+  (`268a323`); a fresh generation from live matched it exactly. Nothing to do by hand.
+- **Security advisor.** Nothing new beyond one house pattern: the paper trigger functions
+  share the `function_search_path_mutable` warning with the repo's other 20 invoker trigger
+  functions. None is `SECURITY DEFINER`, so it is left for whoever fixes that pattern
+  repo-wide.
 
 ### Not yet built
 
 Sessions 2–5: the discovery and resolve workflows, enrichment and the linter, the HQ review
-UI, and the Minute surfaces. No generated types or repository interfaces exist yet, because
-nothing reads these tables. They arrive with the first code that does.
+UI, and the Minute surfaces. Generated types exist (above); repository interfaces do not,
+because nothing reads these tables yet. They arrive with the first code that does.
