@@ -6,8 +6,9 @@
 // paperResolve should write once it has applied the spec's rules — so this
 // tests the deterministic tier, not OpenAlex. Repository copies are loaded as
 // verified_at_host (rule 3), because the labels were checked at the repository.
-// An entry whose expectedResolution merges it into another (gs-37) is not
-// loaded as a paper; the check is instead that its DOI is a copy of the target.
+// Every entry is its own paper, drafts included (rule 4), and every
+// expectedRelations edge between two entries is loaded, so the schema is
+// shown to hold the version pairs (gs-15/gs-37, gs-29/gs-38) as the spec says.
 //
 //   node packages/db/acceptance/golden-set-tiers.mjs | psql -d papers_check -v ON_ERROR_STOP=1
 //
@@ -30,7 +31,6 @@ const out = [
 ];
 
 for (const e of entries) {
-  if (e.expectedResolution) continue;
   const ids = e.identifiers ?? {};
   out.push(
     `INSERT INTO papers (id, doi, openalex_id, handle, source_url, title, peer_review_status) VALUES (` +
@@ -52,13 +52,16 @@ for (const e of entries) {
   );
 }
 
-for (const e of entries.filter((x) => x.expectedResolution?.as === 'copy')) {
-  const target = e.expectedResolution.mergeInto;
-  out.push(
-    `INSERT INTO golden_result SELECT ${q(e.id)}, 'copyOf', ${q(target)}, ` +
-      `CASE WHEN EXISTS (SELECT 1 FROM paper_locations WHERE paper_id = ${id(target)} AND doi = ${q(e.identifiers.doi.toLowerCase())}) ` +
-      `THEN ${q(target)} END;`,
-  );
+const inSet = new Set(entries.map((e) => e.id));
+for (const e of entries) {
+  for (const r of e.expectedRelations ?? []) {
+    if (!inSet.has(r.from) || !inSet.has(r.to)) continue; // e.g. gs-08's erratum, which is not an entry
+    out.push(
+      `INSERT INTO paper_relations (from_paper_id, to_paper_id, relation, source) VALUES (${id(r.from)}, ${id(r.to)}, ${q(r.relation)}, 'manual');`,
+      `INSERT INTO golden_result SELECT ${q(e.id)}, ${q(`${r.relation} ${r.from} -> ${r.to}`)}, 'present', ` +
+        `CASE WHEN EXISTS (SELECT 1 FROM paper_relations WHERE from_paper_id = ${id(r.from)} AND to_paper_id = ${id(r.to)} AND relation = ${q(r.relation)}) THEN 'present' END;`,
+    );
+  }
 }
 
 out.push(

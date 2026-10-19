@@ -298,8 +298,9 @@ CREATE TABLE paper_abstracts (
 -- they are constraints here and a pipeline that misreads OpenAlex fails
 -- the insert instead of moving a tier:
 --   rule 2  SSRN never hosts a published or accepted version;
---   rule 4  a preprint server's copy is a submitted version, and a copy
---           with its own DOI (a merged preprint) is recorded here with it;
+--   rule 4  a preprint server's copy is a submitted version. A draft is
+--           its own paper, linked by published_version_of; its copy may
+--           also be listed on the published paper, with its own doi;
 --   rule 3  a repository copy counts toward the tier only once
 --           verified_at_host — see refresh_paper_access().
 -- ------------------------------------------------------------
@@ -335,8 +336,9 @@ CREATE TABLE paper_locations (
 CREATE UNIQUE INDEX paper_locations_copy_key
   ON paper_locations (paper_id, COALESCE(landing_url, pdf_url));
 
--- A copy's own DOI belongs to one paper (rule 4: X is a copy of Y, once).
-CREATE UNIQUE INDEX paper_locations_doi_key ON paper_locations (doi) WHERE doi IS NOT NULL;
+-- Once per paper. Not across papers: a draft's DOI is both its own record
+-- and, as a copy, a location on its published version (rule 4).
+CREATE UNIQUE INDEX paper_locations_doi_key ON paper_locations (paper_id, doi) WHERE doi IS NOT NULL;
 
 
 -- ------------------------------------------------------------

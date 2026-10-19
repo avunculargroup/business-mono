@@ -98,12 +98,20 @@ SELECT pg_temp.expect((SELECT access_tier FROM papers WHERE id = :P1) = 'read_he
 SELECT pg_temp.expect((SELECT count(*) FROM paper_events WHERE paper_id = :P1 AND event_type = 'access_changed') = 2, 'every tier change logged');
 SELECT pg_temp.expect(EXISTS (SELECT 1 FROM v_licence_audit WHERE paper_id = :P1 AND issue = 'read_here_without_file'), 'audit: read_here without file');
 
--- A preprint is judged on its own copies, and a merged preprint's DOI belongs to one paper.
+-- A preprint is judged on its own copies; it is its own record, linked to its published version.
 INSERT INTO paper_locations (paper_id, host_type, landing_url, doi, version, licence, is_oa, reported_by) VALUES
   (:P5, 'preprint_server', 'https://www.preprints.org/manuscript/202108.0001', '10.20944/preprints202108.0001.v1', 'submittedVersion', 'cc-by', true, 'crossref');
 SELECT pg_temp.expect((SELECT access_tier FROM papers WHERE id = :P5) = 'read_here', 'a preprint is judged on its own copies');
-SELECT pg_temp.raises($$INSERT INTO paper_locations (paper_id, host_type, landing_url, doi, version, is_oa, reported_by) VALUES ('00000000-0000-0000-0000-0000000000b1', 'preprint_server', 'https://www.preprints.org/manuscript/x', '10.20944/preprints202108.0001.v1', 'submittedVersion', true, 'openalex')$$,
-  'paper_locations_doi_key', 'rule 4: one copy DOI, one paper');
+-- Rule 4: the draft is its own record, and its copy can also sit on the published paper.
+INSERT INTO paper_relations (from_paper_id, to_paper_id, relation, source) VALUES (:P1, :P5, 'published_version_of', 'openalex');
+INSERT INTO paper_locations (paper_id, host_type, landing_url, doi, version, licence, is_oa, reported_by) VALUES
+  (:P1, 'preprint_server', 'https://www.preprints.org/manuscript/202108.0001/copy', '10.20944/preprints202108.0001.v1', 'submittedVersion', 'cc-by', true, 'openalex');
+SELECT pg_temp.expect((SELECT count(*) FROM paper_locations WHERE doi = '10.20944/preprints202108.0001.v1') = 2,
+  'rule 4: a draft DOI can be its own record and a copy on the published paper');
+SELECT pg_temp.expect((SELECT best_oa_url FROM papers WHERE id = :P1) = 'https://ledger.pitt.edu/1.pdf',
+  'the draft copy does not displace the published copy');
+SELECT pg_temp.raises($$INSERT INTO paper_locations (paper_id, host_type, landing_url, doi, version, is_oa, reported_by) VALUES ('00000000-0000-0000-0000-0000000000b1', 'preprint_server', 'https://www.preprints.org/manuscript/y', '10.20944/preprints202108.0001.v1', 'submittedVersion', true, 'openalex')$$,
+  'paper_locations_doi_key', 'a copy DOI appears once per paper');
 UPDATE papers SET peer_review_status = 'peer_reviewed' WHERE id = :P5;
 SELECT pg_temp.expect((SELECT access_tier FROM papers WHERE id = :P5) = 'metadata_only', 'the same copy no longer counts once the work is peer reviewed');
 UPDATE papers SET peer_review_status = 'preprint' WHERE id = :P5;

@@ -33,8 +33,8 @@ copy counts only once `verified_at_host`. Third, publishing needs Lex, peer revi
 tier, a slug, a summary and an accepted venue. Fourth, a publisher's abstract, and abstract and
 full-text chunks, reach a subscriber only for a `read_here` paper, by RLS on their own tables.
 The spec's source reconciliation rules that are facts about a copy are `CHECK`s: SSRN is never
-a published or accepted version, a preprint server's copy is a submitted version, and a copy's
-own DOI belongs to one paper. `papers.handle` and `papers.source_url` identify works with no
+a published or accepted version, and a preprint server's copy is a submitted version. A draft
+is its own paper, linked to its published version by `published_version_of`. `papers.handle` and `papers.source_url` identify works with no
 DOI, OpenAlex or arXiv ID. The seed approves CC BY, BY-SA, CC0 and public domain (decided by
 Chris Pollard); everything else is link-out. Where this differs from the spec's reference DDL,
 and why: `docs/features/client-app/library-papers-build-progress.md`.

@@ -8,10 +8,10 @@ file: it was checked against the repo, and the spec was not.
 **Status:** Session 1 (data layer) is built and unapplied. It is one migration,
 [`20261018100000_library_papers.sql`](../../../supabase/migrations/20261018100000_library_papers.sql),
 and it applies when merged to `main`. It follows the spec as revised on 18 October 2026: the
-conservative licence and abstract route, and the source reconciliation rules. Session 0 still
-needs an OpenAlex API key, and has [three questions](#questions-for-a-person) about the golden
-set.
-**Last updated:** 2026-10-18
+conservative licence and abstract route, the source reconciliation rules, and the
+[19 October decisions](#decided-on-19-october) on drafts and the whitepaper. Session 0 still
+needs an OpenAlex API key.
+**Last updated:** 2026-10-19
 
 ---
 
@@ -51,7 +51,7 @@ that believes OpenAlex fails the insert instead of moving a tier:
 |---|---|
 | 2. SSRN is never a published or accepted version | A `CHECK` on `paper_locations` refuses either version on an `ssrn.com` URL or a `10.2139/ssrn.` DOI |
 | 3. Confirm repository copies at the repository | `verified_at_host`. A repository copy counts toward the tier, or can back a stored file, only once it is set |
-| 4. A different-DOI hit is a copy, and a preprint server's copy is a submitted version | `paper_locations.doi`, unique across all copies, so one preprint DOI belongs to one paper; a `CHECK` that a `preprint_server` copy is `submittedVersion` |
+| 4. A draft is always its own record, and a preprint server's copy is a submitted version | A draft is its own `papers` row, linked by `published_version_of`. Its copy may also sit on the published paper, so `paper_locations.doi` is unique per paper, not across papers. A `CHECK` makes every `preprint_server` copy `submittedVersion` |
 | The README's "a preprint never lifts its published version" | `refresh_paper_access()` counts only published and accepted copies for a peer-reviewed paper. A work that is itself a preprint or working paper is judged on its own copies, as the golden-set README says, and changing `peer_review_status` recomputes the tier |
 
 Every rule's input and verdict go into `paper_events` as a `reconciled` event, whose `detail`
@@ -117,8 +117,7 @@ access, 24 / 7 / 4 / 5 on relevance, 27 that would publish.
   its Southampton accepted manuscript, and neither copy said it was free (`isOa` was missing,
   and there is no licence to imply it). Both now carry `isOa: true`, which the recheck's
   evidence already established: Southampton's export says `security: public` for gs-22, and
-  OpenAlex agrees for gs-21. With that, the schema agrees with all 39 tier labels and all 39
-  licence labels, and gs-37 lands as a copy of gs-15.
+  OpenAlex agrees for gs-21. With that, the schema agrees with every tier and licence label.
 - **The recheck report reads as if nothing was applied.** It says its label changes are
   "proposed, not applied" and that gs-23, gs-28 and gs-36 keep their 2026-10-11 check date until
   then, but `golden-set.json` has all of them applied and dated 2026-10-18, and gs-20 is settled
@@ -128,22 +127,20 @@ access, 24 / 7 / 4 / 5 on relevance, 27 that would publish.
   CC BY, BY-SA or CC0. The spec counts only published and accepted copies of a peer-reviewed
   paper and approves public domain too; the rule now says both.
 
-### Questions for a person
+### Decided on 19 October
 
-1. **Preprints are handled two ways.** gs-37 (a preprint OpenAlex merged into gs-15) becomes a
-   *copy* of the published paper under rule 4. gs-38 (a working paper of gs-29, not in
-   OpenAlex) is a separate *paper* linked by `published_version_of`. They are the same kind of
-   thing, and the difference is only whether OpenAlex merged it. That matters because the daily
-   watch will usually find a preprint *before* its published version exists, as a paper row,
-   and rule 4 would then need that row turned into a copy. One rule for both would be simpler.
-   The schema supports either. My recommendation: always a separate paper with a
-   `published_version_of` edge, plus the preprint's copy on the published paper.
-2. **"Access tier on 40 of 40" cannot be met as written.** gs-37 never lands as a paper, so it
-   has no tier to score. The check that fits is 39 tiers plus gs-37 landing as a copy, which is
-   what the golden-set check here does.
-3. **The whitepaper (gs-40) would land in `papers`.** The spec puts it on a "Foundational, not
-   peer-reviewed" shelf *outside* `papers`. As a non-peer-reviewed row it can never publish, so
-   no harm is done, but it is worth deciding whether the watch should keep it at all.
+- **A draft is always its own record (option A).** gs-37 (a preprint OpenAlex merged into
+  gs-15) and gs-38 (a working paper OpenAlex does not have) are now handled the same way: each
+  is its own non-publishing row, linked to its published version by `published_version_of`. The
+  watch usually finds a draft before its journal version exists, so this way nothing ever has to
+  be converted. Rule 4 in the spec is reworded, gs-37's `expectedResolution` is gone, and gs-15
+  carries the edge in `expectedRelations`, as gs-29 already did for gs-38. gs-37 must not take
+  gs-15's OpenAlex ID, which `papers.openalex_id` being unique enforces.
+- **"Access tier on 40 of 40" stands as written**, because gs-37 is a paper again with a tier of
+  its own (`read_here`, from its CC BY preprint copy).
+- **The whitepaper (gs-40) stays.** The spec's scope now says the register may hold
+  non-peer-reviewed works internally as rows that can never publish, separate from the curated
+  "Foundational" shelf.
 
 ---
 
@@ -153,7 +150,7 @@ access, 24 / 7 / 4 / 5 on relevance, 27 that would publish.
    seed, decided by Chris Pollard. Everything else is link-out. Revisit only with legal advice.
 2. **Abstracts: decided 2026-10-18.** Shown only for `read_here` papers. Revisit only with legal
    advice.
-3. **Golden set: done**, with the [three questions](#questions-for-a-person) above.
+3. **Golden set: done**, including the [19 October decisions](#decided-on-19-october).
 4. **Register an OpenAlex API key** and add it to the agents server's Railway environment.
 
 ---
@@ -167,7 +164,7 @@ tables, plus `paper_abstracts`. It also adds the licence and publication gates, 
 access tier, the reconciliation constraints, RLS, the private `papers` bucket (PDF only, 50 MB)
 and five `security_invoker` views, including the spec's `v_minute_paper_chunks`.
 
-All four of the spec's Session 1 acceptance checks pass, along with 56 more covering the
+All four of the spec's Session 1 acceptance checks pass, along with 58 more covering the
 gates above:
 
 - A `paper_files` row with `cc-by-nc` raises.
@@ -178,7 +175,7 @@ gates above:
 
 To confirm the suites catch failures, thirteen rules were broken one at a time: the version
 filter, repository confirmation, preprints judged on their own copies, the abstract and chunk
-RLS rules, the SSRN and preprint-server checks, unique copy DOIs, a BY-ND approval, the file and
+RLS rules, the SSRN and preprint-server checks, the per-paper copy DOI, a BY-ND approval, the file and
 location match, the venue gate, the review guard, and the `reconciled` detail check. A suite
 failed each time. Two of those runs found real bugs: the test helper treated a NULL result as a
 pass, and the `reconciled` check passed when `detail` was NULL. Both are fixed.
@@ -218,7 +215,8 @@ psql -d papers_golden -v ON_ERROR_STOP=1 -f /tmp/papers.sql
 node packages/db/acceptance/golden-set-tiers.mjs | psql -d papers_golden -v ON_ERROR_STOP=1
 ```
 
-A clean run ends with `ALL ACCEPTANCE CHECKS PASSED` and `GOLDEN SET: all 79 checks agree`.
+A clean run ends with `ALL ACCEPTANCE CHECKS PASSED` and `GOLDEN SET: all 82 checks agree`
+(tier and licence for all 40 entries, plus the two draft-to-published edges).
 The golden-set check loads each entry's copies as `paperResolve` should write them after
 reconciliation, so it tests the tier logic, not OpenAlex. It is not Session 2's acceptance,
 which runs the real pipeline. CI runs neither, so run both by hand after any change to the
