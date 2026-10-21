@@ -6,6 +6,19 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-21 — Register facts: business description and headcount
+
+`20261021000000_business_description_and_headcount.sql` adds two `field_source_minimums`
+keys, both classed `implementation`: `business_description` (what the company does, as a
+filing states it) and `headcount` (employees at a stated date). Until now the subscriber
+summary could only say how an entity holds bitcoin, because every implementation fact was
+about the holding. Size is headcount on purpose. Market capitalisation is share price, and
+revenue and assets describe how the business is going, so all three would be outcome facts.
+`market_cap_band` stays a team-only peer-matching input. Both keys accept what `identity`
+accepts except `company_web`, so marketing copy cannot describe the company.
+
+---
+
 ## 2026-10-13 — Turn-aware transcript segments
 
 `20261013000000_turn_aware_transcript_segments.sql` adds `transcript_segments.speakers`

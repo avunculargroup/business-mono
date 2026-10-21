@@ -18,10 +18,11 @@ shows the summary and `is_published` is dropped (session 12), then review state 
 the rows themselves (session 13), then approval per ingest run and persist-and-stop
 (session 14), then the weekly routine and its email (session 15), then "changed since
 review" on records and rows (session 16), then the ingest drafting the subscriber summary
-and EDGAR discovery into `research_documents` (session 17). The routine's first real run
+and EDGAR discovery into `research_documents` (session 17), then what the company does
+and its headcount in the summary (session 18). The routine's first real run
 went on 4 October and left 53 draft rows on five records. Still remaining from session 2:
 the recorded trace bundle.
-**Last updated:** 2026-10-06
+**Last updated:** 2026-10-21
 
 
 > **Superseded in part.** Records 4–12 (Strategy, Metaplanet, 333D, Hamak Strategy,
@@ -1340,3 +1341,36 @@ health panel still shows every source.
   summary names them, and the record page shows them.
 - **Generated types:** hand-added to `database.ts` until the migrate workflow regenerates
   them.
+
+
+## Session 18 — what the company does, and its size
+
+The summary a subscriber reads said only how an entity holds bitcoin, because every
+implementation fact was about the holding. A reader needs to know what the company is
+first.
+
+**Decided:** size is headcount. Market capitalisation is share price, and revenue and
+assets describe how the business is going, so all three are outcome facts.
+`market_cap_band` stays a team-only peer-matching column. A business description is what
+the company is, not how it is going, so it sits with `identity`. It does not sit with
+`operating_metric`.
+
+**Shipped.**
+
+- **`20261021000000_business_description_and_headcount.sql`:** two keys, `business_description`
+  and `headcount`, both `implementation`. Each accepts what `identity` accepts except
+  `company_web`.
+- **`summaryDraft.ts`:** the prompt opens with what the company does and its headcount,
+  leaving out either one when no fact states it. It now allows three to five sentences and
+  at most 120 words. The filter also refuses "market cap" and "market capitalisation" in
+  both spellings.
+
+**Verified.** The agents test suite and typecheck pass, and so do the `@platform/db` tests.
+
+**Not done.**
+
+- **Nothing writes the new facts yet.** The ingest extracts events and does not extract
+  facts, so a record gains a `business_description` or `headcount` only when someone enters
+  one. Until then the draft reads as it did before.
+- **Existing summaries are unchanged.** The draft runs only for a record with no
+  `client_summary`, so a record that already has one needs it rewritten by hand.

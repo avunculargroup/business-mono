@@ -3049,7 +3049,8 @@ CREATE TABLE report_segments (
 --     each field accepts. ledger_event and accounting_treatment: regulated,
 --     exchange, audited, filed_financials. custody/mandate/covenants: those plus
 --     filed_narrative. operating_metric: plus furnished_release. identity: plus
---     company_web. Never secondary.
+--     company_web. business_description and headcount (20261021000000, both
+--     implementation): identity's set without company_web. Never secondary.
 
 -- research_companies — slug UNIQUE, legal_name,
 --   jurisdiction, primary_archetype and self_described_archetype (kept apart:
