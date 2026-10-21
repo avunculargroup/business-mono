@@ -112,11 +112,11 @@ describe('setReviewState', () => {
 });
 
 describe('approveDraftRows', () => {
-  it("approves exactly one run's draft events and findings, and records who did", async () => {
+  it("approves exactly one run's draft events, findings and facts, and records who did", async () => {
     const result = await approveDraftRows('co-1', 'run-abc');
 
     expect(result).toEqual({ success: true });
-    for (const table of ['treasury_events', 'research_findings']) {
+    for (const table of ['treasury_events', 'research_findings', 'research_company_facts']) {
       const [builder] = supabase.__buildersFor(table);
       expect(builder!.update.mock.calls[0]![0]).toMatchObject({
         review_state: 'internal',
@@ -127,8 +127,6 @@ describe('approveDraftRows', () => {
       // Drafts only: a retired row stays retired.
       expect(builder!.eq).toHaveBeenCalledWith('review_state', 'draft');
     }
-    // The ingest writes no facts, so a run's approval does not touch them.
-    expect(supabase.__buildersFor('research_company_facts')).toHaveLength(0);
   });
 
   it("marks the run's audit row approved", async () => {
@@ -142,15 +140,14 @@ describe('approveDraftRows', () => {
     expect(builder!.eq).toHaveBeenCalledWith('workflow_run_id', 'run-abc');
   });
 
-  it('approves the hand-written group: rows with no run, and draft facts', async () => {
+  it('approves the hand-written group: rows with no run, facts included', async () => {
     await approveDraftRows('co-1', null);
 
-    for (const table of ['treasury_events', 'research_findings']) {
+    for (const table of ['treasury_events', 'research_findings', 'research_company_facts']) {
       const [builder] = supabase.__buildersFor(table);
+      expect(builder!.update.mock.calls[0]![0]).toMatchObject({ review_state: 'internal' });
       expect(builder!.is).toHaveBeenCalledWith('ingest_run_id', null);
     }
-    const [facts] = supabase.__buildersFor('research_company_facts');
-    expect(facts!.update.mock.calls[0]![0]).toMatchObject({ review_state: 'internal' });
     expect(supabase.__buildersFor('agent_activity')).toHaveLength(0);
   });
 

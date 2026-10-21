@@ -7254,6 +7254,7 @@ export type Database = {
           created_at: string
           field_key: string
           id: string
+          ingest_run_id: string | null
           is_superseded: boolean
           label: string
           natural_key: string
@@ -7274,6 +7275,7 @@ export type Database = {
           created_at?: string
           field_key: string
           id?: string
+          ingest_run_id?: string | null
           is_superseded?: boolean
           label: string
           natural_key: string
@@ -7294,6 +7296,7 @@ export type Database = {
           created_at?: string
           field_key?: string
           id?: string
+          ingest_run_id?: string | null
           is_superseded?: boolean
           label?: string
           natural_key?: string
@@ -9162,6 +9165,7 @@ export type Database = {
           conflicting_value: string | null
           field_key: string | null
           id: string | null
+          ingest_run_id: string | null
           label: string | null
           review_state: string | null
           slug: string | null

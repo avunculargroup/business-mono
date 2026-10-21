@@ -19,7 +19,7 @@ the rows themselves (session 13), then approval per ingest run and persist-and-s
 (session 14), then the weekly routine and its email (session 15), then "changed since
 review" on records and rows (session 16), then the ingest drafting the subscriber summary
 and EDGAR discovery into `research_documents` (session 17), then what the company does
-and its headcount in the summary (session 18). The routine's first real run
+and its headcount in the summary, read from the filings by the ingest (session 18). The routine's first real run
 went on 4 October and left 53 draft rows on five records. Still remaining from session 2:
 the recorded trace bundle.
 **Last updated:** 2026-10-21
@@ -1349,28 +1349,66 @@ The summary a subscriber reads said only how an entity holds bitcoin, because ev
 implementation fact was about the holding. A reader needs to know what the company is
 first.
 
-**Decided:** size is headcount. Market capitalisation is share price, and revenue and
-assets describe how the business is going, so all three are outcome facts.
-`market_cap_band` stays a team-only peer-matching column. A business description is what
-the company is, not how it is going, so it sits with `identity`. It does not sit with
-`operating_metric`.
+**Decided:**
+
+- **Size is headcount.** Market capitalisation is share price, and revenue and assets
+  describe how the business is going, so all three are outcome facts. `market_cap_band`
+  stays a team-only peer-matching column. A business description is what the company is,
+  not how it is going, so it sits with `identity`, not with `operating_metric`.
+- **The ingest writes both facts.** Hand entry would leave them empty on most records. These
+  are the first facts the pipeline writes, so facts get a run id and go through the commit
+  transaction like everything else.
+- **A fact is its source.** A re-read sends a fact back to draft only when its document,
+  filing item or `as_of` moves. The business description is model prose, reworded on every
+  read, so comparing the text would undo every review weekly.
 
 **Shipped.**
 
 - **`20261021000000_business_description_and_headcount.sql`:** two keys, `business_description`
   and `headcount`, both `implementation`. Each accepts what `identity` accepts except
   `company_web`.
+- **`20261022000000_ingest_writes_facts.sql`:** `research_company_facts.ingest_run_id`,
+  which the change trigger treats as workflow. `v_company_facts` carries it.
+  `commit_research_ingest` takes `payload.facts` and reports a `facts` tally.
+- **`extract_profile`, step 5 of `researchIngest`:**
+  - It admits units against the profile fields' own classes, so it reads 10-K Item 1,
+    which the event extractor never does. A keyword gate (`mayStateProfile`) skips units
+    that mention neither fact, so most announcements cost no model call.
+  - The headcount must appear in the unit's text, checked by `validateClaims`, the same
+    validator the event figures use. The description must pass `summaryViolations`,
+    including the `restricted_metrics` table.
+  - One fact per field is kept: the latest `as_of`, with ties broken on document and
+    section id so the choice is stable between runs. Each is keyed `<slug>:fact:<field>`.
+  - A failure is logged and the run keeps its events.
+  - `researchIngest.extract_profile` is in `MODEL_SCOPES`, with Rex as its fallback agent.
+  - `record_run` counts draft facts among the rows waiting.
 - **`summaryDraft.ts`:** the prompt opens with what the company does and its headcount,
   leaving out either one when no fact states it. It now allows three to five sentences and
   at most 120 words. The filter also refuses "market cap" and "market capitalisation" in
   both spellings.
+- **Read model and review:**
+  - `CompanyFact.ingestRunId` is read from the view by the live adapter and set to null by
+    the fixture adapter.
+  - `/research/[slug]` groups draft facts by run.
+  - `approveDraftRows` approves a run's facts with its events and findings.
 
-**Verified.** The agents test suite and typecheck pass, and so do the `@platform/db` tests.
+**Verified.**
+
+- Tests for the keyword gate, the checks, the stable choice and the prompt
+  (`profileFacts.test.ts`). The workflow tests cover facts committed in the same
+  transaction, a headcount the text lacks never committing, no call for text that mentions
+  neither, a model failure keeping the events, and draft facts counted.
+- `pnpm test` passes in agents, web, data, data-fixtures, data-supabase, ui, demo, client,
+  shared and db. Typecheck passes across the repo, and lint passes in the packages
+  touched.
 
 **Not done.**
 
-- **Nothing writes the new facts yet.** The ingest extracts events and does not extract
-  facts, so a record gains a `business_description` or `headcount` only when someone enters
-  one. Until then the draft reads as it did before.
+- **Neither migration has been run against a database.** `commit_research_ingest` is a
+  restated function, and should be dry-run inside a rolled-back transaction before merge,
+  as session 17's were.
 - **Existing summaries are unchanged.** The draft runs only for a record with no
-  `client_summary`, so a record that already has one needs it rewritten by hand.
+  `client_summary`, so a record that already has one needs it rewritten by hand. The
+  profile facts still land on those records for review.
+- **Hand-entered profile facts are not merged.** A fact entered by hand under a different
+  natural key would sit beside the ingest's. None exist yet.

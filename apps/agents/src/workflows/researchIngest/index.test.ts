@@ -33,7 +33,7 @@ vi.mock('../../lib/contentEmbeddings.js', () => ({
 function builder(table: string) {
   const chain: Record<string, unknown> = {};
   const self = () => chain;
-  for (const method of ['select', 'eq', 'order', 'limit']) {
+  for (const method of ['select', 'eq', 'in', 'order', 'limit']) {
     chain[method] = vi.fn(self);
   }
   chain['upsert'] = vi.fn((values: unknown, options: unknown) => {
@@ -623,5 +623,90 @@ describe('the subscriber summary draft', () => {
 
     expect(result.status).toBe('success');
     expect(result.status === 'success' && result.result.summaryDrafted).toBe(false);
+  });
+});
+
+describe('the profile', () => {
+  const PROFILE_KEY = 'researchIngest.extract_profile';
+  const PROFILE_TEXT = `${ANNOUNCEMENT_TEXT} Locate builds location software for retailers and has 85 full-time employees.`;
+
+  function withProfile(object: unknown) {
+    fetchAllMock.mockResolvedValue([
+      { kind: 'fetched', documentId: 'doc-1', sha256: 'abc123', text: PROFILE_TEXT, pageCount: 1 },
+    ]);
+    const base = rexGenerate.getMockImplementation()!;
+    rexGenerate.mockImplementation((messages: unknown, opts: { requestContext: { key: string } }) =>
+      opts.requestContext.key === PROFILE_KEY
+        ? typeof object === 'function'
+          ? (object as () => Promise<unknown>)()
+          : Promise.resolve({ object })
+        : base(messages, opts),
+    );
+  }
+
+  function committedFacts() {
+    const [, args] = rpcMock.mock.calls.find(([name]) => name === 'commit_research_ingest')!;
+    return (args as { payload: { facts: Array<Record<string, unknown>> } }).payload.facts;
+  }
+
+  it('commits what the company does and its headcount in the same transaction, keyed from the record', async () => {
+    withProfile({
+      business_description: { value: 'Builds location software for retailers.', as_of: '2026-06-30' },
+      headcount: { value: 85, as_of: '2026-06-30' },
+    });
+
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect(committedFacts()).toEqual([
+      expect.objectContaining({
+        field_key: 'business_description',
+        value: 'Builds location software for retailers.',
+        source_document_id: 'doc-1',
+        natural_key: 'locate-technologies:fact:business_description',
+      }),
+      expect.objectContaining({
+        field_key: 'headcount',
+        value: '85',
+        source_document_id: 'doc-1',
+        natural_key: 'locate-technologies:fact:headcount',
+      }),
+    ]);
+  });
+
+  it('never commits a headcount the document does not state', async () => {
+    withProfile({ business_description: null, headcount: { value: 90, as_of: null } });
+
+    await run();
+
+    expect(committedFacts()).toEqual([]);
+  });
+
+  it('does not ask the model about text that mentions neither', async () => {
+    await run();
+
+    expect(rexGenerate).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      requestContext: { key: PROFILE_KEY },
+    }));
+    expect(committedFacts()).toEqual([]);
+  });
+
+  it('keeps the run, and its events, when the model fails outright', async () => {
+    withProfile(() => Promise.reject(new Error('model down')));
+
+    const result = await run();
+
+    expect(result.status).toBe('success');
+    expect(committedFacts()).toEqual([]);
+    const [, args] = rpcMock.mock.calls[0];
+    expect((args as { payload: { events: unknown[] } }).payload.events).toHaveLength(1);
+  });
+
+  it('counts the draft facts it left with the other rows', async () => {
+    tables.set('research_company_facts', [{ id: 'fact-1' }]);
+
+    const result = await run();
+
+    expect((result as { result: { queuedRows: number } }).result.queuedRows).toBe(1);
   });
 });

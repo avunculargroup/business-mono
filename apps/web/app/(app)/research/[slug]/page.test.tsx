@@ -140,13 +140,17 @@ describe('ResearchCompanyPage', () => {
         row('e3', 'draft', null),
         row('e4', 'internal', 'run-bbbbbbbb2'),
       ],
-      facts: [{ id: 'f1', reviewState: 'draft' } as unknown as CompanyFact],
+      facts: [
+        { id: 'f1', reviewState: 'draft', ingestRunId: null } as unknown as CompanyFact,
+        { id: 'f2', reviewState: 'draft', ingestRunId: 'run-aaaaaaaa1' } as unknown as CompanyFact,
+      ],
     });
 
     render(await ResearchCompanyPage({ params }));
 
-    expect(screen.getByText(/Ingest run run-aaaa · 2 rows/)).toBeInTheDocument();
-    // The hand-written event and the draft fact: the ingest writes no facts.
+    // Two events and a fact the same run wrote.
+    expect(screen.getByText(/Ingest run run-aaaa · 3 rows/)).toBeInTheDocument();
+    // The hand-written event and the hand-written fact.
     expect(screen.getByText(/Entered by hand · 2 rows/)).toBeInTheDocument();
     // A reviewed row is in no group.
     expect(screen.queryByText(/run-bbbb/)).not.toBeInTheDocument();

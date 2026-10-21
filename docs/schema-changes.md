@@ -6,6 +6,24 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-22 — The research ingest writes facts
+
+`20261022000000_ingest_writes_facts.sql` lets the ingest commit the two profile facts from
+the 21 October migration, so nobody has to enter them by hand.
+
+- `research_company_facts.ingest_run_id` names the run that wrote a fact, as on
+  `treasury_events` and `research_findings`. Approving a run on `/research` now approves
+  its facts too.
+- The change-since-review trigger treats `ingest_run_id` as workflow, not content.
+- `v_company_facts` gains the column, appended and restated
+  `WITH (security_invoker = true)`.
+- `commit_research_ingest` takes `payload.facts` in the same transaction as everything
+  else. A fact counts as changed when its document, filing item or `as_of` moves, not its
+  wording. The business description is model-written and is reworded on every read, and
+  comparing the text would send every reviewed description back to draft each week.
+
+---
+
 ## 2026-10-21 — Register facts: business description and headcount
 
 `20261021000000_business_description_and_headcount.sql` adds two `field_source_minimums`

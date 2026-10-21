@@ -253,6 +253,15 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'rex',
   },
   {
+    key: 'researchIngest.extract_profile',
+    type: 'workflow_step',
+    label: 'Extract business and headcount',
+    description:
+      'Rex reads what the company does and its stated headcount out of a filing, for the subscriber summary. The headcount is re-located in the source text before anything commits',
+    workflow: 'researchIngest',
+    fallbackAgent: 'rex',
+  },
+  {
     key: 'researchIngest.score',
     type: 'workflow_step',
     label: 'Score findings',

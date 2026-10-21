@@ -261,6 +261,7 @@ type FactRow = {
   id: string;
   review_state: ReviewState;
   changed_since_review: boolean;
+  ingest_run_id: string | null;
   field_key: string;
   label: string;
   value: string;
@@ -634,7 +635,7 @@ export function createCorporateHoldingsRepository(
       const { data, error } = await client
         .from(FACTS_VIEW)
         .select(
-          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url, review_state, changed_since_review',
+          'id, field_key, label, value, as_of, source_document_id, source_title, source_class, source_url, source_published_at, source_is_audited, conflicting_value, conflicting_source_title, conflicting_source_class, conflicting_source_url, review_state, changed_since_review, ingest_run_id',
         )
         .eq('company_id', companyId)
         .in('review_state', readableStates(opts))
@@ -650,6 +651,7 @@ export function createCorporateHoldingsRepository(
         asOf: row.as_of,
         reviewState: row.review_state,
         changedSinceReview: row.changed_since_review,
+        ingestRunId: row.ingest_run_id,
         provenance: toProvenance(row),
         conflicting:
           row.conflicting_value === null

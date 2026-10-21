@@ -89,8 +89,7 @@ export async function setReviewState(companyId: string, state: ReviewState) {
  *
  * Rows are grouped by the ingest run that wrote them, so a reviewer approves
  * exactly what one run produced and nothing else. `runId: null` is the group
- * written by hand: events and findings with no run, and every draft fact (the
- * ingest writes no facts). Row-level, and separate from the record's own state:
+ * written by hand: events, findings and facts with no run. Row-level, and separate from the record's own state:
  * a draft row reaches no subscriber whatever the record's state.
  *
  * Approving a run also marks its `agent_activity` row approved, so the audit
@@ -107,7 +106,7 @@ export async function approveDraftRows(companyId: string, runId: string | null) 
     reviewed_at: reviewedAt,
   };
 
-  for (const table of ['treasury_events', 'research_findings'] as const) {
+  for (const table of ['treasury_events', 'research_findings', 'research_company_facts'] as const) {
     let query = auth.supabase
       .from(table)
       .update(reviewed)
@@ -119,14 +118,7 @@ export async function approveDraftRows(companyId: string, runId: string | null) 
     if (error) return { error: humanizeError(error) };
   }
 
-  if (runId === null) {
-    const { error } = await auth.supabase
-      .from('research_company_facts')
-      .update(reviewed)
-      .eq('company_id', companyId)
-      .eq('review_state', ReviewState.DRAFT);
-    if (error) return { error: humanizeError(error) };
-  } else {
+  if (runId !== null) {
     const { error } = await auth.supabase
       .from('agent_activity')
       .update({ status: 'approved', approved_by: auth.user.id, approved_at: reviewedAt })
