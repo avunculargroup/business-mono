@@ -3049,7 +3049,8 @@ CREATE TABLE report_segments (
 --     each field accepts. ledger_event and accounting_treatment: regulated,
 --     exchange, audited, filed_financials. custody/mandate/covenants: those plus
 --     filed_narrative. operating_metric: plus furnished_release. identity: plus
---     company_web. Never secondary.
+--     company_web. business_description and headcount (20261021000000, both
+--     implementation): identity's set without company_web. Never secondary.
 
 -- research_companies — slug UNIQUE, legal_name,
 --   jurisdiction, primary_archetype and self_described_archetype (kept apart:
@@ -3152,7 +3153,8 @@ CREATE TABLE report_segments (
 --   documents that disagree. The losing claim is stored with is_superseded and
 --   superseded_by rather than deleted: a marketing page claiming self-custody
 --   against an offer document naming a third-party custodian is the finding,
---   not a data-quality problem to resolve silently.
+--   not a data-quality problem to resolve silently. ingest_run_id
+--   (20261022000000) names the run that wrote a fact; NULL for one by hand.
 
 -- Triggers: assert_source_accepted(doc_id, section_id, field) is the shared
 --   assertion: the cited section's class (else the document's) must be in
@@ -3165,8 +3167,10 @@ CREATE TABLE report_segments (
 --   evidence of the gate working and has to be storable).
 
 -- RPC: commit_research_ingest(payload JSONB) — the ingest workflow's persist
---   step, in one transaction. Upserts events, snapshots, findings and
---   classifications on their natural keys; a classification names its event by
+--   step, in one transaction. Upserts events, snapshots, findings, facts
+--   (20261022000000: business_description and headcount, a re-read from the
+--   same source keeping reviewed wording) and classifications on their natural
+--   keys; a classification names its event by
 --   natural key because the workflow cannot know an id the same call is
 --   inserting. Returns inserted/updated counts per collection.
 

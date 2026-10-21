@@ -31,6 +31,13 @@ describe('summaryViolations', () => {
     expect(summaryViolations('Trades at an mNAV of 1.2.', ['mNAV'])).toEqual(['mNAV']);
   });
 
+  it('passes what the company does and its headcount, and refuses size stated as market cap', () => {
+    expect(
+      summaryViolations('Develops payroll software for small businesses and employs 240 people.', ['mNAV']),
+    ).toEqual([]);
+    expect(summaryViolations('A software company with a market cap of A$40 million.', [])).toEqual(['market cap']);
+  });
+
   it('finds outcome phrases and exclamation marks', () => {
     expect(summaryViolations('It holds an unrealised gain!', [])).toEqual(['unrealised gain', '!']);
   });
@@ -81,5 +88,19 @@ describe('summaryPrompt', () => {
     expect(prompt).toContain('- Custody (custody, as of 2026-06-30): Held with a third-party qualified custodian.');
     expect(prompt).toContain('- Mandate (mandate): Board resolution');
     expect(prompt).toContain('refused because it used: "should"');
+  });
+
+  it('asks for what the company does and its headcount first, and never size as a value', () => {
+    const prompt = summaryPrompt({
+      legalName: 'Verrall Holdings',
+      facts: [
+        fact({ field_key: 'business_description', label: 'Business', value: 'Payroll software for small businesses' }),
+        fact({ field_key: 'headcount', label: 'Employees', value: '240' }),
+      ],
+    });
+    expect(prompt).toContain('- Business (business_description, as of 2026-06-30): Payroll software for small businesses');
+    expect(prompt).toContain('- Employees (headcount, as of 2026-06-30): 240');
+    expect(prompt).toMatch(/Open with what the company does and how big it is/);
+    expect(prompt).toMatch(/never as market capitalisation, revenue or assets/);
   });
 });

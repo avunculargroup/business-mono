@@ -34,6 +34,16 @@ import { admitUnits, sectionsFor, unitsFor, type ReadingUnit, type StoredSection
 import { claimsForEvent, validateClaims } from './numerics.js';
 import { isQuietRun, materialDeltas, reconcile, type CommittedEvent } from './reconcile.js';
 import {
+  checkProfile,
+  mayStateProfile,
+  pickProfileFacts,
+  profileExtractionSchema,
+  profileFactSchema,
+  profilePrompt,
+  PROFILE_FIELDS,
+  type ProfileFact,
+} from './profileFacts.js';
+import {
   factsAsOf,
   needsDraft,
   summaryPrompt,
@@ -64,14 +74,20 @@ import {
 const resolvedSchema = researchIngestInputSchema.extend({ refs: z.array(z.any()) });
 const fetchedSchema = researchIngestInputSchema.extend({ fetch: fetchSummarySchema });
 const embeddedSchema = fetchedSchema.extend({ chunkCount: z.number() });
-const sectionedSchema = embeddedSchema.extend({ units: z.array(readingUnitSchema) });
+const sectionedSchema = embeddedSchema.extend({
+  units: z.array(readingUnitSchema),
+  profileUnits: z.array(readingUnitSchema),
+});
+const profiledSchema = sectionedSchema.extend({ profileFacts: z.array(profileFactSchema) });
 const extractedSchema = fetchedSchema.extend({
   units: z.array(readingUnitSchema),
   candidates: z.array(candidateEventSchema),
+  profileFacts: z.array(profileFactSchema),
 });
 const validatedSchema = fetchedSchema.extend({
   validated: z.array(candidateEventSchema),
   rejected: z.array(rejectedClaimSchema),
+  profileFacts: z.array(profileFactSchema),
 });
 const reconciledSchema = validatedSchema.extend({
   created: z.array(candidateEventSchema),
@@ -274,6 +290,18 @@ const splitSectionsStep = createStep({
       throw new Error('field_source_classes has no classes for ledger_event');
     }
 
+    // The profile fields accept a different set — a business description is
+    // in a 10-K's Item 1, which the ledger refuses — so they are admitted
+    // separately, from the same table the gate reads.
+    const { data: profileAccepted, error: profileAcceptedError } = await db
+      .from('field_source_classes')
+      .select('field_key, source_class')
+      .in('field_key', Object.keys(PROFILE_FIELDS));
+    if (profileAcceptedError) throw profileAcceptedError;
+    const profileClasses = new Set(
+      ((profileAccepted ?? []) as Array<{ source_class: string }>).map((row) => row.source_class),
+    );
+
     const units: ReadingUnit[] = [];
     for (const document of inputData.fetch.documents) {
       const sections = sectionsFor(document);
@@ -305,6 +333,9 @@ const splitSectionsStep = createStep({
     }
 
     const { admitted, skipped } = admitUnits(units, acceptedClasses);
+    const profileUnits = admitUnits(units, profileClasses).admitted.filter((unit) =>
+      mayStateProfile(unit.text),
+    );
     if (skipped.length > 0) {
       log.info(
         {
@@ -319,14 +350,86 @@ const splitSectionsStep = createStep({
       );
     }
 
-    return { ...inputData, units: admitted };
+    return { ...inputData, units: admitted, profileUnits };
   },
 });
+
+// ── 5a. Extract the profile (Rex) ────────────────────────────────────────────
+// What the company does and its headcount, for the subscriber summary. Only
+// units the profile fields accept and that mention either. A headcount the
+// text does not state is dropped here, deterministically; a description the
+// summary filter would refuse is dropped too. One fact per field reaches
+// persist, as a draft a person reviews.
+//
+// Never fails the run: losing a profile costs a summary sentence, not a ledger.
+const extractProfileStep = createStep({
+  id: 'extract_profile',
+  inputSchema: sectionedSchema,
+  outputSchema: profiledSchema,
+  execute: async ({ inputData }) => {
+    try {
+      return { ...inputData, profileFacts: await extractProfile(inputData.companyId, inputData.profileUnits) };
+    } catch (err) {
+      log.error({ err, companyId: inputData.companyId }, 'profile extraction failed');
+      return { ...inputData, profileFacts: [] };
+    }
+  },
+});
+
+async function extractProfile(companyId: string, units: ReadingUnit[]): Promise<ProfileFact[]> {
+  if (units.length === 0) return [];
+
+  const { data: company, error: companyError } = await db
+    .from('research_companies')
+    .select('slug')
+    .eq('id', companyId)
+    .maybeSingle();
+  if (companyError) throw companyError;
+  const slug = (company as { slug: string } | null)?.slug;
+  if (!slug) throw new Error(`research company ${companyId} not found`);
+
+  const { data: metrics, error: metricsError } = await db
+    .from('restricted_metrics')
+    .select('label, aliases');
+  if (metricsError) throw metricsError;
+  const restricted = ((metrics ?? []) as Array<{ label: string; aliases: string[] | null }>).flatMap(
+    (metric) => [metric.label, ...(metric.aliases ?? [])],
+  );
+
+  const candidates: Array<Omit<ProfileFact, 'natural_key'>> = [];
+  for (const unit of units) {
+    const text = unit.text.slice(0, MAX_DOCUMENT_CHARS);
+    const response = await rex.generate([{ role: 'user', content: profilePrompt({ ...unit, text }) }], {
+      requestContext: stepRequestContext('researchIngest.extract_profile'),
+      structuredOutput: {
+        schema: profileExtractionSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { business_description: null, headcount: null },
+      },
+    });
+
+    const parsed = profileExtractionSchema.safeParse(response.object);
+    if (!parsed.success) {
+      log.warn({ documentId: unit.documentId, filingItem: unit.filingItem }, 'profile did not match the schema');
+      continue;
+    }
+
+    const { facts, dropped } = checkProfile(parsed.data, { ...unit, text }, restricted);
+    if (dropped.length > 0) {
+      log.warn({ documentId: unit.documentId, filingItem: unit.filingItem, dropped }, 'profile facts dropped');
+    }
+    candidates.push(...facts);
+  }
+
+  const picked = pickProfileFacts(slug, candidates);
+  log.info({ companyId, facts: picked.map((fact) => fact.field_key) }, 'profile extracted');
+  return picked;
+}
 
 // ── 5. Extract (Rex) ─────────────────────────────────────────────────────────
 const extractEventsStep = createStep({
   id: 'extract_events',
-  inputSchema: sectionedSchema,
+  inputSchema: profiledSchema,
   outputSchema: extractedSchema,
   execute: async ({ inputData }) => {
     // The key prefix comes from the record, never the model: that is what stops
@@ -425,6 +528,7 @@ ${unit.text.slice(0, MAX_DOCUMENT_CHARS)}`;
       fetch: inputData.fetch,
       units: inputData.units,
       candidates,
+      profileFacts: inputData.profileFacts,
     };
   },
 });
@@ -474,6 +578,7 @@ const validateNumericsStep = createStep({
       fetch: inputData.fetch,
       validated,
       rejected,
+      profileFacts: inputData.profileFacts,
     };
   },
 });
@@ -677,6 +782,7 @@ const persistStep = createStep({
         })),
       ],
       classifications: inputData.classifications,
+      facts: inputData.profileFacts,
     };
 
     const { data, error } = await db.rpc('commit_research_ingest', { payload });
@@ -838,7 +944,7 @@ const recordRunStep = createStep({
     // draft waiting for someone. A quiet run queues nothing because it writes
     // no draft, not because it is skipped here.
     let queuedRows = 0;
-    for (const table of ['treasury_events', 'research_findings'] as const) {
+    for (const table of ['treasury_events', 'research_findings', 'research_company_facts'] as const) {
       const { count } = await db
         .from(table)
         .select('id', { count: 'exact', head: true })
@@ -894,6 +1000,7 @@ export const researchIngestWorkflow = createWorkflow({
   .then(fetchDocumentsStep)
   .then(chunkAndEmbedStep)
   .then(splitSectionsStep)
+  .then(extractProfileStep)
   .then(extractEventsStep)
   .then(validateNumericsStep)
   .then(reconcileStep)

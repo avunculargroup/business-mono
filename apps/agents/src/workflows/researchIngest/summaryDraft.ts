@@ -79,6 +79,10 @@ export const SUMMARY_OUTCOME_PHRASES: readonly string[] = Object.freeze([
   'accretive',
   'accretion',
   'return on',
+  // Size is stated as headcount. Market capitalisation is share price.
+  'market cap',
+  'market capitalisation',
+  'market capitalization',
 ]);
 
 function escapeRegExp(text: string): string {
@@ -163,11 +167,12 @@ ${facts}
 
 Rules:
 - Use only the facts above. Add nothing from general knowledge about the company.
-- Say how the entity holds bitcoin and how it discloses it: the mandate it relies on, who holds the keys, how it accounts for the holding. Never how the holding has performed, what it is worth, or what it means for the company's securities.
+- Open with what the company does and how big it is, from the business_description and headcount facts. State size as headcount only, never as market capitalisation, revenue or assets. Leave out whichever of the two is not among the facts.
+- Then say how the entity holds bitcoin and how it discloses it: the mandate it relies on, who holds the keys, how it accounts for the holding. Never how the holding has performed, what it is worth, or what it means for the company's securities.
 - No figures about value, gains, losses, share price, premium, discount or yield.
 - Never advise, recommend or judge. No "should", "best", "leading" or similar.
 - Australian English. "Bitcoin" capitalised for the network, "bitcoin" lowercase for the unit. No exclamation marks.
-- Two to four sentences, at most 100 words. Plain prose, no headings or lists.
+- Three to five sentences, at most 120 words. Plain prose, no headings or lists.
 
 A person edits this draft before anyone outside the team reads it.${retry}`;
 }

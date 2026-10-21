@@ -765,13 +765,14 @@ describe('query wiring', () => {
     expect(builder.select).toHaveBeenCalledWith(expect.stringContaining('encumbrance_obligation'));
   });
 
-  it('selects the review columns from the ledger and absence views', async () => {
+  it('selects the review columns from the ledger, absence and fact views', async () => {
     // The fake returns whole rows whatever is selected, so only the select
     // shows the columns are asked for at all.
     await corporateHoldings().getLedger(ctx, 'rc-meridian');
     await corporateHoldings().getStructuralAbsences(ctx, 'rc-verrall');
+    await corporateHoldings().getCompanyFacts(ctx, 'rc-verrall');
 
-    for (const view of ['v_research_ledger', 'v_research_absences']) {
+    for (const view of ['v_research_ledger', 'v_research_absences', 'v_company_facts']) {
       const [builder] = client.__buildersFor(view);
       const columns = builder!.select.mock.calls[0]![0] as string;
       expect(columns).toContain('review_state');

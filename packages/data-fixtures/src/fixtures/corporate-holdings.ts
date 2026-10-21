@@ -744,7 +744,9 @@ function asxListing(
  * A row as written below: its review state defaults to its company's, and its
  * ingest run to none (a hand-written row).
  */
-type RowInput<T extends { reviewState: ReviewState; changedSinceReview: boolean }> = Omit<
+type RowInput<
+  T extends { reviewState: ReviewState; changedSinceReview: boolean; ingestRunId: string | null },
+> = Omit<
   T,
   'reviewState' | 'ingestRunId' | 'changedSinceReview'
 > & {
@@ -758,11 +760,11 @@ type RowInput<T extends { reviewState: ReviewState; changedSinceReview: boolean 
  * the migration did to every existing row. The few that say otherwise are the
  * ones the review cases are about.
  */
-function withRowState<T extends { reviewState: ReviewState; changedSinceReview: boolean }>(
+function withRowState<
+  T extends { reviewState: ReviewState; changedSinceReview: boolean; ingestRunId: string | null },
+>(
   anchor: Date,
   rows: Record<string, RowInput<T>[]>,
-  /** Facts carry no run id: the ingest does not write them. */
-  options: { runIds: boolean } = { runIds: true },
 ): Record<string, T[]> {
   const states = new Map(researchCompanies(anchor).map((c) => [c.id, c.reviewState]));
   return Object.fromEntries(
@@ -774,7 +776,7 @@ function withRowState<T extends { reviewState: ReviewState; changedSinceReview: 
             ...row,
             reviewState: row.reviewState ?? states.get(companyId) ?? 'draft',
             changedSinceReview: row.changedSinceReview ?? false,
-            ...(options.runIds ? { ingestRunId: row.ingestRunId ?? null } : {}),
+            ingestRunId: row.ingestRunId ?? null,
           }) as T,
       ),
     ]),
@@ -1551,7 +1553,7 @@ export function researchFacts(anchor: Date): Record<string, CompanyFact[]> {
         conflicting: null,
       },
     ],
-  }, { runIds: false });
+  });
 }
 
 // ── Structural absences ────────────────────────────────────────────────────

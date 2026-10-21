@@ -71,8 +71,7 @@ export default async function ResearchCompanyPage({
           draftGroups={groupDrafts([
             ...ledger.items,
             ...absences,
-            // The ingest writes no facts, so a draft fact is always by hand.
-            ...facts.map((fact) => ({ ...fact, ingestRunId: null })),
+            ...facts,
           ])}
           changedSinceReview={company.changedSinceReview}
           summaryDraft={summaryDraft}

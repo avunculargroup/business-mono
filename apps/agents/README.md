@@ -68,8 +68,9 @@ Supabase Realtime subscription.
 
 ### `researchIngest` — the corporate research pipeline
 
-`src/workflows/researchIngest/`. Twelve steps over the corporate holdings register:
-resolve → fetch → chunk and embed → split and admit → **extract (Rex)** → validate →
+`src/workflows/researchIngest/`. Thirteen steps over the corporate holdings register:
+resolve → fetch → chunk and embed → split and admit → **extract profile (Rex)** →
+**extract (Rex)** → validate →
 reconcile → **score (Rex)** → **classify (Lex)** → persist → **draft summary (Rex)** →
 record run. Spec:
 [`corporate-research-spec.md`](../../docs/features/corporate-holdings/corporate-research-spec.md),
@@ -107,6 +108,14 @@ Six things about it are load-bearing and easy to undo by accident:
 - **Persist goes through the `commit_research_ingest` RPC.** PostgREST has no
   transactions, and four sequential inserts can half-succeed — leaving events committed
   with the classifications that gate them missing.
+- **The profile is the only fact the ingest writes.** `extract_profile` reads
+  `business_description` and `headcount` for the subscriber summary. It reads its own
+  admitted set: the profile fields accept 10-K Item 1, which the ledger refuses. A keyword
+  gate in `profileFacts.ts` skips text that mentions neither, so most announcements cost
+  no call. The headcount is re-located in the source like any event figure, and the
+  description passes the summary filter. One fact per field commits, keyed
+  `<slug>:fact:<field>`, as a draft under the run. A fact is its source, so a re-read of
+  the same document and item keeps the reviewed wording even though the model rewords it.
 - **The summary draft is inert.** For a record with no `client_summary`, Rex drafts one
   from implementation facts only (never `curator_notes`), filtered by `summaryDraft.ts`
   for the prohibited words and the `restricted_metrics` table, and retried once if the

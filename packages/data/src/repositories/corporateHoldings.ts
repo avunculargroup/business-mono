@@ -336,6 +336,8 @@ export interface CompanyFact {
   reviewState: ReviewState;
   /** Reviewed, and edited since. See `CompanyDossier.changedSinceReview`. */
   changedSinceReview: boolean;
+  /** The ingest run that wrote it; null for one written by hand. */
+  ingestRunId: string | null;
   provenance: Provenance;
   /** Non-null only where a weaker source claimed otherwise. */
   conflicting: {
