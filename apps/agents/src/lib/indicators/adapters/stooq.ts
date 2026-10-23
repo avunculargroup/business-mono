@@ -25,6 +25,7 @@ import type {
   RawObservation,
 } from '../types.js';
 import { toISODateUTC } from '../period.js';
+import { INDICATOR_USER_AGENT } from '../http.js';
 import { parseCsv } from './rba.js';
 
 const STOOQ_ENDPOINT = 'https://stooq.com/q/d/l/';
@@ -104,7 +105,7 @@ export const stooqAdapter: ProviderAdapter = {
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { 'User-Agent': 'BTS-platform/1.0 (economic-indicators)' },
+        headers: { 'User-Agent': INDICATOR_USER_AGENT },
         signal: AbortSignal.timeout(20_000),
       });
     } catch (err) {

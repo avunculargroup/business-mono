@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseSdmxResponse, parseDataflowRef } from './sdmx.js';
 import { startPeriodFor } from './sdmxWindow.js';
 import { isAddressableDataflow } from './oecd.js';
+import { absAdapter } from './abs.js';
+import { INDICATOR_USER_AGENT } from '../http.js';
 
 /**
  * The fixtures here are synthesised from the SDMX-JSON spec rather than
@@ -182,6 +184,64 @@ describe('parseDataflowRef', () => {
       dataflow: 'OECD.SDD.STES,DSD_STES@DF_CLI,',
       dataKey: 'AUS.M.BCICP...AA',
     });
+  });
+});
+
+describe('absAdapter request', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubFetch(response: Response) {
+    const fetchMock = vi.fn(async (_url: URL, _init?: RequestInit) => response);
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  const indicator = {
+    id: 'ind-1',
+    shortLabel: 'AU CPI',
+    provider: 'abs' as const,
+    providerSeriesCode: null,
+    providerTableRef: 'ABS,CPI,2.0.0/1.2.3',
+    granularity: 'monthly' as const,
+  };
+
+  it('keeps a pinned-version dataflow intact and unencoded in the path', async () => {
+    // ABS takes `{agency},{id},{version}` where the bare id goes. Pinning the
+    // version is what turns the next rebase into a 404 instead of a silent
+    // rewrite of every stored period.
+    expect(parseDataflowRef('ABS,CPI,2.0.0/1.2.3')).toEqual({
+      dataflow: 'ABS,CPI,2.0.0',
+      dataKey: '1.2.3',
+    });
+
+    const fetchMock = stubFetch(new Response('', { status: 200 }));
+    await absAdapter.fetchLatest(indicator);
+
+    const url = fetchMock.mock.calls[0]![0];
+    expect(url.pathname).toBe('/rest/data/ABS,CPI,2.0.0/1.2.3');
+  });
+
+  it('sends a User-Agent, which ABS can refuse a request without', async () => {
+    const fetchMock = stubFetch(new Response('', { status: 200 }));
+    await absAdapter.fetchLatest(indicator);
+
+    const headers = fetchMock.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers['User-Agent']).toBe(INDICATOR_USER_AGENT);
+    expect(headers['Accept']).toContain('application/vnd.sdmx.data+json');
+  });
+
+  it('names what to check on a 403 rather than reporting a bare status', async () => {
+    stubFetch(new Response('Missing Authentication Token', { status: 403 }));
+    const res = await absAdapter.fetchLatest(indicator);
+
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.kind).toBe('transport');
+    expect(res.error.status).toBe(403);
+    expect(res.error.message).toContain('/rest/data/ABS,CPI,2.0.0/1.2.3');
+    expect(res.error.message).toContain('User-Agent');
   });
 });
 

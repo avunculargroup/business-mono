@@ -38,6 +38,7 @@
 
 import type { AdapterResult, PeriodGranularity, RawObservation } from '../types.js';
 import { parseSdmxTimePeriod } from '../period.js';
+import { INDICATOR_USER_AGENT } from '../http.js';
 
 /** How much of an unexpected payload to quote back. Enough to identify the
  *  shape, short enough to sit in an `agent_activity.notes` cell. */
@@ -282,13 +283,31 @@ export async function fetchSdmx(
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { Accept: 'application/vnd.sdmx.data+json,application/json' },
+      headers: {
+        Accept: 'application/vnd.sdmx.data+json,application/json',
+        'User-Agent': INDICATOR_USER_AGENT,
+      },
       signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {
     return {
       ok: false,
       error: { kind: 'transport', message: err instanceof Error ? err.message : String(err) },
+    };
+  }
+
+  // ABS answers a request it will not serve — no User-Agent, or egress it does
+  // not accept — with a 403, so say what to check rather than a bare status.
+  if (res.status === 403) {
+    return {
+      ok: false,
+      error: {
+        kind: 'transport',
+        status: 403,
+        message:
+          `${provider} HTTP 403 for ${url.pathname}: provider refused the request `
+          + '(check User-Agent / egress)',
+      },
     };
   }
 

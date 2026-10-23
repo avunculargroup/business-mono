@@ -18,12 +18,16 @@
  * accepted (see parseRbaDate in period.ts). Accepting only the wrong one is
  * exactly what silently zeroed out every RBA observation once.
  *
- * Daily tables (F1) carry one row per business day. Each month keeps its LAST
- * row — the value standing at month end, or today for the current month — so a
- * daily level series collapses to the first-of-month convention without
- * averaging. Averaging is why the cash rate used to read wrong: F1.1's
- * FIRMMCRT is the target's monthly average, so a hike late in a month showed
- * as a fraction of a hike (Sep 2026: 4.36 rather than 4.60).
+ * Daily tables (F1, F2) carry one row per business day. For a monthly row each
+ * month keeps its LAST row — the value standing at month end, or today for the
+ * current month — so a daily level series collapses to the first-of-month
+ * convention without averaging. Averaging is why the cash rate used to read
+ * wrong: F1.1's FIRMMCRT is the target's monthly average, so a hike late in a
+ * month showed as a fraction of a hike (Sep 2026: 4.36 rather than 4.60).
+ *
+ * A row registered with `granularity = 'daily'` (AU 10Y from F2) skips the
+ * collapse and keeps every business day under its own date, so it pairs
+ * day-for-day with the daily US 10Y.
  *
  * providerTableRef may carry an explicit column matcher after a colon, e.g.
  * 'D3:Broad money' or 'F1:FIRMMCRTD'. Without one, a sensible default per table
@@ -36,10 +40,12 @@ import type {
   AdapterResult,
   FetchOptions,
   IndicatorConfig,
+  PeriodGranularity,
   ProviderAdapter,
   RawObservation,
 } from '../types.js';
 import { parseRbaDate } from '../period.js';
+import { INDICATOR_USER_AGENT } from '../http.js';
 
 // Best-guess defaults — CONFIRM against the live CSV at build (see seed notes).
 const DEFAULT_COLUMN: Record<string, string> = {
@@ -92,7 +98,11 @@ export function parseCsv(text: string): string[][] {
 }
 
 /** Pure parse step — exported for fixture tests (no network). */
-export function parseRbaCsv(text: string, columnMatch: string | null): AdapterResult {
+export function parseRbaCsv(
+  text: string,
+  columnMatch: string | null,
+  granularity: PeriodGranularity = 'monthly',
+): AdapterResult {
   if (!columnMatch) {
     return { ok: false, error: { kind: 'not_found', message: 'No column matcher for RBA table (set providerTableRef to "{table}:{column}")' } };
   }
@@ -121,8 +131,9 @@ export function parseRbaCsv(text: string, columnMatch: string | null): AdapterRe
     return { ok: false, error: { kind: 'parse', message: `RBA CSV: column "${columnMatch}" not found` } };
   }
 
-  // periodDate → the latest day seen in that month, and its observation.
-  const byMonth = new Map<string, { day: string; obs: RawObservation }>();
+  // periodDate → the latest day seen in that period, and its observation. A
+  // daily row's period is the day itself, so nothing collapses.
+  const byPeriod = new Map<string, { day: string; obs: RawObservation }>();
   for (const r of rows) {
     const dateCell = (r[0] ?? '').trim();
     const day = parseRbaDate(dateCell);
@@ -133,15 +144,15 @@ export function parseRbaCsv(text: string, columnMatch: string | null): AdapterRe
     if (Number.isNaN(value)) {
       return { ok: false, error: { kind: 'parse', message: `RBA CSV: non-numeric value "${cell}" at ${dateCell}` } };
     }
-    const periodDate = `${day.slice(0, 8)}01`;
-    const held = byMonth.get(periodDate);
+    const periodDate = granularity === 'daily' ? day : `${day.slice(0, 8)}01`;
+    const held = byPeriod.get(periodDate);
     if (held && held.day > day) continue;
-    byMonth.set(periodDate, {
+    byPeriod.set(periodDate, {
       day,
       obs: { periodDate, value, releasedAt: null, raw: { date: dateCell, value: cell, column: columnMatch } },
     });
   }
-  const out = [...byMonth.values()].map((m) => m.obs);
+  const out = [...byPeriod.values()].map((m) => m.obs);
 
   // Unlike FRED (a windowed server-side fetch, where [] legitimately means "no
   // new print"), this parses the FULL historical CSV every call. A matched
@@ -176,7 +187,7 @@ export const rbaAdapter: ProviderAdapter = {
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { 'User-Agent': 'BTS-platform/1.0 (economic-indicators)' },
+        headers: { 'User-Agent': INDICATOR_USER_AGENT },
         signal: AbortSignal.timeout(20_000),
       });
     } catch (err) {
@@ -188,7 +199,7 @@ export const rbaAdapter: ProviderAdapter = {
     }
 
     const text = await res.text();
-    const result = parseRbaCsv(text, columnMatch);
+    const result = parseRbaCsv(text, columnMatch, indicator.granularity ?? 'monthly');
     // Apply backfill/limit: keep the most recent N (parse returns oldest→newest).
     if (result.ok && opts?.limit && result.observations.length > opts.limit) {
       return { ok: true, observations: result.observations.slice(-opts.limit) };

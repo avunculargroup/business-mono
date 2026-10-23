@@ -52,6 +52,8 @@ describe('labels', () => {
     expect(categoryLabel('commodity')).toBe('Commodity');
     expect(categoryLabel('equity')).toBe('Equities');
     expect(categoryLabel('bond_yield')).toBe('Bond yield');
+    expect(categoryLabel('labour')).toBe('Labour market');
+    expect(categoryLabel('credit')).toBe('Credit');
     expect(unitLabel(null)).toBe('');
   });
 });

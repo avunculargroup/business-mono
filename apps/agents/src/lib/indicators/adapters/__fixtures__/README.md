@@ -14,3 +14,7 @@ So a green `sdmx.test.ts` says the parser reads SDMX-JSON. It does not say the
 AU CPI or AU Business Confidence rows will ingest, and that is why both stay
 `is_active = false`. Replace these with recorded payloads on the first live run
 and the tests become the regression net they are for the other providers.
+
+The RBA daily-granularity cases in `rba.test.ts` (AU 10Y, table F2) use an
+inline, hand-written F2-shaped CSV for the same reason. Replace it with a
+recorded `rba-f2.csv` when AU 10Y is activated.

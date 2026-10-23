@@ -3,6 +3,8 @@
 **Status:** Draft · **Author:** Chris Pollard · **Last updated:** 2026-10-17
 **Companion to:** [`adapter-contract.md`](./adapter-contract.md), [`activating-an-indicator.md`](./activating-an-indicator.md)
 
+**Build status (2026-10-23).** The code and schema half of all three sessions is merged: the shared User-Agent and the named 403 in `sdmx.ts`, the pinned-version ref test, daily granularity in `rba.ts`, migrations A, B and C, the two category labels, and the rewritten runbook. Migration B also re-points the inactive AU CPI row at `ABS,CPI,2.0.0`, monthly, polled daily. What is left is the activation loop for each row, plus the recorded fixtures (`sdmx-abs-*.json`, `rba-f2.csv`). Both need a live provider response, and `data.api.abs.gov.au`, `www.rba.gov.au` and `sdmx.oecd.org` are all refused from the build sandbox. `?format=jsondata` is still sent, to be decided on the first live run.
+
 ## Overview
 
 The ABS adapter already exists; what is missing is a verified request and the indicators to point it at. This spec turns on AU CPI and AU business confidence, hardens the ABS request against the current API, and adds six Australian series so the AU side mirrors what the platform tracks for the US.

@@ -36,6 +36,7 @@ import type {
   ProviderAdapter,
 } from '../types.js';
 import { toISODateUTC } from '../period.js';
+import { INDICATOR_USER_AGENT } from '../http.js';
 
 const GOLD_API_ENDPOINT = 'https://api.gold-api.com/price/XAU';
 
@@ -76,7 +77,7 @@ export const goldApiAdapter: ProviderAdapter = {
     let res: Response;
     try {
       res = await fetch(GOLD_API_ENDPOINT, {
-        headers: { 'User-Agent': 'BTS-platform/1.0 (economic-indicators)' },
+        headers: { 'User-Agent': INDICATOR_USER_AGENT },
         signal: AbortSignal.timeout(20_000),
       });
     } catch (err) {

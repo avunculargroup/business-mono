@@ -6,6 +6,27 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-23 — AU indicator expansion: labour/credit categories, six seeded rows, AU–US 10Y spread
+
+Three migrations from `docs/features/economic-indicators/abs-activation-spec.md`.
+`20261023044600_indicator_labour_credit_categories.sql` widens
+`economic_indicators_category_check` with `labour` and `credit`, adds their
+`finding_metric_config` rows (weights 0.90 and 1.20, both proposals), and widens the
+`commodity` vocabulary beyond gold. The config rows land with the constraint because a
+category missing from that table gets an empty vocabulary, and the phrase linter then
+rejects every sentence about it. `20261023044700_seed_au_indicator_expansion.sql` seeds six
+AU rows with `is_active = false` and best-guess refs (Trimmed Mean, Unemployment, WPI,
+Credit, Commodity Prices, 10Y), and re-points the still-inactive AU CPI row at
+`ABS,CPI,2.0.0`, monthly, polled daily. ABS moved CPI to version 2.0.0 (monthly, rebased to
+September 2025 = 100) on 26 November 2025, and pinning the version means the next rebase
+returns a 404 instead of rewriting stored history. Monthly ABS rows poll daily because
+`weekly` means Mondays only. `20261023044800_au_us_10y_spread_view.sql` adds
+`v_au_us_10y_spread` (`security_invoker`), which is computed and not stored. It stays empty
+until AU 10Y is activated. Each row goes live through its own activation migration after a
+verified live run (`docs/features/economic-indicators/activating-an-indicator.md`).
+
+---
+
 ## 2026-10-13 — Turn-aware transcript segments
 
 `20261013000000_turn_aware_transcript_segments.sql` adds `transcript_segments.speakers`

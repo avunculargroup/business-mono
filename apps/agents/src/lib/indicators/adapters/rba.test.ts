@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseRbaCsv, parseTableRef, parseCsv } from './rba.js';
+import { parseRbaCsv, parseTableRef, parseCsv, rbaAdapter } from './rba.js';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8');
@@ -146,6 +146,42 @@ describe('parseRbaCsv', () => {
     expect(res.observations[1].raw).toEqual({ date: '30/09/2026', value: '4.60', column: 'FIRMMCRTD' });
   });
 
+  // F2-shaped, written by hand: the recorded rba-f2.csv waits on a browser fetch,
+  // since www.rba.gov.au is refused where this was written.
+  const f2Daily =
+    'F2 CAPITAL MARKET YIELDS – GOVERNMENT BONDS – DAILY\n' +
+    '"Title","Australian Government 3 year bond","Australian Government 10 year bond"\n' +
+    '"Series ID","FCMYGBAG3D","FCMYGBAG10D"\n' +
+    '"29/09/2026","3.71","4.38"\n' +
+    '"30/09/2026","3.74","4.41"\n' +
+    '"01/10/2026","3.70","4.36"\n' +
+    '"02/10/2026","3.69",""\n' +
+    '"05/10/2026","3.72","4.40"\n';
+
+  it('keeps one observation per business day for a daily row', () => {
+    // AU 10Y pairs day-for-day with the daily US 10Y in v_au_us_10y_spread, so a
+    // daily row must not collapse to month end. The blank 2 Oct cell is skipped.
+    const res = parseRbaCsv(f2Daily, 'FCMYGBAG10D', 'daily');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations.map((o) => [o.periodDate, o.value])).toEqual([
+      ['2026-09-29', 4.38],
+      ['2026-09-30', 4.41],
+      ['2026-10-01', 4.36],
+      ['2026-10-05', 4.4],
+    ]);
+  });
+
+  it('still collapses the same daily table to month end for a monthly row', () => {
+    const res = parseRbaCsv(f2Daily, 'FCMYGBAG10D');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations.map((o) => [o.periodDate, o.value])).toEqual([
+      ['2026-09-01', 4.41],
+      ['2026-10-01', 4.4],
+    ]);
+  });
+
   it('errors (does not silently succeed) when the matched column is blank on every row', () => {
     // Money Base header exists but every data row is blank — e.g. a discontinued
     // series still listed in the preamble. This must not look like a genuine
@@ -160,5 +196,32 @@ describe('parseRbaCsv', () => {
     if (res.ok) return;
     expect(res.error.kind).toBe('parse');
     expect(res.error.message).toMatch(/every data row was blank/);
+  });
+});
+
+describe('rbaAdapter.fetchLatest', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('passes the row\'s granularity through, so a daily row keeps its days', async () => {
+    const csv =
+      '"Title","Australian Government 10 year bond"\n' +
+      '"Series ID","FCMYGBAG10D"\n' +
+      '"30/09/2026","4.41"\n' +
+      '"01/10/2026","4.36"\n';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(csv, { status: 200 })));
+
+    const res = await rbaAdapter.fetchLatest({
+      id: 'ind-1',
+      shortLabel: 'AU 10Y',
+      provider: 'rba',
+      providerSeriesCode: null,
+      providerTableRef: 'F2:FCMYGBAG10D',
+      granularity: 'daily',
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.observations.map((o) => o.periodDate)).toEqual(['2026-09-30', '2026-10-01']);
   });
 });

@@ -1,7 +1,10 @@
 # Turning on a seeded indicator
 
-**Who this is for:** whoever activates `AU CPI` or `AU Bus. Confidence`, the two
-rows sitting in `economic_indicators` with `is_active = false`. It assumes no
+**Who this is for:** whoever activates one of the seeded rows sitting in
+`economic_indicators` with `is_active = false`. AU CPI and AU Bus. Confidence
+are worked through in full; the six further AU rows from
+[`abs-activation-spec.md`](./abs-activation-spec.md#indicator-set) follow the
+same loop (see [The general case](#the-general-case)). It assumes no
 familiarity with the poll, the migration workflow or SDMX. Follow it top to
 bottom.
 
@@ -23,9 +26,9 @@ for two poll runs.
 Turning a row on is safe, and that is deliberate.
 
 Both rows are *known* to be incomplete, and both adapters refuse an incomplete
-request rather than guessing at it. AU CPI's `provider_table_ref` is `CPI` — a
-dataflow with no data key, which asks ABS for every CPI series it publishes, and
-the parser will not pick one of them for you. AU Bus. Confidence's ref names no
+request rather than guessing at it. AU CPI's `provider_table_ref` is
+`ABS,CPI,2.0.0` — a dataflow with no data key, which asks ABS for every CPI
+series it publishes, and the parser will not pick one of them for you. AU Bus. Confidence's ref names no
 publishing agency, so the OECD adapter will not even build the URL.
 
 So the first poll after you activate either row **will fail, and write nothing**.
@@ -119,7 +122,10 @@ AU CPI (parse: ABS: SDMX query returned 47 series where one was expected
 that pins a single series.
 ```
 
-…followed by a slice of the actual ABS response. **That slice is the thing this
+…followed by a slice of the actual ABS response. If instead it says
+`HTTP 403 … provider refused the request (check User-Agent / egress)`, ABS
+turned the request away before answering; the adapter already sends a
+User-Agent, so the likely cause is the agent server's egress, not the ref. **That slice is the thing this
 whole exercise exists to obtain.** It is the first real ABS payload anyone here
 has seen. Copy the entire `failed` entry somewhere you can read it properly — it
 is long, and you will need it twice.
@@ -128,13 +134,18 @@ is long, and you will need it twice.
 
 Inside the quoted response you will find a `structure` block listing the
 dataflow's dimensions and, for each, its possible values with ids and names.
-You are looking for the combination that means **All groups CPI, weighted
-average of eight capital cities**, and whichever adjustment the series should
-use (the seed intends the original, unadjusted index).
+You are looking for the combination that means **All groups CPI, Australia,
+index numbers, original**. Since the November 2025 move to the monthly CPI the
+region is called "Australia", not "Weighted average of eight capital cities";
+read its code from the structure rather than assuming the old one.
 
 A data key is those dimension values in the order the dimensions are listed,
-joined with dots — for example `1.10001.10.50.Q`. Dimensions you want to leave
-unconstrained are left empty between the dots.
+joined with dots, frequency last — `M` for this series, not the old quarterly
+`Q`. Dimensions you want to leave unconstrained are left empty between the
+dots.
+
+Use `CPI` (version 2.0.0), never `CPI_M` (the old Monthly CPI Indicator,
+discontinued) or `CPI_Q` (the quarterly series, a separate dataflow).
 
 If the response does not give you enough to be confident, open
 <https://explore.abs.gov.au> in a browser, find the series by name, and use the
@@ -171,22 +182,26 @@ supabase/migrations/20261002093000_activate_au_cpi.sql
 > the batch — taking every other pending migration with it. A test checks this,
 > so a collision fails the build rather than a deployment.
 
-Contents — substituting your real data key, and `period_granularity` to match
-what the series actually prints (`quarterly` if the time periods you saw were
-`2026-Q1`, `monthly` if they were `2026-01`):
+Contents — substituting your real data key for `<key>`. Keep the version in
+the dataflow: `ABS,CPI,2.0.0` makes the next ABS rebase arrive as a 404 rather
+than as a silent revision of every stored period.
 
 ```sql
 -- Activate AU CPI, verified against a live ABS response on <date>.
--- The seeded ref was the bare dataflow 'CPI', which returns every series in it;
--- the data key below pins All groups CPI, weighted average of eight capital
--- cities. See docs/features/economic-indicators/activating-an-indicator.md.
+-- The seeded ref was the dataflow alone, which returns every series in it;
+-- the data key below pins All groups CPI, Australia, index, original.
+-- See docs/features/economic-indicators/activating-an-indicator.md.
 
 update economic_indicators
-set provider_table_ref = 'CPI/1.10001.10.50.Q',
-    period_granularity = 'quarterly',
+set provider_table_ref = 'ABS,CPI,2.0.0/<key>',
+    period_granularity = 'monthly',
+    poll_frequency     = 'daily',
     is_active          = true
 where short_label = 'AU CPI';
 ```
+
+`poll_frequency` is `daily` because monthly CPI is released on the last
+Wednesday of the month, and a `weekly` row is only polled on Mondays.
 
 Then edit `schema.sql` at the repo root if it records the seeded values, so the
 human-readable reference matches.
@@ -210,12 +225,15 @@ limit 10;
 
 Check all four:
 
-1. **Periods are first-of-period.** `2026-01-01`, `2026-04-01` — never
-   `2026-03-31`. The dashboard's prior and year-ago comparisons join on this
-   column, so an end-of-period date misaligns them silently.
-2. **Values look like a CPI index** — around 130–145 at the time of writing, not
-   percentages and not raw prices. If they look like a different quantity, the
-   data key points at the wrong series. Go back to step 4.
+1. **Periods are first-of-month.** `2026-08-01`, `2026-09-01` — never
+   `2026-08-31`. The back series starts at `2024-04-01`. The dashboard's prior
+   and year-ago comparisons join on this column, so an end-of-period date
+   misaligns them silently.
+2. **Values look like a CPI index near 100.** ABS rebased the monthly CPI to
+   September 2025 = 100, so expect values a little either side of 100 — not
+   percentages, not raw prices, and not the 130–145 the old quarterly series
+   read. If they look like a different quantity, the data key points at the
+   wrong series. Go back to step 4.
 3. **There are roughly 19 of them.** The poll backfills about eighteen periods
    on first ingest so the year-on-year comparison works immediately.
 4. **Spot-check the newest figure against the ABS website.** This is the only
@@ -239,11 +257,19 @@ replacing the synthesised one, and update the expected values in
 `sdmx.test.ts` to match. Then remove `sdmx-abs-cpi.json` from the synthesised
 list in `__fixtures__/README.md`.
 
-You can get the payload by putting the request in a browser:
+You can get the payload from a terminal on any machine that can reach ABS. The
+format comes from the `Accept` header, which is how the API guide documents it:
 
 ```
-https://data.api.abs.gov.au/rest/data/CPI/1.10001.10.50.Q?format=jsondata&startPeriod=2022-01-01
+curl -H 'Accept: application/vnd.sdmx.data+json' \
+     -H 'User-Agent: BTS-platform/1.0 (economic-indicators)' \
+     'https://data.api.abs.gov.au/rest/data/ABS,CPI,2.0.0/<key>?startPeriod=2024-01-01'
 ```
+
+> The adapter still adds `?format=jsondata`, which the current API guide does
+> not document. Note whether the first live run returns valid SDMX-JSON; either
+> way the parameter comes out afterwards, so the request matches the documented
+> interface.
 
 Hand it to me and I will do this part.
 
@@ -303,7 +329,13 @@ Nothing else references those rows, so there is nothing to clean up afterwards.
 ## The general case
 
 Nothing above is specific to these two beyond the dataflow ids. Any seeded
-indicator activates the same way: turn it on, run the poll, read `failed` in the
+indicator activates the same way — including the six rows seeded by
+`20261023044700_seed_au_indicator_expansion.sql`. The RBA ones differ at step 4: AU Credit (`D2`)
+and AU Commodity Prices (`I2`) carry no column matcher yet, so they fail with
+`No column matcher for RBA table` until a Series ID read from the live CSV is
+written into the ref as `D2:<series id>`. AU 10Y (`F2:FCMYGBAG10D`) fails with
+`column "…" not found` only if that guess is wrong. The
+general loop: turn it on, run the poll, read `failed` in the
 newest `agent_activity` row, correct the ref in a migration, run it again, then
 check the periods and spot-check the newest figure against the provider.
 

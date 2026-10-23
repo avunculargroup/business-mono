@@ -2344,7 +2344,8 @@ CREATE TABLE economic_indicators (
   name                   TEXT NOT NULL,
   short_label            TEXT NOT NULL,
   region                 TEXT NOT NULL CHECK (region IN ('au','us','global')),
-  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation','activity')),
+  category               TEXT NOT NULL CHECK (category IN ('policy_rate','money_supply','inflation','activity',
+                                                       'fx','commodity','equity','bond_yield','labour','credit')),
   provider               TEXT NOT NULL CHECK (provider IN ('fred','rba','abs','oecd','stooq','gold_api')),
   provider_series_code   TEXT,                     -- FRED series_id, e.g. 'M2SL'
   provider_table_ref     TEXT,                     -- RBA/ABS table or dataflow ref, e.g. 'D3'
@@ -2392,6 +2393,11 @@ CREATE TABLE indicator_observations (
 --       + activity category (migration 20260621000000): US Manufacturing Activity
 --       (Philly Fed, FRED, live) and AU Business Confidence (OECD, is_active=false
 --       until an 'oecd' SDMX adapter exists).
+--       + AU expansion (migrations 20261023044600–044700): 'labour' and 'credit'
+--       categories with finding_metric_config rows; six AU rows seeded
+--       is_active=false (Trimmed Mean, Unemployment, WPI, Credit, Commodity
+--       Prices, 10Y); AU CPI re-pointed at the pinned monthly 'ABS,CPI,2.0.0'.
+--       Spec: docs/features/economic-indicators/abs-activation-spec.md.
 
 -- Views:
 --   v_indicator_series — current-vintage observations for an indicator, oldest→newest
@@ -2404,6 +2410,9 @@ CREATE TABLE indicator_observations (
 --     release gaps are all 0 (migration 20260707000000). Nothing stored. Component
 --     picks the YoY column by category: yoy_change (policy_rate, pp) vs
 --     yoy_pct_change (inflation = the rate; money_supply = the debasement rate).
+--   v_au_us_10y_spread — current AU 10Y and US 10Y joined on period_date, with
+--     spread_pp = au - us (migration 20261023044800). security_invoker; a day
+--     either market was shut drops out of the join. Nothing stored.
 
 
 -- ============================================================

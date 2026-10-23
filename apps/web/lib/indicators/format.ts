@@ -26,6 +26,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   commodity: 'Commodity',
   equity: 'Equities',
   bond_yield: 'Bond yield',
+  labour: 'Labour market',
+  credit: 'Credit',
 };
 
 export function unitLabel(unit: string | null): string {
