@@ -57,6 +57,11 @@ TIERS
 - peripheral: bitcoin is one series among many, or is mentioned in passing.
 - excluded: bitcoin is not actually a subject (a false positive, or altcoin-only, or blockchain with no bitcoin content).
 
+EXAMPLES (from the register's own tier table)
+- core: accounting for bitcoin holdings under IFRS.
+- substantial: bitcoin vs gold as a hedge across crises (two subjects, each with its own findings); IAS 38 treatment of cryptocurrencies.
+- peripheral: a machine-learning forecasting benchmark using 30 assets, bitcoin among them.
+
 RULES
 - Judge from the title and abstract only. Do not use outside knowledge of the paper or its authors.
 - Do not judge quality, method or conclusions. Only how central bitcoin is.
@@ -71,24 +76,33 @@ Type: ${input.workType ?? 'unknown'}
 Abstract: ${input.abstract ? input.abstract.slice(0, 6000) : '(none available)'}`;
 }
 
-/** Rex's verdict, or null when the answer could not be used. */
+/**
+ * Rex's verdict, or null when the answer could not be used. A malformed answer
+ * is asked for once more, as newsRubric does; an error is not retried.
+ */
 export async function confirmRelevance(input: ConfirmInput): Promise<RelevanceVerdict | null> {
-  try {
-    const response = await rex.generate([{ role: 'user', content: buildPrompt(input) }], {
-      requestContext: stepRequestContext(CONFIRM_RELEVANCE_SCOPE),
-      structuredOutput: { schema: relevanceVerdictSchema, errorStrategy: 'warn' },
-    });
-    // 'warn' continues past a schema failure, so the object is checked here.
-    const parsed = relevanceVerdictSchema.safeParse(response.object);
-    if (!parsed.success) {
-      log.warn({ title: input.title }, 'relevance verdict did not match the schema');
+  const prompt = buildPrompt(input);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await rex.generate([{
+        role: 'user',
+        content: attempt === 1
+          ? prompt
+          : `${prompt}\n\nYour previous answer did not match the schema. Return only the object, with topics from the allowed list and reasons under 600 characters.`,
+      }], {
+        requestContext: stepRequestContext(CONFIRM_RELEVANCE_SCOPE),
+        structuredOutput: { schema: relevanceVerdictSchema, errorStrategy: 'warn' },
+      });
+      // 'warn' continues past a schema failure, so the object is checked here.
+      const parsed = relevanceVerdictSchema.safeParse(response.object);
+      if (parsed.success) return parsed.data;
+      log.warn({ title: input.title, attempt }, 'relevance verdict did not match the schema');
+    } catch (err) {
+      log.error({ err, title: input.title }, 'relevance confirmation failed');
       return null;
     }
-    return parsed.data;
-  } catch (err) {
-    log.error({ err, title: input.title }, 'relevance confirmation failed');
-    return null;
   }
+  return null;
 }
 
 export interface RelevanceDecision {

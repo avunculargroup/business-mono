@@ -155,15 +155,23 @@ describe('confirmRelevance', () => {
     expect(rexGenerate.mock.calls[0][1]).toMatchObject({ requestContext: { key: CONFIRM_RELEVANCE_SCOPE } });
   });
 
-  it('returns null for a malformed verdict or an error, never throws', async () => {
-    rexGenerate.mockResolvedValueOnce({ object: { tier: 'pivotal' } });
+  it('asks once more after a malformed verdict, and takes the second answer', async () => {
+    rexGenerate.mockClear();
+    rexGenerate.mockResolvedValueOnce({ object: { tier: 'pivotal' } }).mockResolvedValueOnce({ object: VERDICT });
+    expect(await confirmRelevance({ title: 't', abstract: null, venue: null, workType: null, scores })).toEqual(VERDICT);
+    expect(rexGenerate).toHaveBeenCalledTimes(2);
+    expect(rexGenerate.mock.calls[1][0][0].content).toContain('did not match the schema');
+  });
+
+  it('returns null after two malformed verdicts or on an error, never throws', async () => {
+    rexGenerate.mockResolvedValueOnce({ object: { tier: 'pivotal' } }).mockResolvedValueOnce({ object: { tier: 'pivotal' } });
     expect(await confirmRelevance({ title: 't', abstract: null, venue: null, workType: null, scores })).toBeNull();
     rexGenerate.mockRejectedValueOnce(new Error('overloaded'));
     expect(await confirmRelevance({ title: 't', abstract: null, venue: null, workType: null, scores })).toBeNull();
   });
 
   it('rejects a topic outside the controlled vocabulary', async () => {
-    rexGenerate.mockResolvedValueOnce({ object: { ...VERDICT, topics: ['vibes'] } });
+    rexGenerate.mockResolvedValueOnce({ object: { ...VERDICT, topics: ['vibes'] } }).mockResolvedValueOnce({ object: { ...VERDICT, topics: ['vibes'] } });
     expect(await confirmRelevance({ title: 't', abstract: null, venue: null, workType: null, scores })).toBeNull();
   });
 });

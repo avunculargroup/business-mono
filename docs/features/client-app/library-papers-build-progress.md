@@ -11,8 +11,7 @@ merged in #417 and is **live on `bts-internal`**, checked there on 2026-10-19 (s
 [Session 1: live check](#session-1-live-check)). It follows the spec as revised on 18 October
 2026 (the conservative licence and abstract route, and the source reconciliation rules) and
 the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper. **Session 2
-(discovery and resolution) is built, and its first live run passed on access tiers; relevance
-is still unmeasured** (see
+(discovery and resolution) is built, and its live golden-set acceptance passes** (see
 [Session 2](#session-2-discovery-and-resolution)). Sessions 3–5 are not started.
 **Last updated:** 2026-10-19
 
@@ -340,9 +339,21 @@ Each fix has a test built on the live shape. After the fixes:
 
 - **Access tier: 37 of 37** resolvable entries are right, including every `knownSourceError`.
   gs-38, gs-39 and gs-40 are entered by hand.
-- **Relevance: not yet measured.** The OpenRouter key in `apps/agents/.env` was rejected
-  (`401 User not found`), so Rex answered none of the 37 calls. The 30 of 37 that came out
-  right are the deterministic band alone.
+- **Relevance: passes, on the third run.** The first run's OpenRouter key was rejected, so
+  Rex answered nothing. With a working key, Rex got 33 of 37 (89%), one short. Two changes
+  then took it over the 90% bar:
+  - A malformed answer is now asked for once more, as `newsRubric` does. gs-34 had fallen back
+    to its band on one bad answer.
+  - The prompt now carries the spec's own tier examples. gs-16, bitcoin against gold, is the
+    spec's example of `substantial`, and Rex had called it core.
+
+  On the passing run, four answers needed the retry, and gs-23 fell back to its band after two
+  misses.
+- **The whole eval passes**: access, every `knownSourceError`, relevance of at least 90%, and
+  gs-37 resolving as its own record linked to gs-15.
+- **gs-09's label looks inconsistent.** It is labelled `peripheral`, but its rationale says
+  bitcoin is absent from the abstract, which the golden-set README defines as `excluded`. Rex
+  said excluded.
 - **Peer review on gs-36 is wrong, and stays wrong for now.** OpenAlex and Crossref type the
   editorial as an article, so it reads as `peer_reviewed`. Peer review is not in the spec's
   Session 2 acceptance, and publication still needs a person and Lex, but an editorial typed
