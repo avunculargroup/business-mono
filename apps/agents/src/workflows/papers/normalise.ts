@@ -60,11 +60,16 @@ function venueType(sourceType: string | null | undefined): VenueType {
   }
 }
 
+// The source's type decides first: a publisher's copy stays a publisher's copy
+// even when OpenAlex attaches a PDF hosted somewhere else (gs-25: the OUP
+// version of record with an nber.org PDF). A repository or unknown source is
+// checked against the preprint hosts on either URL: OpenAlex gives the
+// Preprints.org copy of gs-37 a doi.org landing page and a preprints.org PDF.
 function hostType(loc: OpenAlexLocation): HostType {
-  if (isPreprintHost(loc.landing_page_url) || isPreprintHost(loc.pdf_url)) return 'preprint_server';
   const t = loc.source?.type;
-  if (t === 'repository') return 'repository';
   if (t === 'journal' || t === 'conference' || t === 'book series' || t === 'ebook platform') return 'publisher';
+  if (isPreprintHost(loc.landing_page_url) || isPreprintHost(loc.pdf_url)) return 'preprint_server';
+  if (t === 'repository') return 'repository';
   return 'other';
 }
 
@@ -88,6 +93,7 @@ function locationOf(loc: OpenAlexLocation): Location | null {
   return {
     hostType: hostType(loc),
     sourceName: loc.source?.display_name ?? null,
+    sourceId: shortOpenAlexId(loc.source?.id),
     landingUrl,
     pdfUrl,
     doi: landingDoi,
@@ -119,9 +125,6 @@ export function normaliseWork(work: OpenAlexWork): NormalisedWork {
   const source = work.primary_location?.source ?? null;
 
   const funders: Funder[] = [];
-  for (const g of work.grants ?? []) {
-    if (g.funder_display_name) funders.push({ name: g.funder_display_name, awardId: g.award_id ?? null, source: 'openalex' });
-  }
   for (const a of work.awards ?? []) {
     if (a.funder_display_name) funders.push({ name: a.funder_display_name, awardId: a.funder_award_id ?? null, source: 'openalex' });
   }

@@ -18,6 +18,8 @@ export type VenueType = 'journal' | 'conference' | 'book_series' | 'repository' 
 export interface Location {
   hostType: HostType;
   sourceName: string | null;
+  /** The OpenAlex source id (S…), used to find a repository whose URL OpenAlex garbled. Not stored. */
+  sourceId?: string | null;
   landingUrl: string | null;
   pdfUrl: string | null;
   /** A copy with its own DOI: a preprint or working paper (rule 4). */

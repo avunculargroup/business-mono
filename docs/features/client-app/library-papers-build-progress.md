@@ -11,7 +11,8 @@ merged in #417 and is **live on `bts-internal`**, checked there on 2026-10-19 (s
 [Session 1: live check](#session-1-live-check)). It follows the spec as revised on 18 October
 2026 (the conservative licence and abstract route, and the source reconciliation rules) and
 the [19 October decisions](#decided-on-19-october) on drafts and the whitepaper. **Session 2
-(discovery and resolution) is built and tested offline, not yet merged or run live** (see
+(discovery and resolution) is built, and its first live run passed on access tiers; relevance
+is still unmeasured** (see
 [Session 2](#session-2-discovery-and-resolution)). Sessions 3–5 are not started.
 **Last updated:** 2026-10-19
 
@@ -322,11 +323,36 @@ Tested offline:
 
   Six guards were broken one at a time, and the script failed each time.
 
+### Session 2: first live run
+
+Run on 2026-10-23 against the real OpenAlex, Crossref and repositories. It found five bugs that
+the hand-built test shapes could not:
+
+| Found | Cause | Fixed |
+|---|---|---|
+| Every OpenAlex lookup returned `400` | `grants` is no longer a valid `select` field | Dropped; funding is read from `awards` and `funders` |
+| gs-23 and gs-30 were refused as "notices" | A publisher that retracts in place puts an `update-to` on the original pointing at its own DOI | A notice is an `update-to` naming another DOI; a self-reference marks the paper retracted |
+| gs-21 stayed `metadata_only` | OpenAlex gives the Southampton copy as a file URL (`/id/eprint/400597/1/….docx`) | The EPrints record id is read from the start of the path, on the landing or PDF URL |
+| gs-22 stayed `metadata_only` | OpenAlex's URL for the Southampton copy is garbled (`http://doi.org/…>).`) | The repository is searched by the paper's DOI, on a host known from the copy's source id, taking only an exact DOI match. The repository's own record URL replaces the garbled one |
+| gs-25 stayed `metadata_only` | The OUP version of record has its PDF on `nber.org`, which made it look like a preprint | The source type decides first; only a repository or unknown source can be a preprint server |
+
+Each fix has a test built on the live shape. After the fixes:
+
+- **Access tier: 37 of 37** resolvable entries are right, including every `knownSourceError`.
+  gs-38, gs-39 and gs-40 are entered by hand.
+- **Relevance: not yet measured.** The OpenRouter key in `apps/agents/.env` was rejected
+  (`401 User not found`), so Rex answered none of the 37 calls. The 30 of 37 that came out
+  right are the deterministic band alone.
+- **Peer review on gs-36 is wrong, and stays wrong for now.** OpenAlex and Crossref type the
+  editorial as an article, so it reads as `peer_reviewed`. Peer review is not in the spec's
+  Session 2 acceptance, and publication still needs a person and Lex, but an editorial typed
+  as an article will reach the review queue looking refereed.
+
 ### Session 2: to finish
 
 1. **Run the golden-set eval where the network is allowed**, either locally or in a session
    whose environment allows `api.openalex.org`, `api.crossref.org` and the repository hosts:
-   `pnpm --filter @platform/agents test:eval -- library-papers`. It needs
+   `pnpm --filter @platform/agents test:eval library-papers`. It needs
    `OPENALEX_API_KEY` and a model key. The spec's acceptance has three parts: access tier
    right on every resolvable entry, relevance on at least 90%, and gs-37 resolving as its own
    record linked to gs-15. gs-38, gs-39 and gs-40 are not in OpenAlex and are entered by hand.

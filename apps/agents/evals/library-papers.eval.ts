@@ -21,7 +21,7 @@
  * Hits real APIs and needs OPENALEX_API_KEY and ANTHROPIC_API_KEY (or
  * OPENROUTER_API_KEY), plus network access to api.openalex.org,
  * api.crossref.org and the repositories. Not run in CI. Locally:
- *   pnpm --filter @platform/agents test:eval -- library-papers
+ *   pnpm --filter @platform/agents test:eval library-papers
  */
 
 import { describe, it, expect } from 'vitest';

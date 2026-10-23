@@ -80,8 +80,12 @@ export async function resolvePaper(
 
   const repository = new Map<string, RepositoryRecord | null>();
   for (const l of normalised.locations) {
-    if (l.hostType === 'repository' && l.landingUrl && !repository.has(l.landingUrl)) {
-      repository.set(l.landingUrl, await deps.confirmAtRepository(l.landingUrl));
+    const key = l.landingUrl ?? l.pdfUrl;
+    if (l.hostType === 'repository' && key && !repository.has(key)) {
+      repository.set(key, await deps.confirmAtRepository(
+        { landingUrl: l.landingUrl, pdfUrl: l.pdfUrl, sourceId: l.sourceId ?? null },
+        ownDoi,
+      ));
     }
   }
 

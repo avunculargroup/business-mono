@@ -7,7 +7,7 @@ import {
   updatesAgainst, type CrossrefWork,
 } from './crossref.js';
 import { fromEprints, fromOpenAlex, fromUrl } from './licences.js';
-import { eprintsExportUrl, parseEprintsExport } from './repository.js';
+import { confirmAtRepository, eprintsExportUrl, eprintsSearchUrl, parseEprintsExport, pickByDoi } from './repository.js';
 
 // Fixtures here are built by hand from the documented response shapes of
 // OpenAlex, Crossref and EPrints, not recorded from the live services: this
@@ -43,6 +43,8 @@ describe('openalex', () => {
     expect(url.pathname).toBe('/works/doi:10.5195/ledger.2018.127');
     expect(url.searchParams.get('api_key')).toBe('test-key');
     expect(url.searchParams.get('select')).toContain('abstract_inverted_index');
+    // A select field OpenAlex has retired fails the whole request with a 400.
+    expect(url.searchParams.get('select')?.split(',')).not.toContain('grants');
   });
 
   it('returns null for a work OpenAlex does not have', async () => {
@@ -107,7 +109,36 @@ describe('crossref', () => {
       { kind: 'concern_raised', noticeDoi: '10.1000/e', source: 'crossref' },
     ]);
     expect(isNotice(work)).toBe(false);
-    expect(isNotice({ DOI: 'x', 'update-to': [{ DOI: 'y', type: 'retraction' }] })).toBe(true);
+    expect(isNotice({ DOI: '10.1016/j.irfa.2026.105078', 'update-to': [{ DOI: '10.1016/j.irfa.2018.09.003', type: 'retraction' }] })).toBe(true);
+  });
+
+  // The live shape of gs-23 and gs-30: a publisher that retracts in place puts
+  // an update-to on the original, pointing at the original's own DOI.
+  it('reads a retracted original as retracted, not as a notice (gs-23, gs-30)', () => {
+    const gs30: CrossrefWork = {
+      DOI: '10.1007/s00779-021-01562-z',
+      'update-to': [{ DOI: '10.1007/s00779-021-01562-z', type: 'retraction' }],
+      'updated-by': [{ DOI: '10.1007/s00779-021-01562-z', type: 'retraction' }],
+    };
+    expect(isNotice(gs30)).toBe(false);
+    expect(updatesAgainst(gs30)).toEqual([{ kind: 'retracted', noticeDoi: null, source: 'crossref' }]);
+
+    const gs23: CrossrefWork = {
+      DOI: '10.1016/j.irfa.2018.09.003',
+      'update-to': [{ DOI: '10.1016/j.irfa.2018.09.003', type: 'retraction' }],
+      'updated-by': [
+        { DOI: '10.1016/j.irfa.2018.09.003', type: 'retraction' },
+        { DOI: '10.1016/j.irfa.2026.105078', type: 'erratum' },
+        { DOI: '10.1016/j.irfa.2026.105078', type: 'erratum' },
+        { DOI: '10.1016/j.irfa.2026.105078', type: 'retraction' },
+      ],
+    };
+    expect(isNotice(gs23)).toBe(false);
+    // The real notice replaces the self-reference, and the duplicate erratum is read once.
+    expect(updatesAgainst(gs23)).toEqual([
+      { kind: 'corrected', noticeDoi: '10.1016/j.irfa.2026.105078', source: 'crossref' },
+      { kind: 'retracted', noticeDoi: '10.1016/j.irfa.2026.105078', source: 'crossref' },
+    ]);
   });
 
   it('reads preprint relations and posted-content', () => {
@@ -155,17 +186,57 @@ describe('licences', () => {
 });
 
 describe('repository', () => {
-  it('finds the EPrints export for bare and /id/eprint/ landing pages', () => {
-    expect(eprintsExportUrl('https://eprints.soton.ac.uk/447739')).toBe(
+  const asOf = new Date('2026-10-18');
+
+  it('finds the EPrints export for bare, /id/eprint/ and file URLs', () => {
+    expect(eprintsExportUrl({ landingUrl: 'https://eprints.soton.ac.uk/447739', pdfUrl: null })).toBe(
       'https://eprints.soton.ac.uk/cgi/export/eprint/447739/JSON/eprint-447739.js',
     );
-    expect(eprintsExportUrl('https://researchonline.lse.ac.uk/id/eprint/100409/')).toBe(
+    expect(eprintsExportUrl({ landingUrl: 'https://researchonline.lse.ac.uk/id/eprint/100409/', pdfUrl: null })).toBe(
       'https://researchonline.lse.ac.uk/cgi/export/eprint/100409/JSON/eprint-100409.js',
     );
-    expect(eprintsExportUrl('https://research.birmingham.ac.uk/en/publications/x/')).toBeNull();
+    // gs-21, as OpenAlex lists it: a file under the record.
+    expect(eprintsExportUrl({ landingUrl: 'https://eprints.soton.ac.uk/id/eprint/400597/1/Bitcoin_20efficiency_20R_26R.docx', pdfUrl: null })).toBe(
+      'https://eprints.soton.ac.uk/cgi/export/eprint/400597/JSON/eprint-400597.js',
+    );
+    // gs-36's Southampton copy: a garbled landing URL, but the PDF names the record.
+    expect(eprintsExportUrl({ landingUrl: 'http://doi.org/10.1080/1351847X.2023.2284186>).', pdfUrl: 'https://eprints.soton.ac.uk/486393/1/x.pdf' })).toBe(
+      'https://eprints.soton.ac.uk/cgi/export/eprint/486393/JSON/eprint-486393.js',
+    );
+    expect(eprintsExportUrl({ landingUrl: 'https://research.birmingham.ac.uk/en/publications/x/', pdfUrl: null })).toBeNull();
   });
 
-  const asOf = new Date('2026-10-18');
+  it('searches a known repository by DOI when the copy names no record (gs-22)', () => {
+    const gs22 = { landingUrl: 'http://doi.org/10.1016/j.frl.2021.102016>).', pdfUrl: null, sourceId: 'S4306401019' };
+    expect(eprintsExportUrl(gs22)).toBeNull();
+    expect(eprintsSearchUrl(gs22, '10.1016/j.frl.2021.102016')).toBe(
+      'https://eprints.soton.ac.uk/cgi/search/simple?q=10.1016%2Fj.frl.2021.102016&output=JSON&_action_export=1',
+    );
+    expect(eprintsSearchUrl({ ...gs22, sourceId: 'S1' }, '10.1016/j.frl.2021.102016')).toBeNull();
+  });
+
+  it('takes a search result only on an exact DOI match, and only if it is the one', () => {
+    const hit = { uri: 'https://eprints.soton.ac.uk/id/eprint/447739', doi: '10.1016/j.frl.2021.102016', documents: [{ content: 'accepted', security: 'public', license: 'accepted_manuscript' }] };
+    expect(pickByDoi([hit], '10.1016/j.frl.2021.102016', asOf)).toMatchObject({
+      version: 'acceptedVersion', isOa: true, licence: null, recordUrl: 'https://eprints.soton.ac.uk/id/eprint/447739',
+    });
+    expect(pickByDoi([{ ...hit, doi: '10.1016/j.frl.2021.102017' }], '10.1016/j.frl.2021.102016', asOf)).toBeNull();
+    expect(pickByDoi([hit, { ...hit, uri: 'other' }], '10.1016/j.frl.2021.102016', asOf)).toBeNull();
+    expect(pickByDoi({ not: 'a list' }, '10.1016/j.frl.2021.102016', asOf)).toBeNull();
+  });
+
+  it('confirms through the export, falls back to the search, and gives up quietly', async () => {
+    const fetchImpl = vi.fn(async (url: string) => jsonResponse(url.includes('/cgi/export/')
+      ? { documents: [{ content: 'accepted', security: 'public' }] }
+      : [{ uri: 'https://eprints.soton.ac.uk/id/eprint/447739', doi: '10.1016/j.frl.2021.102016', documents: [{ content: 'accepted', security: 'public' }] }]));
+    const f = fetchImpl as unknown as typeof fetch;
+    expect(await confirmAtRepository({ landingUrl: 'https://eprints.soton.ac.uk/447739', pdfUrl: null, sourceId: null }, null, f, asOf)).toMatchObject({ isOa: true, recordUrl: null });
+    expect(await confirmAtRepository({ landingUrl: 'http://doi.org/x>).', pdfUrl: null, sourceId: 'S4306401019' }, '10.1016/j.frl.2021.102016', f, asOf))
+      .toMatchObject({ isOa: true, recordUrl: 'https://eprints.soton.ac.uk/id/eprint/447739' });
+    expect(await confirmAtRepository({ landingUrl: 'https://research.birmingham.ac.uk/x', pdfUrl: null, sourceId: 'S9' }, '10.1016/j.frl.2021.102016', f, asOf)).toBeNull();
+    const failing = vi.fn(async () => { throw new Error('ECONNRESET'); }) as unknown as typeof fetch;
+    expect(await confirmAtRepository({ landingUrl: 'https://eprints.soton.ac.uk/447739', pdfUrl: null, sourceId: null }, null, failing, asOf)).toBeNull();
+  });
 
   it('takes the best public file (gs-22: a public accepted manuscript, no CC licence)', () => {
     expect(parseEprintsExport({ documents: [{ content: 'accepted', security: 'public', license: 'accepted_manuscript' }] }, asOf))

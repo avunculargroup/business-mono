@@ -96,28 +96,51 @@ export function publishedVersionDois(work: CrossrefWork): string[] {
     .filter((d): d is string => d !== null);
 }
 
+function kindOf(type: string | undefined): Update['kind'] | null {
+  const t = (type ?? '').toLowerCase().replace(/[\s-]+/g, '_');
+  return t === 'retraction' || t === 'withdrawal' || t === 'removal' ? 'retracted'
+    : t === 'correction' || t === 'erratum' || t === 'corrigendum' ? 'corrected'
+    : t === 'expression_of_concern' ? 'concern_raised'
+    : null;
+}
+
 /**
  * Notices against this work. Crossref lists them on the original as
- * `updated-by` (including Retraction Watch's records), so that is what is read;
- * `update-to` appears on the notice itself and means this DOI *is* a notice.
+ * `updated-by` (including Retraction Watch's records). Publishers that retract
+ * in place (Elsevier, Springer: gs-23, gs-30) also put an `update-to` on the
+ * original pointing at its own DOI, which is read the same way. One update per
+ * kind and notice; a self-reference carries no notice DOI.
  */
 export function updatesAgainst(work: CrossrefWork): Update[] {
+  const own = normaliseDoi(work.DOI);
   const out: Update[] = [];
-  for (const u of work['updated-by'] ?? []) {
-    const type = (u.type ?? '').toLowerCase().replace(/[\s-]+/g, '_');
-    const kind: Update['kind'] | null =
-      type === 'retraction' || type === 'withdrawal' || type === 'removal' ? 'retracted'
-      : type === 'correction' || type === 'erratum' || type === 'corrigendum' ? 'corrected'
-      : type === 'expression_of_concern' ? 'concern_raised'
-      : null;
-    if (kind) out.push({ kind, noticeDoi: normaliseDoi(u.DOI), source: 'crossref' });
-  }
+  const add = (type: string | undefined, doi: string | undefined) => {
+    const kind = kindOf(type);
+    if (!kind) return;
+    const notice = normaliseDoi(doi);
+    const noticeDoi = notice === own ? null : notice;
+    if (out.some((u) => u.kind === kind && u.noticeDoi === noticeDoi)) return;
+    // A self-reference adds nothing once a real notice of the same kind is known.
+    if (noticeDoi === null && out.some((u) => u.kind === kind)) return;
+    if (noticeDoi !== null) {
+      const self = out.findIndex((u) => u.kind === kind && u.noticeDoi === null);
+      if (self >= 0) out.splice(self, 1);
+    }
+    out.push({ kind, noticeDoi, source: 'crossref' });
+  };
+  for (const u of work['updated-by'] ?? []) add(u.type, u.DOI);
+  for (const u of work['update-to'] ?? []) if (normaliseDoi(u.DOI) === own) add(u.type, u.DOI);
   return out;
 }
 
-/** True when the DOI is itself a retraction, correction or concern notice. */
+/**
+ * True when the DOI is itself a retraction, correction or concern notice: its
+ * `update-to` names another DOI. An `update-to` naming its own DOI is a
+ * retracted original, not a notice (gs-23, gs-30).
+ */
 export function isNotice(work: CrossrefWork): boolean {
-  return (work['update-to'] ?? []).length > 0;
+  const own = normaliseDoi(work.DOI);
+  return (work['update-to'] ?? []).some((u) => normaliseDoi(u.DOI) !== own);
 }
 
 /** Strips JATS markup from a deposited abstract. */

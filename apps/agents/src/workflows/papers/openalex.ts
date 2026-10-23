@@ -21,7 +21,7 @@ const TIMEOUT_MS = 20_000;
 export const WORK_FIELDS = [
   'id', 'doi', 'title', 'display_name', 'publication_year', 'publication_date', 'language',
   'type', 'type_crossref', 'primary_location', 'locations', 'open_access', 'authorships',
-  'cited_by_count', 'is_retracted', 'abstract_inverted_index', 'grants', 'funders', 'awards',
+  'cited_by_count', 'is_retracted', 'abstract_inverted_index', 'funders', 'awards',
 ].join(',');
 
 export interface OpenAlexSource {
@@ -65,8 +65,7 @@ export interface OpenAlexWork {
   cited_by_count?: number | null;
   is_retracted?: boolean | null;
   abstract_inverted_index?: Record<string, number[]> | null;
-  // Funding moved from `grants` to `funders`/`awards` in 2025; read whichever is present.
-  grants?: Array<{ funder_display_name?: string | null; award_id?: string | null }> | null;
+  // `grants` is gone: OpenAlex rejects it as a select field (400), so only these are read.
   awards?: Array<{ funder_display_name?: string | null; funder_award_id?: string | null }> | null;
   funders?: Array<{ display_name?: string | null }> | null;
 }

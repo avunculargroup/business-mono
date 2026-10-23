@@ -25,7 +25,7 @@ export interface ReconcileInput {
   requestedDoi: string | null;
   /** The publisher's deposit for the work's own DOI (requestedDoi for a draft). */
   crossref: CrossrefWork | null;
-  /** Repository confirmations by landing URL; null where the repository could not be read. */
+  /** Repository confirmations keyed by landing URL (else PDF URL); null where the repository could not be read. */
   repository: ReadonlyMap<string, RepositoryRecord | null>;
   asOf: Date;
 }
@@ -100,11 +100,14 @@ export function reconcile(input: ReconcileInput): Reconciled {
 
   // ── Rule 3: confirm repository copies at the repository ───────────────────
   locations = locations.map((l) => {
-    if (l.hostType !== 'repository' || !l.landingUrl) return l;
-    const record = input.repository.get(l.landingUrl);
+    const key = l.landingUrl ?? l.pdfUrl;
+    if (l.hostType !== 'repository' || !key) return l;
+    const record = input.repository.get(key);
     if (!record) return l; // unconfirmed: recorded, lifts nothing
     const next: Location = {
       ...l,
+      // The repository's own record replaces a URL OpenAlex garbled (gs-22).
+      landingUrl: record.recordUrl ?? l.landingUrl,
       version: record.version ?? l.version,
       isOa: record.isOa,
       licence: record.licence,
@@ -114,7 +117,7 @@ export function reconcile(input: ReconcileInput): Reconciled {
     if (next.isOa !== l.isOa || next.version !== l.version || next.licence !== l.licence) {
       events.push({
         rule: 3,
-        input: `OpenAlex: ${l.landingUrl} is_oa=${l.isOa}, ${l.version ?? 'no version'}, ${l.licence ?? 'no licence'}`,
+        input: `OpenAlex: ${key} is_oa=${l.isOa}, ${l.version ?? 'no version'}, ${l.licence ?? 'no licence'}`,
         verdict: `repository record (${record.evidence}): is_oa=${next.isOa}, ${next.version ?? 'no version'}, ${next.licence ?? 'no licence'}`,
       });
     }

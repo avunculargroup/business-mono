@@ -112,10 +112,13 @@ describe('resolvePaper', () => {
         ...PUBLISHED,
         locations: [{ is_oa: false, landing_page_url: 'https://eprints.soton.ac.uk/447739', version: 'acceptedVersion', source: { display_name: 'Southampton', type: 'repository' } }],
       })),
-      confirmAtRepository: vi.fn(async () => ({ version: 'acceptedVersion' as const, isOa: true, licence: null, evidence: 'content: accepted, security: public' })),
+      confirmAtRepository: vi.fn(async () => ({ version: 'acceptedVersion' as const, isOa: true, licence: null, recordUrl: null, evidence: 'content: accepted, security: public' })),
     });
     await resolvePaper({ doi: '10.3390/jrfm14090427' }, d);
-    expect(d.confirmAtRepository).toHaveBeenCalledWith('https://eprints.soton.ac.uk/447739');
+    expect(d.confirmAtRepository).toHaveBeenCalledWith(
+      { landingUrl: 'https://eprints.soton.ac.uk/447739', pdfUrl: null, sourceId: null },
+      '10.3390/jrfm14090427',
+    );
     expect(d.committed[0].locations).toEqual([expect.objectContaining({ is_oa: true, verified_at_host: true, reported_by: 'repository' })]);
     expect(d.committed[0].reconciled).toEqual([expect.objectContaining({ rule: 3 })]);
   });

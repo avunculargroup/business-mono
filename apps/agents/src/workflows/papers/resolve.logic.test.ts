@@ -44,7 +44,7 @@ describe('normaliseWork', () => {
         { is_oa: false, landing_page_url: 'https://ledger.pitt.edu/1', license: null, version: null, source: { display_name: 'Ledger', type: 'journal' } },
         { is_oa: true, landing_page_url: 'https://arxiv.org/abs/2001.00001v3', version: 'acceptedVersion', license: 'other-oa', source: { display_name: 'arXiv', type: 'repository' } },
       ],
-      grants: [{ funder_display_name: 'ARC', award_id: 'DP1' }],
+      awards: [{ funder_display_name: 'ARC', funder_award_id: 'DP1' }],
     }));
     expect(n.identifiers).toEqual({ doi: '10.1000/paper.1', openalexId: 'W1', arxivId: '2001.00001', handle: null, sourceUrl: null });
     expect(n.venue).toMatchObject({ openalexSourceId: 'S1', name: 'A Journal', venueType: 'journal' });
@@ -54,6 +54,34 @@ describe('normaliseWork', () => {
     expect(n.authors).toEqual([{ openalexAuthorId: 'A5', orcid: '0000-0002-1825-0097', displayName: 'S. Nakamoto', position: 1, rawAffiliation: 'P2P Foundation', isCorresponding: false }]);
     expect(n.abstract).toBe('We study bitcoin');
     expect(n.funders).toEqual([{ name: 'ARC', awardId: 'DP1', source: 'openalex' }]);
+  });
+
+  it('keeps a publisher copy a publisher copy whatever host its PDF is on (gs-25)', () => {
+    const n = normaliseWork(work({
+      locations: [{ is_oa: true, landing_page_url: 'https://doi.org/10.1093/rfs/hhaa113', pdf_url: 'http://www.nber.org/papers/w24877.pdf', version: 'publishedVersion', license: null, source: { display_name: 'Review of Financial Studies', type: 'journal' } }],
+    }));
+    expect(n.locations[0]).toMatchObject({ hostType: 'publisher', version: 'publishedVersion', isOa: true });
+    const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: noRepos, asOf });
+    expect(computeAccessTier(r.locations, 'peer_reviewed').tier).toBe('read_at_source');
+  });
+
+  it('rule 3: the repository\'s record URL replaces one OpenAlex garbled (gs-22)', () => {
+    const garbled = 'http://doi.org/10.1016/j.frl.2021.102016>).';
+    const n = normaliseWork(work({
+      locations: [{ is_oa: false, landing_page_url: garbled, version: 'acceptedVersion', source: { id: 'https://openalex.org/S4306401019', display_name: 'ePrints Soton', type: 'repository' } }],
+    }));
+    expect(n.locations[0].sourceId).toBe('S4306401019');
+    const repos = new Map([[garbled, { version: 'acceptedVersion' as const, isOa: true, licence: null, recordUrl: 'https://eprints.soton.ac.uk/id/eprint/447739', evidence: 'found by DOI search' }]]);
+    const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: repos, asOf });
+    expect(r.locations[0]).toMatchObject({ landingUrl: 'https://eprints.soton.ac.uk/id/eprint/447739', verifiedAtHost: true, isOa: true });
+    expect(computeAccessTier(r.locations, 'peer_reviewed').tier).toBe('read_at_source');
+  });
+
+  it('types a repository copy with a doi.org landing page and a preprint-host PDF as a preprint (gs-37, live shape)', () => {
+    const n = normaliseWork(work({
+      locations: [{ is_oa: true, landing_page_url: 'https://doi.org/10.20944/preprints202108.0555.v1', pdf_url: 'https://www.preprints.org/manuscript/202108.0555/v1/download', version: 'acceptedVersion', license: 'cc-by', source: { display_name: 'Preprints.org', type: 'repository' } }],
+    }));
+    expect(n.locations[0]).toMatchObject({ hostType: 'preprint_server', doi: '10.20944/preprints202108.0555.v1' });
   });
 
   it('recognises preprint hosts and arXiv ids', () => {
@@ -76,7 +104,7 @@ describe('reconcile', () => {
     const unconfirmed = reconcile({ work: n, requestedDoi: null, crossref: null, repository: noRepos, asOf });
     expect(computeAccessTier(unconfirmed.locations, 'peer_reviewed').tier).toBe('metadata_only');
 
-    const repos = new Map([['https://eprints.soton.ac.uk/447739', { version: 'acceptedVersion' as const, isOa: true, licence: null, evidence: 'content: accepted, security: public' }]]);
+    const repos = new Map([['https://eprints.soton.ac.uk/447739', { version: 'acceptedVersion' as const, isOa: true, licence: null, recordUrl: null, evidence: 'content: accepted, security: public' }]]);
     const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: repos, asOf });
     expect(only(r.locations, (l) => l.hostType === 'repository')).toMatchObject({ isOa: true, verifiedAtHost: true, reportedBy: 'repository' });
     expect(r.events).toEqual([expect.objectContaining({ rule: 3 })]);
@@ -96,7 +124,7 @@ describe('reconcile', () => {
     const n = normaliseWork(work({
       locations: [{ is_oa: true, landing_page_url: 'https://eprints.soton.ac.uk/425053', version: 'submittedVersion', source: { display_name: 'Southampton', type: 'repository' } }],
     }));
-    const repos = new Map([['https://eprints.soton.ac.uk/425053', { version: 'acceptedVersion' as const, isOa: true, licence: 'cc-by-nc-nd', evidence: 'content: accepted' }]]);
+    const repos = new Map([['https://eprints.soton.ac.uk/425053', { version: 'acceptedVersion' as const, isOa: true, licence: 'cc-by-nc-nd', recordUrl: null, evidence: 'content: accepted' }]]);
     const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: repos, asOf });
     expect(computeAccessTier(r.locations, 'peer_reviewed')).toEqual({ tier: 'read_at_source', licence: 'cc-by-nc-nd' });
   });
