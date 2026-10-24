@@ -4070,12 +4070,48 @@ export type Database = {
           },
         ]
       }
+      news_item_raw: {
+        Row: {
+          created_at: string
+          extractor_version: string
+          format: string
+          news_item_id: string
+          raw: string
+          raw_chars: number
+        }
+        Insert: {
+          created_at?: string
+          extractor_version: string
+          format: string
+          news_item_id: string
+          raw: string
+          raw_chars: number
+        }
+        Update: {
+          created_at?: string
+          extractor_version?: string
+          format?: string
+          news_item_id?: string
+          raw?: string
+          raw_chars?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_item_raw_news_item_id_fkey"
+            columns: ["news_item_id"]
+            isOneToOne: true
+            referencedRelation: "news_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_items: {
         Row: {
           attachment_count: number
           australian_relevance: boolean
           author: string | null
           body_markdown: string | null
+          body_truncated: boolean
           canonical_url: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at: string
@@ -4112,6 +4148,7 @@ export type Database = {
           australian_relevance?: boolean
           author?: string | null
           body_markdown?: string | null
+          body_truncated?: boolean
           canonical_url?: string | null
           category: Database["public"]["Enums"]["news_category"]
           created_at?: string
@@ -4148,6 +4185,7 @@ export type Database = {
           australian_relevance?: boolean
           author?: string | null
           body_markdown?: string | null
+          body_truncated?: boolean
           canonical_url?: string | null
           category?: Database["public"]["Enums"]["news_category"]
           created_at?: string
@@ -4224,6 +4262,39 @@ export type Database = {
           },
         ]
       }
+      news_items_backfill_snapshot: {
+        Row: {
+          body_markdown: string | null
+          canonical_url: string | null
+          id: string
+          ingestion_ref: string | null
+          relevance_score: number | null
+          snapshot_at: string
+          status: string | null
+          url: string
+        }
+        Insert: {
+          body_markdown?: string | null
+          canonical_url?: string | null
+          id: string
+          ingestion_ref?: string | null
+          relevance_score?: number | null
+          snapshot_at?: string
+          status?: string | null
+          url: string
+        }
+        Update: {
+          body_markdown?: string | null
+          canonical_url?: string | null
+          id?: string
+          ingestion_ref?: string | null
+          relevance_score?: number | null
+          snapshot_at?: string
+          status?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       news_sources: {
         Row: {
           crawl_delay_seconds: number
@@ -4243,6 +4314,9 @@ export type Database = {
           last_scanned_at: string | null
           last_status: string | null
           licence_notes: string | null
+          link_allow_patterns: string[]
+          link_deny_patterns: string[]
+          link_extract_config: Json
           max_backfill_episodes: number
           max_candidates_per_run: number
           max_episode_age_days: number | null
@@ -4281,6 +4355,9 @@ export type Database = {
           last_scanned_at?: string | null
           last_status?: string | null
           licence_notes?: string | null
+          link_allow_patterns?: string[]
+          link_deny_patterns?: string[]
+          link_extract_config?: Json
           max_backfill_episodes?: number
           max_candidates_per_run?: number
           max_episode_age_days?: number | null
@@ -4319,6 +4396,9 @@ export type Database = {
           last_scanned_at?: string | null
           last_status?: string | null
           licence_notes?: string | null
+          link_allow_patterns?: string[]
+          link_deny_patterns?: string[]
+          link_extract_config?: Json
           max_backfill_episodes?: number
           max_candidates_per_run?: number
           max_episode_age_days?: number | null
