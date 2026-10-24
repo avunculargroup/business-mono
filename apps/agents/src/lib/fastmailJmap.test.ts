@@ -298,6 +298,25 @@ describe('FastmailJmapClient', () => {
     expect(id).toBeNull();
   });
 
+  it('queryMailboxPage asks for one page of the folder with its total', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ methodResponses: [['Email/query', { ids: ['e3', 'e4'], total: 1200 }, 'eq']] }),
+        { status: 200 },
+      ),
+    );
+    const client = new FastmailJmapClient('user@example.com', 'tok');
+    const out = await client.queryMailboxPage('acc', 'https://api/', 'mb_research', 250, 2);
+    expect(out).toEqual({ ids: ['e3', 'e4'], total: 1200 });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.methodCalls[0][1]).toMatchObject({
+      filter: { inMailbox: 'mb_research' },
+      position: 250,
+      limit: 2,
+      calculateTotal: true,
+    });
+  });
+
   it('queryEmailIds uses Email/queryChanges when sinceQueryState is provided', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(

@@ -321,7 +321,7 @@ Dispatched by the existing Fastmail polling job when it finds a new unread messa
 
 1. **`validate_sender`** — extract plus-address suffix from `To`; look up `news_sources` by slug; reject if `is_active = false` or not found; check `From` against `sender_allowlist`; reject on `spf=fail` or `dkim=fail` in `Authentication-Results`
 1. **`detect_attachments`** — count attachments; flag any `application/pdf`
-1. **`extract_content`** — HTML → markdown via Turndown; strip footer, unsubscribe links, tracking pixels, “view in browser” prelude, social share buttons; extract title from subject, author from From name, published_at from Date header; best-effort canonical URL from first matching anchor
+1. **`extract_content`** — HTML → markdown in three stages: `cleanEmailHtml` (`apps/agents/src/lib/emailClean.ts`) strips hidden preheaders, image-only and chrome anchors, the unsubscribe footer and layout tables, and reduces tracking-wrapper links to their real URL or their text; Turndown with GFM converts; `normaliseMarkdown` removes spacer characters, empty links, the repeated subject line and repeated lines. The raw body is kept in `news_item_raw`. Title from subject, author from From name, published_at from Date header; canonical URL from the first “view in browser” anchor, unwrapped and de-tracked. See [news-source-email-extraction-spec.md](./news-source-email-extraction-spec.md)
 1. → hand to `processNewsItem`
 1. **Existing polling job** marks message `\Seen` on its own loop after successful dispatch
 

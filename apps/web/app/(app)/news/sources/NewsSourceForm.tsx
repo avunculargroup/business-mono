@@ -32,6 +32,10 @@ export interface NewsSourceFormValues {
   sender_allowlist: string; // textarea: one entry per line
   follow_links: boolean;
   max_followed_links: number;
+  link_allow_patterns: string; // textarea: one pattern per line
+  link_deny_patterns: string; // textarea: one pattern per line
+  link_target_selector: string;
+  link_remove_selector: string;
   // Report-watch fields. Ordered — the first strategy that returns candidates
   // wins and the rest are not run.
   detection_strategies: ReportDetectionStrategy[];
@@ -73,6 +77,10 @@ const DEFAULTS: NewsSourceFormValues = {
   sender_allowlist: '',
   follow_links: false,
   max_followed_links: 5,
+  link_allow_patterns: '',
+  link_deny_patterns: '',
+  link_target_selector: '',
+  link_remove_selector: '',
   detection_strategies: ['index_page'],
   rss_feed_url: '',
   sitemap_url: '',
@@ -429,6 +437,56 @@ export function NewsSourceForm({ initialValues, onSubmit, onCancel, submitting, 
                     across all sources in one poll.
                   </span>
                 </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Only follow links to</span>
+                  <textarea
+                    className={`${styles.input} ${styles.inputMono}`}
+                    rows={2}
+                    value={values.link_allow_patterns}
+                    onChange={(e) => update('link_allow_patterns', e.target.value)}
+                    placeholder="seekingalpha.com/article/"
+                  />
+                  <span className={styles.hint}>
+                    A domain, or a domain and path, one per line. Leave empty to follow any article link.
+                    Checked against where the link really goes, not the newsletter&apos;s tracking address.
+                  </span>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.label}>Never follow links to</span>
+                  <textarea
+                    className={`${styles.input} ${styles.inputMono}`}
+                    rows={2}
+                    value={values.link_deny_patterns}
+                    onChange={(e) => update('link_deny_patterns', e.target.value)}
+                    placeholder={'open.substack.com/pub/pomp/\nevents.example.com'}
+                  />
+                  <span className={styles.hint}>
+                    Same format. Links back to the newsletter&apos;s own site and social profiles are already
+                    skipped.
+                  </span>
+                </label>
+                <div className={styles.fieldRow}>
+                  <label className={styles.field}>
+                    <span className={styles.label}>Article element</span>
+                    <input
+                      className={`${styles.input} ${styles.inputMono}`}
+                      value={values.link_target_selector}
+                      onChange={(e) => update('link_target_selector', e.target.value)}
+                      placeholder="article"
+                    />
+                    <span className={styles.hint}>Optional CSS selector for the story on a cluttered site.</span>
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.label}>Leave out</span>
+                    <input
+                      className={`${styles.input} ${styles.inputMono}`}
+                      value={values.link_remove_selector}
+                      onChange={(e) => update('link_remove_selector', e.target.value)}
+                      placeholder=".newsletter-signup"
+                    />
+                    <span className={styles.hint}>Optional CSS selector for page parts to drop.</span>
+                  </label>
+                </div>
               </>
             )}
           </div>

@@ -1504,6 +1504,10 @@ CREATE TABLE news_sources (
   follow_links              BOOLEAN     NOT NULL DEFAULT false, -- fetch links inside an item as their own news_items
   max_followed_links        INT         NOT NULL DEFAULT 5      -- per-item cap; CHECK 0..20
                               CHECK (max_followed_links >= 0 AND max_followed_links <= 20),
+  -- per-source link-following rules, applied to each link's real URL (migration: 20261024000000)
+  link_allow_patterns       TEXT[]      NOT NULL DEFAULT '{}',  -- host or host+path prefixes; non-empty = must match one
+  link_deny_patterns        TEXT[]      NOT NULL DEFAULT '{}',  -- same syntax; after the global deny lists
+  link_extract_config       JSONB       NOT NULL DEFAULT '{}',  -- Jina options: { targetSelector?, removeSelector? }
   is_active                 BOOLEAN     NOT NULL DEFAULT true,
   last_scanned_at           TIMESTAMPTZ,
   last_status               TEXT        CHECK (last_status IN ('success','failed')),
@@ -1533,6 +1537,7 @@ CREATE TABLE news_items (
   published_at         TIMESTAMPTZ,
   fetched_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   body_markdown        TEXT,
+  body_truncated       BOOLEAN NOT NULL DEFAULT false,  -- the HTML or Jina cap cut the body (migration: 20261024000000)
   summary              TEXT,
   key_points           JSONB NOT NULL DEFAULT '[]'::jsonb,
   category             news_category NOT NULL,
@@ -1562,6 +1567,33 @@ CREATE TABLE news_items (
 CREATE UNIQUE INDEX IF NOT EXISTS news_items_source_ingestion_ref_uniq
   ON news_items (source_id, ingestion_ref) WHERE ingestion_ref IS NOT NULL;
 CREATE INDEX IF NOT EXISTS news_items_source_idx ON news_items (source_id);
+
+-- Email body as received, for re-running extraction as the cleaner improves.
+-- Carries subscriber tokens by nature: team-only, never a subscriber policy,
+-- never a client read model. Email items only — followed links are refetchable.
+-- (migration: 20261024000000; RLS: is_team_member())
+CREATE TABLE news_item_raw (
+  news_item_id      UUID PRIMARY KEY REFERENCES news_items(id) ON DELETE CASCADE,
+  format            TEXT NOT NULL CHECK (format IN ('html', 'text')),
+  raw               TEXT NOT NULL,                -- capped at 1 MB (matches JMAP maxBodyValueBytes)
+  raw_chars         INT  NOT NULL,                -- length before the cap
+  extractor_version TEXT NOT NULL,                -- cleaner that produced the current body_markdown
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Temporary: pre-backfill copy of every news_items row backfillNewsletterContent
+-- changes. Holds the tokens the backfill removes — drop once verified.
+-- (migration: 20261024000000; RLS: is_team_member())
+CREATE TABLE news_items_backfill_snapshot (
+  id              UUID PRIMARY KEY,
+  url             TEXT NOT NULL,
+  canonical_url   TEXT,
+  ingestion_ref   TEXT,
+  body_markdown   TEXT,
+  relevance_score NUMERIC(3,2),
+  status          TEXT,
+  snapshot_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- Publishers behind a hard or metered paywall, edited from /news/sources. A web
 -- article whose host is one of these (or a subdomain) is ingested with

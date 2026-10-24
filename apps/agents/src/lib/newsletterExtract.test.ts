@@ -3,6 +3,7 @@ import TurndownService from 'turndown';
 import {
   getHtmlBody,
   htmlToMarkdown,
+  normaliseMarkdown,
   extractCanonicalUrl,
   synthesizeEmailUrl,
   senderAllowed,
@@ -102,5 +103,37 @@ describe('senderAllowed', () => {
   });
   it('is case-insensitive', () => {
     expect(senderAllowed('News@Gromen.com', ['GROMEN.COM'])).toBe(true);
+  });
+});
+
+describe('normaliseMarkdown', () => {
+  it('removes invisible preheader characters and turns non-breaking spaces into spaces', () => {
+    expect(normaliseMarkdown('A\u034f\u00ad\u200b\u200c\u200d\u2060\ufeff\u2007B\u00a0C')).toBe('AB C');
+  });
+
+  it('removes empty links and image markdown', () => {
+    expect(normaliseMarkdown('[](https://t.example/x) [ ](https://t.example/y)Text ![Image 1: chart](https://cdn/x.png)')).toBe('Text');
+  });
+
+  it('undoes escaping that changes nothing in rendering', () => {
+    expect(normaliseMarkdown('down \\-2.5% in the U\\.S\\. today')).toBe('down -2.5% in the U.S. today');
+  });
+
+  it('keeps escaping that does change rendering', () => {
+    // A leading \- would become a list item; 1\. would become an ordered list.
+    expect(normaliseMarkdown('\\- not a list\n\n2026\\. not a list')).toBe('\\- not a list\n\n2026\\. not a list');
+  });
+
+  it('drops the first line when it only repeats the subject', () => {
+    expect(normaliseMarkdown('\n# Tree Rings — Issue 42!\n\nBody', { subject: 'Tree rings: issue 42' })).toBe('Body');
+    expect(normaliseMarkdown('Intro\n\nTree Rings', { subject: 'Tree Rings' })).toBe('Intro\n\nTree Rings');
+  });
+
+  it('collapses repeated lines, even across blank lines, then blank-line runs', () => {
+    expect(normaliseMarkdown('View in browser\n\nView in browser\n\n\n\nBody\nBody')).toBe('View in browser\n\nBody');
+  });
+
+  it('trims', () => {
+    expect(normaliseMarkdown('  \n\nBody  \n\n')).toBe('Body');
   });
 });

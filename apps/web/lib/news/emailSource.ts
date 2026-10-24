@@ -34,3 +34,16 @@ export function parseSenderAllowlist(raw: string): string[] {
   }
   return [...seen];
 }
+
+/**
+ * Link-following patterns from the form: one per line or comma, scheme and
+ * leading www. dropped (the matcher ignores both), lowercased, deduped.
+ */
+export function parseLinkPatterns(raw: string): string[] {
+  const out: string[] = [];
+  for (const part of raw.split(/[\n,]/)) {
+    const p = part.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+    if (p && !out.includes(p)) out.push(p);
+  }
+  return out;
+}

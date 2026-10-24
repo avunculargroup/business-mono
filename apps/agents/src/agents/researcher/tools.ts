@@ -71,11 +71,12 @@ export const searchWeb = createTool({
 });
 
 // ============================================================
-// fetch_url — Jina Reader (free, no API key)
+// fetch_url — Jina Reader (keyless works; JINA_API_KEY raises the rate limit)
 // ============================================================
 
 // Matches FEED_TIMEOUT_MS in lib/fetchFeed.ts.
 const FETCH_URL_TIMEOUT_MS = 20_000;
+const FETCH_URL_MAX_CHARS = 50_000;
 
 export const fetchUrl = createTool({
   id: 'fetch_url',
@@ -83,9 +84,28 @@ export const fetchUrl = createTool({
     'Fetch and extract clean markdown from any URL using Jina Reader. Preferred over crawl_structured for most cases.',
   inputSchema: z.object({
     url: z.string().url().describe('URL to fetch and extract content from'),
+    target_selector: z
+      .string()
+      .optional()
+      .describe('Optional CSS selector for the article element, for pages with heavy site chrome'),
+    remove_selector: z
+      .string()
+      .optional()
+      .describe('Optional CSS selector for elements to drop before extraction'),
   }),
   execute: async (context) => {
     const jinaUrl = `https://r.jina.ai/${encodeURIComponent(context.url)}`;
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': 'Mozilla/5.0 (compatible; BTSResearcher/1.0)',
+      // Without this Jina keeps an `![Image n: …]` line per image.
+      'X-Retain-Images': 'none',
+    };
+    const apiKey = process.env['JINA_API_KEY'];
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    if (context.target_selector) headers['X-Target-Selector'] = context.target_selector;
+    if (context.remove_selector) headers['X-Remove-Selector'] = context.remove_selector;
 
     // Without a timeout a hung Jina response stalls its caller indefinitely —
     // for the research-mail poll loop that means overlapping poll cycles.
@@ -94,13 +114,7 @@ export const fetchUrl = createTool({
 
     let response: Response;
     try {
-      response = await fetch(jinaUrl, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'Mozilla/5.0 (compatible; BTSResearcher/1.0)',
-        },
-        signal: controller.signal,
-      });
+      response = await fetch(jinaUrl, { headers, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
@@ -117,9 +131,11 @@ export const fetchUrl = createTool({
     };
 
     const title = data.data?.title ?? context.url;
-    const markdown = (data.data?.content ?? '').slice(0, 50000);
-    // Jina fetches server-side and follows redirects, so this is the article's
-    // real address when the input was a newsletter tracking wrapper.
+    const content = data.data?.content ?? '';
+    const markdown = content.slice(0, FETCH_URL_MAX_CHARS);
+    // A hint only: for newsletter tracking wrappers Jina's data.url echoed the
+    // input 99% of the time. Callers that need the real address resolve it
+    // themselves (lib/urlClean.ts resolveRedirect) before fetching.
     const resolved = data.data?.url;
 
     return {
@@ -127,6 +143,7 @@ export const fetchUrl = createTool({
       markdown,
       resolved_url: resolved && /^https?:\/\//i.test(resolved) ? resolved : context.url,
       retrieved_at: new Date().toISOString(),
+      truncated: content.length > FETCH_URL_MAX_CHARS,
     };
   },
 });
