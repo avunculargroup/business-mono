@@ -1,8 +1,9 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { isSubscriberScoped } from '@platform/shared';
 import { CategoryChip } from '@/components/news/CategoryChip';
-import { MarkdownRecordDisplay } from '@/components/company/MarkdownRecordDisplay';
 import { cleanNewsTitle } from '@/lib/news/cleanTitle';
 import { newsOriginalUrl } from '@/lib/news/itemHref';
 import { formatDate } from '@/lib/utils';
@@ -12,10 +13,15 @@ import type { NewsItemDetail as NewsItem } from '@platform/data';
 
 interface NewsItemDetailProps {
   item: NewsItem;
+  /** The body, rendered by the server page with ArticleMarkdown; null when none was stored. */
+  body: ReactNode;
 }
 
-export function NewsItemDetail({ item }: NewsItemDetailProps) {
-  const original = newsOriginalUrl(item.url, item.canonicalUrl);
+export function NewsItemDetail({ item, body }: NewsItemDetailProps) {
+  const link = newsOriginalUrl(item.url, item.canonicalUrl);
+  // A tracking wrapper or tokened URL would register the click as BTS's paid
+  // subscription. Ingest no longer stores them; rows from before it did may.
+  const original = link && !isSubscriberScoped(link) ? link : null;
 
   return (
     <div className={styles.container}>
@@ -63,10 +69,8 @@ export function NewsItemDetail({ item }: NewsItemDetailProps) {
         </div>
       )}
 
-      {item.bodyMarkdown ? (
-        <div className={styles.body}>
-          <MarkdownRecordDisplay content={item.bodyMarkdown} />
-        </div>
+      {body ? (
+        <div className={styles.body}>{body}</div>
       ) : (
         <p className={styles.muted}>
           {item.report

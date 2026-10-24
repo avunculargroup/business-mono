@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugify, computeInboundAddress, parseSenderAllowlist } from './emailSource';
+import { slugify, computeInboundAddress, parseSenderAllowlist, parseLinkPatterns } from './emailSource';
 
 describe('slugify', () => {
   it('lowercases, hyphenates, and trims to a safe slug', () => {
@@ -30,5 +30,18 @@ describe('parseSenderAllowlist', () => {
   });
   it('returns [] for empty input', () => {
     expect(parseSenderAllowlist('')).toEqual([]);
+  });
+});
+
+describe('parseLinkPatterns', () => {
+  it('splits on lines and commas, drops scheme and www., lowercases and dedupes', () => {
+    expect(parseLinkPatterns('https://www.SeekingAlpha.com/article/\n seekingalpha.com/article/ ,events.example.com\n\n')).toEqual([
+      'seekingalpha.com/article/',
+      'events.example.com',
+    ]);
+  });
+
+  it('returns nothing for an empty field', () => {
+    expect(parseLinkPatterns('  \n ')).toEqual([]);
   });
 });

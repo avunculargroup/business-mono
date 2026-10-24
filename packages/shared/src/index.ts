@@ -15,3 +15,4 @@ export * from './reportWatch.js';
 export * from './prepare.js';
 export * from './complianceDocument.js';
 export * from './papers.js';
+export * from './newsUrl.js';

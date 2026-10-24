@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NotFoundError } from '@platform/data';
@@ -24,8 +25,10 @@ vi.mock('@/lib/repositories', () => ({
 }));
 
 vi.mock('./NewsItemDetail', () => ({
-  NewsItemDetail: ({ item }: { item: { title: string; sourceName: string } }) => (
-    <div data-testid="news-detail" data-title={item.title} data-source={item.sourceName} />
+  NewsItemDetail: ({ item, body }: { item: { title: string; sourceName: string }; body: ReactNode }) => (
+    <div data-testid="news-detail" data-title={item.title} data-source={item.sourceName}>
+      {body}
+    </div>
   ),
 }));
 
@@ -51,6 +54,28 @@ describe('NewsItemPage', () => {
     const detail = screen.getByTestId('news-detail');
     expect(detail).toHaveAttribute('data-title', 'Tree Rings — Issue 42');
     expect(detail).toHaveAttribute('data-source', 'Gromen Tree Rings');
+  });
+
+  it('renders the body on the server with ArticleMarkdown and hands it to the detail view', async () => {
+    repositories = createFakeRepositories({
+      newsItem: fakeNewsItemDetail({
+        bodyMarkdown: '# Issue heading\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n<script>x()</script>',
+      }),
+    });
+
+    const { container } = render(await NewsItemPage({ params: Promise.resolve({ id: 'item-9' }) }));
+
+    const detail = screen.getByTestId('news-detail');
+    // Stepped down: the article's h1 never competes with the page title.
+    expect(screen.getByRole('heading', { level: 2, name: 'Issue heading' })).toBeInTheDocument();
+    expect(detail.querySelector('table')).not.toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+  });
+
+  it('hands over no body when none was stored', async () => {
+    repositories = createFakeRepositories({ newsItem: fakeNewsItemDetail({ bodyMarkdown: null }) });
+    render(await NewsItemPage({ params: Promise.resolve({ id: 'item-9' }) }));
+    expect(screen.getByTestId('news-detail')).toBeEmptyDOMElement();
   });
 
   it('titles the page by whether the item carries a report', async () => {

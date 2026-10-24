@@ -19,7 +19,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@platform/shared": "workspace:*"
+    "@platform/shared": "workspace:*",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
   },
   "peerDependencies": {
     "lucide-react": "^0.460.0",

@@ -18,7 +18,7 @@
  */
 
 import { supabase } from '@platform/db';
-import type { NewsCategory } from '@platform/shared';
+import type { NewsCategory, NewsLinkExtractConfig } from '@platform/shared';
 import {
   FastmailJmapClient,
   extractBody,
@@ -29,14 +29,19 @@ import {
   attachmentCount,
   type JmapEmail,
 } from '../lib/fastmailJmap.js';
+import { isSubscriberScoped } from '@platform/shared';
 import {
   getHtmlBody,
   htmlToMarkdown,
+  normaliseMarkdown,
   extractCanonicalUrl,
   synthesizeEmailUrl,
   senderAllowed,
+  MAX_HTML_CHARS,
+  EMAIL_EXTRACTOR_VERSION,
 } from '../lib/newsletterExtract.js';
-import { extractNewsletterLinks } from '../lib/newsletterLinks.js';
+import { extractNewsletterLinks, linkDenyReason, type NewsletterLink } from '../lib/newsletterLinks.js';
+import { cleanUrl, dedupKey, resolveRedirect, stripTrackingParams } from '../lib/urlClean.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
 import { resolvePaywalled } from '../lib/paywalledDomains.js';
@@ -63,6 +68,9 @@ const MIN_FOLLOWED_BODY_CHARS = 1000;
 const LINK_EXTRACT_SCOPE = 'newsletterLinks.extract';
 const LINK_RUBRIC_SCOPE = 'newsletterLinks.rubric_score';
 
+// news_item_raw.raw cap — matches the JMAP maxBodyValueBytes request.
+const MAX_RAW_CHARS = 1_048_576;
+
 export interface EmailSource {
   id: string;
   name: string;
@@ -71,6 +79,9 @@ export interface EmailSource {
   sender_allowlist: string[];
   follow_links: boolean;
   max_followed_links: number;
+  link_allow_patterns?: string[];
+  link_deny_patterns?: string[];
+  link_extract_config?: NewsLinkExtractConfig | null;
 }
 
 /** Mutable per-poll-cycle allowance, shared across accounts and sources. */
@@ -124,7 +135,9 @@ async function runPollCycle(): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase
         .from('news_sources')
-        .select('id, name, slug, tier, sender_allowlist, follow_links, max_followed_links, is_active, source_type')
+        .select(
+          'id, name, slug, tier, sender_allowlist, follow_links, max_followed_links, link_allow_patterns, link_deny_patterns, link_extract_config, is_active, source_type',
+        )
         .eq('source_type' as any, 'email')
         .eq('is_active', true) as any),
     ]);
@@ -264,17 +277,19 @@ export async function processResearchEmail(
     return { status: 'skipped', reason: 'auth_fail' };
   }
 
-  // 3. Content: HTML → markdown (chrome stripped), or plain-text fallback.
+  // 3. Content: HTML → markdown (template stripped), or plain-text fallback.
+  const title = email.subject?.trim() || '(untitled newsletter)';
   const html = getHtmlBody(email);
-  const body = html ? htmlToMarkdown(html) : extractBody(email);
+  const plain = html ? null : extractBody(email);
+  const body = html ? htmlToMarkdown(html, { subject: title }) : normaliseMarkdown(plain ?? '', { subject: title });
   if (!body.trim()) return { status: 'skipped', reason: 'empty_body' };
 
-  const title = email.subject?.trim() || '(untitled newsletter)';
   const author = email.from?.[0]?.name?.trim() || fromEmail || null;
   const messageId = getMessageId(email);
   // Idempotency key: Message-ID when present, else a stable composite.
   const ingestionRef = messageId ?? `${slug}:${email.receivedAt}:${title}`;
-  const canonicalUrl = html ? extractCanonicalUrl(html) : null;
+  const rawCanonical = html ? extractCanonicalUrl(html) : null;
+  const canonicalUrl = rawCanonical ? await cleanUrl(rawCanonical) : null;
   // url stays synthetic + deterministic per message (canonical link lives in
   // canonical_url) so news_items.url never collides on a shared "view online" base.
   const url = synthesizeEmailUrl(slug, ingestionRef);
@@ -304,10 +319,16 @@ export async function processResearchEmail(
     hasPdfAttachment: hasPdfAttachment(email),
     attachmentCount: attachmentCount(email),
     ingestedBy: 'rex',
+    bodyTruncated: html ? html.length > MAX_HTML_CHARS : false,
   });
 
   if (result.status === 'duplicate') return { status: 'duplicate', reason: result.reason };
   if (result.status === 'failed') return { status: 'skipped', reason: `ingest_failed:${result.reason ?? 'unknown'}` };
+
+  // Keep the raw body so extraction can be re-run as the cleaner improves.
+  if (result.newsItemId) {
+    await storeRawBody(result.newsItemId, html ? 'html' : 'text', html ?? plain ?? '');
+  }
 
   // 5. Follow the links in the body, when the source opts in. Only on a fresh
   //    insert — a re-delivered newsletter would otherwise pay for N fetches and
@@ -320,6 +341,7 @@ export async function processResearchEmail(
       parentNewsItemId: result.newsItemId,
       parentIngestionRef: ingestionRef,
       excludeUrls: [url, canonicalUrl].filter((u): u is string => Boolean(u)),
+      selfHosts: [fromEmail.split('@')[1], hostOf(canonicalUrl)].filter((h): h is string => Boolean(h)),
       budget: budget ?? { remaining: MAX_FOLLOWED_LINKS_PER_CYCLE },
     });
   }
@@ -332,15 +354,72 @@ export async function processResearchEmail(
   };
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function hostOf(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes the email body as received to news_item_raw. Team-only by RLS; it
+ * carries subscriber tokens by nature. A failure is logged, never fatal — the
+ * item itself is already stored.
+ */
+async function storeRawBody(newsItemId: string, format: 'html' | 'text', raw: string): Promise<void> {
+  const { error } = await supabase
+    // news_item_raw lands in the generated types on the next regen.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from('news_item_raw' as any)
+    .insert({
+      news_item_id: newsItemId,
+      format,
+      raw: raw.slice(0, MAX_RAW_CHARS),
+      raw_chars: raw.length,
+      extractor_version: EMAIL_EXTRACTOR_VERSION,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  if (error) log.warn({ err: error, newsItemId }, 'raw body not stored');
+}
+
 // ── Follow the links inside a newsletter ────────────────────────────────────────
+
+/** A candidate that survived resolution, filtering and dedup. */
+interface FollowableLink {
+  url: string;
+  anchorText: string;
+}
+
+/**
+ * The real URL for a candidate, or null. Encodable wrappers were already
+ * decoded by extractNewsletterLinks; opaque ones cost one redirect request
+ * here — the only request made before a link is known to be wanted.
+ */
+async function realUrlOf(link: NewsletterLink): Promise<string | null> {
+  if (!link.wrapped) return link.url;
+  const resolved = await resolveRedirect(link.url);
+  return resolved ? stripTrackingParams(resolved) : null;
+}
+
+async function alreadyStored(url: string): Promise<boolean> {
+  const { data } = await supabase.from('news_items').select('id').eq('url', url).limit(1);
+  return Boolean(data && data.length > 0);
+}
 
 /**
  * Fetches each substantive link in a newsletter and ingests it as its own
- * news_items row. Sequential by design: every link is two serialised LLM calls
- * regardless, and concurrency would risk Jina's unauthenticated rate limit.
+ * news_items row. Everything that costs nothing runs first, in document order,
+ * until the cap is met: resolve the real URL, filter on it, dedupe within the
+ * issue and against news_items. Only then is a Jina fetch or an LLM call spent,
+ * always on the real URL — a link that cannot be resolved is skipped, never
+ * stored. Sequential by design: every link is two serialised LLM calls
+ * regardless, and concurrency would risk Jina's rate limit.
  *
- * Children carry `{parentRef}#link:{url}` as their ingestion_ref — unique per
- * source_id, so a re-delivered issue is deduped before any spend — and the
+ * Children carry `{parentRef}#link:{realUrl}` as their ingestion_ref and the
  * parent id in rex_metadata for queryability.
  */
 export async function ingestNewsletterLinks(args: {
@@ -349,6 +428,8 @@ export async function ingestNewsletterLinks(args: {
   parentNewsItemId: string;
   parentIngestionRef: string;
   excludeUrls: string[];
+  /** The newsletter's own hosts — sender domain, canonical_url host. */
+  selfHosts?: string[];
   budget: LinkBudget;
 }): Promise<{ ingested: number; skipped: number }> {
   const { html, source, parentNewsItemId, parentIngestionRef, excludeUrls, budget } = args;
@@ -359,41 +440,77 @@ export async function ingestNewsletterLinks(args: {
     return { ingested: 0, skipped: 0 };
   }
 
-  const links = extractNewsletterLinks(html, { max, excludeUrls });
-  let ingested = 0;
+  const rules = {
+    selfHosts: args.selfHosts ?? [],
+    allowPatterns: source.link_allow_patterns ?? [],
+    denyPatterns: source.link_deny_patterns ?? [],
+  };
+  const seen = new Set<string>(excludeUrls.map(dedupKey).filter((k): k is string => Boolean(k)));
+
+  // 1–7: resolve, filter, dedupe, cap. No spend.
+  const chosen: FollowableLink[] = [];
   let skipped = 0;
-
-  for (const link of links) {
-    if (budget.remaining <= 0) {
-      log.warn({ source: source.name }, 'link budget exhausted mid-newsletter');
-      break;
+  for (const link of extractNewsletterLinks(html, { excludeUrls })) {
+    if (chosen.length >= max) break;
+    const url = await realUrlOf(link);
+    if (!url) {
+      log.info({ source: source.name, host: hostOf(link.url) }, 'link skipped — unresolvable');
+      continue;
     }
-    budget.remaining -= 1;
-
     // Every candidate is logged so the deny-lists can be tuned from real
-    // newsletters rather than guesses.
-    log.info({ source: source.name, url: link.url }, 'following newsletter link');
+    // newsletters rather than guesses. The real URL only: never the wrapper.
+    const denied = linkDenyReason(url, rules);
+    if (denied) {
+      log.info({ source: source.name, url, reason: denied }, 'link skipped — denied');
+      continue;
+    }
+    const key = dedupKey(url);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (await alreadyStored(url)) {
+      log.info({ source: source.name, url }, 'link skipped — already stored');
+      continue;
+    }
+    chosen.push({ url, anchorText: link.anchorText });
+  }
+  budget.remaining -= chosen.length;
+
+  // 8–10: fetch, normalise, extract and ingest. Spend.
+  let ingested = 0;
+  const extractConfig = source.link_extract_config ?? {};
+  for (const link of chosen) {
+    const { url } = link;
+    // The last line of defence: nothing subscriber-scoped reaches news_items.
+    if (isSubscriberScoped(url)) {
+      skipped += 1;
+      log.warn({ host: hostOf(url) }, 'link skipped — subscriber-scoped url survived cleaning');
+      continue;
+    }
+    log.info({ source: source.name, url }, 'following newsletter link');
 
     try {
-      const fetched = (await fetchUrl.execute!({ url: link.url } as never, {} as never)) as
-        | { title?: string; markdown?: string; resolved_url?: string }
-        | undefined;
+      const fetched = (await fetchUrl.execute!(
+        {
+          url,
+          ...(extractConfig.targetSelector ? { target_selector: extractConfig.targetSelector } : {}),
+          ...(extractConfig.removeSelector ? { remove_selector: extractConfig.removeSelector } : {}),
+        } as never,
+        {} as never,
+      )) as { title?: string; markdown?: string; truncated?: boolean } | undefined;
 
-      const markdown = fetched?.markdown?.trim() ?? '';
+      const markdown = normaliseMarkdown(fetched?.markdown ?? '');
       if (markdown.length < MIN_FOLLOWED_BODY_CHARS) {
         skipped += 1;
-        log.info({ url: link.url, chars: markdown.length }, 'link skipped — body too short');
+        log.info({ url, chars: markdown.length }, 'link skipped — body too short');
         continue;
       }
       if (isPaywallStub(markdown)) {
         skipped += 1;
-        log.info({ url: link.url }, 'link skipped — paywall stub');
+        log.info({ url }, 'link skipped — paywall stub');
         continue;
       }
 
-      // Jina follows redirects server-side, so this unwraps tracking wrappers.
-      const url = fetched?.resolved_url ?? link.url;
-      const title = fetched?.title?.trim() || link.anchorText || link.url;
+      const title = fetched?.title?.trim() || link.anchorText || url;
       const page = await fetchPageMeta(url);
       const imageUrl = page.imageUrl;
       const paywalled = await resolvePaywalled({ url, page: page.paywalled, body: markdown });
@@ -418,7 +535,7 @@ export async function ingestNewsletterLinks(args: {
         url,
         imageUrl,
         paywalled,
-        ingestionRef: `${parentIngestionRef}#link:${link.url}`,
+        ingestionRef: `${parentIngestionRef}#link:${url}`,
         ingestedBy: 'rex',
         rubricScopeKey: LINK_RUBRIC_SCOPE,
         rexMetadataExtra: {
@@ -426,6 +543,7 @@ export async function ingestNewsletterLinks(args: {
           from_newsletter_anchor_text: link.anchorText || null,
         },
         status: extracted ? 'new' : 'extraction_failed',
+        bodyTruncated: fetched?.truncated ?? false,
       });
 
       if (result.status === 'inserted') {
@@ -437,7 +555,7 @@ export async function ingestNewsletterLinks(args: {
       }
     } catch (err) {
       skipped += 1;
-      log.warn({ err, url: link.url }, 'link failed — skipping');
+      log.warn({ err, url }, 'link failed — skipping');
     }
   }
 

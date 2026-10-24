@@ -62,6 +62,8 @@ export interface IngestNewsItemInput {
   rexMetadataExtra?: Record<string, unknown>;
   /** Model scope key for the rubric call, so an ingestion path can be configured separately. */
   rubricScopeKey?: string;
+  /** Set when the HTML or Jina cap cut the body (news_items.body_truncated). */
+  bodyTruncated?: boolean;
 }
 
 export type IngestStatus = 'inserted' | 'duplicate' | 'failed';
@@ -170,6 +172,7 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     author: input.author ?? null,
     published_at: input.publishedAt,
     body_markdown: input.body,
+    body_truncated: input.bodyTruncated ?? false,
     summary: scored?.summary ?? input.fallbackSummary,
     key_points: input.keyPoints,
     topic_tags: mergeTopics(input.topicTags, scored?.topics ?? []),

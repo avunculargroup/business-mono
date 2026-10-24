@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { resolveFeedUrl } from '@platform/shared';
 import { validateFeedUrl } from '@/lib/news/validateFeed';
-import { slugify, computeInboundAddress, parseSenderAllowlist } from '@/lib/news/emailSource';
+import { slugify, computeInboundAddress, parseSenderAllowlist, parseLinkPatterns } from '@/lib/news/emailSource';
 import { formBoolean } from '@/lib/formBoolean';
 import { humanizeError } from '@/lib/errors';
 import { normalizePaywalledDomain } from '@/lib/news/paywalledDomain';
@@ -37,6 +37,11 @@ const schema = z.object({
   sender_allowlist: z.string().optional().default(''),
   follow_links: formBoolean(false),
   max_followed_links: z.coerce.number().int().min(0).max(20).optional().default(5),
+  // Newline/comma-separated host or host-plus-path prefixes.
+  link_allow_patterns: z.string().optional().default(''),
+  link_deny_patterns: z.string().optional().default(''),
+  link_target_selector: z.string().trim().max(200).optional().default(''),
+  link_remove_selector: z.string().trim().max(200).optional().default(''),
   // Report-watch fields. detection_config arrives as a JSON string from the
   // form: the three strategies share almost nothing structurally, so a flat set
   // of form fields would need one input per strategy per key.
@@ -147,6 +152,12 @@ function buildRow(input: SourceInput, feedUrl: string | null): Record<string, un
       relevance_threshold: input.relevance_threshold,
       follow_links: input.follow_links,
       max_followed_links: input.max_followed_links,
+      link_allow_patterns: parseLinkPatterns(input.link_allow_patterns),
+      link_deny_patterns: parseLinkPatterns(input.link_deny_patterns),
+      link_extract_config: {
+        ...(input.link_target_selector ? { targetSelector: input.link_target_selector } : {}),
+        ...(input.link_remove_selector ? { removeSelector: input.link_remove_selector } : {}),
+      },
     };
   }
   if (input.source_type === 'report_watch') {
