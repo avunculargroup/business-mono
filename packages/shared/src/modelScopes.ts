@@ -242,6 +242,17 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     fallbackAgent: 'editor',
   },
 
+  // ── Library papers workflow steps ─────────────────────────────────────────
+  {
+    key: 'paperResolve.confirm_relevance',
+    type: 'workflow_step',
+    label: 'Confirm paper relevance',
+    description:
+      'Rex confirms how central bitcoin is to a paper (core, substantial, peripheral, excluded) from its title and abstract, after a deterministic first pass',
+    workflow: 'paperResolve',
+    fallbackAgent: 'rex',
+  },
+
   // ── Corporate research ingest workflow steps ──────────────────────────────
   {
     key: 'researchIngest.extract_events',

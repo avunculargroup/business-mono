@@ -134,6 +134,7 @@ describe('RoutineForm — action type coverage', () => {
     ['market_report', {}],
     ['report_watch_scan', {}],
     ['research_ingest', {}],
+    ['paper_watch', { max_resolve_per_run: 100 }],
   ] as const)('shows %s as the selected type and saves it unchanged', async (actionType, config) => {
     const onSubmit = renderForm(
       routine({ action_type: actionType, action_config: { ...config } }),

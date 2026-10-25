@@ -197,6 +197,13 @@ const FIXTURES: Fixture[] = [
     expected: {},
   },
   {
+    name: 'Daily library papers watch',
+    agent_name: 'rex',
+    action_type: 'paper_watch',
+    stored: { max_resolve_per_run: 100 },
+    expected: { max_resolve_per_run: 100 },
+  },
+  {
     name: 'Social posts — Carolyn Crawford',
     agent_name: 'charlie',
     action_type: 'social_post_from_news',

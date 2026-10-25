@@ -20,6 +20,7 @@ import { pruneStorageWorkflow } from '../workflows/pruneStorageWorkflow.js';
 import { ecosystemScanWorkflow } from '../workflows/ecosystemScanWorkflow.js';
 import { newsletterWorkflow } from '../workflows/newsletter/index.js';
 import { researchIngestWorkflow } from '../workflows/researchIngest/index.js';
+import { paperResolveWorkflow } from '../workflows/papers/resolve.js';
 import { variantWorkflow } from '../workflows/variant/index.js';
 import { strategyWorkflow } from '../workflows/strategy/index.js';
 import { handleTelnyxWebhook } from '../webhooks/telnyx.js';
@@ -184,6 +185,7 @@ export const mastra = new Mastra({
     ecosystemScan: ecosystemScanWorkflow,
     newsletter: newsletterWorkflow,
     researchIngest: researchIngestWorkflow,
+    paperResolve: paperResolveWorkflow,
     variant: variantWorkflow,
     strategy: strategyWorkflow,
   },

@@ -15,7 +15,8 @@
     "test:eval": "vitest run --config vitest.eval.config.ts",
     "seed:voice": "tsx src/seeds/seedVoice.ts",
     "backfill:rechunk": "tsx src/scripts/rechunkTranscripts.ts",
-    "backfill:newsletter": "tsx src/scripts/backfillNewsletterContent.ts"
+    "backfill:newsletter": "tsx src/scripts/backfillNewsletterContent.ts",
+    "backfill:papers": "tsx src/scripts/paperBackfill.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.24",

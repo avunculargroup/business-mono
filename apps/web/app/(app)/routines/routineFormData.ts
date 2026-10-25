@@ -79,6 +79,9 @@ export function valuesToFormData(v: RoutineFormValues): FormData {
     case 'report_watch_scan':
       fd.set('max_acquisitions_per_run', String(cfg['max_acquisitions_per_run'] ?? 10));
       break;
+    case 'paper_watch':
+      fd.set('max_resolve_per_run', String(cfg['max_resolve_per_run'] ?? 100));
+      break;
     case 'market_report':
     case 'research_ingest':
       break;

@@ -59,6 +59,7 @@ export const RoutineActionType = {
   MARKET_REPORT:         'market_report',
   REPORT_WATCH_SCAN:     'report_watch_scan',
   RESEARCH_INGEST:       'research_ingest',
+  PAPER_WATCH:           'paper_watch',
 } as const;
 export type RoutineActionType = (typeof RoutineActionType)[keyof typeof RoutineActionType];
 
@@ -79,6 +80,7 @@ export const ROUTINE_ACTION_LABELS: Record<RoutineActionType, string> = {
   market_report:         'Market report',
   report_watch_scan:     'Report watch scan',
   research_ingest:       'Corporate research ingest',
+  paper_watch:           'Library papers watch',
 };
 
 export const RoutineStatus = {
@@ -348,6 +350,31 @@ export interface ResearchIngestRoutineResult {
   link_label: string;
 }
 
+// action_config shape for a 'paper_watch' routine. Runs every active
+// paper_watches query from its high-water mark and resolves each new work
+// (apps/agents/src/workflows/papers/watch.ts). The one knob bounds a run's cost:
+// each resolve is a Crossref lookup and, for anything not clearly excluded, a
+// Rex call. Works over the budget wait for the next run.
+export interface PaperWatchConfig {
+  max_resolve_per_run?: number; // default 100
+}
+
+// Structured payload persisted under routines.last_result.metadata for paper_watch.
+export interface PaperWatchRoutineResult {
+  watches_run: number;
+  works_seen: number;
+  /** Works the register did not hold. */
+  new_works: number;
+  resolved: number;
+  /** Resolved works Rex (or the band) put at core or substantial. */
+  promoted: number;
+  failed: number;
+  /** New works left for the next run, on the page the budget ran out on. */
+  deferred: number;
+  /** Watches of a type with no runner yet (crossref_query, arxiv_category). */
+  skipped_watches: string[];
+}
+
 export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.RESEARCH_DIGEST } & ResearchDigestConfig)
   | ({ action_type: typeof RoutineActionType.MONITOR_CHANGE } & MonitorChangeConfig)
@@ -359,7 +386,8 @@ export type RoutineActionConfig =
   | ({ action_type: typeof RoutineActionType.SOCIAL_POST_FROM_NEWS } & SocialPostFromNewsConfig)
   | ({ action_type: typeof RoutineActionType.MARKET_REPORT } & MarketReportConfig)
   | ({ action_type: typeof RoutineActionType.REPORT_WATCH_SCAN } & ReportWatchScanConfig)
-  | ({ action_type: typeof RoutineActionType.RESEARCH_INGEST } & ResearchIngestConfig);
+  | ({ action_type: typeof RoutineActionType.RESEARCH_INGEST } & ResearchIngestConfig)
+  | ({ action_type: typeof RoutineActionType.PAPER_WATCH } & PaperWatchConfig);
 
 // Shape persisted in routines.last_result. Action-agnostic so the dashboard tile
 // can render any routine's output uniformly.

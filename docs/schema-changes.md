@@ -40,6 +40,20 @@ on realtime and a ~150 KB blob would ride every change event. Team-only RLS thro
 
 ---
 
+## 2026-10-19 — Minute library papers: resolve commit and the daily watch
+
+`20261025000000_paper_resolve.sql` adds `commit_paper_resolve(payload)`. The function writes
+one paperResolve result in one transaction: the paper, its venue, copies, authors, the
+published-version edge for a draft, notices and reconciliation verdicts. It deduplicates on
+DOI, then OpenAlex ID, arXiv ID, handle and URL, and never on a title. A re-run updates
+metadata and copies but reclassifies only a `candidate` without an override, and it never
+un-retracts a paper. The function is invoker-rights, revoked from `anon` and
+`authenticated`, and granted to `service_role`. The migration also adds `paper_watch` to
+`routines.action_type`, seeds the daily watch routine inactive, and seeds the default "bitcoin
+in title or abstract" watch. Why: `docs/features/client-app/library-papers-build-progress.md`.
+
+---
+
 ## 2026-10-18 — Minute library: peer-reviewed papers (data layer)
 
 `20261018100000_library_papers.sql` adds the twelve `paper_*` tables behind `/library/papers`,

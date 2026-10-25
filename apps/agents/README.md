@@ -40,7 +40,9 @@ src/
   mastra/          # The Mastra instance — agent, workflow and API-route registration
   observability/   # Exporter wiring + span processors (agent_activity mirror, trace recorder)
   seeds/           # One-off seed scripts (seed:voice)
-  scripts/         # One-off backfills (backfill:rechunk — turn-aware transcript re-chunk; backfill:newsletter — newsletter body and link clean)
+  scripts/         # One-off backfills (backfill:rechunk — turn-aware transcript re-chunk;
+                   #   backfill:newsletter — newsletter body and link clean;
+                   #   backfill:papers — seed the library papers register)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
 ```
@@ -56,7 +58,8 @@ kinds live here, and the difference trips people up:
 
 - *Registered* workflows are on the Mastra instance in `src/mastra/index.ts` and can be
   triggered by the scheduler or by a tool: `recorder`, `pm`, `executeRoutine`,
-  `pruneStorage`, `ecosystemScan`, `newsletter`, `researchIngest`, `strategy`, `variant`.
+  `pruneStorage`, `ecosystemScan`, `newsletter`, `researchIngest`, `paperResolve`, `strategy`,
+  `variant`.
 - *Unregistered* workflow modules are plain functions that routines and listeners call
   directly — the news pipeline (`ingestNewsItem`, `newsCuration*`, `newsDedup`,
   `newsRelevance`, `newsRubric`), `podcastIntel/`, `libraryAnswer/`, `socialPost/`. They
@@ -65,6 +68,43 @@ kinds live here, and the difference trips people up:
 
 **Listener** — a long-lived loop started at boot. Either a poll (Signal, JMAP) or a
 Supabase Realtime subscription.
+
+### `papers/` — the library papers register
+
+`src/workflows/papers/`. Finds peer-reviewed bitcoin research and resolves each work into
+the `papers` register behind Minute's `/library/papers`. Spec:
+[`library-papers-spec.md`](../../docs/features/client-app/library-papers-spec.md); build
+notes and decisions:
+[`library-papers-build-progress.md`](../../docs/features/client-app/library-papers-build-progress.md).
+
+- **`paperResolve`** (registered, and `resolvePaper()` called directly by the watch): OpenAlex
+  → Crossref → repository confirmation → the six source reconciliation rules → peer-review
+  status → a deterministic relevance band → **Rex confirms the tier** (scope
+  `paperResolve.confirm_relevance`, skipped for a clear exclude) → one
+  `commit_paper_resolve` RPC. The access tier is never computed here: the database derives
+  it from the copies written.
+- **`paper_watch` routine** (`watch.ts`, daily, seeded inactive): runs every active
+  `paper_watches` query from its high-water mark, resolves only works the register does not
+  hold, and stops at `max_resolve_per_run`. A run that defers or fails anything leaves the
+  mark where it was. `crossref_query` and `arxiv_category` watches have no runner yet and are
+  reported as skipped.
+- **`backfill:papers`** (`src/scripts/paperBackfill.ts`): the same watch with no high-water
+  mark, resumable, with `--no-rex` for a cheap first pass.
+
+Four things are load-bearing:
+
+- **OpenAlex is the index, not the authority.** `reconcile.ts` corrects it before anything is
+  written, and logs each correction as a `reconciled` event with its rule. Licences come only
+  from OpenAlex, the publisher's Crossref deposit and the repository's own record, never from
+  a web page (rule 6).
+- **Nothing is matched on a title** (rule 5). No identifier, no resolve.
+- **A draft is always its own record** (rule 4), committed after its published version so the
+  `published_version_of` edge has something to point at.
+- **`accessTier.ts` is a mirror for the eval, not a source of truth.** It and the SQL are both
+  checked against the golden set; change one and the other's test goes red.
+
+Needs `OPENALEX_API_KEY`. `evals/library-papers.eval.ts` runs the golden set against the real
+APIs and Rex (network required).
 
 ### `researchIngest` — the corporate research pipeline
 
