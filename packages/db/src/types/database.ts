@@ -10217,6 +10217,7 @@ export type Database = {
           full_name: string
         }[]
       }
+      commit_paper_resolve: { Args: { payload: Json }; Returns: string }
       commit_research_ingest: { Args: { payload: Json }; Returns: Json }
       compute_pipeline_validation: {
         Args: { pain_point_uuid: string }
