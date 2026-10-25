@@ -1,19 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { extractNewsletterLinks } from './newsletterLinks.js';
+import { extractNewsletterLinks, linkDenyReason } from './newsletterLinks.js';
 
 /** Anchor with readable text — the shape a real story link takes. */
 function a(href: string, text = 'A substantive headline'): string {
   return `<a href="${href}">${text}</a>`;
 }
 
-const MANY = { max: 50 };
+const MANY = {};
+
+const b64 = (v: string) => Buffer.from(v).toString('base64');
 
 describe('extractNewsletterLinks', () => {
   it('keeps substantive article links in document order', () => {
     const html = a('https://afr.com/first', 'RBA holds') + a('https://wsj.com/second', 'Fed pivots');
     expect(extractNewsletterLinks(html, MANY)).toEqual([
-      { url: 'https://afr.com/first', anchorText: 'RBA holds' },
-      { url: 'https://wsj.com/second', anchorText: 'Fed pivots' },
+      { url: 'https://afr.com/first', anchorText: 'RBA holds', wrapped: false },
+      { url: 'https://wsj.com/second', anchorText: 'Fed pivots', wrapped: false },
     ]);
   });
 
@@ -61,14 +63,14 @@ describe('extractNewsletterLinks', () => {
     expect(extractNewsletterLinks(html, MANY).map((l) => l.url)).toEqual(['https://afr.com/keep']);
   });
 
-  it('keeps mailchimp track/click but drops its chrome paths', () => {
+  it('keeps mailchimp track/click as a wrapped link but drops its chrome paths', () => {
     const html =
       a('https://pub.us1.list-manage.com/track/click?u=1&amp;id=2', 'The real article') +
       a('https://pub.us1.list-manage.com/unsubscribe?u=1', 'Opt out') +
       a('https://pub.us1.list-manage.com/vcard?u=1', 'Add to address book') +
       a('https://pub.us1.list-manage.com/track/open?u=1', 'x');
-    expect(extractNewsletterLinks(html, MANY).map((l) => l.url)).toEqual([
-      'https://pub.us1.list-manage.com/track/click?u=1&id=2',
+    expect(extractNewsletterLinks(html, MANY)).toEqual([
+      { url: 'https://pub.us1.list-manage.com/track/click?u=1&id=2', anchorText: 'The real article', wrapped: true },
     ]);
   });
 
@@ -88,22 +90,9 @@ describe('extractNewsletterLinks', () => {
   it('never follows the parent item own urls', () => {
     const html = a('https://pub.example/issue/42', 'View online copy') + a('https://afr.com/keep');
     const links = extractNewsletterLinks(html, {
-      max: 50,
       excludeUrls: ['https://www.pub.example/issue/42/', 'email://gromen/%3Cabc%3E'],
     });
     expect(links.map((l) => l.url)).toEqual(['https://afr.com/keep']);
-  });
-
-  it('caps at max, keeping the earliest links', () => {
-    const html = a('https://a.example/1') + a('https://b.example/2') + a('https://c.example/3');
-    expect(extractNewsletterLinks(html, { max: 2 }).map((l) => l.url)).toEqual([
-      'https://a.example/1',
-      'https://b.example/2',
-    ]);
-  });
-
-  it('returns nothing when max is zero', () => {
-    expect(extractNewsletterLinks(a('https://afr.com/keep'), { max: 0 })).toEqual([]);
   });
 
   it('drops image-only anchors', () => {
@@ -119,9 +108,9 @@ describe('extractNewsletterLinks', () => {
       a('https://afr.com/two', 'https://afr.com/two') +
       a('https://afr.com/three', '→');
     expect(extractNewsletterLinks(html, MANY)).toEqual([
-      { url: 'https://afr.com/one', anchorText: '' },
-      { url: 'https://afr.com/two', anchorText: '' },
-      { url: 'https://afr.com/three', anchorText: '' },
+      { url: 'https://afr.com/one', anchorText: '', wrapped: false },
+      { url: 'https://afr.com/two', anchorText: '', wrapped: false },
+      { url: 'https://afr.com/three', anchorText: '', wrapped: false },
     ]);
   });
 
@@ -139,5 +128,86 @@ describe('extractNewsletterLinks', () => {
     const html = a('https://afr.com/one') + a('https://afr.com/two');
     const first = extractNewsletterLinks(html, MANY);
     expect(extractNewsletterLinks(html, MANY)).toEqual(first);
+  });
+
+  it('decodes a Seeking Alpha click link and filters on the real URL', () => {
+    const story = `https://email-st.seekingalpha.com/click/1.2/${b64('https://seekingalpha.com/article/1-btc?userid=9&mailingid=1')}/sig`;
+    const social = `https://email-st.seekingalpha.com/click/1.3/${b64('https://twitter.com/seekingalpha')}/sig`;
+    const html = a(story, 'Bitcoin treasury firms') + a(social, 'Follow the desk');
+    expect(extractNewsletterLinks(html, MANY)).toEqual([
+      { url: 'https://seekingalpha.com/article/1-btc', anchorText: 'Bitcoin treasury firms', wrapped: false },
+    ]);
+  });
+
+  it('dedupes decoded links on the destination, not the per-send wrapper', () => {
+    const dest = b64('https://seekingalpha.com/article/1-btc');
+    const html = a(`https://email-st.seekingalpha.com/click/1.2/${dest}/sigA`) + a(`https://email-st.seekingalpha.com/click/1.9/${dest}/sigB`);
+    expect(extractNewsletterLinks(html, MANY)).toHaveLength(1);
+  });
+
+  it('returns opaque wrappers unresolved, flagged wrapped', () => {
+    const html = a('https://example.ghost.io/r/0a1b2c3d?m=placeholder', 'A headline');
+    expect(extractNewsletterLinks(html, MANY)).toEqual([
+      { url: 'https://example.ghost.io/r/0a1b2c3d?m=placeholder', anchorText: 'A headline', wrapped: true },
+    ]);
+  });
+
+  it('applies no cap — the listener caps after filtering', () => {
+    const html = Array.from({ length: 30 }, (_, i) => a(`https://afr.com/story-${i}`)).join('');
+    expect(extractNewsletterLinks(html)).toHaveLength(30);
+  });
+});
+
+describe('linkDenyReason', () => {
+  it('allows a plain article', () => {
+    expect(linkDenyReason('https://afr.com/markets/rba-holds')).toBeNull();
+  });
+
+  it('denies social hosts, assets and chrome paths on the real URL', () => {
+    expect(linkDenyReason('https://x.com/someone/status/1')).toBe('deny_host');
+    expect(linkDenyReason('https://cdn.example/logo.png')).toBe('asset');
+    expect(linkDenyReason('https://seekingalpha.com/account/subscriptions')).toBe('deny_path');
+  });
+
+  it('denies Substack profile and app links', () => {
+    expect(linkDenyReason('https://substack.com/@someone')).toBe('deny_path');
+    expect(linkDenyReason('https://substack.com/app-link/post?post_id=1')).toBe('deny_path');
+    expect(linkDenyReason('https://open.substack.com/pub/x/p/a-post')).toBeNull();
+  });
+
+  it("denies the newsletter's own hosts, including subdomains", () => {
+    const rules = { selfHosts: ['tftc.io'] };
+    expect(linkDenyReason('https://www.tftc.io/issue-600', rules)).toBe('self_link');
+    expect(linkDenyReason('https://shop.tftc.io/x', rules)).toBe('self_link');
+    expect(linkDenyReason('https://nottftc.io/x', rules)).toBeNull();
+  });
+
+  it('never treats a shared sending platform as a self host', () => {
+    const rules = { selfHosts: ['substack.com', 'example.ghost.io'] };
+    expect(linkDenyReason('https://open.substack.com/pub/other/p/a-post', rules)).toBeNull();
+    // A publication's own subdomain on the platform still counts.
+    expect(linkDenyReason('https://example.ghost.io/issue-601', rules)).toBe('self_link');
+    expect(linkDenyReason('https://other.ghost.io/post', rules)).toBeNull();
+  });
+
+  it('lets an allow pattern override the self rule, for gateway newsletters', () => {
+    const rules = { selfHosts: ['seekingalpha.com'], allowPatterns: ['seekingalpha.com/article/'] };
+    expect(linkDenyReason('https://seekingalpha.com/article/1-btc', rules)).toBeNull();
+    expect(linkDenyReason('https://seekingalpha.com/news/1-btc', rules)).toBe('source_allow');
+  });
+
+  it('applies source deny patterns as host or host-plus-path prefixes', () => {
+    const rules = { denyPatterns: ['open.substack.com/pub/pomp/', 'events.example.com'] };
+    expect(linkDenyReason('https://open.substack.com/pub/pomp/p/x', rules)).toBe('source_deny');
+    expect(linkDenyReason('https://open.substack.com/pub/other/p/x', rules)).toBeNull();
+    expect(linkDenyReason('https://events.example.com/tickets', rules)).toBe('source_deny');
+  });
+
+  it('requires a match when source allow patterns are set', () => {
+    const rules = { allowPatterns: ['seekingalpha.com/article/'] };
+    expect(linkDenyReason('https://seekingalpha.com/article/1-btc', rules)).toBeNull();
+    expect(linkDenyReason('https://seekingalpha.com/news/1-btc', rules)).toBe('source_allow');
+    expect(linkDenyReason('https://afr.com/x', rules)).toBe('source_allow');
+    expect(linkDenyReason('https://afr.com/x', { allowPatterns: ['  '] })).toBeNull();
   });
 });

@@ -221,7 +221,7 @@ node packages/db/acceptance/golden-set-tiers.mjs | psql -d papers_golden -v ON_E
 
 # Session 2's commit_paper_resolve, on a fresh database with both migrations
 sed -e 's/vector(1536)/real[]/' -e '/USING hnsw/d' \
-  supabase/migrations/20261019100000_paper_resolve.sql > /tmp/resolve.sql
+  supabase/migrations/20261025000000_paper_resolve.sql > /tmp/resolve.sql
 createdb papers_resolve
 psql -d papers_resolve -v ON_ERROR_STOP=1 -f packages/db/acceptance/stubs.sql
 psql -d papers_resolve -v ON_ERROR_STOP=1 -f /tmp/papers.sql
@@ -273,7 +273,7 @@ What it is (inventory in [`apps/agents/README.md`](../../../apps/agents/README.m
   `scoreRelevance`, Rex's confirmation (`paperResolve.confirm_relevance` in
   `MODEL_SCOPES`), `resolvePaper` (also registered as the `paperResolve` workflow) and the
   watch runner.
-- **[`20261019100000_paper_resolve.sql`](../../../supabase/migrations/20261019100000_paper_resolve.sql).**
+- **[`20261025000000_paper_resolve.sql`](../../../supabase/migrations/20261025000000_paper_resolve.sql).**
   `commit_paper_resolve(payload)` writes one result in one transaction. It is callable only
   by the service role. The migration also adds `paper_watch` to `routines.action_type`,
   seeds the daily watch routine inactive, and seeds the default watch ("bitcoin in title or
@@ -367,7 +367,7 @@ Each fix has a test built on the live shape. After the fixes:
    `OPENALEX_API_KEY` and a model key. The spec's acceptance has three parts: access tier
    right on every resolvable entry, relevance on at least 90%, and gs-37 resolving as its own
    record linked to gs-15. gs-38, gs-39 and gs-40 are not in OpenAlex and are entered by hand.
-2. **Merge.** The merge applies `20261019100000_paper_resolve.sql` to `bts-internal`.
+2. **Merge.** The merge applies `20261025000000_paper_resolve.sql` to `bts-internal`.
 3. **Add `OPENALEX_API_KEY` to the agents service on Railway.**
 4. **Seed the register.** Run `backfill:papers --dry-run` to see the count, then a first pass
    (with `--no-rex` for cost if wanted). Then run the routine once by hand from `/routines`,

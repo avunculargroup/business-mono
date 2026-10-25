@@ -219,6 +219,35 @@ export class FastmailJmapClient {
     return { emailIds: result.ids, newQueryState: result.queryState };
   }
 
+  /**
+   * One page of a mailbox's email ids, newest first, with the mailbox total.
+   * For one-off backfills that walk a whole folder; polling uses queryEmailIds.
+   */
+  async queryMailboxPage(
+    accountId: string,
+    apiUrl: string,
+    mailboxId: string,
+    position: number,
+    limit = 250,
+  ): Promise<{ ids: string[]; total: number }> {
+    const res = await this.callMethod(apiUrl, [
+      [
+        'Email/query',
+        {
+          accountId,
+          filter: { inMailbox: mailboxId },
+          sort: [{ property: 'receivedAt', isAscending: false }],
+          position,
+          limit,
+          calculateTotal: true,
+        },
+        'eq',
+      ],
+    ]);
+    const result = res[0][1] as { ids: string[]; total?: number };
+    return { ids: result.ids, total: result.total ?? result.ids.length };
+  }
+
   // ── Email fetch ────────────────────────────────────────────────────────────
 
   async getEmails(

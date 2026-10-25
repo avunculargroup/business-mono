@@ -41,6 +41,7 @@ src/
   observability/   # Exporter wiring + span processors (agent_activity mirror, trace recorder)
   seeds/           # One-off seed scripts (seed:voice)
   scripts/         # One-off backfills (backfill:rechunk — turn-aware transcript re-chunk;
+                   #   backfill:newsletter — newsletter body and link clean;
                    #   backfill:papers — seed the library papers register)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
@@ -165,7 +166,7 @@ being sent to a guessed address.
 |---|---|---|
 | `signalListener` | Poll | Simon's Signal number. Also intercepts replies that resolve a suspended newsletter gate. |
 | `fastmailListener` | Poll (5 min) | CRM mail — Inbox/Sent → `interactions` → dispatches Della |
-| `researchMailListener` | Poll (5 min) | Research folder → paid email newsletters → `news_items`. Never creates `interactions`. |
+| `researchMailListener` | Poll (5 min) | Research folder → paid email newsletters → `news_items`. Never creates `interactions`. Bodies are cleaned on the DOM (`lib/emailClean.ts`) and the raw HTML kept in `news_item_raw`; followed links are resolved to their real URL (`lib/urlClean.ts`) and filtered on it before any fetch. Spec: [`news-source-email-extraction-spec.md`](../../docs/news-source-email-extraction-spec.md) |
 | `webDirectives` | Realtime | Directives issued from the web UI |
 | `newsletterGateWeb` | Realtime | Resumes a suspended newsletter run when `/content` writes a decision |
 | `strategyGateWeb` / `variantGateWeb` | Realtime | The same pattern for the campaign workflows |

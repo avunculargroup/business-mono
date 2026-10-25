@@ -115,6 +115,10 @@ function valuesToFormData(v: NewsSourceFormValues): FormData {
   fd.set('sender_allowlist', v.sender_allowlist);
   fd.set('follow_links', v.follow_links ? 'true' : 'false');
   fd.set('max_followed_links', String(v.max_followed_links));
+  fd.set('link_allow_patterns', v.link_allow_patterns);
+  fd.set('link_deny_patterns', v.link_deny_patterns);
+  fd.set('link_target_selector', v.link_target_selector);
+  fd.set('link_remove_selector', v.link_remove_selector);
   // Report watch. detection_config is assembled here rather than as a flat set
   // of form fields because the three strategies share almost nothing.
   fd.set('detection_strategies', v.detection_strategies.join(','));
@@ -339,6 +343,10 @@ export function NewsSourcesClient({ initialSources, stats, inboundDomain }: Prop
     sender_allowlist: (r.sender_allowlist ?? []).join('\n'),
     follow_links: r.follow_links ?? false,
     max_followed_links: r.max_followed_links ?? 5,
+    link_allow_patterns: (r.link_allow_patterns ?? []).join('\n'),
+    link_deny_patterns: (r.link_deny_patterns ?? []).join('\n'),
+    link_target_selector: r.link_extract_config?.targetSelector ?? '',
+    link_remove_selector: r.link_extract_config?.removeSelector ?? '',
     ...reportWatchValues(r),
   });
 

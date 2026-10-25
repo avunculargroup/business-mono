@@ -18,7 +18,7 @@ vi.mock('openai', () => ({
   },
 }));
 
-const { queryTranscripts } = await import('./tools.js');
+const { queryTranscripts, fetchUrl } = await import('./tools.js');
 
 // The tool passes the input straight through as the first execute arg in this
 // Mastra version (see tools/newsSources.test.ts for the same convention).
@@ -71,5 +71,52 @@ describe('queryTranscripts', () => {
     expect(result.count).toBe(1);
     expect(result.results[0]!.deep_link).toBe('https://youtu.be/abc?t=90s');
     expect(result.results[0]!.episode_title).toBe('Sound money weekly');
+  });
+});
+
+describe('fetchUrl', () => {
+  const fetchSpy = vi.fn();
+
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal('fetch', fetchSpy);
+    delete process.env['JINA_API_KEY'];
+  });
+
+  function jina(content: string, url = 'https://afr.com/a') {
+    return new Response(JSON.stringify({ data: { title: 'T', content, url } }), { status: 200 });
+  }
+
+  function fetchTool(input: Record<string, unknown>) {
+    return fetchUrl.execute!(input as never, {} as never) as Promise<Record<string, unknown>>;
+  }
+
+  it('asks Jina to drop images and sends no key when none is set', async () => {
+    fetchSpy.mockResolvedValue(jina('body'));
+    await fetchTool({ url: 'https://afr.com/a' });
+    const headers = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
+    expect(headers['X-Retain-Images']).toBe('none');
+    expect(headers['Authorization']).toBeUndefined();
+    expect(headers['X-Target-Selector']).toBeUndefined();
+  });
+
+  it('sends the API key and selectors when given', async () => {
+    process.env['JINA_API_KEY'] = 'test-key';
+    fetchSpy.mockResolvedValue(jina('body'));
+    await fetchTool({ url: 'https://afr.com/a', target_selector: 'article', remove_selector: '.promo' });
+    const headers = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer test-key');
+    expect(headers['X-Target-Selector']).toBe('article');
+    expect(headers['X-Remove-Selector']).toBe('.promo');
+  });
+
+  it('flags a body cut at the 50,000-character cap, keeping the output shape', async () => {
+    fetchSpy.mockResolvedValue(jina('x'.repeat(50_001)));
+    const out = await fetchTool({ url: 'https://afr.com/a' });
+    expect(out).toMatchObject({ title: 'T', resolved_url: 'https://afr.com/a', truncated: true });
+    expect((out['markdown'] as string).length).toBe(50_000);
+
+    fetchSpy.mockResolvedValue(jina('x'.repeat(50_000)));
+    expect((await fetchTool({ url: 'https://afr.com/a' }))['truncated']).toBe(false);
   });
 });

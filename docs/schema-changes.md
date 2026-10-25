@@ -6,6 +6,26 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-10-24 — Newsletter extraction: raw HTML, per-source link rules
+
+`20261024000000_newsletter_extraction.sql` adds `news_item_raw`, one row per email item
+holding the body as received (capped at 1 MB, with `raw_chars` recording the length before the
+cap and `extractor_version` naming the cleaner that wrote the current `body_markdown`), so
+extraction can be re-run as the cleaner improves. It is its own table rather than a column on
+`news_items` because raw newsletter HTML carries subscriber tokens: its only policy is
+`is_team_member()`, and it must never reach a client read model. `news_sources` gains
+`link_allow_patterns`, `link_deny_patterns` (host or host-plus-path prefixes) and
+`link_extract_config` (Jina `targetSelector`/`removeSelector`), all applied to a followed
+link's real URL before any fetch. `news_items.body_truncated` marks a body the HTML or Jina cap
+cut. `news_items_backfill_snapshot` (team-only) holds the original of every row the one-off
+backfill changes; it carries the tokens being removed, so a follow-up migration drops it once
+the acceptance queries pass. The migration also switches off link following for the Seeking Alpha source: 1,031
+followed items averaged 0.10 and 21 reached 0.5. Spec:
+`docs/news-source-email-extraction-spec.md`; build notes:
+`docs/news-source-email-extraction-build-progress.md`.
+
+---
+
 ## 2026-10-13 — Turn-aware transcript segments
 
 `20261013000000_turn_aware_transcript_segments.sql` adds `transcript_segments.speakers`
@@ -22,7 +42,7 @@ on realtime and a ~150 KB blob would ride every change event. Team-only RLS thro
 
 ## 2026-10-19 — Minute library papers: resolve commit and the daily watch
 
-`20261019100000_paper_resolve.sql` adds `commit_paper_resolve(payload)`. The function writes
+`20261025000000_paper_resolve.sql` adds `commit_paper_resolve(payload)`. The function writes
 one paperResolve result in one transaction: the paper, its venue, copies, authors, the
 published-version edge for a draft, notices and reconciliation verdicts. It deduplicates on
 DOI, then OpenAlex ID, arXiv ID, handle and URL, and never on a title. A re-run updates

@@ -1,7 +1,7 @@
 // ============================================================
 // The commit payload — one resolve result, for commit_paper_resolve()
 // ============================================================
-// Snake-case keys matching supabase/migrations/20261019100000_paper_resolve.sql,
+// Snake-case keys matching supabase/migrations/20261025000000_paper_resolve.sql,
 // which documents the shape and does the deduplication, the copy upserts and
 // the event logging in one transaction.
 

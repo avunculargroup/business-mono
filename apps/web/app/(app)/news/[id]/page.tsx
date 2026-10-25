@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { NotFoundError } from '@platform/data';
 import { getRepositories } from '@/lib/repositories';
 import { resolveReadContext } from '@platform/data-supabase';
+import { ArticleMarkdown } from '@platform/ui/ArticleMarkdown';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { NewsItemDetail } from './NewsItemDetail';
 
@@ -29,7 +30,12 @@ export default async function NewsItemPage({ params }: { params: Promise<{ id: s
         backHref="/news"
         backLabel="News feed"
       />
-      <NewsItemDetail item={item} />
+      {/* The body renders here, on the server: it is third-party text, and
+          ArticleMarkdown needs no client JavaScript to show it safely. */}
+      <NewsItemDetail
+        item={item}
+        body={item.bodyMarkdown ? <ArticleMarkdown>{item.bodyMarkdown}</ArticleMarkdown> : null}
+      />
     </>
   );
 }

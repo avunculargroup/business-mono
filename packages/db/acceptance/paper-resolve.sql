@@ -1,4 +1,4 @@
--- Session 2 acceptance for 20261019100000_paper_resolve.sql (commit_paper_resolve).
+-- Session 2 acceptance for 20261025000000_paper_resolve.sql (commit_paper_resolve).
 -- Run after stubs.sql and both papers migrations, on a fresh database.
 -- Every check raises on failure, so a clean run ends with ALL RESOLVE CHECKS PASSED.
 -- See docs/features/client-app/library-papers-build-progress.md#checking-it-locally

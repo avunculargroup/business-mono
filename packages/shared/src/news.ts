@@ -142,12 +142,24 @@ export interface NewsSourceRecord {
   // costs a fetch plus two LLM calls.
   follow_links: boolean;
   max_followed_links: number;
+  // Rules applied to a followed link's real URL: host or host-plus-path
+  // prefixes. A non-empty allow list means a link must match one.
+  link_allow_patterns: string[];
+  link_deny_patterns: string[];
+  // Per-source Jina options for followed links.
+  link_extract_config: NewsLinkExtractConfig;
   last_scanned_at: string | null;
   last_status: 'success' | 'failed' | null;
   last_error: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// news_sources.link_extract_config.
+export interface NewsLinkExtractConfig {
+  targetSelector?: string;
+  removeSelector?: string;
 }
 
 // action_config shape for a 'news_source_scan' routine. The routine scans every

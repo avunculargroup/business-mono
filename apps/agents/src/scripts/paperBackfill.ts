@@ -21,7 +21,7 @@ const log = createLogger('backfill:papers');
  * rex_status 'unavailable'), for a cheap first pass a later run can confirm.
  *
  * Requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENALEX_API_KEY, and
- * ANTHROPIC_API_KEY unless --no-rex, with 20261019100000_paper_resolve applied.
+ * ANTHROPIC_API_KEY unless --no-rex, with 20261025000000_paper_resolve applied.
  *
  *   pnpm --filter @platform/agents backfill:papers --dry-run
  *   pnpm --filter @platform/agents backfill:papers --limit 200 --no-rex
