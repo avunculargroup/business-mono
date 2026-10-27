@@ -82,22 +82,6 @@ export function reconcile(input: ReconcileInput): Reconciled {
     ? { ...work.identifiers, doi: requested, openalexId: null }
     : { ...work.identifiers };
 
-  // Rule 4, second half: a preprint server's copy is a submitted version.
-  // OpenAlex labels merged ones acceptedVersion.
-  // Rule 2: SSRN is never a published or accepted version.
-  locations = locations.map((l) => {
-    const forced = l.hostType === 'preprint_server' || isSsrn(l);
-    if (forced && l.version !== null && l.version !== 'submittedVersion') {
-      events.push({
-        rule: isSsrn(l) ? 2 : 4,
-        input: `${l.landingUrl ?? l.pdfUrl} reported as ${l.version}`,
-        verdict: 'submittedVersion: a preprint server or SSRN copy is never a published or accepted version',
-      });
-      return { ...l, version: 'submittedVersion' as const };
-    }
-    return l;
-  });
-
   // ── Rule 3: confirm repository copies at the repository ───────────────────
   locations = locations.map((l) => {
     const key = l.landingUrl ?? l.pdfUrl;
@@ -106,8 +90,10 @@ export function reconcile(input: ReconcileInput): Reconciled {
     if (!record) return l; // unconfirmed: recorded, lifts nothing
     const next: Location = {
       ...l,
-      // The repository's own record replaces a URL OpenAlex garbled (gs-22).
+      // The repository's own record replaces a URL OpenAlex garbled (gs-22),
+      // and the copy is that record, not whatever DOI the garbled URL named.
       landingUrl: record.recordUrl ?? l.landingUrl,
+      doi: record.recordUrl ? null : l.doi,
       version: record.version ?? l.version,
       isOa: record.isOa,
       licence: record.licence,
@@ -122,6 +108,23 @@ export function reconcile(input: ReconcileInput): Reconciled {
       });
     }
     return next;
+  });
+
+  // After rule 3, so nothing a repository says can lift an SSRN copy.
+  // Rule 4, second half: a preprint server's copy is a submitted version.
+  // OpenAlex labels merged ones acceptedVersion.
+  // Rule 2: SSRN is never a published or accepted version.
+  locations = locations.map((l) => {
+    const forced = l.hostType === 'preprint_server' || isSsrn(l);
+    if (forced && l.version !== null && l.version !== 'submittedVersion') {
+      events.push({
+        rule: isSsrn(l) ? 2 : 4,
+        input: `${l.landingUrl ?? l.pdfUrl} reported as ${l.version}`,
+        verdict: 'submittedVersion: a preprint server or SSRN copy is never a published or accepted version',
+      });
+      return { ...l, version: 'submittedVersion' as const };
+    }
+    return l;
   });
 
   // ── Rule 1: the publisher's Crossref licence deposit for the version of record

@@ -120,6 +120,31 @@ describe('reconcile', () => {
     expect(computeAccessTier(r.locations, 'peer_reviewed').tier).toBe('metadata_only');
   });
 
+  it('rule 3 runs before the SSRN rule, and a confirmed copy drops a DOI read off a garbled URL (first live backfill)', () => {
+    // The row the database refused: a Southampton accepted manuscript whose OpenAlex
+    // landing URL is "http://doi.org/10.2139/ssrn.3550842>).", with the PDF on ePrints.
+    const garbled = 'http://doi.org/10.2139/ssrn.3550842>).';
+    const n = normaliseWork(work({
+      locations: [{ is_oa: true, landing_page_url: garbled, pdf_url: 'https://eprints.soton.ac.uk/439058/1/The_impact.pdf', version: 'acceptedVersion', source: { id: 'https://openalex.org/S4306401019', display_name: 'ePrints Soton', type: 'repository' } }],
+    }));
+    expect(n.locations[0].doi).toBe('10.2139/ssrn.3550842');
+    const repos = new Map([[garbled, { version: 'acceptedVersion' as const, isOa: true, licence: null, recordUrl: 'https://eprints.soton.ac.uk/id/eprint/439058', evidence: 'content: accepted' }]]);
+    const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: repos, asOf });
+    expect(r.locations[0]).toMatchObject({
+      landingUrl: 'https://eprints.soton.ac.uk/id/eprint/439058', doi: null, version: 'acceptedVersion', verifiedAtHost: true,
+    });
+    expect(computeAccessTier(r.locations, 'peer_reviewed').tier).toBe('read_at_source');
+  });
+
+  it('rule 2 still has the last word on a real SSRN copy a repository record describes', () => {
+    const n = normaliseWork(work({
+      locations: [{ is_oa: true, landing_page_url: 'https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1', version: 'publishedVersion', source: { display_name: 'SSRN', type: 'repository' } }],
+    }));
+    const repos = new Map([['https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1', { version: 'publishedVersion' as const, isOa: true, licence: null, recordUrl: null, evidence: 'x' }]]);
+    const r = reconcile({ work: n, requestedDoi: null, crossref: null, repository: repos, asOf });
+    expect(r.locations[0].version).toBe('submittedVersion');
+  });
+
   it('rule 3: the repository corrects the version too (gs-23)', () => {
     const n = normaliseWork(work({
       locations: [{ is_oa: true, landing_page_url: 'https://eprints.soton.ac.uk/425053', version: 'submittedVersion', source: { display_name: 'Southampton', type: 'repository' } }],
@@ -220,6 +245,12 @@ describe('classifyPeerReview', () => {
     [{ workType: 'editorial', crossrefType: 'journal-article', venueType: 'journal' as const, isDraft: false }, 'not_peer_reviewed'],
     [{ workType: 'article', crossrefType: null, venueType: 'repository' as const, isDraft: false }, 'not_peer_reviewed'],
     [{ workType: 'article', crossrefType: null, venueType: null, isDraft: false }, 'unknown'],
+    // From the first live backfill: OpenAlex's type for proceedings papers.
+    [{ workType: 'conference-paper', crossrefType: 'proceedings-article', venueType: 'conference' as const, isDraft: false }, 'peer_reviewed'],
+    [{ workType: 'conference-paper', crossrefType: 'proceedings-article', venueType: 'book_series' as const, isDraft: false }, 'peer_reviewed'],
+    [{ workType: 'conference-paper', crossrefType: null, venueType: null, isDraft: false }, 'unknown'],
+    [{ workType: 'book', crossrefType: 'book', venueType: 'other' as const, isDraft: false }, 'not_peer_reviewed'],
+    [{ workType: 'book-chapter', crossrefType: 'book-chapter', venueType: 'other' as const, isDraft: false }, 'unknown'],
   ])('%o → %s', (input, status) => {
     expect(classifyPeerReview(input).status).toBe(status);
   });

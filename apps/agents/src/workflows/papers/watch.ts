@@ -106,6 +106,12 @@ export interface WatchRunOptions {
   ignoreHighWater?: boolean;
   /** Run only this watch. */
   watchId?: string;
+  /**
+   * Re-resolve works the register already holds, too. commit_paper_resolve
+   * updates them in place and reclassifies only untouched candidates, so this
+   * is how a classifier fix reaches papers already landed.
+   */
+  refresh?: boolean;
 }
 
 export async function runWatches(opts: WatchRunOptions, deps: WatchDeps = defaultWatchDeps): Promise<PaperWatchRoutineResult> {
@@ -135,9 +141,13 @@ export async function runWatches(opts: WatchRunOptions, deps: WatchDeps = defaul
       for (const work of page.results) {
         const oa = shortOpenAlexId(work.id);
         const doi = normaliseDoi(work.doi);
-        if ((oa && known.has(oa)) || (doi && known.has(doi))) continue;
-        hits += 1;
-        result.new_works += 1;
+        const held = Boolean((oa && known.has(oa)) || (doi && known.has(doi)));
+        if (held && !opts.refresh) continue;
+        // Only a work new to the register counts toward the watch's yield.
+        if (!held) {
+          hits += 1;
+          result.new_works += 1;
+        }
         if (budget <= 0) {
           complete = false;
           outOfBudget = true;
@@ -149,7 +159,7 @@ export async function runWatches(opts: WatchRunOptions, deps: WatchDeps = defaul
           const r = await deps.resolve({ work, discoveredVia: watch.id });
           if (r.status === 'committed') {
             result.resolved += 1;
-            if (r.relevanceTier === 'core' || r.relevanceTier === 'substantial') promoted += 1;
+            if (!held && (r.relevanceTier === 'core' || r.relevanceTier === 'substantial')) promoted += 1;
           }
         } catch (err) {
           result.failed += 1;

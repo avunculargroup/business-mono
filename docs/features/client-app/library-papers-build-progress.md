@@ -359,6 +359,40 @@ Each fix has a test built on the live shape. After the fixes:
   Session 2 acceptance, and publication still needs a person and Lex, but an editorial typed
   as an article will reach the review queue looking refereed.
 
+### Session 2: first backfill sample
+
+Run against `bts-internal` on 2026-10-26, after #422 merged and `OPENALEX_API_KEY` was set.
+
+- **The corpus is 35,728 works, not 8,000–15,000.** That is the default watch, bitcoin in
+  title or abstract. The spec's estimate came from narrower Scopus queries, and the broad
+  filter pulls in every passing mention. This changes how to backfill. A pass re-reads the list
+  from the start and skips works already held, so many small passes cost far more list pages
+  than one large one. Run one large `--no-rex` pass, and have Rex confirm only what comes out
+  `core` or `substantial`.
+- **200 papers landed as candidates** (`--limit 200 --no-rex`):
+  - access: 154 `metadata_only`, 32 `read_at_source`, 14 `read_here`;
+  - every rule except 1 fired: rule 2 (SSRN) 29 times, rule 3 (repository confirmation) 14
+    times, rule 4 (a merged preprint) once;
+  - 1 retraction and 4 corrections were picked up.
+
+  All 200 are `core` by band, because OpenAlex lists title matches first.
+- **It found three bugs, all fixed:**
+  - **Proceedings papers came out `unknown`.** OpenAlex types them `conference-paper`, and the
+    classifier only knew `article`, `review` and `book-chapter`. That left 38 refereed papers,
+    including LNCS and IEEE S&P, at `unknown`. `conference-paper` now counts, and a monograph
+    (`book`) is `not_peer_reviewed`. Unknowns fell from 62 to 19, all with no venue or an
+    eBook chapter.
+  - **The DOI reader kept trailing junk.** A Southampton copy's URL,
+    `http://doi.org/10.2139/ssrn.3550842>).`, read as an SSRN DOI. `normaliseDoi` now cuts
+    angle brackets, quotes, trailing punctuation and unbalanced parentheses.
+  - **Rule 3 ran after the SSRN rule.** The repository confirmation then made that copy an
+    accepted version, so it looked like an accepted SSRN copy, which the database refused. The
+    SSRN and preprint-server rules now run after rule 3, and a confirmed repository copy takes
+    the repository's own record URL and drops a DOI read off a garbled one.
+- **`--refresh`** re-resolves works the register already holds, which is how those fixes reached
+  the 200. Only untouched candidates are reclassified, and a refreshed work does not count
+  toward a watch's yield.
+
 ### Session 2: to finish
 
 1. **Run the golden-set eval where the network is allowed**, either locally or in a session
