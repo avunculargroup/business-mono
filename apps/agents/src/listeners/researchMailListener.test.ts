@@ -63,7 +63,7 @@ beforeEach(() => {
     data: {
       category: 'macro',
       summary: 'Gromen on treasury issuance.',
-      key_points: ['point a', 'point b'],
+      key_points: [{ text: 'point a', kind: 'new' }, { text: 'point b', kind: 'background' }],
       topic_tags: ['macro', 'treasury-issuance'],
       australian_relevance: false,
       bitcoin_relevance: true,
@@ -127,7 +127,7 @@ describe('processResearchEmail', () => {
         title: 'Tree Rings — Issue 42',
         author: 'Luke Gromen',
         category: 'macro',
-        keyPoints: ['point a', 'point b'],
+        keyPoints: [{ text: 'point a', kind: 'new' }, { text: 'point b', kind: 'background' }],
         topicTags: ['macro', 'treasury-issuance'],
         ingestionRef: 'issue-42@gromen.com',
         hasPdfAttachment: true,

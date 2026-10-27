@@ -44,9 +44,9 @@ const verificationSchema = z.object({
 export interface VerifyStory {
   title: string;
   source_name: string;
-  /** Extracted key points — the main claims, numbers, names, dates. May be empty (e.g. podcasts). */
+  /** The story's `new` key points — what it reports as news. May be empty (e.g. podcasts). */
   key_points: string[];
-  /** The stored summary, as a fallback when key_points are thin. */
+  /** Fallback evidence when key_points is empty; '' for a news item, whose summary includes background. */
   summary: string;
 }
 
@@ -66,7 +66,9 @@ export interface MoodVerification {
 function storyBlock(story: VerifyStory, i: number): string {
   const facts = story.key_points.length
     ? story.key_points.map((p) => `   - ${p}`).join('\n')
-    : `   - ${story.summary.slice(0, 400)}`;
+    : story.summary
+      ? `   - ${story.summary.slice(0, 400)}`
+      : '   - (no new facts reported)';
   return `${i + 1}. ${story.title} (${story.source_name})\n${facts}`;
 }
 

@@ -33,6 +33,24 @@ describe('mapNewsRowToCandidate', () => {
     expect(c).toMatchObject({ id: 'n1', source_name: 'Src', category: 'corporate', key_points: ['a', 'b'] });
   });
 
+  it('labels background and opinion key points so the post cannot present them as news', () => {
+    const c = mapNewsRowToCandidate({
+      id: 'n3',
+      title: 'T',
+      url: 'https://x/3',
+      key_points: [
+        { text: 'RBA raised the cash rate to 4.60%', kind: 'background', asOf: '2026-09-30' },
+        { text: 'Guidance has been inconsistent', kind: 'new' },
+        { text: 'Another hike is likely', kind: 'opinion' },
+      ],
+    });
+    expect(c.key_points).toEqual([
+      '[background, as of 2026-09-30] RBA raised the cash rate to 4.60%',
+      'Guidance has been inconsistent',
+      '[opinion] Another hike is likely',
+    ]);
+  });
+
   it('tolerates null/missing fields', () => {
     const c = mapNewsRowToCandidate({ id: 'n2', title: 'T', url: 'https://x/2' });
     expect(c.summary).toBe('');

@@ -25,6 +25,69 @@ export const NewsStatus = {
 } as const;
 export type NewsStatus = (typeof NewsStatus)[keyof typeof NewsStatus];
 
+// What a key point is doing in its article. An article published today still
+// restates last month's facts as context, and a stored point carried no way to
+// tell the two apart — which is how "The RBA raised the cash rate to 4.60%",
+// background in a 25 Oct opinion piece, went out in a digest as that day's news.
+//   new         — what this article itself reports for the first time
+//   background  — an earlier fact restated for context (a past decision, prior data)
+//   opinion     — the author's or a quoted person's view, forecast or argument
+export const KeyPointKind = {
+  NEW:        'new',
+  BACKGROUND: 'background',
+  OPINION:    'opinion',
+} as const;
+export type KeyPointKind = (typeof KeyPointKind)[keyof typeof KeyPointKind];
+
+export interface KeyPoint {
+  text: string;
+  kind: KeyPointKind;
+  // ISO date the fact refers to, when the article states or implies one.
+  asOf?: string;
+}
+
+const KEY_POINT_KINDS = new Set<string>(Object.values(KeyPointKind));
+
+/**
+ * Reads news_items.key_points (JSONB) into KeyPoint[]. Rows extracted before
+ * the kinds existed hold bare strings; those read as `new`, which is exactly
+ * how every consumer treated them before, so an un-backfilled row behaves as
+ * it always did. Anything unrecognisable is dropped rather than guessed at.
+ */
+export function normalizeKeyPoints(raw: unknown): KeyPoint[] {
+  if (!Array.isArray(raw)) return [];
+  const out: KeyPoint[] = [];
+  for (const entry of raw) {
+    if (typeof entry === 'string') {
+      if (entry.trim()) out.push({ text: entry, kind: 'new' });
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    const { text, kind, asOf } = entry as Record<string, unknown>;
+    if (typeof text !== 'string' || !text.trim()) continue;
+    if (typeof kind !== 'string' || !KEY_POINT_KINDS.has(kind)) continue;
+    out.push({ text, kind: kind as KeyPointKind, ...(typeof asOf === 'string' && asOf ? { asOf } : {}) });
+  }
+  return out;
+}
+
+/** The points that are this article's own news — the only ones a "today" summary may state as fact. */
+export function newKeyPoints(points: KeyPoint[]): KeyPoint[] {
+  return points.filter((p) => p.kind === 'new');
+}
+
+/**
+ * One prompt line per point, labelled with its kind, for long-form writers
+ * that may use background as context but must not present it as news.
+ */
+export function formatKeyPointsForPrompt(points: KeyPoint[]): string[] {
+  return points.map((p) =>
+    p.kind === 'new'
+      ? p.text
+      : `[${p.kind}${p.asOf ? `, as of ${p.asOf}` : ''}] ${p.text}`,
+  );
+}
+
 export const NEWS_CATEGORY_LABELS: Record<NewsCategory, string> = {
   regulatory:    'Regulatory',
   corporate:     'Corporate',
@@ -201,7 +264,7 @@ export interface NewsItemRecord {
   fetched_at: string;
   body_markdown: string | null;
   summary: string | null;
-  key_points: string[];
+  key_points: KeyPoint[];
   category: NewsCategory;
   topic_tags: string[];
   australian_relevance: boolean;

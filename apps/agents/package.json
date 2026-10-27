@@ -16,7 +16,8 @@
     "seed:voice": "tsx src/seeds/seedVoice.ts",
     "backfill:rechunk": "tsx src/scripts/rechunkTranscripts.ts",
     "backfill:newsletter": "tsx src/scripts/backfillNewsletterContent.ts",
-    "backfill:papers": "tsx src/scripts/paperBackfill.ts"
+    "backfill:papers": "tsx src/scripts/paperBackfill.ts",
+    "backfill:key-point-kinds": "tsx src/scripts/backfillKeyPointKinds.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.24",

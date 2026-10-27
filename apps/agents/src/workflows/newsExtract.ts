@@ -30,8 +30,19 @@ export const newsExtractionSchema = z.object({
   // TEXT with no length constraint.
   summary: z.string().min(40)
     .describe('A neutral 2–3 sentence summary of the article, up to about 500 characters. Use capital B for the Bitcoin protocol/network and lowercase b for the currency unit.'),
-  key_points: z.array(z.string()).min(2).max(7)
-    .describe('2–7 short factual bullet points capturing the main claims, numbers, names, and dates from the article. No marketing language.'),
+  // Each point carries its role in the article, because a fresh article still
+  // restates old facts as context. The digest states only `new` points as news;
+  // classifying here, per point, is what lets code rather than a prompt make
+  // that cut. See KeyPoint in @platform/shared.
+  key_points: z.array(z.object({
+    text: z.string()
+      .describe('One short factual statement — a claim, number, name or date from the article. No marketing language.'),
+    kind: z.enum(['new', 'background', 'opinion'])
+      .describe('"new" = a development this article itself reports (an event, decision, release or data point that is the news here). "background" = an earlier fact the article restates for context, such as a past rate decision or previously released data — even if stated in the present tense. "opinion" = the author\'s or a quoted person\'s view, forecast, expectation or argument.'),
+    asOf: z.string().optional()
+      .describe('ISO date (YYYY-MM-DD, or YYYY-MM) the fact refers to, when the article states or clearly implies one. Omit when unknown.'),
+  })).min(2).max(7)
+    .describe('2–7 key points capturing the main claims, numbers, names and dates, each classified as new, background or opinion.'),
   topic_tags: z.array(z.string()).min(2).max(8)
     .describe('2–8 lowercase, hyphenated topic tags. Examples: "etf", "rba", "asx-listed", "treasury-strategy", "mining", "regulation".'),
   australian_relevance: z.boolean()
@@ -52,6 +63,7 @@ function getNewsExtractor(): Agent {
         'You extract structured metadata from news articles for a Bitcoin treasury research database. ' +
         'Be neutral and factual. Capital B = the Bitcoin protocol/network; lowercase b = the currency unit. ' +
         'Avoid marketing language. Topic tags must be lowercase and hyphenated. ' +
+        'Classify every key point by its role in the article: a past decision or earlier data restated for context is "background", never "new", even when the article is published today — e.g. an article about rate expectations that mentions "the RBA raised the cash rate to 4.60% at its last meeting" is reporting that hike as background. ' +
         'Set bitcoin_relevance=false for any article that does not meaningfully touch Bitcoin, crypto, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context — even if the article was returned by a Bitcoin-themed search query. ' +
         'Always return data shaped exactly to the requested schema — never refuse, never wrap output in prose or code fences.',
       model: dynamicModelFor('executeRoutine.news_extractor'),
@@ -86,7 +98,7 @@ export async function extractNewsMetadata(input: {
     `Source: ${input.source}\n\n` +
     `Article:\n${input.content}\n\n` +
     `Extract: category (best-fit of the four values), summary (2–3 sentences, at least 40 characters, up to about 500), ` +
-    `key_points (2–7 factual bullets), ` +
+    `key_points (2–7 factual points, each with kind new/background/opinion and asOf when known), ` +
     `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
     `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
 

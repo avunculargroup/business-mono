@@ -28,7 +28,10 @@ const REAL_503_CHAR_SUMMARY =
 const validExtraction = (summary: string) => ({
   category: 'international' as const,
   summary,
-  key_points: ['Riot had 5,821 BTC pledged against a $200 million loan.', 'The estimated LTV fell to 44.1%.'],
+  key_points: [
+    { text: 'Riot had 5,821 BTC pledged against a $200 million loan.', kind: 'new' as const },
+    { text: 'The estimated LTV fell to 44.1%.', kind: 'new' as const, asOf: '2026-06' },
+  ],
   topic_tags: ['bitcoin-mining', 'corporate-treasury'],
   australian_relevance: false,
   bitcoin_relevance: true,
@@ -47,6 +50,31 @@ describe('newsExtractionSchema summary', () => {
 
   it('still rejects a summary under the 40-character floor', () => {
     expect(newsExtractionSchema.safeParse(validExtraction('Too short.')).success).toBe(false);
+  });
+});
+
+describe('newsExtractionSchema key_points', () => {
+  const summary = 'x'.repeat(100);
+
+  it('requires each point to carry a kind', () => {
+    const legacy = { ...validExtraction(summary), key_points: ['a bare string', 'another'] };
+    expect(newsExtractionSchema.safeParse(legacy).success).toBe(false);
+  });
+
+  it('accepts background and opinion points, with asOf optional', () => {
+    const parsed = newsExtractionSchema.safeParse({
+      ...validExtraction(summary),
+      key_points: [
+        { text: 'The RBA raised the cash rate by 25 basis points to 4.60% in its last meeting.', kind: 'background', asOf: '2026-09-30' },
+        { text: 'A further hike is likely.', kind: 'opinion' },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a kind outside new/background/opinion', () => {
+    const bad = { ...validExtraction(summary), key_points: [{ text: 'a', kind: 'rumour' }, { text: 'b', kind: 'new' }] };
+    expect(newsExtractionSchema.safeParse(bad).success).toBe(false);
   });
 });
 

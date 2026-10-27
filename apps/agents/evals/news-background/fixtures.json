@@ -1,0 +1,12 @@
+[
+  {
+    "id": "macrobusiness-rba-consistency-2026-10-25",
+    "title": "RBA lacks consistency on interest rates",
+    "source": "Macro business Australia",
+    "url": "https://www.macrobusiness.com.au/2026/10/rba-lacks-consistency-on-interest-rates/",
+    "publishedAt": "2026-10-25T13:01:30Z",
+    "content": "# RBA lacks consistency on interest rates\n\nLeith van Onselen\n\nSunday 25 October 2026\n\nRecent Reserve Bank of Australia (RBA) commentary on inflation and interest rates has been inconsistent, leading to wide swings in interest rate expectations.\n\nWhen the RBA Board delivered its interest rate decision last month, its commentary was unambiguously hawkish. The Board unanimously lifted the cash rate by 25 bp to 4.60%, identified inflation as its top priority, and explicitly stated it would raise rates further if needed.\n\nThe subsequent Minutes reinforced that message, focusing on upside inflation risks, domestic capacity pressures and the possibility that a higher neutral rate means policy is less restrictive than it appears.\n\nThe full text of this article is available to MacroBusiness subscribers",
+    "factPattern": "4\\.60?\\s?(%|per ?cent)",
+    "rationale": "The 25 Oct digest intro opened 'The RBA raised the cash rate to 4.60%' — a September decision this article restates as background. The free preview above is exactly what ingestion stored (site navigation removed); the rest is paywalled."
+  }
+]

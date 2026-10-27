@@ -65,7 +65,7 @@ function baseInput() {
     body: 'Long body about fiscal dominance and treasury issuance dynamics.',
     fallbackSummary: 'Fallback summary',
     category: 'macro' as const,
-    keyPoints: ['point a', 'point b'],
+    keyPoints: [{ text: 'point a', kind: 'new' as const }, { text: 'point b', kind: 'background' as const }],
     topicTags: ['macro', 'Debasement'],
     australianRelevance: false,
     author: 'Luke Gromen',
