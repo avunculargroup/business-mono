@@ -13,6 +13,7 @@ const charlieGenerate = vi.fn();
 const fetchOgImage = vi.fn();
 const verifyMoodSummary = vi.fn();
 const isEmailSafeImage = vi.fn();
+const deliverNewsDigest = vi.fn();
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../agents/researcher/index.js', () => ({ rex: { generate: vi.fn() } }));
@@ -35,6 +36,7 @@ vi.mock('../lib/emailImage.js', async (importOriginal) => ({
   isEmailSafeImage,
 }));
 vi.mock('./newsCurationVerify.js', () => ({ verifyMoodSummary }));
+vi.mock('../lib/sendNewsDigest.js', () => ({ deliverNewsDigest }));
 vi.mock('../config/model.js', () => ({
   stepRequestContext: vi.fn(() => ({})),
   dynamicModelFor: vi.fn(() => 'mock-model'),
@@ -93,6 +95,7 @@ beforeEach(() => {
   isEmailSafeImage.mockResolvedValue(true);
   // Default: the intro passes verification unchanged.
   verifyMoodSummary.mockImplementation(async ({ draft }: { draft: string }) => ({ summary: draft, status: 'ok' }));
+  deliverNewsDigest.mockResolvedValue({ configured: true, attempted: 2, sent: 2, failed: 0 });
 });
 
 describe('runNewsCuration', () => {
@@ -276,7 +279,7 @@ describe('runNewsCuration', () => {
     expect(stories.map((s) => s.id)).toEqual([
       'news-0', 'news-1', 'news-2', 'news-3', 'news-4', 'news-5',
     ]);
-    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 0, stories: 6 });
+    expect(outcome.news_curation_result).toMatchObject({ candidates: 8, editor_picked: 0, stories: 6 });
   });
 
   it('accepts bare numeric indices as well as { index } objects', async () => {
@@ -290,7 +293,7 @@ describe('runNewsCuration', () => {
     // The editor's own ordering leads; the rest is topped up to six.
     expect(stories.slice(0, 3).map((s) => s.id)).toEqual(['news-4', 'news-2', 'news-6']);
     expect(stories).toHaveLength(6);
-    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 3, stories: 6 });
+    expect(outcome.news_curation_result).toMatchObject({ candidates: 8, editor_picked: 3, stories: 6 });
   });
 
   it('keeps the editor picks first and tops up a short selection', async () => {
@@ -304,7 +307,7 @@ describe('runNewsCuration', () => {
     expect(stories.map((s) => s.id)).toEqual([
       'news-5', 'news-0', 'news-1', 'news-2', 'news-3', 'news-4',
     ]);
-    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 1, stories: 6 });
+    expect(outcome.news_curation_result).toMatchObject({ candidates: 8, editor_picked: 1, stories: 6 });
   });
 
   it('drops out-of-range and duplicate indices without shrinking the digest', async () => {
@@ -331,7 +334,7 @@ describe('runNewsCuration', () => {
 
     const stories = (outcome.result?.metadata as Record<string, unknown>)['stories'] as unknown[];
     expect(stories).toHaveLength(2);
-    expect(outcome.news_curation_result).toEqual({ candidates: 2, editor_picked: 0, stories: 2 });
+    expect(outcome.news_curation_result).toMatchObject({ candidates: 2, editor_picked: 0, stories: 2 });
   });
 
   it('reports selection stats on a clean run', async () => {
@@ -343,7 +346,7 @@ describe('runNewsCuration', () => {
 
     const outcome = await runNewsCuration(ROUTINE);
 
-    expect(outcome.news_curation_result).toEqual({ candidates: 8, editor_picked: 6, stories: 6 });
+    expect(outcome.news_curation_result).toMatchObject({ candidates: 8, editor_picked: 6, stories: 6 });
   });
 
   it('hard-caps the curated set at six items even if configured higher', async () => {
@@ -368,5 +371,120 @@ describe('runNewsCuration', () => {
 
     expect(outcome.status).toBe('failed');
     expect(outcome.error).toContain('news_items query failed');
+  });
+
+  it('records whether and when the digest was delivered', async () => {
+    setPool([newsItem(0)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    expect(outcome.news_curation_result?.delivery).toMatchObject({ configured: true, sent: 2, failed: 0 });
+    expect(outcome.news_curation_result?.delivery?.sent_at).toEqual(expect.any(String));
+  });
+
+  it('leaves sent_at null when no recipient received the digest', async () => {
+    setPool([newsItem(0)], []);
+    editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+    deliverNewsDigest.mockResolvedValue({ configured: false, attempted: 0, sent: 0, failed: 0 });
+
+    const outcome = await runNewsCuration(ROUTINE);
+
+    expect(outcome.news_curation_result?.delivery).toEqual({
+      configured: false, attempted: 0, sent: 0, failed: 0, sent_at: null,
+    });
+  });
+
+  // Regression for the 25 Oct digest: a fresh opinion piece restated the
+  // September rate hike as background, and the intro reported it as news.
+  describe('background facts', () => {
+    const rbaArticle = {
+      ...newsItem(0),
+      title: 'RBA lacks consistency on interest rates',
+      source_name: 'Macro business Australia',
+      published_at: '2026-10-25T13:01:30Z',
+      summary: "The RBA's recent rate hike to 4.60% and mixed forward guidance have created uncertainty.",
+      key_points: [
+        { text: 'The RBA raised the cash rate by 25 basis points to 4.60% in its last meeting.', kind: 'background', asOf: '2026-09-30' },
+        { text: 'Subsequent RBA communications have been inconsistent, contributing to swings in rate expectations.', kind: 'new' },
+        { text: 'The RBA risks losing credibility.', kind: 'opinion' },
+      ],
+    };
+
+    it('gives the intro writer only the new points, never the summary', async () => {
+      setPool([rbaArticle], []);
+      editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+
+      await runNewsCuration(ROUTINE);
+
+      const prompt = charlieGenerate.mock.calls[0][0][0].content as string;
+      expect(prompt).toContain('Subsequent RBA communications have been inconsistent');
+      expect(prompt).toContain('published 2026-10-25');
+      expect(prompt).toContain('Write only about new developments');
+      expect(prompt).not.toContain('4.60%');
+      expect(prompt).not.toContain('losing credibility');
+    });
+
+    it('checks the intro only against new points, so a restated hike is unsupported', async () => {
+      setPool([rbaArticle], [podcastEpisode(1)]);
+      editorGenerate.mockResolvedValue({ object: { selected: [0, 1] } });
+
+      await runNewsCuration(ROUTINE);
+
+      const { stories } = verifyMoodSummary.mock.calls[0][0] as {
+        stories: Array<{ key_points: string[]; summary: string }>;
+      };
+      expect(stories[0]).toEqual(expect.objectContaining({
+        key_points: ['Subsequent RBA communications have been inconsistent, contributing to swings in rate expectations.'],
+        summary: '',
+      }));
+      // A podcast has no key points, so it keeps its description as evidence.
+      expect(stories[1].summary).toBe('Episode summary 1');
+    });
+
+    it('shows a news item with no new points by title alone', async () => {
+      setPool([{ ...rbaArticle, key_points: rbaArticle.key_points.filter((p) => p.kind !== 'new') }], []);
+      editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+
+      await runNewsCuration(ROUTINE);
+
+      const prompt = charlieGenerate.mock.calls[0][0][0].content as string;
+      expect(prompt).toContain('1. RBA lacks consistency on interest rates (Macro business Australia)');
+      expect(prompt).not.toContain('4.60%');
+    });
+
+    it('treats legacy string key points as new', async () => {
+      setPool([{ ...newsItem(0), key_points: ['Legacy point'] }], []);
+      editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+
+      await runNewsCuration(ROUTINE);
+
+      expect(charlieGenerate.mock.calls[0][0][0].content).toContain('- Legacy point');
+    });
+  });
+
+  describe('cash rate check', () => {
+    it('keeps an intro whose cash rate matches the stored rate', async () => {
+      setPool([newsItem(0)], []);
+      fakeSupabase.__setResponse('v_indicator_latest', { data: { current_value: 4.6 }, error: null });
+      editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+      charlieGenerate.mockResolvedValue({ object: { mood_summary: 'With the cash rate at 4.60%, Strive bought bitcoin.' } });
+
+      const outcome = await runNewsCuration(ROUTINE);
+
+      expect(outcome.result?.summary).toBe('With the cash rate at 4.60%, Strive bought bitcoin.');
+    });
+
+    it('falls back to the neutral intro when the stated cash rate is wrong', async () => {
+      setPool([newsItem(0)], []);
+      fakeSupabase.__setResponse('v_indicator_latest', { data: { current_value: 4.6 }, error: null });
+      editorGenerate.mockResolvedValue({ object: { selected: [0] } });
+      charlieGenerate.mockResolvedValue({ object: { mood_summary: 'The RBA raised the cash rate to 4.85% overnight.' } });
+
+      const outcome = await runNewsCuration(ROUTINE);
+
+      expect(outcome.result?.summary).toBe('Curated 1 story.');
+      expect((outcome.result?.metadata as Record<string, unknown>)['mood_summary']).toBe('Curated 1 story.');
+    });
   });
 });

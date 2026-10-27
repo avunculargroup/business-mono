@@ -1,5 +1,5 @@
 import { supabase } from '../client.js';
-import { DEFAULT_TIMEZONE, dayBoundsInTz } from '@platform/shared';
+import { DEFAULT_TIMEZONE, dayBoundsInTz, normalizeKeyPoints } from '@platform/shared';
 import type { NewsCategory, NewsItemRecord } from '@platform/shared';
 
 export interface NewsVectorSearchResult {
@@ -104,7 +104,7 @@ export async function newsDailyDigest(
     if (bucket.length < 5) {
       bucket.push({
         ...(item as unknown as NewsItemRecord),
-        key_points: (item.key_points as string[]) ?? [],
+        key_points: normalizeKeyPoints(item.key_points),
         topic_tags: item.topic_tags ?? [],
       });
       grouped[cat] = bucket;

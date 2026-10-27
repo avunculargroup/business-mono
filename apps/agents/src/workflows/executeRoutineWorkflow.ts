@@ -38,7 +38,7 @@ import type {
   ReportWatchScanConfig,
   ReportWatchScanResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter, newKeyPoints, normalizeKeyPoints } from '@platform/shared';
 import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { runMarketReport } from '../lib/report/runMarketReport.js';
@@ -54,6 +54,7 @@ import { coerceToSchema } from './newsletter/coerce.js';
 import { startNewsletterRun } from './startNewsletterRun.js';
 import { shouldDropForRelevance } from './newsRelevance.js';
 import { verifyMoodSummary } from './newsCurationVerify.js';
+import { checkIntroCashRate, loadStoredCashRate } from '../lib/introCashRate.js';
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices, isListingPageUrl } from './newsDedup.js';
@@ -421,11 +422,30 @@ async function runResearchDigest(
 }
 
 /** One normalized item in the curation candidate pool. */
-interface CurationCandidate extends NewsCurationStory {
+export interface CurationCandidate extends NewsCurationStory {
   summary: string;
-  /** Extracted key points (news items); empty for podcasts. Used by the intro fact-check. */
+  /**
+   * The story's `new` key points only — background and opinion are cut here, in
+   * code, so neither the intro writer nor its fact-check ever sees a restated
+   * old fact as a candidate for today's news. Empty for podcasts.
+   */
   key_points: string[];
   published_at: string | null;
+}
+
+/**
+ * One story as the intro writer sees it. A news item is represented by its
+ * `new` key points rather than its stored summary: the summary is a paraphrase
+ * of the whole article, background included, and it is what put a month-old RBA
+ * hike into the 25 Oct digest. A news item with no new points shows its title
+ * alone; a podcast keeps its description, since episodes have no key points.
+ */
+function introStoryBlock(c: CurationCandidate, i: number): string {
+  const published = c.published_at ? ` — published ${c.published_at.slice(0, 10)}` : '';
+  const head = `${i + 1}. ${c.title} (${c.source_name})${published}`;
+  if (c.kind === 'podcast') return `${head}\n   ${c.summary.slice(0, 400)}`;
+  if (c.key_points.length === 0) return head;
+  return `${head}\n${c.key_points.map((p) => `   - ${p}`).join('\n')}`;
 }
 
 /**
@@ -481,6 +501,36 @@ export function topUpSelection<T extends { id: string }>(
     out.push(candidate);
   }
   return out;
+}
+
+/**
+ * Charlie's two-sentence digest intro over the selected stories. Exported so
+ * the news-background eval runs the same prompt the routine sends. Returns ''
+ * on any failure — the caller falls back to a neutral line.
+ */
+export async function draftIntro(selected: CurationCandidate[]): Promise<string> {
+  const moodPrompt = `Write a TWO-sentence intro (max 400 characters, no exclamation marks, BTS brand voice) for today's news digest. Ground it in the specific facts of the stories below — name the companies, figures, decisions, jurisdictions, or events that actually appear. A reader should learn the concrete substance from your two sentences. Do NOT write vague, sweeping generalities like "treasury desks lean in" or "the market is buzzing". "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
+
+Write only about new developments — what these stories report as happening now. Never restate an earlier decision, rate move or data release as if it were today's event: a story about rate expectations is news about the expectations, not a fresh report of the last rate decision. If a story lists no facts, refer to it by its subject only.
+
+${selected.map(introStoryBlock).join('\n\n')}
+
+${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
+
+  try {
+    const resp = await charlie.generate([{ role: 'user', content: moodPrompt }], {
+      requestContext: stepRequestContext('executeRoutine.news_curation_summary'),
+      structuredOutput: {
+        schema: curationMoodSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: { mood_summary: '' },
+      },
+    });
+    return coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
+  } catch (err) {
+    curationLog.warn({ err }, 'Charlie mood summary failed');
+    return '';
+  }
 }
 
 /**
@@ -542,9 +592,7 @@ export async function runNewsCuration(
     image_url: (r.image_url as string | null) ?? undefined,
     ...(r.paywalled === true ? { paywalled: true } : {}),
     summary: (r.summary as string | null) ?? '',
-    key_points: Array.isArray(r.key_points)
-      ? (r.key_points as unknown[]).filter((p): p is string => typeof p === 'string')
-      : [],
+    key_points: newKeyPoints(normalizeKeyPoints(r.key_points)).map((p) => p.text),
     published_at: (r.published_at as string | null) ?? null,
   }));
 
@@ -638,30 +686,11 @@ ${candidateLines}`;
   }));
 
   // ── Charlie writes the two-sentence, fact-grounded intro summary ─────────────
-  const moodPrompt = `Write a TWO-sentence intro (max 400 characters, no exclamation marks, BTS brand voice) for today's news digest. Ground it in the specific facts of the stories below — name the companies, figures, decisions, jurisdictions, or events that actually appear. A reader should learn the concrete substance from your two sentences. Do NOT write vague, sweeping generalities like "treasury desks lean in" or "the market is buzzing". "Bitcoin" (capital B) = network/protocol; "bitcoin" (lowercase b) = the currency.
-
-${selected.map((c, i) => `${i + 1}. ${c.title} (${c.source_name})\n   ${c.summary.slice(0, 400)}`).join('\n\n')}
-
-${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
-
-  let moodSummary = '';
-  try {
-    const resp = await charlie.generate([{ role: 'user', content: moodPrompt }], {
-      requestContext: stepRequestContext('executeRoutine.news_curation_summary'),
-      structuredOutput: {
-        schema: curationMoodSchema,
-        errorStrategy: 'fallback',
-        fallbackValue: { mood_summary: '' },
-      },
-    });
-    moodSummary = coerceToSchema(curationMoodSchema, resp.object ?? { mood_summary: '' }).mood_summary;
-  } catch (err) {
-    curationLog.warn({ err }, 'Charlie mood summary failed');
-  }
+  let moodSummary = await draftIntro(selected);
 
   // ── Fact-check the intro against the stories' key facts ──────────────────────
   // Charlie is primed on BTS's corporate-treasury audience and works from a
-  // truncated summary, so it can reframe a story onto that audience (e.g. cast an
+  // handful of key points, so it can reframe a story onto that audience (e.g. cast an
   // individuals/sole-trader tax change as a corporate obligation). The verifier
   // passes a faithful draft through, rewrites an unsupported one, or — when it
   // can't be salvaged — hands back a neutral fallback. Best-effort: never throws.
@@ -673,7 +702,9 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
         title: c.title,
         source_name: c.source_name,
         key_points: c.key_points,
-        summary: c.summary,
+        // A news item's summary paraphrases its background too, so it is not
+        // evidence for the intro; only a podcast falls back to its description.
+        summary: c.kind === 'podcast' ? c.summary : '',
       })),
       neutralFallback,
     });
@@ -681,6 +712,17 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
       curationLog.info({ status: verification.status }, 'intro adjusted by verifier');
     }
     moodSummary = verification.summary;
+
+    // The verifier trusts the stories; this trusts our own stored rate. A cash
+    // rate figure that disagrees with it drops the intro to the neutral line.
+    const rateCheck = checkIntroCashRate(moodSummary, await loadStoredCashRate());
+    if (rateCheck.status === 'mismatch') {
+      curationLog.warn(
+        { stated: rateCheck.stated, stored: rateCheck.stored, intro: moodSummary },
+        'intro cash rate disagrees with stored rate — using neutral intro',
+      );
+      moodSummary = neutralFallback;
+    }
   }
 
   // ── Headline image: walk the ranked stories and use the first that resolves ──
@@ -727,7 +769,7 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
 
   // Email the curated digest to the team. Best-effort: deliverNewsDigest never
   // throws, so a delivery problem can't fail the routine.
-  await deliverNewsDigest({ id: routine.id, title: routine.name }, result);
+  const delivery = await deliverNewsDigest({ id: routine.id, title: routine.name }, result);
 
   return {
     ...base,
@@ -738,6 +780,7 @@ ${NEWS_CURATION_NO_TOOL_INSTRUCTION}`;
       candidates: candidates.length,
       editor_picked: editorPicked,
       stories: stories.length,
+      delivery: { ...delivery, sent_at: delivery.sent > 0 ? new Date().toISOString() : null },
     },
   };
 }
@@ -1997,6 +2040,7 @@ const persistAndSchedule = createStep({
         trigger_type: 'scheduled',
         entity_type: 'routine',
         entity_id: outcome.routine_id,
+        workflow_run_id: params.runId,
         approved_actions: outcome.result
           ? ([outcome.result as unknown as Record<string, unknown>] as Json)
           : null,

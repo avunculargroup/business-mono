@@ -192,6 +192,17 @@ export interface NewsCurationRunStats {
   editor_picked: number;
   // Items actually featured in the digest.
   stories: number;
+  // What happened to the email. The intro and story IDs are already on the same
+  // agent_activity row (approved_actions[0].metadata); this records whether — and
+  // when — that text actually reached the team. Absent on runs with no stories.
+  delivery?: {
+    configured: boolean;
+    attempted: number;
+    sent: number;
+    failed: number;
+    // When the send finished, if at least one recipient got it; null otherwise.
+    sent_at: string | null;
+  };
 }
 
 // action_config shape for an 'indicator_poll' routine. Polls economic_indicators.

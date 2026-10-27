@@ -12,7 +12,7 @@
  */
 
 import { supabase } from '@platform/db';
-import type { NewsCategory } from '@platform/shared';
+import type { KeyPoint, NewsCategory } from '@platform/shared';
 import { embedText } from '../lib/embedText.js';
 import { scoreNewsItem, RUBRIC_VERSION, type SimilarItem } from './newsRubric.js';
 
@@ -31,7 +31,7 @@ export interface IngestNewsItemInput {
   /** Extractor summary — used as the stored summary only if rubric scoring fails. */
   fallbackSummary: string;
   category: NewsCategory;
-  keyPoints: string[];
+  keyPoints: KeyPoint[];
   topicTags: string[];
   australianRelevance: boolean;
   author?: string | null;

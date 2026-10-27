@@ -42,7 +42,9 @@ src/
   seeds/           # One-off seed scripts (seed:voice)
   scripts/         # One-off backfills (backfill:rechunk — turn-aware transcript re-chunk;
                    #   backfill:newsletter — newsletter body and link clean;
-                   #   backfill:papers — seed the library papers register)
+                   #   backfill:papers — seed the library papers register;
+                   #   backfill:key-point-kinds — re-extract recent news key points
+                   #   as new/background/opinion; dry run unless --apply)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
 ```

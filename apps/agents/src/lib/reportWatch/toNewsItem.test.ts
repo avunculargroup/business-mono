@@ -42,7 +42,7 @@ const goodExtraction = {
   data: {
     category: 'corporate',
     summary: 'A summary of the report that is long enough to be useful to a reader.',
-    key_points: ['a', 'b'],
+    key_points: [{ text: 'a', kind: 'new' as const }, { text: 'b', kind: 'new' as const }],
     topic_tags: ['adoption', 'treasury-strategy'],
     australian_relevance: false,
     bitcoin_relevance: true,

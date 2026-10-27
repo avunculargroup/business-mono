@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { formatKeyPointsForPrompt, normalizeKeyPoints } from '@platform/shared';
 import { SOCIAL_POST_FORM_VALUES, type SocialPostForm } from './forms.js';
 
 // Pure story-selection helpers for the social_post_from_news routine. A founder's
@@ -15,6 +16,7 @@ export interface StoryCandidate {
   summary: string;
   source_name: string;
   category: string;
+  /** Prompt-ready lines: background and opinion points carry a `[kind]` label. */
   key_points: string[];
   topic_tags: string[];
   relevance_score: number | null;
@@ -47,7 +49,7 @@ export function mapNewsRowToCandidate(row: Row): StoryCandidate {
     summary: (row.summary as string | null) ?? '',
     source_name: (row.source_name as string | null) ?? 'News',
     category: (row.category as string | null) ?? 'news',
-    key_points: Array.isArray(row.key_points) ? (row.key_points as string[]) : [],
+    key_points: formatKeyPointsForPrompt(normalizeKeyPoints(row.key_points)),
     topic_tags: Array.isArray(row.topic_tags) ? (row.topic_tags as string[]) : [],
     relevance_score: (row.relevance_score as number | null) ?? null,
     published_at: (row.published_at as string | null) ?? null,

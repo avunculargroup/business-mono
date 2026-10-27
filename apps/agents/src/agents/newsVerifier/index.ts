@@ -30,6 +30,7 @@ Every claim in the intro must be supported by the story facts. Scrutinise, in pa
 - WHO a policy, ruling, tax change, or decision applies to. Individuals, sole traders, trusts, complying super funds, and companies are DIFFERENT parties — do not let the intro widen or swap them. (For example: Australia's 50% CGT discount applies to individuals, trusts, and super funds, not companies, so a change to it is not a corporate-treasury obligation.)
 - Figures, dates, thresholds, and named entities — the intro may not invent or alter them.
 - Jurisdiction — the intro may not relocate a story to Australia (or anywhere else) unless the facts place it there.
+- Timing — the facts list only what each story reports as new. An earlier decision or data release (e.g. a past rate rise) stated as a current event is unsupported unless it appears in the facts, even if it is true.
 
 The digest audience is BTS's corporate-treasury clients, but that is NOT licence to reframe a story onto them. Report what the story says, not who BTS wishes it were about.
 
