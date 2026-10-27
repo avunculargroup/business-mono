@@ -26,6 +26,12 @@ describe('openalex', () => {
     expect(normaliseDoi('https://doi.org/10.5195/LEDGER.2018.127')).toBe('10.5195/ledger.2018.127');
     expect(normaliseDoi('10.20944/preprints202108.0555.v1')).toBe('10.20944/preprints202108.0555.v1');
     expect(normaliseDoi('W2766522683')).toBeNull();
+    // From the first live backfill: a URL copied out of running text.
+    expect(normaliseDoi('http://doi.org/10.2139/ssrn.3550842>).')).toBe('10.2139/ssrn.3550842');
+    expect(normaliseDoi('https://doi.org/10.1016/j.frl.2021.102016).')).toBe('10.1016/j.frl.2021.102016');
+    // A DOI's own parentheses survive.
+    expect(normaliseDoi('10.1016/S0140-6736(20)30183-5')).toBe('10.1016/s0140-6736(20)30183-5');
+    expect(normaliseDoi('10.1016/S0140-6736(20)30183-5).')).toBe('10.1016/s0140-6736(20)30183-5');
     expect(shortOpenAlexId('https://openalex.org/W2766522683')).toBe('W2766522683');
     expect(shortOpenAlexId('nonsense')).toBeNull();
   });
