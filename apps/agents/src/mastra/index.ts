@@ -167,7 +167,9 @@ export const mastra = new Mastra({
   //      resolves to its own CJS build and works — so keep it external.
   bundler: {
     transpilePackages: ['@platform/shared', '@platform/db', '@platform/signal', '@platform/voice'],
-    externals: ['xmlbuilder', 'turndown'],
+    // `sharp` (social post image crop + mark) ships a native libvips binary
+    // per platform; it must be resolved from node_modules, never bundled.
+    externals: ['xmlbuilder', 'turndown', 'sharp'],
   },
   // Route Mastra's framework-internal logs through pino too, so they emit the
   // same single-line JSON as the app logger. prettyPrint is off in production

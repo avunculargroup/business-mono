@@ -106,4 +106,31 @@ describe('renderSocialDraftEmail', () => {
     expect(text).toContain('1/ First point about rates.');
     expect(text).toContain('https://hq.bts.example/content/ci-li');
   });
+
+  it('shows each post\'s own image crop at full card width, with its alt text', () => {
+    const { html, text } = renderSocialDraftEmail({
+      founderName: 'Chris',
+      story: STORY,
+      posts: [
+        { ...LINKEDIN_POST, image: { url: 'https://signed.example/li.png?token=a&b=1', altText: 'A sketch of a "level" scale.' } },
+        { ...X_THREAD, image: { url: 'https://signed.example/x.png', altText: 'A sketch of a scale.' } },
+      ],
+      company: COMPANY,
+    });
+    expect(html).toContain(
+      '<img src="https://signed.example/li.png?token=a&amp;b=1" alt="A sketch of a &quot;level&quot; scale." width="100%" style="display:block;width:100%;height:auto;border-radius:8px;">',
+    );
+    expect(html).toContain('src="https://signed.example/x.png"');
+    expect(text).toContain('Image: A sketch of a scale.');
+  });
+
+  it('renders no image when the post has none, or the URL is not http(s)', () => {
+    const { html } = renderSocialDraftEmail({
+      founderName: 'Chris',
+      story: STORY,
+      posts: [LINKEDIN_POST, { ...X_THREAD, image: { url: 'javascript:alert(1)', altText: 'x' } }],
+      company: COMPANY,
+    });
+    expect(html).not.toContain('<img');
+  });
 });

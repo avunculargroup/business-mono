@@ -2,7 +2,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModelV4, LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import { RequestContext } from '@mastra/core/request-context';
-import { DEFAULT_MODEL, MODEL_SCOPES } from '@platform/shared';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_MODEL, MODEL_SCOPES } from '@platform/shared';
 import { supabase } from '@platform/db';
 import { isKeyLimitError } from '../lib/llmErrors.js';
 import { createLogger } from '../lib/logger.js';
@@ -196,6 +196,17 @@ async function resolveModel(
     }
   }
   return buildModel(modelId ?? ENV_DEFAULT_MODEL_ID);
+}
+
+/**
+ * Resolve the model id for an `image_step` scope. Image scopes return an id
+ * string for the OpenRouter Image API, not a LanguageModel, and never fall back
+ * to an agent: a model_configs row wins, then env OPENROUTER_IMAGE_MODEL, then
+ * DEFAULT_IMAGE_MODEL.
+ */
+export async function resolveImageModelId(scopeKey: string): Promise<string> {
+  const configs = await getConfigs();
+  return configs.get(scopeKey) ?? process.env['OPENROUTER_IMAGE_MODEL'] ?? DEFAULT_IMAGE_MODEL;
 }
 
 /**

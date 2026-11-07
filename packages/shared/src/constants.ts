@@ -1,6 +1,12 @@
 // Model used across all agents
 export const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5';
 
+// Image model for the social post image render (OpenRouter Image API), used when
+// neither a model_configs row nor env OPENROUTER_IMAGE_MODEL is set. Provisional:
+// the bake-off (docs/features/social-post-image/feature-spec.md, step 0) picks
+// the real default.
+export const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
+
 // Embedding model (OpenAI)
 export const EMBEDDING_MODEL = 'text-embedding-3-small';
 export const EMBEDDING_DIMENSIONS = 1536;

@@ -161,6 +161,8 @@ Rarely used. Backdrop blur only appears on the mobile "More" sheet backdrop (`rg
 
 There is **no stock photography** in this product. No hero images, no finance clichés (gold bars, bitcoin coins, rising chart illustrations). If illustration is ever needed for empty states or onboarding: simple line art in the warm palette, not playful or cartoon. Warm tone, never cool or grainy.
 
+**Generated social post images** follow the sketch canon held in the `brand_visual` table (hand-drawn graphite and ink on warm paper, one muted-gold accent, a closed motif vocabulary, no text). The BTS mark is composited bottom-right by code and is never drawn by the image model. Edit the canon in the table, not here — see `docs/features/social-post-image/feature-spec.md`.
+
 ### Cards
 
 - `--color-surface` background, 1px `--color-border`, `12px` radius, `--shadow-sm` default.

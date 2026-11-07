@@ -6,6 +6,25 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — Social post images: `brand_visual`, `content_images` provenance
+
+`20261108000000_add_brand_visual.sql` adds `brand_visual`, the versioned visual canon for the
+daily social post image (app-layer singleton like `brand_voice`, `is_team_member()` RLS), seeded
+with v1.0: light, hand-drawn sketch style, one gold accent, a closed vocabulary of ten motifs.
+It is a table rather than code so the founders can tune it without a deploy, and every image
+records the version it used. `prohibited_block` is sent to the image model; `prohibited_terms`
+is not — it feeds the deterministic brief linter. The same migration widens
+`model_configs.scope_type` to admit `image_step`, because an image scope resolves to a model id
+string rather than a language model and never falls back to an agent.
+`20261108000001_extend_content_images.sql` adds nullable provenance columns to
+`content_images` (`generation_group_id`, `image_brief`, `assembled_prompt`,
+`brand_visual_version`, `model_id`, `generation_ref`, `cost_usd`, `is_style_anchor`,
+`review_outcome`, `alt_text_verdict`), so any generated image can be explained later — which
+prompt, which model, which canon, what it cost. Uploads are unaffected. Spec:
+`docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-10-24 — Newsletter extraction: raw HTML, per-source link rules
 
 `20261024000000_newsletter_extraction.sql` adds `news_item_raw`, one row per email item

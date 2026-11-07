@@ -2,7 +2,7 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
-**Status:** Draft
+**Status:** Sessions 1–2 built (data layer + pipeline); step 0 bake-off and Session 3 UI outstanding
 **Last updated:** 2026-11-08
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 

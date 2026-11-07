@@ -10,6 +10,7 @@ const charlieGenerate = vi.fn();
 const lexGenerate = vi.fn();
 const sendSocialDraft = vi.fn();
 const resolveVoiceContext = vi.fn();
+const runImageStep = vi.fn();
 
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('@platform/voice', () => ({ resolveVoiceContext }));
@@ -17,6 +18,8 @@ vi.mock('../../agents/contentCreator/index.js', () => ({ charlie: { generate: ch
 vi.mock('../../agents/editorial/index.js', () => ({ editor: { generate: editorGenerate } }));
 vi.mock('../../agents/compliance/index.js', () => ({ lex: { generate: lexGenerate } }));
 vi.mock('../../lib/sendSocialDraft.js', () => ({ sendSocialDraft }));
+// Step 5b has its own suite (image.test.ts); here only its wiring is asserted.
+vi.mock('./image.js', () => ({ runImageStep }));
 vi.mock('../../config/model.js', () => ({
   stepRequestContext: vi.fn(() => ({})),
   dynamicModelFor: vi.fn(() => 'mock-model'),
@@ -106,6 +109,7 @@ beforeEach(() => {
     object: { classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'edu' },
   });
   sendSocialDraft.mockResolvedValue(true);
+  runImageStep.mockResolvedValue({ outcome: { status: 'skipped', reason: 'quiet' }, images: new Map() });
 });
 
 describe('runSocialPost', () => {
@@ -276,5 +280,76 @@ describe('runSocialPost', () => {
     const posts = (outcome.result?.metadata as Record<string, unknown>)['posts'] as unknown[];
     expect(posts).toHaveLength(1);
     expect(sendSocialDraft).toHaveBeenCalledTimes(1);
+  });
+
+  describe('image step (5b)', () => {
+    it('runs once after every draft is persisted, with the LinkedIn copy, and puts each crop on its email card', async () => {
+      wireHappyPath();
+      fakeSupabase.__setResponses('content_items', [
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: { id: 'ci-li' }, error: null },
+        { data: { id: 'ci-x' }, error: null },
+      ]);
+      runImageStep.mockResolvedValue({
+        outcome: { status: 'generated', generation_group_id: 'g-1', motif_key: 'balance', cost_usd: 0.04 },
+        images: new Map([
+          ['ci-li', { url: 'https://signed.example/li.png', altText: 'A scale.' }],
+          ['ci-x', { url: 'https://signed.example/x.png', altText: 'A scale.' }],
+        ]),
+      });
+
+      const outcome = await runSocialPost(ROUTINE);
+
+      expect(runImageStep).toHaveBeenCalledTimes(1);
+      const params = runImageStep.mock.calls[0]![0];
+      expect(params.posts).toEqual([
+        { contentItemId: 'ci-li', platform: 'linkedin' },
+        { contentItemId: 'ci-x', platform: 'twitter_x' },
+      ]);
+      expect(params.postCopy).toContain('The RBA held rates at 4.35%.');
+      expect(params.accountIds).toEqual(['acc-li', 'acc-x']);
+      // Called after both content_items inserts.
+      const lastInsertOrder = Math.max(
+        ...fakeSupabase.__buildersFor('content_items').map((b) => b.insert.mock.invocationCallOrder[0] ?? 0),
+      );
+      expect(runImageStep.mock.invocationCallOrder[0]).toBeGreaterThan(lastInsertOrder);
+
+      const emailPosts = sendSocialDraft.mock.calls[0]![0].posts as Array<{ contentItemId: string; image?: { url: string } }>;
+      expect(emailPosts.find((p) => p.contentItemId === 'ci-li')?.image?.url).toBe('https://signed.example/li.png');
+      expect(emailPosts.find((p) => p.contentItemId === 'ci-x')?.image?.url).toBe('https://signed.example/x.png');
+
+      const meta = outcome.result?.metadata as Record<string, unknown>;
+      expect(meta['image']).toEqual({ status: 'generated', generation_group_id: 'g-1', motif_key: 'balance', cost_usd: 0.04 });
+    });
+
+    it('does not run when generate_image is false', async () => {
+      wireHappyPath();
+      const outcome = await runSocialPost({
+        ...ROUTINE,
+        action_config: { ...ROUTINE.action_config, generate_image: false },
+      });
+      expect(runImageStep).not.toHaveBeenCalled();
+      expect((outcome.result?.metadata as Record<string, unknown>)['image']).toMatchObject({ status: 'disabled' });
+    });
+
+    it('never fails the run or blocks the email when the image step throws', async () => {
+      wireHappyPath();
+      runImageStep.mockRejectedValue(new Error('boom'));
+
+      const outcome = await runSocialPost(ROUTINE);
+
+      expect(outcome.status).toBe('success');
+      expect(sendSocialDraft).toHaveBeenCalledTimes(1);
+      expect((outcome.result?.metadata as Record<string, unknown>)['image']).toEqual({ status: 'failed', reason: 'boom' });
+    });
+
+    it('does not run when no draft persisted', async () => {
+      wireHappyPath();
+      charlieGenerate.mockRejectedValue(new Error('model down'));
+      const outcome = await runSocialPost(ROUTINE);
+      expect(outcome.status).toBe('failed');
+      expect(runImageStep).not.toHaveBeenCalled();
+    });
   });
 });
