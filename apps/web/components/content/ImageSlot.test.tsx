@@ -5,6 +5,7 @@ import { toBrandVisual } from '@platform/shared';
 import type { ContentImage, ContentImageRequest } from '@platform/data';
 
 const actions = {
+  selectImageCandidate: vi.fn(),
   getImageDownloadUrl: vi.fn(),
   requestImageRegenerate: vi.fn(),
   requestImageRender: vi.fn(),
@@ -14,6 +15,7 @@ const actions = {
 };
 vi.mock('@/app/actions/contentImages', () => ({
   getImageDownloadUrl: (...a: unknown[]) => actions.getImageDownloadUrl(...a),
+  selectImageCandidate: (...a: unknown[]) => actions.selectImageCandidate(...a),
   requestImageRegenerate: (...a: unknown[]) => actions.requestImageRegenerate(...a),
   requestImageRender: (...a: unknown[]) => actions.requestImageRender(...a),
   saveImageAltText: (...a: unknown[]) => actions.saveImageAltText(...a),
@@ -53,33 +55,41 @@ const CANON = toBrandVisual({
   palette: [{ role: 'Paper', hex: '#FAFAF8', usage: 'warm off-white' }],
   composition_block: 'Leave the bottom-right corner empty.',
   prohibited_block: 'Never include text.',
-  prohibited_terms: ['rocket'],
-  motifs: [
-    { key: 'vault', label: 'Vault', description: 'A strongbox', use_when: 'Custody', is_active: true },
-    { key: 'horizon', label: 'Horizon', description: 'A low line', use_when: 'Macro', is_active: true },
+  prohibited_terms: ['rocket', 'hourglass'],
+  motifs: [{ key: 'timepiece', label: 'Timepiece', description: 'An hourglass', use_when: 'Time', is_active: true }],
+  layouts: [
+    { key: 'left_third', label: 'Left third', description: 'Subject in the left third.', is_active: true },
+    { key: 'low_horizon', label: 'Low horizon', description: 'One horizon line, low.', is_active: true },
   ],
 });
 
-function image(overrides: Partial<ContentImage> = {}): ContentImage & { url: string | null } {
+const PIER = {
+  tension: 'Nobody knows the trigger, only that the safe ground is shorter than it looks.',
+  subject: 'A timber pier running out over open water',
+  drawn: 'the near end of the pier',
+  undrawn: 'the far end, as pencil guidelines over the water',
+  layout: 'left_third',
+  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+};
+
+function image(overrides: Partial<ContentImage & { url: string | null }> = {}): ContentImage & { url: string | null } {
   return {
     id: 'img-1',
     source: 'ai_generated',
     storagePath: `social-images/2026-11-08/${GROUP}/linkedin-1200x627.png`,
     masterPath: `social-images/2026-11-08/${GROUP}/master-16x9.png`,
     generationGroupId: GROUP,
-    altText: 'A pencil sketch of an open strongbox.',
+    altText: 'A pencil sketch of a pier whose far end is only outlined.',
     platformCrop: 'linkedin_1200x627',
-    brief: {
-      skip: false,
-      skip_reason: null,
-      motif_key: 'vault',
-      subject: 'An open strongbox on a desk',
-      metaphor: 'custody is a habit',
-      composition: null,
-      alt_text: 'A pencil sketch of an open strongbox.',
-    },
+    brief: PIER,
+    tension: PIER.tension,
+    layout: 'left_third',
+    motifKey: null,
+    candidateSetId: 'set-1',
+    candidateIndex: 0,
+    isSelected: true,
     assembledPrompt: 'PROMPT',
-    brandVisualVersion: '1.0',
+    brandVisualVersion: '1.1',
     modelId: 'google/gemini-2.5-flash-image',
     costUsd: 0.039,
     isStyleAnchor: false,
@@ -102,8 +112,9 @@ beforeEach(() => {
 describe('ImageSlot', () => {
   it('shows the image with its alt text and provenance line', () => {
     render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
-    expect(screen.getByRole('img', { name: 'A pencil sketch of an open strongbox.' })).toHaveAttribute('src', 'https://signed.example/li.png');
-    expect(screen.getByText('Vault · google/gemini-2.5-flash-image · canon v1.0 · $0.04')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'A pencil sketch of a pier whose far end is only outlined.' })).toHaveAttribute('src', 'https://signed.example/li.png');
+    expect(screen.getByText('Left third · google/gemini-2.5-flash-image · canon v1.1 · $0.04')).toBeInTheDocument();
+    expect(screen.getByText(PIER.tension)).toBeInTheDocument();
     // A clear verdict shows no chip.
     expect(screen.queryByText(/alt text implies/i)).not.toBeInTheDocument();
   });
@@ -174,7 +185,7 @@ describe('ImageSlot', () => {
 
   it('shows progress and disables actions while a request is open', () => {
     render(<ImageSlot contentItemId={ITEM} image={image()} request={request()} canon={CANON} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Rendering a new image');
+    expect(screen.getByRole('status')).toHaveTextContent('Rendering a new set of images');
     expect(screen.getByRole('button', { name: 'Regenerate image' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Edit brief' })).toBeDisabled();
   });
@@ -207,26 +218,86 @@ describe('ImageSlot', () => {
     expect(screen.queryByRole('button', { name: 'Use as style anchor' })).not.toBeInTheDocument();
   });
 
-  it('edits the brief with a live prompt preview and lint, then renders', async () => {
+  it('edits the concept with a live prompt preview and lint, then renders', async () => {
     const user = userEvent.setup();
     render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
     await user.click(screen.getByRole('button', { name: 'Edit brief' }));
 
+    // No motif select any more; the concept's fields, prefilled from the selected image.
+    expect(screen.queryByLabelText('Motif')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Tension')).toHaveValue(PIER.tension);
     const prompt = screen.getByText(/^A hand-drawn sketch\./);
-    expect(prompt).toHaveTextContent('Visual metaphor: Vault — custody is a habit');
+    expect(prompt).toHaveTextContent('Leave as construction lines only: the far end, as pencil guidelines over the water');
+    expect(prompt).not.toHaveTextContent(PIER.tension);
 
     const subject = screen.getByLabelText('Subject');
     await user.clear(subject);
-    await user.type(subject, 'A rocket on a desk');
-    expect(screen.getByText('subject names prohibited imagery: rocket.')).toBeInTheDocument();
+    await user.type(subject, 'An hourglass on a desk');
+    expect(screen.getByText('subject names prohibited imagery: hourglass.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Render with this brief' })).toBeDisabled();
 
+    const undrawn = screen.getByLabelText('Construction lines only');
     await user.clear(subject);
-    await user.type(subject, 'A low horizon line');
-    await user.selectOptions(screen.getByLabelText('Motif'), 'horizon');
-    expect(screen.getByText(/^A hand-drawn sketch\./)).toHaveTextContent('Visual metaphor: Horizon — custody is a habit');
+    await user.type(subject, 'A footbridge half built across a gorge');
+    await user.clear(undrawn);
+    expect(screen.getByText(/undrawn is missing/)).toBeInTheDocument();
+    await user.type(undrawn, 'the spans that would reach the far side');
+    await user.selectOptions(screen.getByLabelText('Layout'), 'low_horizon');
+    expect(screen.getByText(/^A hand-drawn sketch\./)).toHaveTextContent('Layout: Low horizon: One horizon line, low.');
     await user.click(screen.getByRole('button', { name: 'Render with this brief' }));
-    expect(actions.requestImageRender).toHaveBeenCalledWith(ITEM, expect.objectContaining({ motif_key: 'horizon', subject: 'A low horizon line' }));
+    expect(actions.requestImageRender).toHaveBeenCalledWith(
+      ITEM,
+      expect.objectContaining({ layout: 'low_horizon', subject: 'A footbridge half built across a gorge', undrawn: 'the spans that would reach the far side' }),
+    );
+  });
+
+  it('shows the run\'s other candidates with their tension, and switches to one', async () => {
+    const user = userEvent.setup();
+    const bridge = image({
+      id: 'img-2',
+      generationGroupId: 'g-2',
+      candidateIndex: 1,
+      isSelected: false,
+      tension: 'Everyone is building toward a far side nobody has surveyed.',
+      altText: 'A pencil sketch of a half-built footbridge.',
+      url: 'https://signed.example/bridge.png',
+    });
+    render(<ImageSlot contentItemId={ITEM} image={image()} candidates={[bridge]} request={null} canon={CANON} />);
+
+    expect(screen.getByText('Other options')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'A pencil sketch of a half-built footbridge.' })).toHaveAttribute('src', 'https://signed.example/bridge.png');
+    expect(screen.getByText('Everyone is building toward a far side nobody has surveyed.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Use option 1: Everyone is building/ }));
+    expect(actions.selectImageCandidate).toHaveBeenCalledWith({ contentItemId: ITEM, generationGroupId: 'g-2' });
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it('still offers the candidates after the selected image is removed', () => {
+    const bridge = image({ id: 'img-2', generationGroupId: 'g-2', isSelected: false, tension: 'Far side.' });
+    render(<ImageSlot contentItemId={ITEM} image={null} candidates={[bridge]} request={null} canon={CANON} />);
+    expect(screen.getByText('No image on this draft.')).toBeInTheDocument();
+    expect(screen.getByText('Options')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Use option 1/ })).toBeEnabled();
+  });
+
+  it('disables switching while a render runs', () => {
+    const bridge = image({ id: 'img-2', generationGroupId: 'g-2', isSelected: false });
+    render(<ImageSlot contentItemId={ITEM} image={image()} candidates={[bridge]} request={request()} canon={CANON} />);
+    expect(screen.getByRole('button', { name: /Use option 1/ })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Rendering a new set of images');
+  });
+
+  it('labels a v1.0 image by its motif', () => {
+    render(
+      <ImageSlot
+        contentItemId={ITEM}
+        image={image({ brief: null, tension: null, layout: null, motifKey: 'timepiece', brandVisualVersion: '1.0', candidateSetId: null })}
+        request={null}
+        canon={CANON}
+      />,
+    );
+    expect(screen.getByText(/^Timepiece · /)).toBeInTheDocument();
   });
 
   it('offers a brief when there is no image, and points to the canon when there is none', () => {

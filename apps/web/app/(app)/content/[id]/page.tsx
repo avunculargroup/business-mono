@@ -19,7 +19,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
 
   // The image slot needs a signed URL and the visual canon: storage and a
   // singleton the content read model does not carry.
-  const slot = hasImageSlot(item.type) ? await loadImageSlotData(await createClient(), item.image) : null;
+  const slot = hasImageSlot(item.type) ? await loadImageSlotData(await createClient(), item.image, item.imageCandidates) : null;
 
   return (
     <>
@@ -34,6 +34,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
             <ImageSlot
               contentItemId={item.id}
               image={slot.image}
+              candidates={slot.candidates}
               request={item.latestImageRequest}
               canon={slot.canon}
             />

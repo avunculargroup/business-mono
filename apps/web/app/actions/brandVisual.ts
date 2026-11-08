@@ -25,21 +25,20 @@ const canonSchema = z.object({
   palette: z
     .array(z.object({ role: z.string().trim().min(1, 'Name every colour'), hex, usage: z.string().trim() }))
     .min(1, 'Keep at least one colour'),
-  motifs: z
+  layouts: z
     .array(
       z.object({
         key: z
           .string()
           .trim()
-          .regex(/^[a-z][a-z0-9_]{1,39}$/, 'Motif keys are lowercase words joined by underscores'),
-        label: z.string().trim().min(1, 'Every motif needs a label'),
-        description: z.string().trim().min(1, 'Every motif needs a description'),
-        use_when: z.string().trim(),
+          .regex(/^[a-z][a-z0-9_]{1,39}$/, 'Layout keys are lowercase words joined by underscores'),
+        label: z.string().trim().min(1, 'Every layout needs a label'),
+        description: z.string().trim().min(1, 'Every layout needs a description'),
         is_active: z.boolean(),
       }),
     )
-    .refine((m) => m.some((x) => x.is_active), 'Keep at least one motif active')
-    .refine((m) => new Set(m.map((x) => x.key)).size === m.length, 'Motif keys must be unique'),
+    .refine((l) => l.some((x) => x.is_active), 'Keep at least one layout active')
+    .refine((l) => new Set(l.map((x) => x.key)).size === l.length, 'Layout keys must be unique'),
   brand_mark: z.object({
     enabled: z.boolean(),
     height_pct: z.number().min(3, 'Mark height is between 3% and 20%').max(20, 'Mark height is between 3% and 20%'),
@@ -76,7 +75,8 @@ export async function saveBrandVisual(input: BrandVisualInput) {
       prohibited_block: d.prohibited_block,
       prohibited_terms: [...new Set(d.prohibited_terms.map((t) => t.toLowerCase()))],
       palette: d.palette,
-      motifs: d.motifs,
+      // `motifs` (canon v1.0) is not written: retired, kept on the row for old images.
+      layouts: d.layouts,
       // Position and opacity are not editable; keep whatever the row holds.
       brand_mark: { ...((existing.brand_mark as Record<string, unknown>) ?? {}), ...d.brand_mark, position: 'bottom_right' },
       notes: d.notes || null,

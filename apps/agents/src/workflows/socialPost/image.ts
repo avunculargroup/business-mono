@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { supabase } from '@platform/db';
-import type { SocialPostImageOutcome } from '@platform/shared';
+import { planCandidateSelection, type CandidateRow, type SocialPostImageOutcome } from '@platform/shared';
 import { resolveImageModelId, stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { lex } from '../../agents/compliance/index.js';
@@ -377,10 +377,7 @@ export async function selectCandidate(
     .select('id, generation_group_id, review_outcome')
     .eq('candidate_set_id', candidateSetId);
   if (readErr) throw new Error(`reading the candidate set failed: ${readErr.message}`);
-  const rows = (data ?? []) as Array<{ id: string; generation_group_id: string; review_outcome: string | null }>;
-  const live = (r: (typeof rows)[number]) => r.review_outcome !== 'removed' && r.review_outcome !== 'regenerated';
-  const offIds = rows.filter((r) => r.generation_group_id !== generationGroupId && live(r)).map((r) => r.id);
-  const onIds = rows.filter((r) => r.generation_group_id === generationGroupId).map((r) => r.id);
+  const { onIds, offIds } = planCandidateSelection((data ?? []) as CandidateRow[], generationGroupId);
   if (onIds.length === 0) throw new Error('that candidate is not in this set');
 
   if (offIds.length > 0) {

@@ -5,7 +5,13 @@ import { SlideOver } from '@platform/ui/SlideOver';
 import { Button } from '@platform/ui/Button';
 import { FormSelect, FormTextarea } from '@platform/ui/FormField';
 import { useToast } from '@platform/ui/ToastProvider';
-import { activeMotifs, buildImagePrompt, lintImageBrief, type BrandVisual, type ImageBrief } from '@platform/shared';
+import {
+  activeLayouts,
+  buildImagePrompt,
+  lintImageConcept,
+  type BrandVisual,
+  type ImageConcept,
+} from '@platform/shared';
 import { requestImageRender } from '@/app/actions/contentImages';
 import styles from './ImageSlot.module.css';
 
@@ -15,58 +21,55 @@ interface ImageBriefSlideOverProps {
   onQueued: () => void;
   contentItemId: string;
   canon: BrandVisual;
-  initial: ImageBrief | null;
+  /** The concept to start from: the selected image's, or null for a blank brief. */
+  initial: ImageConcept | null;
 }
 
 /**
- * Edit an image's brief and render it. The assembled prompt shows beneath the
- * fields, built by the same function the agents server uses, so what is shown
- * is exactly what will be sent. Lint flags show live, before a render is paid for.
+ * Edit one image concept and render it. The new image joins the draft's
+ * candidates and is selected. The assembled prompt shows beneath the fields,
+ * built by the same function the agents server uses, so what is shown is
+ * exactly what will be sent. Lint flags show live, before a render is paid for.
  */
 export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, canon, initial }: ImageBriefSlideOverProps) {
-  const motifs = activeMotifs(canon);
-  const [motifKey, setMotifKey] = useState(initial?.motif_key ?? motifs[0]?.key ?? '');
+  const layouts = activeLayouts(canon);
+  const startLayout = initial && layouts.some((l) => l.key === initial.layout) ? initial.layout : (layouts[0]?.key ?? '');
+  const [tension, setTension] = useState(initial?.tension ?? '');
   const [subject, setSubject] = useState(initial?.subject ?? '');
-  const [metaphor, setMetaphor] = useState(initial?.metaphor ?? '');
-  const [composition, setComposition] = useState(initial?.composition ?? '');
+  const [drawn, setDrawn] = useState(initial?.drawn ?? '');
+  const [undrawn, setUndrawn] = useState(initial?.undrawn ?? '');
+  const [layout, setLayout] = useState(startLayout);
   const [altText, setAltText] = useState(initial?.alt_text ?? '');
   const [isPending, startTransition] = useTransition();
   const { success, error } = useToast();
 
-  const brief: ImageBrief = {
-    skip: false,
-    skip_reason: null,
-    motif_key: motifKey || null,
-    subject: subject.trim() || null,
-    metaphor: metaphor.trim() || null,
-    composition: composition.trim() || null,
-    alt_text: altText.trim() || null,
+  const concept: ImageConcept = {
+    tension: tension.trim(),
+    subject: subject.trim(),
+    drawn: drawn.trim(),
+    undrawn: undrawn.trim(),
+    layout,
+    alt_text: altText.trim(),
   };
-  const flags = lintImageBrief(brief, { motifs: canon.motifs, prohibitedTerms: canon.prohibitedTerms });
+  const flags = lintImageConcept(concept, { layouts, prohibitedTerms: canon.prohibitedTerms });
 
   const prompt = useMemo(() => {
-    if (!canon.motifs.some((m) => m.key === motifKey)) return null;
-    return buildImagePrompt(canon, brief, { aspectRatio: canon.defaultAspectRatio });
-    // brief is rebuilt each render from the fields listed here.
+    if (!canon.layouts.some((l) => l.key === layout)) return null;
+    return buildImagePrompt(canon, concept, { aspectRatio: canon.defaultAspectRatio });
+    // concept is rebuilt each render from the fields listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canon, motifKey, subject, metaphor, composition, altText]);
+  }, [canon, layout, subject, drawn, undrawn]);
 
-  const selected = canon.motifs.find((m) => m.key === motifKey);
+  const selected = layouts.find((l) => l.key === layout);
 
   const handleRender = () => {
     startTransition(async () => {
-      const result = await requestImageRender(contentItemId, {
-        motif_key: motifKey,
-        subject,
-        metaphor,
-        composition,
-        alt_text: altText,
-      });
+      const result = await requestImageRender(contentItemId, concept);
       if ('error' in result) {
         error(result.error);
         return;
       }
-      success('Rendering a new image. It replaces the current one on every draft that shares it.');
+      success('Rendering this image. It becomes the selected image on every draft that shares it.');
       onQueued();
       onClose();
     });
@@ -89,46 +92,55 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
       }
     >
       <div className={styles.briefForm}>
-        <FormSelect
-          name="motif_key"
-          label="Motif"
-          hint={selected ? `${selected.description}. Use when: ${selected.use_when}` : undefined}
-          value={motifKey}
-          onChange={(e) => setMotifKey(e.target.value)}
-        >
-          {motifs.map((m) => (
-            <option key={m.key} value={m.key}>
-              {m.label}
-            </option>
-          ))}
-        </FormSelect>
+        <FormTextarea
+          name="tension"
+          label="Tension"
+          hint="The surprising, uneasy or unresolved idea in the post. Not its topic."
+          rows={3}
+          maxLength={200}
+          value={tension}
+          onChange={(e) => setTension(e.target.value)}
+        />
         <FormTextarea
           name="subject"
           label="Subject"
-          hint="What is drawn, concretely. Objects and places, no text or figures."
+          hint="A concrete thing or place that carries the tension. No text or figures."
           rows={2}
           maxLength={200}
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
         />
         <FormTextarea
-          name="metaphor"
-          label="Metaphor"
-          hint="How the motif carries the post's idea."
+          name="drawn"
+          label="Drawn in full"
+          hint="The part that is known or certain."
           rows={2}
           maxLength={200}
-          value={metaphor}
-          onChange={(e) => setMetaphor(e.target.value)}
+          value={drawn}
+          onChange={(e) => setDrawn(e.target.value)}
         />
         <FormTextarea
-          name="composition"
-          label="Composition note"
-          hint="Optional. Keep the bottom-right corner empty for the mark."
+          name="undrawn"
+          label="Construction lines only"
+          hint="The part that is unknown, unbuilt or in doubt. Every image has one."
           rows={2}
           maxLength={200}
-          value={composition}
-          onChange={(e) => setComposition(e.target.value)}
+          value={undrawn}
+          onChange={(e) => setUndrawn(e.target.value)}
         />
+        <FormSelect
+          name="layout"
+          label="Layout"
+          hint={selected?.description}
+          value={layout}
+          onChange={(e) => setLayout(e.target.value)}
+        >
+          {layouts.map((l) => (
+            <option key={l.key} value={l.key}>
+              {l.label}
+            </option>
+          ))}
+        </FormSelect>
         <FormTextarea
           name="alt_text"
           label="Alt text"
@@ -149,7 +161,7 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
 
         <div className={styles.promptBlock}>
           <span className={styles.label}>Prompt sent to the image model</span>
-          <pre className={styles.prompt}>{prompt ?? 'Choose a motif to see the prompt.'}</pre>
+          <pre className={styles.prompt}>{prompt ?? 'Choose a layout to see the prompt.'}</pre>
           <span className={styles.caption}>Canon v{canon.version}</span>
         </div>
       </div>

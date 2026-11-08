@@ -15,14 +15,17 @@ import {
   removeImage,
   requestImageRegenerate,
   saveImageAltText,
+  selectImageCandidate,
 } from '@/app/actions/contentImages';
 import { ImageBriefSlideOver } from './ImageBriefSlideOver';
 import styles from './ImageSlot.module.css';
 
 export interface ImageSlotProps {
   contentItemId: string;
-  /** The current image with a short-lived signed URL, or null. */
+  /** The selected image with a short-lived signed URL, or null. */
   image: (ContentImage & { url: string | null }) | null;
+  /** The run's other candidates, each with a short-lived signed URL. */
+  candidates?: Array<ContentImage & { url: string | null }>;
   request: ContentImageRequest | null;
   canon: BrandVisual | null;
 }
@@ -44,12 +47,12 @@ function formatCost(cost: number): string {
 }
 
 /**
- * The image on a social draft: preview, alt text with Lex's verdict, and the
- * actions a founder takes on it. Regenerate and render-with-brief run on the
- * agents server; the slot shows their progress and re-reads the page until
- * they resolve.
+ * The image on a social draft: the selected candidate's preview, alt text with
+ * Lex's verdict, the actions a founder takes on it, and the run's other
+ * candidates to choose from. Regenerate and render-with-brief run on the agents
+ * server; the slot shows their progress and re-reads the page until they resolve.
  */
-export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotProps) {
+export function ImageSlot({ contentItemId, image, candidates = [], request, canon }: ImageSlotProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -95,10 +98,15 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
 
   const ai = image?.source === 'ai_generated' && image.generationGroupId !== null;
   const groupId = image?.generationGroupId ?? '';
-  const motif = canon?.motifs.find((m) => m.key === image?.brief?.motif_key);
+  // v1.1+ images name a layout; v1.0 images a motif from the retired list.
+  const styleLabel = image?.layout
+    ? (canon?.layouts.find((l) => l.key === image.layout)?.label ?? image.layout)
+    : image?.motifKey
+      ? (canon?.motifs.find((m) => m.key === image.motifKey)?.label ?? image.motifKey)
+      : null;
   const meta = image
     ? [
-        motif?.label ?? image.brief?.motif_key,
+        styleLabel,
         image.modelId,
         image.brandVisualVersion ? `canon v${image.brandVisualVersion}` : null,
         image.costUsd !== null ? formatCost(image.costUsd) : null,
@@ -117,7 +125,9 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
         <p className={styles.progress} role="status">
           {request!.action === 'recheck_alt_text'
             ? 'Lex is checking the alt text.'
-            : 'Rendering a new image. This can take a couple of minutes.'}
+            : request!.action === 'regenerate'
+              ? 'Rendering a new set of images. This can take a couple of minutes.'
+              : 'Rendering the image. This can take a couple of minutes.'}
         </p>
       )}
       {request?.status === 'failed' && request.error && (
@@ -135,6 +145,7 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
           ) : (
             <p className={styles.missing}>The image file could not be loaded.</p>
           )}
+          {image.tension && <p className={styles.tension}>{image.tension}</p>}
           {meta.length > 0 && <p className={styles.caption}>{meta.join(' · ')}</p>}
 
           <div className={styles.altField}>
@@ -185,7 +196,7 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
                 <Button
                   variant="secondary"
                   disabled={busy || !canon}
-                  onClick={() => run(() => requestImageRegenerate(contentItemId), 'Rendering a new image.')}
+                  onClick={() => run(() => requestImageRegenerate(contentItemId), 'Rendering a new set of images.')}
                 >
                   Regenerate image
                 </Button>
@@ -215,6 +226,40 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
         <p className={styles.empty}>
           Images need a visual canon. Set one up in <Link href="/brand">Brand Hub → Visual</Link>.
         </p>
+      )}
+
+      {candidates.length > 0 && (
+        <div className={styles.candidates}>
+          <span className={styles.label}>{image ? 'Other options' : 'Options'}</span>
+          <ul className={styles.candidateList}>
+            {candidates.map((c, i) => (
+              <li key={c.id} className={styles.candidate}>
+                {c.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className={styles.candidateImage} src={c.url} alt={c.altText ?? `Option ${i + 1}`} />
+                ) : (
+                  <span className={styles.candidateMissing}>Preview unavailable</span>
+                )}
+                {c.tension && <p className={styles.candidateTension}>{c.tension}</p>}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={styles.candidateUse}
+                  disabled={busy || isPending || !c.generationGroupId}
+                  aria-label={`Use option ${i + 1}${c.tension ? `: ${c.tension}` : ''}`}
+                  onClick={() =>
+                    run(
+                      () => selectImageCandidate({ contentItemId, generationGroupId: c.generationGroupId ?? '' }),
+                      'Image changed on every draft that shares it.',
+                    )
+                  }
+                >
+                  Use this image
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {canon && briefOpen && (

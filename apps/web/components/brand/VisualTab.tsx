@@ -9,8 +9,8 @@ import {
   buildImagePrompt,
   nextBrandVisualVersion,
   type BrandVisual,
-  type ImageBrief,
-  type Motif,
+  type ImageConcept,
+  type Layout,
   type PaletteEntry,
 } from '@platform/shared';
 import { removeStyleAnchor, saveBrandVisual } from '@/app/actions/brandVisual';
@@ -33,16 +33,15 @@ interface VisualTabProps {
 const PREVIEW_W = 1200;
 const PREVIEW_H = 627;
 
-/** A brief to preview the prompt against, so edits can be checked without a render. */
-function sampleBrief(motif: Motif | undefined): ImageBrief {
+/** A concept to preview the prompt against, so edits can be checked without a render. */
+function sampleConcept(layout: Layout | undefined): ImageConcept {
   return {
-    skip: false,
-    skip_reason: null,
-    motif_key: motif?.key ?? null,
-    subject: 'A two-pan balance scale resting level on a plain desk',
-    metaphor: 'a decision weighed before it is made',
-    composition: null,
-    alt_text: 'A pencil sketch of a level balance scale.',
+    tension: 'Nobody knows what will trigger it, only that the safe ground is shorter than it looks.',
+    subject: 'A timber pier running out over open water',
+    drawn: 'the near end of the pier, planks and pilings in full',
+    undrawn: 'the far end, where the planks thin into pencil guidelines over the water',
+    layout: layout?.key ?? '',
+    alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
   };
 }
 
@@ -74,7 +73,7 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
   const [composition, setComposition] = useState(canon.compositionBlock);
   const [prohibitedBlock, setProhibitedBlock] = useState(canon.prohibitedBlock);
   const [terms, setTerms] = useState<string[]>(canon.prohibitedTerms);
-  const [motifs, setMotifs] = useState<Motif[]>(canon.motifs);
+  const [layouts, setLayouts] = useState<Layout[]>(canon.layouts);
   const [mark, setMark] = useState(canon.brandMark);
   const [notes, setNotes] = useState(initialNotes ?? '');
 
@@ -87,21 +86,21 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
     compositionBlock: composition.trim(),
     prohibitedBlock: prohibitedBlock.trim(),
     prohibitedTerms: terms,
-    motifs,
+    layouts,
     brandMark: mark,
   };
-  const previewMotif = motifs.find((m) => m.is_active);
+  const previewLayout = layouts.find((l) => l.is_active && l.key.trim());
   const prompt = useMemo(
-    () => (previewMotif ? buildImagePrompt(draft, sampleBrief(previewMotif), { aspectRatio: canon.defaultAspectRatio }) : null),
+    () => (previewLayout ? buildImagePrompt(draft, sampleConcept(previewLayout), { aspectRatio: canon.defaultAspectRatio }) : null),
     // draft is rebuilt each render from the state listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [styleBlock, palette, composition, prohibitedBlock, motifs, previewMotif?.key],
+    [styleBlock, palette, composition, prohibitedBlock, layouts, previewLayout?.key],
   );
 
   const setPaletteAt = (i: number, patch: Partial<PaletteEntry>) =>
     setPalette((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-  const setMotifAt = (i: number, patch: Partial<Motif>) =>
-    setMotifs((prev) => prev.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  const setLayoutAt = (i: number, patch: Partial<Layout>) =>
+    setLayouts((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
   const handleSave = () => {
     setConfirmSave(false);
@@ -112,7 +111,7 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
         prohibited_block: prohibitedBlock,
         prohibited_terms: terms,
         palette,
-        motifs,
+        layouts,
         brand_mark: { enabled: mark.enabled, height_pct: mark.height_pct, margin_pct: mark.margin_pct },
         notes,
       });
@@ -228,37 +227,33 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>Motifs</h2>
-        <p className={styles.hint}>The brief must choose one active motif. Retire one by unticking it; it stays on images already made.</p>
+        <h2 className={styles.heading}>Layouts</h2>
+        <p className={styles.hint}>
+          The brief places every concept in one of these. Retire one by unticking it; images already made keep theirs.
+        </p>
         <ul className={styles.rows}>
-          {motifs.map((m, i) => (
-            <li key={i} className={styles.motifRow}>
+          {layouts.map((l, i) => (
+            <li key={i} className={styles.layoutRow}>
               <input
-                aria-label={`Motif ${i + 1} key`}
+                aria-label={`Layout ${i + 1} key`}
                 className={`${styles.input} ${styles.mono}`}
-                value={m.key}
-                onChange={(e) => setMotifAt(i, { key: e.target.value })}
+                value={l.key}
+                onChange={(e) => setLayoutAt(i, { key: e.target.value })}
               />
               <input
-                aria-label={`Motif ${i + 1} label`}
+                aria-label={`Layout ${i + 1} label`}
                 className={styles.input}
-                value={m.label}
-                onChange={(e) => setMotifAt(i, { label: e.target.value })}
+                value={l.label}
+                onChange={(e) => setLayoutAt(i, { label: e.target.value })}
               />
               <input
-                aria-label={`Motif ${i + 1} description`}
+                aria-label={`Layout ${i + 1} description`}
                 className={`${styles.input} ${styles.wide}`}
-                value={m.description}
-                onChange={(e) => setMotifAt(i, { description: e.target.value })}
-              />
-              <input
-                aria-label={`Motif ${i + 1} use when`}
-                className={`${styles.input} ${styles.wide}`}
-                value={m.use_when}
-                onChange={(e) => setMotifAt(i, { use_when: e.target.value })}
+                value={l.description}
+                onChange={(e) => setLayoutAt(i, { description: e.target.value })}
               />
               <label className={styles.check}>
-                <input type="checkbox" checked={m.is_active} onChange={(e) => setMotifAt(i, { is_active: e.target.checked })} />
+                <input type="checkbox" checked={l.is_active} onChange={(e) => setLayoutAt(i, { is_active: e.target.checked })} />
                 Active
               </label>
             </li>
@@ -267,9 +262,9 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setMotifs((prev) => [...prev, { key: '', label: '', description: '', use_when: '', is_active: true }])}
+          onClick={() => setLayouts((prev) => [...prev, { key: '', label: '', description: '', is_active: true }])}
         >
-          Add motif
+          Add layout
         </Button>
       </section>
 
@@ -356,7 +351,7 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
         <h2 className={styles.heading}>Prompt preview</h2>
         <p className={styles.hint}>The canon as it stands in this form, assembled against a sample brief. Nothing is rendered.</p>
         <pre className={styles.prompt} aria-label="Assembled prompt">
-          {prompt ?? 'Make at least one motif active to preview the prompt.'}
+          {prompt ?? 'Make at least one layout active to preview the prompt.'}
         </pre>
       </section>
 

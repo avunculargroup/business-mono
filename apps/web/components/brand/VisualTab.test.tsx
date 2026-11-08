@@ -37,9 +37,10 @@ const CANON = toBrandVisual({
   composition_block: 'Leave the corner empty.',
   prohibited_block: 'Never include text.',
   prohibited_terms: ['rocket'],
-  motifs: [
-    { key: 'retired', label: 'Retired', description: 'old', use_when: 'never', is_active: false },
-    { key: 'balance', label: 'Balance', description: 'A scale', use_when: 'Trade-offs', is_active: true },
+  motifs: [{ key: 'balance', label: 'Balance', description: 'A scale', use_when: 'Trade-offs', is_active: true }],
+  layouts: [
+    { key: 'retired_layout', label: 'Retired', description: 'Old.', is_active: false },
+    { key: 'low_horizon', label: 'Low horizon', description: 'One horizon line in the lower third.', is_active: true },
   ],
 });
 
@@ -50,11 +51,12 @@ beforeEach(() => {
 });
 
 describe('VisualTab', () => {
-  it('previews the assembled prompt against a sample brief using the first active motif', () => {
+  it('previews the assembled prompt against a sample concept using the first active layout', () => {
     render(<VisualTab canon={CANON} notes={null} anchors={[]} />);
     const prompt = screen.getByLabelText('Assembled prompt');
     expect(prompt).toHaveTextContent('A hand-drawn sketch.');
-    expect(prompt).toHaveTextContent('Visual metaphor: Balance');
+    expect(prompt).toHaveTextContent('Layout: Low horizon: One horizon line in the lower third.');
+    expect(prompt).toHaveTextContent('Leave as construction lines only:');
     expect(prompt).toHaveTextContent('Never include text.');
   });
 
@@ -82,7 +84,7 @@ describe('VisualTab', () => {
       prohibited_block: 'Never include text.',
       prohibited_terms: ['rocket'],
       palette: CANON.palette,
-      motifs: CANON.motifs,
+      layouts: CANON.layouts,
       brand_mark: { enabled: true, height_pct: 9, margin_pct: 4 },
       notes: 'Why.',
     });
@@ -116,5 +118,22 @@ describe('VisualTab', () => {
   it('explains when there is no canon', () => {
     render(<VisualTab canon={null} notes={null} anchors={[]} />);
     expect(screen.getByText(/There is no visual canon yet/)).toBeInTheDocument();
+  });
+});
+
+describe('VisualTab layouts', () => {
+  it('edits layouts in place and no longer offers the retired motifs', async () => {
+    const user = userEvent.setup();
+    render(<VisualTab canon={CANON} notes={null} anchors={[]} />);
+    expect(screen.queryByRole('heading', { name: 'Motifs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Layouts' })).toBeInTheDocument();
+
+    const description = screen.getByLabelText('Layout 2 description');
+    await user.clear(description);
+    await user.type(description, 'A single low line.');
+    expect(screen.getByLabelText('Assembled prompt')).toHaveTextContent('Layout: Low horizon: A single low line.');
+
+    await user.click(screen.getByRole('button', { name: 'Add layout' }));
+    expect(screen.getByLabelText('Layout 3 key')).toHaveValue('');
   });
 });

@@ -325,6 +325,34 @@ export function imageBriefRewriteInstruction(flags: string[]): string | null {
   return flags.map((f) => `- ${f}`).join('\n');
 }
 
+/** A content_images row as the selection rule reads it. */
+export interface CandidateRow {
+  id: string;
+  generation_group_id: string;
+  review_outcome: string | null;
+}
+
+export interface CandidateSelectionPlan {
+  /** Rows of the chosen group: is_selected = true. */
+  onIds: string[];
+  /** Live rows of every other group in the set: is_selected = false. */
+  offIds: string[];
+}
+
+/**
+ * Which rows of a candidate set to switch on and off to select one group.
+ * Retired rows (regenerated, removed) are left alone, so their outcome is
+ * never overwritten. Shared by the agents' automatic pick and the web's
+ * "Use this image", so the two cannot disagree about what selecting means.
+ */
+export function planCandidateSelection(rows: CandidateRow[], generationGroupId: string): CandidateSelectionPlan {
+  const live = (r: CandidateRow) => r.review_outcome !== 'removed' && r.review_outcome !== 'regenerated';
+  return {
+    onIds: rows.filter((r) => r.generation_group_id === generationGroupId).map((r) => r.id),
+    offIds: rows.filter((r) => r.generation_group_id !== generationGroupId && live(r)).map((r) => r.id),
+  };
+}
+
 /**
  * The next canon version: a minor bump ("1.0" → "1.1", "1.9" → "1.10"). Any
  * edit that changes the assembled prompt is a new version, so every image

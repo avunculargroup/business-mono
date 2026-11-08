@@ -16,6 +16,7 @@ vi.mock('@/lib/action', () => ({
 }));
 
 import {
+  selectImageCandidate,
   getImageDownloadUrl,
   promoteImageToStyleAnchor,
   removeImage,
@@ -38,12 +39,19 @@ const CANON = {
   composition_block: 'C',
   prohibited_block: 'P',
   prohibited_terms: ['rocket', '$'],
-  motifs: [{ key: 'vault', label: 'Vault', description: 'd', use_when: 'u', is_active: true }],
+  layouts: [{ key: 'left_third', label: 'Left third', description: 'd', is_active: true }],
   style_anchor_paths: [] as string[],
   default_aspect_ratio: '16:9',
   brand_mark: {},
 };
-const BRIEF = { motif_key: 'vault', subject: 'An open strongbox on a desk', metaphor: 'custody', composition: '', alt_text: 'A sketch of a strongbox.' };
+const BRIEF = {
+  tension: 'Nobody knows the trigger.',
+  subject: 'A timber pier running out over open water',
+  drawn: 'the near end of the pier',
+  undrawn: 'the far end, as pencil guidelines',
+  layout: 'left_third',
+  alt_text: 'A sketch of a pier.',
+};
 
 function inserts(table: string) {
   return supabase.__buildersFor(table).flatMap((b) => b.insert.mock.calls.map((c) => c[0] as Record<string, unknown>));
@@ -92,12 +100,17 @@ describe('requestImageRender', () => {
     supabase.__setResponses('content_image_requests', [{ data: [], error: null }, { data: null, error: null }]);
   });
 
-  it('queues a linted brief, blanks as null', async () => {
-    expect(await requestImageRender(ITEM, BRIEF)).toEqual({ success: true });
+  it('queues a linted concept, trimmed', async () => {
+    expect(await requestImageRender(ITEM, { ...BRIEF, subject: '  A timber pier  ' })).toEqual({ success: true });
     expect(inserts('content_image_requests')[0]).toMatchObject({
       action: 'render_brief',
-      brief: { skip: false, motif_key: 'vault', composition: null, alt_text: 'A sketch of a strongbox.' },
+      brief: { ...BRIEF, subject: 'A timber pier' },
     });
+  });
+
+  it('refuses a layout the canon does not have', async () => {
+    const res = await requestImageRender(ITEM, { ...BRIEF, layout: 'centred' });
+    expect(res).toEqual({ error: expect.stringContaining('layout "centred" is not one of the listed layouts') });
   });
 
   it('names the prohibited term instead of queuing', async () => {
@@ -108,6 +121,7 @@ describe('requestImageRender', () => {
 
   it('validates the form fields before anything else', async () => {
     expect(await requestImageRender(ITEM, { ...BRIEF, alt_text: ' ' })).toEqual({ error: 'Write the alt text' });
+    expect(await requestImageRender(ITEM, { ...BRIEF, undrawn: '' })).toEqual({ error: 'Say what is left as construction lines' });
   });
 
   it('says so when there is no canon', async () => {
@@ -173,5 +187,45 @@ describe('getImageDownloadUrl', () => {
     expect(await getImageDownloadUrl(path)).toEqual({ url: `https://signed/${path}` });
     expect(bucket.createSignedUrl).toHaveBeenCalledWith(path, 300, { download: 'bts-linkedin-1200x627.png' });
     expect(await getImageDownloadUrl('contracts/secret.pdf')).toEqual({ error: 'That image could not be found.' });
+  });
+});
+
+describe('selectImageCandidate', () => {
+  const OTHER = '2b8f4c1a-0000-4000-8000-0000000000bb';
+  const SET_ROWS = [
+    { id: 'a-li', generation_group_id: GROUP, review_outcome: null },
+    { id: 'a-x', generation_group_id: GROUP, review_outcome: null },
+    { id: 'b-li', generation_group_id: OTHER, review_outcome: null },
+    { id: 'b-x', generation_group_id: OTHER, review_outcome: null },
+    { id: 'old', generation_group_id: '2b8f4c1a-0000-4000-8000-0000000000cc', review_outcome: 'removed' },
+  ];
+
+  it('selects the group on every draft and marks the rest of the set not_chosen', async () => {
+    supabase.__setResponses('content_images', [
+      { data: { candidate_set_id: 'set-1' }, error: null },
+      { data: SET_ROWS, error: null },
+    ]);
+    expect(await selectImageCandidate({ contentItemId: ITEM, generationGroupId: OTHER })).toEqual({ success: true });
+
+    const writes = supabase.__buildersFor('content_images').filter((b) => b.update.mock.calls.length > 0);
+    expect(writes.map((b) => b.update.mock.calls[0]![0])).toEqual([
+      { is_selected: false, review_outcome: 'not_chosen' },
+      { is_selected: true, review_outcome: 'kept' },
+    ]);
+    expect(writes[0]!.in).toHaveBeenCalledWith('id', ['a-li', 'a-x']); // never the removed row
+    expect(writes[1]!.in).toHaveBeenCalledWith('id', ['b-li', 'b-x']);
+    expect(revalidatePath).toHaveBeenCalledWith(`/content/${ITEM}`);
+  });
+
+  it('refuses an image that is not part of a candidate set', async () => {
+    supabase.__setResponses('content_images', [{ data: { candidate_set_id: null }, error: null }]);
+    expect(await selectImageCandidate({ contentItemId: ITEM, generationGroupId: OTHER })).toEqual({ error: 'That image could not be found.' });
+    expect(supabase.__buildersFor('content_images').some((b) => b.update.mock.calls.length > 0)).toBe(false);
+  });
+
+  it('rejects a malformed id and a signed-out user', async () => {
+    expect(await selectImageCandidate({ contentItemId: ITEM, generationGroupId: 'nope' })).toEqual({ error: 'That image could not be found.' });
+    authed = false;
+    expect(await selectImageCandidate({ contentItemId: ITEM, generationGroupId: OTHER })).toEqual({ error: 'You need to be signed in to do that.' });
   });
 });
