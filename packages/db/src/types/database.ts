@@ -392,6 +392,7 @@ export type Database = {
           default_aspect_ratio: string
           id: string
           is_active: boolean
+          layouts: Json
           motifs: Json
           notes: string | null
           palette: Json
@@ -410,6 +411,7 @@ export type Database = {
           default_aspect_ratio?: string
           id?: string
           is_active?: boolean
+          layouts?: Json
           motifs?: Json
           notes?: string | null
           palette?: Json
@@ -428,6 +430,7 @@ export type Database = {
           default_aspect_ratio?: string
           id?: string
           is_active?: boolean
+          layouts?: Json
           motifs?: Json
           notes?: string | null
           palette?: Json
@@ -2110,6 +2113,8 @@ export type Database = {
           alt_text_verdict: Json | null
           assembled_prompt: string | null
           brand_visual_version: string | null
+          candidate_index: number | null
+          candidate_set_id: string | null
           content_item_id: string
           cost_usd: number | null
           created_at: string
@@ -2118,6 +2123,7 @@ export type Database = {
           generation_ref: string | null
           id: string
           image_brief: Json | null
+          is_selected: boolean
           is_style_anchor: boolean
           model_id: string | null
           platform_crop: string | null
@@ -2132,6 +2138,8 @@ export type Database = {
           alt_text_verdict?: Json | null
           assembled_prompt?: string | null
           brand_visual_version?: string | null
+          candidate_index?: number | null
+          candidate_set_id?: string | null
           content_item_id: string
           cost_usd?: number | null
           created_at?: string
@@ -2140,6 +2148,7 @@ export type Database = {
           generation_ref?: string | null
           id?: string
           image_brief?: Json | null
+          is_selected?: boolean
           is_style_anchor?: boolean
           model_id?: string | null
           platform_crop?: string | null
@@ -2154,6 +2163,8 @@ export type Database = {
           alt_text_verdict?: Json | null
           assembled_prompt?: string | null
           brand_visual_version?: string | null
+          candidate_index?: number | null
+          candidate_set_id?: string | null
           content_item_id?: string
           cost_usd?: number | null
           created_at?: string
@@ -2162,6 +2173,7 @@ export type Database = {
           generation_ref?: string | null
           id?: string
           image_brief?: Json | null
+          is_selected?: boolean
           is_style_anchor?: boolean
           model_id?: string | null
           platform_crop?: string | null

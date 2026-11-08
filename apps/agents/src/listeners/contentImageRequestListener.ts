@@ -1,12 +1,15 @@
 import { createRealtimeClient, supabase } from '@platform/db';
-import { lintImageBrief, type ImageBrief } from '@platform/shared';
+import { activeLayouts, lintImageConcept, type ImageConcept } from '@platform/shared';
 import {
+  briefConcepts,
   classifyAltText,
   loadCanon,
+  loadImageHistory,
   logActivity,
-  renderAndPersistImage,
+  renderCandidateSet,
   type PersistedPost,
 } from '../workflows/socialPost/image.js';
+import { mapNewsRowToCandidate } from '../workflows/socialPost/select.js';
 import type { Platform } from '../workflows/variant/schemas.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
 import { createLogger } from '../lib/logger.js';
@@ -20,10 +23,12 @@ const log = createLogger('content-image-request');
 // 'done' or 'failed' with an error the page shows. Same web → DB → agents
 // pattern as libraryQuestionListener.
 //
-// One render serves every crop in a generation group (the LinkedIn and X drafts
-// of one run), so regenerate and render-with-brief replace the whole group: the
-// new group is written first, then the old rows are marked 'regenerated'. They
-// are kept, because review_outcome is the signal a later distil step reads.
+// A run's images are a candidate set: up to three generation groups, each with a
+// crop per draft (LinkedIn and X), exactly one group selected. Regenerate writes
+// a fresh set of three from a fresh brief, then marks the old set 'regenerated'.
+// Render-with-brief adds one candidate to the current set and selects it, which
+// marks the others 'not_chosen'. Old rows are kept, because review_outcome is
+// the signal a later distil step reads.
 
 const realtime = createRealtimeClient();
 
@@ -47,19 +52,25 @@ interface ClaimedRequest {
   id: string;
   content_item_id: string;
   action: ImageRequestAction;
-  brief: Partial<ImageBrief> | null;
+  brief: Partial<ImageConcept> | null;
 }
 
-interface GroupRow {
+interface SetRow {
   id: string;
   content_item_id: string;
   generation_group_id: string;
+  candidate_set_id: string | null;
+  candidate_index: number | null;
+  is_selected: boolean;
   platform_crop: string | null;
-  image_brief: ImageBrief | null;
+  image_brief: unknown;
   alt_text: string | null;
   review_outcome: string | null;
   created_at: string;
 }
+
+const SET_COLUMNS =
+  'id, content_item_id, generation_group_id, candidate_set_id, candidate_index, is_selected, platform_crop, image_brief, alt_text, review_outcome, created_at';
 
 /** The platform a crop belongs to, from its platform_crop key. Pure. */
 export function platformOfCrop(cropKey: string | null): Platform | null {
@@ -69,60 +80,65 @@ export function platformOfCrop(cropKey: string | null): Platform | null {
   return null;
 }
 
-/** A founder's edited brief, normalised to a renderable one. Pure. */
-export function normaliseFounderBrief(input: Partial<ImageBrief> | null): ImageBrief {
-  const text = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
+/** A founder's edited concept, normalised to a renderable one. Pure. */
+export function normaliseFounderConcept(input: Partial<ImageConcept> | null): ImageConcept {
+  const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   return {
-    skip: false,
-    skip_reason: null,
-    motif_key: text(input?.motif_key),
+    tension: text(input?.tension),
     subject: text(input?.subject),
-    metaphor: text(input?.metaphor),
-    composition: text(input?.composition),
+    drawn: text(input?.drawn),
+    undrawn: text(input?.undrawn),
+    layout: text(input?.layout),
     alt_text: text(input?.alt_text),
   };
 }
 
+const live = (r: SetRow) => r.review_outcome !== 'removed' && r.review_outcome !== 'regenerated';
+
+export interface CurrentSet {
+  /** Null for images made before candidate sets: their group stands in for a set. */
+  setId: string | null;
+  /** Every live row of the set, across both drafts. */
+  rows: SetRow[];
+  /** The selected group's rows, if one is selected. */
+  selected: SetRow[];
+}
+
 /**
- * The item's current AI image group — the newest ai_generated rows not marked
- * regenerated or removed — and every row in it (one per draft). Null when the
- * item has none. Filtered in code rather than with an `or()` so the query stays
- * a plain chain.
+ * The item's current candidate set: the set of its newest live AI image, and
+ * every live row in it. Null when the item has none. Filtered in code rather
+ * than with an `or()` so the query stays a plain chain.
  */
-async function currentGroup(contentItemId: string): Promise<GroupRow[] | null> {
+async function currentSet(contentItemId: string): Promise<CurrentSet | null> {
   const { data, error } = await db
     .from('content_images')
-    .select('id, content_item_id, generation_group_id, platform_crop, image_brief, alt_text, review_outcome, created_at')
+    .select(SET_COLUMNS)
     .eq('content_item_id', contentItemId)
     .eq('source', 'ai_generated')
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) throw new Error(`content_images read failed: ${error.message}`);
-  const live = ((data ?? []) as GroupRow[]).find(
-    (r) => r.generation_group_id && (r.review_outcome === null || r.review_outcome === 'kept'),
-  );
-  if (!live) return null;
+  const newest = ((data ?? []) as SetRow[]).find((r) => r.generation_group_id && live(r));
+  if (!newest) return null;
 
-  const { data: groupRows, error: groupErr } = await db
-    .from('content_images')
-    .select('id, content_item_id, generation_group_id, platform_crop, image_brief, alt_text, review_outcome, created_at')
-    .eq('generation_group_id', live.generation_group_id);
-  if (groupErr) throw new Error(`content_images group read failed: ${groupErr.message}`);
-  return (groupRows ?? []) as GroupRow[];
+  const { data: setRows, error: setErr } = newest.candidate_set_id
+    ? await db.from('content_images').select(SET_COLUMNS).eq('candidate_set_id', newest.candidate_set_id)
+    : await db.from('content_images').select(SET_COLUMNS).eq('generation_group_id', newest.generation_group_id);
+  if (setErr) throw new Error(`content_images set read failed: ${setErr.message}`);
+  const rows = ((setRows ?? []) as SetRow[]).filter(live);
+  return { setId: newest.candidate_set_id, rows, selected: rows.filter((r) => r.is_selected) };
 }
 
-async function postsFor(contentItemId: string, group: GroupRow[] | null): Promise<PersistedPost[]> {
-  if (group && group.length > 0) {
-    const posts: PersistedPost[] = [];
-    for (const r of group) {
-      const platform = platformOfCrop(r.platform_crop);
-      if (platform && !posts.some((p) => p.contentItemId === r.content_item_id)) {
-        posts.push({ contentItemId: r.content_item_id, platform });
-      }
+async function postsFor(contentItemId: string, set: CurrentSet | null): Promise<PersistedPost[]> {
+  const posts: PersistedPost[] = [];
+  for (const r of set?.rows ?? []) {
+    const platform = platformOfCrop(r.platform_crop);
+    if (platform && !posts.some((p) => p.contentItemId === r.content_item_id)) {
+      posts.push({ contentItemId: r.content_item_id, platform });
     }
-    if (posts.length > 0) return posts;
   }
-  // No group (never rendered, or removed): the image goes on this draft alone.
+  if (posts.length > 0) return posts;
+  // No set (never rendered, or removed): the image goes on this draft alone.
   const { data, error } = await db.from('content_items').select('id, type').eq('id', contentItemId).maybeSingle();
   if (error) throw new Error(`content_items read failed: ${error.message}`);
   const type = (data as { type?: string } | null)?.type;
@@ -140,49 +156,116 @@ async function imageSpecsFor(posts: PersistedPost[]): Promise<Map<Platform, unkn
   return specs;
 }
 
-async function rerender(req: ClaimedRequest): Promise<void> {
-  const group = await currentGroup(req.content_item_id);
+/**
+ * What a fresh brief reads for a draft: its copy, the story the morning run
+ * drafted it from (recorded on its social_post_drafted activity), and the
+ * subjects and layouts of its account's recent images. The story is optional:
+ * a draft made outside the routine has the post alone.
+ */
+async function briefContext(contentItemId: string) {
+  const { data: item, error } = await db
+    .from('content_items')
+    .select('id, body, title, social_account_id')
+    .eq('id', contentItemId)
+    .maybeSingle();
+  if (error) throw new Error(`content_items read failed: ${error.message}`);
+  if (!item) throw new Error('That draft could not be found.');
 
-  let brief: ImageBrief;
-  if (req.action === 'regenerate') {
-    const stored = group?.find((r) => r.image_brief)?.image_brief;
-    if (!stored) throw new Error('There is no image to regenerate. Edit the brief to render one.');
-    brief = { ...stored, skip: false, skip_reason: null };
-  } else {
-    brief = normaliseFounderBrief(req.brief);
+  let story = null;
+  let form: string | null = null;
+  const { data: activity } = await db
+    .from('agent_activity')
+    .select('proposed_actions')
+    .eq('entity_id', contentItemId)
+    .eq('action', 'social_post_drafted')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const drafted = Array.isArray(activity?.proposed_actions) ? activity.proposed_actions[0] : null;
+  if (typeof drafted?.story_id === 'string') {
+    const { data: news } = await db
+      .from('news_items')
+      .select('id, title, url, summary, key_points, source_name, category, relevance_score, topic_tags, published_at')
+      .eq('id', drafted.story_id)
+      .maybeSingle();
+    if (news) story = mapNewsRowToCandidate(news);
+    form = typeof drafted.form === 'string' ? drafted.form : null;
   }
 
+  const accountIds = item.social_account_id ? [item.social_account_id as string] : [];
+  return {
+    story,
+    form,
+    postCopy: [item.title, item.body].filter((v: unknown) => typeof v === 'string' && v.trim()).join('\n\n'),
+    history: await loadImageHistory(accountIds),
+  };
+}
+
+async function retire(rows: SetRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await db
+    .from('content_images')
+    .update({ review_outcome: 'regenerated', is_selected: false })
+    .in('id', rows.map((r) => r.id));
+  // The new set is in place and selected; the page shows the newest. Logged, not thrown.
+  if (error) log.warn({ error: error.message }, 'marking the previous candidate set regenerated failed');
+}
+
+/** A fresh brief, a fresh set of up to three candidates, then the old set retired. */
+async function regenerate(req: ClaimedRequest): Promise<void> {
+  const set = await currentSet(req.content_item_id);
   const canon = await loadCanon();
   if (!canon) throw new Error('There is no active brand visual canon. Set one up in Brand → Visual.');
-  const flags = lintImageBrief(brief, { motifs: canon.motifs, prohibitedTerms: canon.prohibitedTerms });
-  if (flags.length > 0) throw new Error(`The brief needs changes: ${flags.join(' ')}`);
 
-  const posts = await postsFor(req.content_item_id, group);
-  const result = await renderAndPersistImage({
+  const briefed = await briefConcepts(canon, await briefContext(req.content_item_id));
+  if ('skip' in briefed) throw new Error(`No new images: ${briefed.skip}`);
+
+  const posts = await postsFor(req.content_item_id, set);
+  const result = await renderCandidateSet({
     canon,
-    brief,
+    concepts: briefed.concepts,
     posts,
     imageSpecs: await imageSpecsFor(posts),
     triggerType: 'manual',
   });
-  if (!result.ok) throw new Error(result.reason);
-
-  // The new group is in place; retire the old one. A failure here leaves two
-  // live groups, and the page shows the newest, so it is logged, not thrown.
-  const oldGroupId = group?.[0]?.generation_group_id;
-  if (oldGroupId) {
-    const { error } = await db
-      .from('content_images')
-      .update({ review_outcome: 'regenerated' })
-      .eq('generation_group_id', oldGroupId);
-    if (error) log.warn({ error: error.message, oldGroupId }, 'marking previous image group regenerated failed');
+  if (!result.selected) {
+    throw new Error(result.results.map((r) => (r.ok ? '' : r.reason)).filter(Boolean).join(' | ') || 'Every candidate failed.');
   }
+  await retire(set?.rows ?? []);
+}
+
+/** One founder-edited concept, rendered into the current set and selected. */
+async function renderBrief(req: ClaimedRequest): Promise<void> {
+  const concept = normaliseFounderConcept(req.brief);
+  const canon = await loadCanon();
+  if (!canon) throw new Error('There is no active brand visual canon. Set one up in Brand → Visual.');
+  const flags = lintImageConcept(concept, { layouts: activeLayouts(canon), prohibitedTerms: canon.prohibitedTerms });
+  if (flags.length > 0) throw new Error(`The brief needs changes: ${flags.join(' ')}`);
+
+  const set = await currentSet(req.content_item_id);
+  const posts = await postsFor(req.content_item_id, set);
+  // A pre-set image has no set id; the new candidate starts one, and the old
+  // group is retired once the new one is in, as a regenerate would.
+  const startIndex = set?.setId ? Math.max(-1, ...set.rows.map((r) => r.candidate_index ?? 0)) + 1 : 0;
+  const result = await renderCandidateSet({
+    canon,
+    concepts: [concept],
+    posts,
+    imageSpecs: await imageSpecsFor(posts),
+    triggerType: 'manual',
+    candidateSetId: set?.setId ?? undefined,
+    startIndex,
+    founderChoice: true,
+  });
+  if (!result.selected) throw new Error(result.results[0] && !result.results[0].ok ? result.results[0].reason : 'The render failed.');
+  if (set && !set.setId) await retire(set.rows);
 }
 
 async function recheckAltText(req: ClaimedRequest): Promise<void> {
-  const group = await currentGroup(req.content_item_id);
-  const altText = group?.find((r) => r.alt_text?.trim())?.alt_text?.trim();
-  if (!group || !altText) throw new Error('There is no alt text to check.');
+  const set = await currentSet(req.content_item_id);
+  const group = set?.selected ?? [];
+  const altText = group.find((r) => r.alt_text?.trim())?.alt_text?.trim();
+  if (group.length === 0 || !altText) throw new Error('There is no alt text to check.');
 
   const verdict = await classifyAltText(altText);
   const groupId = group[0]!.generation_group_id;
@@ -240,7 +323,8 @@ export async function handleImageRequestRow(row: ImageRequestRow): Promise<void>
   log.info({ requestId: req.id, action: req.action }, 'image request claimed');
   try {
     if (req.action === 'recheck_alt_text') await recheckAltText(req);
-    else if (req.action === 'regenerate' || req.action === 'render_brief') await rerender(req);
+    else if (req.action === 'regenerate') await regenerate(req);
+    else if (req.action === 'render_brief') await renderBrief(req);
     else throw new Error(`Unknown image action: ${String(req.action)}`);
     await resolve(req.id, null);
   } catch (err) {

@@ -124,6 +124,32 @@ describe('renderSocialDraftEmail', () => {
     expect(text).toContain('Image: A sketch of a scale.');
   });
 
+  it('says how many other image options wait in Review, under the image', () => {
+    const { html, text } = renderSocialDraftEmail({
+      founderName: 'Chris',
+      story: STORY,
+      posts: [
+        { ...LINKEDIN_POST, image: { url: 'https://signed.example/li.png', altText: 'A pier.', moreOptions: 2 } },
+        { ...X_THREAD, image: { url: 'https://signed.example/x.png', altText: 'A pier.', moreOptions: 1 } },
+      ],
+      company: COMPANY,
+    });
+    expect(html).toContain('2 more image options to choose from in Review');
+    expect(html).toContain('1 more image option to choose from in Review');
+    expect(text).toContain('(2 more image options to choose from in Review.)');
+    expect(html.indexOf('li.png')).toBeLessThan(html.indexOf('2 more image options'));
+  });
+
+  it('adds no options line when the image is the only one', () => {
+    const { html } = renderSocialDraftEmail({
+      founderName: 'Chris',
+      story: STORY,
+      posts: [{ ...LINKEDIN_POST, image: { url: 'https://signed.example/li.png', altText: 'A pier.', moreOptions: 0 } }],
+      company: COMPANY,
+    });
+    expect(html).not.toContain('more image option');
+  });
+
   it('renders no image when the post has none, or the URL is not http(s)', () => {
     const { html } = renderSocialDraftEmail({
       founderName: 'Chris',

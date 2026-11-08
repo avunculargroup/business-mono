@@ -292,10 +292,19 @@ export interface SocialPostFromNewsResult {
 
 export interface SocialPostImageOutcome {
   status: 'generated' | 'skipped' | 'failed' | 'disabled';
+  // The selected candidate's generation group.
   generation_group_id?: string;
+  // Shared by every candidate group of the run.
+  candidate_set_id?: string;
+  // How many candidates rendered (1-3); the founder picks between them.
+  candidates?: number;
+  // The selected candidate's layout (canon v1.1+).
+  layout?: string;
+  // Canon v1.0 only; kept so old run results still type-check.
   motif_key?: string;
   // Skip reason or error summary.
   reason?: string;
+  // Total across every candidate rendered.
   cost_usd?: number;
 }
 

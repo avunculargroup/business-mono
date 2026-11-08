@@ -13,34 +13,51 @@ import {
   imageBriefRewriteInstruction,
   imageBriefSchema,
   lintImageBrief,
-  recentMotifs,
+  recentImageHistory,
   type ImageBrief,
+  type ImageBriefPromptParams,
+  type ImageConcept,
 } from './imageBrief.js';
-import { activeMotifs, buildImagePrompt, toBrandVisual, type BrandVisual } from './imagePrompt.js';
-import { composePlatformImage, platformCrop, toPngMaster } from './imageCompose.js';
+import { activeLayouts, buildImagePrompt, toBrandVisual, type BrandVisual } from './imagePrompt.js';
+import {
+  DEFAULT_PAPER_HEX,
+  composePlatformImage,
+  correctPaper,
+  platformCrop,
+  toPngMaster,
+  type PaperCorrection,
+} from './imageCompose.js';
 import type { StoryCandidate } from './select.js';
 import { createLogger } from '../../lib/logger.js';
 
 const log = createLogger('social-post-image');
 
-// Step 5b of social_post_from_news: one on-brand image per run, shared by the
+// Step 5b of social_post_from_news: image candidates for the run, shared by the
 // LinkedIn and X drafts. Best-effort end to end — it runs after both drafts are
 // persisted, never throws, and nothing here can change the run's status.
 //
-//   load canon + motif history → brief (LLM) → lint (one re-brief, then skip)
-//   → buildImagePrompt (pure) → render (OpenRouter) → crop + mark + upload
-//   → Lex on alt text (advisory) → content_images rows + agent_activity
+//   load canon + recent subjects/layouts → brief (LLM, up to three concepts)
+//   → lint per concept (one re-brief if none are clean, then skip)
+//   → for each clean concept, in parallel:
+//       buildImagePrompt (pure) → render (OpenRouter) → paper correction
+//       → crop + mark + upload → Lex on alt text (advisory) → content_images rows
+//   → select the lowest successful candidate; the founder can pick another
 //
-// Spec: docs/features/social-post-image/feature-spec.md
+// Each rendered concept is its own generation group; the groups of one run share
+// a candidate set. Selection is per run, not per platform: LinkedIn and X always
+// show the same image. Spec: docs/features/social-post-image/feature-spec.md
 
-// content_images' new columns and brand_visual are not in the generated types
-// until they are regenerated after the migration applies.
+// content_images' and brand_visual's newer columns are cast past the generated
+// types at this boundary, as the rest of the social post workflow does.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
 const BUCKET = 'platform-files';
 const RENDER_SCOPE = 'social_post.image_render';
-const MOTIF_HISTORY_ROWS = 10;
+/** Five runs, each up to three candidate groups across two platforms. */
+const HISTORY_ROWS = 40;
+/** At most this many concepts are rendered per run. */
+export const MAX_CANDIDATES = 3;
 const ANCHOR_URL_TTL_S = 60 * 60;
 /** Email links: 7 days. If it expires, the alt text shows and Review still works. */
 const EMAIL_URL_TTL_S = 7 * 24 * 60 * 60;
@@ -64,15 +81,17 @@ export interface ImageStepParams {
 export interface EmailImage {
   url: string;
   altText: string;
+  /** Other candidates the founder can pick from in Review. */
+  moreOptions: number;
 }
 
 export interface ImageStepResult {
   outcome: SocialPostImageOutcome;
-  /** Signed URL + alt text per content item, for the founder email. */
+  /** Signed URL + alt text of the selected image per content item, for the founder email. */
   images: Map<string, EmailImage>;
 }
 
-async function generateBrief(prompt: string): Promise<ImageBrief> {
+export async function generateBrief(prompt: string): Promise<ImageBrief> {
   try {
     const response = await charlie.generate([{ role: 'user', content: prompt }], {
       requestContext: stepRequestContext('social_post.image_brief'),
@@ -116,19 +135,19 @@ export async function loadCanon(): Promise<BrandVisual | null> {
   return data ? toBrandVisual(data) : null;
 }
 
-async function loadRecentMotifs(accountIds: string[]): Promise<string[]> {
+export async function loadImageHistory(accountIds: string[]) {
   const { data, error } = await db
     .from('content_images')
-    .select('generation_group_id, image_brief, created_at, content_items!inner(social_account_id)')
+    .select('candidate_set_id, generation_group_id, image_brief, is_selected, created_at, content_items!inner(social_account_id)')
     .eq('source', 'ai_generated')
     .in('content_items.social_account_id', accountIds)
     .order('created_at', { ascending: false })
-    .limit(MOTIF_HISTORY_ROWS);
+    .limit(HISTORY_ROWS);
   if (error) {
-    log.warn({ error: error.message }, 'motif history read failed');
-    return [];
+    log.warn({ error: error.message }, 'image history read failed');
+    return recentImageHistory([]);
   }
-  return recentMotifs(data);
+  return recentImageHistory(data);
 }
 
 /** Never throws: a missing URL only drops a reference image or an email preview. */
@@ -167,35 +186,53 @@ function summariseError(err: unknown): string {
 
 export interface RenderParams {
   canon: BrandVisual;
-  /** A brief that has already passed lintImageBrief (skip = false). */
-  brief: ImageBrief;
+  /** A concept that has already passed lintImageConcept. */
+  concept: ImageConcept;
   posts: PersistedPost[];
   imageSpecs: Map<Platform, unknown>;
   triggerType: 'scheduled' | 'manual';
+  candidateSetId: string;
+  candidateIndex: number;
 }
 
 export type RenderResult =
-  | { ok: true; groupId: string; motifKey: string; altText: string; costUsd: number | null; cropPaths: Map<string, string> }
-  | { ok: false; motifKey: string; reason: string };
+  | {
+      ok: true;
+      groupId: string;
+      candidateIndex: number;
+      layout: string;
+      altText: string;
+      costUsd: number | null;
+      cropPaths: Map<string, string>;
+      paper: PaperCorrection;
+    }
+  | { ok: false; candidateIndex: number; layout: string; reason: string };
+
+/** The palette's paper colour, which the paper correction aims for. */
+function paperHex(canon: BrandVisual): string {
+  return canon.palette.find((p) => p.role.toLowerCase() === 'paper')?.hex ?? DEFAULT_PAPER_HEX;
+}
 
 /**
- * Assemble → render → crop + mark + upload → Lex on alt text → persist a new
- * generation group, one content_images row per post. Shared by the morning run
- * (5b) and the founder's regenerate / render-with-brief actions. Never throws;
- * on failure nothing is left behind (uploaded objects are removed, no rows).
+ * Assemble → render → paper correction → crop + mark + upload → Lex on alt
+ * text → persist one candidate: a new generation group, one content_images row
+ * per post, written unselected (the set's selection is made once every candidate
+ * has settled). Shared by the morning run and the founder's regenerate and
+ * render-with-brief actions. Never throws; on failure nothing is left behind
+ * (uploaded objects are removed, no rows).
  */
 export async function renderAndPersistImage(params: RenderParams): Promise<RenderResult> {
-  const { canon, brief } = params;
+  const { canon, concept, candidateIndex } = params;
   const primary = params.posts.find((p) => p.platform === 'linkedin') ?? params.posts[0]!;
-  const motifKey = brief.motif_key!;
-  const altText = brief.alt_text!.trim();
+  const layout = concept.layout;
+  const altText = concept.alt_text.trim();
   const groupId = randomUUID();
   const uploaded: string[] = [];
 
   try {
     // ── 5b.4–5b.5: assemble + render ─────────────────────────────────────────
     const aspectRatio = canon.defaultAspectRatio;
-    const prompt = buildImagePrompt(canon, brief, { aspectRatio });
+    const prompt = buildImagePrompt(canon, concept, { aspectRatio });
     const apiKey = process.env['OPENROUTER_API_KEY'];
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set; the image render needs OpenRouter.');
     const model = await resolveImageModelId(RENDER_SCOPE);
@@ -209,7 +246,9 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
     const rendered = await generateImage({ model, prompt, aspectRatio, referenceUrls }, { apiKey });
 
     // ── 5b.6: crop + mark + upload (insert rows only after every object lands) ─
-    const master = await toPngMaster(rendered.image);
+    // Paper first: the stored master, every crop and any anchor promoted from
+    // it share the corrected paper, and the mark is composited onto clean paper.
+    const { image: master, correction: paper } = await correctPaper(await toPngMaster(rendered.image), paperHex(canon));
     const folder = `social-images/${new Date().toISOString().slice(0, 10)}/${groupId}`;
     const objects: Array<{ path: string; bytes: Buffer }> = [{ path: `${folder}/master-16x9.png`, bytes: master }];
     const cropPaths = new Map<string, { path: string; cropKey: string }>();
@@ -249,7 +288,10 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       source: 'ai_generated',
       created_by: null,
       generation_group_id: groupId,
-      image_brief: brief,
+      candidate_set_id: params.candidateSetId,
+      candidate_index: candidateIndex,
+      is_selected: false,
+      image_brief: concept,
       assembled_prompt: prompt,
       brand_visual_version: canon.version,
       model_id: model,
@@ -273,11 +315,16 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             type: 'social_image',
             generation_group_id: groupId,
             content_item_ids: params.posts.map((p) => p.contentItemId),
-            motif_key: motifKey,
+            candidate_set_id: params.candidateSetId,
+            candidate_index: candidateIndex,
+            layout,
+            subject: concept.subject,
+            tension: concept.tension,
             model_id: model,
             cost_usd: rendered.costUsd,
             references_sent: rendered.referencesDropped ? 0 : referenceUrls.length,
             references_dropped: rendered.referencesDropped,
+            paper,
           },
         ],
       },
@@ -297,17 +344,143 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
     return {
       ok: true,
       groupId,
-      motifKey,
+      candidateIndex,
+      layout,
       altText,
       costUsd: rendered.costUsd,
       cropPaths: new Map([...cropPaths].map(([id, c]) => [id, c.path])),
+      paper,
     };
   } catch (err) {
-    log.error({ err, groupId }, 'image step failed');
+    log.error({ err, groupId, candidateIndex }, 'image candidate failed');
     // No partial state: an unmarked or orphaned image never reaches a founder.
     await removeObjects(uploaded);
-    return { ok: false, motifKey, reason: summariseError(err) };
+    return { ok: false, candidateIndex, layout, reason: summariseError(err) };
   }
+}
+
+/**
+ * Make one group the selected image of its set, and every other group of the
+ * set unselected. Selection is per run: the set spans both platforms' drafts.
+ * Unpicked groups are marked not_chosen only when `markOthers` is set, i.e.
+ * when a founder chose; the automatic pick at render time is not a judgement.
+ */
+export async function selectCandidate(
+  candidateSetId: string,
+  generationGroupId: string,
+  opts: { markOthers: boolean },
+): Promise<void> {
+  // Read, then update by id: a removed or regenerated group keeps its outcome,
+  // and SQL's IN never matches the NULL outcome most rows carry.
+  const { data, error: readErr } = await db
+    .from('content_images')
+    .select('id, generation_group_id, review_outcome')
+    .eq('candidate_set_id', candidateSetId);
+  if (readErr) throw new Error(`reading the candidate set failed: ${readErr.message}`);
+  const rows = (data ?? []) as Array<{ id: string; generation_group_id: string; review_outcome: string | null }>;
+  const live = (r: (typeof rows)[number]) => r.review_outcome !== 'removed' && r.review_outcome !== 'regenerated';
+  const offIds = rows.filter((r) => r.generation_group_id !== generationGroupId && live(r)).map((r) => r.id);
+  const onIds = rows.filter((r) => r.generation_group_id === generationGroupId).map((r) => r.id);
+  if (onIds.length === 0) throw new Error('that candidate is not in this set');
+
+  if (offIds.length > 0) {
+    const off: Record<string, unknown> = { is_selected: false };
+    if (opts.markOthers) off['review_outcome'] = 'not_chosen';
+    const { error } = await db.from('content_images').update(off).in('id', offIds);
+    if (error) throw new Error(`clearing the candidate set's selection failed: ${error.message}`);
+  }
+  const on: Record<string, unknown> = { is_selected: true };
+  if (opts.markOthers) on['review_outcome'] = 'kept';
+  const { error } = await db.from('content_images').update(on).in('id', onIds);
+  if (error) throw new Error(`selecting the candidate failed: ${error.message}`);
+}
+
+export interface CandidateSetResult {
+  candidateSetId: string;
+  /** Every candidate, in concept order. */
+  results: RenderResult[];
+  /** The selected candidate, or null when every render failed. */
+  selected: Extract<RenderResult, { ok: true }> | null;
+}
+
+/**
+ * Render each concept as a candidate, in parallel, into one candidate set, then
+ * select the lowest successful one. A failed candidate leaves nothing behind
+ * and does not affect the others.
+ */
+export async function renderCandidateSet(params: {
+  canon: BrandVisual;
+  concepts: ImageConcept[];
+  posts: PersistedPost[];
+  imageSpecs: Map<Platform, unknown>;
+  triggerType: 'scheduled' | 'manual';
+  /** Render into an existing set (Edit brief) instead of a new one. */
+  candidateSetId?: string;
+  /** Index for the first concept, after a set's existing candidates. */
+  startIndex?: number;
+  /** A founder's choice marks the rest not_chosen; the morning run's pick does not. */
+  founderChoice?: boolean;
+}): Promise<CandidateSetResult> {
+  const candidateSetId = params.candidateSetId ?? randomUUID();
+  const startIndex = params.startIndex ?? 0;
+  const settled = await Promise.allSettled(
+    params.concepts.slice(0, MAX_CANDIDATES).map((concept, i) =>
+      renderAndPersistImage({
+        canon: params.canon,
+        concept,
+        posts: params.posts,
+        imageSpecs: params.imageSpecs,
+        triggerType: params.triggerType,
+        candidateSetId,
+        candidateIndex: startIndex + i,
+      }),
+    ),
+  );
+  // renderAndPersistImage never throws; a rejection here is a bug, kept as a failure.
+  const results: RenderResult[] = settled.map((s, i) =>
+    s.status === 'fulfilled'
+      ? s.value
+      : { ok: false, candidateIndex: startIndex + i, layout: params.concepts[i]?.layout ?? '', reason: summariseError(s.reason) },
+  );
+  const selected = results.find((r): r is Extract<RenderResult, { ok: true }> => r.ok) ?? null;
+  if (selected) {
+    try {
+      await selectCandidate(candidateSetId, selected.groupId, { markOthers: params.founderChoice ?? false });
+    } catch (err) {
+      // The rows are in place; a founder can still pick one from the page.
+      log.error({ err, candidateSetId }, 'selecting the first candidate failed');
+    }
+  }
+  return { candidateSetId, results, selected };
+}
+
+/**
+ * Ask for a brief and lint it: concepts that fail are dropped; if none
+ * survive, one re-brief carries every flag. Returns the clean concepts, or the
+ * reason there are none (a skip, or two failed briefs).
+ */
+export async function briefConcepts(
+  canon: BrandVisual,
+  params: Omit<ImageBriefPromptParams, 'layouts' | 'prohibitedTerms' | 'rewriteInstruction'>,
+): Promise<{ concepts: ImageConcept[] } | { skip: string }> {
+  const layouts = activeLayouts(canon);
+  if (layouts.length === 0) return { skip: 'The brand visual canon has no active layouts.' };
+  const briefParams = { ...params, layouts, prohibitedTerms: canon.prohibitedTerms };
+  const lintOpts = { layouts, prohibitedTerms: canon.prohibitedTerms };
+
+  let brief: ImageBrief = await generateBrief(buildImageBriefPrompt(briefParams));
+  if (brief.skip) return { skip: brief.skip_reason?.trim() || 'The brief chose not to illustrate this post.' };
+  let lint = lintImageBrief(brief, lintOpts);
+  if (lint.clean.length === 0) {
+    brief = await generateBrief(
+      buildImageBriefPrompt({ ...briefParams, rewriteInstruction: imageBriefRewriteInstruction(lint.flags) }),
+    );
+    if (brief.skip) return { skip: brief.skip_reason?.trim() || 'The brief chose not to illustrate this post.' };
+    lint = lintImageBrief(brief, lintOpts);
+  }
+  if (lint.clean.length === 0) return { skip: `Brief failed lint twice: ${lint.flags.join(' ')}` };
+  if (lint.flags.length > 0) log.info({ dropped: lint.flags }, 'image concepts dropped by lint');
+  return { concepts: lint.clean };
 }
 
 /** Step 5b. Never throws. */
@@ -331,7 +504,14 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
     return { outcome: { status: 'disabled', reason: 'No active brand_visual canon.' }, images };
   }
 
-  const skip = async (reason: string, motifKey?: string): Promise<ImageStepResult> => {
+  // ── Brief: recent subjects/layouts → up to three concepts → lint ──────────
+  const briefed = await briefConcepts(canon, {
+    story: params.story,
+    form: params.form,
+    postCopy: params.postCopy,
+    history: await loadImageHistory(params.accountIds),
+  });
+  if ('skip' in briefed) {
     await logActivity([
       {
         agent_name: 'charlie',
@@ -340,60 +520,45 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
         trigger_type: 'scheduled',
         entity_type: 'content_item',
         entity_id: primary.contentItemId,
-        proposed_actions: [{ type: 'social_image', skipped: true, reason, story_id: params.story.id }],
+        proposed_actions: [{ type: 'social_image', skipped: true, reason: briefed.skip, story_id: params.story.id }],
       },
     ]);
-    return { outcome: { status: 'skipped', reason, ...(motifKey ? { motif_key: motifKey } : {}) }, images };
-  };
-
-  // ── 5b.1–5b.3: motif history → brief → lint (one re-brief, then skip) ──────
-  const motifs = activeMotifs(canon);
-  if (motifs.length === 0) return skip('The brand visual canon has no active motifs.');
-  const recentMotifKeys = await loadRecentMotifs(params.accountIds);
-  const briefParams = {
-    story: params.story,
-    form: params.form,
-    postCopy: params.postCopy,
-    motifs,
-    recentMotifKeys,
-  };
-  const lintOpts = { motifs, prohibitedTerms: canon.prohibitedTerms };
-
-  let brief = await generateBrief(buildImageBriefPrompt(briefParams));
-  let flags = lintImageBrief(brief, lintOpts);
-  if (flags.length > 0) {
-    brief = await generateBrief(
-      buildImageBriefPrompt({ ...briefParams, rewriteInstruction: imageBriefRewriteInstruction(flags) }),
-    );
-    flags = lintImageBrief(brief, lintOpts);
+    return { outcome: { status: 'skipped', reason: briefed.skip }, images };
   }
-  if (brief.skip) return skip(brief.skip_reason?.trim() || 'The brief chose not to illustrate this story.');
-  if (flags.length > 0) return skip(`Brief failed lint twice: ${flags.join(' ')}`, brief.motif_key ?? undefined);
 
-  const rendered = await renderAndPersistImage({
+  // ── Render the candidates in parallel; select the first that succeeds ──────
+  const set = await renderCandidateSet({
     canon,
-    brief,
+    concepts: briefed.concepts,
     posts: params.posts,
     imageSpecs: params.imageSpecs,
     triggerType: 'scheduled',
   });
-  if (!rendered.ok) {
-    return { outcome: { status: 'failed', motif_key: rendered.motifKey, reason: rendered.reason }, images };
+  const succeeded = set.results.filter((r) => r.ok);
+  const cost = succeeded.reduce((sum, r) => sum + (r.ok && r.costUsd !== null ? r.costUsd : 0), 0);
+  if (!set.selected) {
+    const reasons = set.results.map((r) => (r.ok ? '' : r.reason)).filter(Boolean);
+    return {
+      outcome: { status: 'failed', candidate_set_id: set.candidateSetId, candidates: 0, reason: reasons.join(' | ') || 'Every candidate failed.' },
+      images,
+    };
   }
 
   // Email links are a convenience: a missing URL just means no image in the card.
   for (const post of params.posts) {
-    const path = rendered.cropPaths.get(post.contentItemId);
+    const path = set.selected.cropPaths.get(post.contentItemId);
     const url = path ? await signedUrl(path, EMAIL_URL_TTL_S) : null;
-    if (url) images.set(post.contentItemId, { url, altText: rendered.altText });
+    if (url) images.set(post.contentItemId, { url, altText: set.selected.altText, moreOptions: succeeded.length - 1 });
   }
 
   return {
     outcome: {
       status: 'generated',
-      generation_group_id: rendered.groupId,
-      motif_key: rendered.motifKey,
-      ...(rendered.costUsd !== null ? { cost_usd: rendered.costUsd } : {}),
+      generation_group_id: set.selected.groupId,
+      candidate_set_id: set.candidateSetId,
+      candidates: succeeded.length,
+      layout: set.selected.layout,
+      ...(succeeded.some((r) => r.ok && r.costUsd !== null) ? { cost_usd: Number(cost.toFixed(4)) } : {}),
     },
     images,
   };

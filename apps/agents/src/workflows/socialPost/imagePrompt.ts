@@ -3,12 +3,13 @@
 // the same functions. Re-exported here so the image step's imports stay local.
 export {
   DEFAULT_BRAND_MARK,
-  activeMotifs,
+  activeLayouts,
   buildImagePrompt,
   buildPaletteBlock,
   toBrandVisual,
   type BrandMark,
   type BrandVisual,
+  type Layout,
   type Motif,
   type PaletteEntry,
 } from '@platform/shared';
