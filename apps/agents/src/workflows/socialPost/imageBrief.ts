@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import type { Motif } from './imagePrompt.js';
+import type { ImageBrief as SharedImageBrief, Motif } from '@platform/shared';
 import type { StoryCandidate } from './select.js';
 
 // The image brief: the only part of an image an LLM decides. It picks one motif
 // from the canon's closed vocabulary and describes the subject concretely — it
 // never writes the prompt the image model receives (buildImagePrompt does). A
-// pure linter then checks the brief before a render is paid for: one re-brief on
-// a hit, then skip, never a loop — the same shape as the AI-tell gate.
+// pure linter (lintImageBrief, in @platform/shared) then checks the brief before
+// a render is paid for: one re-brief on a hit, then skip, never a loop — the
+// same shape as the AI-tell gate.
 
 export const imageBriefSchema = z.object({
   skip: z.boolean(),
@@ -18,6 +19,12 @@ export const imageBriefSchema = z.object({
   alt_text: z.string().max(300).nullable(), // describes the image, not the post
 });
 export type ImageBrief = z.infer<typeof imageBriefSchema>;
+// The schema and the shared interface must describe the same shape: a drift
+// fails typecheck here rather than at render time.
+const _sameShape: [ImageBrief, SharedImageBrief] extends [SharedImageBrief, ImageBrief] ? true : never = true;
+void _sameShape;
+
+export { lintImageBrief, imageBriefRewriteInstruction } from '@platform/shared';
 
 export const FALLBACK_IMAGE_BRIEF: ImageBrief = {
   skip: true,
@@ -104,55 +111,6 @@ ${motifList}${recent}
 - No people's faces.
 - alt_text: describe what the image shows for a screen reader, plainly, in under 300 characters. Describe the picture, not the post's argument.
 - If the story has no honest visual — the image would only be filler — set skip = true with a short skip_reason and leave the other fields null. Skipping is a good outcome, not a failure.${rewrite}`;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Case-insensitive whole-word match; terms with no word character (₿, $) match as substrings. */
-function containsTerm(text: string, term: string): boolean {
-  const t = term.trim();
-  if (!t) return false;
-  if (!/\w/.test(t)) return text.includes(t);
-  return new RegExp(`\\b${escapeRegex(t)}\\b`, 'i').test(text);
-}
-
-/**
- * Lint a brief. Returns the specific flags, empty when clean. A skip brief is
- * always clean — the quiet path needs no fields.
- */
-export function lintImageBrief(brief: ImageBrief, opts: { motifs: Motif[]; prohibitedTerms: string[] }): string[] {
-  if (brief.skip) return [];
-  const flags: string[] = [];
-
-  const active = new Set(opts.motifs.filter((m) => m.is_active).map((m) => m.key));
-  if (!brief.motif_key || !active.has(brief.motif_key)) {
-    flags.push(`motif_key "${brief.motif_key ?? ''}" is not one of the listed motifs.`);
-  }
-  if (!brief.subject?.trim()) flags.push('subject is missing.');
-  if (!brief.alt_text?.trim()) flags.push('alt_text is missing.');
-
-  const fields: Array<[string, string | null]> = [
-    ['subject', brief.subject],
-    ['metaphor', brief.metaphor],
-    ['composition', brief.composition],
-  ];
-  for (const [name, value] of fields) {
-    if (!value) continue;
-    const hits = opts.prohibitedTerms.filter((t) => containsTerm(value, t));
-    if (hits.length > 0) flags.push(`${name} names prohibited imagery: ${hits.join(', ')}.`);
-  }
-  for (const [name, value] of fields.slice(0, 2)) {
-    if (value && /\d/.test(value)) flags.push(`${name} contains digits; numbers invite rendered text.`);
-  }
-  return flags;
-}
-
-/** The re-brief instruction naming each flag, or null when the brief is clean. */
-export function imageBriefRewriteInstruction(flags: string[]): string | null {
-  if (flags.length === 0) return null;
-  return flags.map((f) => `- ${f}`).join('\n');
 }
 
 /**

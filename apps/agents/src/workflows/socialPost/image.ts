@@ -85,7 +85,7 @@ async function generateBrief(prompt: string): Promise<ImageBrief> {
   }
 }
 
-async function classifyAltText(altText: string): Promise<LexVerdict> {
+export async function classifyAltText(altText: string): Promise<LexVerdict> {
   const fallback: LexVerdict = {
     classification: 'general_advice',
     needs_disclaimer: false,
@@ -104,7 +104,7 @@ async function classifyAltText(altText: string): Promise<LexVerdict> {
   }
 }
 
-async function loadCanon(): Promise<BrandVisual | null> {
+export async function loadCanon(): Promise<BrandVisual | null> {
   const { data, error } = await db
     .from('brand_visual')
     .select('*')
@@ -152,7 +152,7 @@ async function removeObjects(paths: string[]): Promise<void> {
   }
 }
 
-async function logActivity(rows: Array<Record<string, unknown>>): Promise<void> {
+export async function logActivity(rows: Array<Record<string, unknown>>): Promise<void> {
   try {
     const { error } = await db.from('agent_activity').insert(rows);
     if (error) log.warn({ error: error.message }, 'image agent_activity insert failed');
@@ -165,66 +165,28 @@ function summariseError(err: unknown): string {
   return (err instanceof Error ? err.message : String(err)).slice(0, 300);
 }
 
-/** Step 5b. Never throws. */
-export async function runImageStep(params: ImageStepParams): Promise<ImageStepResult> {
-  const images = new Map<string, EmailImage>();
-  if (params.posts.length === 0) {
-    return { outcome: { status: 'skipped', reason: 'No persisted posts to illustrate.' }, images };
-  }
-  // The audit rows hang off the LinkedIn draft when there is one.
+export interface RenderParams {
+  canon: BrandVisual;
+  /** A brief that has already passed lintImageBrief (skip = false). */
+  brief: ImageBrief;
+  posts: PersistedPost[];
+  imageSpecs: Map<Platform, unknown>;
+  triggerType: 'scheduled' | 'manual';
+}
+
+export type RenderResult =
+  | { ok: true; groupId: string; motifKey: string; altText: string; costUsd: number | null; cropPaths: Map<string, string> }
+  | { ok: false; motifKey: string; reason: string };
+
+/**
+ * Assemble → render → crop + mark + upload → Lex on alt text → persist a new
+ * generation group, one content_images row per post. Shared by the morning run
+ * (5b) and the founder's regenerate / render-with-brief actions. Never throws;
+ * on failure nothing is left behind (uploaded objects are removed, no rows).
+ */
+export async function renderAndPersistImage(params: RenderParams): Promise<RenderResult> {
+  const { canon, brief } = params;
   const primary = params.posts.find((p) => p.platform === 'linkedin') ?? params.posts[0]!;
-
-  let canon: BrandVisual | null;
-  try {
-    canon = await loadCanon();
-  } catch (err) {
-    log.error({ err }, 'brand visual canon load failed');
-    return { outcome: { status: 'failed', reason: summariseError(err) }, images };
-  }
-  if (!canon) {
-    log.info('no active brand_visual row — image step disabled');
-    return { outcome: { status: 'disabled', reason: 'No active brand_visual canon.' }, images };
-  }
-
-  const skip = async (reason: string, motifKey?: string): Promise<ImageStepResult> => {
-    await logActivity([
-      {
-        agent_name: 'charlie',
-        action: 'social_image_skipped',
-        status: 'pending',
-        trigger_type: 'scheduled',
-        entity_type: 'content_item',
-        entity_id: primary.contentItemId,
-        proposed_actions: [{ type: 'social_image', skipped: true, reason, story_id: params.story.id }],
-      },
-    ]);
-    return { outcome: { status: 'skipped', reason, ...(motifKey ? { motif_key: motifKey } : {}) }, images };
-  };
-
-  // ── 5b.1–5b.3: motif history → brief → lint (one re-brief, then skip) ──────
-  const motifs = activeMotifs(canon);
-  if (motifs.length === 0) return skip('The brand visual canon has no active motifs.');
-  const recentMotifKeys = await loadRecentMotifs(params.accountIds);
-  const briefParams = {
-    story: params.story,
-    form: params.form,
-    postCopy: params.postCopy,
-    motifs,
-    recentMotifKeys,
-  };
-  const lintOpts = { motifs, prohibitedTerms: canon.prohibitedTerms };
-
-  let brief = await generateBrief(buildImageBriefPrompt(briefParams));
-  let flags = lintImageBrief(brief, lintOpts);
-  if (flags.length > 0) {
-    brief = await generateBrief(
-      buildImageBriefPrompt({ ...briefParams, rewriteInstruction: imageBriefRewriteInstruction(flags) }),
-    );
-    flags = lintImageBrief(brief, lintOpts);
-  }
-  if (brief.skip) return skip(brief.skip_reason?.trim() || 'The brief chose not to illustrate this story.');
-  if (flags.length > 0) return skip(`Brief failed lint twice: ${flags.join(' ')}`, brief.motif_key ?? undefined);
-
   const motifKey = brief.motif_key!;
   const altText = brief.alt_text!.trim();
   const groupId = randomUUID();
@@ -303,7 +265,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
         agent_name: 'charlie',
         action: 'social_image_generated',
         status: 'pending',
-        trigger_type: 'scheduled',
+        trigger_type: params.triggerType,
         entity_type: 'content_item',
         entity_id: primary.contentItemId,
         proposed_actions: [
@@ -323,7 +285,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
         agent_name: 'lex',
         action: 'compliance_checked',
         status: 'pending',
-        trigger_type: 'scheduled',
+        trigger_type: params.triggerType,
         entity_type: 'content_item',
         entity_id: primary.contentItemId,
         proposed_actions: [
@@ -332,25 +294,107 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
       },
     ]);
 
-    // Email links are a convenience: a missing URL just means no image in the card.
-    for (const post of params.posts) {
-      const url = await signedUrl(cropPaths.get(post.contentItemId)!.path, EMAIL_URL_TTL_S);
-      if (url) images.set(post.contentItemId, { url, altText });
-    }
-
     return {
-      outcome: {
-        status: 'generated',
-        generation_group_id: groupId,
-        motif_key: motifKey,
-        ...(rendered.costUsd !== null ? { cost_usd: rendered.costUsd } : {}),
-      },
-      images,
+      ok: true,
+      groupId,
+      motifKey,
+      altText,
+      costUsd: rendered.costUsd,
+      cropPaths: new Map([...cropPaths].map(([id, c]) => [id, c.path])),
     };
   } catch (err) {
     log.error({ err, groupId }, 'image step failed');
     // No partial state: an unmarked or orphaned image never reaches a founder.
     await removeObjects(uploaded);
-    return { outcome: { status: 'failed', motif_key: motifKey, reason: summariseError(err) }, images };
+    return { ok: false, motifKey, reason: summariseError(err) };
   }
+}
+
+/** Step 5b. Never throws. */
+export async function runImageStep(params: ImageStepParams): Promise<ImageStepResult> {
+  const images = new Map<string, EmailImage>();
+  if (params.posts.length === 0) {
+    return { outcome: { status: 'skipped', reason: 'No persisted posts to illustrate.' }, images };
+  }
+  // The audit rows hang off the LinkedIn draft when there is one.
+  const primary = params.posts.find((p) => p.platform === 'linkedin') ?? params.posts[0]!;
+
+  let canon: BrandVisual | null;
+  try {
+    canon = await loadCanon();
+  } catch (err) {
+    log.error({ err }, 'brand visual canon load failed');
+    return { outcome: { status: 'failed', reason: summariseError(err) }, images };
+  }
+  if (!canon) {
+    log.info('no active brand_visual row — image step disabled');
+    return { outcome: { status: 'disabled', reason: 'No active brand_visual canon.' }, images };
+  }
+
+  const skip = async (reason: string, motifKey?: string): Promise<ImageStepResult> => {
+    await logActivity([
+      {
+        agent_name: 'charlie',
+        action: 'social_image_skipped',
+        status: 'pending',
+        trigger_type: 'scheduled',
+        entity_type: 'content_item',
+        entity_id: primary.contentItemId,
+        proposed_actions: [{ type: 'social_image', skipped: true, reason, story_id: params.story.id }],
+      },
+    ]);
+    return { outcome: { status: 'skipped', reason, ...(motifKey ? { motif_key: motifKey } : {}) }, images };
+  };
+
+  // ── 5b.1–5b.3: motif history → brief → lint (one re-brief, then skip) ──────
+  const motifs = activeMotifs(canon);
+  if (motifs.length === 0) return skip('The brand visual canon has no active motifs.');
+  const recentMotifKeys = await loadRecentMotifs(params.accountIds);
+  const briefParams = {
+    story: params.story,
+    form: params.form,
+    postCopy: params.postCopy,
+    motifs,
+    recentMotifKeys,
+  };
+  const lintOpts = { motifs, prohibitedTerms: canon.prohibitedTerms };
+
+  let brief = await generateBrief(buildImageBriefPrompt(briefParams));
+  let flags = lintImageBrief(brief, lintOpts);
+  if (flags.length > 0) {
+    brief = await generateBrief(
+      buildImageBriefPrompt({ ...briefParams, rewriteInstruction: imageBriefRewriteInstruction(flags) }),
+    );
+    flags = lintImageBrief(brief, lintOpts);
+  }
+  if (brief.skip) return skip(brief.skip_reason?.trim() || 'The brief chose not to illustrate this story.');
+  if (flags.length > 0) return skip(`Brief failed lint twice: ${flags.join(' ')}`, brief.motif_key ?? undefined);
+
+  const rendered = await renderAndPersistImage({
+    canon,
+    brief,
+    posts: params.posts,
+    imageSpecs: params.imageSpecs,
+    triggerType: 'scheduled',
+  });
+  if (!rendered.ok) {
+    return { outcome: { status: 'failed', motif_key: rendered.motifKey, reason: rendered.reason }, images };
+  }
+
+  // Email links are a convenience: a missing URL just means no image in the card.
+  for (const post of params.posts) {
+    const path = rendered.cropPaths.get(post.contentItemId);
+    const url = path ? await signedUrl(path, EMAIL_URL_TTL_S) : null;
+    if (url) images.set(post.contentItemId, { url, altText: rendered.altText });
+  }
+
+  return {
+    outcome: {
+      status: 'generated',
+      generation_group_id: rendered.groupId,
+      motif_key: rendered.motifKey,
+      ...(rendered.costUsd !== null ? { cost_usd: rendered.costUsd } : {}),
+    },
+    images,
+  };
 }
