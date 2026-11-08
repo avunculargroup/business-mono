@@ -2184,6 +2184,22 @@ CREATE INDEX idx_content_images_item    ON content_images(content_item_id);
 CREATE INDEX idx_content_images_segment ON content_images(thread_segment_id);
 CREATE INDEX idx_content_images_generation_group ON content_images(generation_group_id) WHERE generation_group_id IS NOT NULL;
 
+-- Founder image actions from /content/[id]; contentImageRequestListener claims
+-- each (pending -> working) and resolves it to done or failed. Kept as a record.
+CREATE TABLE content_image_requests (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id  UUID        NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  action           TEXT        NOT NULL CHECK (action IN ('regenerate', 'render_brief', 'recheck_alt_text')),
+  brief            JSONB,      -- render_brief only
+  status           TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'working', 'done', 'failed')),
+  error            TEXT,
+  requested_by     UUID        REFERENCES team_members(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at     TIMESTAMPTZ,
+  CONSTRAINT content_image_requests_brief_present CHECK (action <> 'render_brief' OR brief IS NOT NULL)
+);
+
 -- Manual post-hoc metrics, one row per published variant (UNIQUE), updated in place.
 CREATE TABLE post_metrics (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

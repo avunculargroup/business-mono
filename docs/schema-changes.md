@@ -6,6 +6,19 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — Social post images: `content_image_requests`
+
+`20261108000002_content_image_requests.sql` adds the queue behind the image slot on
+`/content/[id]`. The web app cannot reach the agents server over HTTP, so "Regenerate image",
+"Render with this brief" and an alt-text edit insert a row (`regenerate`, `render_brief`,
+`recheck_alt_text`); `contentImageRequestListener` claims it via Realtime (`pending` →
+`working`) and resolves it to `done` or `failed` with an error the page shows. A CHECK
+requires `brief` on `render_brief`. Rows are kept as the record of who asked for what.
+`is_team_member()` RLS; in the Realtime publication with `REPLICA IDENTITY FULL`. Spec:
+`docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-11-08 — Social post images: `brand_visual`, `content_images` provenance
 
 `20261108000000_add_brand_visual.sql` adds `brand_visual`, the versioned visual canon for the

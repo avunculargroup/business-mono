@@ -2,7 +2,7 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
-**Status:** Sessions 1–2 built (data layer + pipeline); step 0 bake-off and Session 3 UI outstanding
+**Status:** Sessions 1–3 built; step 0 bake-off outstanding (see Build notes)
 **Last updated:** 2026-11-08
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
@@ -529,6 +529,23 @@ Images are **on for both founders from launch**. That makes step 0 a hard prereq
 | 2026-11-07 | **Sketch style.** Canon v1.0 describes a confident hand-drawn graphite and ink sketch on warm paper with one gold accent. |
 | 2026-11-08 | **Full-width images in the email.** Each post card shows its own platform crop at full card width. No thumbnail. |
 | 2026-11-08 | **Images on by default.** `generate_image` absent means on, for both founders from launch. Step 0 must be complete before launch. |
+
+-----
+
+## Build notes
+
+Where the build departs from this spec, and why.
+
+| Spec says | Built | Why |
+|---|---|---|
+| `apps/agents/assets/bts-logo.svg` | `workflows/socialPost/brandMark.ts`, a string constant, with a test that it is byte-identical to the skill's SVG | `mastra build` bundles source and leaves loose asset files behind |
+| Check `/images/models/{id}/endpoints` for reference-image support | Send references; on a 400, retry once prompt-only and record `references_dropped` | A failed call is not billed, and the endpoint's response shape could not be verified from the build sandbox |
+| Linter requires alt text | Also requires a subject | The subject block cannot be assembled without one |
+| Image slot below the copy editor | In the editor's side panel, above Feedback | The copy column is a full-height textarea; a 16:9 preview below it would squash it |
+| Remove deletes rows and objects | Deletes the objects; marks the rows `removed` | The prompt, model and cost are the provenance record, and `review_outcome` is the signal the deferred distil step reads |
+| Regenerate "replaces the group" | Writes a new group, then marks the old rows `regenerated` | Same reason; the page shows the newest live group |
+| Regenerate and edit-brief call the agents server | Through a `content_image_requests` queue and `contentImageRequestListener` | The web app has no HTTP route to the agents server; this is the platform's web → DB → agents pattern |
+| `buildImagePrompt` in `apps/agents` | In `@platform/shared` (`brandVisual.ts`), with `lintImageBrief` | The brief slide-over and the Visual tab preview with the same function the render uses |
 
 -----
 
