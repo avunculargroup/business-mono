@@ -21,6 +21,7 @@ import { toRecentPosts, extractOpeningLines, recentForms, type RecentPost } from
 import { toGuidelines, buildGuidelinesBlock } from './guidelines.js';
 import { scoreAiTells, aiTellRewriteInstruction } from './aiTell.js';
 import { sendSocialDraft, type SocialDraftPost } from '../../lib/sendSocialDraft.js';
+import { runImageStep, type PersistedPost } from './image.js';
 // Type-only — erased at compile time, so no runtime import cycle with the
 // workflow file (which imports this handler's value). Mirrors runIndicatorPoll.
 import type { RoutineOutcome } from '../executeRoutineWorkflow.js';
@@ -150,11 +151,15 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
   // ── Platform specs + active disclaimers ─────────────────────────────────────
   const { data: specRows, error: specErr } = await db
     .from('platform_specs')
-    .select('platform, max_chars, max_thread_segments, hashtag_guidance')
+    .select('platform, max_chars, max_thread_segments, hashtag_guidance, image_specs')
     .in('platform', [...accounts.keys()]);
   if (specErr) return fail(`platform_specs lookup failed: ${specErr.message}`);
   const specs = new Map<Platform, PlatformSpecLite>();
-  for (const s of (specRows ?? []) as PlatformSpecLite[]) specs.set(s.platform, s);
+  const imageSpecs = new Map<Platform, unknown>();
+  for (const s of (specRows ?? []) as Array<PlatformSpecLite & { image_specs?: unknown }>) {
+    specs.set(s.platform, s);
+    imageSpecs.set(s.platform, s.image_specs);
+  }
 
   const { data: snippetRows } = await db.from('compliance_snippets').select('id, key').eq('is_active', true);
   const disclaimers: DisclaimerRef[] = ((snippetRows ?? []) as Array<{ id: string; key: string }>).map((s) => ({
@@ -249,6 +254,8 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
   // ── Draft each platform: Charlie → Lex → persist ────────────────────────────
   const posts: SocialPostDraft[] = [];
   const emailPosts: SocialDraftPost[] = [];
+  // Persisted copy per platform — the image brief reads the actual post.
+  const persistedCopy = new Map<Platform, string>();
   for (const account of accounts.values()) {
     const spec = specs.get(account.platform);
     if (!spec) {
@@ -346,6 +353,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
       ]);
 
       posts.push({ contentItemId, platform: account.platform, is_thread: row.is_thread });
+      persistedCopy.set(account.platform, variantCopyText(draft));
       emailPosts.push({
         contentItemId,
         platform: account.platform,
@@ -366,6 +374,33 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     return fail(`Drafting failed for every platform for ${founderName}.`);
   }
 
+  // ── 5b. One on-brand image for the run (best-effort) ────────────────────────
+  // After every draft is persisted, so an image problem can never lose copy.
+  // runImageStep never throws; the catch is belt and braces for the run status.
+  let image: SocialPostFromNewsResult['image'];
+  if (cfg.generate_image === false) {
+    image = { status: 'disabled', reason: 'generate_image is false for this routine.' };
+  } else {
+    try {
+      const imageResult = await runImageStep({
+        accountIds: [...accounts.values()].map((a) => a.id),
+        story,
+        form,
+        postCopy: persistedCopy.get('linkedin') ?? persistedCopy.get('twitter_x') ?? '',
+        posts: posts.map((p): PersistedPost => ({ contentItemId: p.contentItemId, platform: p.platform })),
+        imageSpecs,
+      });
+      image = imageResult.outcome;
+      for (const ep of emailPosts) {
+        const img = imageResult.images.get(ep.contentItemId);
+        if (img) ep.image = img;
+      }
+    } catch (err) {
+      log.error({ err }, 'image step threw');
+      image = { status: 'failed', reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   // ── Email the founder their drafts (best-effort) ────────────────────────────
   let emailed = false;
   try {
@@ -382,6 +417,7 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     form,
     posts,
     emailed,
+    image,
   };
   const result: RoutineResult = {
     summary: `Drafted ${posts.length} post${posts.length === 1 ? '' : 's'} for ${founderName} (${form.replace(/_/g, ' ')}) from: ${story.title}`,

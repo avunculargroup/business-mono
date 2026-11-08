@@ -412,4 +412,9 @@
 @media (max-width: 767px) {
   .container { padding: var(--space-4); }
   .tabs { padding: 0 var(--space-4); }
+
+  /* The chip remove control is a 44px target in its own right on touch. */
+  .chip { padding-right: 0; }
+  .chipRemove { justify-content: center; min-width: 44px; min-height: 44px; }
+  .chipInput { min-height: 44px; font-size: 16px; }
 }

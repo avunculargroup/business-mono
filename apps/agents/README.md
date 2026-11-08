@@ -182,6 +182,7 @@ being sent to a guessed address.
 | `complianceRecheck` | Realtime | Re-runs Lex when a variant's copy is edited |
 | `feedbackDistillListener` | Realtime | Distils director feedback into reusable guidance |
 | `marketReportFeedbackListener` | Realtime | The same loop for market reports |
+| `contentImageRequestListener` | Realtime + 5-min sweep | Founder image actions from `/content/[id]` (`content_image_requests`): regenerate, render with an edited brief, re-check alt text. Fails requests left `working` |
 
 ## Webhooks
 

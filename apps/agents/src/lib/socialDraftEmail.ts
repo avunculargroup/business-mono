@@ -49,6 +49,8 @@ export interface SocialDraftPost {
   isThread: boolean;
   classification: Classification;
   needsDisclaimer: boolean;
+  /** This platform's marked crop (signed URL) and its alt text, when the image step succeeded. */
+  image?: { url: string; altText: string };
 }
 
 export interface SocialDraftEmailInput {
@@ -130,6 +132,20 @@ function bodyHtml(post: SocialDraftPost, dark: boolean): string {
 }
 
 /** One platform-mimic preview card. */
+/**
+ * The platform crop at full card width, where the image sits in a real post. If
+ * the signed URL has expired or remote images are blocked, the alt text shows.
+ */
+function imageHtml(post: SocialDraftPost): string {
+  const src = post.image ? safeHref(post.image.url) : null;
+  if (!post.image || !src) return '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+          <tr><td><img src="${escapeHtml(src)}" alt="${escapeHtml(
+            post.image.altText,
+          )}" width="100%" style="display:block;width:100%;height:auto;border-radius:8px;"></td></tr>
+        </table>`;
+}
+
 function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
   const dark = post.platform === 'twitter_x';
   const cardBg = dark ? C.xBg : C.surface;
@@ -179,6 +195,7 @@ function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
           ${bodyHtml(post, dark)}
         </table>
+        ${imageHtml(post)}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr><td style="padding:10px 0 0 0;font-family:${FONT_BODY};font-size:12px;color:${metaColor};">${charCount(
             previewText,
@@ -216,6 +233,7 @@ export function renderSocialDraftEmail(input: SocialDraftEmailInput): RenderedEm
     } else {
       textLines.push(p.body);
     }
+    if (p.image) textLines.push(`Image: ${p.image.altText}`);
     if (p.needsDisclaimer) textLines.push('(Disclaimer to be attached by Lex.)');
     const href = reviewUrl(p.contentItemId, input.webAppUrl);
     if (href) textLines.push(`Review: ${href}`);

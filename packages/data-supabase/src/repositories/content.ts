@@ -3,6 +3,8 @@ import type {
   ContentCard,
   ContentDetail,
   ContentEditGuard,
+  ContentImage,
+  ContentImageRequest,
   ContentRepository,
   NewContentItem,
   Paginated,
@@ -38,6 +40,106 @@ const EXCERPT_MAX = 500;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+const IMAGE_COLUMNS =
+  'id, source, storage_path, generation_group_id, alt_text, platform_crop, image_brief, assembled_prompt, brand_visual_version, model_id, cost_usd, is_style_anchor, alt_text_verdict, review_outcome, created_at' as const;
+
+/** The unmarked master sits beside its crops, under the group's folder. */
+const MASTER_FILE = 'master-16x9.png';
+
+type ImageRow = {
+  id: string;
+  source: string;
+  storage_path: string;
+  generation_group_id: string | null;
+  alt_text: string | null;
+  platform_crop: string | null;
+  image_brief: unknown;
+  assembled_prompt: string | null;
+  brand_visual_version: string | null;
+  model_id: string | null;
+  cost_usd: number | null;
+  is_style_anchor: boolean;
+  alt_text_verdict: unknown;
+  review_outcome: string | null;
+  created_at: string;
+};
+
+function toContentImage(row: ImageRow): ContentImage {
+  const ai = row.source === 'ai_generated';
+  const verdict = row.alt_text_verdict as { classification?: unknown; rationale?: unknown; checked_at?: unknown } | null;
+  const slash = row.storage_path.lastIndexOf('/');
+  return {
+    id: row.id,
+    source: ai ? 'ai_generated' : 'upload',
+    storagePath: row.storage_path,
+    masterPath: ai && row.generation_group_id && slash > 0 ? `${row.storage_path.slice(0, slash)}/${MASTER_FILE}` : null,
+    generationGroupId: row.generation_group_id,
+    altText: row.alt_text,
+    platformCrop: row.platform_crop,
+    brief: (row.image_brief ?? null) as ContentImage['brief'],
+    assembledPrompt: row.assembled_prompt,
+    brandVisualVersion: row.brand_visual_version,
+    modelId: row.model_id,
+    // NUMERIC can arrive as a string from PostgREST.
+    costUsd: row.cost_usd === null ? null : Number(row.cost_usd),
+    isStyleAnchor: row.is_style_anchor,
+    altTextVerdict:
+      verdict && typeof verdict.classification === 'string'
+        ? {
+            classification: verdict.classification,
+            rationale: typeof verdict.rationale === 'string' ? verdict.rationale : '',
+            checkedAt: typeof verdict.checked_at === 'string' ? verdict.checked_at : null,
+          }
+        : null,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * The image a draft carries now: the newest post-level row not retired by a
+ * regenerate or a remove. Retired rows stay in the table as the review signal,
+ * so the filter is here rather than in a delete.
+ */
+async function readCurrentImage(
+  client: SupabaseAdapterContext['client'],
+  contentItemId: string,
+): Promise<ContentImage | null> {
+  const { data, error } = await client
+    .from('content_images')
+    .select(IMAGE_COLUMNS)
+    .eq('content_item_id', contentItemId)
+    .is('thread_segment_id', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+  const live = ((data ?? []) as ImageRow[]).find((r) => r.review_outcome === null || r.review_outcome === 'kept');
+  return live ? toContentImage(live) : null;
+}
+
+async function readLatestImageRequest(
+  client: SupabaseAdapterContext['client'],
+  contentItemId: string,
+): Promise<ContentImageRequest | null> {
+  const { data, error } = await client
+    .from('content_image_requests')
+    .select('id, action, status, error, created_at')
+    .eq('content_item_id', contentItemId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    id: data.id,
+    action: data.action as ContentImageRequest['action'],
+    status: data.status as ContentImageRequest['status'],
+    error: data.error,
+    createdAt: data.created_at,
+  };
 }
 
 async function readThreadSegments(
@@ -141,10 +243,12 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
 
       // Three reads that each depend on what the item turned out to be, and on
       // nothing else — so they go together rather than in sequence.
-      const [segments, feedback, spec] = await Promise.all([
+      const [segments, feedback, spec, image, imageRequest] = await Promise.all([
         item.is_thread ? readThreadSegments(client, item.id) : Promise.resolve([]),
         item.social_account_id ? readDraftFeedback(client, item.id) : Promise.resolve([]),
         client.from('platform_specs').select('max_chars').eq('platform', item.type).maybeSingle(),
+        readCurrentImage(client, item.id),
+        readLatestImageRequest(client, item.id),
       ]);
 
       return {
@@ -163,6 +267,8 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         threadSegments: segments,
         priorFeedback: feedback,
         maxChars: spec.data?.max_chars ?? null,
+        image,
+        latestImageRequest: imageRequest,
       };
     },
 
@@ -182,7 +288,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
       if (error) throw error;
       if (!item) return null;
 
-      const [account, segments, disclaimer] = await Promise.all([
+      const [account, segments, disclaimer, image] = await Promise.all([
         item.social_account_id
           ? client
               .from('social_accounts')
@@ -204,6 +310,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
               .eq('id', item.disclaimer_snippet_id)
               .maybeSingle()
           : Promise.resolve({ data: null }),
+        readCurrentImage(client, item.id),
       ]);
 
       return {
@@ -214,6 +321,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         isThread: item.is_thread ?? false,
         segments: (segments.data ?? []).map((segment) => segment.body),
         disclaimerText: disclaimer.data?.body ?? null,
+        image: image ? { storagePath: image.storagePath, altText: image.altText } : null,
       };
     },
 

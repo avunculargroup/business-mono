@@ -339,6 +339,33 @@ CREATE TRIGGER brand_voice_updated_at
   BEFORE UPDATE ON brand_voice
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- Visual canon for generated social images (app-layer singleton, like brand_voice).
+-- The image step's LLM writes a brief; buildImagePrompt joins it to this row.
+-- prohibited_block is sent to the image model; prohibited_terms feeds the brief
+-- linter only. Seeded v1.0 (light, sketch) in 20261108000000_add_brand_visual.sql.
+CREATE TABLE brand_visual (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  version               TEXT        NOT NULL DEFAULT '1.0',
+  is_active             BOOLEAN     NOT NULL DEFAULT true,
+  style_block           TEXT        NOT NULL,
+  palette               JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- [{ role, hex, usage }]
+  composition_block     TEXT        NOT NULL,
+  prohibited_block      TEXT        NOT NULL,
+  prohibited_terms      TEXT[]      NOT NULL DEFAULT '{}',
+  motifs                JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- [{ key, label, description, use_when, is_active }]
+  style_anchor_paths    TEXT[]      NOT NULL DEFAULT '{}',
+  default_aspect_ratio  TEXT        NOT NULL DEFAULT '16:9',
+  brand_mark            JSONB       NOT NULL DEFAULT '{"enabled": true, "position": "bottom_right", "height_pct": 9, "margin_pct": 4, "opacity": 1}'::jsonb,
+  notes                 TEXT,
+  updated_by            UUID        REFERENCES team_members(id),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER brand_visual_updated_at
+  BEFORE UPDATE ON brand_visual
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- Embeddable exemplar library. social_account_id NULL = company canon. Embedded
 -- on save via text-embedding-3-small (HNSW index, pgvector 0.8.0).
 CREATE TABLE voice_snippets (
@@ -2139,11 +2166,39 @@ CREATE TABLE content_images (
   sort_order        INT NOT NULL DEFAULT 0,
   source            TEXT NOT NULL DEFAULT 'upload' CHECK (source IN ('upload', 'ai_generated')),
   created_by        UUID REFERENCES team_members(id),
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Provenance for source = 'ai_generated' (social post image step). All nullable.
+  generation_group_id  UUID,          -- shared by every crop from one render
+  image_brief          JSONB,         -- the validated brief
+  assembled_prompt     TEXT,          -- the exact prompt sent (audit trail)
+  brand_visual_version TEXT,
+  model_id             TEXT,
+  generation_ref       TEXT,          -- OpenRouter generation id, where returned
+  cost_usd             NUMERIC(8,4),
+  is_style_anchor      BOOLEAN NOT NULL DEFAULT false,
+  review_outcome       TEXT CHECK (review_outcome IN ('kept', 'regenerated', 'removed')),
+  alt_text_verdict     JSONB          -- Lex on the alt text: { classification, needs_disclaimer, rationale, checked_at }
 );
 
 CREATE INDEX idx_content_images_item    ON content_images(content_item_id);
 CREATE INDEX idx_content_images_segment ON content_images(thread_segment_id);
+CREATE INDEX idx_content_images_generation_group ON content_images(generation_group_id) WHERE generation_group_id IS NOT NULL;
+
+-- Founder image actions from /content/[id]; contentImageRequestListener claims
+-- each (pending -> working) and resolves it to done or failed. Kept as a record.
+CREATE TABLE content_image_requests (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_item_id  UUID        NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  action           TEXT        NOT NULL CHECK (action IN ('regenerate', 'render_brief', 'recheck_alt_text')),
+  brief            JSONB,      -- render_brief only
+  status           TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'working', 'done', 'failed')),
+  error            TEXT,
+  requested_by     UUID        REFERENCES team_members(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at     TIMESTAMPTZ,
+  CONSTRAINT content_image_requests_brief_present CHECK (action <> 'render_brief' OR brief IS NOT NULL)
+);
 
 -- Manual post-hoc metrics, one row per published variant (UNIQUE), updated in place.
 CREATE TABLE post_metrics (

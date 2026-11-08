@@ -6,6 +6,60 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — `platform-files` storage limited to team members
+
+`20261108000004_platform_files_team_only.sql` rewrites the bucket's four `storage.objects`
+policies from "any `authenticated` session" to `authenticated` and `is_team_member()`, the form
+the `papers` and `product-images` buckets already use. Minute subscribers are `authenticated`
+too, so they could list and read the whole bucket, which since the social post image step
+includes unpublished draft images. Unaffected: the agents server (service-role key bypasses
+RLS), signed URLs already issued (the draft email's 7-day image links, previews, downloads carry
+their own token), and the anon `platform_files_objects_public_select` policy behind `/share/<id>`.
+The `reports` bucket has the same open pattern and is not changed here.
+
+---
+
+## 2026-11-08 — Social post images: capability row
+
+`20261108000003_capability_social_post_images.sql` registers `charlie` /
+`social_post_images` in `platform_capabilities` so Simon's capacity check knows the image step
+exists. Guarded with `WHERE NOT EXISTS`, since the table has no unique key on
+`(agent_name, capability)`.
+
+---
+
+## 2026-11-08 — Social post images: `content_image_requests`
+
+`20261108000002_content_image_requests.sql` adds the queue behind the image slot on
+`/content/[id]`. The web app cannot reach the agents server over HTTP, so "Regenerate image",
+"Render with this brief" and an alt-text edit insert a row (`regenerate`, `render_brief`,
+`recheck_alt_text`); `contentImageRequestListener` claims it via Realtime (`pending` →
+`working`) and resolves it to `done` or `failed` with an error the page shows. A CHECK
+requires `brief` on `render_brief`. Rows are kept as the record of who asked for what.
+`is_team_member()` RLS; in the Realtime publication with `REPLICA IDENTITY FULL`. Spec:
+`docs/features/social-post-image/feature-spec.md`.
+
+---
+
+## 2026-11-08 — Social post images: `brand_visual`, `content_images` provenance
+
+`20261108000000_add_brand_visual.sql` adds `brand_visual`, the versioned visual canon for the
+daily social post image (app-layer singleton like `brand_voice`, `is_team_member()` RLS), seeded
+with v1.0: light, hand-drawn sketch style, one gold accent, a closed vocabulary of ten motifs.
+It is a table rather than code so the founders can tune it without a deploy, and every image
+records the version it used. `prohibited_block` is sent to the image model; `prohibited_terms`
+is not — it feeds the deterministic brief linter. The same migration widens
+`model_configs.scope_type` to admit `image_step`, because an image scope resolves to a model id
+string rather than a language model and never falls back to an agent.
+`20261108000001_extend_content_images.sql` adds nullable provenance columns to
+`content_images` (`generation_group_id`, `image_brief`, `assembled_prompt`,
+`brand_visual_version`, `model_id`, `generation_ref`, `cost_usd`, `is_style_anchor`,
+`review_outcome`, `alt_text_verdict`), so any generated image can be explained later — which
+prompt, which model, which canon, what it cost. Uploads are unaffected. Spec:
+`docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-10-24 — Newsletter extraction: raw HTML, per-source link rules
 
 `20261024000000_newsletter_extraction.sql` adds `news_item_raw`, one row per email item

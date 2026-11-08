@@ -31,7 +31,7 @@ import { at } from './anchor';
 
 interface ContentFixture {
   card: ContentCard;
-  detail: Omit<ContentDetail, 'id' | 'title' | 'type' | 'status'>;
+  detail: Omit<ContentDetail, 'id' | 'title' | 'type' | 'status' | 'image' | 'latestImageRequest'>;
   gate: Omit<PublishGate, 'status' | 'type' | 'body' | 'isThread'>;
 }
 
@@ -229,6 +229,10 @@ export function contentDetails(anchor: Date): ContentDetail[] {
     type: card.type,
     status: card.status,
     ...detail,
+    // No fixture draft carries an image: the demo has no storage to sign a URL
+    // against, and an image the page could not show would be a broken frame.
+    image: null,
+    latestImageRequest: null,
   }));
 }
 

@@ -121,9 +121,22 @@ For **each** of the founder's accounts (LinkedIn and/or X):
 
 A failure drafting one platform is caught and logged; the other platform still proceeds. Only if **every** platform fails does the run fail.
 
+### 5b. One image for the run (best-effort)
+
+After every draft is persisted, `runImageStep` (`image.ts`) makes **one** on-brand illustration that both drafts share. It is best-effort end to end: it never throws, and no image outcome changes the run's status. Set `generate_image: false` in `action_config` to opt a routine out (absent means on). Full design: [`docs/features/social-post-image/feature-spec.md`](./features/social-post-image/feature-spec.md).
+
+1. **Load the canon** — the active `brand_visual` row. No row → image status `disabled`.
+2. **Brief** (`image_brief` step, agent `charlie`). Reads the story, the form and the **persisted** post copy, plus the last 3 motifs used on the founder's accounts (rotation, from `content_images.image_brief`). Returns a structured brief: one `motif_key` from the canon's closed vocabulary, a concrete `subject`, the `metaphor`, an optional `composition`, and `alt_text` — or `skip` when the story has no honest visual.
+3. **Lint** (`lintImageBrief`, pure): active motif, no prohibited term, no digits in subject or metaphor, alt text present. On a hit, **one** re-brief carrying the flags; still flagged → `skipped`. Never loops.
+4. **Assemble** (`buildImagePrompt`, pure): canon style → palette → composition → subject → prohibited. The LLM never writes this prompt.
+5. **Render** via OpenRouter's Image API (`lib/openrouterImage.ts`, scope `social_post.image_render`), 16:9, with up to 4 style anchors as reference images. A 400 with references retries once prompt-only. 120 s timeout, no other retry.
+6. **Crop + mark + upload** (`imageCompose.ts`, `sharp`): a centre crop per platform (1600×900 X, 1200×627 LinkedIn), then the BTS mark bottom-right. The unmarked master and each crop go to `platform-files/social-images/{date}/{group}/`. Rows are written only after every object uploads; a failure removes what was uploaded.
+7. **Lex on the alt text** — advisory, stored in `content_images.alt_text_verdict`; fail-safe `general_advice`.
+8. **Persist** one `content_images` row per draft sharing a `generation_group_id`, with the brief, the exact prompt, canon version, model and cost. Audit: `charlie` → `social_image_generated` (or `social_image_skipped` with the reason) and `lex` → `compliance_checked`.
+
 ### 6. Email the founder
 
-Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a platform-mimic email showing each draft, its compliance chip, and — when `WEB_APP_URL` is set — a **Review** link per draft into the web app.
+Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a platform-mimic email showing each draft, its compliance chip, and — when `WEB_APP_URL` is set — a **Review** link per draft into the web app. When step 5b produced an image, each card shows its own platform's crop at full card width (a 7-day signed URL, with the alt text as fallback).
 
 - Recipient is resolved from the founder's **account email** (`team_members.id === auth.users.id`).
 - Delivery reuses the **news-digest sender plumbing**: the `avuncular@fastmail.com` login's stored Fastmail token (no separate secret), sending as the `hq@btreasury.com.au` identity. It does **not** create `interactions` and is independent of the CRM/newsletter inbound polls.
@@ -131,7 +144,7 @@ Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a pl
 
 ### 7. Result
 
-The routine returns a `RoutineOutcome` whose `metadata` (`SocialPostFromNewsResult`) records the founder, the chosen `story_id` / `story_url`, the `form`, the drafted `posts` (content-item ids + platform + thread flag), and whether the email sent — persisted to `routines.last_result` for the dashboard and audit.
+The routine returns a `RoutineOutcome` whose `metadata` (`SocialPostFromNewsResult`) records the founder, the chosen `story_id` / `story_url`, the `form`, the drafted `posts` (content-item ids + platform + thread flag), the `image` outcome (`generated` / `skipped` / `failed` / `disabled`, with motif, group id, cost or reason), and whether the email sent — persisted to `routines.last_result` for the dashboard and audit.
 
 -----
 
@@ -155,7 +168,7 @@ Approval philosophy applies as everywhere else: **public content is always human
 
 Simon is **not** in the loop — this is a scheduled routine, not a Signal-dispatched directive.
 
-Each LLM step is model-configurable via `/settings/models` under the scopes `social_post.editor_select`, `social_post.generate_copy`, and `social_post.compliance_check` (registered in `packages/shared/src/modelScopes.ts`, wired with `stepRequestContext(...)`).
+Each LLM step is model-configurable via `/settings/models` under the scopes `social_post.editor_select`, `social_post.generate_copy`, `social_post.compliance_check` and `social_post.image_brief` (registered in `packages/shared/src/modelScopes.ts`, wired with `stepRequestContext(...)`).
 
 -----
 
@@ -163,7 +176,7 @@ Each LLM step is model-configurable via `/settings/models` under the scopes `soc
 
 **Reads:** `team_members`, `social_accounts`, `platform_specs`, `compliance_snippets`, `news_items`, plus voice tables via `@platform/voice`, plus `auth.users` (recipient email) and `company_profile` (email footer).
 
-**Writes:** `content_items` (drafts), `thread_segments` (threads only), `agent_activity` (audit), `routines.last_result` (run summary). Sends one email via Fastmail JMAP.
+**Writes:** `content_items` (drafts), `thread_segments` (threads only), `content_images` + the `platform-files` bucket (image step), `agent_activity` (audit), `routines.last_result` (run summary). Sends one email via Fastmail JMAP. The image step also reads `brand_visual` and calls OpenRouter's Image API.
 
 Note: the campaign `content_items` columns (`social_account_id`, `is_thread`, compliance fields, etc.) are not yet in the generated `Database` types, so the handler casts the Supabase client to `any` for those inserts — the same pattern the campaign variant workflow uses.
 
@@ -181,6 +194,7 @@ Note: the campaign `content_items` columns (`social_account_id`, `is_thread`, co
 | Lex compliance errors | Fail-safe verdict: `general_advice` **with** a disclaimer |
 | One platform's draft throws | Caught and logged; the other platform still runs |
 | **Every** platform fails | Run **fails** |
+| Image step skips, fails or is disabled | Recorded in `metadata.image`; run still **succeeds**, email goes without images |
 | Email delivery fails | Logged; run still **succeeds** — drafts are already saved |
 
 -----
@@ -193,6 +207,9 @@ Note: the campaign `content_items` columns (`social_account_id`, `is_thread`, co
 | `apps/agents/src/workflows/socialPost/select.ts` | Candidate mapping + editor-pick resolution (pure) |
 | `apps/agents/src/workflows/socialPost/prompts.ts` | Editor-selection + Charlie generation prompts (pure) |
 | `apps/agents/src/workflows/socialPost/persist.ts` | `content_items` / `thread_segments` row builders (pure) |
+| `apps/agents/src/workflows/socialPost/image.ts` | Step 5b orchestration — brief, lint, render, crop + mark, persist (best-effort) |
+| `apps/agents/src/workflows/socialPost/imageBrief.ts`, `imagePrompt.ts`, `imageCompose.ts` | Brief schema + linter, `buildImagePrompt`, crop + `markPlacement` (pure apart from `sharp`) |
+| `apps/agents/src/lib/openrouterImage.ts` | OpenRouter Image API client |
 | `apps/agents/src/lib/sendSocialDraft.ts` | Emails one founder their drafts (best-effort) |
 | `apps/agents/src/lib/socialDraftEmail.ts` | Branded platform-mimic draft email HTML |
 | `apps/agents/src/workflows/executeRoutineWorkflow.ts` | Scheduler dispatch (`social_post_from_news` branch) |
@@ -211,4 +228,6 @@ Tests: `index.test.ts`, `prompts.test.ts`, `persist.test.ts` alongside the handl
 - **Change a founder's platforms / lookback / cadence:** edit that founder's `routines` row (`action_config`, `time_of_day`, `frequency`).
 - **Change the story pool or ranking:** it flows from the upstream news pipeline (`news_items` + Rex's relevance rubric) — tune there, not here.
 - **Change post style / voice:** voice lives in the voice tables per account (via `@platform/voice`), not in this code. Platform mechanics live in `platform_specs` rows. Brand voice canon is `docs/brand-voice.md`.
-- **Change which model writes/selects/checks:** `/settings/models`, scopes `social_post.*`.
+- **Change which model writes/selects/checks:** `/settings/models`, scopes `social_post.*`. The image render model (`social_post.image_render`) is under **Image models** there, picked from OpenRouter's image catalog; left at Default it uses `OPENROUTER_IMAGE_MODEL`, then `DEFAULT_IMAGE_MODEL`.
+- **Change how images look:** `/brand` → Visual edits the `brand_visual` canon (style, palette, motifs, prohibitions, mark placement, style anchors) and saves it as a new version, with a prompt preview that needs no render.
+- **Fix one day's image:** on `/content/[id]`, the image slot downloads the platform crop, regenerates, renders from an edited brief, saves alt text (Lex re-checks it), removes the image or promotes it to a style anchor. Regenerate and render run on the agents server through `content_image_requests` (`contentImageRequestListener`).

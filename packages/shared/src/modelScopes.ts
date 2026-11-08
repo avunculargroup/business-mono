@@ -4,7 +4,9 @@
 // the web app uses the same registry to render the settings page so the two
 // stay in sync. Adding an agent or AI-using workflow step? Add it here.
 
-export type ModelScopeType = 'agent' | 'workflow_step';
+// 'image_step' scopes resolve to an image-model id string (OpenRouter Image
+// API), not a LanguageModel, so they never enter the agent fallback chain.
+export type ModelScopeType = 'agent' | 'workflow_step' | 'image_step';
 
 export interface ModelScope {
   /** Canonical identifier used by `model_configs.scope_key`. */
@@ -376,6 +378,23 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     workflow: 'social_post',
     fallbackAgent: 'editor',
   },
+  {
+    key: 'social_post.image_brief',
+    type: 'workflow_step',
+    label: 'Image brief',
+    description: 'Charlie picks a motif from the brand visual canon and describes the day\'s image (never the final prompt)',
+    workflow: 'social_post',
+    fallbackAgent: 'charlie',
+  },
+  {
+    // No fallbackAgent: an image model is not a language model. Unset, it
+    // resolves to env OPENROUTER_IMAGE_MODEL, then DEFAULT_IMAGE_MODEL.
+    key: 'social_post.image_render',
+    type: 'image_step',
+    label: 'Image render',
+    description: 'The image model that renders the daily social post illustration (OpenRouter Image API)',
+    workflow: 'social_post',
+  },
 
   // ── Content compliance review (Lex, on draft persistence) ──────────────────
   {
@@ -542,3 +561,11 @@ export const POPULAR_MODELS: readonly ModelOption[] = [
   { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro (Google)' },
   { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Google)' },
 ] as const;
+
+// Image models offered for `image_step` scopes when OpenRouter's image catalog
+// (GET /api/v1/images/models) cannot be reached. Only models named in the
+// social post image spec's bake-off; the catalog is the authority.
+export const POPULAR_IMAGE_MODELS: readonly ModelOption[] = [
+  { id: 'google/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (Google)' },
+  { id: 'openai/gpt-image-2', label: 'GPT Image 2 (OpenAI)' },
+];

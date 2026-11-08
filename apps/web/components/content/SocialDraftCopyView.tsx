@@ -1,6 +1,10 @@
 'use client';
 
+import { useTransition } from 'react';
 import { CopyButton } from '@platform/ui/CopyButton';
+import { Button } from '@platform/ui/Button';
+import { useToast } from '@platform/ui/ToastProvider';
+import { getImageDownloadUrl } from '@/app/actions/contentImages';
 import styles from './SocialDraftCopyView.module.css';
 
 export interface SocialDraftCopyViewProps {
@@ -10,6 +14,8 @@ export interface SocialDraftCopyViewProps {
   isThread: boolean;
   segments: string[];
   disclaimerText: string | null;
+  /** The marked platform crop, with a short-lived preview URL. */
+  image?: { storagePath: string; altText: string | null; previewUrl: string | null } | null;
 }
 
 export function SocialDraftCopyView({
@@ -19,7 +25,23 @@ export function SocialDraftCopyView({
   isThread,
   segments,
   disclaimerText,
+  image = null,
 }: SocialDraftCopyViewProps) {
+  const [isDownloading, startDownload] = useTransition();
+  const { error } = useToast();
+
+  const handleDownload = () => {
+    if (!image) return;
+    startDownload(async () => {
+      const result = await getImageDownloadUrl(image.storagePath);
+      if ('error' in result) {
+        error(result.error ?? 'The image could not be downloaded.');
+        return;
+      }
+      window.location.assign(result.url);
+    });
+  };
+
   const fullText = isThread ? segments.map((s, i) => `${i + 1}/ ${s}`).join('\n\n') : (body ?? '');
 
   return (
@@ -46,6 +68,26 @@ export function SocialDraftCopyView({
         </ol>
       ) : (
         <p className={styles.body}>{body}</p>
+      )}
+
+      {image && (
+        <div className={styles.image}>
+          {image.previewUrl && (
+            // Signed, short-lived storage URL: next/image would cache it past expiry.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className={styles.imagePreview} src={image.previewUrl} alt={image.altText ?? ''} />
+          )}
+          {image.altText && (
+            <div className={styles.altText}>
+              <span className={styles.disclaimerTag}>Alt text</span>
+              <p className={styles.disclaimerText}>{image.altText}</p>
+              <CopyButton text={image.altText} label="Copy alt text" />
+            </div>
+          )}
+          <Button variant="secondary" onClick={handleDownload} loading={isDownloading}>
+            Download image
+          </Button>
+        </div>
       )}
 
       {disclaimerText && (

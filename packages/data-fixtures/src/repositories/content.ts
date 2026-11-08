@@ -40,6 +40,7 @@ export function createContentRepository(): ContentRepository {
         isThread: detail.isThread,
         segments: detail.threadSegments.map((segment) => segment.body),
         disclaimerText: null,
+        image: null,
       };
     },
 

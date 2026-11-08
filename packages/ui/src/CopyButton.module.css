@@ -15,3 +15,11 @@
   background: var(--color-surface-hover);
   color: var(--color-text-primary);
 }
+
+/* Touch has a 44px floor below 768px, the same rule Button applies. */
+@media (max-width: 767px) {
+  .btn {
+    min-height: 44px;
+    padding: 0 var(--space-4);
+  }
+}

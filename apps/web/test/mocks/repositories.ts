@@ -248,6 +248,8 @@ export function fakeContentDetail(overrides: Partial<ContentDetail> = {}): Conte
     threadSegments: [],
     priorFeedback: [],
     maxChars: null,
+    image: null,
+    latestImageRequest: null,
     ...overrides,
   };
 }

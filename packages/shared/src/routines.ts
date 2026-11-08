@@ -253,6 +253,9 @@ export interface SocialPostFromNewsConfig {
   platforms?: ('linkedin' | 'twitter_x')[];
   // Only consider news_items fetched within this many hours (default 24).
   lookback_hours?: number;
+  // Generate one on-brand image per run, shared by both drafts. Absent is
+  // treated as true; set false to opt a routine out.
+  generate_image?: boolean;
 }
 
 // The post form the editor chooses for a given story + founder.
@@ -283,6 +286,17 @@ export interface SocialPostFromNewsResult {
   posts: SocialPostDraft[];
   // True when the founder draft email was sent successfully.
   emailed: boolean;
+  // Outcome of the best-effort image step. Never changes the run status.
+  image?: SocialPostImageOutcome;
+}
+
+export interface SocialPostImageOutcome {
+  status: 'generated' | 'skipped' | 'failed' | 'disabled';
+  generation_group_id?: string;
+  motif_key?: string;
+  // Skip reason or error summary.
+  reason?: string;
+  cost_usd?: number;
 }
 
 // action_config shape for a 'market_report' routine. No knobs in v1 — the report

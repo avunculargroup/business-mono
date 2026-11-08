@@ -55,3 +55,23 @@
   color: var(--color-text-primary);
   font-family: inherit;
 }
+
+/* Below 768px the remove control is a 44px target in its own right, so the
+   chip grows to hold it rather than relying on a 12px icon. The entry field
+   matches, at 16px so iOS Safari does not zoom on focus. */
+@media (max-width: 767px) {
+  .chip {
+    padding-right: 0;
+  }
+
+  .chipRemove {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .chipInput {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

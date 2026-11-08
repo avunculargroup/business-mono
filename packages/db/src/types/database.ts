@@ -384,6 +384,71 @@ export type Database = {
           },
         ]
       }
+      brand_visual: {
+        Row: {
+          brand_mark: Json
+          composition_block: string
+          created_at: string
+          default_aspect_ratio: string
+          id: string
+          is_active: boolean
+          motifs: Json
+          notes: string | null
+          palette: Json
+          prohibited_block: string
+          prohibited_terms: string[]
+          style_anchor_paths: string[]
+          style_block: string
+          updated_at: string
+          updated_by: string | null
+          version: string
+        }
+        Insert: {
+          brand_mark?: Json
+          composition_block: string
+          created_at?: string
+          default_aspect_ratio?: string
+          id?: string
+          is_active?: boolean
+          motifs?: Json
+          notes?: string | null
+          palette?: Json
+          prohibited_block: string
+          prohibited_terms?: string[]
+          style_anchor_paths?: string[]
+          style_block: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string
+        }
+        Update: {
+          brand_mark?: Json
+          composition_block?: string
+          created_at?: string
+          default_aspect_ratio?: string
+          id?: string
+          is_active?: boolean
+          motifs?: Json
+          notes?: string | null
+          palette?: Json
+          prohibited_block?: string
+          prohibited_terms?: string[]
+          style_anchor_paths?: string[]
+          style_block?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_visual_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_voice: {
         Row: {
           bitcoin_capitalisation_rule: string | null
@@ -1971,14 +2036,92 @@ export type Database = {
           },
         ]
       }
+      content_image_requests: {
+        Row: {
+          action: string
+          brief: Json | null
+          completed_at: string | null
+          content_item_id: string
+          created_at: string
+          error: string | null
+          id: string
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          brief?: Json | null
+          completed_at?: string | null
+          content_item_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          brief?: Json | null
+          completed_at?: string | null
+          content_item_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_image_requests_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_image_requests_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_campaign_matrix"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_image_requests_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_ready_to_post"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_image_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_images: {
         Row: {
           alt_text: string | null
+          alt_text_verdict: Json | null
+          assembled_prompt: string | null
+          brand_visual_version: string | null
           content_item_id: string
+          cost_usd: number | null
           created_at: string
           created_by: string | null
+          generation_group_id: string | null
+          generation_ref: string | null
           id: string
+          image_brief: Json | null
+          is_style_anchor: boolean
+          model_id: string | null
           platform_crop: string | null
+          review_outcome: string | null
           sort_order: number
           source: string
           storage_path: string
@@ -1986,11 +2129,21 @@ export type Database = {
         }
         Insert: {
           alt_text?: string | null
+          alt_text_verdict?: Json | null
+          assembled_prompt?: string | null
+          brand_visual_version?: string | null
           content_item_id: string
+          cost_usd?: number | null
           created_at?: string
           created_by?: string | null
+          generation_group_id?: string | null
+          generation_ref?: string | null
           id?: string
+          image_brief?: Json | null
+          is_style_anchor?: boolean
+          model_id?: string | null
           platform_crop?: string | null
+          review_outcome?: string | null
           sort_order?: number
           source?: string
           storage_path: string
@@ -1998,11 +2151,21 @@ export type Database = {
         }
         Update: {
           alt_text?: string | null
+          alt_text_verdict?: Json | null
+          assembled_prompt?: string | null
+          brand_visual_version?: string | null
           content_item_id?: string
+          cost_usd?: number | null
           created_at?: string
           created_by?: string | null
+          generation_group_id?: string | null
+          generation_ref?: string | null
           id?: string
+          image_brief?: Json | null
+          is_style_anchor?: boolean
+          model_id?: string | null
           platform_crop?: string | null
+          review_outcome?: string | null
           sort_order?: number
           source?: string
           storage_path?: string

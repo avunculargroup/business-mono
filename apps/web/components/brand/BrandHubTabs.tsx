@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { VoiceTab } from './VoiceTab';
 import { BrandView } from './BrandView';
+import { VisualTab, type StyleAnchorView } from './VisualTab';
+import type { BrandVisual } from '@platform/shared';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from './voiceTypes';
 import type { AccountGuidelinesRow, ContentFeedbackRow } from './FeedbackGuidelinesPanel';
 import styles from '@/app/(app)/brand/voice.module.css';
@@ -16,11 +18,12 @@ interface BrandHubTabsProps {
   assets: BrandAsset[];
   guidelines: AccountGuidelinesRow[];
   feedback: ContentFeedbackRow[];
+  visual: { canon: BrandVisual | null; notes: string | null; anchors: StyleAnchorView[] };
 }
 
-type Tab = 'voice' | 'assets';
+type Tab = 'voice' | 'visual' | 'assets';
 
-export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, feedback }: BrandHubTabsProps) {
+export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, feedback, visual }: BrandHubTabsProps) {
   const [tab, setTab] = useState<Tab>('voice');
 
   return (
@@ -36,6 +39,14 @@ export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, fe
         </button>
         <button
           role="tab"
+          aria-selected={tab === 'visual'}
+          className={`${styles.tab} ${tab === 'visual' ? styles.tabActive : ''}`}
+          onClick={() => setTab('visual')}
+        >
+          Visual
+        </button>
+        <button
+          role="tab"
           aria-selected={tab === 'assets'}
           className={`${styles.tab} ${tab === 'assets' ? styles.tabActive : ''}`}
           onClick={() => setTab('assets')}
@@ -44,7 +55,7 @@ export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, fe
         </button>
       </div>
 
-      {tab === 'voice' ? (
+      {tab === 'voice' && (
         <VoiceTab
           voice={voice}
           snippets={snippets}
@@ -52,9 +63,9 @@ export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, fe
           guidelines={guidelines}
           feedback={feedback}
         />
-      ) : (
-        <BrandView assets={assets} />
       )}
+      {tab === 'visual' && <VisualTab canon={visual.canon} notes={visual.notes} anchors={visual.anchors} />}
+      {tab === 'assets' && <BrandView assets={assets} />}
     </>
   );
 }
