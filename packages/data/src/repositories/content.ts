@@ -1,4 +1,4 @@
-import type { ContentStatus, ImageBrief } from '@platform/shared';
+import type { ContentStatus, ImageConcept } from '@platform/shared';
 import type { Paginated, QueryOptions, ReadContext } from '../context';
 
 /** One card on the pipeline board. */
@@ -69,10 +69,11 @@ export interface ContentImageVerdict {
 }
 
 /**
- * The image a draft currently carries: the newest `content_images` row not
- * marked regenerated or removed. An AI image also carries its provenance — the
- * brief, the exact prompt sent, the canon version, model and cost — so the
- * page can say exactly what produced it.
+ * An image on a draft. A run renders up to three candidates (one generation
+ * group each, sharing a candidate set); exactly one is selected, and the
+ * selected one is the draft's image everywhere it is consumed. An AI image also
+ * carries its provenance — the concept, the exact prompt sent, the canon
+ * version, model and cost — so the page can say exactly what produced it.
  */
 export interface ContentImage {
   id: string;
@@ -85,7 +86,18 @@ export interface ContentImage {
   generationGroupId: string | null;
   altText: string | null;
   platformCrop: string | null;
-  brief: ImageBrief | null;
+  /** The concept it was rendered from (canon v1.1+); null for v1.0 images and uploads. */
+  brief: ImageConcept | null;
+  /** The idea the image carries, shown so a founder judges the idea and not just the drawing. */
+  tension: string | null;
+  /** Canon v1.1+ layout key. */
+  layout: string | null;
+  /** Canon v1.0 motif key, for images made before v1.1. */
+  motifKey: string | null;
+  /** Shared by every candidate of one run; null for images made before candidates. */
+  candidateSetId: string | null;
+  candidateIndex: number | null;
+  isSelected: boolean;
   assembledPrompt: string | null;
   brandVisualVersion: string | null;
   modelId: string | null;
@@ -128,7 +140,10 @@ export interface ContentDetail {
   threadSegments: ThreadSegment[];
   priorFeedback: DraftFeedbackEntry[];
   maxChars: number | null;
+  /** The selected image. Never an unselected candidate. */
   image: ContentImage | null;
+  /** The other live candidates of the draft's current run, in brief order. */
+  imageCandidates: ContentImage[];
   latestImageRequest: ContentImageRequest | null;
 }
 
@@ -141,7 +156,7 @@ export interface SocialDraftCopy {
   isThread: boolean;
   segments: string[];
   disclaimerText: string | null;
-  /** The marked platform crop to download, when the draft has an image. */
+  /** The selected image's marked platform crop to download, when the draft has one. */
   image: { storagePath: string; altText: string | null } | null;
 }
 

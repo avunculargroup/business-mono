@@ -1,22 +1,26 @@
-// The brand_visual v1.0 seed row, mirrored from
-// supabase/migrations/20261108000000_add_brand_visual.sql so the image-step tests
-// exercise the canon that actually ships. If the seed changes, change this too.
-export const BRAND_VISUAL_V1_ROW = {
+// The active brand_visual row as production holds it: the v1.0 seed in
+// supabase/migrations/20261108000000_add_brand_visual.sql, updated in place to
+// v1.1 by 20261108100000_brand_visual_v1_1.sql. Mirrored here so the image-step
+// tests exercise the canon that actually ships. If either migration changes the
+// canon, change this too. `motifs` is v1.0's retired list, kept on the row.
+export const BRAND_VISUAL_ROW = {
   id: 'bv-1',
-  version: '1.0',
+  version: '1.1',
   is_active: true,
-  style_block: `A hand-drawn sketch in graphite pencil and fine ink on warm off-white paper.
-Loose, confident linework from a skilled hand: some lines drawn twice, light
-construction lines left visible, light cross-hatching for shade. It should look
-like a page from an architect's or engineer's sketchbook, drawn to think
-something through. One focal idea with generous empty paper; the subject fills
-no more than about 60% of the frame. Calm, considered and quietly confident.
-Warm in tone, never cool.`,
+  style_block: `A hand-drawn sketch in graphite pencil and fine ink on bright, fresh cartridge
+paper. Every drawing is deliberately unfinished. The part of the subject that is
+known or certain is drawn in full: confident line, light cross-hatching, and the
+single gold accent. The part that is uncertain, unbuilt or unknown is left as
+faint construction lines only: guidelines, measured marks, an outline that stops
+partway. The edge where finished drawing gives way to construction lines is the
+point of the picture. It should look like an architect's working sketch, drawn by
+a skilled hand to think something through, not to decorate. Considered and
+quietly confident, with a clear point of view.`,
   palette: [
   {
     "role": "Paper",
     "hex": "#FAFAF8",
-    "usage": "warm off-white. Clean and even, no visible paper grain, stains or vignette."
+    "usage": "Bright near-white paper. Not cream, not aged, not yellowed, not parchment. Clean and even."
   },
   {
     "role": "Main linework",
@@ -34,11 +38,11 @@ Warm in tone, never cool.`,
     "usage": "a single light wash or stroke of muted gold on ONE element only."
   }
 ],
-  composition_block: `Front-on or gentle three-quarter view; no dramatic perspective. Asymmetric
-balance with clear empty paper on at least one side. Keep every important
-element inside the central 80% of the frame, so the image survives platform
-crops. Leave the bottom-right corner (roughly the lowest and rightmost 15% of
-the frame) as empty paper.`,
+  composition_block: `Follow the layout given below exactly. Never centre a single upright object in a
+wide frame. Prefer subjects with a horizontal extent that suit a landscape frame.
+Keep every important element inside the central 80% of the frame. Leave the
+bottom-right corner (roughly the lowest and rightmost 15% of the frame) as empty
+paper.`,
   prohibited_block: `Never include: text, letters, numbers, labels, logos, watermarks or signatures.
 Coins of any kind, currency symbols, gold bars, piles of money, rockets, moons,
 bulls or bears, price charts, candlesticks, arrows pointing up or down, trading
@@ -46,7 +50,7 @@ screens. People's faces, hands holding phones, office stock-photo scenes. Neon,
 dark backgrounds, colour beyond the palette, 3D renders, photorealism, digital
 vector polish, cartoon, comic, caricature or childlike doodle styles, mascots,
 paper texture or film grain.`,
-  prohibited_terms: ['coin', 'coins', 'rocket', 'moon', 'chart', 'candlestick', 'arrow', '₿', '$', 'bull', 'bear', 'lambo'],
+  prohibited_terms: ["$", "arrow", "balance scale", "bear", "bull", "calendar", "candlestick", "chart", "chess", "chessboard", "clock", "coin", "coins", "compass", "crossroads", "hourglass", "jigsaw", "key", "keyhole", "ladder", "lambo", "light bulb", "lightbulb", "moon", "mountain peak", "padlock", "piggy bank", "puzzle", "rocket", "safe", "scales", "signpost", "stopwatch", "summit", "umbrella", "vault door", "₿"],
   motifs: [
   {
     "key": "ledger",
@@ -116,6 +120,32 @@ paper texture or film grain.`,
     "label": "Horizon",
     "description": "A single landscape line with a low sun or moon-free sky",
     "use_when": "Macro, monetary conditions, the long view",
+    "is_active": true
+  }
+],
+  layouts: [
+  {
+    "key": "left_third",
+    "label": "Left third",
+    "description": "Subject sits in the left third; open paper runs to the right, so the eye travels into space.",
+    "is_active": true
+  },
+  {
+    "key": "low_horizon",
+    "label": "Low horizon",
+    "description": "One horizon line in the lower third; the subject is small on it, with wide open paper above.",
+    "is_active": true
+  },
+  {
+    "key": "close_detail",
+    "label": "Close detail",
+    "description": "A tight close-up of one part of an object, running off at least one edge of the frame.",
+    "is_active": true
+  },
+  {
+    "key": "small_in_space",
+    "label": "Small in space",
+    "description": "A small subject placed well off-centre in a large empty field.",
     "is_active": true
   }
 ],

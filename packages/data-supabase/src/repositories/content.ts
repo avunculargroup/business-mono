@@ -15,6 +15,7 @@ import type {
   SocialDraftCopy,
   ThreadSegment,
 } from '@platform/data';
+import { readStoredBrief } from '@platform/shared';
 import type { SupabaseAdapterContext } from '../adapterContext';
 
 /**
@@ -43,7 +44,7 @@ function isUuid(value: string): boolean {
 }
 
 const IMAGE_COLUMNS =
-  'id, source, storage_path, generation_group_id, alt_text, platform_crop, image_brief, assembled_prompt, brand_visual_version, model_id, cost_usd, is_style_anchor, alt_text_verdict, review_outcome, created_at' as const;
+  'id, source, storage_path, generation_group_id, candidate_set_id, candidate_index, is_selected, alt_text, platform_crop, image_brief, assembled_prompt, brand_visual_version, model_id, cost_usd, is_style_anchor, alt_text_verdict, review_outcome, created_at' as const;
 
 /** The unmarked master sits beside its crops, under the group's folder. */
 const MASTER_FILE = 'master-16x9.png';
@@ -53,6 +54,9 @@ type ImageRow = {
   source: string;
   storage_path: string;
   generation_group_id: string | null;
+  candidate_set_id: string | null;
+  candidate_index: number | null;
+  is_selected: boolean;
   alt_text: string | null;
   platform_crop: string | null;
   image_brief: unknown;
@@ -70,6 +74,8 @@ function toContentImage(row: ImageRow): ContentImage {
   const ai = row.source === 'ai_generated';
   const verdict = row.alt_text_verdict as { classification?: unknown; rationale?: unknown; checked_at?: unknown } | null;
   const slash = row.storage_path.lastIndexOf('/');
+  // Two stored shapes: one concept (canon v1.1+) or a v1.0 motif brief.
+  const brief = readStoredBrief(row.image_brief);
   return {
     id: row.id,
     source: ai ? 'ai_generated' : 'upload',
@@ -78,7 +84,13 @@ function toContentImage(row: ImageRow): ContentImage {
     generationGroupId: row.generation_group_id,
     altText: row.alt_text,
     platformCrop: row.platform_crop,
-    brief: (row.image_brief ?? null) as ContentImage['brief'],
+    brief: brief?.concept ?? null,
+    tension: brief?.tension ?? null,
+    layout: brief?.layout ?? null,
+    motifKey: brief?.motifKey ?? null,
+    candidateSetId: row.candidate_set_id,
+    candidateIndex: row.candidate_index,
+    isSelected: row.is_selected !== false,
     assembledPrompt: row.assembled_prompt,
     brandVisualVersion: row.brand_visual_version,
     modelId: row.model_id,
@@ -97,26 +109,48 @@ function toContentImage(row: ImageRow): ContentImage {
   };
 }
 
+interface DraftImages {
+  /** The selected image, or null. Never an unselected candidate. */
+  image: ContentImage | null;
+  /** The other live candidates of the draft's current run, in brief order. */
+  candidates: ContentImage[];
+}
+
+const isLive = (r: ImageRow) => r.review_outcome !== 'removed' && r.review_outcome !== 'regenerated';
+
 /**
- * The image a draft carries now: the newest post-level row not retired by a
- * regenerate or a remove. Retired rows stay in the table as the review signal,
- * so the filter is here rather than in a delete.
+ * Split a draft's post-level image rows (newest first) into the selected image
+ * and the other live candidates of its current run. Retired rows (regenerated,
+ * removed) stay in the table as the review signal, so the filter is here rather
+ * than in a delete. Pure, so the selection rules are tested on their own.
  */
-async function readCurrentImage(
+function splitDraftImages(rows: ImageRow[]): DraftImages {
+  const live = rows.filter(isLive);
+  const selected = live.find((r) => r.is_selected !== false) ?? null;
+  // With no selection (the founder removed it), the newest set's candidates still show.
+  const setId = selected?.candidate_set_id ?? live[0]?.candidate_set_id ?? null;
+  const candidates = setId
+    ? live
+        .filter((r) => r.candidate_set_id === setId && r.id !== selected?.id && r.is_selected === false)
+        .sort((x, y) => (x.candidate_index ?? 0) - (y.candidate_index ?? 0))
+    : [];
+  return { image: selected ? toContentImage(selected) : null, candidates: candidates.map(toContentImage) };
+}
+
+async function readDraftImages(
   client: SupabaseAdapterContext['client'],
   contentItemId: string,
-): Promise<ContentImage | null> {
+): Promise<DraftImages> {
   const { data, error } = await client
     .from('content_images')
     .select(IMAGE_COLUMNS)
     .eq('content_item_id', contentItemId)
     .is('thread_segment_id', null)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(30);
 
   if (error) throw error;
-  const live = ((data ?? []) as ImageRow[]).find((r) => r.review_outcome === null || r.review_outcome === 'kept');
-  return live ? toContentImage(live) : null;
+  return splitDraftImages((data ?? []) as ImageRow[]);
 }
 
 async function readLatestImageRequest(
@@ -247,7 +281,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         item.is_thread ? readThreadSegments(client, item.id) : Promise.resolve([]),
         item.social_account_id ? readDraftFeedback(client, item.id) : Promise.resolve([]),
         client.from('platform_specs').select('max_chars').eq('platform', item.type).maybeSingle(),
-        readCurrentImage(client, item.id),
+        readDraftImages(client, item.id),
         readLatestImageRequest(client, item.id),
       ]);
 
@@ -267,7 +301,8 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         threadSegments: segments,
         priorFeedback: feedback,
         maxChars: spec.data?.max_chars ?? null,
-        image,
+        image: image.image,
+        imageCandidates: image.candidates,
         latestImageRequest: imageRequest,
       };
     },
@@ -310,7 +345,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
               .eq('id', item.disclaimer_snippet_id)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        readCurrentImage(client, item.id),
+        readDraftImages(client, item.id),
       ]);
 
       return {
@@ -321,7 +356,7 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         isThread: item.is_thread ?? false,
         segments: (segments.data ?? []).map((segment) => segment.body),
         disclaimerText: disclaimer.data?.body ?? null,
-        image: image ? { storagePath: image.storagePath, altText: image.altText } : null,
+        image: image.image ? { storagePath: image.image.storagePath, altText: image.image.altText } : null,
       };
     },
 

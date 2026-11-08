@@ -352,7 +352,8 @@ CREATE TABLE brand_visual (
   composition_block     TEXT        NOT NULL,
   prohibited_block      TEXT        NOT NULL,
   prohibited_terms      TEXT[]      NOT NULL DEFAULT '{}',
-  motifs                JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- [{ key, label, description, use_when, is_active }]
+  motifs                JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- [{ key, label, description, use_when, is_active }]; retired as a pick in v1.1
+  layouts               JSONB       NOT NULL DEFAULT '[]'::jsonb,  -- [{ key, label, description, is_active }]; v1.1
   style_anchor_paths    TEXT[]      NOT NULL DEFAULT '{}',
   default_aspect_ratio  TEXT        NOT NULL DEFAULT '16:9',
   brand_mark            JSONB       NOT NULL DEFAULT '{"enabled": true, "position": "bottom_right", "height_pct": 9, "margin_pct": 4, "opacity": 1}'::jsonb,
@@ -2176,13 +2177,18 @@ CREATE TABLE content_images (
   generation_ref       TEXT,          -- OpenRouter generation id, where returned
   cost_usd             NUMERIC(8,4),
   is_style_anchor      BOOLEAN NOT NULL DEFAULT false,
-  review_outcome       TEXT CHECK (review_outcome IN ('kept', 'regenerated', 'removed')),
-  alt_text_verdict     JSONB          -- Lex on the alt text: { classification, needs_disclaimer, rationale, checked_at }
+  review_outcome       TEXT CHECK (review_outcome IN ('kept', 'regenerated', 'removed', 'not_chosen')),
+  alt_text_verdict     JSONB,         -- Lex on the alt text: { classification, needs_disclaimer, rationale, checked_at }
+  -- Candidates (canon v1.1): up to three groups per run share a set; one is selected.
+  candidate_set_id     UUID,
+  candidate_index      SMALLINT,      -- concept order from the brief
+  is_selected          BOOLEAN NOT NULL DEFAULT true  -- consumers read selected rows only
 );
 
 CREATE INDEX idx_content_images_item    ON content_images(content_item_id);
 CREATE INDEX idx_content_images_segment ON content_images(thread_segment_id);
 CREATE INDEX idx_content_images_generation_group ON content_images(generation_group_id) WHERE generation_group_id IS NOT NULL;
+CREATE INDEX idx_content_images_candidate_set ON content_images(candidate_set_id) WHERE candidate_set_id IS NOT NULL;
 
 -- Founder image actions from /content/[id]; contentImageRequestListener claims
 -- each (pending -> working) and resolves it to done or failed. Kept as a record.

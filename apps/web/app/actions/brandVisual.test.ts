@@ -19,7 +19,7 @@ const INPUT: BrandVisualInput = {
   prohibited_block: 'Never include text.',
   prohibited_terms: ['Rocket', 'rocket', 'coin'],
   palette: [{ role: 'Paper', hex: '#FAFAF8', usage: 'warm off-white' }],
-  motifs: [{ key: 'vault', label: 'Vault', description: 'A strongbox', use_when: 'Custody', is_active: true }],
+  layouts: [{ key: 'left_third', label: 'Left third', description: 'Subject in the left third.', is_active: true }],
   brand_mark: { enabled: true, height_pct: 9, margin_pct: 4 },
 };
 
@@ -46,14 +46,17 @@ describe('saveBrandVisual', () => {
       brand_mark: { opacity: 1, position: 'bottom_right', enabled: true, height_pct: 9, margin_pct: 4 },
       updated_by: 'director-1',
       notes: null,
+      layouts: INPUT.layouts,
     });
+    // The retired v1.0 motifs stay on the row untouched.
+    expect(updates()[0]).not.toHaveProperty('motifs');
   });
 
   it.each([
     [{ palette: [{ role: 'Paper', hex: 'FAFAF8', usage: '' }] }, /six-digit hex/],
-    [{ motifs: [{ ...INPUT.motifs[0]!, is_active: false }] }, /at least one motif active/],
-    [{ motifs: [INPUT.motifs[0]!, INPUT.motifs[0]!] }, /unique/],
-    [{ motifs: [{ ...INPUT.motifs[0]!, key: 'Vault Door' }] }, /lowercase/],
+    [{ layouts: [{ ...INPUT.layouts[0]!, is_active: false }] }, /at least one layout active/],
+    [{ layouts: [INPUT.layouts[0]!, INPUT.layouts[0]!] }, /unique/],
+    [{ layouts: [{ ...INPUT.layouts[0]!, key: 'Left Third' }] }, /lowercase/],
     [{ brand_mark: { enabled: true, height_pct: 40, margin_pct: 4 } }, /between 3% and 20%/],
   ])('rejects %j', async (patch, message) => {
     const res = await saveBrandVisual({ ...INPUT, ...patch } as BrandVisualInput);

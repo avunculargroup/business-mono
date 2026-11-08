@@ -49,8 +49,12 @@ export interface SocialDraftPost {
   isThread: boolean;
   classification: Classification;
   needsDisclaimer: boolean;
-  /** This platform's marked crop (signed URL) and its alt text, when the image step succeeded. */
-  image?: { url: string; altText: string };
+  /**
+   * This platform's marked crop of the selected image (signed URL) and its alt
+   * text, when the image step succeeded. `moreOptions` counts the other
+   * candidates the founder can pick from in Review.
+   */
+  image?: { url: string; altText: string; moreOptions?: number };
 }
 
 export interface SocialDraftEmailInput {
@@ -136,13 +140,25 @@ function bodyHtml(post: SocialDraftPost, dark: boolean): string {
  * The platform crop at full card width, where the image sits in a real post. If
  * the signed URL has expired or remote images are blocked, the alt text shows.
  */
+/** "2 more image options to choose from in Review", or null when there are none. */
+export function moreImageOptionsLine(count: number | undefined): string | null {
+  if (!count || count < 1) return null;
+  return `${count} more image ${count === 1 ? 'option' : 'options'} to choose from in Review`;
+}
+
 function imageHtml(post: SocialDraftPost): string {
   const src = post.image ? safeHref(post.image.url) : null;
   if (!post.image || !src) return '';
+  const dark = post.platform === 'twitter_x';
+  const more = moreImageOptionsLine(post.image.moreOptions);
+  const moreRow = more
+    ? `<tr><td style="padding:8px 0 0 0;font-family:${FONT_BODY};font-size:12px;color:${dark ? C.xMuted : C.textTertiary};">${escapeHtml(more)}</td></tr>`
+    : '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
           <tr><td><img src="${escapeHtml(src)}" alt="${escapeHtml(
             post.image.altText,
           )}" width="100%" style="display:block;width:100%;height:auto;border-radius:8px;"></td></tr>
+          ${moreRow}
         </table>`;
 }
 
@@ -233,7 +249,11 @@ export function renderSocialDraftEmail(input: SocialDraftEmailInput): RenderedEm
     } else {
       textLines.push(p.body);
     }
-    if (p.image) textLines.push(`Image: ${p.image.altText}`);
+    if (p.image) {
+      textLines.push(`Image: ${p.image.altText}`);
+      const more = moreImageOptionsLine(p.image.moreOptions);
+      if (more) textLines.push(`(${more}.)`);
+    }
     if (p.needsDisclaimer) textLines.push('(Disclaimer to be attached by Lex.)');
     const href = reviewUrl(p.contentItemId, input.webAppUrl);
     if (href) textLines.push(`Review: ${href}`);

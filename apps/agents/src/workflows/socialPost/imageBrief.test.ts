@@ -1,125 +1,222 @@
 import { describe, it, expect } from 'vitest';
-import { BRAND_VISUAL_V1_ROW } from '../../../test/fixtures/brandVisual.js';
-import { toBrandVisual } from './imagePrompt.js';
+import { readStoredBrief } from '@platform/shared';
+import { BRAND_VISUAL_ROW } from '../../../test/fixtures/brandVisual.js';
+import { activeLayouts, toBrandVisual } from './imagePrompt.js';
 import {
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
   imageBriefRewriteInstruction,
+  imageBriefSchema,
+  layoutToRest,
   lintImageBrief,
-  recentMotifs,
-  type ImageBrief,
+  lintImageConcept,
+  recentImageHistory,
+  type ImageConcept,
 } from './imageBrief.js';
 
-const canon = toBrandVisual(BRAND_VISUAL_V1_ROW);
-const opts = { motifs: canon.motifs, prohibitedTerms: canon.prohibitedTerms };
+const canon = toBrandVisual(BRAND_VISUAL_ROW);
+const opts = { layouts: canon.layouts, prohibitedTerms: canon.prohibitedTerms };
 
-const CLEAN: ImageBrief = {
-  skip: false,
-  skip_reason: null,
-  motif_key: 'ledger',
-  subject: 'An open ledger book with one ruled entry picked out',
-  metaphor: 'disclosure is a single honest line in the books',
-  composition: null,
-  alt_text: 'A pencil sketch of an open ledger with one highlighted line.',
+const PIER: ImageConcept = {
+  tension: 'Nobody knows the trigger, only that the safe ground is shorter than it looks.',
+  subject: 'A timber pier running out over open water',
+  drawn: 'the near end of the pier, planks and pilings',
+  undrawn: 'the far end, planks thinning into pencil guidelines over the water',
+  layout: 'left_third',
+  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+};
+const BRIDGE: ImageConcept = {
+  ...PIER,
+  subject: 'A footbridge half built across a gorge',
+  drawn: 'the near abutment and first spans',
+  undrawn: 'the spans that would reach the far side',
+  layout: 'low_horizon',
+};
+const ROAD: ImageConcept = {
+  ...PIER,
+  subject: 'A surveyed road that stops at a field edge',
+  drawn: 'the paved stretch nearest the viewer',
+  undrawn: 'the pegged-out route beyond the field',
+  layout: 'small_in_space',
 };
 
+// The real post the v1.1 change was made for.
+const TWENTY_YEARS =
+  "Twenty years.\n\nThat's Penn Wharton's outer limit before the US either defaults or prints its way out. Could be 14.\n\nThe trigger? Nobody knows. Dr Kent Smetters says it's whenever markets stop believing Congress will fix it.\n\nPretty easy to see why some CFOs are quietly rethinking what 'safe' means.";
+
+describe('imageBriefSchema', () => {
+  it('accepts up to three concepts and rejects a fourth', () => {
+    expect(imageBriefSchema.safeParse({ skip: false, skip_reason: null, concepts: [PIER, BRIDGE, ROAD] }).success).toBe(true);
+    expect(imageBriefSchema.safeParse({ skip: false, skip_reason: null, concepts: [PIER, BRIDGE, ROAD, PIER] }).success).toBe(false);
+  });
+
+  it('accepts a skip with no concepts', () => {
+    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', concepts: [] }).success).toBe(true);
+  });
+});
+
+describe('lintImageConcept', () => {
+  it('passes a clean concept', () => {
+    expect(lintImageConcept(PIER, opts)).toEqual([]);
+  });
+
+  it('requires an active layout', () => {
+    expect(lintImageConcept({ ...PIER, layout: 'centred' }, opts).join(' ')).toMatch(/layout "centred" is not one of the listed layouts/);
+    const retired = canon.layouts.map((l) => (l.key === 'left_third' ? { ...l, is_active: false } : l));
+    expect(lintImageConcept(PIER, { ...opts, layouts: retired })).toHaveLength(1);
+  });
+
+  it.each(['', 'none', 'None.', 'n/a', 'nothing'])('requires the undrawn part (%j is not one)', (undrawn) => {
+    expect(lintImageConcept({ ...PIER, undrawn }, opts).join(' ')).toMatch(/undrawn is missing/);
+  });
+
+  it('flags stock symbols in subject, drawn or undrawn', () => {
+    const flags = lintImageConcept({ ...PIER, subject: 'An hourglass on a desk', drawn: 'the upper bulb of the hourglass' }, opts);
+    expect(flags).toEqual(
+      expect.arrayContaining(['subject names prohibited imagery: hourglass.', 'drawn names prohibited imagery: hourglass.']),
+    );
+    expect(lintImageConcept({ ...PIER, undrawn: 'the rest of the vault door' }, opts).join(' ')).toMatch(/undrawn names prohibited imagery: vault door/);
+  });
+
+  it('matches whole words only: "keystone" is not "key", "clockwise" is not "clock"', () => {
+    expect(lintImageConcept({ ...PIER, subject: 'An arch missing its keystone, turning clockwise' }, opts)).toEqual([]);
+  });
+
+  it('flags digits, which invite rendered text', () => {
+    expect(lintImageConcept({ ...PIER, drawn: 'the first 14 planks' }, opts).join(' ')).toMatch(/drawn contains digits/);
+  });
+
+  it('requires tension, subject, drawn and alt text', () => {
+    const flags = lintImageConcept({ ...PIER, tension: ' ', subject: '', drawn: '', alt_text: '' }, opts);
+    expect(flags).toEqual(
+      expect.arrayContaining(['tension is missing.', 'subject is missing.', 'drawn is missing.', 'alt_text is missing.']),
+    );
+  });
+});
+
 describe('lintImageBrief', () => {
-  it('passes a clean brief', () => {
-    expect(lintImageBrief(CLEAN, opts)).toEqual([]);
+  it('keeps clean concepts and drops flagged ones, numbering their flags', () => {
+    const lint = lintImageBrief({ skip: false, skip_reason: null, concepts: [PIER, { ...BRIDGE, subject: 'A clock tower' }, ROAD] }, opts);
+    expect(lint.clean).toEqual([PIER, ROAD]);
+    expect(lint.flags).toEqual(['Concept 2: subject names prohibited imagery: clock.']);
   });
 
-  it('passes any skip brief — the quiet path needs no fields', () => {
-    expect(lintImageBrief({ ...CLEAN, skip: true, motif_key: null, alt_text: null, subject: 'rocket' }, opts)).toEqual([]);
+  it('drops a concept that repeats an earlier subject', () => {
+    const lint = lintImageBrief({ skip: false, skip_reason: null, concepts: [PIER, { ...PIER, layout: 'low_horizon' }] }, opts);
+    expect(lint.clean).toEqual([PIER]);
+    expect(lint.flags[0]).toMatch(/Concept 2: subject repeats an earlier concept/);
   });
 
-  it('flags a motif outside the active vocabulary', () => {
-    const flags = lintImageBrief({ ...CLEAN, motif_key: 'rocketship' }, opts);
-    expect(flags.join(' ')).toMatch(/not one of the listed motifs/);
-  });
-
-  it('flags a retired motif', () => {
-    const retired = canon.motifs.map((m) => (m.key === 'ledger' ? { ...m, is_active: false } : m));
-    expect(lintImageBrief(CLEAN, { ...opts, motifs: retired })).toHaveLength(1);
-  });
-
-  it('flags prohibited imagery on word boundaries, case-insensitively', () => {
-    const flags = lintImageBrief({ ...CLEAN, metaphor: 'a Rocket leaving the books behind' }, opts);
-    expect(flags.join(' ')).toMatch(/metaphor names prohibited imagery: rocket/);
-    // "chartered" is not "chart", "bullet" is not "bull".
-    expect(lintImageBrief({ ...CLEAN, subject: 'A chartered accountant’s bullet journal' }, opts)).toEqual([]);
-  });
-
-  it('matches symbol terms (₿, $) as substrings', () => {
-    const flags = lintImageBrief({ ...CLEAN, composition: 'a faint $ sign in the margin' }, opts);
-    expect(flags.join(' ')).toMatch(/composition names prohibited imagery: \$/);
-  });
-
-  it('flags digits in subject or metaphor, which invite rendered text', () => {
-    const flags = lintImageBrief({ ...CLEAN, subject: 'A ledger dated 2026' }, opts);
-    expect(flags.join(' ')).toMatch(/subject contains digits/);
-  });
-
-  it('requires alt text and a subject when not skipping', () => {
-    const flags = lintImageBrief({ ...CLEAN, alt_text: ' ', subject: null }, opts);
-    expect(flags).toEqual(expect.arrayContaining(['alt_text is missing.', 'subject is missing.']));
+  it('says so when the brief returned no concepts, and treats a skip as clean', () => {
+    expect(lintImageBrief({ skip: false, skip_reason: null, concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
+    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
   });
 });
 
 describe('imageBriefRewriteInstruction', () => {
   it('is null when clean and lists each flag otherwise', () => {
     expect(imageBriefRewriteInstruction([])).toBeNull();
-    expect(imageBriefRewriteInstruction(['a.', 'b.'])).toBe('- a.\n- b.');
+    expect(imageBriefRewriteInstruction(['Concept 1: a.', 'Concept 2: b.'])).toBe('- Concept 1: a.\n- Concept 2: b.');
   });
 });
 
-describe('recentMotifs', () => {
-  it('dedupes the two crops of one render by group, most recent first, capped at 3', () => {
+describe('recentImageHistory', () => {
+  it('reads selected images, one per run, most recent first, from either brief shape', () => {
     const rows = [
-      { generation_group_id: 'g1', image_brief: { motif_key: 'vault' } },
-      { generation_group_id: 'g1', image_brief: { motif_key: 'vault' } },
-      { generation_group_id: 'g2', image_brief: { motif_key: 'ledger' } },
-      { generation_group_id: 'g3', image_brief: null },
-      { generation_group_id: 'g4', image_brief: { motif_key: 'horizon' } },
-      { generation_group_id: 'g5', image_brief: { motif_key: 'survey' } },
+      // run A: three candidates over two platforms; only the selected group counts
+      { candidate_set_id: 'A', generation_group_id: 'a1', is_selected: true, image_brief: PIER },
+      { candidate_set_id: 'A', generation_group_id: 'a1', is_selected: true, image_brief: PIER },
+      { candidate_set_id: 'A', generation_group_id: 'a2', is_selected: false, image_brief: BRIDGE },
+      // run B
+      { candidate_set_id: 'B', generation_group_id: 'b1', is_selected: true, image_brief: ROAD },
+      // a v1.0 image, before candidate sets
+      { candidate_set_id: null, generation_group_id: 'old', is_selected: true, image_brief: { motif_key: 'timepiece', subject: 'An hourglass', metaphor: 'time', composition: null } },
     ];
-    expect(recentMotifs(rows)).toEqual(['vault', 'ledger', 'horizon']);
+    expect(recentImageHistory(rows)).toEqual({
+      subjects: [PIER.subject, ROAD.subject, 'An hourglass'],
+      layouts: ['left_third', 'small_in_space'],
+    });
   });
 
-  it('degrades to no history on a bad read', () => {
-    expect(recentMotifs(null)).toEqual([]);
-    expect(recentMotifs({})).toEqual([]);
+  it('stops at five runs and degrades to no history on a bad read', () => {
+    const rows = Array.from({ length: 8 }, (_, i) => ({ candidate_set_id: `s${i}`, is_selected: true, image_brief: { ...PIER, subject: `Subject ${i}` } }));
+    expect(recentImageHistory(rows).subjects).toHaveLength(5);
+    expect(recentImageHistory(null)).toEqual({ subjects: [], layouts: [] });
+  });
+
+  it('names the layout to rest only after two runs in a row used it', () => {
+    expect(layoutToRest({ subjects: [], layouts: ['left_third', 'left_third', 'low_horizon'] })).toBe('left_third');
+    expect(layoutToRest({ subjects: [], layouts: ['left_third', 'low_horizon'] })).toBeNull();
+    expect(layoutToRest({ subjects: [], layouts: ['left_third'] })).toBeNull();
+  });
+});
+
+describe('readStoredBrief', () => {
+  it('reads a v1.1 concept', () => {
+    expect(readStoredBrief(PIER)).toMatchObject({ kind: 'concept', tension: PIER.tension, subject: PIER.subject, layout: 'left_third', concept: PIER });
+  });
+
+  it('reads a v1.0 brief without throwing', () => {
+    const v1 = { skip: false, skip_reason: null, motif_key: 'timepiece', subject: 'An hourglass', metaphor: 'time', composition: null, alt_text: 'x' };
+    expect(readStoredBrief(v1)).toEqual({ kind: 'legacy', tension: null, subject: 'An hourglass', layout: null, motifKey: 'timepiece', concept: null });
+  });
+
+  it('reads anything else as null', () => {
+    expect(readStoredBrief(null)).toBeNull();
+    expect(readStoredBrief('brief')).toBeNull();
+    expect(readStoredBrief([PIER])).toBeNull();
+    expect(readStoredBrief({ unrelated: true })).toBeNull();
   });
 });
 
 describe('buildImageBriefPrompt', () => {
   const base = {
-    story: { title: 'RBA holds', summary: 'Rates unchanged.', key_points: ['held'] },
-    form: 'teach',
-    postCopy: 'The RBA held rates today.',
-    motifs: canon.motifs,
-    recentMotifKeys: [] as string[],
+    story: { title: 'Penn Wharton: debt limits', summary: 'Twenty years, maybe fourteen.', key_points: ['20 years'] },
+    form: 'flat_observation',
+    postCopy: TWENTY_YEARS,
+    layouts: activeLayouts(canon),
+    history: { subjects: [], layouts: [] },
+    prohibitedTerms: canon.prohibitedTerms,
   };
 
-  it('carries the post copy and every motif key', () => {
+  it('asks for the tension before the subject, three concepts, and the device', () => {
     const p = buildImageBriefPrompt(base);
-    expect(p).toContain('The RBA held rates today.');
-    for (const m of canon.motifs) expect(p).toContain(`- ${m.key} (`);
-    expect(p).not.toContain('Recently used motifs');
+    expect(p).toContain(TWENTY_YEARS);
+    expect(p.indexOf('1. tension')).toBeLessThan(p.indexOf('2. subject'));
+    expect(p).toContain('Return three concepts with three different subjects, using at least two different layouts.');
+    expect(p).toContain('left as faint construction lines only');
+    for (const l of activeLayouts(canon)) expect(p).toContain(`- ${l.key} (${l.label}):`);
+    expect(p).toContain('hourglass');
+    expect(p).not.toContain('Recent images');
     expect(p).not.toContain('Re-brief');
   });
 
-  it('tells the step to avoid recent motifs, and carries re-brief flags', () => {
-    const p = buildImageBriefPrompt({ ...base, recentMotifKeys: ['vault', 'ledger'], rewriteInstruction: '- subject is missing.' });
-    expect(p).toContain('## Recently used motifs\nvault, ledger.');
-    expect(p).toContain('Re-brief');
-    expect(p).toContain('- subject is missing.');
+  it('tells it not to repeat recent subjects, and to rest a layout used twice in a row', () => {
+    const p = buildImageBriefPrompt({
+      ...base,
+      history: { subjects: ['A timber pier', 'A half-built bridge'], layouts: ['left_third', 'left_third'] },
+    });
+    expect(p).toContain('Recent images showed: A timber pier; A half-built bridge. Do not repeat any of these subjects.');
+    expect(p).toContain('The last two images both used the left_third layout. Do not use left_third in any concept.');
+  });
+
+  it('works from the post alone when the story is not known', () => {
+    const p = buildImageBriefPrompt({ ...base, story: null, form: null });
+    expect(p).not.toContain('## The story behind it');
+    expect(p).toContain('## The post\n');
+  });
+
+  it('carries the flags on a re-brief', () => {
+    const p = buildImageBriefPrompt({ ...base, rewriteInstruction: '- Concept 1: subject names prohibited imagery: hourglass.' });
+    expect(p).toContain('## Re-brief: none of your concepts could be used, for these reasons');
+    expect(p).toContain('- Concept 1: subject names prohibited imagery: hourglass.');
   });
 });
 
 describe('buildAltTextLexPrompt', () => {
   it('offers no disclaimer keys', () => {
-    const p = buildAltTextLexPrompt('A sketch of a vault door.');
-    expect(p).toContain('A sketch of a vault door.');
+    const p = buildAltTextLexPrompt('A sketch of a pier.');
+    expect(p).toContain('A sketch of a pier.');
     expect(p).toContain('needs_disclaimer = false');
   });
 });

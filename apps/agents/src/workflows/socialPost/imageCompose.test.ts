@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { composePlatformImage, markAspect, markPlacement, platformCrop, toPngMaster } from './imageCompose.js';
+import {
+  GAIN_MAX,
+  GAIN_MIN,
+  composePlatformImage,
+  correctPaper,
+  markAspect,
+  markPlacement,
+  paperGains,
+  platformCrop,
+  samplePaper,
+  toPngMaster,
+} from './imageCompose.js';
 import { DEFAULT_BRAND_MARK } from './imagePrompt.js';
 
 const PAPER = { r: 0xfa, g: 0xfa, b: 0xf8 };
@@ -77,5 +88,71 @@ describe('composePlatformImage', () => {
   it('normalises a JPEG master to PNG', async () => {
     const jpeg = await sharp({ create: { width: 64, height: 36, channels: 3, background: PAPER } }).jpeg().toBuffer();
     expect((await sharp(await toPngMaster(jpeg)).metadata()).format).toBe('png');
+  });
+});
+
+describe('paperGains', () => {
+  it('pulls yellowed paper back toward the palette paper, within the clamp', () => {
+    // The parchment the v1.0 hourglass came back on.
+    const c = paperGains([236, 226, 200], '#FAFAF8');
+    expect(c.applied).toBe(true);
+    for (const g of c.gains) {
+      expect(g).toBeGreaterThanOrEqual(GAIN_MIN);
+      expect(g).toBeLessThanOrEqual(GAIN_MAX);
+    }
+    expect(c.gains[0]).toBeCloseTo(250 / 236, 3);
+    expect(c.gains[1]).toBeCloseTo(250 / 226, 3);
+    // Blue would need 1.24 to reach #F8; it stops at the clamp, and says so.
+    expect(c.gains[2]).toBe(GAIN_MAX);
+    expect(c.reason).toMatch(/clamp/);
+  });
+
+  it('skips a corner that holds drawing rather than paper', () => {
+    const c = paperGains([60, 58, 52], '#FAFAF8');
+    expect(c).toMatchObject({ applied: false, gains: [1, 1, 1] });
+    expect(c.reason).toMatch(/not empty paper/);
+  });
+
+  it('leaves paper that is already right at about 1', () => {
+    const c = paperGains([250, 250, 248], '#FAFAF8');
+    expect(c.applied).toBe(true);
+    for (const g of c.gains) expect(g).toBeCloseTo(1, 3);
+  });
+
+  it('never darkens bright paper past the lower clamp, and falls back to #FAFAF8 on a bad hex', () => {
+    expect(paperGains([255, 255, 255], '#C0C0C0').gains).toEqual([GAIN_MIN, GAIN_MIN, GAIN_MIN]);
+    expect(paperGains([236, 226, 200], 'not-a-hex').gains).toEqual(paperGains([236, 226, 200], '#FAFAF8').gains);
+  });
+});
+
+describe('correctPaper', () => {
+  it('samples the empty bottom-right corner and corrects the whole master', async () => {
+    const parchment = await sharp({ create: { width: 400, height: 225, channels: 3, background: { r: 236, g: 226, b: 200 } } })
+      .png()
+      .toBuffer();
+    expect(await samplePaper(parchment)).toEqual([236, 226, 200]);
+
+    const { image, correction } = await correctPaper(parchment, '#FAFAF8');
+    expect(correction.applied).toBe(true);
+    const [r, g, b] = await pixel(image, 10, 10);
+    expect(r).toBeGreaterThanOrEqual(249);
+    expect(g).toBeGreaterThanOrEqual(249);
+    expect(b).toBeGreaterThan(200); // moved toward #F8, held by the clamp
+  });
+
+  it('leaves the master untouched when the corner is not paper', async () => {
+    const dark = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 40, g: 40, b: 40 } } }).png().toBuffer();
+    const { image, correction } = await correctPaper(dark, '#FAFAF8');
+    expect(correction.applied).toBe(false);
+    expect(image).toBe(dark);
+  });
+
+  it('handles a render with an alpha channel', async () => {
+    const rgba = await sharp({ create: { width: 100, height: 100, channels: 4, background: { r: 236, g: 226, b: 200, alpha: 1 } } })
+      .png()
+      .toBuffer();
+    const { correction } = await correctPaper(rgba, '#FAFAF8');
+    expect(correction.sample).toEqual([236, 226, 200]);
+    expect(correction.applied).toBe(true);
   });
 });

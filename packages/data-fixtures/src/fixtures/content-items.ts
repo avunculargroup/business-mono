@@ -1,4 +1,4 @@
-import type { ContentCard, ContentDetail, PublishGate } from '@platform/data';
+import type { ContentCard, ContentDetail, ContentImage, PublishGate } from '@platform/data';
 import { at } from './anchor';
 
 /**
@@ -31,7 +31,7 @@ import { at } from './anchor';
 
 interface ContentFixture {
   card: ContentCard;
-  detail: Omit<ContentDetail, 'id' | 'title' | 'type' | 'status' | 'image' | 'latestImageRequest'>;
+  detail: Omit<ContentDetail, 'id' | 'title' | 'type' | 'status' | 'image' | 'imageCandidates' | 'latestImageRequest'>;
   gate: Omit<PublishGate, 'status' | 'type' | 'body' | 'isThread'>;
 }
 
@@ -229,11 +229,89 @@ export function contentDetails(anchor: Date): ContentDetail[] {
     type: card.type,
     status: card.status,
     ...detail,
-    // No fixture draft carries an image: the demo has no storage to sign a URL
-    // against, and an image the page could not show would be a broken frame.
-    image: null,
+    ...selectDraftImages(contentImageRows(anchor)[card.id] ?? []),
     latestImageRequest: null,
   }));
+}
+
+/** A stored image row: the read model plus the outcome the selection rule reads. */
+export interface FixtureImageRow extends ContentImage {
+  reviewOutcome: 'kept' | 'regenerated' | 'removed' | 'not_chosen' | null;
+}
+
+function imageRow(anchor: Date, overrides: Partial<FixtureImageRow> & Pick<FixtureImageRow, 'id' | 'generationGroupId'>): FixtureImageRow {
+  const group = overrides.generationGroupId;
+  return {
+    source: 'ai_generated',
+    storagePath: `social-images/demo/${group}/linkedin-1200x627.png`,
+    masterPath: `social-images/demo/${group}/master-16x9.png`,
+    altText: 'A pencil sketch of a pier whose far end is only outlined.',
+    platformCrop: 'linkedin_1200x627',
+    brief: null,
+    tension: null,
+    layout: null,
+    motifKey: null,
+    assembledPrompt: null,
+    brandVisualVersion: '1.1',
+    modelId: 'google/gemini-2.5-flash-image',
+    costUsd: 0.04,
+    isStyleAnchor: false,
+    altTextVerdict: { classification: 'educational', rationale: 'Describes the picture.', checkedAt: at(anchor, -2) },
+    candidateSetId: 'set-flagged',
+    candidateIndex: 0,
+    isSelected: false,
+    createdAt: at(anchor, -2),
+    reviewOutcome: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Image rows per draft, newest first, as the table holds them. One draft
+ * carries a run's candidate set (the selected one, an unselected one written
+ * after it, so "newest" is not "selected") and a removed image from an earlier
+ * run, so the selection rule has something to get wrong. The demo never renders
+ * these: they exist for the content-images contract both adapters pass.
+ */
+export function contentImageRows(anchor: Date): Record<string, FixtureImageRow[]> {
+  const concept = (subject: string, layout: string, tension: string) => ({
+    tension,
+    subject,
+    drawn: 'the near end, in full',
+    undrawn: 'the far end, as construction lines',
+    layout,
+    alt_text: `A pencil sketch of ${subject.toLowerCase()}.`,
+  });
+  const bridge = concept('A footbridge half built across a gorge', 'low_horizon', 'Everyone is building toward a far side nobody has surveyed.');
+  const pier = concept('A timber pier running out over open water', 'left_third', 'Nobody knows the trigger, only that the safe ground is shorter than it looks.');
+  return {
+    'cnt-flagged': [
+      imageRow(anchor, { id: 'img-flagged-bridge', generationGroupId: 'grp-bridge', candidateIndex: 1, brief: bridge, tension: bridge.tension, layout: bridge.layout }),
+      imageRow(anchor, { id: 'img-flagged-pier', generationGroupId: 'grp-pier', candidateIndex: 0, isSelected: true, brief: pier, tension: pier.tension, layout: pier.layout }),
+      imageRow(anchor, {
+        id: 'img-flagged-removed',
+        generationGroupId: 'grp-removed',
+        candidateSetId: 'set-earlier',
+        isSelected: true,
+        reviewOutcome: 'removed',
+        createdAt: at(anchor, -3),
+      }),
+    ],
+  };
+}
+
+/** The selection rule, as the live adapter applies it: the selected live image, and its set's other live candidates. */
+export function selectDraftImages(rows: FixtureImageRow[]): Pick<ContentDetail, 'image' | 'imageCandidates'> {
+  const strip = ({ reviewOutcome: _outcome, ...image }: FixtureImageRow): ContentImage => image;
+  const live = rows.filter((r) => r.reviewOutcome !== 'removed' && r.reviewOutcome !== 'regenerated');
+  const selected = live.find((r) => r.isSelected) ?? null;
+  const setId = selected?.candidateSetId ?? live[0]?.candidateSetId ?? null;
+  const candidates = setId
+    ? live
+        .filter((r) => r.candidateSetId === setId && r.id !== selected?.id && !r.isSelected)
+        .sort((x, y) => (x.candidateIndex ?? 0) - (y.candidateIndex ?? 0))
+    : [];
+  return { image: selected ? strip(selected) : null, imageCandidates: candidates.map(strip) };
 }
 
 export function publishGates(anchor: Date): Record<string, PublishGate> {

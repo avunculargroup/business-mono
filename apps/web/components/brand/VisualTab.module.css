@@ -93,9 +93,9 @@
   gap: var(--space-2);
 }
 
-.motifRow {
+.layoutRow {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 2fr) minmax(0, 2fr) auto;
+  grid-template-columns: 140px minmax(0, 1fr) minmax(0, 3fr) auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -225,13 +225,13 @@
     justify-self: start;
   }
 
-  .motifRow {
+  .layoutRow {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     padding-bottom: var(--space-3);
     border-bottom: 1px solid var(--color-border);
   }
 
-  .motifRow .wide {
+  .layoutRow .wide {
     grid-column: 1 / -1;
   }
 

@@ -249,6 +249,7 @@ export function fakeContentDetail(overrides: Partial<ContentDetail> = {}): Conte
     priorFeedback: [],
     maxChars: null,
     image: null,
+    imageCandidates: [],
     latestImageRequest: null,
     ...overrides,
   };

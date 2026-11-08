@@ -78,6 +78,103 @@ async function rasteriseMark(placement: MarkPlacement, opacity: number): Promise
     .toBuffer();
 }
 
+// ── Paper correction ─────────────────────────────────────────────────────────
+// Models drift the paper toward cream or aged parchment however the palette
+// words it. The canon keeps the bottom-right corner empty, and the mark is not
+// on yet, so that corner is a clean sample of what the model drew as paper.
+// Scaling each channel so the sample lands on the palette's paper colour pulls
+// the whole render back, within a clamp so a misread can never repaint it.
+
+export const DEFAULT_PAPER_HEX = '#FAFAF8';
+/** The sample is the lowest, rightmost 12% of the master in each dimension. */
+export const PAPER_SAMPLE_FRACTION = 0.12;
+/**
+ * Below this the corner holds drawing, not paper, and is left alone. Luma from
+ * gamma-encoded values, deliberately not linear-light luminance: yellowed paper
+ * (the case being corrected) falls under 0.80 in linear light and would be
+ * skipped, while ink in the corner still falls well below it.
+ */
+export const MIN_PAPER_LUMA = 0.8;
+export const GAIN_MIN = 0.9;
+export const GAIN_MAX = 1.15;
+
+export type Rgb = [number, number, number];
+
+export interface PaperCorrection {
+  sample: Rgb;
+  gains: Rgb;
+  applied: boolean;
+  reason: string;
+}
+
+function hexToRgb(hex: string): Rgb | null {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : null;
+}
+
+/** Rec. 709 weights over gamma-encoded 0–1 values. */
+export function paperLuma([r, g, b]: Rgb): number {
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+/**
+ * The per-channel gains that move the sampled paper onto the target paper
+ * colour, clamped to [GAIN_MIN, GAIN_MAX]. Pure, so it is tested without images.
+ */
+export function paperGains(sample: Rgb, targetHex: string): PaperCorrection {
+  const target = hexToRgb(targetHex) ?? hexToRgb(DEFAULT_PAPER_HEX)!;
+  const unity: Rgb = [1, 1, 1];
+  const luma = paperLuma(sample);
+  if (luma < MIN_PAPER_LUMA) {
+    return { sample, gains: unity, applied: false, reason: `corner luma ${luma.toFixed(3)} is below ${MIN_PAPER_LUMA}; it is not empty paper` };
+  }
+  const clamp = (g: number) => Math.min(Math.max(g, GAIN_MIN), GAIN_MAX);
+  const gains = sample.map((c, i) => Number(clamp(target[i]! / Math.max(c, 1)).toFixed(4))) as Rgb;
+  const clamped = sample.some((c, i) => target[i]! / Math.max(c, 1) !== clamp(target[i]! / Math.max(c, 1)));
+  return {
+    sample,
+    gains,
+    applied: true,
+    reason: clamped ? 'corrected toward the palette paper; at least one channel hit the clamp' : 'corrected toward the palette paper',
+  };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
+}
+
+/** Per-channel median of the bottom-right sample of an image. */
+export async function samplePaper(image: Buffer): Promise<Rgb> {
+  const { width = 0, height = 0 } = await sharp(image).metadata();
+  const w = Math.max(1, Math.round(width * PAPER_SAMPLE_FRACTION));
+  const h = Math.max(1, Math.round(height * PAPER_SAMPLE_FRACTION));
+  const { data, info } = await sharp(image)
+    .extract({ left: width - w, top: height - h, width: w, height: h })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const channels: [number[], number[], number[]] = [[], [], []];
+  for (let i = 0; i < data.length; i += info.channels) {
+    channels[0].push(data[i]!);
+    channels[1].push(data[i + 1]!);
+    channels[2].push(data[i + 2]!);
+  }
+  return [median(channels[0]), median(channels[1]), median(channels[2])];
+}
+
+/**
+ * Correct the paper of a master before it is cropped and marked, so every crop
+ * and any style anchor promoted from the master share the corrected paper.
+ */
+export async function correctPaper(master: Buffer, targetHex: string): Promise<{ image: Buffer; correction: PaperCorrection }> {
+  const correction = paperGains(await samplePaper(master), targetHex);
+  if (!correction.applied) return { image: master, correction };
+  const image = await sharp(master).linear(correction.gains, [0, 0, 0]).png().toBuffer();
+  return { image, correction };
+}
+
 /** Normalise whatever the model returned (png/jpeg/webp) to the PNG master. */
 export async function toPngMaster(image: Buffer): Promise<Buffer> {
   return sharp(image).png().toBuffer();
