@@ -29,6 +29,10 @@ interface Props {
   defaultModel: string;
   popularModels: ModelOption[];
   catalogModels: CatalogModel[];
+  /** OpenRouter's image catalog; empty when it could not be reached. */
+  imageCatalogModels?: CatalogModel[];
+  popularImageModels?: ModelOption[];
+  defaultImageModel?: string;
   workflowLabels: Record<string, string>;
   loadError: string | null;
   catalogError: string | null;
@@ -50,12 +54,16 @@ export function ModelSettingsClient({
   defaultModel,
   popularModels,
   catalogModels,
+  imageCatalogModels = [],
+  popularImageModels = [],
+  defaultImageModel = '',
   workflowLabels,
   loadError,
   catalogError,
 }: Props) {
   const agentRows = rows.filter((r) => r.type === 'agent');
   const stepRows = rows.filter((r) => r.type === 'workflow_step');
+  const imageRows = rows.filter((r) => r.type === 'image_step');
 
   const workflowGroups = new Map<string, ScopeRow[]>();
   for (const row of stepRows) {
@@ -132,6 +140,30 @@ export function ModelSettingsClient({
           </ul>
         </section>
       ))}
+
+      {imageRows.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Image models</h2>
+            <p className={styles.sectionDesc}>
+              Models that render images through OpenRouter&rsquo;s Image API. Only image-capable models are listed. Left at
+              Default, the agent server uses <span className={styles.code}>OPENROUTER_IMAGE_MODEL</span> if it is set.
+            </p>
+          </div>
+          <ul className={styles.list}>
+            {imageRows.map((row) => (
+              <ScopeListItem
+                key={row.key}
+                row={row}
+                defaultModel={defaultImageModel}
+                popularModels={popularImageModels}
+                catalogModels={imageCatalogModels}
+                fallbackLabel={null}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

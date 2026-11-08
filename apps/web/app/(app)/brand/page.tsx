@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { toBrandVisual } from '@platform/shared';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import { BrandHubTabs } from '@/components/brand/BrandHubTabs';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from '@/components/brand/voiceTypes';
@@ -14,6 +15,7 @@ export default async function BrandPage() {
     { data: accounts },
     { data: guidelines },
     { data: feedback },
+    { data: visualRow },
   ] = await Promise.all([
     supabase.from('brand_assets').select('*').order('name'),
     supabase
@@ -40,7 +42,17 @@ export default async function BrandPage() {
       .select('id, social_account_id, verdict, feedback, created_at')
       .order('created_at', { ascending: false })
       .limit(50),
+    supabase.from('brand_visual').select('*').eq('is_active', true).limit(1).maybeSingle(),
   ]);
+
+  // Style anchors are private storage objects; sign them for the Visual tab.
+  const canon = visualRow ? toBrandVisual(visualRow) : null;
+  const anchorPaths = canon?.styleAnchorPaths ?? [];
+  const { data: signed } = anchorPaths.length
+    ? await supabase.storage.from('platform-files').createSignedUrls(anchorPaths, 3600)
+    : { data: [] };
+  const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
+  const anchors = anchorPaths.map((path) => ({ path, url: urlByPath.get(path) ?? null }));
 
   return (
     <>
@@ -52,6 +64,7 @@ export default async function BrandPage() {
         assets={assets || []}
         guidelines={(guidelines as AccountGuidelinesRow[]) ?? []}
         feedback={(feedback as ContentFeedbackRow[]) ?? []}
+        visual={{ canon, notes: visualRow?.notes ?? null, anchors }}
       />
     </>
   );

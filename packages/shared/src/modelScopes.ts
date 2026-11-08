@@ -561,3 +561,11 @@ export const POPULAR_MODELS: readonly ModelOption[] = [
   { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro (Google)' },
   { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Google)' },
 ] as const;
+
+// Image models offered for `image_step` scopes when OpenRouter's image catalog
+// (GET /api/v1/images/models) cannot be reached. Only models named in the
+// social post image spec's bake-off; the catalog is the authority.
+export const POPULAR_IMAGE_MODELS: readonly ModelOption[] = [
+  { id: 'google/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (Google)' },
+  { id: 'openai/gpt-image-2', label: 'GPT Image 2 (OpenAI)' },
+];

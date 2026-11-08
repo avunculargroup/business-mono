@@ -2,9 +2,11 @@ import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/app-shell/PageHeader';
 import {
   MODEL_SCOPES,
+  POPULAR_IMAGE_MODELS,
   POPULAR_MODELS,
   WORKFLOW_LABELS,
   DEFAULT_MODEL,
+  DEFAULT_IMAGE_MODEL,
   type ModelScope,
 } from '@platform/shared';
 import { ModelSettingsClient, type ScopeRow, type CatalogModel } from './ModelSettingsClient';
@@ -19,11 +21,13 @@ interface OpenRouterModelsResponse {
   data?: OpenRouterModel[];
 }
 
-async function fetchOpenRouterCatalog(): Promise<{ models: CatalogModel[]; error: string | null }> {
+async function fetchOpenRouterCatalog(
+  url = 'https://openrouter.ai/api/v1/models',
+): Promise<{ models: CatalogModel[]; error: string | null }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/models', {
+    const res = await fetch(url, {
       signal: controller.signal,
       next: { revalidate: 3600 },
     });
@@ -51,9 +55,12 @@ async function fetchOpenRouterCatalog(): Promise<{ models: CatalogModel[]; error
 export default async function ModelSettingsPage() {
   const supabase = await createClient();
 
-  const [{ data, error }, catalog] = await Promise.all([
+  // Image scopes pick from the Image API's own catalog, so only models that
+  // can render an image are offered for them.
+  const [{ data, error }, catalog, imageCatalog] = await Promise.all([
     supabase.from('model_configs').select('scope_key, model_id, updated_at'),
     fetchOpenRouterCatalog(),
+    fetchOpenRouterCatalog('https://openrouter.ai/api/v1/images/models'),
   ]);
 
   const configByKey = new Map<string, { model_id: string; updated_at: string }>();
@@ -92,6 +99,9 @@ export default async function ModelSettingsPage() {
         defaultModel={DEFAULT_MODEL}
         popularModels={[...POPULAR_MODELS]}
         catalogModels={catalogModels}
+        imageCatalogModels={imageCatalog.models}
+        popularImageModels={[...POPULAR_IMAGE_MODELS]}
+        defaultImageModel={DEFAULT_IMAGE_MODEL}
         workflowLabels={WORKFLOW_LABELS}
         loadError={error?.message ?? null}
         catalogError={catalog.error}
