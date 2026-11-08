@@ -121,22 +121,19 @@ For **each** of the founder's accounts (LinkedIn and/or X):
 
 A failure drafting one platform is caught and logged; the other platform still proceeds. Only if **every** platform fails does the run fail.
 
-### 5b. One image for the run (best-effort)
+### 5b. Image candidates for the run (best-effort)
 
-After every draft is persisted, `runImageStep` (`image.ts`) makes **one** on-brand illustration that both drafts share. It is best-effort end to end: it never throws, and no image outcome changes the run's status. Set `generate_image: false` in `action_config` to opt a routine out (absent means on). Full design: [`docs/features/social-post-image/feature-spec.md`](./features/social-post-image/feature-spec.md).
+After every draft is persisted, `runImageStep` (`image.ts`) makes up to **three** on-brand candidates that both drafts share, and selects one. It is best-effort end to end: it never throws, and no image outcome changes the run's status. Set `generate_image: false` in `action_config` to opt a routine out (absent means on). Full design, including why canon v1.1 replaced v1.0's motif list: [`docs/features/social-post-image/feature-spec.md`](./features/social-post-image/feature-spec.md).
 
 1. **Load the canon** — the active `brand_visual` row. No row → image status `disabled`.
-2. **Brief** (`image_brief` step, agent `charlie`). Reads the story, the form and the **persisted** post copy, plus the last 3 motifs used on the founder's accounts (rotation, from `content_images.image_brief`). Returns a structured brief: one `motif_key` from the canon's closed vocabulary, a concrete `subject`, the `metaphor`, an optional `composition`, and `alt_text` — or `skip` when the story has no honest visual.
-3. **Lint** (`lintImageBrief`, pure): active motif, no prohibited term, no digits in subject or metaphor, alt text present. On a hit, **one** re-brief carrying the flags; still flagged → `skipped`. Never loops.
-4. **Assemble** (`buildImagePrompt`, pure): canon style → palette → composition → subject → prohibited. The LLM never writes this prompt.
-5. **Render** via OpenRouter's Image API (`lib/openrouterImage.ts`, scope `social_post.image_render`), 16:9, with up to 4 style anchors as reference images. A 400 with references retries once prompt-only. 120 s timeout, no other retry.
-6. **Crop + mark + upload** (`imageCompose.ts`, `sharp`): a centre crop per platform (1600×900 X, 1200×627 LinkedIn), then the BTS mark bottom-right. The unmarked master and each crop go to `platform-files/social-images/{date}/{group}/`. Rows are written only after every object uploads; a failure removes what was uploaded.
-7. **Lex on the alt text** — advisory, stored in `content_images.alt_text_verdict`; fail-safe `general_advice`.
-8. **Persist** one `content_images` row per draft sharing a `generation_group_id`, with the brief, the exact prompt, canon version, model and cost. Audit: `charlie` → `social_image_generated` (or `social_image_skipped` with the reason) and `lex` → `compliance_checked`.
+2. **Brief** (`image_brief` step, agent `charlie`). Reads the story, the form and the **persisted** post copy, plus the subjects and layouts of the founder's last 5 runs. Finds the post's **tension** (the uneasy or unresolved idea, not its topic) and returns up to three concepts: a concrete `subject`, what is `drawn` in full, what is left `undrawn` as construction lines, a `layout`, and `alt_text`. Or `skip` when the post has no honest visual.
+3. **Lint** (`lintImageBrief`, in `@platform/shared`) per concept: active layout, `undrawn` required, no prohibited term or stock symbol (hourglass, clock, compass …), no digits, alt text present. Flagged concepts drop; if none survive, **one** re-brief carrying the flags, then `skipped`. Never loops.
+4. **For each clean concept, in parallel**, as its own generation group: **assemble** (`buildImagePrompt`, pure) → **render** via OpenRouter (`lib/openrouterImage.ts`, scope `social_post.image_render`) → **paper correction** (the empty bottom-right corner is sampled and each channel scaled toward the palette paper, clamped) → **crop + mark + upload** (`imageCompose.ts`, `sharp`) → **Lex on the alt text** (advisory) → `content_images` rows, unselected. A failed candidate leaves nothing behind and does not affect the others.
+5. **Select** the lowest successful candidate. Selection is per run, not per platform: LinkedIn and X always show the same image. Every candidate failing → `failed`, and the run still succeeds. Audit: one `charlie` → `social_image_generated` per candidate (with the paper correction record), or `social_image_skipped` with the reason; `lex` → `compliance_checked`.
 
 ### 6. Email the founder
 
-Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a platform-mimic email showing each draft, its compliance chip, and — when `WEB_APP_URL` is set — a **Review** link per draft into the web app. When step 5b produced an image, each card shows its own platform's crop at full card width (a 7-day signed URL, with the alt text as fallback).
+Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a platform-mimic email showing each draft, its compliance chip, and — when `WEB_APP_URL` is set — a **Review** link per draft into the web app. When step 5b produced an image, each card shows its own platform's crop of the **selected** candidate at full card width (a 7-day signed URL, with the alt text as fallback), and a line saying how many other options wait in Review.
 
 - Recipient is resolved from the founder's **account email** (`team_members.id === auth.users.id`).
 - Delivery reuses the **news-digest sender plumbing**: the `avuncular@fastmail.com` login's stored Fastmail token (no separate secret), sending as the `hq@btreasury.com.au` identity. It does **not** create `interactions` and is independent of the CRM/newsletter inbound polls.
@@ -144,7 +141,7 @@ Best-effort (`sendSocialDraft` → `socialDraftEmail.ts`). The founder gets a pl
 
 ### 7. Result
 
-The routine returns a `RoutineOutcome` whose `metadata` (`SocialPostFromNewsResult`) records the founder, the chosen `story_id` / `story_url`, the `form`, the drafted `posts` (content-item ids + platform + thread flag), the `image` outcome (`generated` / `skipped` / `failed` / `disabled`, with motif, group id, cost or reason), and whether the email sent — persisted to `routines.last_result` for the dashboard and audit.
+The routine returns a `RoutineOutcome` whose `metadata` (`SocialPostFromNewsResult`) records the founder, the chosen `story_id` / `story_url`, the `form`, the drafted `posts` (content-item ids + platform + thread flag), the `image` outcome (`generated` / `skipped` / `failed` / `disabled`, with the selected group, candidate set and count, layout, cost or reason), and whether the email sent — persisted to `routines.last_result` for the dashboard and audit.
 
 -----
 
@@ -229,5 +226,5 @@ Tests: `index.test.ts`, `prompts.test.ts`, `persist.test.ts` alongside the handl
 - **Change the story pool or ranking:** it flows from the upstream news pipeline (`news_items` + Rex's relevance rubric) — tune there, not here.
 - **Change post style / voice:** voice lives in the voice tables per account (via `@platform/voice`), not in this code. Platform mechanics live in `platform_specs` rows. Brand voice canon is `docs/brand-voice.md`.
 - **Change which model writes/selects/checks:** `/settings/models`, scopes `social_post.*`. The image render model (`social_post.image_render`) is under **Image models** there, picked from OpenRouter's image catalog; left at Default it uses `OPENROUTER_IMAGE_MODEL`, then `DEFAULT_IMAGE_MODEL`.
-- **Change how images look:** `/brand` → Visual edits the `brand_visual` canon (style, palette, motifs, prohibitions, mark placement, style anchors) and saves it as a new version, with a prompt preview that needs no render.
-- **Fix one day's image:** on `/content/[id]`, the image slot downloads the platform crop, regenerates, renders from an edited brief, saves alt text (Lex re-checks it), removes the image or promotes it to a style anchor. Regenerate and render run on the agents server through `content_image_requests` (`contentImageRequestListener`).
+- **Change how images look:** `/brand` → Visual edits the `brand_visual` canon (style, palette, layouts, prohibitions and stock symbols, mark placement, style anchors) and saves it as a new version, with a prompt preview that needs no render.
+- **Fix one day's image:** on `/content/[id]`, the image slot switches to another of the run's candidates (**Use this image**), downloads the platform crop, regenerates a fresh set of three, renders one concept from an edited brief into the set, saves alt text (Lex re-checks it), removes the image or promotes it to a style anchor. Regenerate and render run on the agents server through `content_image_requests` (`contentImageRequestListener`).

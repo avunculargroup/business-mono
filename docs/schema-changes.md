@@ -6,6 +6,28 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — Social post images: canon v1.1 and candidates
+
+`20261108100000_brand_visual_v1_1.sql` adds `brand_visual.layouts` (JSONB, `[{ key, label,
+description, is_active }]`) and moves the active canon to v1.1 in place, as the `/brand` save
+action does: a style block built on the drawn/undrawn device, a bright-paper palette entry, a
+layout-led composition block, four seeded layouts, and a stock-symbol list (hourglass, clock,
+compass and the rest) appended to `prohibited_terms`. Guarded to run once (only while `layouts`
+is empty). `motifs` is kept, untouched: v1.0 images reference it. Why: v1.0's motif list mapped
+a post's topic to a stock symbol, and the first real post came back as a centred hourglass on
+yellowed paper.
+
+`20261108100001_content_image_candidates.sql` adds `content_images.candidate_set_id` (UUID),
+`candidate_index` (SMALLINT) and `is_selected` (BOOLEAN NOT NULL DEFAULT true, which backfills
+every existing row as selected), and extends `review_outcome`'s CHECK with `not_chosen`. A run
+renders up to three candidates, each its own generation group sharing a candidate set; one is
+selected, per run rather than per platform, and everything that consumes an image reads
+`is_selected = true` only. Unpicked candidates stay, marked `not_chosen` when a founder picks
+another, as the signal a later feedback step reads. Spec:
+`docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-11-08 — `platform-files` storage limited to team members
 
 `20261108000004_platform_files_team_only.sql` rewrites the bucket's four `storage.objects`

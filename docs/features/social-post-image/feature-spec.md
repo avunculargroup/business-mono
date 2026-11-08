@@ -3,24 +3,26 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; step 0 bake-off outstanding (see Build notes)
-**Last updated:** 2026-11-08
+**Last updated:** 2026-11-08 (canon v1.1)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
 
 ## Overview
 
-Each morning the daily routine produces a LinkedIn draft and an X draft for each founder. This feature adds one on-brand illustration per run. Both drafts share it, and the founder reviews it with the copy.
+Each morning the daily routine produces a LinkedIn draft and an X draft for each founder. This feature adds on-brand illustrations to the run: up to three candidates, one selected, which both drafts share. The founder reviews the selected image with the copy and can switch to another candidate.
 
 The hard part is not generating an image. It is making image #40 look like it belongs with image #1. Image models drift: each prompt is read fresh, and a model fills any gap in the prompt with its own defaults (gold coins, rocket ships, a blue gradient). This spec treats consistency as a data problem rather than a prompting trick. It has three layers:
 
-1. **A versioned brand visual canon.** This is the base prompt, the palette, a closed motif vocabulary and a prohibited list. It lives in a `brand_visual` table next to `brand_voice`, not in code.
-2. **A structured brief per story.** An LLM step picks a motif from the closed vocabulary and describes the subject. It never writes the final prompt.
+1. **A versioned brand visual canon.** This is the base prompt, the palette, layout presets, a house visual device and a prohibited list. It lives in a `brand_visual` table next to `brand_voice`, not in code.
+2. **A structured brief per post.** An LLM step reads the post for its **tension** (the uneasy or unresolved idea, not the topic) and proposes up to three concepts that carry it. It never writes the final prompt.
 3. **Deterministic assembly.** A pure function joins the canon, the brief and the platform format into the exact prompt the image model receives. That prompt is stored with the image as its audit trail.
 
 **Style anchors** add to this: approved images go back into the model as reference images. The voice work taught us that showing an example beats describing it. The `voice_snippets` library exists because the `example_posts` JSONB described a voice without showing it. Style anchors apply the same lesson to images.
 
-The style is a **sketch**: hand-drawn graphite and ink on warm paper, with one gold accent. Each run makes one render, which is cropped per platform. The **BTS mark** is then placed in the bottom-right corner of each crop by code. The model never draws the mark.
+The style is a deliberately **unfinished sketch**: what the post treats as known is drawn in full, and what is uncertain is left as construction lines (canon v1.1). Each run renders up to three candidates, each cropped per platform. Code corrects the paper colour of each render, then places the **BTS mark** in the bottom-right corner of each crop. The model never draws the mark.
+
+**Canon v1.1 (2026-11-08)** replaced v1.0's closed motif list after the first real post. "Twenty years ... The trigger? Nobody knows ... rethinking what 'safe' means" came back as a pencil hourglass with gold sand, centred in a wide frame on yellowed paper. The motif list mapped the post's topic to a stock symbol and ignored its point. The fix was art direction, not a better model: a better model would only draw a nicer hourglass.
 
 The step is **best-effort**. It runs after both drafts are persisted, and no image failure can sink the routine.
 
@@ -84,14 +86,20 @@ Each decision traces back to existing evidence or an existing principle.
 |---|---|---|
 | Canon in a DB table, not in code | Founders tune it without a deploy, and it is versioned like voice | `brand_voice` v1.3 pattern; brand-voice migration moved voice out of markdown |
 | The LLM writes a **brief**, never the final prompt | Keeps every image's style fixed and leaves only the subject to vary. An LLM that writes free-form prompts brings back the drift we are trying to remove. | Principle: deterministic before LLM |
-| **Closed motif vocabulary** | A short list of on-brand visual metaphors is the main defence against cliché, and it makes images recognisable as a set | Design skill → Imagery: "no finance clichés (gold bars, bitcoin coins, rising chart illustrations)" |
+| ~~Closed motif vocabulary~~ **(retired in v1.1)** | v1.0 used a short list of on-brand metaphors as the defence against cliché. In practice it mapped topics to stock symbols: the first real post ("Twenty years ... nobody knows the trigger") became a centred hourglass. Replaced by the device and layouts below. | The 2026-11-08 example, recorded in the Overview |
+| The brief finds the **tension**, not the topic | The interesting idea in a post is what is surprising, uneasy or unresolved. An image of the topic is filler. | The hourglass ignored "nobody knows the trigger" and "what 'safe' means" |
+| **Drawn vs not yet drawn** is the house device | Consistency comes from a visual device instead of a symbol list: the known part in full, the uncertain part as construction lines. It also gives every image a point of view. | Canon v1.1 style block |
+| **Layout presets**, chosen per concept | v1.0's "asymmetric balance" was ignored; a named layout is followed | The hourglass sat dead centre in a 16:9 frame |
+| **Stock-symbol terms** in the linter | Hourglass, clock, compass and the rest are what a model reaches for first | Linter only; never sent to the image model |
+| **Paper correction in code** | "Warm off-white" rendered as aged parchment. Sampling the empty corner and scaling each channel fixes it deterministically. | The hourglass's paper was yellow, not `#FAFAF8` |
+| **Three candidates, founder picks** | One render is a lottery. Three distinct concepts, each with its tension shown, let the founder judge the idea. | Unpicked candidates are the signal a later feedback step learns from |
 | Deterministic brief linter, one re-brief, then skip | Same shape as the AI-tell gate: flag, one rewrite pass, never loop | `socialPost/aiTell.ts` |
 | Style anchors as reference images | Showing beats describing | `voice_snippets` replaced `example_posts` for the same reason |
 | Image runs **after** copy is persisted | A failure cannot lose drafts, and the brief can read the actual post | Existing rule: email is best-effort and drafts save first |
 | `skip` is a valid brief outcome | Forcing an image onto a story that doesn't suit one produces filler | Principle: the quiet-day path is mandatory |
 | No text in generated images | Image models garble text. Image text also never passes Lex, and screen readers can't read it. | Lex reviews copy only |
 | No directional charts, arrows, price imagery | An up-and-to-the-right picture says what the copy is careful not to say | Principle: state facts, never conclusions; neutral delta colour rule |
-| One render per run, cropped per platform | Halves the cost and keeps the two posts visually identical, while each platform still gets its native ratio | `content_images` spec: "same upload can be reused across variants"; `platform_specs.image_specs` ratios |
+| Each render cropped per platform; selection is per run | Keeps the two posts visually identical, while each platform still gets its native ratio | `content_images` spec: "same upload can be reused across variants"; `platform_specs.image_specs` ratios |
 | Sketch style | A sketch reads as human and considered, not machine-made, and sits well beside founder-voice copy. Its slightly rough quality also hides small model artefacts that clean vector line art would show. | Decided by Chris 2026-11-07; within the design skill's "simple line art in the warm palette, not playful or cartoon" |
 | BTS mark composited by code, never generated | Image models redraw logos inaccurately. Placing the real SVG by code gives the exact mark at the exact size and position every time. | Text policy, same reasoning |
 | Style anchors stored **without** the mark | If anchors carried the logo, the model would learn to draw its own version of it | Reference images are imitated closely |
@@ -99,45 +107,49 @@ Each decision traces back to existing evidence or an existing principle.
 
 -----
 
-## The base prompt (brand visual canon v1.0)
+## The base prompt (brand visual canon v1.1)
 
-This is the seed content for `brand_visual`. It is derived from the BTS design skill (`.claude/skills/bts-design/README.md` → Visual foundations, Imagery vibe), which is the visual canon. The legacy `DESIGN_BRIEF.md` is not used.
+This is the content of the active `brand_visual` row: the v1.0 seed (`20261108000000_add_brand_visual.sql`), updated in place to v1.1 by `20261108100000_brand_visual_v1_1.sql`. It is derived from the BTS design skill (`.claude/skills/bts-design/README.md` → Visual foundations, Imagery vibe), which is the visual canon. The legacy `DESIGN_BRIEF.md` is not used.
 
 **Light only (decided 2026-11-07).** The earlier charcoal-ground, gold-gradient social graphic style is retired for generated images. There is no dark variant and no second canon profile.
 
 **Sketch style (decided 2026-11-07).** The canon describes a confident hand-drawn sketch, the kind an architect or engineer draws in a good notebook. It is not a doodle, a cartoon or a polished vector illustration.
 
+**Deliberately unfinished (decided 2026-11-08, v1.1).** What the post treats as known is drawn in full; what is uncertain is left as construction lines. See "The house device" below.
+
 ### Style block
 
 ```
-A hand-drawn sketch in graphite pencil and fine ink on warm off-white paper.
-Loose, confident linework from a skilled hand: some lines drawn twice, light
-construction lines left visible, light cross-hatching for shade. It should look
-like a page from an architect's or engineer's sketchbook, drawn to think
-something through. One focal idea with generous empty paper; the subject fills
-no more than about 60% of the frame. Calm, considered and quietly confident.
-Warm in tone, never cool.
+A hand-drawn sketch in graphite pencil and fine ink on bright, fresh cartridge
+paper. Every drawing is deliberately unfinished. The part of the subject that is
+known or certain is drawn in full: confident line, light cross-hatching, and the
+single gold accent. The part that is uncertain, unbuilt or unknown is left as
+faint construction lines only: guidelines, measured marks, an outline that stops
+partway. The edge where finished drawing gives way to construction lines is the
+point of the picture. It should look like an architect's working sketch, drawn by
+a skilled hand to think something through, not to decorate. Considered and
+quietly confident, with a clear point of view.
 ```
 
 ### Palette block
 
 ```
 Use only these colours:
-- Paper: warm off-white #FAFAF8. Clean and even, no visible paper grain, stains or vignette.
-- Main linework: warm near-black graphite and ink, #1A1915.
-- Lighter strokes and hatching: warm grey #6B6860.
-- Accent: a single light wash or stroke of muted gold #C9A84C on ONE element only.
+- Paper #FAFAF8: Bright near-white paper. Not cream, not aged, not yellowed, not parchment. Clean and even.
+- Main linework #1A1915: warm near-black graphite and ink.
+- Lighter strokes and hatching #6B6860: warm grey.
+- Accent #C9A84C: a single light wash or stroke of muted gold on ONE element only.
 No other colour. No gradients, no glow, no metallic sheen, no drop shadows.
 ```
 
 ### Composition block
 
 ```
-Front-on or gentle three-quarter view; no dramatic perspective. Asymmetric
-balance with clear empty paper on at least one side. Keep every important
-element inside the central 80% of the frame, so the image survives platform
-crops. Leave the bottom-right corner (roughly the lowest and rightmost 15% of
-the frame) as empty paper.
+Follow the layout given below exactly. Never centre a single upright object in a
+wide frame. Prefer subjects with a horizontal extent that suit a landscape frame.
+Keep every important element inside the central 80% of the frame. Leave the
+bottom-right corner (roughly the lowest and rightmost 15% of the frame) as empty
+paper.
 ```
 
 ### Prohibited block (sent to the model as part of the prompt)
@@ -152,35 +164,44 @@ vector polish, cartoon, comic, caricature or childlike doodle styles, mascots,
 paper texture or film grain.
 ```
 
-### Subject block (filled from the brief)
+### Subject block (filled from one concept)
 
 ```
-Subject: {{brief.subject}}
-Visual metaphor: {{motif.label}} — {{brief.metaphor}}
-Composition note: {{brief.composition}}
+Subject: {{concept.subject}}
+Draw in full: {{concept.drawn}}
+Leave as construction lines only: {{concept.undrawn}}
+Layout: {{layout.label}}: {{layout.description}}
 Format: {{format.aspect_ratio}} landscape.
 ```
 
+The concept's **tension** is not sent: it is the reasoning, and the subject, drawn and undrawn lines are how it reaches the picture. It is stored with the image and shown to the founder.
+
 **Assembly order** is style, palette, composition, subject, prohibited. The prohibited block goes last on purpose: it is the part most often lost when a model weights the subject heavily.
 
-### Motif vocabulary (seed)
+### The house device: drawn and not yet drawn
 
-The brief must choose exactly one `motif_key`. Each motif has a `label`, a `description` the brief step reads, and a `use_when` hint.
+Every image is an architect's working sketch, deliberately unfinished. The brief decides, per concept, which part of the subject is **drawn** in full (what the post treats as known or certain) and which is **undrawn**: left as faint construction lines (what is unknown, unbuilt or in doubt). The edge between them is the point of the picture. `undrawn` is mandatory; the linter rejects an empty one or "none".
 
-| `motif_key` | Label | Description | Use when |
-|---|---|---|---|
-| `ledger` | Ledger | Ruled ledger lines, columns, a single highlighted entry | Accounting treatment, reporting, disclosure |
-| `vault` | Vault | A simple vault door or strongbox in outline | Custody, preservation, security |
-| `balance` | Balance | A two-pan balance scale, level or gently weighted | Risk management, trade-offs, policy decisions |
-| `architecture` | Architecture | Columns, foundations, an elevation drawing | Treasury structure, governance frameworks |
-| `timepiece` | Timepiece | Hourglass, clock face, long time horizons | Time preference, long-term holding, cycles |
-| `survey` | Survey | Contour lines, compass, a surveyed boundary | Regulation, navigating unfamiliar ground |
-| `network` | Network | Nodes joined by fine lines, evenly distributed | The Bitcoin network, decentralisation, adoption |
-| `instrument` | Instrument | A gauge or measuring instrument, needle at rest | Indicators, measurement, monitoring |
-| `document` | Document | Folded papers, a seal, a signed page (no legible text) | Policy, standards, legislation, board papers |
-| `horizon` | Horizon | A single landscape line with a low sun or moon-free sky | Macro, monetary conditions, the long view |
+For the post that prompted v1.1, a concept that uses the device: a timber pier drawn in full near the viewer, its planks thinning into pencil guidelines over open water. The safe ground is shorter than it looks, and nobody knows where it ends.
 
-The vocabulary is data. Founders add, retire or reword motifs in `/brand` → Visual.
+### Layouts
+
+The brief must choose one active layout per concept. They are data, in `brand_visual.layouts`; founders add, retire or reword them in `/brand` → Visual.
+
+| `key` | Label | Description |
+|---|---|---|
+| `left_third` | Left third | Subject sits in the left third; open paper runs to the right, so the eye travels into space. |
+| `low_horizon` | Low horizon | One horizon line in the lower third; the subject is small on it, with wide open paper above. |
+| `close_detail` | Close detail | A tight close-up of one part of an object, running off at least one edge of the frame. |
+| `small_in_space` | Small in space | A small subject placed well off-centre in a large empty field. |
+
+### Stock symbols (linter only)
+
+v1.1 adds these to `prohibited_terms`, on top of the v1.0 terms: hourglass, clock, stopwatch, calendar, compass, chess, chessboard, lightbulb, light bulb, puzzle, jigsaw, scales, balance scale, padlock, key, keyhole, ladder, summit, mountain peak, crossroads, signpost, umbrella, piggy bank, vault door, safe. Matched case-insensitively on whole words ("keystone" is not "key"). Founders edit the list in `/brand`.
+
+### Retired: the v1.0 motif vocabulary
+
+v1.0 asked the brief to pick one of ten motifs (`ledger`, `vault`, `balance`, `architecture`, `timepiece`, `survey`, `network`, `instrument`, `document`, `horizon`). It is no longer a pick. `brand_visual.motifs` is kept, unchanged, because images made under v1.0 reference it: the image slot labels them by motif. The Visual tab hides it rather than show a menu that no longer does anything.
 
 ### Text policy
 
@@ -217,7 +238,8 @@ Singleton at the application layer, the same as `brand_voice` and `company_profi
 | `composition_block` | TEXT | |
 | `prohibited_block` | TEXT | Sent to the model |
 | `prohibited_terms` | TEXT[] | Used by the **brief linter**, not sent to the model, e.g. `{coin,rocket,moon,chart,candlestick,arrow,₿,$,bull,bear,lambo}` |
-| `motifs` | JSONB | `[{ key, label, description, use_when, is_active }]` |
+| `motifs` | JSONB | `[{ key, label, description, use_when, is_active }]`. Retired as a pick in v1.1; kept for v1.0 images. |
+| `layouts` | JSONB | `[{ key, label, description, is_active }]`. Added in v1.1. |
 | `style_anchor_paths` | TEXT[] | Storage paths of approved reference images (max 4 sent per call) |
 | `default_aspect_ratio` | TEXT | Default `16:9` |
 | `brand_mark` | JSONB | `{ enabled: true, position: 'bottom_right', height_pct: 9, margin_pct: 4, opacity: 1 }`. The SVG ships with the agents app (see Key files); this column holds placement only. |
@@ -233,15 +255,18 @@ The table already exists (`20260622000000_add_campaigns_schema.sql`) with `sourc
 
 | Column | Type | Notes |
 |---|---|---|
-| `generation_group_id` | UUID | Shared by every row from one render (LinkedIn crop + X crop), so regenerate and remove act on the group |
-| `image_brief` | JSONB | The validated brief (see schema below) |
+| `generation_group_id` | UUID | Shared by every row from one render (LinkedIn crop + X crop), so selecting, removing and promoting act on the group |
+| `image_brief` | JSONB | The concept the image was rendered from, tension included (v1.1+). v1.0 rows hold `{ motif_key, subject, metaphor, ... }`; `readStoredBrief` reads both |
+| `candidate_set_id` | UUID | Shared by every group from one run or one regenerate (v1.1) |
+| `candidate_index` | SMALLINT | Concept order from the brief, 0–2; an Edit brief render takes the next index |
+| `is_selected` | BOOLEAN | NOT NULL, default `true`, which backfills pre-v1.1 rows. Exactly one group per set is selected; everything that consumes an image reads `is_selected = true` only |
 | `assembled_prompt` | TEXT | The exact prompt sent. This is the audit trail. |
 | `brand_visual_version` | TEXT | Canon version used |
 | `model_id` | TEXT | e.g. `google/gemini-2.5-flash-image` |
 | `generation_ref` | TEXT | OpenRouter generation id, where returned |
 | `cost_usd` | NUMERIC(8,4) | From the response `usage.cost` |
 | `is_style_anchor` | BOOLEAN | Default `false`. Set when promoted. Mirrors `brand_visual.style_anchor_paths`. |
-| `review_outcome` | TEXT | `kept`, `regenerated`, `removed`, NULL while pending. Feeds a later distil step (deferred). |
+| `review_outcome` | TEXT | `kept`, `regenerated`, `removed`, `not_chosen`, NULL while pending. `not_chosen` marks candidates a founder passed over when picking another. Feeds a later distil step (deferred). |
 | `alt_text_verdict` | JSONB | Lex's verdict on the alt text: `{ classification, needs_disclaimer, rationale, checked_at }`. Advisory only. |
 
 `created_by` stays NULL for agent-generated rows.
@@ -262,10 +287,13 @@ The table already exists (`20260622000000_add_campaigns_schema.sql`) with `sourc
 ```ts
 image?: {
   status: 'generated' | 'skipped' | 'failed' | 'disabled';
-  generation_group_id?: string;
-  motif_key?: string;
-  reason?: string;          // skip reason or error summary
-  cost_usd?: number;
+  generation_group_id?: string;   // the selected candidate's group
+  candidate_set_id?: string;
+  candidates?: number;            // how many rendered
+  layout?: string;                // the selected candidate's layout
+  motif_key?: string;             // v1.0 results only
+  reason?: string;                // skip reason or error summary
+  cost_usd?: number;              // across every candidate
 }
 ```
 
@@ -273,7 +301,7 @@ image?: {
 
 The existing `platform-files` private bucket, under `social-images/{yyyy-mm-dd}/{generation_group_id}/`:
 
-- `master-16x9.png`: the render as returned, **without the mark**. Kept for regeneration and for promoting to a style anchor.
+- `master-16x9.png`: the render, paper-corrected, **without the mark**. Kept for promoting to a style anchor, so anchors carry the corrected paper too.
 - `x-1600x900.png`: X crop, with the mark
 - `linkedin-1200x627.png`: LinkedIn crop, with the mark
 - `anchors/`: copies of promoted style anchors, taken from the unmarked master, so deleting a post never removes an anchor
@@ -292,58 +320,67 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
 4  editor picks story + form
 5  per platform: Charlie → AI-tell gate → Lex → persist content_items
 5b IMAGE (new, best-effort, once per run)
-   5b.1  load active brand_visual + recent motif history
-   5b.2  image brief          (LLM, structured)      scope social_post.image_brief
-   5b.3  lint brief           (pure)                 one re-brief on hit, then skip
+   5b.1  load active brand_visual + recent subjects and layouts
+   5b.2  image brief          (LLM, structured)      scope social_post.image_brief   up to three concepts
+   5b.3  lint per concept     (pure)                 drop flagged; re-brief once if none clean, then skip
+   per clean concept, in parallel (Promise.allSettled), each its own generation group:
    5b.4  assemble prompt      (pure)                 buildImagePrompt()
    5b.5  render               (OpenRouter Image API) scope social_post.image_render
-   5b.6  crop + mark + upload (sharp → Storage)
+   5b.6  paper correction, crop + mark + upload (sharp → Storage)
    5b.7  Lex on alt text      (LLM, structured)      scope social_post.compliance_check
-   5b.8  persist content_images rows + agent_activity
+   5b.8  persist content_images rows (unselected) + agent_activity
+   then: select the lowest successful candidate
 6  email founder (each post preview now shows its image when 5b succeeded)
 ```
 
-### 5b.1 Load canon and motif history
+### 5b.1 Load canon and image history
 
 - `brand_visual where is_active = true limit 1`. If no row exists, image status is `disabled` and the step ends.
-- The last 10 `content_images` rows for this founder's accounts where `source = 'ai_generated'`, read for `image_brief->>'motif_key'`. This mirrors `history.ts` → `recentForms`.
+- Recent `content_images` rows for this founder's accounts where `source = 'ai_generated'`, reduced to the **selected** image of each of the last 5 runs (deduped by candidate set, falling back to generation group for pre-v1.1 rows): their subjects and layouts (`recentImageHistory`). Reads both stored brief shapes.
 
 ### 5b.2 Image brief
 
-The input is the story (title, summary, key points), the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active motif list, and the last 3 motifs used. The prompt tells the step to avoid the last 3 motifs unless no other motif fits.
+The input is the story (title, summary, key points) when known, the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active layouts, the canon's prohibited terms, and the recent subjects and layouts. The brief works out, in order, for each concept: the **tension** (the surprising, uneasy or unresolved idea, not the topic), a concrete **subject** that carries it, what is **drawn** in full, what is left **undrawn**, a **layout**, and **alt text**. It returns three concepts with different subjects using at least two layouts. It is told not to repeat a recent subject, and not to use a layout the last two runs both used.
 
-Output schema (`socialPost/imageBrief.ts`):
+Output schema (`socialPost/imageBrief.ts`; the shared `ImageBrief` interface matches it, guarded at compile time):
 
 ```ts
+const conceptSchema = z.object({
+  tension: z.string().max(200),
+  subject: z.string().max(200),
+  drawn: z.string().max(200),     // rendered in full
+  undrawn: z.string().max(200),   // left as construction lines only
+  layout: z.string(),             // validated against active layouts by the linter
+  alt_text: z.string().max(300),
+});
 export const imageBriefSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().max(200).nullable(),
-  motif_key: z.string().nullable(),         // validated against active motifs at runtime
-  subject: z.string().max(200).nullable(),  // what is depicted, concretely
-  metaphor: z.string().max(200).nullable(), // how the motif carries the idea
-  composition: z.string().max(200).nullable(),
-  alt_text: z.string().max(300).nullable(), // describes the image, not the post
+  concepts: z.array(conceptSchema).max(3),
 });
 ```
 
-Structured output uses `errorStrategy: 'fallback'` with `{ skip: true, skip_reason: 'Brief generation failed.' }`. This matches `generateDraft`.
+Structured output uses `errorStrategy: 'fallback'` with `{ skip: true, skip_reason: 'Brief generation failed.', concepts: [] }`. This matches `generateDraft`.
 
-### 5b.3 Brief linter (pure: `lintImageBrief`)
+### 5b.3 Linter (pure: `lintImageConcept`, `lintImageBrief`, in `@platform/shared`)
 
-- `motif_key` must be an active motif.
-- No term from `prohibited_terms` may appear in `subject`, `metaphor` or `composition` (case-insensitive, word-boundary match).
-- No digits in `subject` or `metaphor`. Numbers invite rendered text.
-- `alt_text` is required when `skip = false`.
+Per concept:
 
-On any flag: one re-brief carrying the specific flags (`imageBriefRewriteInstruction`, the same shape as `aiTellRewriteInstruction`). If it is still flagged, status is `skipped` with a reason. It never loops.
+- `layout` must be an active layout.
+- `tension`, `subject`, `drawn` and `alt_text` are required.
+- `undrawn` is required and must not be empty or "none". The device is mandatory.
+- No term from `prohibited_terms` (stock symbols included) may appear in `subject`, `drawn` or `undrawn` (case-insensitive, whole words; symbols such as `$` match as substrings).
+- No digits in `subject`, `drawn` or `undrawn`. Numbers invite rendered text.
+
+A flagged concept is dropped, not the brief; so is one repeating an earlier concept's subject. If none survive: one re-brief carrying every flag (`imageBriefRewriteInstruction`, the same shape as `aiTellRewriteInstruction`), then status `skipped` with a reason. It never loops.
 
 ### 5b.4 Prompt assembly (pure: `buildImagePrompt`)
 
 ```ts
-buildImagePrompt(canon: BrandVisual, brief: ImageBrief, format: { aspectRatio: string }): string
+buildImagePrompt(canon: BrandVisual, concept: ImageConcept, format: { aspectRatio: string }): string
 ```
 
-Concatenates the blocks in the order above and fills the subject block. It has no IO and no randomness, so it can be snapshot-tested. Changing the canon changes the snapshot, which forces a version bump in review.
+Lives in `@platform/shared` so the web previews use it too. Concatenates the blocks in the order above and fills the subject block. It has no IO and no randomness, so it can be snapshot-tested. Changing the canon changes the snapshot, which forces a version bump in review.
 
 ### 5b.5 Render
 
@@ -358,16 +395,19 @@ Concatenates the blocks in the order above and fills the subject block. It has n
 
 Timeout: 120 s. Generations of about 90 s have been observed for high-quality 16:9 renders. No retry on timeout: status is `failed` and the run continues. OpenRouter bills image generation all-or-nothing, so a failed call costs nothing.
 
-### 5b.6 Crop, mark and upload (`imageCompose.ts`)
+### 5b.6 Paper correction, crop, mark and upload (`imageCompose.ts`)
 
-Order matters: **crop first, then mark**, so the mark sits in the same place on every crop.
+Order matters: **correct the paper, then crop, then mark**, so every crop shares the corrected paper and the mark sits in the same place on every crop.
 
 1. Decode `b64_json` and keep it as the unmarked master.
+1. **Paper correction** (`correctPaper`, with the maths in the pure `paperGains(sampleRgb, targetHex)`). Sample the bottom-right 12% × 12% of the master (the canon keeps it empty; the mark is not on yet) and take the per-channel median. If the sample's luma is below 0.80, the corner holds drawing: skip, and record why. Otherwise gains = palette paper hex (fallback `#FAFAF8`) / sample, per channel, clamped to [0.90, 1.15], applied with `sharp().linear(gains, [0,0,0])`. The record `{ sample, gains, applied, reason }` goes into the `social_image_generated` activity's `proposed_actions`. The corrected master is the one stored.
 2. Crop for each platform from `platform_specs.image_specs`, using a `sharp` centre crop and resize:
    - X: 16:9 → 1600×900, a resize only.
    - LinkedIn: 1.91:1 → 1200×627. A 16:9 frame loses about 3.5% at the top and bottom, which sits inside the composition block's 80% safe area.
 3. Rasterise `bts-logo.svg` at the computed height and composite it bottom-right with the `brand_mark` margins (`sharp().composite([{ input, top, left }])`). The placement maths is a pure function (`markPlacement(width, height, brandMark)`) so it can be unit-tested without images.
 4. Upload all three objects. Insert rows only after all three succeed.
+
+Each candidate does this independently; a failed candidate leaves nothing behind and does not affect the others.
 
 `sharp` is new to `apps/agents`; add it as a dependency. `sharp` rasterises SVG through librsvg, so the gradient renders correctly. Confirm this in the bake-off contact sheet.
 
@@ -381,15 +421,16 @@ The pipeline order does not change. Copy goes through Lex before persist exactly
 
 ### 5b.8 Persist
 
-- One `content_images` row per persisted `content_item`, all with the same `generation_group_id`. `platform_crop` is `linkedin_1200x627` or `x_1600x900`. `sort_order` is 0 and `thread_segment_id` is NULL. On X threads the image attaches to the post, which in practice means the first segment.
-- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying `motif_key`, `model_id`, `cost_usd`. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
+- Per candidate: one `content_images` row per persisted `content_item`, all with the same `generation_group_id`, the run's `candidate_set_id`, its `candidate_index`, and `is_selected = false`. `platform_crop` is `linkedin_1200x627` or `x_1600x900`.
+- Once every candidate has settled, the lowest successful `candidate_index` is selected (`planCandidateSelection` in `@platform/shared`, the same rule the web's "Use this image" applies). If every candidate failed, the outcome is `failed` and the run still succeeds. `sort_order` is 0 and `thread_segment_id` is NULL. On X threads the image attaches to the post, which in practice means the first segment.
+- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
 - A second row for the alt-text check: `agent_name = 'lex'`, `action = 'compliance_checked'`, `proposed_actions: [{ type: 'image_alt_text', classification }]`.
 
 ### Compliance
 
 Lex reviews copy, not pixels. The image's compliance surface is the **brief** and the **alt text**, which are text:
 
-- The deterministic linter enforces the prohibited motifs, the main way an image could imply returns.
+- The deterministic linter enforces the prohibited terms and stock symbols, the main way an image could imply returns.
 - Lex classifies the alt text separately (5b.7). It is advisory, the same as the copy check.
 - When a founder edits the alt text or the brief on `/content/[id]`, the alt-text check runs again. A clear verdict does not survive an edit, which matches the existing rule for copy.
 
@@ -418,15 +459,17 @@ Below the copy editor, for any item with `content_images`:
 
 - Preview at the item's platform crop, mark included, with a 12px radius and a 1px border. No other decoration.
 - **Alt text**: editable field. Saving sets `review_outcome = 'kept'`.
-- **Regenerate** reuses the same brief with a new render and replaces the group. It is labelled "Regenerate image" in sentence case.
-- **Edit brief** opens a slide-over with the brief fields and the motif select, then "Render with this brief". The assembled prompt shows read-only beneath it in JetBrains Mono, so a founder can see exactly what was sent.
+- The selected image's **tension** shows beneath it.
+- **Other options**: the run's other candidates in their own row beneath, each with its tension as a caption and a **Use this image** action. Choosing one selects its group on every draft that shares it and marks the others `not_chosen`.
+- **Regenerate** runs a fresh brief and renders a fresh set of three, then marks the old set `regenerated`. It is labelled "Regenerate image" in sentence case. Without a recorded story, the brief works from the post alone.
+- **Edit brief** opens a slide-over with one concept's fields (tension, subject, drawn in full, construction lines only, layout, alt text), then "Render with this brief". The new image joins the run's set and is selected. The assembled prompt shows read-only beneath it in JetBrains Mono, so a founder can see exactly what was sent.
 - **Remove image** sets `review_outcome = 'removed'` and deletes the rows and objects.
 - **Use as style anchor** copies the **unmarked master** to `anchors/` and appends to `brand_visual.style_anchor_paths` (max 8 stored, 4 sent). It asks "Use this image to guide future images?" as a conversational confirm, per the design skill.
-- Caption-style metadata line: `motif · model · canon v1.0 · $0.04`.
+- Caption-style metadata line: `layout · model · canon v1.1 · $0.04` (v1.0 images show their motif instead of a layout).
 
 Regenerate and edit-brief call the agents server, following the existing web → agents on-demand pattern. They log `agent_activity` with `trigger_type = 'manual'`.
 
-Mobile: actions sit in their own row (not hover-revealed), with tap targets of 44px or more, per the design skill's Mobile section.
+Mobile: actions and candidates sit in their own rows (nothing hover-revealed), with tap targets of 44px or more, per the design skill's Mobile section. Checked at 375px and 320px.
 
 ### `/content/[id]/copy`: copy-out
 
@@ -434,7 +477,7 @@ Add **Download image**, which serves the platform's marked crop, with the alt te
 
 ### `/brand`: new Visual tab
 
-Next to Voice. Sections: Style, Palette (swatches with hex in mono), Composition, Prohibited (block + terms), Motifs (table: key, label, use when, active), Brand mark (enabled, size and margin, with a live preview on a sample crop), Style anchors (grid, with remove). Saving bumps `version` and asks "Save as v1.1?". **Preview prompt** renders `buildImagePrompt` against a sample brief so edits can be checked without spending a render.
+Next to Voice. Sections: Style, Palette (swatches with hex in mono), Composition, Prohibited (block + terms), Layouts (key, label, description, active; the retired motifs are hidden), Brand mark (enabled, size and margin, with a live preview on a sample crop), Style anchors (grid, with remove). Saving bumps `version` and asks "Save as v1.1?". **Preview prompt** renders `buildImagePrompt` against a sample brief so edits can be checked without spending a render.
 
 ### Draft email
 
@@ -442,6 +485,7 @@ The email already shows each draft as a post-style card inside a 600px column (`
 
 - Markup: `<img width="100%" style="display:block;width:100%;height:auto;border-radius:8px;">` inside the card cell, with the brief's alt text as `alt`.
 - Source: the full-resolution crop, so it is sharp on retina screens. At about 1600px wide this is a few hundred KB per image, which is fine for email.
+- Each card shows the **selected** candidate. When others exist, one plain line under the image: "2 more image options to choose from in Review".
 - Delivery: a signed URL with a 7-day expiry. If the URL has expired or the mail client blocks remote images, the alt text shows in its place and the Review link still works. See Open question 1.
 
 -----
@@ -454,8 +498,11 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | No active `brand_visual` row | `disabled`; logged once per run |
 | Brief call errors | Fallback brief → `skipped` |
 | Brief returns `skip: true` | `skipped` with reason; logged as `social_image_skipped` |
-| Brief fails lint twice | `skipped` with the flags as the reason |
-| Render errors, times out or is refused | `failed`; nothing billed; drafts and email unaffected |
+| Some concepts fail lint | They are dropped; the clean ones render, with no re-brief |
+| No concept passes lint, twice | `skipped` with the flags as the reason |
+| One candidate's render errors, times out or is refused | That candidate is dropped; the others are kept and the lowest success is selected |
+| Every candidate's render fails | `failed`; nothing billed; drafts and email unaffected |
+| Paper sample is not empty paper (luma < 0.80) | Correction skipped and recorded; the render is used as returned |
 | Reference images unsupported by endpoint | Render prompt-only; noted in `proposed_actions` |
 | Crop, mark composite or upload fails | `failed`; no partial `content_images` rows (insert only after all three objects upload). An unmarked image never reaches a founder. |
 | Lex alt-text check errors | Fail-safe verdict (`general_advice`, "check unavailable"); image still persists with a chip |
@@ -465,7 +512,7 @@ The email already shows each draft as a post-style card inside a 600px column (`
 
 ## Cost
 
-About 60 renders a month (2 founders × 1 render a day × 30). For reference, OpenRouter's docs show a high-quality 16:9 render on a top-tier model at about US$0.13, which is about US$8 a month at that price. Cheaper models land well under that. Regenerations add to it. `cost_usd` per row makes the real figure a simple query, and the existing OpenRouter credits panel on the dashboard already shows spend.
+About 180 renders a month (2 founders × 3 candidates a day × 30), from canon v1.1. For reference, OpenRouter's docs show a high-quality 16:9 render on a top-tier model at about US$0.13, which is about US$23 a month at that price. Cheaper models land well under that. Regenerations add to it. `cost_usd` per row makes the real figure a simple query, and the existing OpenRouter credits panel on the dashboard already shows spend.
 
 -----
 
@@ -529,6 +576,11 @@ Images are **on for both founders from launch**. That makes step 0 a hard prereq
 | 2026-11-07 | **Sketch style.** Canon v1.0 describes a confident hand-drawn graphite and ink sketch on warm paper with one gold accent. |
 | 2026-11-08 | **Full-width images in the email.** Each post card shows its own platform crop at full card width. No thumbnail. |
 | 2026-11-08 | **Images on by default.** `generate_image` absent means on, for both founders from launch. Step 0 must be complete before launch. |
+| 2026-11-08 | **Canon v1.1: the motif list is retired.** It mapped topics to stock symbols; the first real post became a centred hourglass on yellowed paper. The brief finds the post's tension instead. `motifs` is kept for v1.0 images. |
+| 2026-11-08 | **The drawn/undrawn device.** What is known is drawn in full; what is uncertain is left as construction lines. Mandatory in every concept. |
+| 2026-11-08 | **Layout presets.** Four seeded (`left_third`, `low_horizon`, `close_detail`, `small_in_space`), editable in `/brand`. A layout used twice in a row is rested. |
+| 2026-11-08 | **Paper correction in code.** The empty corner is sampled and each channel scaled toward the palette paper, clamped, before crop and mark. |
+| 2026-11-08 | **Three candidates, founder picks.** Up to three concepts render in parallel; the lowest success is selected; selection is per run, not per platform. Unpicked candidates are kept as `not_chosen`. |
 
 -----
 
@@ -546,6 +598,11 @@ Where the build departs from this spec, and why.
 | Regenerate "replaces the group" | Writes a new group, then marks the old rows `regenerated` | Same reason; the page shows the newest live group |
 | Regenerate and edit-brief call the agents server | Through a `content_image_requests` queue and `contentImageRequestListener` | The web app has no HTTP route to the agents server; this is the platform's web → DB → agents pattern |
 | `buildImagePrompt` in `apps/agents` | In `@platform/shared` (`brandVisual.ts`), with `lintImageBrief` | The brief slide-over and the Visual tab preview with the same function the render uses |
+| v1.1: insert a new canon row and deactivate v1.0 | The migration updates the active row in place and bumps its version, guarded to run once | That is what the `/brand` Visual tab's save action does; each image already records its version and exact prompt |
+| v1.1: paper correction threshold is "relative luminance" below 0.80 | Luma over gamma-encoded values (Rec. 709 weights), not linear-light luminance | Moderately yellowed paper, the case being corrected, falls under 0.80 in linear light and would be skipped; ink in the corner still falls well below 0.80 either way |
+| v1.1: concepts use "at least two different layouts" | Asked for in the brief prompt; the linter drops repeated subjects but does not reject a brief whose clean concepts share one layout | Rejecting would force a re-brief and could lose good concepts over composition alone |
+| v1.1: the Visual tab may keep motifs read-only or hide them | Hidden, and never written by the save action | A retired menu beside the live controls invites edits that do nothing |
+| v1.1: remove | Removes the selected group only; the run's other candidates stay and the slot offers them | The founder may want one of the alternatives; nothing is auto-selected |
 
 -----
 
