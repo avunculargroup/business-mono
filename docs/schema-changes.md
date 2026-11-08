@@ -6,6 +6,19 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — `platform-files` storage limited to team members
+
+`20261108000004_platform_files_team_only.sql` rewrites the bucket's four `storage.objects`
+policies from "any `authenticated` session" to `authenticated` and `is_team_member()`, the form
+the `papers` and `product-images` buckets already use. Minute subscribers are `authenticated`
+too, so they could list and read the whole bucket, which since the social post image step
+includes unpublished draft images. Unaffected: the agents server (service-role key bypasses
+RLS), signed URLs already issued (the draft email's 7-day image links, previews, downloads carry
+their own token), and the anon `platform_files_objects_public_select` policy behind `/share/<id>`.
+The `reports` bucket has the same open pattern and is not changed here.
+
+---
+
 ## 2026-11-08 — Social post images: capability row
 
 `20261108000003_capability_social_post_images.sql` registers `charlie` /
