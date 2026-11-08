@@ -72,7 +72,7 @@ Everything under `app/(app)/` sits inside the authenticated shell (sidebar + hea
 | `/crm` | Contacts, companies, and the discovery sub-sections: `personas`, `segments`, `interviews`, `champions`, `community` |
 | `/company` | Single-company view |
 | `/projects`, `/tasks` | PM surfaces — list, detail, kanban and table views |
-| `/content` | Content pipeline (kanban + editor) and the newsletter approval gates. A social draft's editor carries its image slot (regenerate, edit brief, alt text, style anchor); `/content/[id]/copy` offers the image download |
+| `/content` | Content pipeline (kanban + editor) and the newsletter approval gates. A social draft's editor carries its image slot (download, regenerate, edit brief, alt text, style anchor); `/content/[id]/copy` offers the image download |
 | `/campaigns` | Campaign strategy, beats, and per-platform variants with compliance state |
 | `/news` | Research feed, `daily` digest, `sources` management, and `podcasts` (see below) |
 | `/market-reports` | Daily narrated market reports — published, held, or un-narrated |

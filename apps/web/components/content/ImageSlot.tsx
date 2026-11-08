@@ -10,6 +10,7 @@ import { useToast } from '@platform/ui/ToastProvider';
 import type { BrandVisual } from '@platform/shared';
 import type { ContentImage, ContentImageRequest } from '@platform/data';
 import {
+  getImageDownloadUrl,
   promoteImageToStyleAnchor,
   removeImage,
   requestImageRegenerate,
@@ -55,7 +56,22 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
   const [altText, setAltText] = useState(image?.altText ?? '');
   const [briefOpen, setBriefOpen] = useState(false);
   const [confirm, setConfirm] = useState<'remove' | 'anchor' | null>(null);
+  const [isDownloading, startDownload] = useTransition();
   const busy = isOpen(request);
+
+  // Signed on click (5 minutes, named for the platform crop) rather than reusing
+  // the preview URL, so the browser saves a file instead of opening the image.
+  const handleDownload = () => {
+    if (!image) return;
+    startDownload(async () => {
+      const result = await getImageDownloadUrl(image.storagePath);
+      if ('error' in result) {
+        error(result.error ?? 'The image could not be downloaded.');
+        return;
+      }
+      window.location.assign(result.url);
+    });
+  };
 
   useEffect(() => setAltText(image?.altText ?? ''), [image?.id, image?.altText]);
 
@@ -160,28 +176,33 @@ export function ImageSlot({ contentItemId, image, request, canon }: ImageSlotPro
             )}
           </div>
 
-          {ai && (
-            <div className={styles.actions}>
-              <Button
-                variant="secondary"
-                disabled={busy || !canon}
-                onClick={() => run(() => requestImageRegenerate(contentItemId), 'Rendering a new image.')}
-              >
-                Regenerate image
-              </Button>
-              <Button variant="secondary" disabled={busy || !canon} onClick={() => setBriefOpen(true)}>
-                Edit brief
-              </Button>
-              {!image.isStyleAnchor && (
-                <Button variant="ghost" disabled={busy} onClick={() => setConfirm('anchor')}>
-                  Use as style anchor
+          <div className={styles.actions}>
+            <Button variant="secondary" onClick={handleDownload} loading={isDownloading} disabled={!image.url}>
+              Download image
+            </Button>
+            {ai && (
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={busy || !canon}
+                  onClick={() => run(() => requestImageRegenerate(contentItemId), 'Rendering a new image.')}
+                >
+                  Regenerate image
                 </Button>
-              )}
-              <Button variant="ghost" disabled={busy} onClick={() => setConfirm('remove')}>
-                Remove image
-              </Button>
-            </div>
-          )}
+                <Button variant="secondary" disabled={busy || !canon} onClick={() => setBriefOpen(true)}>
+                  Edit brief
+                </Button>
+                {!image.isStyleAnchor && (
+                  <Button variant="ghost" disabled={busy} onClick={() => setConfirm('anchor')}>
+                    Use as style anchor
+                  </Button>
+                )}
+                <Button variant="ghost" disabled={busy} onClick={() => setConfirm('remove')}>
+                  Remove image
+                </Button>
+              </>
+            )}
+          </div>
         </>
       ) : canon ? (
         <div className={styles.empty}>

@@ -5,6 +5,7 @@ import { toBrandVisual } from '@platform/shared';
 import type { ContentImage, ContentImageRequest } from '@platform/data';
 
 const actions = {
+  getImageDownloadUrl: vi.fn(),
   requestImageRegenerate: vi.fn(),
   requestImageRender: vi.fn(),
   saveImageAltText: vi.fn(),
@@ -12,6 +13,7 @@ const actions = {
   promoteImageToStyleAnchor: vi.fn(),
 };
 vi.mock('@/app/actions/contentImages', () => ({
+  getImageDownloadUrl: (...a: unknown[]) => actions.getImageDownloadUrl(...a),
   requestImageRegenerate: (...a: unknown[]) => actions.requestImageRegenerate(...a),
   requestImageRender: (...a: unknown[]) => actions.requestImageRender(...a),
   saveImageAltText: (...a: unknown[]) => actions.saveImageAltText(...a),
@@ -135,6 +137,32 @@ describe('ImageSlot', () => {
 
     expect(actions.saveImageAltText).toHaveBeenCalledWith({ contentItemId: ITEM, generationGroupId: GROUP, altText: 'A sketch of a vault door.' });
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it('downloads the platform crop through a freshly signed link', async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } });
+    actions.getImageDownloadUrl.mockResolvedValue({ url: 'https://signed/download.png' });
+    try {
+      render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
+      await user.click(screen.getByRole('button', { name: 'Download image' }));
+      expect(actions.getImageDownloadUrl).toHaveBeenCalledWith(`social-images/2026-11-08/${GROUP}/linkedin-1200x627.png`);
+      expect(assign).toHaveBeenCalledWith('https://signed/download.png');
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original });
+    }
+  });
+
+  it('says so when the download link cannot be made, and is available while a render runs', async () => {
+    const user = userEvent.setup();
+    actions.getImageDownloadUrl.mockResolvedValue({ error: 'That image could not be found.' });
+    render(<ImageSlot contentItemId={ITEM} image={image()} request={request()} canon={CANON} />);
+    const download = screen.getByRole('button', { name: 'Download image' });
+    expect(download).toBeEnabled();
+    await user.click(download);
+    expect(toast.error).toHaveBeenCalledWith('That image could not be found.');
   });
 
   it('queues a regenerate', async () => {
