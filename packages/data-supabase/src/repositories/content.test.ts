@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { expectPaginationContract, testReadContext } from '@platform/data/testing';
+import { describeContentImagesContract, expectPaginationContract, testReadContext } from '@platform/data/testing';
 import type { Principal } from '@platform/data';
 import { createFakeSupabase, type FakeSupabaseClient } from '../../test/mocks/supabase';
 import { createSupabaseRepositories } from '../bundle';
@@ -322,6 +322,9 @@ function imageRow(overrides: Record<string, unknown> = {}) {
     source: 'ai_generated',
     storage_path: 'social-images/2026-11-08/g1/linkedin-1200x627.png',
     generation_group_id: 'g1',
+    candidate_set_id: null,
+    candidate_index: null,
+    is_selected: true,
     alt_text: 'A sketch of a scale.',
     platform_crop: 'linkedin_1200x627',
     image_brief: { skip: false, skip_reason: null, motif_key: 'balance', subject: 's', metaphor: 'm', composition: null, alt_text: 'A sketch of a scale.' },
@@ -438,7 +441,14 @@ describe('getDetail', () => {
       generationGroupId: 'g1',
       altText: 'A sketch of a scale.',
       platformCrop: 'linkedin_1200x627',
-      brief: expect.objectContaining({ motif_key: 'balance' }),
+      // A v1.0 motif brief: read without throwing, no concept to edit from.
+      brief: null,
+      tension: null,
+      layout: null,
+      motifKey: 'balance',
+      candidateSetId: null,
+      candidateIndex: null,
+      isSelected: true,
       assembledPrompt: 'PROMPT',
       brandVisualVersion: '1.0',
       modelId: 'google/gemini-2.5-flash-image',
@@ -648,4 +658,33 @@ describe('createItem and setStatus', () => {
     expect(builder.update).toHaveBeenCalledWith({ status: 'review' });
     expect(builder.eq).toHaveBeenCalledWith('id', 'c1');
   });
+});
+
+// The same contract the fixture adapter passes. Rows arrive newest first, as the
+// query orders them: an unselected candidate written after the selected one,
+// then the selected one, then a removed image from an earlier run.
+describeContentImagesContract({
+  name: 'supabase',
+  createBundle: () => {
+    const fake = createFakeSupabase();
+    fake.__setResponse('content_items', {
+      data: {
+        id: 'c-cand', title: 'T', type: 'linkedin', status: 'draft', body: 'B', is_thread: false,
+        social_account_id: 'acc-li', disclaimer_snippet_id: null, scheduled_for: null, published_at: null,
+        publish_error: null, created_at: '2026-11-08T00:00:00Z', updated_at: '2026-11-08T00:00:00Z',
+      },
+      error: null,
+    });
+    fake.__setResponse('content_images', {
+      data: [
+        imageRow({ id: 'img-b', generation_group_id: 'grp-b', candidate_set_id: 'set-1', candidate_index: 1, is_selected: false, storage_path: 'social-images/d/grp-b/linkedin-1200x627.png', created_at: '2026-11-08T00:00:02Z' }),
+        imageRow({ id: 'img-a', generation_group_id: 'grp-a', candidate_set_id: 'set-1', candidate_index: 0, is_selected: true, storage_path: 'social-images/d/grp-a/linkedin-1200x627.png', created_at: '2026-11-08T00:00:01Z' }),
+        imageRow({ id: 'img-old', generation_group_id: 'grp-old', candidate_set_id: 'set-0', is_selected: true, review_outcome: 'removed', storage_path: 'social-images/d/grp-old/linkedin-1200x627.png', created_at: '2026-11-07T00:00:00Z' }),
+      ],
+      error: null,
+    });
+    return createSupabaseRepositories(fake as unknown as PlatformSupabaseClient, principal);
+  },
+  draftId: 'c-cand',
+  selectedGroupId: 'grp-a',
 });

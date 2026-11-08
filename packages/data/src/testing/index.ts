@@ -16,3 +16,4 @@ export {
   describeClientContract,
   type ClientAdapterUnderTest,
 } from './client';
+export { describeContentImagesContract, type ContentImagesScenario } from './contentImages';
