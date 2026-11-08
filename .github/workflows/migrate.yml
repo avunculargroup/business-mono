@@ -27,7 +27,13 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned, never `latest`. CLI 3.0.0 (2026-11-02) rejected this repo's
+          # config.toml and changed the remote flags this job relies on
+          # (`gen types --project-id` became `--remote`), so `db push` failed in
+          # a second and no migration applied while the merge looked fine. Move
+          # to 3.x deliberately: update the link / push / gen types steps for
+          # its flags, then bump this.
+          version: 2.122.1
 
       - name: Link Supabase project
         run: supabase link --project-ref $SUPABASE_PROJECT_ID --password $SUPABASE_DB_PASSWORD
