@@ -316,6 +316,27 @@ describe('schedule', () => {
   });
 });
 
+function imageRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'img-1',
+    source: 'ai_generated',
+    storage_path: 'social-images/2026-11-08/g1/linkedin-1200x627.png',
+    generation_group_id: 'g1',
+    alt_text: 'A sketch of a scale.',
+    platform_crop: 'linkedin_1200x627',
+    image_brief: { skip: false, skip_reason: null, motif_key: 'balance', subject: 's', metaphor: 'm', composition: null, alt_text: 'A sketch of a scale.' },
+    assembled_prompt: 'PROMPT',
+    brand_visual_version: '1.0',
+    model_id: 'google/gemini-2.5-flash-image',
+    cost_usd: '0.0390',
+    is_style_anchor: false,
+    alt_text_verdict: { classification: 'educational', needs_disclaimer: false, rationale: 'plain', checked_at: '2026-11-08T00:00:00Z' },
+    review_outcome: null,
+    created_at: '2026-11-08T00:00:00Z',
+    ...overrides,
+  };
+}
+
 describe('getDetail', () => {
   function detailRow(overrides: Record<string, unknown> = {}) {
     return {
@@ -395,6 +416,59 @@ describe('getDetail', () => {
 
     expect(await content().getDetail(ctx, 'nope')).toBeNull();
   });
+
+  it('returns the newest image not retired by a regenerate or remove, with its provenance', async () => {
+    client.__setResponse('content_items', { data: detailRow(), error: null });
+    client.__setResponse('content_images', {
+      data: [imageRow({ id: 'img-new', review_outcome: 'regenerated' }), imageRow({ id: 'img-live', review_outcome: 'kept' })],
+      error: null,
+    });
+    client.__setResponse('content_image_requests', {
+      data: { id: 'req-1', action: 'regenerate', status: 'failed', error: 'Timed out.', created_at: '2026-11-08T01:00:00Z' },
+      error: null,
+    });
+
+    const detail = await content().getDetail(ctx, 'c1');
+
+    expect(detail?.image).toEqual({
+      id: 'img-live',
+      source: 'ai_generated',
+      storagePath: 'social-images/2026-11-08/g1/linkedin-1200x627.png',
+      masterPath: 'social-images/2026-11-08/g1/master-16x9.png',
+      generationGroupId: 'g1',
+      altText: 'A sketch of a scale.',
+      platformCrop: 'linkedin_1200x627',
+      brief: expect.objectContaining({ motif_key: 'balance' }),
+      assembledPrompt: 'PROMPT',
+      brandVisualVersion: '1.0',
+      modelId: 'google/gemini-2.5-flash-image',
+      costUsd: 0.039,
+      isStyleAnchor: false,
+      altTextVerdict: { classification: 'educational', rationale: 'plain', checkedAt: '2026-11-08T00:00:00Z' },
+      createdAt: '2026-11-08T00:00:00Z',
+    });
+    expect(detail?.latestImageRequest).toEqual({
+      id: 'req-1',
+      action: 'regenerate',
+      status: 'failed',
+      error: 'Timed out.',
+      createdAt: '2026-11-08T01:00:00Z',
+    });
+    expect(client.__buildersFor('content_images')[0].is).toHaveBeenCalledWith('thread_segment_id', null);
+  });
+
+  it('has no image and no master path for an upload', async () => {
+    client.__setResponse('content_items', { data: detailRow(), error: null });
+    client.__setResponse('content_images', {
+      data: [imageRow({ source: 'upload', generation_group_id: null, alt_text_verdict: null, cost_usd: null })],
+      error: null,
+    });
+    const detail = await content().getDetail(ctx, 'c1');
+    expect(detail?.image).toMatchObject({ source: 'upload', masterPath: null, altTextVerdict: null, costUsd: null });
+
+    client.__setResponse('content_images', { data: [], error: null });
+    expect((await content().getDetail(ctx, 'c1'))?.image).toBeNull();
+  });
 });
 
 describe('getSocialDraftCopy', () => {
@@ -447,7 +521,22 @@ describe('getSocialDraftCopy', () => {
       isThread: true,
       segments: ['One.', 'Two.'],
       disclaimerText: 'Not advice.',
+      image: null,
     });
+  });
+
+  it('carries the draft\'s current marked crop for download', async () => {
+    client.__setResponse('content_items', {
+      data: { id: 'c1', title: 'T', body: 'B', type: 'linkedin', is_thread: false, social_account_id: null, disclaimer_snippet_id: null },
+      error: null,
+    });
+    client.__setResponse('content_images', {
+      data: [imageRow({ review_outcome: 'removed', storage_path: 'social-images/old/linkedin-1200x627.png' }), imageRow()],
+      error: null,
+    });
+
+    const copy = await content().getSocialDraftCopy(ctx, 'c1');
+    expect(copy?.image).toEqual({ storagePath: 'social-images/2026-11-08/g1/linkedin-1200x627.png', altText: 'A sketch of a scale.' });
   });
 });
 

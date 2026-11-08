@@ -108,6 +108,9 @@ export type {
 export type {
   ContentCard,
   ContentDetail,
+  ContentImage,
+  ContentImageRequest,
+  ContentImageVerdict,
   ContentEditGuard,
   ContentRepository,
   DraftFeedbackEntry,

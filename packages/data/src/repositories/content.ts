@@ -1,4 +1,4 @@
-import type { ContentStatus } from '@platform/shared';
+import type { ContentStatus, ImageBrief } from '@platform/shared';
 import type { Paginated, QueryOptions, ReadContext } from '../context';
 
 /** One card on the pipeline board. */
@@ -61,6 +61,49 @@ export interface DraftFeedbackEntry {
   createdAt: string;
 }
 
+/** Lex's advisory verdict on an image's alt text. */
+export interface ContentImageVerdict {
+  classification: string;
+  rationale: string;
+  checkedAt: string | null;
+}
+
+/**
+ * The image a draft currently carries: the newest `content_images` row not
+ * marked regenerated or removed. An AI image also carries its provenance — the
+ * brief, the exact prompt sent, the canon version, model and cost — so the
+ * page can say exactly what produced it.
+ */
+export interface ContentImage {
+  id: string;
+  source: 'upload' | 'ai_generated';
+  /** The platform crop, marked. What gets posted. */
+  storagePath: string;
+  /** The unmarked render, for promoting to a style anchor. Null for uploads. */
+  masterPath: string | null;
+  /** Shared by every crop of one render; regenerate and remove act on it. */
+  generationGroupId: string | null;
+  altText: string | null;
+  platformCrop: string | null;
+  brief: ImageBrief | null;
+  assembledPrompt: string | null;
+  brandVisualVersion: string | null;
+  modelId: string | null;
+  costUsd: number | null;
+  isStyleAnchor: boolean;
+  altTextVerdict: ContentImageVerdict | null;
+  createdAt: string;
+}
+
+/** The newest founder image action on a draft, so the page can show progress. */
+export interface ContentImageRequest {
+  id: string;
+  action: 'regenerate' | 'render_brief' | 'recheck_alt_text';
+  status: 'pending' | 'working' | 'done' | 'failed';
+  error: string | null;
+  createdAt: string;
+}
+
 /**
  * A draft on its own page: the item, its segments, the feedback already left on
  * it, and the platform's character limit.
@@ -85,6 +128,8 @@ export interface ContentDetail {
   threadSegments: ThreadSegment[];
   priorFeedback: DraftFeedbackEntry[];
   maxChars: number | null;
+  image: ContentImage | null;
+  latestImageRequest: ContentImageRequest | null;
 }
 
 /** The copy-to-clipboard surface a social-draft email links to. */
@@ -96,6 +141,8 @@ export interface SocialDraftCopy {
   isThread: boolean;
   segments: string[];
   disclaimerText: string | null;
+  /** The marked platform crop to download, when the draft has an image. */
+  image: { storagePath: string; altText: string | null } | null;
 }
 
 export interface NewContentItem {
