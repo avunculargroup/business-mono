@@ -46,9 +46,17 @@ interface ContentEditorProps {
   threadSegments: ThreadSegment[];
   priorFeedback?: DraftFeedbackEntry[];
   maxChars?: number | null;
+  /** The image slot, rendered by the page (it needs signed URLs and the canon). */
+  imageSlot?: React.ReactNode;
 }
 
-export function ContentEditor({ item, threadSegments, priorFeedback = [], maxChars = null }: ContentEditorProps) {
+export function ContentEditor({
+  item,
+  threadSegments,
+  priorFeedback = [],
+  maxChars = null,
+  imageSlot,
+}: ContentEditorProps) {
   const [body, setBody] = useState(item.body || '');
   const [savedBody, setSavedBody] = useState(item.body || '');
   const [scheduleAt, setScheduleAt] = useState(toDatetimeLocal(item.scheduledFor));
@@ -251,6 +259,8 @@ export function ContentEditor({ item, threadSegments, priorFeedback = [], maxCha
             </div>
           </div>
         )}
+
+        {imageSlot}
 
         {item.socialAccountId && (
           <DraftFeedback contentItemId={item.id} priorFeedback={priorFeedback} />
