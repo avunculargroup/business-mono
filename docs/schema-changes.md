@@ -6,6 +6,15 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-08 — Social post images: capability row
+
+`20261108000003_capability_social_post_images.sql` registers `charlie` /
+`social_post_images` in `platform_capabilities` so Simon's capacity check knows the image step
+exists. Guarded with `WHERE NOT EXISTS`, since the table has no unique key on
+`(agent_name, capability)`.
+
+---
+
 ## 2026-11-08 — Social post images: `content_image_requests`
 
 `20261108000002_content_image_requests.sql` adds the queue behind the image slot on
