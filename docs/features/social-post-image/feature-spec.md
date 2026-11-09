@@ -3,7 +3,7 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; canon v1.2. The step 0 bake-off was dropped: tested in production (see Decisions)
-**Last updated:** 2026-11-09 (canon v1.2; the hook and the idea review)
+**Last updated:** 2026-11-09 (canon v1.2; the hook, the idea review, and acting on it)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
@@ -93,7 +93,8 @@ Each decision traces back to existing evidence or an existing principle.
 | ~~**Drawn vs not yet drawn** is the house device~~ **(retired in v1.2)** | v1.1 drew the known part in full and left the uncertain part as construction lines. The images were clever but did not read at phone size. | The ASIC CP 392 example, recorded in the Overview |
 | **A familiar symbol with one twist** | Recognition must be instant, so the symbol is one everyone already knows; one visible change ties it to this post. Originality comes from the twist, not the symbol. | The half-second test; the brief's worked examples |
 | The brief anchors on the post's **hook** | A symbol of the topic illustrates every post on the subject. The hook ("capital buffers", not "regulation") is what makes it this post, and a pun on its words often reads fastest. | The capital-buffers post: a balance scale and a farm gate, both pictures of "regulation" |
-| A **text-only reviewer** shortlists before rendering | Judging an idea costs a fraction of a cent; a render costs cents. The brief proposes six, the editor scores them, and only the top three are rendered. Advisory, like Lex: it never stops an image being made. | The capital-buffers post's scale had the weighted pan sitting higher; nothing checked it before the render |
+| A **text-only reviewer** shortlists before rendering | Judging an idea costs a fraction of a cent; a render costs cents. The brief proposes six, the editor scores them, and only the top three are rendered. | The capital-buffers post's scale had the weighted pan sitting higher; nothing checked it before the render |
+| The reviewer is **acted on**, not just recorded | When fewer than three ideas pass, one more text-only brief carries the reviewer's notes; a gap after that is filled with the best-scoring rejects, never the brief's first three. A second round of text costs a fraction of a cent; a bad render costs about 7 cents and a wasted candidate. Only an unusable review falls back to brief order. | The "playbook" run: all six ideas scored 5–10 of 15, and the fallback rendered the first three, including the 5/15 chalk line |
 | **Linocut style** | Solid black masses and a flat gold shape read at thumbnail size, where fine pencil lines vanish. It is consistent by construction: few colours, few marks. | Canon v1.2 style block |
 | **Layout presets**, chosen per concept | v1.0's "asymmetric balance" was ignored; a named layout is followed | The hourglass sat dead centre in a 16:9 frame |
 | ~~**Stock-symbol terms** in the linter~~ **(retired in v1.2)** | v1.1 banned hourglass, clock, compass and the rest. That pushed the brief to obscure subjects. v1.2 wants familiar symbols, with a twist. The finance clichés stay banned: that rule is compliance, not taste. | The ASIC CP 392 example |
@@ -194,13 +195,24 @@ The brief works out, per concept: the **tension**, a **symbol** everyone already
 
 - Weak, a symbol with no twist: "Twenty years" became an hourglass. True, but it says nothing.
 - Weak, no symbol: a half-drawn bridge pier for a regulator's consultation paper. It needs explaining.
-- Strong: a regulator's consultation paper became a giant rubber stamp poised just above a blank sheet, about to land. Or a lighthouse throwing one solid gold beam through fog, for "clarity's coming".
+- Strong: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
+
+An earlier strong example, a rubber stamp "poised just above a blank sheet, about to land", was removed on 2026-11-09: in the "playbook" run all six concepts copied its shape (a drafting tool caught in a pause), and a pause cannot be seen in a still image.
 
 Before the symbol, the brief names the **hook**: the post's single most specific, concrete phrase, the thing a reader would quote back ("capital buffers", not "regulation"; "Twenty years", not "US debt"). Every concept must be about it, and visual puns on its words are welcome. If the twist involves weight, balance, light, motion or water, it must read correctly: a weighted pan sits lower. The examples gained the post that prompted this:
 
 - Weak, the topic and not the hook: "capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.
 - Weak, the topic and not the hook: "capital buffers" became a closed farm gate.
-- Strong, the hook with a pun: "capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.
+- Strong, the hook with a pun: "capital buffers" became a heavy railway buffer stop printed in gold, a black rail running straight into it.
+- Strong, a pun on "the game": "writing the playbook, not banning the game" became a football on a kicking tee on a freshly marked pitch, its touchline painted in gold.
+- Weak, generic writing and a pause nobody can see: "the playbook" became a fountain pen lifted mid-stroke.
+
+Four rules came from the "playbook" run:
+
+- **The twist is a visible physical state, never a moment in time.** "About to", "not yet", "paused", "poised", "mid-stroke" and "waiting" do not read in a still image. Half-finished is fine when the half can be seen (half the pitch lined).
+- **Six concepts from at least four domains** (sport, home, nature, transport, building, kitchen, travel …), at most two from any one. That run's six all came from writing and printing tools.
+- **At least two concepts pun on the hook's literal words.** "Playbook" and "the game" were right there, and none of the six used them.
+- **No symbol whose meaning depends on writing:** pens writing, type, documents, signs, newspapers, seals, books shown open. The model draws letters on them whatever the prohibited block says; that run's composing stick and pen both came back lettered. A closed book is fine.
 
 The linter rejects a twist that only restates the symbol, and drops a concept repeating another concept's symbol. The brief is told not to reuse a symbol from the last five runs (see 5b.1).
 
@@ -350,6 +362,8 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
    5b.2  image brief          (LLM, structured)      scope social_post.image_brief   the hook + up to six concepts
    5b.3  lint per concept     (pure)                 drop flagged; re-brief once if none clean, then skip
    5b.3b review + rank        (LLM, structured)      scope social_post.image_critic  editor scores; rankConcepts keeps the top three
+         if fewer than three pass: one re-brief with the reviewer's notes → lint → review → rank both rounds
+         gaps filled with the best soft rejects (never a physics or needs-text fault)
    per shortlisted concept, in parallel (Promise.allSettled), each its own generation group, best first:
    5b.4  assemble prompt      (pure)                 buildImagePrompt()
    5b.5  render               (OpenRouter Image API) scope social_post.image_render
@@ -401,19 +415,26 @@ Per concept:
 - The twist must not just restate the symbol (compared after normalising case and punctuation).
 - No term from `prohibited_terms` may appear in `subject`, `symbol` or `twist` (case-insensitive, whole words; symbols such as `$` match as substrings).
 - No digits in `subject`, `symbol` or `twist`. Numbers invite rendered text.
+- The twist must not lean on a moment in time: `TEMPORAL_TWIST_TERMS` (`about to`, `not yet`, `yet to`, `hasn't`, `has not`, `paused`, `poised`, `mid-stroke`, `mid-air`, `waiting`, `ready to`, `before it`), whole words, case-insensitive.
+- `symbol` and `subject` must not name a text-bearing object: `TEXT_BEARING_SYMBOLS` (`typeset`, `type block`, `movable type`, `moveable type`, `composing stick`, `galley`, `handwriting`, `signature`, `newspaper`, `headline`, `signpost`, `placard`, `typewriter`, `open book`). Both lists are exported constants in code, not canon `prohibited_terms`: they are structural rules, not brand choices.
 
 A flagged concept is dropped, not the brief; so is one repeating an earlier concept's symbol. If none survive: one re-brief carrying every flag (`imageBriefRewriteInstruction`, the same shape as `aiTellRewriteInstruction`), then status `skipped` with a reason. It never loops.
 
 ### 5b.3b Review and rank (`buildImageCriticPrompt`, `rankConcepts`, pure, in `imageBrief.ts`)
 
-The internal `editor` agent scores every lint-clean concept, text only, under the `social_post.image_critic` scope. It sees the post, the hook and the concepts numbered from 1, is told to be strict, and is calibrated on the capital-buffers post (the scale, the gate and the buffer stop). For each concept it returns `recognisable`, `twist_visible` and `on_hook` (1–5), `physics_ok` and a one-line `note`. A plain symbol with no twist scores 1 on `twist_visible`; a picture of the general topic scores 1 on `on_hook`.
+The internal `editor` agent scores every lint-clean concept, text only, under the `social_post.image_critic` scope. It sees the post, the hook and the concepts numbered from 1, is told to be strict, and is calibrated on the capital-buffers post (the scale, the gate and the buffer stop). For each concept it returns `recognisable`, `twist_visible` and `on_hook` (1–5), `physics_ok`, `needs_text` (does the picture need visible letters, numbers or writing to read?) and a one-line `note`. A plain symbol with no twist scores 1 on `twist_visible`; a picture of the general topic scores 1 on `on_hook`; a twist that is a moment in time scores 2 or less on `twist_visible`.
 
 `rankConcepts(concepts, critique, max = 3)` is deterministic:
 
-- Drop a concept with `physics_ok` false or any score of 2 or less.
-- Order the rest by total (`recognisable + twist_visible + on_hook`); the brief's order breaks ties. Concepts the reviewer did not score rank after every scored one and are never dropped.
-- Take the top three. Their order becomes `candidate_index`, so candidate 0, the default selection, is the reviewer's top pick.
-- **Advisory, like Lex.** If the critique is missing or malformed, names an index outside the list or scores one twice, or nothing survives the filter, the shortlist is the top three in brief order (`fallback: true`, logged). The reviewer never stops an image being made, and never triggers a re-brief or a re-render.
+- Reject a concept with `physics_ok` false, `needs_text` true, or any score of 2 or less. Physics and text are **hard faults**: such a concept is rendered only when every reviewed concept has one.
+- Order the survivors by total (`recognisable + twist_visible + on_hook`); the brief's order breaks ties. Concepts the reviewer did not score rank after every scored one and are never rejected.
+- Take the top three. If fewer than three survive, fill the remaining slots with the highest-total **soft** rejects (low scores only, never a hard fault while anything else is left), marked `filled_from_rejected`.
+- Their order becomes `candidate_index`, so candidate 0, the default selection, is the reviewer's top pick.
+- If the critique is missing or malformed, names an index outside the list or scores one twice, the shortlist is the top three in brief order (`fallback: true`, logged). Only then is the reviewer ignored.
+
+**One reviewer-driven re-brief** (`briefConcepts` in `image.ts`). If the critique was usable and fewer than three concepts survive, the brief runs once more carrying `reviewerRewriteInstruction`: each rejected symbol with the reviewer's note and what it fell down on (a hard fault, else its lowest score), every symbol already tried (none may be reused), and a push to different domains. The new concepts are linted, any repeating a round-one symbol is dropped, the editor reviews them, and `rankConcepts` ranks both rounds together. It runs at most once, never loops, and never blocks an image: if the second brief skips, lints to nothing, or its review is unusable, round one stands (with its fills). There are no re-renders.
+
+If every reviewed concept has a hard fault, the run still renders: the highest-total of them fill the slots (`filled_from_rejected`). A run always gets an image; the founder can regenerate.
 
 ### 5b.4 Prompt assembly (pure: `buildImagePrompt`)
 
@@ -466,7 +487,7 @@ The pipeline order does not change. Copy goes through Lex before persist exactly
 
 - Per candidate: one `content_images` row per persisted `content_item`, all with the same `generation_group_id`, the run's `candidate_set_id`, its `candidate_index`, and `is_selected = false`. `platform_crop` is `linkedin_1200x627` or `x_1600x900`.
 - Once every candidate has settled, the lowest successful `candidate_index` is selected (`planCandidateSelection` in `@platform/shared`, the same rule the web's "Use this image" applies). If every candidate failed, the outcome is `failed` and the run still succeeds. `sort_order` is 0 and `thread_segment_id` is NULL. On X threads the image attaches to the post, which in practice means the first segment.
-- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. When the reviewer ran, each row also carries `hook`, `review_fallback` and `review`: **every** concept the reviewer saw, with its scores, total, rank and outcome (`shortlisted`, `dropped` with the reason, or `not_shortlisted`), so the audit trail shows why an idea did not make it. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
+- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. When the reviewer ran, each row also carries `hook`, `review_fallback` (the critique was unusable), `review_rounds` (1, or 2 after a reviewer-driven re-brief) and `review`: **every** concept the reviewer saw in either round, with its round, scores, `needs_text`, total, rank, outcome (`shortlisted`, `dropped` with the reason, or `not_shortlisted`) and `filled_from_rejected`, so the audit trail shows why an idea did or did not make it. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
 - A second row for the alt-text check: `agent_name = 'lex'`, `action = 'compliance_checked'`, `proposed_actions: [{ type: 'image_alt_text', classification }]`.
 
 ### Compliance
@@ -543,7 +564,10 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | Brief call errors | Fallback brief → `skipped` |
 | Brief returns `skip: true` | `skipped` with reason; logged as `social_image_skipped` |
 | Some concepts fail lint | They are dropped; the clean ones go to review, with no re-brief |
-| Reviewer errors, returns a malformed critique, or drops every concept | Advisory: the top three clean concepts render in brief order; `review_fallback` is recorded and `review` is stored as null |
+| Reviewer errors or returns a malformed critique | The top three clean concepts render in brief order; `review_fallback` is recorded and `review` is stored as null. No re-brief |
+| Fewer than three concepts pass the review | One re-brief with the reviewer's notes; both rounds ranked together; any gap filled with the best soft rejects (`filled_from_rejected`) |
+| The re-brief skips, lints to nothing, or its review fails | Round one stands, with its fills; `review_rounds` is 1 |
+| Every reviewed concept needs text or gets its physics wrong | Still renders: the highest-total of them fill the slots, marked `filled_from_rejected` |
 | No concept passes lint, twice | `skipped` with the flags as the reason |
 | One candidate's render errors, times out or is refused | That candidate is dropped; the others are kept and the lowest success is selected |
 | Every candidate's render fails | `failed`; nothing billed; drafts and email unaffected |
@@ -638,6 +662,11 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **The brief anchors on the post's hook; puns welcome.** The capital-buffers post got a balance scale and a closed farm gate: strong prints, both pictures of "regulation". The hook ("capital buffers") is what the post is about; a railway buffer stop says it in half a second. |
 | 2026-11-09 | **Six ideas; the editor shortlists three before rendering.** A text-only review scores recognition, twist and hook, and the top three render, best first. Advisory: a failed review falls back to brief order. |
 | 2026-11-09 | **Physics must read correctly.** The capital-buffers scale had its weighted pan sitting higher. The brief is told to get weight, balance, light, motion and water right, and the reviewer drops a concept that does not. |
+| 2026-11-09 | **Act on the reviewer: one re-brief, then rank by score.** The "playbook" run scored its six ideas 10, 10, 5, 9, 8 and 8 of 15 (composing stick, fountain pen, chalk line, wax seal, galley tray, anvil); none passed, and the fallback rendered the first three in brief order, the 5/15 chalk line among them. Now fewer than three survivors triggers one re-brief carrying the reviewer's notes, and any gap is filled by total, never by brief order. |
+| 2026-11-09 | **The "about to land" stamp example is gone; twists must be visible states.** All six "playbook" ideas copied its shape (pen lifted, line not yet snapped, half-set type, seal poised), and none of those pauses can be seen. The linter flags temporal twists; the reviewer scores them 2 or less on `twist_visible`. |
+| 2026-11-09 | **Four domains, at most two per domain.** The six "playbook" ideas all came from writing and printing tools. |
+| 2026-11-09 | **At least two hook puns.** "Playbook" and "the game" were in the post; a football on a kicking tee on a freshly marked pitch was there to be had, and none of the six used the words. |
+| 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` never fills a slot while any other concept can. If every idea has a physics or text fault, the best of them still render: a run always gets an image (Chris, 2026-11-09). |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |
 
 -----
@@ -664,6 +693,7 @@ Where the build departs from this spec, and why.
 | v1.2: bake-off of the new canon on candidate models, with a contact sheet | Not built | Chris asked to test in production instead (see Decisions, 2026-11-09). `openrouterImage.ts` is unchanged |
 | v1.2: a new canon row | The migration updates the active row in place and bumps its version, guarded on the v1.1 style block so it never overwrites a founder's edits | Same as v1.1 |
 | v1.2: symbol history | A pre-v1.2 image has no symbol; its subject stands in | So the last five runs still count from the first v1.2 run |
+| Reviewer-driven re-brief: "if the second brief or review fails, use what the first round produced" | Also when the second brief lints to nothing new. Fills exclude physics and needs-text faults except when every reviewed concept has one: then the best of them render by total | Chris chose 2026-11-09 that a run always renders rather than skip |
 | v1.2: legibility rejections are logged | One `social_image_rejected` activity per run, listing each rejected candidate's index, reason and coverage | Rejections are invisible otherwise: a rejected candidate leaves no `content_images` row |
 
 -----

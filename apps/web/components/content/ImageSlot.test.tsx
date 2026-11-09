@@ -248,16 +248,19 @@ describe('ImageSlot', () => {
     await user.type(twist, 'a rubber stamp');
     expect(screen.getByText(/twist only restates the symbol/)).toBeInTheDocument();
     await user.clear(twist);
-    await user.type(twist, 'Giant, poised above a blank sheet');
+    await user.type(twist, 'Poised above a blank sheet');
+    expect(screen.getByText(/twist leans on a moment in time \(poised\)/)).toBeInTheDocument();
+    await user.clear(twist);
+    await user.type(twist, 'Giant, its print in gold on a blank sheet');
     const subject = screen.getByLabelText('Subject');
     await user.clear(subject);
-    await user.type(subject, 'A giant rubber stamp poised above a blank sheet');
+    await user.type(subject, 'A giant rubber stamp beside its gold print');
     await user.selectOptions(screen.getByLabelText('Layout'), 'low_horizon');
     expect(screen.getByText(/^A hand-drawn sketch\./)).toHaveTextContent('Layout: Low horizon: One horizon line, low.');
     await user.click(screen.getByRole('button', { name: 'Render with this brief' }));
     expect(actions.requestImageRender).toHaveBeenCalledWith(
       ITEM,
-      expect.objectContaining({ layout: 'low_horizon', symbol: 'A rubber stamp', twist: 'Giant, poised above a blank sheet' }),
+      expect.objectContaining({ layout: 'low_horizon', symbol: 'A rubber stamp', twist: 'Giant, its print in gold on a blank sheet' }),
     );
   });
 

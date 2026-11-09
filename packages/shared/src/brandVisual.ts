@@ -65,6 +65,8 @@ export interface ConceptReview {
   twist_visible: number;
   on_hook: number;
   physics_ok: boolean;
+  /** Whether the picture would need visible letters, numbers or writing to read. */
+  needs_text: boolean;
   note: string;
   total: number | null;
   rank: number;
@@ -242,6 +244,51 @@ export interface LintOptions {
   prohibitedTerms: string[];
 }
 
+/**
+ * Twists that lean on a moment in time. A still image cannot show "about to"
+ * or "not yet": every concept in the 2026-11-09 "playbook" run copied a
+ * worked example's "poised, about to land" and none of them read. A twist must
+ * be a visible physical state; half-finished is fine when the half can be seen.
+ */
+export const TEMPORAL_TWIST_TERMS = [
+  'about to',
+  'not yet',
+  'yet to',
+  "hasn't",
+  'has not',
+  'paused',
+  'poised',
+  'mid-stroke',
+  'mid-air',
+  'waiting',
+  'ready to',
+  'before it',
+] as const;
+
+/**
+ * Symbols whose meaning depends on writing. Image models draw garbled
+ * pseudo-letters on them whatever the prohibited block says (the "playbook"
+ * run's composing stick and fountain pen both came back lettered). Structural,
+ * not a brand choice, so it lives here rather than in the canon's terms. A
+ * closed book is fine; an open one is not.
+ */
+export const TEXT_BEARING_SYMBOLS = [
+  'typeset',
+  'type block',
+  'movable type',
+  'moveable type',
+  'composing stick',
+  'galley',
+  'handwriting',
+  'signature',
+  'newspaper',
+  'headline',
+  'signpost',
+  'placard',
+  'typewriter',
+  'open book',
+] as const;
+
 /** Lower-case, letters and digits only: enough to catch a twist that just repeats its symbol. */
 function normalise(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -267,6 +314,17 @@ export function lintImageConcept(concept: ImageConcept, opts: LintOptions): stri
   if (!text(concept.alt_text)) flags.push('alt_text is missing.');
   if (text(concept.symbol) && text(concept.twist) && normalise(concept.twist) === normalise(concept.symbol)) {
     flags.push('twist only restates the symbol; it must change the symbol in one visible way.');
+  }
+  const temporal = TEMPORAL_TWIST_TERMS.filter((t) => containsTerm(text(concept.twist), t));
+  if (temporal.length > 0) {
+    flags.push(`twist leans on a moment in time (${temporal.join(', ')}); a still image needs a visible state.`);
+  }
+  for (const [name, value] of [
+    ['symbol', text(concept.symbol)],
+    ['subject', text(concept.subject)],
+  ] as const) {
+    const hits = TEXT_BEARING_SYMBOLS.filter((t) => containsTerm(value, t));
+    if (hits.length > 0) flags.push(`${name} depends on writing (${hits.join(', ')}); the model will draw letters on it.`);
   }
 
   const fields: Array<[string, string]> = [
@@ -348,6 +406,7 @@ function readReview(v: unknown): ConceptReview | null {
     twist_visible: twist,
     on_hook: onHook,
     physics_ok: r['physics_ok'] !== false,
+    needs_text: r['needs_text'] === true,
     note: typeof r['note'] === 'string' ? r['note'].trim() : '',
     total: score(r['total']),
     rank,
