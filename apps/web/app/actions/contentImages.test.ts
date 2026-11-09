@@ -46,9 +46,9 @@ const CANON = {
 };
 const BRIEF = {
   tension: 'Nobody knows the trigger.',
-  subject: 'A timber pier running out over open water',
-  drawn: 'the near end of the pier',
-  undrawn: 'the far end, as pencil guidelines',
+  symbol: 'A lighthouse',
+  twist: 'One solid gold beam cuts through the fog',
+  subject: 'A lighthouse throwing one solid gold beam through fog',
   layout: 'left_third',
   alt_text: 'A sketch of a pier.',
 };
@@ -101,10 +101,10 @@ describe('requestImageRender', () => {
   });
 
   it('queues a linted concept, trimmed', async () => {
-    expect(await requestImageRender(ITEM, { ...BRIEF, subject: '  A timber pier  ' })).toEqual({ success: true });
+    expect(await requestImageRender(ITEM, { ...BRIEF, subject: '  A lighthouse in fog  ' })).toEqual({ success: true });
     expect(inserts('content_image_requests')[0]).toMatchObject({
       action: 'render_brief',
-      brief: { ...BRIEF, subject: 'A timber pier' },
+      brief: { ...BRIEF, subject: 'A lighthouse in fog' },
     });
   });
 
@@ -121,7 +121,8 @@ describe('requestImageRender', () => {
 
   it('validates the form fields before anything else', async () => {
     expect(await requestImageRender(ITEM, { ...BRIEF, alt_text: ' ' })).toEqual({ error: 'Write the alt text' });
-    expect(await requestImageRender(ITEM, { ...BRIEF, undrawn: '' })).toEqual({ error: 'Say what is left as construction lines' });
+    expect(await requestImageRender(ITEM, { ...BRIEF, twist: '' })).toEqual({ error: 'Say what the twist is' });
+    expect(await requestImageRender(ITEM, { ...BRIEF, symbol: ' ' })).toEqual({ error: 'Name the symbol' });
   });
 
   it('says so when there is no canon', async () => {

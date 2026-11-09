@@ -274,16 +274,16 @@ function imageRow(anchor: Date, overrides: Partial<FixtureImageRow> & Pick<Fixtu
  * these: they exist for the content-images contract both adapters pass.
  */
 export function contentImageRows(anchor: Date): Record<string, FixtureImageRow[]> {
-  const concept = (subject: string, layout: string, tension: string) => ({
+  const concept = (symbol: string, twist: string, layout: string, tension: string) => ({
     tension,
-    subject,
-    drawn: 'the near end, in full',
-    undrawn: 'the far end, as construction lines',
+    symbol,
+    twist,
+    subject: `${symbol}: ${twist.toLowerCase()}`,
     layout,
-    alt_text: `A pencil sketch of ${subject.toLowerCase()}.`,
+    alt_text: `A linocut of ${symbol.toLowerCase()}.`,
   });
-  const bridge = concept('A footbridge half built across a gorge', 'low_horizon', 'Everyone is building toward a far side nobody has surveyed.');
-  const pier = concept('A timber pier running out over open water', 'left_third', 'Nobody knows the trigger, only that the safe ground is shorter than it looks.');
+  const bridge = concept('A lighthouse', 'One solid gold beam cuts through the fog', 'against_gold', 'After years of fog, clarity is coming.');
+  const pier = concept('A rubber stamp', 'Giant, poised just above a blank sheet', 'hero_left', 'The rules are about to land.');
   return {
     'cnt-flagged': [
       imageRow(anchor, { id: 'img-flagged-bridge', generationGroupId: 'grp-bridge', candidateIndex: 1, brief: bridge, tension: bridge.tension, layout: bridge.layout }),

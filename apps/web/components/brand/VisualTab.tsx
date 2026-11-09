@@ -36,12 +36,12 @@ const PREVIEW_H = 627;
 /** A concept to preview the prompt against, so edits can be checked without a render. */
 function sampleConcept(layout: Layout | undefined): ImageConcept {
   return {
-    tension: 'Nobody knows what will trigger it, only that the safe ground is shorter than it looks.',
-    subject: 'A timber pier running out over open water',
-    drawn: 'the near end of the pier, planks and pilings in full',
-    undrawn: 'the far end, where the planks thin into pencil guidelines over the water',
+    tension: 'After years of fog, the rules are finally arriving.',
+    symbol: 'A lighthouse',
+    twist: 'It throws one solid gold beam straight through a bank of fog',
+    subject: 'A lighthouse on a rock throwing one solid gold beam through dense fog',
     layout: layout?.key ?? '',
-    alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+    alt_text: 'A linocut of a lighthouse sending a gold beam through fog.',
   };
 }
 

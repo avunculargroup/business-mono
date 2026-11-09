@@ -36,8 +36,8 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
   const startLayout = initial && layouts.some((l) => l.key === initial.layout) ? initial.layout : (layouts[0]?.key ?? '');
   const [tension, setTension] = useState(initial?.tension ?? '');
   const [subject, setSubject] = useState(initial?.subject ?? '');
-  const [drawn, setDrawn] = useState(initial?.drawn ?? '');
-  const [undrawn, setUndrawn] = useState(initial?.undrawn ?? '');
+  const [symbol, setSymbol] = useState(initial?.symbol ?? '');
+  const [twist, setTwist] = useState(initial?.twist ?? '');
   const [layout, setLayout] = useState(startLayout);
   const [altText, setAltText] = useState(initial?.alt_text ?? '');
   const [isPending, startTransition] = useTransition();
@@ -46,8 +46,8 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
   const concept: ImageConcept = {
     tension: tension.trim(),
     subject: subject.trim(),
-    drawn: drawn.trim(),
-    undrawn: undrawn.trim(),
+    symbol: symbol.trim(),
+    twist: twist.trim(),
     layout,
     alt_text: altText.trim(),
   };
@@ -58,7 +58,7 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
     return buildImagePrompt(canon, concept, { aspectRatio: canon.defaultAspectRatio });
     // concept is rebuilt each render from the fields listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canon, layout, subject, drawn, undrawn]);
+  }, [canon, layout, subject, symbol, twist]);
 
   const selected = layouts.find((l) => l.key === layout);
 
@@ -102,31 +102,31 @@ export function ImageBriefSlideOver({ open, onClose, onQueued, contentItemId, ca
           onChange={(e) => setTension(e.target.value)}
         />
         <FormTextarea
+          name="symbol"
+          label="Symbol"
+          hint="An object, place or tool everyone already knows. Recognised in half a second on a phone."
+          rows={2}
+          maxLength={200}
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+        />
+        <FormTextarea
+          name="twist"
+          label="Twist"
+          hint="One visible change that makes the symbol about this post."
+          rows={2}
+          maxLength={200}
+          value={twist}
+          onChange={(e) => setTwist(e.target.value)}
+        />
+        <FormTextarea
           name="subject"
           label="Subject"
-          hint="A concrete thing or place that carries the tension. No text or figures."
+          hint="One sentence: the symbol with its twist, as it will be printed. No text or figures."
           rows={2}
           maxLength={200}
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-        />
-        <FormTextarea
-          name="drawn"
-          label="Drawn in full"
-          hint="The part that is known or certain."
-          rows={2}
-          maxLength={200}
-          value={drawn}
-          onChange={(e) => setDrawn(e.target.value)}
-        />
-        <FormTextarea
-          name="undrawn"
-          label="Construction lines only"
-          hint="The part that is unknown, unbuilt or in doubt. Every image has one."
-          rows={2}
-          maxLength={200}
-          value={undrawn}
-          onChange={(e) => setUndrawn(e.target.value)}
         />
         <FormSelect
           name="layout"

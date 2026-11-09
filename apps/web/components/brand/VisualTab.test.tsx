@@ -56,7 +56,8 @@ describe('VisualTab', () => {
     const prompt = screen.getByLabelText('Assembled prompt');
     expect(prompt).toHaveTextContent('A hand-drawn sketch.');
     expect(prompt).toHaveTextContent('Layout: Low horizon: One horizon line in the lower third.');
-    expect(prompt).toHaveTextContent('Leave as construction lines only:');
+    expect(prompt).toHaveTextContent('The symbol: A lighthouse');
+    expect(prompt).toHaveTextContent('The twist: It throws one solid gold beam');
     expect(prompt).toHaveTextContent('Never include text.');
   });
 

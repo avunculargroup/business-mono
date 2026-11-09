@@ -55,7 +55,7 @@ const CANON = toBrandVisual({
   palette: [{ role: 'Paper', hex: '#FAFAF8', usage: 'warm off-white' }],
   composition_block: 'Leave the bottom-right corner empty.',
   prohibited_block: 'Never include text.',
-  prohibited_terms: ['rocket', 'hourglass'],
+  prohibited_terms: ['rocket', 'coin'],
   motifs: [{ key: 'timepiece', label: 'Timepiece', description: 'An hourglass', use_when: 'Time', is_active: true }],
   layouts: [
     { key: 'left_third', label: 'Left third', description: 'Subject in the left third.', is_active: true },
@@ -65,11 +65,11 @@ const CANON = toBrandVisual({
 
 const PIER = {
   tension: 'Nobody knows the trigger, only that the safe ground is shorter than it looks.',
-  subject: 'A timber pier running out over open water',
-  drawn: 'the near end of the pier',
-  undrawn: 'the far end, as pencil guidelines over the water',
+  symbol: 'A lighthouse',
+  twist: 'One solid gold beam cuts through the fog',
+  subject: 'A lighthouse throwing one solid gold beam through fog',
   layout: 'left_third',
-  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+  alt_text: 'A linocut of a lighthouse with a gold beam through fog.',
 };
 
 function image(overrides: Partial<ContentImage & { url: string | null }> = {}): ContentImage & { url: string | null } {
@@ -79,7 +79,7 @@ function image(overrides: Partial<ContentImage & { url: string | null }> = {}): 
     storagePath: `social-images/2026-11-08/${GROUP}/linkedin-1200x627.png`,
     masterPath: `social-images/2026-11-08/${GROUP}/master-16x9.png`,
     generationGroupId: GROUP,
-    altText: 'A pencil sketch of a pier whose far end is only outlined.',
+    altText: 'A linocut of a lighthouse with a gold beam through fog.',
     platformCrop: 'linkedin_1200x627',
     brief: PIER,
     tension: PIER.tension,
@@ -112,7 +112,7 @@ beforeEach(() => {
 describe('ImageSlot', () => {
   it('shows the image with its alt text and provenance line', () => {
     render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
-    expect(screen.getByRole('img', { name: 'A pencil sketch of a pier whose far end is only outlined.' })).toHaveAttribute('src', 'https://signed.example/li.png');
+    expect(screen.getByRole('img', { name: 'A linocut of a lighthouse with a gold beam through fog.' })).toHaveAttribute('src', 'https://signed.example/li.png');
     expect(screen.getByText('Left third · google/gemini-2.5-flash-image · canon v1.1 · $0.04')).toBeInTheDocument();
     expect(screen.getByText(PIER.tension)).toBeInTheDocument();
     // A clear verdict shows no chip.
@@ -218,36 +218,45 @@ describe('ImageSlot', () => {
     expect(screen.queryByRole('button', { name: 'Use as style anchor' })).not.toBeInTheDocument();
   });
 
-  it('edits the concept with a live prompt preview and lint, then renders', async () => {
+  it('edits the concept (symbol and twist) with a live prompt preview and lint, then renders', async () => {
     const user = userEvent.setup();
     render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
     await user.click(screen.getByRole('button', { name: 'Edit brief' }));
 
-    // No motif select any more; the concept's fields, prefilled from the selected image.
+    // v1.2 fields, prefilled from the selected image; no drawn/undrawn, no motif.
+    expect(screen.queryByLabelText('Construction lines only')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Motif')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Tension')).toHaveValue(PIER.tension);
+    expect(screen.getByLabelText('Symbol')).toHaveValue('A lighthouse');
+    expect(screen.getByLabelText('Twist')).toHaveValue('One solid gold beam cuts through the fog');
     const prompt = screen.getByText(/^A hand-drawn sketch\./);
-    expect(prompt).toHaveTextContent('Leave as construction lines only: the far end, as pencil guidelines over the water');
+    expect(prompt).toHaveTextContent('The symbol: A lighthouse');
+    expect(prompt).toHaveTextContent('The twist: One solid gold beam cuts through the fog');
     expect(prompt).not.toHaveTextContent(PIER.tension);
 
-    const subject = screen.getByLabelText('Subject');
-    await user.clear(subject);
-    await user.type(subject, 'An hourglass on a desk');
-    expect(screen.getByText('subject names prohibited imagery: hourglass.')).toBeInTheDocument();
+    const symbol = screen.getByLabelText('Symbol');
+    await user.clear(symbol);
+    await user.type(symbol, 'A rocket');
+    expect(screen.getByText('symbol names prohibited imagery: rocket.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Render with this brief' })).toBeDisabled();
 
-    const undrawn = screen.getByLabelText('Construction lines only');
+    await user.clear(symbol);
+    await user.type(symbol, 'A rubber stamp');
+    const twist = screen.getByLabelText('Twist');
+    await user.clear(twist);
+    await user.type(twist, 'a rubber stamp');
+    expect(screen.getByText(/twist only restates the symbol/)).toBeInTheDocument();
+    await user.clear(twist);
+    await user.type(twist, 'Giant, poised above a blank sheet');
+    const subject = screen.getByLabelText('Subject');
     await user.clear(subject);
-    await user.type(subject, 'A footbridge half built across a gorge');
-    await user.clear(undrawn);
-    expect(screen.getByText(/undrawn is missing/)).toBeInTheDocument();
-    await user.type(undrawn, 'the spans that would reach the far side');
+    await user.type(subject, 'A giant rubber stamp poised above a blank sheet');
     await user.selectOptions(screen.getByLabelText('Layout'), 'low_horizon');
     expect(screen.getByText(/^A hand-drawn sketch\./)).toHaveTextContent('Layout: Low horizon: One horizon line, low.');
     await user.click(screen.getByRole('button', { name: 'Render with this brief' }));
     expect(actions.requestImageRender).toHaveBeenCalledWith(
       ITEM,
-      expect.objectContaining({ layout: 'low_horizon', subject: 'A footbridge half built across a gorge', undrawn: 'the spans that would reach the far side' }),
+      expect.objectContaining({ layout: 'low_horizon', symbol: 'A rubber stamp', twist: 'Giant, poised above a blank sheet' }),
     );
   });
 
