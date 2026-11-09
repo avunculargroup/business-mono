@@ -175,6 +175,162 @@ export async function correctPaper(master: Buffer, targetHex: string): Promise<{
   return { image, correction };
 }
 
+// ── Letterbox bars ───────────────────────────────────────────────────────────
+// Models sometimes return a landscape frame letterboxed with black bars. Left in,
+// they become part of every crop, and the paper sample (the bottom-right corner)
+// lands on a bar, so the paper correction skips. Stripping them first fixes both.
+
+/** A bar line: near-black (mean luma below this) ... */
+export const BAR_MAX_MEAN = 0.12;
+/** ... and near-uniform (luma standard deviation below this). A dark subject touching an edge varies more. */
+export const BAR_MAX_STD = 0.04;
+/** Bars over this share of the height or width are not letterboxing: the candidate is rejected. */
+export const BAR_MAX_SHARE = 0.2;
+
+/** Mean and standard deviation of luma (0–1) along one row or column. */
+export interface LineStats {
+  mean: number;
+  std: number;
+}
+
+export interface BarDetection {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  reject: boolean;
+  reason: string;
+}
+
+function isBar(line: LineStats): boolean {
+  return line.mean < BAR_MAX_MEAN && line.std < BAR_MAX_STD;
+}
+
+function countFromEdge(lines: LineStats[]): number {
+  let n = 0;
+  while (n < lines.length && isBar(lines[n]!)) n += 1;
+  return n;
+}
+
+/**
+ * How many bar lines run inwards from each edge, given per-row stats (top to
+ * bottom) and per-column stats (left to right). Pure, so it is tested without
+ * images; `stripBars` is the sharp wrapper.
+ */
+export function detectBars(rows: LineStats[], cols: LineStats[]): BarDetection {
+  const top = countFromEdge(rows);
+  const bottom = top >= rows.length ? 0 : countFromEdge([...rows].reverse());
+  const left = countFromEdge(cols);
+  const right = left >= cols.length ? 0 : countFromEdge([...cols].reverse());
+  const vertical = rows.length > 0 ? (top + bottom) / rows.length : 0;
+  const horizontal = cols.length > 0 ? (left + right) / cols.length : 0;
+  if (vertical > BAR_MAX_SHARE || horizontal > BAR_MAX_SHARE) {
+    return {
+      top,
+      bottom,
+      left,
+      right,
+      reject: true,
+      reason: `bars cover ${Math.round(Math.max(vertical, horizontal) * 100)}% of the frame; that is not letterboxing`,
+    };
+  }
+  const any = top + bottom + left + right > 0;
+  return { top, bottom, left, right, reject: false, reason: any ? 'letterbox bars stripped' : 'no bars' };
+}
+
+/** Per-row and per-column luma stats of an image, from its greyscale pixels. */
+export async function lineStats(image: Buffer): Promise<{ rows: LineStats[]; cols: LineStats[] }> {
+  const { data, info } = await sharp(image).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const rowSum = new Float64Array(height);
+  const rowSq = new Float64Array(height);
+  const colSum = new Float64Array(width);
+  const colSq = new Float64Array(width);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const v = data[(y * width + x) * channels]! / 255;
+      rowSum[y] += v;
+      rowSq[y] += v * v;
+      colSum[x] += v;
+      colSq[x] += v * v;
+    }
+  }
+  const stats = (sum: Float64Array, sq: Float64Array, n: number): LineStats[] =>
+    Array.from(sum, (s, i) => {
+      const mean = s / n;
+      return { mean, std: Math.sqrt(Math.max(sq[i]! / n - mean * mean, 0)) };
+    });
+  return { rows: stats(rowSum, rowSq, width), cols: stats(colSum, colSq, height) };
+}
+
+/**
+ * Strip letterbox bars from a master before anything else reads it. Returns the
+ * image unchanged when there are none. When the detection rejects (bars over
+ * BAR_MAX_SHARE), the image is returned as is and the caller drops the candidate.
+ */
+export async function stripBars(master: Buffer): Promise<{ image: Buffer; bars: BarDetection }> {
+  const { rows, cols } = await lineStats(master);
+  const bars = detectBars(rows, cols);
+  if (bars.reject || bars.top + bars.bottom + bars.left + bars.right === 0) return { image: master, bars };
+  const image = await sharp(master)
+    .extract({
+      left: bars.left,
+      top: bars.top,
+      width: cols.length - bars.left - bars.right,
+      height: rows.length - bars.top - bars.bottom,
+    })
+    .png()
+    .toBuffer();
+  return { image, bars };
+}
+
+// ── Legibility gate ──────────────────────────────────────────────────────────
+// The half-second phone test, measured: at phone width, enough of the image
+// must be printed (black or gold) to register in a mostly white feed, and not
+// so much that it reads as a muddy black mass. Gold #C9A84C is about 0.66 luma,
+// so it counts as ink. A candidate outside the band is not persisted.
+
+/** Pixels darker than this luma count as ink. */
+export const INK_LUMA = 0.75;
+export const MIN_INK_COVERAGE = 0.2;
+export const MAX_INK_COVERAGE = 0.75;
+/** The check runs at about the width a phone shows the image. */
+export const LEGIBILITY_WIDTH = 300;
+
+export interface InkCoverage {
+  coverage: number;
+  pass: boolean;
+  reason: string;
+}
+
+/** Ink coverage from a 256-bin luma histogram. Pure, so it is tested without images. */
+export function inkCoverage(histogram: number[]): InkCoverage {
+  const total = histogram.reduce((a, b) => a + b, 0);
+  if (total === 0) return { coverage: 0, pass: false, reason: 'empty image' };
+  const cutoff = Math.round(INK_LUMA * 255);
+  const ink = histogram.slice(0, cutoff).reduce((a, b) => a + b, 0);
+  const coverage = Number((ink / total).toFixed(4));
+  if (coverage < MIN_INK_COVERAGE) {
+    return { coverage, pass: false, reason: `ink covers ${Math.round(coverage * 100)}%; too faint to register at phone size` };
+  }
+  if (coverage > MAX_INK_COVERAGE) {
+    return { coverage, pass: false, reason: `ink covers ${Math.round(coverage * 100)}%; reads as a solid mass at phone size` };
+  }
+  return { coverage, pass: true, reason: 'legible at phone size' };
+}
+
+/** The legibility gate: downscale to phone width, greyscale, measure ink coverage. */
+export async function legibility(master: Buffer): Promise<InkCoverage> {
+  const { data, info } = await sharp(master)
+    .resize({ width: LEGIBILITY_WIDTH })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const histogram = new Array<number>(256).fill(0);
+  for (let i = 0; i < data.length; i += info.channels) histogram[data[i]!] += 1;
+  return inkCoverage(histogram);
+}
+
 /** Normalise whatever the model returned (png/jpeg/webp) to the PNG master. */
 export async function toPngMaster(image: Buffer): Promise<Buffer> {
   return sharp(image).png().toBuffer();

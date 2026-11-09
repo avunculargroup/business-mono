@@ -10,25 +10,27 @@
 // what was sent. No IO and no randomness; the agents suite carries a literal of
 // the current prompt, so a canon change shows up in review as a changed line.
 //
-// Canon v1.1 replaced v1.0's closed motif list (a menu of stock symbols that
-// mapped a post's topic to a clip-art object) with a visual device: each image
-// draws in full what the post treats as known, and leaves what is uncertain as
-// bare construction lines. The brief now finds the post's tension, not its topic.
+// Canon history, because stored rows carry every shape:
+//   v1.0  one motif from a closed list. Familiar symbols, no twist: bland.
+//   v1.1  the drawn/undrawn pencil device, stock symbols banned. Clever, but
+//         unreadable at phone size: concept sketches that needed a caption.
+//   v1.2  a bold two-colour linocut of a familiar symbol with one twist, built
+//         for the half-second phone test.
 // Spec: docs/features/social-post-image/feature-spec.md
 
 /**
- * One image idea. The brief proposes up to three; each one rendered is stored
- * on its rows in `content_images.image_brief`.
+ * One image idea (canon v1.2). The brief proposes up to three; each one rendered
+ * is stored on its rows in `content_images.image_brief`.
  */
 export interface ImageConcept {
-  /** The surprising, uneasy or unresolved idea in the post. Not its topic. */
+  /** The surprising or uneasy idea in the post. Not its topic. */
   tension: string;
-  /** A concrete thing or place that can carry the tension. */
+  /** A familiar, instantly recognisable object everyone knows. */
+  symbol: string;
+  /** The one change that makes the symbol about this post. Visible, not explained. */
+  twist: string;
+  /** One sentence: the symbol with its twist, as it will be drawn. */
   subject: string;
-  /** The part of the subject drawn in full: what is known or certain. */
-  drawn: string;
-  /** The part left as construction lines only: what is unknown, unbuilt or in doubt. */
-  undrawn: string;
   /** A layout key, validated against the canon's active layouts by the linter. */
   layout: string;
   /** Describes the image, not the post. */
@@ -168,7 +170,7 @@ export function buildPaletteBlock(palette: PaletteEntry[]): string {
   const lines = palette.map((p) => `- ${p.role} ${p.hex}: ${p.usage}`.trimEnd());
   return `Use only these colours:
 ${lines.join('\n')}
-No other colour. No gradients, no glow, no metallic sheen, no drop shadows.`;
+No other colour. No gradients or soft shading: tone comes only from carved lines. No glow, no metallic sheen, no drop shadows.`;
 }
 
 /**
@@ -176,7 +178,7 @@ No other colour. No gradients, no glow, no metallic sheen, no drop shadows.`;
  * composition, subject, prohibited — the prohibited block goes last because it
  * is the part a model most often loses when it weights the subject heavily.
  * The concept's tension is not sent: it is the reasoning, and the subject,
- * drawn and undrawn lines are how it reaches the picture. Throws if the concept
+ * symbol and twist are how it reaches the picture. Throws if the concept
  * names a layout the canon does not have; the linter runs first, so that is a
  * programming error, not a runtime path.
  */
@@ -186,8 +188,8 @@ export function buildImagePrompt(canon: BrandVisual, concept: ImageConcept, form
 
   const subject = [
     `Subject: ${concept.subject}`,
-    `Draw in full: ${concept.drawn}`,
-    `Leave as construction lines only: ${concept.undrawn}`,
+    `The symbol: ${concept.symbol}`,
+    `The twist: ${concept.twist}`,
     `Layout: ${layout.label}: ${layout.description}`,
     `Format: ${format.aspectRatio} landscape.`,
   ].join('\n');
@@ -209,15 +211,21 @@ function containsTerm(text: string, term: string): boolean {
   return new RegExp(`\\b${escapeRegex(t)}\\b`, 'i').test(text);
 }
 
-/** Answers that mean the device was skipped. */
-const EMPTY_UNDRAWN = new Set(['', 'none', 'n/a', 'na', 'nothing', '-', 'null']);
-
 export interface LintOptions {
   layouts: Layout[];
   prohibitedTerms: string[];
 }
 
-/** Lint one concept. Returns its flags, empty when it may be rendered. */
+/** Lower-case, letters and digits only: enough to catch a twist that just repeats its symbol. */
+function normalise(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Lint one concept. Returns its flags, empty when it may be rendered. Familiar
+ * symbols are wanted from v1.2 (the stock-symbol ban is lifted); finance
+ * clichés and anything implying a price direction stay in `prohibitedTerms`.
+ */
 export function lintImageConcept(concept: ImageConcept, opts: LintOptions): string[] {
   const flags: string[] = [];
   const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -227,17 +235,18 @@ export function lintImageConcept(concept: ImageConcept, opts: LintOptions): stri
     flags.push(`layout "${text(concept.layout)}" is not one of the listed layouts.`);
   }
   if (!text(concept.tension)) flags.push('tension is missing.');
+  if (!text(concept.symbol)) flags.push('symbol is missing.');
+  if (!text(concept.twist)) flags.push('twist is missing.');
   if (!text(concept.subject)) flags.push('subject is missing.');
-  if (!text(concept.drawn)) flags.push('drawn is missing.');
-  if (EMPTY_UNDRAWN.has(text(concept.undrawn).toLowerCase().replace(/\.$/, ''))) {
-    flags.push('undrawn is missing; every image leaves the uncertain part as construction lines.');
-  }
   if (!text(concept.alt_text)) flags.push('alt_text is missing.');
+  if (text(concept.symbol) && text(concept.twist) && normalise(concept.twist) === normalise(concept.symbol)) {
+    flags.push('twist only restates the symbol; it must change the symbol in one visible way.');
+  }
 
   const fields: Array<[string, string]> = [
     ['subject', text(concept.subject)],
-    ['drawn', text(concept.drawn)],
-    ['undrawn', text(concept.undrawn)],
+    ['symbol', text(concept.symbol)],
+    ['twist', text(concept.twist)],
   ];
   for (const [name, value] of fields) {
     if (!value) continue;
@@ -257,23 +266,23 @@ export interface BriefLint {
 
 /**
  * Lint a brief concept by concept. A flagged concept is dropped, not the
- * brief; so is one that repeats an earlier clean concept's subject. A skip
+ * brief; so is one that repeats an earlier clean concept's symbol. A skip
  * brief is clean with nothing to render — the quiet path needs no concepts.
  */
 export function lintImageBrief(brief: ImageBrief, opts: LintOptions): BriefLint {
   if (brief.skip) return { clean: [], flags: [] };
   const clean: ImageConcept[] = [];
   const flags: string[] = [];
-  const subjects = new Set<string>();
+  const symbols = new Set<string>();
   (brief.concepts ?? []).slice(0, 3).forEach((concept, i) => {
     const own = lintImageConcept(concept, opts);
-    const key = (concept.subject ?? '').trim().toLowerCase();
-    if (own.length === 0 && subjects.has(key)) own.push('subject repeats an earlier concept; each concept needs its own subject.');
+    const key = normalise(concept.symbol ?? '');
+    if (own.length === 0 && symbols.has(key)) own.push('symbol repeats an earlier concept; each concept needs its own symbol.');
     if (own.length > 0) {
       flags.push(...own.map((f) => `Concept ${i + 1}: ${f}`));
       return;
     }
-    subjects.add(key);
+    symbols.add(key);
     clean.push(concept);
   });
   if (clean.length === 0 && flags.length === 0) flags.push('The brief returned no concepts.');
@@ -282,39 +291,47 @@ export function lintImageBrief(brief: ImageBrief, opts: LintOptions): BriefLint 
 
 /** What every reader needs from a stored `content_images.image_brief`, whichever canon wrote it. */
 export interface StoredBriefSummary {
-  /** `concept` for canon v1.1 and later; `legacy` for v1.0's motif briefs. */
-  kind: 'concept' | 'legacy';
+  /** `concept` for canon v1.2+; `drawn` for v1.1's drawn/undrawn briefs; `legacy` for v1.0's motif briefs. */
+  kind: 'concept' | 'drawn' | 'legacy';
   tension: string | null;
   subject: string | null;
+  /** v1.2+ only. */
+  symbol: string | null;
   layout: string | null;
   /** v1.0 only. */
   motifKey: string | null;
-  /** The full concept, when the row holds one; what Edit brief starts from. */
+  /** The full v1.2 concept, when the row holds one; what Edit brief starts from. */
   concept: ImageConcept | null;
 }
 
 /**
- * Read a stored brief of either shape without throwing. Rows written under
- * canon v1.0 hold `{ motif_key, subject, metaphor, ... }`; later rows hold one
- * concept. Anything else reads as null.
+ * Read a stored brief of any canon's shape without throwing. Rows hold:
+ *   v1.0  { motif_key, subject, metaphor, composition, ... }
+ *   v1.1  { tension, subject, drawn, undrawn, layout, alt_text }
+ *   v1.2  { tension, symbol, twist, subject, layout, alt_text }
+ * Anything else reads as null.
  */
 export function readStoredBrief(json: unknown): StoredBriefSummary | null {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
   const r = json as Row;
   const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  if (typeof r['undrawn'] === 'string' || typeof r['layout'] === 'string' || typeof r['tension'] === 'string') {
+  const base = { tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']) };
+  if (typeof r['symbol'] === 'string' || typeof r['twist'] === 'string') {
     const concept: ImageConcept = {
-      tension: str(r['tension']) ?? '',
-      subject: str(r['subject']) ?? '',
-      drawn: str(r['drawn']) ?? '',
-      undrawn: str(r['undrawn']) ?? '',
-      layout: str(r['layout']) ?? '',
+      tension: base.tension ?? '',
+      symbol: str(r['symbol']) ?? '',
+      twist: str(r['twist']) ?? '',
+      subject: base.subject ?? '',
+      layout: base.layout ?? '',
       alt_text: str(r['alt_text']) ?? '',
     };
-    return { kind: 'concept', tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']), motifKey: null, concept };
+    return { kind: 'concept', ...base, symbol: str(r['symbol']), motifKey: null, concept };
+  }
+  if (typeof r['undrawn'] === 'string' || typeof r['drawn'] === 'string' || typeof r['tension'] === 'string' || typeof r['layout'] === 'string') {
+    return { kind: 'drawn', ...base, symbol: null, motifKey: null, concept: null };
   }
   if ('motif_key' in r || 'metaphor' in r || 'subject' in r) {
-    return { kind: 'legacy', tension: null, subject: str(r['subject']), layout: null, motifKey: str(r['motif_key']), concept: null };
+    return { kind: 'legacy', ...base, symbol: null, motifKey: str(r['motif_key']), concept: null };
   }
   return null;
 }

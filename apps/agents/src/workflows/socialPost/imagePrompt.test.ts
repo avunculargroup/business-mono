@@ -3,46 +3,46 @@ import { BRAND_VISUAL_ROW } from '../../../test/fixtures/brandVisual.js';
 import { activeLayouts, buildImagePrompt, toBrandVisual, DEFAULT_BRAND_MARK } from './imagePrompt.js';
 import type { ImageConcept } from './imageBrief.js';
 
-const PIER: ImageConcept = {
-  tension: 'Nobody knows what will trigger the reckoning, only that the safe ground is shorter than it looks.',
-  subject: 'A timber pier running out over open water',
-  drawn: 'the near end of the pier, planks and pilings in full',
-  undrawn: 'the far end, where the planks thin into pencil guidelines over the water',
-  layout: 'left_third',
-  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+const LIGHTHOUSE: ImageConcept = {
+  tension: 'The rules are finally arriving, after years of fog.',
+  symbol: 'A lighthouse',
+  twist: 'It throws one solid gold beam straight through a bank of fog',
+  subject: 'A lighthouse on a rock throwing one solid gold beam through dense fog',
+  layout: 'hero_left',
+  alt_text: 'A linocut of a lighthouse sending a gold beam through fog.',
 };
 
 // Hand-maintained literal rather than a .snap file (the repo's convention — see
 // apps/web/app/globals.test.ts). A canon change shows up here as changed lines,
-// which is the cue to bump brand_visual.version in the same review. Canon v1.1:
-// the drawn/undrawn device, layouts, bright paper.
-const EXPECTED_V1_1_PROMPT = `A hand-drawn sketch in graphite pencil and fine ink on bright, fresh cartridge
-paper. Every drawing is deliberately unfinished. The part of the subject that is
-known or certain is drawn in full: confident line, light cross-hatching, and the
-single gold accent. The part that is uncertain, unbuilt or unknown is left as
-faint construction lines only: guidelines, measured marks, an outline that stops
-partway. The edge where finished drawing gives way to construction lines is the
-point of the picture. It should look like an architect's working sketch, drawn by
-a skilled hand to think something through, not to decorate. Considered and
-quietly confident, with a clear point of view.
+// which is the cue to bump brand_visual.version in the same review. Canon v1.2:
+// the linocut, a familiar symbol with one twist, the half-second phone test.
+const EXPECTED_V1_2_PROMPT = `A bold two-colour linocut print: black ink and one flat gold, printed on bright
+off-white paper. Strong, simple shapes cut with confidence: solid black masses,
+crisp white gouge lines carved through them, visible carving marks, and the
+slightly uneven ink texture of a hand-pulled print. Gold is a second printed
+colour laid down in large flat shapes, not a thin accent. One iconic subject,
+big and instantly recognisable, with a silhouette that still reads at thumbnail
+size. Graphic, confident and striking, like a classic travel poster or a
+woodcut book cover.
 
 Use only these colours:
-- Paper #FAFAF8: Bright near-white paper. Not cream, not aged, not yellowed, not parchment. Clean and even.
-- Main linework #1A1915: warm near-black graphite and ink.
-- Lighter strokes and hatching #6B6860: warm grey.
-- Accent #C9A84C: a single light wash or stroke of muted gold on ONE element only.
-No other colour. No gradients, no glow, no metallic sheen, no drop shadows.
+- Paper #FAFAF8: Bright off-white, unprinted areas clean and even. Not cream, not aged, not yellowed.
+- Ink #1A1915: Solid black printed masses and carved line work.
+- Gold #C9A84C: A flat second printed colour in large shapes. It may cover up to a third of the image.
+No other colour. No gradients or soft shading: tone comes only from carved lines. No glow, no metallic sheen, no drop shadows.
 
-Follow the layout given below exactly. Never centre a single upright object in a
-wide frame. Prefer subjects with a horizontal extent that suit a landscape frame.
-Keep every important element inside the central 80% of the frame. Leave the
-bottom-right corner (roughly the lowest and rightmost 15% of the frame) as empty
-paper.
+One subject, and make it big: it fills 60 to 80 percent of the frame height.
+Simple and bold enough to recognise in half a second on a phone. Place it
+according to the layout below, never small and never lost in empty space. Black
+and gold together cover roughly a third to two thirds of the image. Print
+full-bleed on the paper: no borders, frames, margins, mounts or black bars. Keep
+the bottom-right corner (roughly the lowest and rightmost 15 percent of the
+frame) as unprinted paper.
 
-Subject: A timber pier running out over open water
-Draw in full: the near end of the pier, planks and pilings in full
-Leave as construction lines only: the far end, where the planks thin into pencil guidelines over the water
-Layout: Left third: Subject sits in the left third; open paper runs to the right, so the eye travels into space.
+Subject: A lighthouse on a rock throwing one solid gold beam through dense fog
+The symbol: A lighthouse
+The twist: It throws one solid gold beam straight through a bank of fog
+Layout: Hero left: The subject is large and sits left of centre, filling most of the frame height; bold open space to the right.
 Format: 16:9 landscape.
 
 Never include: text, letters, numbers, labels, logos, watermarks or signatures.
@@ -51,62 +51,68 @@ bulls or bears, price charts, candlesticks, arrows pointing up or down, trading
 screens. People's faces, hands holding phones, office stock-photo scenes. Neon,
 dark backgrounds, colour beyond the palette, 3D renders, photorealism, digital
 vector polish, cartoon, comic, caricature or childlike doodle styles, mascots,
-paper texture or film grain.`;
+paper texture or film grain.
+Pencil sketch, fine hatching, construction or guide lines, unfinished drawing.
+Photographs, 3D, gradients, airbrushing. Any colour other than black and gold.
+Borders, frames, letterboxing or bars.`;
 
 describe('buildImagePrompt', () => {
   const canon = toBrandVisual(BRAND_VISUAL_ROW);
 
-  it('assembles canon v1.1 + a concept into the exact prompt sent', () => {
-    expect(buildImagePrompt(canon, PIER, { aspectRatio: '16:9' })).toBe(EXPECTED_V1_1_PROMPT);
+  it('assembles canon v1.2 + a concept into the exact prompt sent', () => {
+    expect(buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9' })).toBe(EXPECTED_V1_2_PROMPT);
   });
 
   it('puts the blocks in order: style, palette, composition, subject, prohibited', () => {
-    const p = buildImagePrompt(canon, PIER, { aspectRatio: '16:9' });
+    const p = buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9' });
     const at = (s: string) => p.indexOf(s);
-    expect(at('A hand-drawn sketch')).toBe(0);
-    expect(at('Use only these colours')).toBeGreaterThan(at('A hand-drawn sketch'));
-    expect(at('Follow the layout given below')).toBeGreaterThan(at('Use only these colours'));
-    expect(at('Subject:')).toBeGreaterThan(at('Follow the layout given below'));
+    expect(at('A bold two-colour linocut')).toBe(0);
+    expect(at('Use only these colours')).toBeGreaterThan(at('A bold two-colour linocut'));
+    expect(at('One subject, and make it big')).toBeGreaterThan(at('Use only these colours'));
+    expect(at('Subject:')).toBeGreaterThan(at('One subject, and make it big'));
     expect(at('Never include:')).toBeGreaterThan(at('Subject:'));
   });
 
   it('never sends the tension: it is the reasoning, not the picture', () => {
-    expect(buildImagePrompt(canon, PIER, { aspectRatio: '16:9' })).not.toContain(PIER.tension);
+    expect(buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9' })).not.toContain(LIGHTHOUSE.tension);
   });
 
-  it('throws on a layout the canon does not have (the linter runs first)', () => {
-    expect(() => buildImagePrompt(canon, { ...PIER, layout: 'centred' }, { aspectRatio: '16:9' })).toThrow(/unknown layout/);
+  it('throws on a layout the canon does not have, or one v1.2 retired (the linter runs first)', () => {
+    expect(() => buildImagePrompt(canon, { ...LIGHTHOUSE, layout: 'centred' }, { aspectRatio: '16:9' })).toThrow(/unknown layout/);
   });
 });
 
 describe('toBrandVisual', () => {
-  it('maps the v1.1 row, keeping the retired motifs for old images', () => {
+  it('maps the v1.2 row: three colours, the v1.2 layouts active, v1.1 layouts kept inactive', () => {
     const canon = toBrandVisual(BRAND_VISUAL_ROW);
-    expect(canon.version).toBe('1.1');
-    expect(activeLayouts(canon).map((l) => l.key)).toEqual(['left_third', 'low_horizon', 'close_detail', 'small_in_space']);
+    expect(canon.version).toBe('1.2');
+    expect(canon.palette.map((p) => p.hex)).toEqual(['#FAFAF8', '#1A1915', '#C9A84C']);
+    expect(activeLayouts(canon).map((l) => l.key)).toEqual(['hero_left', 'close_crop', 'diagonal', 'against_gold']);
+    expect(canon.layouts.filter((l) => !l.is_active).map((l) => l.key)).toEqual(['left_third', 'low_horizon', 'close_detail', 'small_in_space']);
+    expect(canon.styleAnchorPaths).toEqual([]);
     expect(canon.motifs).toHaveLength(10);
-    expect(canon.palette.map((p) => p.hex)).toEqual(['#FAFAF8', '#1A1915', '#6B6860', '#C9A84C']);
-    expect(canon.prohibitedTerms).toEqual(expect.arrayContaining(['hourglass', 'clock', 'calendar', 'vault door', 'coin']));
     expect(canon.brandMark).toEqual(DEFAULT_BRAND_MARK);
+  });
+
+  it('lifts the stock-symbol ban but keeps every finance cliché', () => {
+    const canon = toBrandVisual(BRAND_VISUAL_ROW);
+    expect(canon.prohibitedTerms).not.toEqual(expect.arrayContaining(['hourglass']));
+    expect(canon.prohibitedTerms).not.toContain('clock');
+    expect(canon.prohibitedTerms).toEqual(expect.arrayContaining(['coin', 'rocket', 'moon', 'chart', 'candlestick', 'arrow', 'bull', 'bear', '$', '₿']));
   });
 
   it('drops malformed JSONB entries and defaults a missing brand_mark, rather than throwing', () => {
     const canon = toBrandVisual({
       ...BRAND_VISUAL_ROW,
-      layouts: [{ key: 'left_third', label: 'Left third', is_active: false }, { nope: true }, 'junk'],
+      layouts: [{ key: 'hero_left', label: 'Hero left', is_active: false }, { nope: true }, 'junk'],
       palette: [{ hex: '#000' }],
       brand_mark: null,
       prohibited_terms: ['coin', '', 7],
     });
-    expect(canon.layouts.map((l) => l.key)).toEqual(['left_third']);
+    expect(canon.layouts.map((l) => l.key)).toEqual(['hero_left']);
     expect(activeLayouts(canon)).toEqual([]);
     expect(canon.palette).toEqual([]);
     expect(canon.brandMark).toEqual(DEFAULT_BRAND_MARK);
     expect(canon.prohibitedTerms).toEqual(['coin']);
-  });
-
-  it('reads a row from before v1.1 as having no layouts', () => {
-    const { layouts: _dropped, ...v1 } = BRAND_VISUAL_ROW;
-    expect(toBrandVisual(v1).layouts).toEqual([]);
   });
 });

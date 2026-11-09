@@ -1,8 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import {
+  BAR_MAX_SHARE,
   GAIN_MAX,
   GAIN_MIN,
+  MAX_INK_COVERAGE,
+  MIN_INK_COVERAGE,
+  detectBars,
+  inkCoverage,
+  legibility,
+  stripBars,
   composePlatformImage,
   correctPaper,
   markAspect,
@@ -154,5 +161,149 @@ describe('correctPaper', () => {
     const { correction } = await correctPaper(rgba, '#FAFAF8');
     expect(correction.sample).toEqual([236, 226, 200]);
     expect(correction.applied).toBe(true);
+  });
+});
+
+// ── Letterbox bars ───────────────────────────────────────────────────────────
+
+const paperLine = { mean: 0.95, std: 0.01 };
+const barLine = { mean: 0.03, std: 0.005 };
+const lines = (top: number, middle: number, bottom: number, mid = paperLine) => [
+  ...Array(top).fill(barLine),
+  ...Array(middle).fill(mid),
+  ...Array(bottom).fill(barLine),
+];
+
+describe('detectBars', () => {
+  it('finds top and bottom letterbox bars', () => {
+    expect(detectBars(lines(6, 86, 8), lines(0, 160, 0))).toEqual({
+      top: 6,
+      bottom: 8,
+      left: 0,
+      right: 0,
+      reject: false,
+      reason: 'letterbox bars stripped',
+    });
+  });
+
+  it('leaves a frame with no bars untouched', () => {
+    expect(detectBars(lines(0, 90, 0), lines(0, 160, 0))).toMatchObject({ top: 0, bottom: 0, left: 0, right: 0, reject: false, reason: 'no bars' });
+  });
+
+  it('rejects bars over 20% of the frame: that is not letterboxing', () => {
+    const d = detectBars(lines(15, 70, 15), lines(0, 160, 0));
+    expect(d.reject).toBe(true);
+    expect((15 + 15) / 100).toBeGreaterThan(BAR_MAX_SHARE);
+    expect(d.reason).toMatch(/30% of the frame/);
+  });
+
+  it('does not take a dark subject touching an edge for a bar', () => {
+    // A black mass along the top edge with carved white lines through it:
+    // dark on average, but far from uniform.
+    const subjectEdge = { mean: 0.1, std: 0.3 };
+    expect(detectBars([subjectEdge, subjectEdge, ...lines(0, 80, 0)], lines(0, 160, 0))).toMatchObject({ top: 0, reject: false });
+  });
+
+  it('rejects an all-black frame', () => {
+    expect(detectBars(lines(50, 0, 0), lines(80, 0, 0)).reject).toBe(true);
+  });
+});
+
+/** A cream render with a dark subject, letterboxed top and bottom: the v1.1 fence-post case. */
+async function letterboxedCream(): Promise<Buffer> {
+  const width = 1344;
+  const height = 768;
+  const bar = 72;
+  const subject = await sharp({ create: { width: 500, height: 400, channels: 3, background: { r: 26, g: 25, b: 21 } } }).png().toBuffer();
+  const black = await sharp({ create: { width, height: bar, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+  return sharp({ create: { width, height, channels: 3, background: { r: 236, g: 226, b: 200 } } })
+    .composite([
+      { input: black, left: 0, top: 0 },
+      { input: black, left: 0, top: height - bar },
+      { input: subject, left: 150, top: 184 },
+    ])
+    .png()
+    .toBuffer();
+}
+
+describe('stripBars', () => {
+  it('fixes the letterbox-and-cream case: bars stripped, then the paper correction applies', async () => {
+    const render = await letterboxedCream();
+
+    // The bug: sampled with the bars in, the corner is black and the correction skips.
+    const before = await correctPaper(render, '#FAFAF8');
+    expect(before.correction.applied).toBe(false);
+    expect(before.correction.reason).toMatch(/not empty paper/);
+
+    const { image, bars } = await stripBars(render);
+    expect(bars).toMatchObject({ top: 72, bottom: 72, left: 0, right: 0, reject: false });
+    expect(await sharp(image).metadata()).toMatchObject({ width: 1344, height: 624 });
+
+    const after = await correctPaper(image, '#FAFAF8');
+    expect(after.correction).toMatchObject({ sample: [236, 226, 200], applied: true });
+    expect((await pixel(after.image, 20, 20))[0]).toBeGreaterThanOrEqual(249);
+  });
+
+  it('returns a clean render untouched', async () => {
+    const clean = await paperMaster(400, 225);
+    const { image, bars } = await stripBars(clean);
+    expect(image).toBe(clean);
+    expect(bars.reason).toBe('no bars');
+  });
+});
+
+// ── Legibility gate ──────────────────────────────────────────────────────────
+
+/** A 256-bin histogram with `ink` of the pixels at luma 40 and the rest at 250. */
+function histogram(ink: number, total = 10000): number[] {
+  const h = new Array<number>(256).fill(0);
+  h[40] = Math.round(total * ink);
+  h[250] = total - h[40]!;
+  return h;
+}
+
+describe('inkCoverage', () => {
+  it('fails a faint sketch: too little ink to register at phone size', () => {
+    const c = inkCoverage(histogram(0.06));
+    expect(c).toMatchObject({ coverage: 0.06, pass: false });
+    expect(c.reason).toMatch(/too faint/);
+  });
+
+  it('passes a bold print', () => {
+    expect(inkCoverage(histogram(0.45))).toMatchObject({ coverage: 0.45, pass: true });
+  });
+
+  it('fails a near-solid black mass', () => {
+    const c = inkCoverage(histogram(0.9));
+    expect(c.pass).toBe(false);
+    expect(c.reason).toMatch(/solid mass/);
+  });
+
+  it('counts gold as ink and the band edges as passing', () => {
+    const h = new Array<number>(256).fill(0);
+    h[168] = 3000; // #C9A84C is about 0.66 luma
+    h[250] = 7000;
+    expect(inkCoverage(h)).toMatchObject({ coverage: 0.3, pass: true });
+    expect(inkCoverage(histogram(MIN_INK_COVERAGE)).pass).toBe(true);
+    expect(inkCoverage(histogram(MAX_INK_COVERAGE)).pass).toBe(true);
+  });
+
+  it('fails an empty histogram', () => {
+    expect(inkCoverage(new Array(256).fill(0))).toMatchObject({ coverage: 0, pass: false });
+  });
+});
+
+describe('legibility', () => {
+  it('measures a real bold print and a real faint one', async () => {
+    const block = await sharp({ create: { width: 700, height: 500, channels: 3, background: { r: 26, g: 25, b: 21 } } }).png().toBuffer();
+    const bold = await sharp({ create: { width: 1344, height: 768, channels: 3, background: PAPER } })
+      .composite([{ input: block, left: 100, top: 130 }])
+      .png()
+      .toBuffer();
+    const bolder = await legibility(bold);
+    expect(bolder.pass).toBe(true);
+    expect(bolder.coverage).toBeGreaterThan(0.3);
+
+    expect((await legibility(await paperMaster())).pass).toBe(false);
   });
 });

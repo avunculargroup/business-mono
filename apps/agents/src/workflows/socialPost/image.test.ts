@@ -29,33 +29,31 @@ vi.mock('../../lib/openrouterImage.js', () => ({ generateImage, MAX_REFERENCE_IM
 
 const { runImageStep } = await import('./image.js');
 
-const PIER = {
-  tension: 'Nobody knows the trigger, only that the safe ground is shorter than it looks.',
-  subject: 'A timber pier running out over open water',
-  drawn: 'the near end of the pier, planks and pilings',
-  undrawn: 'the far end, planks thinning into pencil guidelines over the water',
-  layout: 'left_third',
-  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+const STAMP = {
+  tension: 'The rules are about to land, and everyone is waiting for the impact.',
+  symbol: 'A rubber stamp',
+  twist: 'Giant, poised just above a blank sheet, about to land',
+  subject: 'A giant rubber stamp hovering just above a blank sheet of paper',
+  layout: 'hero_left',
+  alt_text: 'A linocut of a huge rubber stamp about to come down on a blank page.',
 };
-const BRIDGE = {
-  ...PIER,
-  tension: 'Everyone is building toward a far side nobody has surveyed.',
-  subject: 'A footbridge half built across a gorge',
-  drawn: 'the near abutment and first spans',
-  undrawn: 'the spans that would reach the far side',
-  layout: 'low_horizon',
-  alt_text: 'A pencil sketch of a half-built footbridge.',
+const LIGHTHOUSE = {
+  tension: 'After years of fog, clarity is coming.',
+  symbol: 'A lighthouse',
+  twist: 'One solid gold beam cuts through the fog',
+  subject: 'A lighthouse throwing one solid gold beam through dense fog',
+  layout: 'against_gold',
+  alt_text: 'A linocut of a lighthouse with a gold beam through fog.',
 };
-const ROAD = {
-  ...PIER,
-  tension: 'The safe route ends where the survey ends.',
-  subject: 'A surveyed road that stops at a field edge',
-  drawn: 'the paved stretch nearest the viewer',
-  undrawn: 'the pegged-out route beyond the field',
-  layout: 'small_in_space',
-  alt_text: 'A pencil sketch of a road that turns into survey pegs.',
+const GATE = {
+  tension: 'A hundred and forty firms are queueing at a door that is not open yet.',
+  symbol: 'A turnstile',
+  twist: 'Locked, with a long queue of briefcases behind it',
+  subject: 'A locked turnstile with a long line of briefcases behind it',
+  layout: 'diagonal',
+  alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, concepts: [PIER, BRIDGE, ROAD] };
+const BRIEF = { skip: false, skip_reason: null, concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const PARAMS = {
   accountIds: ['acc-li', 'acc-x'],
@@ -69,16 +67,23 @@ const PARAMS = {
   imageSpecs: new Map(),
 };
 
-// A render on yellowed paper, as v1.0's hourglass came back.
+// A bold print on yellowed paper: passes the legibility gate, and the paper
+// correction has cream to fix. And a faint one, which the gate rejects.
 let parchment: Buffer;
+let faint: Buffer;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   fakeSupabase.__responses.clear();
   process.env['OPENROUTER_API_KEY'] = 'test-key';
-  parchment ??= await sharp({ create: { width: 1344, height: 768, channels: 3, background: { r: 236, g: 226, b: 200 } } })
-    .png()
-    .toBuffer();
+  if (!parchment) {
+    const block = await sharp({ create: { width: 600, height: 520, channels: 3, background: { r: 26, g: 25, b: 21 } } }).png().toBuffer();
+    parchment = await sharp({ create: { width: 1344, height: 768, channels: 3, background: { r: 236, g: 226, b: 200 } } })
+      .composite([{ input: block, left: 120, top: 120 }])
+      .png()
+      .toBuffer();
+    faint = await sharp({ create: { width: 1344, height: 768, channels: 3, background: { r: 236, g: 226, b: 200 } } }).png().toBuffer();
+  }
 
   fakeSupabase.__setResponse('brand_visual', { data: BRAND_VISUAL_ROW, error: null });
   fakeSupabase.__setResponse('content_images', { data: [], error: null });
@@ -145,8 +150,8 @@ describe('runImageStep', () => {
 
       expect(generateImage).toHaveBeenCalledTimes(3);
       const prompts = generateImage.mock.calls.map((c) => c[0].prompt as string);
-      expect(prompts.some((p) => p.includes('Leave as construction lines only: the far end, planks thinning'))).toBe(true);
-      expect(prompts.some((p) => p.includes('Layout: Low horizon:'))).toBe(true);
+      expect(prompts.some((p) => p.includes('The twist: One solid gold beam cuts through the fog'))).toBe(true);
+      expect(prompts.some((p) => p.includes('Layout: Against gold:'))).toBe(true);
 
       const rows = insertedImageRows();
       expect(rows).toHaveLength(6); // three candidates × two drafts
@@ -155,30 +160,30 @@ describe('runImageStep', () => {
       expect(new Set(rows.map((r) => r['generation_group_id'])).size).toBe(3);
       expect(rows.every((r) => r['is_selected'] === false)).toBe(true); // selection is made after all settle
       expect(rows.map((r) => r['candidate_index']).sort()).toEqual([0, 0, 1, 1, 2, 2]);
-      const pierRow = rows.find((r) => r['candidate_index'] === 0)!;
-      expect(pierRow['image_brief']).toEqual(PIER);
+      const stampRow = rows.find((r) => r['candidate_index'] === 0)!;
+      expect(stampRow['image_brief']).toEqual(STAMP);
 
       // The lowest index is selected; the morning run's pick marks nothing not_chosen.
-      const pierGroup = pierRow['generation_group_id'];
+      const stampGroup = stampRow['generation_group_id'];
       const updates = imageUpdates();
       const on = updates.find((u) => u.patch['is_selected'] === true)!;
       expect(on.patch).toEqual({ is_selected: true });
       const onRowIds = insertedImageRows()
         .map((r, i) => ({ r, id: `row-${i}` }))
-        .filter(({ r }) => r['generation_group_id'] === pierGroup)
+        .filter(({ r }) => r['generation_group_id'] === stampGroup)
         .map(({ id }) => id);
       expect(on.ids).toEqual(onRowIds);
       expect(updates.find((u) => u.patch['is_selected'] === false)!.patch).toEqual({ is_selected: false });
 
       expect(outcome).toMatchObject({
         status: 'generated',
-        generation_group_id: pierGroup,
+        generation_group_id: stampGroup,
         candidate_set_id: [...setIds][0],
         candidates: 3,
-        layout: 'left_third',
+        layout: 'hero_left',
         cost_usd: 0.12,
       });
-      expect(images.get('ci-li')).toEqual({ url: expect.stringMatching(/linkedin-1200x627\.png$/), altText: PIER.alt_text, moreOptions: 2 });
+      expect(images.get('ci-li')).toEqual({ url: expect.stringMatching(/linkedin-1200x627\.png$/), altText: STAMP.alt_text, moreOptions: 2 });
     } finally {
       restore();
     }
@@ -189,7 +194,10 @@ describe('runImageStep', () => {
 
     const generated = activityRows().filter((r) => r.action === 'social_image_generated');
     expect(generated).toHaveLength(3);
-    const paper = generated[0]!.proposed_actions[0]!['paper'] as { sample: number[]; gains: number[]; applied: boolean };
+    const actions = generated[0]!.proposed_actions[0]!;
+    expect(actions['bars']).toEqual({ top: 0, bottom: 0, left: 0, right: 0 });
+    expect(actions['coverage']).toBeGreaterThan(0.2);
+    const paper = actions['paper'] as { sample: number[]; gains: number[]; applied: boolean };
     expect(paper.sample).toEqual([236, 226, 200]);
     expect(paper.applied).toBe(true);
     expect(paper.gains[2]).toBe(1.15);
@@ -202,7 +210,7 @@ describe('runImageStep', () => {
 
   it('keeps the other candidates when one render fails, and selects the lowest that succeeded', async () => {
     generateImage.mockImplementation(async ({ prompt }: { prompt: string }) => {
-      if (prompt.includes(PIER.subject)) throw new Error('Image render timed out after 120s.');
+      if (prompt.includes(STAMP.subject)) throw new Error('Image render timed out after 120s.');
       return { image: parchment, mediaType: 'image/png', costUsd: 0.04, generationRef: 'gen', referencesDropped: false };
     });
     const restore = answerSetReadWithInsertedRows();
@@ -210,13 +218,69 @@ describe('runImageStep', () => {
       const { outcome, images } = await runImageStep(PARAMS);
       const rows = insertedImageRows();
       expect(new Set(rows.map((r) => r['generation_group_id'])).size).toBe(2);
-      expect(outcome).toMatchObject({ status: 'generated', candidates: 2, layout: 'low_horizon' });
-      const bridgeGroup = rows.find((r) => r['candidate_index'] === 1)!['generation_group_id'];
-      expect(outcome.generation_group_id).toBe(bridgeGroup);
+      expect(outcome).toMatchObject({ status: 'generated', candidates: 2, layout: 'against_gold' });
+      const lighthouseGroup = rows.find((r) => r['candidate_index'] === 1)!['generation_group_id'];
+      expect(outcome.generation_group_id).toBe(lighthouseGroup);
       expect(images.get('ci-x')?.moreOptions).toBe(1);
     } finally {
       restore();
     }
+  });
+
+  it('drops a candidate the legibility gate rejects, keeps the others, and records the rejection', async () => {
+    generateImage.mockImplementation(async ({ prompt }: { prompt: string }) => ({
+      image: prompt.includes(STAMP.subject) ? faint : parchment,
+      mediaType: 'image/png',
+      costUsd: 0.04,
+      generationRef: 'gen',
+      referencesDropped: false,
+    }));
+    const restore = answerSetReadWithInsertedRows();
+    try {
+      const { outcome } = await runImageStep(PARAMS);
+      const rows = insertedImageRows();
+      expect(new Set(rows.map((r) => r['generation_group_id'])).size).toBe(2);
+      expect(rows.some((r) => r['candidate_index'] === 0)).toBe(false);
+      expect(outcome).toMatchObject({ status: 'generated', candidates: 2, layout: 'against_gold' });
+      expect(outcome.generation_group_id).toBe(rows.find((r) => r['candidate_index'] === 1)!['generation_group_id']);
+
+      const rejected = activityRows().find((r) => r.action === 'social_image_rejected')!;
+      expect(rejected.proposed_actions[0]!['rejected']).toEqual([
+        { candidate_index: 0, reason: expect.stringMatching(/too faint/), coverage: 0 },
+      ]);
+      // Nothing of the rejected render was uploaded.
+      expect(bucket.upload.mock.calls.length).toBe(6); // two candidates × (master + two crops)
+    } finally {
+      restore();
+    }
+  });
+
+  it('fails, with the reasons, when every candidate is rejected', async () => {
+    generateImage.mockResolvedValue({ image: faint, mediaType: 'image/png', costUsd: 0.04, generationRef: 'gen', referencesDropped: false });
+    const { outcome } = await runImageStep(PARAMS);
+    expect(outcome).toMatchObject({ status: 'failed', candidates: 0 });
+    expect(outcome.reason).toMatch(/too faint/);
+    expect(insertedImageRows()).toEqual([]);
+    expect(activityRows().find((r) => r.action === 'social_image_rejected')!.proposed_actions[0]!['rejected']).toHaveLength(3);
+  });
+
+  it('strips letterbox bars before the paper sample, so the correction still applies', async () => {
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [STAMP] } });
+    const black = await sharp({ create: { width: 1344, height: 72, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+    const boxed = await sharp(parchment)
+      .composite([
+        { input: black, left: 0, top: 0 },
+        { input: black, left: 0, top: 768 - 72 },
+      ])
+      .png()
+      .toBuffer();
+    generateImage.mockResolvedValue({ image: boxed, mediaType: 'image/png', costUsd: 0.04, generationRef: 'gen', referencesDropped: false });
+
+    const { outcome } = await runImageStep(PARAMS);
+    expect(outcome.status).toBe('generated');
+    const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+    expect(actions['bars']).toEqual({ top: 72, bottom: 72, left: 0, right: 0 });
+    expect((actions['paper'] as { applied: boolean; sample: number[] })).toMatchObject({ applied: true, sample: [236, 226, 200] });
   });
 
   it('fails when every candidate fails, without writing rows', async () => {
@@ -239,16 +303,16 @@ describe('runImageStep', () => {
     fakeSupabase.__setResponses('content_images', [
       {
         data: [
-          { candidate_set_id: 's1', generation_group_id: 'g1', is_selected: true, image_brief: { ...PIER, subject: 'A lighthouse on a spit' } },
-          { candidate_set_id: 's2', generation_group_id: 'g2', is_selected: true, image_brief: { ...BRIDGE, layout: 'left_third' } },
+          { candidate_set_id: 's1', generation_group_id: 'g1', is_selected: true, image_brief: { ...STAMP, symbol: 'A padlock', layout: 'diagonal' } },
+          { candidate_set_id: 's2', generation_group_id: 'g2', is_selected: true, image_brief: { ...LIGHTHOUSE, layout: 'diagonal' } },
         ],
         error: null,
       },
     ]);
     await runImageStep(PARAMS);
     const prompt = charlieGenerate.mock.calls[0]![0][0].content as string;
-    expect(prompt).toContain('Recent images showed: A lighthouse on a spit; A footbridge half built across a gorge.');
-    expect(prompt).toContain('Do not use left_third in any concept.');
+    expect(prompt).toContain('Recent images used: A padlock; A lighthouse. Do not use any of these symbols again.');
+    expect(prompt).toContain('Do not use diagonal in any concept.');
     expect(prompt).toContain('Twenty years. The trigger? Nobody knows.');
   });
 
@@ -261,7 +325,7 @@ describe('runImageStep', () => {
   });
 
   it('renders only the clean concepts, without a re-brief', async () => {
-    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [{ ...PIER, subject: 'An hourglass on a desk' }, BRIDGE, ROAD] } });
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [{ ...STAMP, subject: 'A stamp over a rocket' }, LIGHTHOUSE, GATE] } });
     await runImageStep(PARAMS);
     expect(charlieGenerate).toHaveBeenCalledTimes(1);
     expect(generateImage).toHaveBeenCalledTimes(2);
@@ -269,18 +333,18 @@ describe('runImageStep', () => {
 
   it('re-briefs once when no concept is clean, carrying the flags', async () => {
     charlieGenerate
-      .mockResolvedValueOnce({ object: { ...BRIEF, concepts: [{ ...PIER, subject: 'An hourglass' }, { ...BRIDGE, undrawn: 'none' }] } })
+      .mockResolvedValueOnce({ object: { ...BRIEF, concepts: [{ ...STAMP, symbol: 'A rocket' }, { ...LIGHTHOUSE, twist: 'a lighthouse' }] } })
       .mockResolvedValueOnce({ object: BRIEF });
     const { outcome } = await runImageStep(PARAMS);
     expect(charlieGenerate).toHaveBeenCalledTimes(2);
     const rebrief = charlieGenerate.mock.calls[1]![0][0].content as string;
-    expect(rebrief).toContain('- Concept 1: subject names prohibited imagery: hourglass.');
-    expect(rebrief).toContain('- Concept 2: undrawn is missing');
+    expect(rebrief).toContain('- Concept 1: symbol names prohibited imagery: rocket.');
+    expect(rebrief).toContain('- Concept 2: twist only restates the symbol');
     expect(outcome.status).toBe('generated');
   });
 
   it('skips after a second brief with nothing clean, never looping', async () => {
-    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [{ ...PIER, layout: 'centred' }] } });
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [{ ...STAMP, layout: 'centred' }] } });
     const { outcome } = await runImageStep(PARAMS);
     expect(outcome.status).toBe('skipped');
     expect(outcome.reason).toMatch(/failed lint twice/);
@@ -295,7 +359,7 @@ describe('runImageStep', () => {
   });
 
   it('removes a candidate\'s uploads and writes none of its rows when an upload fails part-way', async () => {
-    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [PIER] } });
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [STAMP] } });
     bucket.upload
       .mockResolvedValueOnce({ data: {}, error: null })
       .mockResolvedValueOnce({ data: null, error: { message: 'quota' } });
@@ -306,7 +370,7 @@ describe('runImageStep', () => {
   });
 
   it('persists with a fail-safe verdict when the alt-text Lex check errors', async () => {
-    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [PIER] } });
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [STAMP] } });
     lexGenerate.mockRejectedValue(new Error('lex down'));
     const { outcome } = await runImageStep(PARAMS);
     expect(outcome.status).toBe('generated');
@@ -316,7 +380,7 @@ describe('runImageStep', () => {
   });
 
   it('sends signed style-anchor URLs as references', async () => {
-    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [PIER] } });
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, concepts: [STAMP] } });
     fakeSupabase.__setResponse('brand_visual', {
       data: { ...BRAND_VISUAL_ROW, style_anchor_paths: ['social-images/anchors/a.png', 'social-images/anchors/b.png'] },
       error: null,

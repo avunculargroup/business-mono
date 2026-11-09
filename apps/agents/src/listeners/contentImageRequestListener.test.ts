@@ -31,12 +31,12 @@ const { handleImageRequestRow, normaliseFounderConcept, platformOfCrop, reconcil
 );
 
 const PIER = {
-  tension: 'Nobody knows the trigger.',
-  subject: 'A timber pier running out over open water',
-  drawn: 'the near end of the pier',
-  undrawn: 'the far end, as pencil guidelines over the water',
-  layout: 'left_third',
-  alt_text: 'A pencil sketch of a pier whose far end is only outlined.',
+  tension: 'After years of fog, clarity is coming.',
+  symbol: 'A lighthouse',
+  twist: 'One solid gold beam cuts through the fog',
+  subject: 'A lighthouse throwing one solid gold beam through dense fog',
+  layout: 'hero_left',
+  alt_text: 'A linocut of a lighthouse with a gold beam through fog.',
 };
 
 function row(overrides: Record<string, unknown>) {
@@ -179,20 +179,20 @@ describe('handleImageRequestRow', () => {
 
   describe('render_brief', () => {
     it('lints a founder concept, renders it into the current set after its candidates, and selects it', async () => {
-      claim('render_brief', { ...PIER, layout: 'close_detail', subject: '  A rope bridge  ' });
+      claim('render_brief', { ...PIER, layout: 'close_crop', subject: '  A lighthouse lamp, cropped close  ' });
       await handleImageRequestRow({ id: 'req-1', status: 'pending' });
       const params = renderCandidateSet.mock.calls[0]![0];
-      expect(params.concepts[0]).toMatchObject({ layout: 'close_detail', subject: 'A rope bridge' });
+      expect(params.concepts[0]).toMatchObject({ layout: 'close_crop', subject: 'A lighthouse lamp, cropped close' });
       expect(params).toMatchObject({ candidateSetId: 'set-1', startIndex: 2, founderChoice: true });
       expect(imageUpdates()).toEqual([]); // the set is kept; selection moves inside renderCandidateSet
       expect(resolution()).toMatchObject({ status: 'done' });
     });
 
-    it('fails a concept that names a stock symbol, without rendering', async () => {
-      claim('render_brief', { ...PIER, subject: 'A clock tower over the harbour' });
+    it('fails a concept that names a finance cliché, without rendering', async () => {
+      claim('render_brief', { ...PIER, twist: 'A rocket launches from the rock' });
       await handleImageRequestRow({ id: 'req-1', status: 'pending' });
       expect(renderCandidateSet).not.toHaveBeenCalled();
-      expect(String(resolution()!['error'])).toMatch(/needs changes: subject names prohibited imagery: clock/);
+      expect(String(resolution()!['error'])).toMatch(/needs changes: twist names prohibited imagery: rocket/);
     });
 
     it('starts a set for a draft with no live image, on that draft alone', async () => {
@@ -253,12 +253,12 @@ describe('pure helpers', () => {
   });
 
   it('normalises a founder concept: trims, blanks to empty strings for the linter to name', () => {
-    expect(normaliseFounderConcept({ layout: ' left_third ', subject: '' } as never)).toEqual({
+    expect(normaliseFounderConcept({ layout: ' hero_left ', symbol: ' A stamp ', subject: '' } as never)).toEqual({
       tension: '',
+      symbol: 'A stamp',
+      twist: '',
       subject: '',
-      drawn: '',
-      undrawn: '',
-      layout: 'left_third',
+      layout: 'hero_left',
       alt_text: '',
     });
   });

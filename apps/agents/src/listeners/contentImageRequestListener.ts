@@ -85,9 +85,9 @@ export function normaliseFounderConcept(input: Partial<ImageConcept> | null): Im
   const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   return {
     tension: text(input?.tension),
+    symbol: text(input?.symbol),
+    twist: text(input?.twist),
     subject: text(input?.subject),
-    drawn: text(input?.drawn),
-    undrawn: text(input?.undrawn),
     layout: text(input?.layout),
     alt_text: text(input?.alt_text),
   };
