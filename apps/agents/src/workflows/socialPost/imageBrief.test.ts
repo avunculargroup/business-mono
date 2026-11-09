@@ -5,12 +5,16 @@ import { activeLayouts, toBrandVisual } from './imagePrompt.js';
 import {
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
+  buildImageCriticPrompt,
   imageBriefRewriteInstruction,
   imageBriefSchema,
   layoutToRest,
   lintImageBrief,
   lintImageConcept,
+  rankConcepts,
   recentImageHistory,
+  storedReview,
+  type Critique,
   type ImageConcept,
 } from './imageBrief.js';
 
@@ -41,15 +45,22 @@ const GATE: ImageConcept = {
   layout: 'diagonal',
   alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, concepts: [STAMP, LIGHTHOUSE, GATE] };
+const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const CP392 =
   "140 businesses have applied to offer digital asset services in Australia.\n\nASIC just dropped Consultation Paper 392 — the rulebook for custody, settlement, and capital requirements under the new Digital Assets Framework Act.\n\nClarity's coming. April 2027.\n\nNot nothing.";
 
 describe('imageBriefSchema', () => {
-  it('accepts up to three v1.2 concepts and rejects a fourth', () => {
+  it('accepts up to six v1.2 concepts and rejects a seventh', () => {
     expect(imageBriefSchema.safeParse(BRIEF).success).toBe(true);
-    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [STAMP, LIGHTHOUSE, GATE, STAMP] }).success).toBe(false);
+    const six = [STAMP, LIGHTHOUSE, GATE, STAMP, LIGHTHOUSE, GATE];
+    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: six }).success).toBe(true);
+    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [...six, STAMP] }).success).toBe(false);
+  });
+
+  it('requires the hook', () => {
+    const { hook: _hook, ...noHook } = BRIEF;
+    expect(imageBriefSchema.safeParse(noHook).success).toBe(false);
   });
 
   it('rejects the v1.1 drawn/undrawn shape', () => {
@@ -108,8 +119,20 @@ describe('lintImageBrief', () => {
   });
 
   it('says so when the brief returned no concepts, and treats a skip as clean', () => {
-    expect(lintImageBrief({ skip: false, skip_reason: null, concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
-    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
+    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
+    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
+  });
+
+  it('allows digits in the hook only', () => {
+    expect(lintImageBrief({ ...BRIEF, hook: '140 applicants' }, opts)).toEqual({ clean: [STAMP, LIGHTHOUSE, GATE], flags: [] });
+    expect(lintImageBrief({ ...BRIEF, hook: '140 applicants', concepts: [{ ...STAMP, symbol: '140 stamps' }] }, opts).flags[0]).toMatch(
+      /symbol contains digits/,
+    );
+  });
+
+  it('lints up to six concepts', () => {
+    const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
+    expect(lintImageBrief({ ...BRIEF, concepts: [...six, { ...STAMP, symbol: 'a seventh' }] }, opts).clean).toHaveLength(6);
   });
 });
 
@@ -130,7 +153,16 @@ describe('readStoredBrief', () => {
       layout: 'hero_left',
       motifKey: null,
       concept: STAMP,
+      hook: null,
+      review: null,
     });
+  });
+
+  it('reads the hook and the review stored beside a reviewed concept, and a fallback review as null', () => {
+    const review = { recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'A pun on the exact words.', total: 14, rank: 1 };
+    const stored = readStoredBrief({ ...STAMP, hook: 'capital buffers', review });
+    expect(stored).toMatchObject({ kind: 'concept', hook: 'capital buffers', review, concept: STAMP });
+    expect(readStoredBrief({ ...STAMP, hook: 'capital buffers', review: null })).toMatchObject({ hook: 'capital buffers', review: null });
   });
 
   it('reads a v1.1 drawn/undrawn brief without throwing', () => {
@@ -143,6 +175,8 @@ describe('readStoredBrief', () => {
       layout: 'left_third',
       motifKey: null,
       concept: null,
+      hook: null,
+      review: null,
     });
   });
 
@@ -156,6 +190,8 @@ describe('readStoredBrief', () => {
       layout: null,
       motifKey: 'timepiece',
       concept: null,
+      hook: null,
+      review: null,
     });
   });
 
@@ -211,11 +247,32 @@ describe('buildImageBriefPrompt', () => {
     expect(p).toContain(CP392);
     expect(p).toContain('## The half-second test');
     expect(p).toContain('2. symbol: an object, place or tool everyone already knows.');
-    expect(p).toContain('3. twist: one change to the symbol that ties it to the tension. One change only.');
+    expect(p).toContain('3. twist: one change to the symbol that ties it to the hook and the tension. One change only.');
     expect(p).toContain('would someone scrolling past at phone size recognise the symbol and get the twist without reading the post?');
-    expect(p).toContain('Return three concepts with three different symbols, using at least two different layouts.');
+    expect(p).toContain('Return six concepts with six different symbols, using at least two different layouts.');
+    expect(p).toContain('a reviewer will shortlist them');
     for (const l of activeLayouts(canon)) expect(p).toContain(`- ${l.key} (${l.label}):`);
     expect(p).not.toContain('left_third');
+  });
+
+  it('names the hook first, before the tension, and welcomes puns on it', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('hook: the single most specific, concrete phrase in the post.');
+    expect(p).toContain('"capital buffers", not "regulation"; "Twenty years", not "US debt"');
+    expect(p).toContain('Visual puns on the hook\'s words are welcome');
+    expect(p.indexOf('## First, the hook')).toBeGreaterThan(-1);
+    expect(p.indexOf('## First, the hook')).toBeLessThan(p.indexOf('1. tension:'));
+  });
+
+  it('asks for physics that reads correctly', () => {
+    expect(buildImageBriefPrompt(base)).toContain('A weighted pan sits lower; light comes from its source; water finds its level.');
+  });
+
+  it('carries the capital-buffers examples', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('"capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.');
+    expect(p).toContain('"capital buffers" became a closed farm gate.');
+    expect(p).toContain('"capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.');
   });
 
   it('carries the worked examples, weak and strong', () => {
@@ -237,6 +294,99 @@ describe('buildImageBriefPrompt', () => {
     expect(p).not.toContain('## The story behind it');
     expect(p).toContain('## Re-brief: none of your concepts could be used, for these reasons');
     expect(p).toContain('- Concept 1: twist is missing.');
+  });
+});
+
+const BUFFERS_POST =
+  "ASIC's consultation paper for digital asset platforms dropped last week.\n\nBuried in there: net tangible asset requirements.\n\nNot just custody rules. Not just settlement standards. Capital buffers.\n\nSubmissions close 27 November.";
+const SCALE: ImageConcept = { ...STAMP, symbol: 'A balance scale', twist: 'One pan holds a heavy weight', subject: 'A balance scale with a heavy weight' };
+const FARM_GATE: ImageConcept = { ...STAMP, symbol: 'A farm gate', twist: 'Shut and bolted', subject: 'A closed farm gate' };
+const BUFFER: ImageConcept = { ...STAMP, symbol: 'A railway buffer stop', twist: 'Heavy and gold, a rail running into it', subject: 'A gold railway buffer stop at the end of a black rail' };
+
+describe('buildImageCriticPrompt', () => {
+  it('numbers the concepts, names the hook and carries the calibration', () => {
+    const p = buildImageCriticPrompt({ postCopy: BUFFERS_POST, hook: 'capital buffers', concepts: [SCALE, FARM_GATE, BUFFER] });
+    expect(p).toContain(BUFFERS_POST);
+    expect(p).toContain('## The hook\ncapital buffers');
+    expect(p).toContain('1. Symbol: A balance scale');
+    expect(p).toContain('2. Symbol: A farm gate');
+    expect(p).toContain('3. Symbol: A railway buffer stop\n   Twist: Heavy and gold, a rail running into it');
+    expect(p).toContain('Be strict');
+    expect(p).toContain('A plain symbol with no twist scores 1.');
+    expect(p).toContain('A picture of the general topic scores 1.');
+    expect(p).toContain('A balance scale with the weighted pan sitting higher');
+    expect(p).toContain('A closed farm gate');
+    expect(p).toContain('A heavy railway buffer stop in gold');
+  });
+});
+
+function score(index: number, r: number, t: number, h: number, physics_ok = true): Critique['scores'][number] {
+  return { index, recognisable: r, twist_visible: t, on_hook: h, physics_ok, note: `note ${index}` };
+}
+
+describe('rankConcepts', () => {
+  const four = [SCALE, FARM_GATE, BUFFER, LIGHTHOUSE];
+
+  it('drops a physics failure and any score of 2 or less, and puts the best first', () => {
+    const critique = { scores: [score(1, 5, 3, 3, false), score(2, 5, 1, 1), score(3, 5, 4, 5), score(4, 4, 3, 3)] };
+    const r = rankConcepts(four, critique);
+    expect(r.fallback).toBe(false);
+    expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.rank])).toEqual([
+      ['A railway buffer stop', 14, 1],
+      ['A lighthouse', 10, 2],
+    ]);
+    expect(r.dropped).toEqual([
+      { index: 1, reason: 'physics reads wrong' },
+      { index: 2, reason: 'scored 2 or less on twist_visible, on_hook' },
+    ]);
+  });
+
+  it('keeps brief order on a tie and caps at max', () => {
+    const critique = { scores: [score(1, 4, 4, 4), score(2, 4, 4, 4), score(3, 5, 5, 5), score(4, 4, 4, 4)] };
+    const r = rankConcepts(four, critique, 3);
+    expect(r.ranked.map((x) => x.concept.symbol)).toEqual(['A railway buffer stop', 'A balance scale', 'A farm gate']);
+  });
+
+  it('ranks unscored concepts after every scored one, and never drops them', () => {
+    const r = rankConcepts(four, { scores: [score(2, 3, 3, 3), score(4, 4, 4, 4)] }, 4);
+    expect(r.ranked.map((x) => [x.concept.symbol, x.total])).toEqual([
+      ['A lighthouse', 12],
+      ['A farm gate', 9],
+      ['A balance scale', null],
+      ['A railway buffer stop', null],
+    ]);
+    expect(r.dropped).toEqual([]);
+    expect(storedReview(r.ranked[2]!)).toBeNull();
+  });
+
+  it('falls back to brief order when the critique is missing, malformed or lost track of the indices', () => {
+    for (const critique of [
+      null,
+      { scores: [] },
+      { scores: [{ index: 1, recognisable: 9 }] } as unknown as Critique,
+      { scores: [score(7, 5, 5, 5)] },
+      { scores: [score(1, 5, 5, 5), score(1, 4, 4, 4)] },
+    ]) {
+      const r = rankConcepts(four, critique);
+      expect(r.fallback).toBe(true);
+      expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.rank])).toEqual([
+        ['A balance scale', null, 1],
+        ['A farm gate', null, 2],
+        ['A railway buffer stop', null, 3],
+      ]);
+    }
+  });
+
+  it('falls back when nothing survives the filter', () => {
+    const r = rankConcepts(four, { scores: [score(1, 1, 1, 1), score(2, 2, 2, 2), score(3, 5, 5, 5, false), score(4, 5, 2, 5)] });
+    expect(r.fallback).toBe(true);
+    expect(r.ranked.map((x) => x.concept.symbol)).toEqual(['A balance scale', 'A farm gate', 'A railway buffer stop']);
+    expect(r.dropped).toEqual([]);
+  });
+
+  it('stores the review beside a ranked concept', () => {
+    const r = rankConcepts([BUFFER], { scores: [score(1, 5, 4, 5)] });
+    expect(storedReview(r.ranked[0]!)).toEqual({ recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'note 1', total: 14, rank: 1 });
   });
 });
 

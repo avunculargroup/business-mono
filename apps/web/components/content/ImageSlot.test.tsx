@@ -85,6 +85,7 @@ function image(overrides: Partial<ContentImage & { url: string | null }> = {}): 
     tension: PIER.tension,
     layout: 'left_third',
     motifKey: null,
+    reviewNote: null,
     candidateSetId: 'set-1',
     candidateIndex: 0,
     isSelected: true,
@@ -280,6 +281,18 @@ describe('ImageSlot', () => {
     await user.click(screen.getByRole('button', { name: /Use option 1: Everyone is building/ }));
     expect(actions.selectImageCandidate).toHaveBeenCalledWith({ contentItemId: ITEM, generationGroupId: 'g-2' });
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it('shows the reviewer\'s note under the tension, for the selected image and each candidate', () => {
+    const other = image({ id: 'img-2', generationGroupId: 'g-2', candidateIndex: 1, isSelected: false, tension: 'A turnstile.', reviewNote: 'Recognisable, but off the hook.' });
+    render(<ImageSlot contentItemId={ITEM} image={image({ reviewNote: 'A pun on the exact words.' })} candidates={[other]} request={null} canon={CANON} />);
+    expect(screen.getByText('A pun on the exact words.')).toBeInTheDocument();
+    expect(screen.getByText('Recognisable, but off the hook.')).toBeInTheDocument();
+  });
+
+  it('shows no note when the reviewer did not score the image', () => {
+    render(<ImageSlot contentItemId={ITEM} image={image()} request={null} canon={CANON} />);
+    expect(screen.queryByText(/pun/)).not.toBeInTheDocument();
   });
 
   it('still offers the candidates after the selected image is removed', () => {

@@ -224,6 +224,7 @@ async function regenerate(req: ClaimedRequest): Promise<void> {
   const result = await renderCandidateSet({
     canon,
     concepts: briefed.concepts,
+    review: briefed.review,
     posts,
     imageSpecs: await imageSpecsFor(posts),
     triggerType: 'manual',

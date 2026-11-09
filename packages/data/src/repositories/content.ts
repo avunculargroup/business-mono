@@ -94,6 +94,8 @@ export interface ContentImage {
   layout: string | null;
   /** Canon v1.0 motif key, for images made before v1.1. */
   motifKey: string | null;
+  /** The reviewer's one-line note on the idea; null before the reviewer, on a fallback, or for a founder's own brief. */
+  reviewNote: string | null;
   /** Shared by every candidate of one run; null for images made before candidates. */
   candidateSetId: string | null;
   candidateIndex: number | null;

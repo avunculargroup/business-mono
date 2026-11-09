@@ -382,9 +382,17 @@ export const MODEL_SCOPES: readonly ModelScope[] = [
     key: 'social_post.image_brief',
     type: 'workflow_step',
     label: 'Image brief',
-    description: 'Charlie picks a motif from the brand visual canon and describes the day\'s image (never the final prompt)',
+    description: 'Charlie names the post\'s hook and proposes up to six image ideas, each a familiar symbol with one twist (never the final prompt)',
     workflow: 'social_post',
     fallbackAgent: 'charlie',
+  },
+  {
+    key: 'social_post.image_critic',
+    type: 'workflow_step',
+    label: 'Image idea review',
+    description: 'The editor scores each image idea on recognition, twist and hook before any render is paid for',
+    workflow: 'social_post',
+    fallbackAgent: 'editor',
   },
   {
     // No fallbackAgent: an image model is not a language model. Unset, it

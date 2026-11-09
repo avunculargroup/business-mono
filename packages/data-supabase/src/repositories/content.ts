@@ -88,6 +88,7 @@ function toContentImage(row: ImageRow): ContentImage {
     tension: brief?.tension ?? null,
     layout: brief?.layout ?? null,
     motifKey: brief?.motifKey ?? null,
+    reviewNote: brief?.review?.note || null,
     candidateSetId: row.candidate_set_id,
     candidateIndex: row.candidate_index,
     isSelected: row.is_selected !== false,

@@ -3,7 +3,7 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; canon v1.2. The step 0 bake-off was dropped: tested in production (see Decisions)
-**Last updated:** 2026-11-09 (canon v1.2)
+**Last updated:** 2026-11-09 (canon v1.2; the hook and the idea review)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
@@ -15,7 +15,7 @@ Each morning the daily routine produces a LinkedIn draft and an X draft for each
 The hard part is not generating an image. It is making image #40 look like it belongs with image #1. Image models drift: each prompt is read fresh, and a model fills any gap in the prompt with its own defaults (gold coins, rocket ships, a blue gradient). This spec treats consistency as a data problem rather than a prompting trick. It has three layers:
 
 1. **A versioned brand visual canon.** This is the base prompt, the palette, layout presets and a prohibited list. It lives in a `brand_visual` table next to `brand_voice`, not in code.
-2. **A structured brief per post.** An LLM step reads the post for its **tension** (the uneasy or unresolved idea, not the topic) and proposes up to three concepts that carry it, each a familiar **symbol** with one visible **twist**. It never writes the final prompt.
+2. **A structured brief per post.** An LLM step names the post's **hook** (its most specific phrase), reads it for its **tension** (the uneasy or unresolved idea, not the topic) and proposes up to six concepts about the hook, each a familiar **symbol** with one visible **twist**. A text-only reviewer then shortlists three to render. The brief never writes the final prompt.
 3. **Deterministic assembly.** A pure function joins the canon, the brief and the platform format into the exact prompt the image model receives. That prompt is stored with the image as its audit trail.
 
 **Style anchors** add to this: approved images go back into the model as reference images. The voice work taught us that showing an example beats describing it. The `voice_snippets` library exists because the `example_posts` JSONB described a voice without showing it. Style anchors apply the same lesson to images.
@@ -92,6 +92,8 @@ Each decision traces back to existing evidence or an existing principle.
 | The brief finds the **tension**, not the topic | The interesting idea in a post is what is surprising, uneasy or unresolved. An image of the topic is filler. | The hourglass ignored "nobody knows the trigger" and "what 'safe' means" |
 | ~~**Drawn vs not yet drawn** is the house device~~ **(retired in v1.2)** | v1.1 drew the known part in full and left the uncertain part as construction lines. The images were clever but did not read at phone size. | The ASIC CP 392 example, recorded in the Overview |
 | **A familiar symbol with one twist** | Recognition must be instant, so the symbol is one everyone already knows; one visible change ties it to this post. Originality comes from the twist, not the symbol. | The half-second test; the brief's worked examples |
+| The brief anchors on the post's **hook** | A symbol of the topic illustrates every post on the subject. The hook ("capital buffers", not "regulation") is what makes it this post, and a pun on its words often reads fastest. | The capital-buffers post: a balance scale and a farm gate, both pictures of "regulation" |
+| A **text-only reviewer** shortlists before rendering | Judging an idea costs a fraction of a cent; a render costs cents. The brief proposes six, the editor scores them, and only the top three are rendered. Advisory, like Lex: it never stops an image being made. | The capital-buffers post's scale had the weighted pan sitting higher; nothing checked it before the render |
 | **Linocut style** | Solid black masses and a flat gold shape read at thumbnail size, where fine pencil lines vanish. It is consistent by construction: few colours, few marks. | Canon v1.2 style block |
 | **Layout presets**, chosen per concept | v1.0's "asymmetric balance" was ignored; a named layout is followed | The hourglass sat dead centre in a 16:9 frame |
 | ~~**Stock-symbol terms** in the linter~~ **(retired in v1.2)** | v1.1 banned hourglass, clock, compass and the rest. That pushed the brief to obscure subjects. v1.2 wants familiar symbols, with a twist. The finance clichés stay banned: that rule is compliance, not taste. | The ASIC CP 392 example |
@@ -194,6 +196,12 @@ The brief works out, per concept: the **tension**, a **symbol** everyone already
 - Weak, no symbol: a half-drawn bridge pier for a regulator's consultation paper. It needs explaining.
 - Strong: a regulator's consultation paper became a giant rubber stamp poised just above a blank sheet, about to land. Or a lighthouse throwing one solid gold beam through fog, for "clarity's coming".
 
+Before the symbol, the brief names the **hook**: the post's single most specific, concrete phrase, the thing a reader would quote back ("capital buffers", not "regulation"; "Twenty years", not "US debt"). Every concept must be about it, and visual puns on its words are welcome. If the twist involves weight, balance, light, motion or water, it must read correctly: a weighted pan sits lower. The examples gained the post that prompted this:
+
+- Weak, the topic and not the hook: "capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.
+- Weak, the topic and not the hook: "capital buffers" became a closed farm gate.
+- Strong, the hook with a pun: "capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.
+
 The linter rejects a twist that only restates the symbol, and drops a concept repeating another concept's symbol. The brief is told not to reuse a symbol from the last five runs (see 5b.1).
 
 ### Layouts
@@ -274,7 +282,7 @@ The table already exists (`20260622000000_add_campaigns_schema.sql`) with `sourc
 | Column | Type | Notes |
 |---|---|---|
 | `generation_group_id` | UUID | Shared by every row from one render (LinkedIn crop + X crop), so selecting, removing and promoting act on the group |
-| `image_brief` | JSONB | The concept the image was rendered from, tension included (v1.1+): `{ tension, symbol, twist, subject, layout, alt_text }` from v1.2, `{ ..., drawn, undrawn }` in v1.1. v1.0 rows hold `{ motif_key, subject, metaphor, ... }`; `readStoredBrief` reads all three |
+| `image_brief` | JSONB | The concept the image was rendered from, tension included (v1.1+): `{ tension, symbol, twist, subject, layout, alt_text }` from v1.2, plus `{ hook, review }` once the reviewer ran (`review` is null when its ranking fell back, and both are absent on a founder's Edit brief render); `{ ..., drawn, undrawn }` in v1.1. v1.0 rows hold `{ motif_key, subject, metaphor, ... }`; `readStoredBrief` reads all three |
 | `candidate_set_id` | UUID | Shared by every group from one run or one regenerate (v1.1) |
 | `candidate_index` | SMALLINT | Concept order from the brief, 0–2; an Edit brief render takes the next index |
 | `is_selected` | BOOLEAN | NOT NULL, default `true`, which backfills pre-v1.1 rows. Exactly one group per set is selected; everything that consumes an image reads `is_selected = true` only |
@@ -339,15 +347,16 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
 5  per platform: Charlie → AI-tell gate → Lex → persist content_items
 5b IMAGE (new, best-effort, once per run)
    5b.1  load active brand_visual + recent symbols and layouts
-   5b.2  image brief          (LLM, structured)      scope social_post.image_brief   up to three concepts
+   5b.2  image brief          (LLM, structured)      scope social_post.image_brief   the hook + up to six concepts
    5b.3  lint per concept     (pure)                 drop flagged; re-brief once if none clean, then skip
-   per clean concept, in parallel (Promise.allSettled), each its own generation group:
+   5b.3b review + rank        (LLM, structured)      scope social_post.image_critic  editor scores; rankConcepts keeps the top three
+   per shortlisted concept, in parallel (Promise.allSettled), each its own generation group, best first:
    5b.4  assemble prompt      (pure)                 buildImagePrompt()
    5b.5  render               (OpenRouter Image API) scope social_post.image_render
    5b.6  strip bars, paper correction, legibility gate, crop + mark + upload (sharp → Storage)
    5b.7  Lex on alt text      (LLM, structured)      scope social_post.compliance_check
    5b.8  persist content_images rows (unselected) + agent_activity
-   then: select the lowest successful candidate
+   then: select the lowest successful candidate (the reviewer's top pick, when it rendered)
 6  email founder (each post preview now shows its image when 5b succeeded)
 ```
 
@@ -358,7 +367,7 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
 
 ### 5b.2 Image brief
 
-The input is the story (title, summary, key points) when known, the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active layouts, the canon's prohibited terms, and the recent symbols and layouts. The prompt opens with the half-second test, then the brief works out, in order, for each concept: the **tension** (the surprising, uneasy or unresolved idea, not the topic), a familiar **symbol**, one visible **twist**, the **subject** (the symbol with its twist, as printed), a **layout**, and **alt text**. It then checks each concept against the half-second test, using the worked examples in "Symbol and twist" above. It returns three concepts with three different symbols using at least two layouts. It is told not to use a recent symbol again, and not to use a layout the last two runs both used.
+The input is the story (title, summary, key points) when known, the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active layouts, the canon's prohibited terms, and the recent symbols and layouts. The prompt opens with the half-second test. The brief first names the run's **hook** (see "Symbol and twist" above), then works out, in order, for each concept: the **tension** (the surprising, uneasy or unresolved idea, not the topic), a familiar **symbol**, one visible **twist**, the **subject** (the symbol with its twist, as printed), a **layout**, and **alt text**. It then checks each concept against the half-second test, using the worked examples in "Symbol and twist" above. It returns six concepts with six different symbols using at least two layouts: breadth over polish, because a reviewer shortlists them. It is told not to use a recent symbol again, and not to use a layout the last two runs both used.
 
 Output schema (`socialPost/imageBrief.ts`; the shared `ImageBrief` interface matches it, guarded at compile time):
 
@@ -366,7 +375,7 @@ Output schema (`socialPost/imageBrief.ts`; the shared `ImageBrief` interface mat
 const conceptSchema = z.object({
   tension: z.string().max(200),
   symbol: z.string().max(200),    // an object, place or tool everyone knows
-  twist: z.string().max(200),     // one visible change that ties it to the tension
+  twist: z.string().max(200),     // one visible change that ties it to the hook and tension
   subject: z.string().max(200),   // the symbol with its twist, as printed
   layout: z.string(),             // validated against active layouts by the linter
   alt_text: z.string().max(300),
@@ -374,11 +383,14 @@ const conceptSchema = z.object({
 export const imageBriefSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().max(200).nullable(),
-  concepts: z.array(conceptSchema).max(3),
+  hook: z.string().max(120),      // the post's most specific, concrete phrase
+  concepts: z.array(conceptSchema).max(6),
 });
 ```
 
-Structured output uses `errorStrategy: 'fallback'` with `{ skip: true, skip_reason: 'Brief generation failed.', concepts: [] }`. This matches `generateDraft`.
+The hook is never sent to the image model, so it is exempt from the no-digits lint: "140 applicants" is a fine hook.
+
+Structured output uses `errorStrategy: 'fallback'` with `{ skip: true, skip_reason: 'Brief generation failed.', hook: '', concepts: [] }`. This matches `generateDraft`.
 
 ### 5b.3 Linter (pure: `lintImageConcept`, `lintImageBrief`, in `@platform/shared`)
 
@@ -391,6 +403,17 @@ Per concept:
 - No digits in `subject`, `symbol` or `twist`. Numbers invite rendered text.
 
 A flagged concept is dropped, not the brief; so is one repeating an earlier concept's symbol. If none survive: one re-brief carrying every flag (`imageBriefRewriteInstruction`, the same shape as `aiTellRewriteInstruction`), then status `skipped` with a reason. It never loops.
+
+### 5b.3b Review and rank (`buildImageCriticPrompt`, `rankConcepts`, pure, in `imageBrief.ts`)
+
+The internal `editor` agent scores every lint-clean concept, text only, under the `social_post.image_critic` scope. It sees the post, the hook and the concepts numbered from 1, is told to be strict, and is calibrated on the capital-buffers post (the scale, the gate and the buffer stop). For each concept it returns `recognisable`, `twist_visible` and `on_hook` (1–5), `physics_ok` and a one-line `note`. A plain symbol with no twist scores 1 on `twist_visible`; a picture of the general topic scores 1 on `on_hook`.
+
+`rankConcepts(concepts, critique, max = 3)` is deterministic:
+
+- Drop a concept with `physics_ok` false or any score of 2 or less.
+- Order the rest by total (`recognisable + twist_visible + on_hook`); the brief's order breaks ties. Concepts the reviewer did not score rank after every scored one and are never dropped.
+- Take the top three. Their order becomes `candidate_index`, so candidate 0, the default selection, is the reviewer's top pick.
+- **Advisory, like Lex.** If the critique is missing or malformed, names an index outside the list or scores one twice, or nothing survives the filter, the shortlist is the top three in brief order (`fallback: true`, logged). The reviewer never stops an image being made, and never triggers a re-brief or a re-render.
 
 ### 5b.4 Prompt assembly (pure: `buildImagePrompt`)
 
@@ -443,7 +466,7 @@ The pipeline order does not change. Copy goes through Lex before persist exactly
 
 - Per candidate: one `content_images` row per persisted `content_item`, all with the same `generation_group_id`, the run's `candidate_set_id`, its `candidate_index`, and `is_selected = false`. `platform_crop` is `linkedin_1200x627` or `x_1600x900`.
 - Once every candidate has settled, the lowest successful `candidate_index` is selected (`planCandidateSelection` in `@platform/shared`, the same rule the web's "Use this image" applies). If every candidate failed, the outcome is `failed` and the run still succeeds. `sort_order` is 0 and `thread_segment_id` is NULL. On X threads the image attaches to the post, which in practice means the first segment.
-- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
+- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. When the reviewer ran, each row also carries `hook`, `review_fallback` and `review`: **every** concept the reviewer saw, with its scores, total, rank and outcome (`shortlisted`, `dropped` with the reason, or `not_shortlisted`), so the audit trail shows why an idea did not make it. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
 - A second row for the alt-text check: `agent_name = 'lex'`, `action = 'compliance_checked'`, `proposed_actions: [{ type: 'image_alt_text', classification }]`.
 
 ### Compliance
@@ -463,6 +486,7 @@ Two new scopes in `packages/shared/src/modelScopes.ts`:
 | Key | Type | Label | Fallback |
 |---|---|---|---|
 | `social_post.image_brief` | `workflow_step` | Image brief | `charlie` |
+| `social_post.image_critic` | `workflow_step` | Image idea review | `editor` |
 | `social_post.image_render` | `image_step` (new type) | Image render | none: env `OPENROUTER_IMAGE_MODEL`, else the bake-off default |
 
 `image_step` is new because the existing resolver returns a `LanguageModelV4`. An image scope only needs a model id string. `/settings/models` shows `image_step` scopes with a picker filled from `GET /api/v1/images/models`, so only image-capable models can be chosen.
@@ -479,8 +503,8 @@ Below the copy editor, for any item with `content_images`:
 
 - Preview at the item's platform crop, mark included, with a 12px radius and a 1px border. No other decoration.
 - **Alt text**: editable field. Saving sets `review_outcome = 'kept'`.
-- The selected image's **tension** shows beneath it.
-- **Other options**: the run's other candidates in their own row beneath, each with its tension as a caption and a **Use this image** action. Choosing one selects its group on every draft that shares it and marks the others `not_chosen`.
+- The selected image's **tension** shows beneath it, and under that the reviewer's one-line **note** when there is one.
+- **Other options**: the run's other candidates in their own row beneath, each with its tension (and the reviewer's note, when present) as a caption and a **Use this image** action. Choosing one selects its group on every draft that shares it and marks the others `not_chosen`.
 - **Regenerate** runs a fresh brief and renders a fresh set of three, then marks the old set `regenerated`. It is labelled "Regenerate image" in sentence case. Without a recorded story, the brief works from the post alone.
 - **Edit brief** opens a slide-over with one concept's fields (tension, symbol, twist, subject, layout, alt text), then "Render with this brief". The new image joins the run's set and is selected. The assembled prompt shows read-only beneath it in JetBrains Mono, so a founder can see exactly what was sent.
 - **Remove image** sets `review_outcome = 'removed'` and deletes the rows and objects.
@@ -518,7 +542,8 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | No active `brand_visual` row | `disabled`; logged once per run |
 | Brief call errors | Fallback brief → `skipped` |
 | Brief returns `skip: true` | `skipped` with reason; logged as `social_image_skipped` |
-| Some concepts fail lint | They are dropped; the clean ones render, with no re-brief |
+| Some concepts fail lint | They are dropped; the clean ones go to review, with no re-brief |
+| Reviewer errors, returns a malformed critique, or drops every concept | Advisory: the top three clean concepts render in brief order; `review_fallback` is recorded and `review` is stored as null |
 | No concept passes lint, twice | `skipped` with the flags as the reason |
 | One candidate's render errors, times out or is refused | That candidate is dropped; the others are kept and the lowest success is selected |
 | Every candidate's render fails | `failed`; nothing billed; drafts and email unaffected |
@@ -534,7 +559,7 @@ The email already shows each draft as a post-style card inside a 600px column (`
 
 ## Cost
 
-About 180 renders a month (2 founders × 3 candidates a day × 30), from canon v1.1, unchanged in v1.2. Rejected candidates are billed: the gate runs after the render. For reference, OpenRouter's docs show a high-quality 16:9 render on a top-tier model at about US$0.13, which is about US$23 a month at that price. Cheaper models land well under that. Regenerations add to it. `cost_usd` per row makes the real figure a simple query, and the existing OpenRouter credits panel on the dashboard already shows spend.
+About 180 renders a month (2 founders × 3 candidates a day × 30), from canon v1.1, unchanged in v1.2. Rejected candidates are billed: the gate runs after the render. For reference, OpenRouter's docs show a high-quality 16:9 render on a top-tier model at about US$0.13, which is about US$23 a month at that price. Cheaper models land well under that. Regenerations add to it. The brief and the idea review are one text call each, a fraction of a cent, against three renders. `cost_usd` per row makes the real figure a simple query, and the existing OpenRouter credits panel on the dashboard already shows spend.
 
 -----
 
@@ -610,6 +635,9 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **v1.1 layouts deactivated, four added.** `hero_left`, `close_crop`, `diagonal`, `against_gold`. Old layouts are kept inactive because older images reference them. |
 | 2026-11-09 | **Bars stripped before paper correction.** Letterbox and pillarbox bars are cropped off; more than 20% of an axis rejects the candidate. |
 | 2026-11-09 | **Legibility gate.** Ink coverage at thumbnail size must be 0.20–0.75, or the candidate is rejected. No vision-model QA and no automatic re-render. |
+| 2026-11-09 | **The brief anchors on the post's hook; puns welcome.** The capital-buffers post got a balance scale and a closed farm gate: strong prints, both pictures of "regulation". The hook ("capital buffers") is what the post is about; a railway buffer stop says it in half a second. |
+| 2026-11-09 | **Six ideas; the editor shortlists three before rendering.** A text-only review scores recognition, twist and hook, and the top three render, best first. Advisory: a failed review falls back to brief order. |
+| 2026-11-09 | **Physics must read correctly.** The capital-buffers scale had its weighted pan sitting higher. The brief is told to get weight, balance, light, motion and water right, and the reviewer drops a concept that does not. |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |
 
 -----

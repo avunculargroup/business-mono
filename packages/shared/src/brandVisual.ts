@@ -16,10 +16,15 @@
 //         unreadable at phone size: concept sketches that needed a caption.
 //   v1.2  a bold two-colour linocut of a familiar symbol with one twist, built
 //         for the half-second phone test.
+// From 2026-11-09 the brief also names the post's hook and proposes up to six
+// concepts, and a text-only reviewer shortlists three before any render.
 // Spec: docs/features/social-post-image/feature-spec.md
 
+/** How many concepts a brief may propose; a reviewer shortlists the ones rendered. */
+export const MAX_BRIEF_CONCEPTS = 6;
+
 /**
- * One image idea (canon v1.2). The brief proposes up to three; each one rendered
+ * One image idea (canon v1.2). The brief proposes up to six; each one rendered
  * is stored on its rows in `content_images.image_brief`.
  */
 export interface ImageConcept {
@@ -41,7 +46,28 @@ export interface ImageConcept {
 export interface ImageBrief {
   skip: boolean;
   skip_reason: string | null;
+  /**
+   * The post's most specific, concrete phrase: what a reader would quote back,
+   * not the topic ("capital buffers", not "regulation"). Every concept is about
+   * it. Exempt from the no-digits lint: it is never sent to the image model.
+   */
+  hook: string;
   concepts: ImageConcept[];
+}
+
+/**
+ * What the reviewer said about one rendered concept, stored beside it in
+ * `content_images.image_brief.review`. Scores are 1-5; `rank` is 1 for the
+ * reviewer's top pick, which renders as candidate 0.
+ */
+export interface ConceptReview {
+  recognisable: number;
+  twist_visible: number;
+  on_hook: number;
+  physics_ok: boolean;
+  note: string;
+  total: number | null;
+  rank: number;
 }
 
 /** A composition preset the brief must choose from, so frames stop defaulting to centred. */
@@ -258,7 +284,7 @@ export function lintImageConcept(concept: ImageConcept, opts: LintOptions): stri
 }
 
 export interface BriefLint {
-  /** Concepts that may be rendered, in the brief's order, at most three. */
+  /** Concepts that may be rendered, in the brief's order, at most MAX_BRIEF_CONCEPTS. */
   clean: ImageConcept[];
   /** Every flag on a dropped concept, prefixed with its number, for the re-brief. */
   flags: string[];
@@ -274,7 +300,7 @@ export function lintImageBrief(brief: ImageBrief, opts: LintOptions): BriefLint 
   const clean: ImageConcept[] = [];
   const flags: string[] = [];
   const symbols = new Set<string>();
-  (brief.concepts ?? []).slice(0, 3).forEach((concept, i) => {
+  (brief.concepts ?? []).slice(0, MAX_BRIEF_CONCEPTS).forEach((concept, i) => {
     const own = lintImageConcept(concept, opts);
     const key = normalise(concept.symbol ?? '');
     if (own.length === 0 && symbols.has(key)) own.push('symbol repeats an earlier concept; each concept needs its own symbol.');
@@ -302,6 +328,30 @@ export interface StoredBriefSummary {
   motifKey: string | null;
   /** The full v1.2 concept, when the row holds one; what Edit brief starts from. */
   concept: ImageConcept | null;
+  /** The brief's hook, on rows rendered after the reviewer was added. */
+  hook: string | null;
+  /** The reviewer's scores; null when it was not run or its ranking fell back. */
+  review: ConceptReview | null;
+}
+
+function readReview(v: unknown): ConceptReview | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const r = v as Row;
+  const score = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+  const recognisable = score(r['recognisable']);
+  const twist = score(r['twist_visible']);
+  const onHook = score(r['on_hook']);
+  const rank = score(r['rank']);
+  if (recognisable === null || twist === null || onHook === null || rank === null) return null;
+  return {
+    recognisable,
+    twist_visible: twist,
+    on_hook: onHook,
+    physics_ok: r['physics_ok'] !== false,
+    note: typeof r['note'] === 'string' ? r['note'].trim() : '',
+    total: score(r['total']),
+    rank,
+  };
 }
 
 /**
@@ -309,13 +359,15 @@ export interface StoredBriefSummary {
  *   v1.0  { motif_key, subject, metaphor, composition, ... }
  *   v1.1  { tension, subject, drawn, undrawn, layout, alt_text }
  *   v1.2  { tension, symbol, twist, subject, layout, alt_text }
+ *         + { hook, review } once the reviewer ran (review null on a fallback);
+ *         a founder's Edit brief render carries neither
  * Anything else reads as null.
  */
 export function readStoredBrief(json: unknown): StoredBriefSummary | null {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
   const r = json as Row;
   const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const base = { tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']) };
+  const base = { tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']), hook: str(r['hook']), review: readReview(r['review']) };
   if (typeof r['symbol'] === 'string' || typeof r['twist'] === 'string') {
     const concept: ImageConcept = {
       tension: base.tension ?? '',
