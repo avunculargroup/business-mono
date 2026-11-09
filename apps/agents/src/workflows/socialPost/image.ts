@@ -21,6 +21,9 @@ import {
 import { activeLayouts, buildImagePrompt, toBrandVisual, type BrandVisual } from './imagePrompt.js';
 import {
   DEFAULT_PAPER_HEX,
+  legibility,
+  stripBars,
+  type BarDetection,
   composePlatformImage,
   correctPaper,
   platformCrop,
@@ -205,8 +208,27 @@ export type RenderResult =
       costUsd: number | null;
       cropPaths: Map<string, string>;
       paper: PaperCorrection;
+      bars: BarDetection;
+      coverage: number;
     }
-  | { ok: false; candidateIndex: number; layout: string; reason: string };
+  | {
+      ok: false;
+      candidateIndex: number;
+      layout: string;
+      reason: string;
+      /** Set when a quality check (bars, legibility) dropped a render that did come back. */
+      rejected?: { reason: string; coverage: number | null };
+    };
+
+/** A render the quality checks dropped: not persisted, recorded on the run's activity. */
+class CandidateRejected extends Error {
+  constructor(
+    readonly reason: string,
+    readonly coverage: number | null,
+  ) {
+    super(reason);
+  }
+}
 
 /** The palette's paper colour, which the paper correction aims for. */
 function paperHex(canon: BrandVisual): string {
@@ -245,10 +267,16 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
 
     const rendered = await generateImage({ model, prompt, aspectRatio, referenceUrls }, { apiKey });
 
-    // ── 5b.6: crop + mark + upload (insert rows only after every object lands) ─
-    // Paper first: the stored master, every crop and any anchor promoted from
-    // it share the corrected paper, and the mark is composited onto clean paper.
-    const { image: master, correction: paper } = await correctPaper(await toPngMaster(rendered.image), paperHex(canon));
+    // ── 5b.6: bars → paper → legibility → crop + mark + upload ───────────────
+    // Bars first: a letterboxed render puts a black bar where the paper sample
+    // is read, and the correction silently skips. Then paper: the stored
+    // master, every crop and any anchor promoted from it share the corrected
+    // paper. Then the phone-size legibility gate, before anything is uploaded.
+    const { image: unbarred, bars } = await stripBars(await toPngMaster(rendered.image));
+    if (bars.reject) throw new CandidateRejected(bars.reason, null);
+    const { image: master, correction: paper } = await correctPaper(unbarred, paperHex(canon));
+    const legible = await legibility(master);
+    if (!legible.pass) throw new CandidateRejected(legible.reason, legible.coverage);
     const folder = `social-images/${new Date().toISOString().slice(0, 10)}/${groupId}`;
     const objects: Array<{ path: string; bytes: Buffer }> = [{ path: `${folder}/master-16x9.png`, bytes: master }];
     const cropPaths = new Map<string, { path: string; cropKey: string }>();
@@ -324,7 +352,9 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             cost_usd: rendered.costUsd,
             references_sent: rendered.referencesDropped ? 0 : referenceUrls.length,
             references_dropped: rendered.referencesDropped,
+            bars: { top: bars.top, bottom: bars.bottom, left: bars.left, right: bars.right },
             paper,
+            coverage: legible.coverage,
           },
         ],
       },
@@ -350,11 +380,17 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       costUsd: rendered.costUsd,
       cropPaths: new Map([...cropPaths].map(([id, c]) => [id, c.path])),
       paper,
+      bars,
+      coverage: legible.coverage,
     };
   } catch (err) {
-    log.error({ err, groupId, candidateIndex }, 'image candidate failed');
     // No partial state: an unmarked or orphaned image never reaches a founder.
     await removeObjects(uploaded);
+    if (err instanceof CandidateRejected) {
+      log.info({ groupId, candidateIndex, reason: err.reason, coverage: err.coverage }, 'image candidate rejected');
+      return { ok: false, candidateIndex, layout, reason: err.reason, rejected: { reason: err.reason, coverage: err.coverage } };
+    }
+    log.error({ err, groupId, candidateIndex }, 'image candidate failed');
     return { ok: false, candidateIndex, layout, reason: summariseError(err) };
   }
 }
@@ -440,6 +476,25 @@ export async function renderCandidateSet(params: {
       : { ok: false, candidateIndex: startIndex + i, layout: params.concepts[i]?.layout ?? '', reason: summariseError(s.reason) },
   );
   const selected = results.find((r): r is Extract<RenderResult, { ok: true }> => r.ok) ?? null;
+
+  // Rejected renders leave no rows, so the run's activity is their only record.
+  const rejected = results.flatMap((r) =>
+    !r.ok && r.rejected ? [{ candidate_index: r.candidateIndex, reason: r.rejected.reason, coverage: r.rejected.coverage }] : [],
+  );
+  if (rejected.length > 0) {
+    await logActivity([
+      {
+        agent_name: 'charlie',
+        action: 'social_image_rejected',
+        status: 'pending',
+        trigger_type: params.triggerType,
+        entity_type: 'content_item',
+        entity_id: (params.posts.find((p) => p.platform === 'linkedin') ?? params.posts[0])?.contentItemId ?? null,
+        proposed_actions: [{ type: 'social_image', candidate_set_id: candidateSetId, rejected }],
+      },
+    ]);
+  }
+
   if (selected) {
     try {
       await selectCandidate(candidateSetId, selected.groupId, { markOthers: params.founderChoice ?? false });

@@ -6,6 +6,22 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-09 — Social post images: canon v1.2 (data only)
+
+`20261109100000_brand_visual_v1_2.sql` changes data, not schema: no column is added, dropped or
+renamed. It moves the active `brand_visual` row to v1.2 in place, as the `/brand` save action
+does: a linocut style block, a three-entry palette (paper, ink, gold), a big-subject full-bleed
+composition block, three lines appended to `prohibited_block`, v1.1's 25 stock-symbol terms
+removed from `prohibited_terms` (the v1.0 finance clichés stay), `style_anchor_paths` cleared
+(the objects stay in storage), v1.1's four layouts set `is_active = false` and four added
+(`hero_left`, `close_crop`, `diagonal`, `against_gold`). Guarded to run once, and only over the
+unedited v1.1 style block. `content_images.image_brief` now holds `{ tension, symbol, twist,
+subject, layout, alt_text }` for new images; older rows keep their shape and `readStoredBrief`
+reads all three. Why: v1.1's images were clever concept sketches that did not read at phone
+size. Spec: `docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-11-08 — Social post images: canon v1.1 and candidates
 
 `20261108100000_brand_visual_v1_1.sql` adds `brand_visual.layouts` (JSONB, `[{ key, label,

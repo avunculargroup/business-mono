@@ -35,6 +35,10 @@ Transform tasks into verifiable goals before implementing:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - For multi-step tasks, state a brief plan with a verify step for each.
 
+### Testing in production (Chris's standing preference)
+- Chris prefers to test in production, live, unless told otherwise for a given change. Do not build bake-offs, model comparisons, contact sheets, evaluation scripts or staging rehearsals as a step before shipping, and do not propose them as prerequisites. Ship behind the normal checks below and let real runs be the evidence.
+- This does not relax the automated suite, typecheck or CI gates: those still run on every change.
+
 ### Run Tests While Developing
 - After any change to `apps/agents`, run `pnpm --filter @platform/agents test` before reporting work as done. The suite is fully mocked, runs in ~2s, and needs no secrets.
 - Also run `pnpm --filter @platform/agents typecheck` before submitting — both checks are gated by the GitHub Actions PR workflow (`.github/workflows/test.yml`), so red here = red on the PR.

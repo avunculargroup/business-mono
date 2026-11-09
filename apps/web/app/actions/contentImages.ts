@@ -30,9 +30,9 @@ const uuid = z.string().uuid();
 
 const conceptSchema = z.object({
   tension: z.string().trim().min(1, 'Say what the image is about').max(200, 'Keep the tension under 200 characters'),
+  symbol: z.string().trim().min(1, 'Name the symbol').max(200, 'Keep the symbol under 200 characters'),
+  twist: z.string().trim().min(1, 'Say what the twist is').max(200, 'Keep the twist under 200 characters'),
   subject: z.string().trim().min(1, 'Describe the subject').max(200, 'Keep the subject under 200 characters'),
-  drawn: z.string().trim().min(1, 'Say what is drawn in full').max(200, 'Keep "drawn in full" under 200 characters'),
-  undrawn: z.string().trim().min(1, 'Say what is left as construction lines').max(200, 'Keep "construction lines" under 200 characters'),
   layout: z.string().trim().min(1, 'Choose a layout'),
   alt_text: z.string().trim().min(1, 'Write the alt text').max(300, 'Keep the alt text under 300 characters'),
 });
