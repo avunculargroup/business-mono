@@ -319,6 +319,35 @@ export interface Ranking {
   fallback: boolean;
 }
 
+/**
+ * Why a critique cannot be ranked on, or null when it can. The same conditions
+ * as rankConcepts' fallback, spelled out for the run's record. Out-of-range
+ * indices are the likeliest cause in round two: the reviewer has just seen
+ * round one's numbering and may carry on from it.
+ */
+export function critiqueProblem(critique: unknown, count: number): string | null {
+  if (critique === null || critique === undefined) return 'no critique returned';
+  const parsed = critiqueSchema.safeParse(critique);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return `malformed critique: ${issue?.path.join('.') || 'root'} ${issue?.message ?? ''}`.trim();
+  }
+  if (parsed.data.scores.length === 0) return 'no scores returned';
+  const seen = new Set<number>();
+  const outside: number[] = [];
+  const twice: number[] = [];
+  for (const s of parsed.data.scores) {
+    if (s.index < 1 || s.index > count) outside.push(s.index);
+    else if (seen.has(s.index)) twice.push(s.index);
+    seen.add(s.index);
+  }
+  const problems = [
+    outside.length > 0 ? `indices outside 1–${count}: ${outside.join(', ')}` : null,
+    twice.length > 0 ? `scored twice: ${[...new Set(twice)].join(', ')}` : null,
+  ].filter(Boolean);
+  return problems.length > 0 ? problems.join('; ') : null;
+}
+
 /** Faults no score can outweigh: such a concept fills a slot only when every concept has one. */
 function hardFault(s: ConceptScore): string | null {
   if (!s.physics_ok) return 'physics reads wrong';

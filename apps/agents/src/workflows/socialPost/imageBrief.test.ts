@@ -13,6 +13,7 @@ import {
   layoutToRest,
   lintImageBrief,
   lintImageConcept,
+  critiqueProblem,
   rankConcepts,
   recentImageHistory,
   reviewerRewriteInstruction,
@@ -510,5 +511,28 @@ describe('buildAltTextLexPrompt', () => {
     const p = buildAltTextLexPrompt('A linocut of a lighthouse.');
     expect(p).toContain('A linocut of a lighthouse.');
     expect(p).toContain('needs_disclaimer = false');
+  });
+});
+
+describe('critiqueProblem', () => {
+  const ok = (index: number) => ({ index, recognisable: 4, twist_visible: 4, on_hook: 4, physics_ok: true, needs_text: false, note: 'n' });
+
+  it('is null for a usable critique', () => {
+    expect(critiqueProblem({ scores: [ok(1), ok(2)] }, 2)).toBeNull();
+  });
+
+  it('names each way a critique cannot be ranked on', () => {
+    expect(critiqueProblem(null, 3)).toBe('no critique returned');
+    expect(critiqueProblem({ scores: [] }, 3)).toBe('no scores returned');
+    expect(critiqueProblem({ scores: [{ index: 1 }] }, 3)).toMatch(/^malformed critique: scores\.0\./);
+    expect(critiqueProblem({ scores: [ok(1), ok(7), ok(8)] }, 3)).toBe('indices outside 1–3: 7, 8');
+    expect(critiqueProblem({ scores: [ok(1), ok(1), ok(9)] }, 3)).toBe('indices outside 1–3: 9; scored twice: 1');
+  });
+
+  it('agrees with rankConcepts about when to fall back', () => {
+    for (const critique of [null, { scores: [] }, { scores: [ok(4)] }, { scores: [ok(1), ok(1)] }, { scores: [ok(1)] }]) {
+      const concepts = [STAMP, LIGHTHOUSE, GATE];
+      expect(critiqueProblem(critique, 3) !== null).toBe(rankConcepts(concepts, critique as Critique | null).fallback);
+    }
   });
 });

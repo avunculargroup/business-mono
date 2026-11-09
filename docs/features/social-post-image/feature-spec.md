@@ -3,7 +3,7 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; canon v1.2. The step 0 bake-off was dropped: tested in production (see Decisions)
-**Last updated:** 2026-11-09 (canon v1.2; the hook, the idea review, and acting on it)
+**Last updated:** 2026-11-09 (canon v1.3; the corner check and the round-two record)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
@@ -115,25 +115,27 @@ Each decision traces back to existing evidence or an existing principle.
 
 -----
 
-## The base prompt (brand visual canon v1.2)
+## The base prompt (brand visual canon v1.3)
 
-This is the content of the active `brand_visual` row: the v1.0 seed (`20261108000000_add_brand_visual.sql`), updated in place to v1.1 by `20261108100000_brand_visual_v1_1.sql` and to v1.2 by `20261109100000_brand_visual_v1_2.sql`. It is derived from the BTS design skill (`.claude/skills/bts-design/README.md` → Visual foundations, Imagery vibe), which is the visual canon. The legacy `DESIGN_BRIEF.md` is not used.
+This is the content of the active `brand_visual` row: the v1.0 seed (`20261108000000_add_brand_visual.sql`), updated in place to v1.1 by `20261108100000_brand_visual_v1_1.sql` to v1.2 by `20261109100000_brand_visual_v1_2.sql`, and to v1.3 by `20261109300000_brand_visual_v1_3.sql`. It is derived from the BTS design skill (`.claude/skills/bts-design/README.md` → Visual foundations, Imagery vibe), which is the visual canon. The legacy `DESIGN_BRIEF.md` is not used.
 
 **Light only (decided 2026-11-07).** The earlier charcoal-ground, gold-gradient social graphic style is retired for generated images. There is no dark variant and no second canon profile.
 
 **Linocut (decided 2026-11-09, v1.2).** Black ink and one flat gold, printed on bright paper. One big, familiar subject with one twist. It replaces the v1.0 sketch and the v1.1 unfinished sketch.
 
+**A flat print, not a photograph of one (decided 2026-11-09, v1.3).** The style now says the image is "a flat, straight-on scan of the printed sheet that fills the whole frame", and the prohibited block names the photographed-print look. v1.2's "the slightly uneven ink texture of a hand-pulled print" was read as "show me a print": a render came back as a linocut photographed on a wooden table. The wording is the first defence; the corner check (5b.6) is the second.
+
 ### Style block
 
 ```
-A bold two-colour linocut print: black ink and one flat gold, printed on bright
-off-white paper. Strong, simple shapes cut with confidence: solid black masses,
-crisp white gouge lines carved through them, visible carving marks, and the
-slightly uneven ink texture of a hand-pulled print. Gold is a second printed
-colour laid down in large flat shapes, not a thin accent. One iconic subject,
-big and instantly recognisable, with a silhouette that still reads at thumbnail
-size. Graphic, confident and striking, like a classic travel poster or a
-woodcut book cover.
+A bold two-colour linocut print, shown as a flat, straight-on scan of the printed
+sheet that fills the whole frame: black ink and one flat gold on bright off-white
+paper. Strong, simple shapes cut with confidence: solid black masses, crisp white
+gouge lines carved through them, visible carving marks, and the slightly uneven
+ink texture of hand printing. Gold is a second printed colour laid down in large
+flat shapes, not a thin accent. One iconic subject, big and instantly
+recognisable, with a silhouette that still reads at thumbnail size. Graphic,
+confident and striking, like a classic travel poster or a woodcut book cover.
 ```
 
 ### Palette block
@@ -160,7 +162,7 @@ frame) as unprinted paper.
 
 ### Prohibited block (sent to the model as part of the prompt)
 
-v1.2 appends its last three lines to the existing block, so the v1.0 and v1.1 lines stay:
+v1.2 appended three lines and v1.3 one more (the last two lines below), so the v1.0 and v1.1 lines stay:
 
 ```
 Never include: text, letters, numbers, labels, logos, watermarks or signatures.
@@ -173,6 +175,8 @@ paper texture or film grain.
 Pencil sketch, fine hatching, construction or guide lines, unfinished drawing.
 Photographs, 3D, gradients, airbrushing. Any colour other than black and gold.
 Borders, frames, letterboxing or bars.
+A photograph of a print: no table, desk or background surface, no visible paper
+edges or corners, no perspective or tilt, no shadows or lighting on the paper.
 ```
 
 ### Subject block (filled from one concept)
@@ -367,7 +371,7 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
    per shortlisted concept, in parallel (Promise.allSettled), each its own generation group, best first:
    5b.4  assemble prompt      (pure)                 buildImagePrompt()
    5b.5  render               (OpenRouter Image API) scope social_post.image_render
-   5b.6  strip bars, paper correction, legibility gate, crop + mark + upload (sharp → Storage)
+   5b.6  strip bars, paper correction, corner check, legibility gate, crop + mark + upload (sharp → Storage)
    5b.7  Lex on alt text      (LLM, structured)      scope social_post.compliance_check
    5b.8  persist content_images rows (unselected) + agent_activity
    then: select the lowest successful candidate (the reviewer's top pick, when it rendered)
@@ -439,6 +443,18 @@ The internal `editor` agent scores every lint-clean concept, text only, under th
 
 **One reviewer-driven re-brief** (`briefConcepts` in `image.ts`). If the critique was usable and fewer than three concepts survive, the brief runs once more carrying `reviewerRewriteInstruction`: each rejected symbol with the reviewer's note and what it fell down on (a hard fault, else its lowest score), every symbol already tried (none may be reused), and a push to different domains. The new concepts are linted, any repeating a round-one symbol is dropped, the editor reviews them, and `rankConcepts` ranks both rounds together. It runs at most once, never loops, and never blocks an image: if the second brief skips, lints to nothing, or its review is unusable, round one stands (with its fills). There are no re-renders.
 
+**What round two did is recorded on every run** as `round_two` in `proposed_actions`, so `review_rounds: 1` can be explained:
+
+| `status` | When | Also recorded |
+|---|---|---|
+| `not_needed` | Three or more passed round one, or round one's review was unusable (no notes to re-brief from) | `reason`: how many passed, or the round-one critique problem |
+| `ran` | The second review was usable and both rounds were ranked together | `concepts_returned`, `fresh_clean` |
+| `brief_skipped` | The second brief skipped or failed | `reason`: its skip reason |
+| `no_fresh_concepts` | Nothing lint-clean and new came back | `reason`: how many repeated a round-one symbol, and the lint flags |
+| `critique_unusable` | The second review could not be ranked on | `reason` from `critiqueProblem`: no critique, malformed, no scores, `indices outside 1–n: …` (the reviewer carried on round one's numbering) or `scored twice: …` |
+
+When round two's review is unusable, its concepts are still appended to `review` with `round: 2`, `outcome: 'not_shortlisted'` and whatever in-range scores came back; they are never ranked. Selection is unchanged: this is visibility only.
+
 If every reviewed concept has a hard fault, the run still renders: the highest-total of them fill the slots (`filled_from_rejected`). A run always gets an image; the founder can regenerate.
 
 ### 5b.4 Prompt assembly (pure: `buildImagePrompt`)
@@ -469,6 +485,7 @@ Order matters: **strip bars, correct the paper, check legibility, then crop, the
 1. Decode `b64_json` and keep it as the unmarked master.
 1. **Strip bars** (`stripBars`, with the decision in the pure `detectBars(rows, cols)`). Models sometimes letterbox a render despite the prompt. Each edge row and column is reduced to its mean luma and standard deviation; a run of near-uniform dark lines from an edge (mean ≤ 0.12, std ≤ 0.04) is a bar and is cropped off. This must run before paper correction: with a bar in place, the bottom-right sample lands on the bar and the correction is skipped, which is how a cream render with letterbox bars got through. If the bars on either axis would take more than 20% of the frame, the candidate is rejected instead (the picture is mostly bar). The record `{ top, bottom, left, right }` goes into `proposed_actions`.
 1. **Paper correction** (`correctPaper`, with the maths in the pure `paperGains(sampleRgb, targetHex)`). Sample the bottom-right 12% × 12% of the master (the canon keeps it empty; the mark is not on yet) and take the per-channel median. If the sample's luma is below 0.80, the corner holds drawing: skip, and record why. Otherwise gains = palette paper hex (fallback `#FAFAF8`) / sample, per channel, clamped to [0.90, 1.15], applied with `sharp().linear(gains, [0,0,0])`. The record `{ sample, gains, applied, reason }` goes into the `social_image_generated` activity's `proposed_actions`. The corrected master is the one stored.
+1. **Corner check** (`corners`, with the decision in the pure `cornerCheck(samples, palette)`). After the paper correction, each corner is sampled as a square 5% of the shorter side and reduced to its per-channel median. A corner passes when it is within RGB distance `CORNER_MAX_DISTANCE` (45) of any palette colour: paper, ink or gold, from the canon's palette, falling back to `#FAFAF8`, `#1A1915`, `#C9A84C`. Ink and gold count because `close_crop` subjects run off the edge. Any failing corner rejects the candidate (`corner off-palette — likely a photographed print`), which is not persisted; the four samples and distances go into the run's `social_image_rejected` entry, and a kept render records its four distances as `corners`. Calibration: slightly cream paper (`[238, 237, 233]`) is about 23 away and passes; the wooden table (`[150, 110, 70]`) is about 77 from gold and a grey shadow (`[185, 182, 175]`) about 101, and both fail.
 1. **Legibility gate** (`legibility`, with the maths in the pure `inkCoverage(histogram)`). The master is downsized to 300px wide (phone-thumbnail scale) in greyscale; ink coverage is the share of pixels with luma below 0.75 (black and gold both count). Coverage outside **0.20–0.75** rejects the candidate: below, the image is mostly empty paper and vanishes in a feed; above, it is a dark mass with no shape. The coverage goes into `proposed_actions`. There is no automatic re-render: a rejected candidate is dropped like a failed render, and the founder can regenerate.
 2. Crop for each platform from `platform_specs.image_specs`, using a `sharp` centre crop and resize:
    - X: 16:9 → 1600×900, a resize only.
@@ -492,7 +509,7 @@ The pipeline order does not change. Copy goes through Lex before persist exactly
 
 - Per candidate: one `content_images` row per persisted `content_item`, all with the same `generation_group_id`, the run's `candidate_set_id`, its `candidate_index`, and `is_selected = false`. `platform_crop` is `linkedin_1200x627` or `x_1600x900`.
 - Once every candidate has settled, the lowest successful `candidate_index` is selected (`planCandidateSelection` in `@platform/shared`, the same rule the web's "Use this image" applies). If every candidate failed, the outcome is `failed` and the run still succeeds. `sort_order` is 0 and `thread_segment_id` is NULL. On X threads the image attaches to the post, which in practice means the first segment.
-- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. When the reviewer ran, each row also carries `hook`, `review_fallback` (the critique was unusable), `review_rounds` (1, or 2 after a reviewer-driven re-brief) and `review`: **every** concept the reviewer saw in either round, with its round, scores, `needs_text`, total, rank, outcome (`shortlisted`, `dropped` with the reason, or `not_shortlisted`) and `filled_from_rejected`, so the audit trail shows why an idea did or did not make it. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
+- `agent_activity`: `agent_name = 'charlie'` (already in the CHECK), `action = 'social_image_generated'`, `status = 'pending'`, `trigger_type = 'scheduled'`, `entity_type = 'content_item'`, and `proposed_actions` carrying the candidate set and index, `layout`, `subject`, `tension`, `model_id`, `cost_usd` and the paper correction. One row per candidate. When the reviewer ran, each row also carries `hook`, `review_fallback` (the critique was unusable), `review_rounds` (1, or 2 after a reviewer-driven re-brief), `round_two` (what the second round did; see 5b.3b) and `review`: **every** concept the reviewer saw in either round, with its round, scores, `needs_text`, total, rank, outcome (`shortlisted`, `dropped` with the reason, or `not_shortlisted`) and `filled_from_rejected`, so the audit trail shows why an idea did or did not make it. A skip logs `action = 'social_image_skipped'` with the reason, so the quiet path is visible in the audit trail.
 - A second row for the alt-text check: `agent_name = 'lex'`, `action = 'compliance_checked'`, `proposed_actions: [{ type: 'image_alt_text', classification }]`.
 
 ### Compliance
@@ -587,6 +604,7 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | Every candidate's render fails | `failed`; nothing billed; drafts and email unaffected |
 | Render has letterbox or pillarbox bars | Stripped before paper correction and recorded; if bars would take more than 20% of either axis, the candidate is rejected |
 | Paper sample is not empty paper (luma < 0.80) | Correction skipped and recorded; the render is used as returned |
+| A corner is off-palette (table, desk or shadow: a photographed print) | Candidate rejected and dropped, with the four corner samples and distances in a `social_image_rejected` activity; the others are kept. No re-render |
 | Ink coverage at thumbnail size below 0.20 or above 0.75 | Candidate rejected and dropped, with the coverage recorded in a `social_image_rejected` activity; the others are kept. No automatic re-render. If every candidate is rejected, status is `failed` |
 | Reference images unsupported by endpoint | Render prompt-only; noted in `proposed_actions` |
 | Crop, mark composite or upload fails | `failed`; no partial `content_images` rows (insert only after all three objects upload). An unmarked image never reaches a founder. |
@@ -682,6 +700,8 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **Four domains, at most two per domain.** The six "playbook" ideas all came from writing and printing tools. |
 | 2026-11-09 | **At least two hook puns.** "Playbook" and "the game" were in the post; a football on a kicking tee on a freshly marked pitch was there to be had, and none of the six used the words. |
 | 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` never fills a slot while any other concept can. If every idea has a physics or text fault, the best of them still render: a run always gets an image (Chris, 2026-11-09). |
+| 2026-11-09 | **A flat print, not a photo of a print (canon v1.3, corner check).** The CP 392 railway signal gantry came back as a linocut photographed on a wooden table (paper edge, wood in the top-left corner, perspective, shadow); an earlier football pitch was photographed at an angle with a grey shadow at its edge. The style now asks for a flat, straight-on scan of the sheet, the prohibited block names the look, and a render whose corner is not paper, ink or gold is rejected. |
+| 2026-11-09 | **Round two outcomes recorded.** The 10:50 UTC CP 392 run passed two ideas (whiteboard 15, gantry 12), so round two should have run, yet the row read `review_rounds: 1` and filled slot three with a stream scoring 1 on the hook. Three silent paths could explain it. `round_two` now records which, with counts and the reviewer's index problems; an unusable round two's concepts are logged though never ranked. Selection unchanged. |
 | 2026-11-09 | **The brief always asks for six ideas.** One CP 392 round returned four, leaving the reviewer less to choose from. The prompt says "exactly six" in both rounds and the contract schema requires six for a non-skip brief. A short brief is still reviewed, never re-asked or turned into a skip. |
 | 2026-11-09 | **Founder picks are compared with the reviewer's, read-only.** `v_image_pick_agreement` and the Reviewer agreement panel. On the CP 392 run Chris picked the football pitch (the reviewer's third) over its top pick, the blueprint tube. If that pattern holds, the reviewer's scoring changes; the evidence comes first. |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |

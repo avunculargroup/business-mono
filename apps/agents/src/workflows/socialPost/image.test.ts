@@ -264,6 +264,43 @@ describe('runImageStep', () => {
     }
   });
 
+  it('drops a render whose corner shows a table, records its corners, and keeps the others', async () => {
+    const wood = await sharp({ create: { width: 140, height: 120, channels: 3, background: { r: 150, g: 110, b: 70 } } }).png().toBuffer();
+    const onTable = await sharp(parchment).composite([{ input: wood, left: 0, top: 0 }]).png().toBuffer();
+    generateImage.mockImplementation(async ({ prompt }: { prompt: string }) => ({
+      image: prompt.includes(STAMP.subject) ? onTable : parchment,
+      mediaType: 'image/png',
+      costUsd: 0.04,
+      generationRef: 'gen',
+      referencesDropped: false,
+    }));
+    const restore = answerSetReadWithInsertedRows();
+    try {
+      const { outcome } = await runImageStep(PARAMS);
+      expect(outcome).toMatchObject({ status: 'generated', candidates: 2 });
+      expect(insertedImageRows().some((r) => r['candidate_index'] === 0)).toBe(false);
+      const rejected = activityRows().find((r) => r.action === 'social_image_rejected')!.proposed_actions[0]!['rejected'] as Array<
+        Record<string, unknown>
+      >;
+      expect(rejected).toEqual([
+        {
+          candidate_index: 0,
+          reason: 'corner off-palette — likely a photographed print',
+          coverage: null,
+          corners: { samples: expect.any(Array), distances: expect.any(Array) },
+        },
+      ]);
+      const corners = rejected[0]!['corners'] as { distances: number[] };
+      expect(corners.distances[0]).toBeGreaterThan(45);
+      expect(corners.distances.slice(1).every((d) => d <= 45)).toBe(true);
+      // Kept renders carry their corner distances too.
+      const generated = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+      expect((generated['corners'] as number[]).every((d) => d <= 45)).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
   it('fails, with the reasons, when every candidate is rejected', async () => {
     generateImage.mockResolvedValue({ image: faint, mediaType: 'image/png', costUsd: 0.04, generationRef: 'gen', referencesDropped: false });
     const { outcome } = await runImageStep(PARAMS);
@@ -448,6 +485,88 @@ describe('runImageStep', () => {
     const WHISTLE = { ...STAMP, symbol: "A referee's whistle", twist: 'Solid gold, on a black lanyard', subject: "A gold referee's whistle" };
     // Round one: only the lighthouse passes.
     const ROUND1 = { scores: [SCORE(1, 2, 4, 4), SCORE(2, 5, 4, 5), SCORE(3, 3, 2, 3)] };
+
+    const roundTwoOf = () =>
+      activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!['round_two'] as Record<string, unknown>;
+    const reviewOf = () =>
+      activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!['review'] as Array<Record<string, unknown>>;
+
+    it('records round two as not needed when three or more pass round one', async () => {
+      editorGenerate.mockResolvedValueOnce({ object: { scores: [SCORE(1, 4, 4, 4), SCORE(2, 5, 4, 5), SCORE(3, 4, 3, 4)] } });
+      await runImageStep(PARAMS);
+      expect(charlieGenerate).toHaveBeenCalledTimes(1);
+      expect(roundTwoOf()).toEqual({ status: 'not_needed', reason: '3 of 3 passed in round one' });
+    });
+
+    it('records round two as not needed, with the reason, when round one\'s review was unusable', async () => {
+      editorGenerate.mockResolvedValueOnce({ object: null });
+      await runImageStep(PARAMS);
+      expect(roundTwoOf()).toMatchObject({ status: 'not_needed', reason: expect.stringMatching(/round one review unusable \(no critique returned\)/) });
+    });
+
+    it('records a round two that ran', async () => {
+      charlieGenerate
+        .mockResolvedValueOnce({ object: BRIEF })
+        .mockResolvedValueOnce({ object: { ...BRIEF, concepts: [FOOTBALL, WHISTLE, { ...LIGHTHOUSE, symbol: 'a lighthouse' }] } });
+      editorGenerate
+        .mockResolvedValueOnce({ object: ROUND1 })
+        .mockResolvedValueOnce({ object: { scores: [SCORE(1, 5, 4, 5), SCORE(2, 4, 4, 3)] } });
+      await runImageStep(PARAMS);
+      expect(roundTwoOf()).toEqual({ status: 'ran', concepts_returned: 3, fresh_clean: 2 });
+    });
+
+    it('records a second brief that skipped', async () => {
+      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockRejectedValueOnce(new Error('brief down'));
+      editorGenerate.mockResolvedValueOnce({ object: ROUND1 });
+      await runImageStep(PARAMS);
+      expect(roundTwoOf()).toEqual({ status: 'brief_skipped', reason: 'Brief generation failed.', concepts_returned: 0 });
+      expect(activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!['review_rounds']).toBe(1);
+    });
+
+    it('records a second brief with nothing new: how many repeated round one', async () => {
+      charlieGenerate
+        .mockResolvedValueOnce({ object: BRIEF })
+        .mockResolvedValueOnce({ object: { ...BRIEF, concepts: [{ ...LIGHTHOUSE, symbol: 'A Lighthouse.' }, { ...GATE, symbol: 'a turnstile' }] } });
+      editorGenerate.mockResolvedValueOnce({ object: ROUND1 });
+      await runImageStep(PARAMS);
+      expect(editorGenerate).toHaveBeenCalledTimes(1);
+      expect(roundTwoOf()).toEqual({
+        status: 'no_fresh_concepts',
+        reason: '2 clean concepts repeated a round-one symbol',
+        concepts_returned: 2,
+        fresh_clean: 0,
+      });
+    });
+
+    it('records an unusable second review by its index problem, and still logs round two\'s concepts', async () => {
+      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockResolvedValueOnce({ object: { ...BRIEF, concepts: [FOOTBALL, WHISTLE] } });
+      // The reviewer carried on round one's numbering: 4 and 5 for a list of two.
+      editorGenerate.mockResolvedValueOnce({ object: ROUND1 }).mockResolvedValueOnce({ object: { scores: [SCORE(4, 5, 5, 5), SCORE(5, 4, 4, 4)] } });
+      await runImageStep(PARAMS);
+
+      expect(roundTwoOf()).toEqual({ status: 'critique_unusable', reason: 'indices outside 1–2: 4, 5', concepts_returned: 2, fresh_clean: 2 });
+      const review = reviewOf();
+      expect(review.filter((c) => c['round'] === 2).map((c) => [c['symbol'], c['outcome'], c['total']])).toEqual([
+        ['A football on a kicking tee', 'not_shortlisted', null],
+        ["A referee's whistle", 'not_shortlisted', null],
+      ]);
+      // Selection is unchanged: round one stands, the gaps filled from its soft rejects.
+      const rows = insertedImageRows();
+      expect(rows.some((r) => (r['image_brief'] as { symbol: string }).symbol === 'A football on a kicking tee')).toBe(false);
+    });
+
+    it('keeps the in-range scores of a second review that scored a concept twice', async () => {
+      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockResolvedValueOnce({ object: { ...BRIEF, concepts: [FOOTBALL, WHISTLE] } });
+      editorGenerate
+        .mockResolvedValueOnce({ object: ROUND1 })
+        .mockResolvedValueOnce({ object: { scores: [SCORE(1, 5, 4, 5), SCORE(1, 3, 3, 3), SCORE(2, 4, 4, 4)] } });
+      await runImageStep(PARAMS);
+      expect(roundTwoOf()).toMatchObject({ status: 'critique_unusable', reason: 'scored twice: 1' });
+      expect(reviewOf().filter((c) => c['round'] === 2).map((c) => [c['symbol'], c['total']])).toEqual([
+        ['A football on a kicking tee', 14],
+        ["A referee's whistle", 12],
+      ]);
+    });
 
     it('re-briefs once with the reviewer\'s notes when fewer than three pass, and renders round two\'s survivors', async () => {
       charlieGenerate

@@ -18,6 +18,10 @@ import {
   platformCrop,
   samplePaper,
   toPngMaster,
+  CORNER_MAX_DISTANCE,
+  cornerCheck,
+  corners,
+  type Rgb,
 } from './imageCompose.js';
 import { DEFAULT_BRAND_MARK } from './imagePrompt.js';
 
@@ -305,5 +309,53 @@ describe('legibility', () => {
     expect(bolder.coverage).toBeGreaterThan(0.3);
 
     expect((await legibility(await paperMaster())).pass).toBe(false);
+  });
+});
+
+describe('cornerCheck', () => {
+  const PALETTE = ['#FAFAF8', '#1A1915', '#C9A84C'];
+  const PAPER: Rgb = [250, 250, 248];
+
+  it('passes clean paper in all four corners, and slightly cream paper', () => {
+    expect(cornerCheck([PAPER, PAPER, PAPER, PAPER], PALETTE)).toMatchObject({ pass: true, failing: [] });
+    const cream: Rgb = [238, 237, 233];
+    const r = cornerCheck([cream, cream, cream, cream], PALETTE);
+    expect(r.pass).toBe(true);
+    expect(r.distances[0]).toBeLessThan(CORNER_MAX_DISTANCE);
+  });
+
+  it('fails a wood-brown corner: the table under a photographed print', () => {
+    const r = cornerCheck([[150, 110, 70], PAPER, PAPER, PAPER], PALETTE);
+    expect(r).toMatchObject({ pass: false, failing: [0] });
+    expect(r.distances[0]).toBeGreaterThan(CORNER_MAX_DISTANCE);
+  });
+
+  it('fails a grey shadow corner', () => {
+    expect(cornerCheck([PAPER, PAPER, PAPER, [185, 182, 175]], PALETTE)).toMatchObject({ pass: false, failing: [3] });
+  });
+
+  it('passes a close_crop subject running off the edges in black and gold', () => {
+    expect(cornerCheck([[26, 25, 21], [201, 168, 76], [30, 28, 24], PAPER], PALETTE).pass).toBe(true);
+  });
+
+  it('falls back to paper, ink and gold when the palette has no usable colour', () => {
+    expect(cornerCheck([[26, 25, 21], PAPER, PAPER, PAPER], ['not-a-colour']).pass).toBe(true);
+  });
+});
+
+describe('corners', () => {
+  it('samples each corner of a real image and finds the photographed-print corner', async () => {
+    const paper = { r: 250, g: 250, b: 248 };
+    const wood = await sharp({ create: { width: 140, height: 120, channels: 3, background: { r: 150, g: 110, b: 70 } } }).png().toBuffer();
+    const photographed = await sharp({ create: { width: 1344, height: 768, channels: 3, background: paper } })
+      .composite([{ input: wood, left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+    const r = await corners(photographed, ['#FAFAF8', '#1A1915', '#C9A84C']);
+    expect(r.samples[0]).toEqual([150, 110, 70]);
+    expect(r).toMatchObject({ pass: false, failing: [0] });
+
+    const flat = await sharp({ create: { width: 1344, height: 768, channels: 3, background: paper } }).png().toBuffer();
+    expect((await corners(flat, ['#FAFAF8'])).pass).toBe(true);
   });
 });

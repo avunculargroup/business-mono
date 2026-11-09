@@ -1,22 +1,23 @@
 // The active brand_visual row as production holds it: the v1.0 seed in
 // supabase/migrations/20261108000000_add_brand_visual.sql, updated in place to
-// v1.1 by 20261108100000_brand_visual_v1_1.sql and to v1.2 by
-// 20261109100000_brand_visual_v1_2.sql. Mirrored here so the image-step tests
+// v1.1 by 20261108100000_brand_visual_v1_1.sql, to v1.2 by
+// 20261109100000_brand_visual_v1_2.sql and to v1.3 by
+// 20261109300000_brand_visual_v1_3.sql. Mirrored here so the image-step tests
 // exercise the canon that actually ships. If a migration changes the canon,
 // change this too. `motifs` (v1.0) and the inactive v1.1 layouts stay on the
 // row because old images reference them.
 export const BRAND_VISUAL_ROW = {
   id: 'bv-1',
-  version: '1.2',
+  version: '1.3',
   is_active: true,
-  style_block: `A bold two-colour linocut print: black ink and one flat gold, printed on bright
-off-white paper. Strong, simple shapes cut with confidence: solid black masses,
-crisp white gouge lines carved through them, visible carving marks, and the
-slightly uneven ink texture of a hand-pulled print. Gold is a second printed
-colour laid down in large flat shapes, not a thin accent. One iconic subject,
-big and instantly recognisable, with a silhouette that still reads at thumbnail
-size. Graphic, confident and striking, like a classic travel poster or a
-woodcut book cover.`,
+  style_block: `A bold two-colour linocut print, shown as a flat, straight-on scan of the printed
+sheet that fills the whole frame: black ink and one flat gold on bright off-white
+paper. Strong, simple shapes cut with confidence: solid black masses, crisp white
+gouge lines carved through them, visible carving marks, and the slightly uneven
+ink texture of hand printing. Gold is a second printed colour laid down in large
+flat shapes, not a thin accent. One iconic subject, big and instantly
+recognisable, with a silhouette that still reads at thumbnail size. Graphic,
+confident and striking, like a classic travel poster or a woodcut book cover.`,
   palette: [
   {
     "role": "Paper",
@@ -50,7 +51,9 @@ vector polish, cartoon, comic, caricature or childlike doodle styles, mascots,
 paper texture or film grain.
 Pencil sketch, fine hatching, construction or guide lines, unfinished drawing.
 Photographs, 3D, gradients, airbrushing. Any colour other than black and gold.
-Borders, frames, letterboxing or bars.`,
+Borders, frames, letterboxing or bars.
+A photograph of a print: no table, desk or background surface, no visible paper
+edges or corners, no perspective or tilt, no shadows or lighting on the paper.`,
   prohibited_terms: ["$", "arrow", "bear", "bull", "candlestick", "chart", "coin", "coins", "lambo", "moon", "rocket", "₿"],
   motifs: [
   {

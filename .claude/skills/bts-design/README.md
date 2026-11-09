@@ -161,7 +161,7 @@ Rarely used. Backdrop blur only appears on the mobile "More" sheet backdrop (`rg
 
 There is **no stock photography** in this product. No hero images, no finance clichés (gold bars, bitcoin coins, rising chart illustrations). If illustration is ever needed for empty states or onboarding: simple line art in the warm palette, not playful or cartoon. Warm tone, never cool or grainy.
 
-**Generated social post images** follow the linocut canon held in the `brand_visual` table (v1.2: a bold two-colour linocut, black ink and one flat muted gold on bright near-white paper; one big familiar symbol with one twist, readable in half a second on a phone; layout presets; full-bleed, no borders; no text). The BTS mark is composited bottom-right by code and is never drawn by the image model. Edit the canon in the table, not here — see `docs/features/social-post-image/feature-spec.md`.
+**Generated social post images** follow the linocut canon held in the `brand_visual` table (v1.3: a bold two-colour linocut, shown as a flat scan of the printed sheet, black ink and one flat muted gold on bright near-white paper; one big familiar symbol with one twist, readable in half a second on a phone; layout presets; full-bleed, no borders; no text). The BTS mark is composited bottom-right by code and is never drawn by the image model. Edit the canon in the table, not here — see `docs/features/social-post-image/feature-spec.md`.
 
 ### Cards
 

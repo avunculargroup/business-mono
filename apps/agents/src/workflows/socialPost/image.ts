@@ -19,6 +19,7 @@ import {
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
   buildImageCriticPrompt,
+  critiqueProblem,
   critiqueSchema,
   imageBriefRewriteInstruction,
   imageBriefOutputSchema,
@@ -36,7 +37,9 @@ import {
 import { activeLayouts, buildImagePrompt, toBrandVisual, type BrandVisual } from './imagePrompt.js';
 import {
   DEFAULT_PAPER_HEX,
+  corners,
   legibility,
+  type Rgb,
   stripBars,
   type BarDetection,
   composePlatformImage,
@@ -245,8 +248,10 @@ export interface ReviewLog {
   hook: string;
   /** True when the reviewer's output was unusable and the brief's order was rendered. */
   review_fallback: boolean;
-  /** 2 when the reviewer's notes drove a second brief. */
+  /** 2 when the reviewer's notes drove a second brief whose review was ranked. */
   review_rounds: 1 | 2;
+  /** What the reviewer-driven second round did, every run. */
+  round_two: RoundTwoRecord;
   concepts: Array<{
     /** Across both rounds, from 1. */
     index: number;
@@ -265,6 +270,20 @@ export interface ReviewLog {
     /** Rendered although the filter rejected it, because too few passed. */
     filled_from_rejected: boolean;
   }>;
+}
+
+/**
+ * The second round's outcome, recorded on every run so a "review_rounds: 1"
+ * can be explained: it was not needed, or it was tried and fell short, and why.
+ * Visibility only: selection is unchanged.
+ */
+export interface RoundTwoRecord {
+  status: 'not_needed' | 'ran' | 'brief_skipped' | 'no_fresh_concepts' | 'critique_unusable';
+  reason?: string;
+  /** Concepts the second brief returned, before lint and de-duplication. */
+  concepts_returned?: number;
+  /** Of those, how many were lint-clean and new. */
+  fresh_clean?: number;
 }
 
 /** What briefConcepts hands the renderer alongside the shortlisted concepts. */
@@ -294,14 +313,21 @@ export type RenderResult =
       layout: string;
       reason: string;
       /** Set when a quality check (bars, legibility) dropped a render that did come back. */
-      rejected?: { reason: string; coverage: number | null };
+      rejected?: { reason: string; coverage: number | null; corners?: CornerRecord };
     };
+
+/** The four corner samples (top-left, top-right, bottom-left, bottom-right) and their palette distances. */
+export interface CornerRecord {
+  samples: Rgb[];
+  distances: number[];
+}
 
 /** A render the quality checks dropped: not persisted, recorded on the run's activity. */
 class CandidateRejected extends Error {
   constructor(
     readonly reason: string,
     readonly coverage: number | null,
+    readonly corners?: CornerRecord,
   ) {
     super(reason);
   }
@@ -352,6 +378,12 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
     const { image: unbarred, bars } = await stripBars(await toPngMaster(rendered.image));
     if (bars.reject) throw new CandidateRejected(bars.reason, null);
     const { image: master, correction: paper } = await correctPaper(unbarred, paperHex(canon));
+    // A photograph of a print shows table or shadow in its corners; a print shows paper, ink or gold.
+    const cornerResult = await corners(master, canon.palette.map((p) => p.hex));
+    const cornerRecord: CornerRecord = { samples: cornerResult.samples, distances: cornerResult.distances };
+    if (!cornerResult.pass) {
+      throw new CandidateRejected('corner off-palette — likely a photographed print', null, cornerRecord);
+    }
     const legible = await legibility(master);
     if (!legible.pass) throw new CandidateRejected(legible.reason, legible.coverage);
     const folder = `social-images/${new Date().toISOString().slice(0, 10)}/${groupId}`;
@@ -431,12 +463,14 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             references_dropped: rendered.referencesDropped,
             bars: { top: bars.top, bottom: bars.bottom, left: bars.left, right: bars.right },
             paper,
+            corners: cornerRecord.distances,
             coverage: legible.coverage,
             ...(params.review
               ? {
                   hook: params.review.hook,
                   review_fallback: params.review.log.review_fallback,
                   review_rounds: params.review.log.review_rounds,
+                  round_two: params.review.log.round_two,
                   review: params.review.log.concepts,
                 }
               : {}),
@@ -473,7 +507,13 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
     await removeObjects(uploaded);
     if (err instanceof CandidateRejected) {
       log.info({ groupId, candidateIndex, reason: err.reason, coverage: err.coverage }, 'image candidate rejected');
-      return { ok: false, candidateIndex, layout, reason: err.reason, rejected: { reason: err.reason, coverage: err.coverage } };
+      return {
+        ok: false,
+        candidateIndex,
+        layout,
+        reason: err.reason,
+        rejected: { reason: err.reason, coverage: err.coverage, ...(err.corners ? { corners: err.corners } : {}) },
+      };
     }
     log.error({ err, groupId, candidateIndex }, 'image candidate failed');
     return { ok: false, candidateIndex, layout, reason: summariseError(err) };
@@ -569,7 +609,16 @@ export async function renderCandidateSet(params: {
 
   // Rejected renders leave no rows, so the run's activity is their only record.
   const rejected = results.flatMap((r) =>
-    !r.ok && r.rejected ? [{ candidate_index: r.candidateIndex, reason: r.rejected.reason, coverage: r.rejected.coverage }] : [],
+    !r.ok && r.rejected
+      ? [
+          {
+            candidate_index: r.candidateIndex,
+            reason: r.rejected.reason,
+            coverage: r.rejected.coverage,
+            ...(r.rejected.corners ? { corners: r.rejected.corners } : {}),
+          },
+        ]
+      : [],
   );
   if (rejected.length > 0) {
     await logActivity([
@@ -636,13 +685,22 @@ export async function briefConcepts(
   if (ranking.fallback) log.warn({ hadCritique: critique1 !== null }, 'image idea review unusable — rendering in brief order');
 
   // ── One reviewer-driven re-brief when too few ideas pass ──────────────────
+  let roundTwo: RoundTwoRecord = ranking.fallback
+    ? { status: 'not_needed', reason: `round one review unusable (${critiqueProblem(critique1, round1.length)}); no notes to re-brief from` }
+    : { status: 'not_needed', reason: `${ranking.passed} of ${round1.length} passed in round one` };
+  /** Round two's concepts when its review was unusable: logged, never ranked. */
+  let unranked: { concepts: ImageConcept[]; critique: Critique | null } | null = null;
   if (!ranking.fallback && ranking.passed < MAX_CANDIDATES && critique1) {
     const second = await secondRound(briefParams, lintOpts, params.postCopy, hook, round1, critique1, ranking);
-    if (second) {
-      concepts = [...round1, ...second.concepts];
-      critique = second.critique;
+    roundTwo = second.record;
+    log.info({ round_two: second.record }, 'image review round two');
+    if (second.record.status === 'ran' && second.merged) {
+      concepts = [...round1, ...second.merged.concepts];
+      critique = second.merged.critique;
       ranking = rankConcepts(concepts, critique, MAX_CANDIDATES);
       rounds = 2;
+    } else if (second.record.status === 'critique_unusable' && second.unranked) {
+      unranked = second.unranked;
     }
   }
 
@@ -651,7 +709,7 @@ export async function briefConcepts(
     review: {
       hook,
       reviews: ranking.ranked.map(storedReview),
-      log: reviewLog(hook, concepts, round1.length, critique, ranking, rounds),
+      log: reviewLog(hook, concepts, round1.length, critique, ranking, rounds, roundTwo, unranked),
     },
   };
 }
@@ -661,12 +719,18 @@ function symbolKey(symbol: string): string {
   return symbol.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+interface SecondRound {
+  record: RoundTwoRecord;
+  /** Status 'ran': round two's concepts and a critique covering both rounds (round two's indices shifted past round one's). */
+  merged?: { concepts: ImageConcept[]; critique: Critique };
+  /** Status 'critique_unusable': round two's concepts and whatever its reviewer returned, for the log only. */
+  unranked?: { concepts: ImageConcept[]; critique: Critique | null };
+}
+
 /**
  * The single re-brief driven by the reviewer: its notes on every rejected
- * concept and every symbol already tried. Returns the second round's clean,
- * new concepts with a critique covering both rounds (round two's indices
- * shifted past round one's), or null whenever the second round cannot be
- * used, in which case the first round stands.
+ * concept and every symbol already tried. Always says what happened; only a
+ * usable second review is ranked, so round one stands otherwise.
  */
 async function secondRound(
   briefParams: ImageBriefPromptParams,
@@ -676,7 +740,7 @@ async function secondRound(
   round1: ImageConcept[],
   critique1: Critique,
   ranking: Ranking,
-): Promise<{ concepts: ImageConcept[]; critique: Critique } | null> {
+): Promise<SecondRound> {
   const scores = new Map(critique1.scores.map((sc) => [sc.index, sc]));
   const rejected = ranking.dropped.flatMap((d) => {
     const sc = scores.get(d.index);
@@ -687,27 +751,66 @@ async function secondRound(
   const instruction = reviewerRewriteInstruction(rejected, tried);
 
   const brief = await generateBrief(buildImageBriefPrompt({ ...briefParams, reviewerInstruction: instruction }));
-  if (brief.skip) return null;
+  if (brief.skip) {
+    return {
+      record: { status: 'brief_skipped', reason: brief.skip_reason?.trim() || 'the second brief chose to skip', concepts_returned: 0 },
+    };
+  }
+  const returned = brief.concepts.length;
   const seen = new Set(tried.map(symbolKey));
-  const fresh = lintImageBrief(brief, lintOpts).clean.filter((c) => !seen.has(symbolKey(c.symbol)));
+  const lint = lintImageBrief(brief, lintOpts);
+  const fresh = lint.clean.filter((c) => !seen.has(symbolKey(c.symbol)));
   if (fresh.length === 0) {
-    log.info('reviewer re-brief produced no new clean concepts — keeping round one');
-    return null;
+    const duplicates = lint.clean.length;
+    const parts = [
+      duplicates > 0 ? `${duplicates} clean concept${duplicates === 1 ? '' : 's'} repeated a round-one symbol` : null,
+      lint.flags.length > 0 ? `lint: ${lint.flags.join(' ')}` : null,
+    ].filter(Boolean);
+    return {
+      record: { status: 'no_fresh_concepts', reason: parts.join('; ') || 'no concepts came back', concepts_returned: returned, fresh_clean: 0 },
+    };
   }
   const critique2 = await generateCritique(buildImageCriticPrompt({ postCopy, hook, concepts: fresh }));
-  // Unusable second review: round one stands rather than ranking half-blind.
-  if (!critique2 || rankConcepts(fresh, critique2).fallback) {
-    log.warn('second image idea review unusable — keeping round one');
-    return null;
+  // Unusable second review: round one stands rather than ranking half-blind,
+  // but what came back is kept for the record.
+  const problem = critiqueProblem(critique2, fresh.length);
+  if (problem) {
+    const parsed = critiqueSchema.safeParse(critique2);
+    return {
+      record: { status: 'critique_unusable', reason: problem, concepts_returned: returned, fresh_clean: fresh.length },
+      unranked: { concepts: fresh, critique: parsed.success ? parsed.data : null },
+    };
   }
   const offset = round1.length;
   return {
-    concepts: fresh,
-    critique: { scores: [...critique1.scores, ...critique2.scores.map((sc) => ({ ...sc, index: sc.index + offset }))] },
+    record: { status: 'ran', concepts_returned: returned, fresh_clean: fresh.length },
+    merged: {
+      concepts: fresh,
+      critique: { scores: [...critique1.scores, ...critique2!.scores.map((sc) => ({ ...sc, index: sc.index + offset }))] },
+    },
   };
 }
 
-/** Every reviewed concept, both rounds, with its scores and fate, so the activity row shows why an idea did not make it. */
+type LoggedConcept = ReviewLog['concepts'][number];
+
+function scoreFields(sc: Critique['scores'][number] | undefined) {
+  return {
+    recognisable: sc?.recognisable ?? null,
+    twist_visible: sc?.twist_visible ?? null,
+    on_hook: sc?.on_hook ?? null,
+    physics_ok: sc?.physics_ok ?? null,
+    needs_text: sc?.needs_text ?? null,
+    note: sc?.note ?? null,
+    total: sc ? sc.recognisable + sc.twist_visible + sc.on_hook : null,
+  };
+}
+
+/**
+ * Every reviewed concept, both rounds, with its scores and fate, so the
+ * activity row shows why an idea did not make it. An unusable round two's
+ * concepts are appended with whatever in-range scores its reviewer gave; they
+ * were never ranked.
+ */
 function reviewLog(
   hook: string,
   concepts: ImageConcept[],
@@ -715,36 +818,45 @@ function reviewLog(
   critique: Critique | null,
   ranking: Ranking,
   rounds: 1 | 2,
+  roundTwo: RoundTwoRecord,
+  unranked: { concepts: ImageConcept[]; critique: Critique | null } | null,
 ): ReviewLog {
   const scores = new Map((critique?.scores ?? []).map((sc) => [sc.index, sc]));
   const ranked = new Map(ranking.ranked.map((r) => [r.concept, r]));
   const dropped = new Map(ranking.dropped.map((d) => [d.index, d.reason]));
-  return {
-    hook,
-    review_fallback: ranking.fallback,
-    review_rounds: rounds,
-    concepts: concepts.map((concept, i) => {
-      const sc = scores.get(i + 1);
-      const r = ranked.get(concept);
-      const reason = dropped.get(i + 1) ?? null;
-      return {
-        index: i + 1,
-        round: i < round1Count ? 1 : 2,
+  const logged: LoggedConcept[] = concepts.map((concept, i) => {
+    const r = ranked.get(concept);
+    const reason = dropped.get(i + 1) ?? null;
+    return {
+      index: i + 1,
+      round: i < round1Count ? 1 : 2,
+      symbol: concept.symbol,
+      ...scoreFields(scores.get(i + 1)),
+      rank: r?.rank ?? null,
+      outcome: r ? 'shortlisted' : reason ? 'dropped' : 'not_shortlisted',
+      reason,
+      filled_from_rejected: r?.filled ?? false,
+    };
+  });
+  if (unranked) {
+    const own = new Map<number, Critique['scores'][number]>();
+    for (const sc of unranked.critique?.scores ?? []) {
+      if (sc.index >= 1 && sc.index <= unranked.concepts.length && !own.has(sc.index)) own.set(sc.index, sc);
+    }
+    unranked.concepts.forEach((concept, i) => {
+      logged.push({
+        index: concepts.length + i + 1,
+        round: 2,
         symbol: concept.symbol,
-        recognisable: sc?.recognisable ?? null,
-        twist_visible: sc?.twist_visible ?? null,
-        on_hook: sc?.on_hook ?? null,
-        physics_ok: sc?.physics_ok ?? null,
-        needs_text: sc?.needs_text ?? null,
-        note: sc?.note ?? null,
-        total: sc ? sc.recognisable + sc.twist_visible + sc.on_hook : null,
-        rank: r?.rank ?? null,
-        outcome: r ? 'shortlisted' : reason ? 'dropped' : 'not_shortlisted',
-        reason,
-        filled_from_rejected: r?.filled ?? false,
-      };
-    }),
-  };
+        ...scoreFields(own.get(i + 1)),
+        rank: null,
+        outcome: 'not_shortlisted',
+        reason: 'round two review unusable; round one stands',
+        filled_from_rejected: false,
+      });
+    });
+  }
+  return { hook, review_fallback: ranking.fallback, review_rounds: rounds, round_two: roundTwo, concepts: logged };
 }
 
 /** Step 5b. Never throws. */
