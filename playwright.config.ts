@@ -58,6 +58,8 @@ export default defineConfig({
     url: 'http://127.0.0.1:4321',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // Next writes build errors to stdout; without this a failed build shows only "exited (1)".
+    stdout: 'pipe',
   },
 
   use: {
