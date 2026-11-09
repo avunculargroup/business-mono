@@ -15,6 +15,8 @@ import {
 } from '@platform/shared';
 import { removeStyleAnchor, saveBrandVisual } from '@/app/actions/brandVisual';
 import { ChipField } from './ChipField';
+import { ReviewerAgreement } from './ReviewerAgreement';
+import type { PickAgreementRow } from './reviewerAgreement';
 import styles from './VisualTab.module.css';
 
 export interface StyleAnchorView {
@@ -27,6 +29,8 @@ interface VisualTabProps {
   canon: BrandVisual | null;
   notes: string | null;
   anchors: StyleAnchorView[];
+  /** Decided runs from v_image_pick_agreement, newest first. */
+  agreement?: PickAgreementRow[];
 }
 
 /** The LinkedIn crop, used for the mark preview: the smaller of the two. */
@@ -50,7 +54,7 @@ function sampleConcept(layout: Layout | undefined): ImageConcept {
  * from. Saving makes a new version; the prompt preview below uses the same
  * function the agents server does, against a sample brief.
  */
-export function VisualTab({ canon, notes, anchors }: VisualTabProps) {
+export function VisualTab({ canon, notes, anchors, agreement = [] }: VisualTabProps) {
   if (!canon) {
     return (
       <p className={styles.empty}>
@@ -58,10 +62,20 @@ export function VisualTab({ canon, notes, anchors }: VisualTabProps) {
       </p>
     );
   }
-  return <VisualCanonForm canon={canon} notes={notes} anchors={anchors} />;
+  return <VisualCanonForm canon={canon} notes={notes} anchors={anchors} agreement={agreement} />;
 }
 
-function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: BrandVisual; notes: string | null; anchors: StyleAnchorView[] }) {
+function VisualCanonForm({
+  canon,
+  notes: initialNotes,
+  anchors,
+  agreement,
+}: {
+  canon: BrandVisual;
+  notes: string | null;
+  anchors: StyleAnchorView[];
+  agreement: PickAgreementRow[];
+}) {
   const router = useRouter();
   const { success, error } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -143,6 +157,8 @@ function VisualCanonForm({ canon, notes: initialNotes, anchors }: { canon: Brand
         Every generated social image is assembled from this canon and the day&rsquo;s brief. The model never sees
         anything else. Canon v{canon.version}.
       </p>
+
+      <ReviewerAgreement rows={agreement} />
 
       <section className={styles.section}>
         <h2 className={styles.heading}>Style</h2>

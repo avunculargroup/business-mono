@@ -22,6 +22,12 @@
 
 /** How many concepts a brief may propose; a reviewer shortlists the ones rendered. */
 export const MAX_BRIEF_CONCEPTS = 6;
+/**
+ * How many a non-skip brief must propose: always six, so the reviewer has the
+ * full range to choose from (one CP 392 round came back with four). A skip
+ * brief has none.
+ */
+export const MIN_BRIEF_CONCEPTS = 6;
 
 /**
  * One image idea (canon v1.2). The brief proposes up to six; each one rendered

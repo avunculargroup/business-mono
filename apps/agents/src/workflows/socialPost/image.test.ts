@@ -28,6 +28,11 @@ vi.mock('../../config/model.js', () => ({
   resolveImageModelId: vi.fn(async () => 'google/gemini-2.5-flash-image'),
 }));
 vi.mock('../../lib/openrouterImage.js', () => ({ generateImage, MAX_REFERENCE_IMAGES: 4 }));
+const logInfo = vi.fn();
+vi.mock('../../lib/logger.js', async (importActual) => {
+  const actual = await importActual<typeof import('../../lib/logger.js')>();
+  return { ...actual, createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }) };
+});
 
 const { runImageStep } = await import('./image.js');
 
@@ -511,6 +516,15 @@ describe('runImageStep', () => {
       expect(outcome).toMatchObject({ status: 'generated', candidates: 1, layout: 'against_gold' });
       expect((insertedImageRows()[0]!['image_brief'] as { symbol: string }).symbol).toBe('A lighthouse');
     });
+  });
+
+  it('reviews a brief that came back short instead of skipping it, and logs it once', async () => {
+    // BRIEF has three concepts, not six: the model came back short.
+    const { outcome } = await runImageStep(PARAMS);
+    expect(outcome.status).toBe('generated');
+    expect(editorGenerate).toHaveBeenCalled();
+    const short = logInfo.mock.calls.filter((c) => c[1] === 'brief returned fewer concepts than asked');
+    expect(short).toEqual([[{ count: 3 }, 'brief returned fewer concepts than asked']]);
   });
 
   it('renders in brief order when the reviewer throws, with review_fallback recorded', async () => {

@@ -6,6 +6,21 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-09 — Social post images: `v_image_pick_agreement`
+
+`20261109200000_image_pick_agreement_view.sql` adds a view, `WITH (security_invoker = true)`, so
+`content_images`' team-only RLS applies to the reader. One row per decided candidate set: the
+group the founder selected and kept (`is_selected` and `review_outcome = 'kept'`) against the
+group the reviewer ranked first (`image_brief->'review'->>'rank' = 1`), with each side's symbol,
+layout and recognisable / twist_visible / on_hook scores, and `agreed`. Sets left on their default
+selection are excluded (a default is not a pick), as are sets only regenerated or removed. Rows
+are read one per `generation_group_id`, since a group has a row per draft. `agreed` is NULL when
+the pick or the set has no reviewer verdict (a review fallback, or a founder's own Edit brief
+render). No table changes. Read by the `/brand` Visual tab's Reviewer agreement panel; why:
+evidence on whether the reviewer's scoring matches the founder's taste, before changing it.
+
+---
+
 ## 2026-11-09 — Social post images: canon v1.2 (data only)
 
 `20261109100000_brand_visual_v1_2.sql` changes data, not schema: no column is added, dropped or

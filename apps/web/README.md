@@ -83,7 +83,7 @@ Everything under `app/(app)/` sits inside the authenticated shell (sidebar + hea
 | `/discovery` | `pipeline`, `lexicon`, `templates`, `feedback` |
 | `/products`, `/advisors` | Ecosystem registers — human-maintained, no agent writes. A product's detail page carries the `is_financial_product` classification, where `true` means the Minute directory card emits no anchor at all |
 | `/routines` | Scheduled agent routines |
-| `/brand` | Brand hub — assets, the voice editor, and the Visual tab (the `brand_visual` canon for generated social images) |
+| `/brand` | Brand hub — assets, the voice editor, and the Visual tab (the `brand_visual` canon for generated social images, and the read-only Reviewer agreement panel from `v_image_pick_agreement`) |
 | `/clients` | Minute subscriber administration — accounts, seats, and invitation issuance. The only place a `client_invites` row is created; the link is shown once because only its hash is stored. Also the operational readout: who is locked out by the current Service Statement, and whether anyone has opened the app |
 | `/compliance` | Everything that must be true before a Minute subscriber can log in: the `company_profile` singleton, the compliance documents (edit, resolve-preview, publish), the Minute library (sections and entries), and the Lex approval queue for `/prepare` templates and client library entries. Bodies are editable while unpublished and frozen once live — a live one is changed by cutting a new version |
 | `/decks`, `/docs`, `/files` | Supporting workspace pages |

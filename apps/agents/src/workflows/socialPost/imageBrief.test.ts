@@ -6,6 +6,8 @@ import {
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
   buildImageCriticPrompt,
+  FALLBACK_IMAGE_BRIEF,
+  imageBriefOutputSchema,
   imageBriefRewriteInstruction,
   imageBriefSchema,
   layoutToRest,
@@ -52,21 +54,33 @@ const CP392 =
   "140 businesses have applied to offer digital asset services in Australia.\n\nASIC just dropped Consultation Paper 392 — the rulebook for custody, settlement, and capital requirements under the new Digital Assets Framework Act.\n\nClarity's coming. April 2027.\n\nNot nothing.";
 
 describe('imageBriefSchema', () => {
-  it('accepts up to six v1.2 concepts and rejects a seventh', () => {
-    expect(imageBriefSchema.safeParse(BRIEF).success).toBe(true);
-    const six = [STAMP, LIGHTHOUSE, GATE, STAMP, LIGHTHOUSE, GATE];
+  const six = [STAMP, LIGHTHOUSE, GATE, STAMP, LIGHTHOUSE, GATE];
+
+  it('asks a non-skip brief for exactly six concepts', () => {
     expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: six }).success).toBe(true);
+    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: six.slice(0, 5) }).success).toBe(false);
     expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [...six, STAMP] }).success).toBe(false);
   });
 
+  it('lets a skip brief carry no concepts, and the fallback brief parse', () => {
+    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] }).success).toBe(true);
+    expect(imageBriefSchema.safeParse(FALLBACK_IMAGE_BRIEF).success).toBe(true);
+    expect(imageBriefOutputSchema.safeParse(FALLBACK_IMAGE_BRIEF).success).toBe(true);
+  });
+
+  it('accepts a short brief from the model, so it is reviewed rather than turned into a skip', () => {
+    expect(imageBriefOutputSchema.safeParse({ ...BRIEF, concepts: six.slice(0, 4) }).success).toBe(true);
+  });
+
   it('requires the hook', () => {
-    const { hook: _hook, ...noHook } = BRIEF;
+    const { hook: _hook, ...noHook } = { ...BRIEF, concepts: six };
     expect(imageBriefSchema.safeParse(noHook).success).toBe(false);
+    expect(imageBriefOutputSchema.safeParse(noHook).success).toBe(false);
   });
 
   it('rejects the v1.1 drawn/undrawn shape', () => {
     const v11 = { tension: 't', subject: 's', drawn: 'd', undrawn: 'u', layout: 'hero_left', alt_text: 'a' };
-    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [v11] }).success).toBe(false);
+    expect(imageBriefOutputSchema.safeParse({ ...BRIEF, concepts: [v11] }).success).toBe(false);
   });
 });
 
@@ -264,7 +278,7 @@ describe('buildImageBriefPrompt', () => {
     expect(p).toContain('2. symbol: an object, place or tool everyone already knows.');
     expect(p).toContain('3. twist: one change to the symbol that ties it to the hook and the tension. One change only.');
     expect(p).toContain('would someone scrolling past at phone size recognise the symbol and get the twist without reading the post?');
-    expect(p).toContain('Return six concepts with six different symbols, using at least two different layouts.');
+    expect(p).toContain('Return exactly six concepts with six different symbols, using at least two different layouts.');
     expect(p).toContain('a reviewer will shortlist them');
     for (const l of activeLayouts(canon)) expect(p).toContain(`- ${l.key} (${l.label}):`);
     expect(p).not.toContain('left_third');
@@ -309,8 +323,9 @@ describe('buildImageBriefPrompt', () => {
     expect(p).toContain('A closed book is fine.');
   });
 
-  it('carries a reviewer re-brief under its own heading', () => {
+  it('carries a reviewer re-brief under its own heading, still asking for exactly six', () => {
     const p = buildImageBriefPrompt({ ...base, reviewerInstruction: '- A wax seal: signals approval (lowest: on_hook 2)' });
+    expect(p).toContain('Return exactly six concepts');
     expect(p).toContain('## Re-brief: a reviewer rejected these concepts\n- A wax seal: signals approval (lowest: on_hook 2)');
   });
 

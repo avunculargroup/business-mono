@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { VoiceTab } from './VoiceTab';
 import { BrandView } from './BrandView';
 import { VisualTab, type StyleAnchorView } from './VisualTab';
+import type { PickAgreementRow } from './reviewerAgreement';
 import type { BrandVisual } from '@platform/shared';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from './voiceTypes';
 import type { AccountGuidelinesRow, ContentFeedbackRow } from './FeedbackGuidelinesPanel';
@@ -18,7 +19,7 @@ interface BrandHubTabsProps {
   assets: BrandAsset[];
   guidelines: AccountGuidelinesRow[];
   feedback: ContentFeedbackRow[];
-  visual: { canon: BrandVisual | null; notes: string | null; anchors: StyleAnchorView[] };
+  visual: { canon: BrandVisual | null; notes: string | null; anchors: StyleAnchorView[]; agreement?: PickAgreementRow[] };
 }
 
 type Tab = 'voice' | 'visual' | 'assets';
@@ -64,7 +65,7 @@ export function BrandHubTabs({ voice, snippets, accounts, assets, guidelines, fe
           feedback={feedback}
         />
       )}
-      {tab === 'visual' && <VisualTab canon={visual.canon} notes={visual.notes} anchors={visual.anchors} />}
+      {tab === 'visual' && <VisualTab canon={visual.canon} notes={visual.notes} anchors={visual.anchors} agreement={visual.agreement} />}
       {tab === 'assets' && <BrandView assets={assets} />}
     </>
   );

@@ -9632,6 +9632,26 @@ export type Database = {
         }
         Relationships: []
       }
+      v_image_pick_agreement: {
+        Row: {
+          agreed: boolean | null
+          candidate_set_id: string | null
+          created_at: string | null
+          picked_group: string | null
+          picked_layout: string | null
+          picked_on_hook: number | null
+          picked_rank: number | null
+          picked_recognisable: number | null
+          picked_symbol: string | null
+          picked_twist_visible: number | null
+          top_group: string | null
+          top_on_hook: number | null
+          top_recognisable: number | null
+          top_symbol: string | null
+          top_twist_visible: number | null
+        }
+        Relationships: []
+      }
       v_indicator_latest: {
         Row: {
           category: string | null

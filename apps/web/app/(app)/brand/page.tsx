@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/app-shell/PageHeader';
 import { BrandHubTabs } from '@/components/brand/BrandHubTabs';
 import type { BrandVoiceRow, SocialAccountRow, VoiceSnippetRow } from '@/components/brand/voiceTypes';
 import type { AccountGuidelinesRow, ContentFeedbackRow } from '@/components/brand/FeedbackGuidelinesPanel';
+import type { PickAgreementRow } from '@/components/brand/reviewerAgreement';
 
 export default async function BrandPage() {
   const supabase = await createClient();
@@ -16,6 +17,7 @@ export default async function BrandPage() {
     { data: guidelines },
     { data: feedback },
     { data: visualRow },
+    { data: pickAgreement },
   ] = await Promise.all([
     supabase.from('brand_assets').select('*').order('name'),
     supabase
@@ -43,6 +45,8 @@ export default async function BrandPage() {
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.from('brand_visual').select('*').eq('is_active', true).limit(1).maybeSingle(),
+    // The last 20 runs where a founder picked an image, against the reviewer's top pick.
+    supabase.from('v_image_pick_agreement').select('*').order('created_at', { ascending: false }).limit(20),
   ]);
 
   // Style anchors are private storage objects; sign them for the Visual tab.
@@ -64,7 +68,7 @@ export default async function BrandPage() {
         assets={assets || []}
         guidelines={(guidelines as AccountGuidelinesRow[]) ?? []}
         feedback={(feedback as ContentFeedbackRow[]) ?? []}
-        visual={{ canon, notes: visualRow?.notes ?? null, anchors }}
+        visual={{ canon, notes: visualRow?.notes ?? null, anchors, agreement: (pickAgreement as PickAgreementRow[]) ?? [] }}
       />
     </>
   );
