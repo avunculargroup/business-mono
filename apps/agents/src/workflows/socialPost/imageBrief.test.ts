@@ -442,9 +442,21 @@ describe('rankConcepts', () => {
     expect(r.dropped).toEqual([{ index: 1, reason: 'needs visible text to read' }]);
   });
 
-  it('renders nothing when every concept has a hard fault', () => {
-    const r = rankConcepts([SCALE, BUFFER], { scores: [score(1, 5, 5, 5, false), score(2, 5, 5, 5, true, true)] });
-    expect(r).toMatchObject({ ranked: [], passed: 0, fallback: false });
+  it('still renders, best total first, when every concept has a hard fault', () => {
+    const r = rankConcepts([SCALE, FARM_GATE, BUFFER], {
+      scores: [score(1, 3, 3, 3, false), score(2, 5, 5, 5, true, true), score(3, 4, 4, 4, false)],
+    });
+    expect(r).toMatchObject({ passed: 0, fallback: false });
+    expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.filled])).toEqual([
+      ['A farm gate', 15, true],
+      ['A railway buffer stop', 12, true],
+      ['A balance scale', 9, true],
+    ]);
+  });
+
+  it('prefers a soft reject over a hard fault when filling', () => {
+    const r = rankConcepts([SCALE, FARM_GATE], { scores: [score(1, 5, 5, 5, false), score(2, 3, 2, 3)] });
+    expect(r.ranked.map((x) => x.concept.symbol)).toEqual(['A farm gate']);
   });
 
   it('stores the review beside a ranked concept', () => {

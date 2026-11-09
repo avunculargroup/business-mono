@@ -640,9 +640,6 @@ export async function briefConcepts(
     }
   }
 
-  if (ranking.ranked.length === 0) {
-    return { skip: 'The reviewer found that every idea needs visible text or gets its physics wrong.' };
-  }
   return {
     concepts: ranking.ranked.map((r) => r.concept),
     review: {

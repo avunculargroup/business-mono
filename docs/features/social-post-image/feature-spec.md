@@ -426,15 +426,15 @@ The internal `editor` agent scores every lint-clean concept, text only, under th
 
 `rankConcepts(concepts, critique, max = 3)` is deterministic:
 
-- Reject a concept with `physics_ok` false, `needs_text` true, or any score of 2 or less. Physics and text are **hard faults**: such a concept is never rendered.
+- Reject a concept with `physics_ok` false, `needs_text` true, or any score of 2 or less. Physics and text are **hard faults**: such a concept is rendered only when every reviewed concept has one.
 - Order the survivors by total (`recognisable + twist_visible + on_hook`); the brief's order breaks ties. Concepts the reviewer did not score rank after every scored one and are never rejected.
-- Take the top three. If fewer than three survive, fill the remaining slots with the highest-total **soft** rejects (low scores only, never a hard fault), marked `filled_from_rejected`.
+- Take the top three. If fewer than three survive, fill the remaining slots with the highest-total **soft** rejects (low scores only, never a hard fault while anything else is left), marked `filled_from_rejected`.
 - Their order becomes `candidate_index`, so candidate 0, the default selection, is the reviewer's top pick.
 - If the critique is missing or malformed, names an index outside the list or scores one twice, the shortlist is the top three in brief order (`fallback: true`, logged). Only then is the reviewer ignored.
 
 **One reviewer-driven re-brief** (`briefConcepts` in `image.ts`). If the critique was usable and fewer than three concepts survive, the brief runs once more carrying `reviewerRewriteInstruction`: each rejected symbol with the reviewer's note and what it fell down on (a hard fault, else its lowest score), every symbol already tried (none may be reused), and a push to different domains. The new concepts are linted, any repeating a round-one symbol is dropped, the editor reviews them, and `rankConcepts` ranks both rounds together. It runs at most once, never loops, and never blocks an image: if the second brief skips, lints to nothing, or its review is unusable, round one stands (with its fills). There are no re-renders.
 
-If every reviewed concept has a hard fault, nothing is rendered and the step is `skipped` with that reason; a founder can regenerate.
+If every reviewed concept has a hard fault, the run still renders: the highest-total of them fill the slots (`filled_from_rejected`). A run always gets an image; the founder can regenerate.
 
 ### 5b.4 Prompt assembly (pure: `buildImagePrompt`)
 
@@ -567,7 +567,7 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | Reviewer errors or returns a malformed critique | The top three clean concepts render in brief order; `review_fallback` is recorded and `review` is stored as null. No re-brief |
 | Fewer than three concepts pass the review | One re-brief with the reviewer's notes; both rounds ranked together; any gap filled with the best soft rejects (`filled_from_rejected`) |
 | The re-brief skips, lints to nothing, or its review fails | Round one stands, with its fills; `review_rounds` is 1 |
-| Every reviewed concept needs text or gets its physics wrong | `skipped` with that reason; nothing rendered |
+| Every reviewed concept needs text or gets its physics wrong | Still renders: the highest-total of them fill the slots, marked `filled_from_rejected` |
 | No concept passes lint, twice | `skipped` with the flags as the reason |
 | One candidate's render errors, times out or is refused | That candidate is dropped; the others are kept and the lowest success is selected |
 | Every candidate's render fails | `failed`; nothing billed; drafts and email unaffected |
@@ -666,7 +666,7 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **The "about to land" stamp example is gone; twists must be visible states.** All six "playbook" ideas copied its shape (pen lifted, line not yet snapped, half-set type, seal poised), and none of those pauses can be seen. The linter flags temporal twists; the reviewer scores them 2 or less on `twist_visible`. |
 | 2026-11-09 | **Four domains, at most two per domain.** The six "playbook" ideas all came from writing and printing tools. |
 | 2026-11-09 | **At least two hook puns.** "Playbook" and "the game" were in the post; a football on a kicking tee on a freshly marked pitch was there to be had, and none of the six used the words. |
-| 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` is never rendered, not even to fill a slot. |
+| 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` never fills a slot while any other concept can. If every idea has a physics or text fault, the best of them still render: a run always gets an image (Chris, 2026-11-09). |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |
 
 -----
@@ -693,7 +693,7 @@ Where the build departs from this spec, and why.
 | v1.2: bake-off of the new canon on candidate models, with a contact sheet | Not built | Chris asked to test in production instead (see Decisions, 2026-11-09). `openrouterImage.ts` is unchanged |
 | v1.2: a new canon row | The migration updates the active row in place and bumps its version, guarded on the v1.1 style block so it never overwrites a founder's edits | Same as v1.1 |
 | v1.2: symbol history | A pre-v1.2 image has no symbol; its subject stands in | So the last five runs still count from the first v1.2 run |
-| Reviewer-driven re-brief: "if the second brief or review fails, use what the first round produced" | Also when the second brief lints to nothing new; and a run whose every reviewed concept has a hard fault is skipped rather than rendered in brief order | Rendering a concept the reviewer says needs text would bring back the garbled letters this change exists to stop; the founder can regenerate |
+| Reviewer-driven re-brief: "if the second brief or review fails, use what the first round produced" | Also when the second brief lints to nothing new. Fills exclude physics and needs-text faults except when every reviewed concept has one: then the best of them render by total | Chris chose 2026-11-09 that a run always renders rather than skip |
 | v1.2: legibility rejections are logged | One `social_image_rejected` activity per run, listing each rejected candidate's index, reason and coverage | Rejections are invisible otherwise: a rejected candidate leaves no `content_images` row |
 
 -----

@@ -301,7 +301,7 @@ export interface Ranking {
   fallback: boolean;
 }
 
-/** Faults no score can outweigh: such a concept is never rendered, not even to fill a slot. */
+/** Faults no score can outweigh: such a concept fills a slot only when every concept has one. */
 function hardFault(s: ConceptScore): string | null {
   if (!s.physics_ok) return 'physics reads wrong';
   if (s.needs_text) return 'needs visible text to read';
@@ -324,8 +324,9 @@ const totalOf = (s: ConceptScore) => s.recognisable + s.twist_visible + s.on_hoo
  * or less. Survivors are ordered by total (brief order breaks ties), unscored
  * ones after every scored one, and the top `max` taken. If fewer than `max`
  * survive, the remaining slots are filled with the highest-total soft rejects
- * (never a physics or needs-text fault). Only a missing or malformed critique
- * falls back to the brief's own order.
+ * (never a physics or needs-text fault while anything else is left; when every
+ * concept has one, the highest-total of those, so a run always renders). Only a
+ * missing or malformed critique falls back to the brief's own order.
  */
 export function rankConcepts(concepts: ImageConcept[], critique: Critique | null, max = MAX_CANDIDATES): Ranking {
   const fallback = (): Ranking => ({
@@ -347,6 +348,7 @@ export function rankConcepts(concepts: ImageConcept[], critique: Critique | null
   const dropped: Ranking['dropped'] = [];
   const passed: Entry[] = [];
   const softRejects: Entry[] = [];
+  const hardRejects: Entry[] = [];
   concepts.forEach((concept, i) => {
     const score = byIndex.get(i + 1) ?? null;
     const entry = { concept, order: i, score, total: score ? totalOf(score) : null };
@@ -357,6 +359,7 @@ export function rankConcepts(concepts: ImageConcept[], critique: Critique | null
     }
     dropped.push({ index: i + 1, reason });
     if (score && !hardFault(score)) softRejects.push(entry);
+    else if (score) hardRejects.push(entry);
   });
 
   const byTotal = (a: Entry, b: Entry) => {
@@ -368,9 +371,13 @@ export function rankConcepts(concepts: ImageConcept[], critique: Critique | null
   };
   passed.sort(byTotal);
   softRejects.sort(byTotal);
+  hardRejects.sort(byTotal);
+  // A hard fault never fills a slot while anything else can; only when every
+  // concept has one does the best of them render, so a run always has an image.
+  const fills = passed.length + softRejects.length > 0 ? softRejects : hardRejects;
   const picks = [
     ...passed.slice(0, max).map((e) => ({ ...e, filled: false })),
-    ...softRejects.slice(0, Math.max(0, max - passed.length)).map((e) => ({ ...e, filled: true })),
+    ...fills.slice(0, Math.max(0, max - passed.length)).map((e) => ({ ...e, filled: true })),
   ];
   return {
     ranked: picks.map((e, i) => ({ concept: e.concept, total: e.total, rank: i + 1, score: e.score, filled: e.filled })),
