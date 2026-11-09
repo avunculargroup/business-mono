@@ -251,6 +251,7 @@ function imageRow(anchor: Date, overrides: Partial<FixtureImageRow> & Pick<Fixtu
     tension: null,
     layout: null,
     motifKey: null,
+    reviewNote: null,
     assembledPrompt: null,
     brandVisualVersion: '1.1',
     modelId: 'google/gemini-2.5-flash-image',

@@ -446,6 +446,7 @@ describe('getDetail', () => {
       tension: null,
       layout: null,
       motifKey: 'balance',
+      reviewNote: null,
       candidateSetId: null,
       candidateIndex: null,
       isSelected: true,
@@ -478,6 +479,17 @@ describe('getDetail', () => {
 
     client.__setResponse('content_images', { data: [], error: null });
     expect((await content().getDetail(ctx, 'c1'))?.image).toBeNull();
+  });
+
+  it('carries the reviewer\'s note from a reviewed concept, and none from a fallback', async () => {
+    const concept = { tension: 't', symbol: 'A railway buffer stop', twist: 'gold', subject: 's', layout: 'hero_left', alt_text: 'a' };
+    const review = { recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'A pun on the exact words.', total: 14, rank: 1 };
+    client.__setResponse('content_items', { data: detailRow(), error: null });
+    client.__setResponse('content_images', { data: [imageRow({ image_brief: { ...concept, hook: 'capital buffers', review } })], error: null });
+    expect((await content().getDetail(ctx, 'c1'))?.image).toMatchObject({ reviewNote: 'A pun on the exact words.', tension: 't' });
+
+    client.__setResponse('content_images', { data: [imageRow({ image_brief: { ...concept, hook: 'capital buffers', review: null } })], error: null });
+    expect((await content().getDetail(ctx, 'c1'))?.image).toMatchObject({ reviewNote: null });
   });
 });
 

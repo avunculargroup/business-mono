@@ -146,6 +146,7 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
             <p className={styles.missing}>The image file could not be loaded.</p>
           )}
           {image.tension && <p className={styles.tension}>{image.tension}</p>}
+          {image.reviewNote && <p className={styles.caption}>{image.reviewNote}</p>}
           {meta.length > 0 && <p className={styles.caption}>{meta.join(' · ')}</p>}
 
           <div className={styles.altField}>
@@ -241,6 +242,7 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
                   <span className={styles.candidateMissing}>Preview unavailable</span>
                 )}
                 {c.tension && <p className={styles.candidateTension}>{c.tension}</p>}
+                {c.reviewNote && <p className={styles.caption}>{c.reviewNote}</p>}
                 <Button
                   variant="secondary"
                   size="sm"

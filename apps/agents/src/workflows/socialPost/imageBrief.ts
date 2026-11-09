@@ -1,12 +1,18 @@
 import { z } from 'zod';
-import { readStoredBrief, type ImageBrief as SharedImageBrief, type Layout } from '@platform/shared';
+import {
+  MAX_BRIEF_CONCEPTS,
+  readStoredBrief,
+  type ConceptReview,
+  type ImageBrief as SharedImageBrief,
+  type Layout,
+} from '@platform/shared';
 import type { StoryCandidate } from './select.js';
 
-// The image brief: the only part of an image an LLM decides. It reads the post
-// for its tension, then proposes up to three concepts, each a familiar symbol
-// everyone already knows with one visible twist that makes it about this post,
-// and a layout. It never writes the prompt the image model receives
-// (buildImagePrompt does).
+// The image brief: the only part of an image an LLM decides. It names the
+// post's hook (its most specific phrase), reads the post for its tension, then
+// proposes up to six concepts about that hook, each a familiar symbol everyone
+// already knows with one visible twist, and a layout. It never writes the
+// prompt the image model receives (buildImagePrompt does).
 //
 // The bar is the half-second phone test: someone scrolling past at about 350px
 // recognises the symbol and gets the twist without reading the post.
@@ -18,6 +24,11 @@ import type { StoryCandidate } from './select.js';
 // The pure linter (lintImageBrief, in @platform/shared) drops flagged concepts
 // before a render is paid for; if none survive, one re-brief carries the flags,
 // then skip. Never a loop: the same shape as the AI-tell gate.
+//
+// Then a text-only reviewer (the editor) scores the clean concepts, and
+// rankConcepts shortlists the top three to render. Judging an idea costs a
+// fraction of a cent; a render costs cents. The reviewer is advisory, like Lex:
+// when it fails, the shortlist is the brief's own order.
 
 const conceptSchema = z.object({
   tension: z.string().max(200),
@@ -31,7 +42,8 @@ const conceptSchema = z.object({
 export const imageBriefSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().max(200).nullable(),
-  concepts: z.array(conceptSchema).max(3),
+  hook: z.string().max(120), // the post's most specific, concrete phrase
+  concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
 });
 export type ImageBrief = z.infer<typeof imageBriefSchema>;
 export type ImageConcept = z.infer<typeof conceptSchema>;
@@ -45,8 +57,12 @@ export { lintImageBrief, lintImageConcept, imageBriefRewriteInstruction } from '
 export const FALLBACK_IMAGE_BRIEF: ImageBrief = {
   skip: true,
   skip_reason: 'Brief generation failed.',
+  hook: '',
   concepts: [],
 };
+
+/** At most this many concepts are rendered per run: the reviewer's shortlist. */
+export const MAX_CANDIDATES = 3;
 
 /** How many recent runs the brief is shown, to avoid repeating itself. */
 export const RECENT_RUNS = 5;
@@ -151,10 +167,15 @@ ${p.postCopy}
 ${story}## The half-second test
 The image is seen at phone size by someone scrolling past. In half a second they must recognise the subject and get the idea, without reading the post. A clever image that needs a caption fails.
 
-## Work it out in this order, for each concept
+## First, the hook
+hook: the single most specific, concrete phrase in the post. It is the thing a reader would quote back, not the topic: "capital buffers", not "regulation"; "Twenty years", not "US debt". Prefer a noun phrase. Copy it from the post.
+
+Every concept must be about the hook, not the post's general topic. Visual puns on the hook's words are welcome, and often the strongest option: "capital buffers" can be railway buffer stops.
+
+## Then work it out in this order, for each concept
 1. tension: the surprising or uneasy idea in this post, in one sentence. Not its topic.
 2. symbol: an object, place or tool everyone already knows. Instant recognition matters more than originality.
-3. twist: one change to the symbol that ties it to the tension. One change only. It must be visible in the picture, not explained in words.
+3. twist: one change to the symbol that ties it to the hook and the tension. One change only. It must be visible in the picture, not explained in words.
 4. subject: one sentence describing the symbol with its twist, as it will be printed. One big subject.
 5. layout: exactly one key from this list:
 ${layoutList}
@@ -162,17 +183,164 @@ ${layoutList}
 
 Then test each concept: would someone scrolling past at phone size recognise the symbol and get the twist without reading the post? If not, pick a simpler symbol.
 
+Physics: if the twist involves weight, balance, light, motion or water, describe it so it reads correctly. A weighted pan sits lower; light comes from its source; water finds its level.
+
 ## Examples
 - Weak, a symbol with no twist: "Twenty years" became an hourglass. True, but it says nothing.
 - Weak, no symbol: a half-drawn bridge pier for a regulator's consultation paper. It needs explaining.
+- Weak, the topic and not the hook: "capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.
+- Weak, the topic and not the hook: "capital buffers" became a closed farm gate.
 - Strong: a regulator's consultation paper became a giant rubber stamp poised just above a blank sheet, about to land. Or a lighthouse throwing one solid gold beam through fog, for "clarity's coming".
+- Strong, the hook with a pun: "capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.
 
 ## Rules
-- Return three concepts with three different symbols, using at least two different layouts.
+- Return six concepts with six different symbols, using at least two different layouts. Breadth matters more than polish: a reviewer will shortlist them.
 - No text, letters, numbers or figures anywhere in the picture. Images cannot carry them.
 - No coins, currency symbols, charts, arrows or anything that implies a price going up or down. No people's faces.${avoid}
 - Keep the bottom-right corner of the picture empty.
-- If the post has no honest visual, set skip = true with a short skip_reason and return no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}`;
+- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}`;
+}
+
+// ── The reviewer: shortlist before any render is paid for ──────────────────────
+
+const scoreSchema = z.number().int().min(1).max(5);
+
+export const critiqueSchema = z.object({
+  scores: z.array(
+    z.object({
+      index: z.number().int(), // the concept's number in the prompt, from 1
+      recognisable: scoreSchema, // symbol recognised in half a second at phone size
+      twist_visible: scoreSchema, // the twist is in the picture, not in words
+      on_hook: scoreSchema, // about the hook, not the general topic
+      physics_ok: z.boolean(),
+      note: z.string().max(160),
+    }),
+  ),
+});
+export type Critique = z.infer<typeof critiqueSchema>;
+export type ConceptScore = Critique['scores'][number];
+
+export interface ImageCriticPromptParams {
+  postCopy: string;
+  hook: string;
+  /** Lint-clean concepts, in brief order; numbered from 1 in the prompt. */
+  concepts: ImageConcept[];
+}
+
+export function buildImageCriticPrompt(p: ImageCriticPromptParams): string {
+  const list = p.concepts
+    .map(
+      (c, i) => `${i + 1}. Symbol: ${c.symbol}
+   Twist: ${c.twist}
+   Subject: ${c.subject}`,
+    )
+    .join('\n');
+  return `You review image ideas for a founder's social post before any are printed. Each idea will be a bold two-colour linocut seen at phone size by someone scrolling past. Be strict: most ideas should not score well, and a polite middle score helps nobody.
+
+## The post
+${p.postCopy}
+
+## The hook
+${p.hook || '(none given: judge on_hook against the post\'s most specific phrase)'}
+
+## The ideas
+${list}
+
+## Score every idea, 1 to 5
+- recognisable: would someone recognise the symbol in half a second at phone size?
+- twist_visible: is the twist in the picture itself, not in words or a caption? A plain symbol with no twist scores 1.
+- on_hook: is it about the hook, not the post's general topic? A picture of the general topic scores 1.
+- physics_ok: false if the picture would get weight, balance, light, motion or water visibly wrong.
+- note: one short line on the idea's strength or flaw, under 160 characters.
+
+Return one entry per idea, with index set to the idea's number above.
+
+## Calibration (hook: "capital buffers")
+- A balance scale with the weighted pan sitting higher: recognisable 5, twist_visible 1, on_hook 1, physics_ok false. It says "regulation", and the weighted pan should sit lower.
+- A closed farm gate: recognisable 5, twist_visible 1, on_hook 1, physics_ok true. A picture of the topic.
+- A heavy railway buffer stop in gold, a black rail running straight into it: recognisable 5, twist_visible 4, on_hook 5, physics_ok true. A pun on the exact words, read in half a second.`;
+}
+
+export interface RankedConcept {
+  concept: ImageConcept;
+  /** recognisable + twist_visible + on_hook; null when unscored or on a fallback. */
+  total: number | null;
+  /** 1 for the top pick. */
+  rank: number;
+  /** The reviewer's scores, when it scored this concept and the ranking did not fall back. */
+  score: ConceptScore | null;
+}
+
+export interface Ranking {
+  ranked: RankedConcept[];
+  /** Concepts the filter removed, by their 1-based number; empty on a fallback. */
+  dropped: Array<{ index: number; reason: string }>;
+  /** True when the reviewer's output could not be used: the ranking is the brief's order. */
+  fallback: boolean;
+}
+
+/** Why the filter drops a scored concept, or null to keep it. */
+function dropReason(s: ConceptScore): string | null {
+  if (!s.physics_ok) return 'physics reads wrong';
+  const low = (['recognisable', 'twist_visible', 'on_hook'] as const).filter((k) => s[k] <= 2);
+  return low.length > 0 ? `scored 2 or less on ${low.join(', ')}` : null;
+}
+
+/**
+ * Shortlist the concepts to render from the reviewer's scores. Pure.
+ * Drops a concept with physics_ok false or any score of 2 or less, orders the
+ * rest by total (brief order breaks ties), unscored concepts after every scored
+ * one, and takes the top `max`. Advisory: a missing or malformed critique, or
+ * nothing surviving the filter, falls back to the brief's own order.
+ */
+export function rankConcepts(concepts: ImageConcept[], critique: Critique | null, max = MAX_CANDIDATES): Ranking {
+  const fallback = (): Ranking => ({
+    ranked: concepts.slice(0, max).map((concept, i) => ({ concept, total: null, rank: i + 1, score: null })),
+    dropped: [],
+    fallback: true,
+  });
+  const parsed = critiqueSchema.safeParse(critique);
+  if (!parsed.success || parsed.data.scores.length === 0) return fallback();
+  const byIndex = new Map<number, ConceptScore>();
+  for (const s of parsed.data.scores) {
+    // An index outside the list, or scored twice, means the reviewer lost track.
+    if (s.index < 1 || s.index > concepts.length || byIndex.has(s.index)) return fallback();
+    byIndex.set(s.index, s);
+  }
+
+  const dropped: Ranking['dropped'] = [];
+  const kept: Array<{ concept: ImageConcept; order: number; score: ConceptScore | null; total: number | null }> = [];
+  concepts.forEach((concept, i) => {
+    const score = byIndex.get(i + 1) ?? null;
+    const reason = score ? dropReason(score) : null;
+    if (reason) {
+      dropped.push({ index: i + 1, reason });
+      return;
+    }
+    const total = score ? score.recognisable + score.twist_visible + score.on_hook : null;
+    kept.push({ concept, order: i, score, total });
+  });
+  if (kept.length === 0) return fallback();
+
+  kept.sort((a, b) => {
+    if (a.total === null || b.total === null) {
+      if (a.total !== b.total) return a.total === null ? 1 : -1;
+      return a.order - b.order;
+    }
+    return b.total - a.total || a.order - b.order;
+  });
+  return {
+    ranked: kept.slice(0, max).map((k, i) => ({ concept: k.concept, total: k.total, rank: i + 1, score: k.score })),
+    dropped,
+    fallback: false,
+  };
+}
+
+/** The review to store beside a rendered concept, or null when it was unscored or the ranking fell back. */
+export function storedReview(r: RankedConcept): ConceptReview | null {
+  if (!r.score) return null;
+  const { recognisable, twist_visible, on_hook, physics_ok, note } = r.score;
+  return { recognisable, twist_visible, on_hook, physics_ok, note, total: r.total, rank: r.rank };
 }
 
 /**

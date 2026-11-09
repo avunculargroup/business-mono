@@ -1,19 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { supabase } from '@platform/db';
-import { planCandidateSelection, type CandidateRow, type SocialPostImageOutcome } from '@platform/shared';
+import {
+  planCandidateSelection,
+  type CandidateRow,
+  type ConceptReview,
+  type SocialPostImageOutcome,
+} from '@platform/shared';
 import { resolveImageModelId, stepRequestContext } from '../../config/model.js';
 import { charlie } from '../../agents/contentCreator/index.js';
 import { lex } from '../../agents/compliance/index.js';
+import { editor } from '../../agents/editorial/index.js';
 import { generateImage, MAX_REFERENCE_IMAGES } from '../../lib/openrouterImage.js';
 import { lexVerdictSchema, type LexVerdict, type Platform } from '../variant/schemas.js';
 import {
   FALLBACK_IMAGE_BRIEF,
+  MAX_CANDIDATES,
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
+  buildImageCriticPrompt,
+  critiqueSchema,
   imageBriefRewriteInstruction,
   imageBriefSchema,
   lintImageBrief,
+  rankConcepts,
   recentImageHistory,
+  storedReview,
+  type Critique,
   type ImageBrief,
   type ImageBriefPromptParams,
   type ImageConcept,
@@ -39,12 +51,14 @@ const log = createLogger('social-post-image');
 // LinkedIn and X drafts. Best-effort end to end — it runs after both drafts are
 // persisted, never throws, and nothing here can change the run's status.
 //
-//   load canon + recent subjects/layouts → brief (LLM, up to three concepts)
+//   load canon + recent symbols/layouts → brief (LLM: the hook, up to six concepts)
 //   → lint per concept (one re-brief if none are clean, then skip)
-//   → for each clean concept, in parallel:
+//   → review (editor, text only, advisory) → rank: the top three, best first
+//   → for each shortlisted concept, in parallel:
 //       buildImagePrompt (pure) → render (OpenRouter) → paper correction
 //       → crop + mark + upload → Lex on alt text (advisory) → content_images rows
-//   → select the lowest successful candidate; the founder can pick another
+//   → select the lowest successful candidate (the reviewer's top pick when it
+//     rendered); the founder can pick another
 //
 // Each rendered concept is its own generation group; the groups of one run share
 // a candidate set. Selection is per run, not per platform: LinkedIn and X always
@@ -59,8 +73,7 @@ const BUCKET = 'platform-files';
 const RENDER_SCOPE = 'social_post.image_render';
 /** Five runs, each up to three candidate groups across two platforms. */
 const HISTORY_ROWS = 40;
-/** At most this many concepts are rendered per run. */
-export const MAX_CANDIDATES = 3;
+export { MAX_CANDIDATES };
 const ANCHOR_URL_TTL_S = 60 * 60;
 /** Email links: 7 days. If it expires, the alt text shows and Review still works. */
 const EMAIL_URL_TTL_S = 7 * 24 * 60 * 60;
@@ -104,6 +117,23 @@ export async function generateBrief(prompt: string): Promise<ImageBrief> {
   } catch (err) {
     log.warn({ err }, 'image brief generation failed');
     return FALLBACK_IMAGE_BRIEF;
+  }
+}
+
+/**
+ * The editor scores the lint-clean concepts. Advisory: any failure returns
+ * null, and rankConcepts falls back to the brief's own order.
+ */
+export async function generateCritique(prompt: string): Promise<Critique | null> {
+  try {
+    const response = await editor.generate([{ role: 'user', content: prompt }], {
+      requestContext: stepRequestContext('social_post.image_critic'),
+      structuredOutput: { schema: critiqueSchema, errorStrategy: 'fallback', fallbackValue: null },
+    });
+    return response.object ? critiqueSchema.parse(response.object) : null;
+  } catch (err) {
+    log.warn({ err }, 'image idea review failed');
+    return null;
   }
 }
 
@@ -196,6 +226,35 @@ export interface RenderParams {
   triggerType: 'scheduled' | 'manual';
   candidateSetId: string;
   candidateIndex: number;
+  /** The run's review: stored with the concept and logged on its activity. Absent for a founder's own brief. */
+  review?: { hook: string; concept: ConceptReview | null; log: ReviewLog };
+}
+
+/** Every concept the reviewer saw and what became of it, for the run's activity rows. */
+export interface ReviewLog {
+  hook: string;
+  review_fallback: boolean;
+  concepts: Array<{
+    index: number;
+    symbol: string;
+    recognisable: number | null;
+    twist_visible: number | null;
+    on_hook: number | null;
+    physics_ok: boolean | null;
+    note: string | null;
+    total: number | null;
+    rank: number | null;
+    outcome: 'shortlisted' | 'dropped' | 'not_shortlisted';
+    reason: string | null;
+  }>;
+}
+
+/** What briefConcepts hands the renderer alongside the shortlisted concepts. */
+export interface BriefReview {
+  hook: string;
+  /** Aligned with the shortlisted concepts: each one's stored review. */
+  reviews: Array<ConceptReview | null>;
+  log: ReviewLog;
 }
 
 export type RenderResult =
@@ -319,7 +378,7 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       candidate_set_id: params.candidateSetId,
       candidate_index: candidateIndex,
       is_selected: false,
-      image_brief: concept,
+      image_brief: params.review ? { ...concept, hook: params.review.hook, review: params.review.concept } : concept,
       assembled_prompt: prompt,
       brand_visual_version: canon.version,
       model_id: model,
@@ -355,6 +414,9 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             bars: { top: bars.top, bottom: bars.bottom, left: bars.left, right: bars.right },
             paper,
             coverage: legible.coverage,
+            ...(params.review
+              ? { hook: params.review.hook, review_fallback: params.review.log.review_fallback, review: params.review.log.concepts }
+              : {}),
           },
         ],
       },
@@ -453,6 +515,8 @@ export async function renderCandidateSet(params: {
   startIndex?: number;
   /** A founder's choice marks the rest not_chosen; the morning run's pick does not. */
   founderChoice?: boolean;
+  /** The reviewer's shortlist for these concepts, from briefConcepts. */
+  review?: BriefReview;
 }): Promise<CandidateSetResult> {
   const candidateSetId = params.candidateSetId ?? randomUUID();
   const startIndex = params.startIndex ?? 0;
@@ -466,6 +530,9 @@ export async function renderCandidateSet(params: {
         triggerType: params.triggerType,
         candidateSetId,
         candidateIndex: startIndex + i,
+        ...(params.review
+          ? { review: { hook: params.review.hook, concept: params.review.reviews[i] ?? null, log: params.review.log } }
+          : {}),
       }),
     ),
   );
@@ -508,13 +575,15 @@ export async function renderCandidateSet(params: {
 
 /**
  * Ask for a brief and lint it: concepts that fail are dropped; if none
- * survive, one re-brief carries every flag. Returns the clean concepts, or the
- * reason there are none (a skip, or two failed briefs).
+ * survive, one re-brief carries every flag. Then the editor reviews the clean
+ * concepts and the top three are returned, best first, with the review to
+ * store. Returns the reason there are none instead (a skip, or two failed
+ * briefs). The reviewer never causes a skip.
  */
 export async function briefConcepts(
   canon: BrandVisual,
   params: Omit<ImageBriefPromptParams, 'layouts' | 'prohibitedTerms' | 'rewriteInstruction'>,
-): Promise<{ concepts: ImageConcept[] } | { skip: string }> {
+): Promise<{ concepts: ImageConcept[]; review: BriefReview } | { skip: string }> {
   const layouts = activeLayouts(canon);
   if (layouts.length === 0) return { skip: 'The brand visual canon has no active layouts.' };
   const briefParams = { ...params, layouts, prohibitedTerms: canon.prohibitedTerms };
@@ -532,7 +601,47 @@ export async function briefConcepts(
   }
   if (lint.clean.length === 0) return { skip: `Brief failed lint twice: ${lint.flags.join(' ')}` };
   if (lint.flags.length > 0) log.info({ dropped: lint.flags }, 'image concepts dropped by lint');
-  return { concepts: lint.clean };
+
+  // ── Review → rank: shortlist before any render is paid for ────────────────
+  const hook = brief.hook.trim();
+  const critique = await generateCritique(buildImageCriticPrompt({ postCopy: params.postCopy, hook, concepts: lint.clean }));
+  const ranking = rankConcepts(lint.clean, critique, MAX_CANDIDATES);
+  if (ranking.fallback) log.warn({ hadCritique: critique !== null }, 'image idea review unusable — rendering in brief order');
+  return {
+    concepts: ranking.ranked.map((r) => r.concept),
+    review: { hook, reviews: ranking.ranked.map(storedReview), log: reviewLog(hook, lint.clean, critique, ranking) },
+  };
+}
+
+/** Every clean concept with its scores and fate, so the activity row shows why an idea did not make it. */
+function reviewLog(
+  hook: string,
+  concepts: ImageConcept[], critique: Critique | null, ranking: ReturnType<typeof rankConcepts>): ReviewLog {
+  const scores = new Map((critique?.scores ?? []).map((s) => [s.index, s]));
+  const ranked = new Map(ranking.ranked.map((r) => [r.concept, r]));
+  const dropped = new Map(ranking.dropped.map((d) => [d.index, d.reason]));
+  return {
+    hook,
+    review_fallback: ranking.fallback,
+    concepts: concepts.map((concept, i) => {
+      const s = scores.get(i + 1);
+      const r = ranked.get(concept);
+      const reason = dropped.get(i + 1) ?? null;
+      return {
+        index: i + 1,
+        symbol: concept.symbol,
+        recognisable: s?.recognisable ?? null,
+        twist_visible: s?.twist_visible ?? null,
+        on_hook: s?.on_hook ?? null,
+        physics_ok: s?.physics_ok ?? null,
+        note: s?.note ?? null,
+        total: s ? s.recognisable + s.twist_visible + s.on_hook : null,
+        rank: r?.rank ?? null,
+        outcome: r ? 'shortlisted' : reason ? 'dropped' : 'not_shortlisted',
+        reason,
+      };
+    }),
+  };
 }
 
 /** Step 5b. Never throws. */
@@ -556,7 +665,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
     return { outcome: { status: 'disabled', reason: 'No active brand_visual canon.' }, images };
   }
 
-  // ── Brief: recent subjects/layouts → up to three concepts → lint ──────────
+  // ── Brief: recent symbols/layouts → hook + six concepts → lint → review ───
   const briefed = await briefConcepts(canon, {
     story: params.story,
     form: params.form,
@@ -582,6 +691,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
   const set = await renderCandidateSet({
     canon,
     concepts: briefed.concepts,
+    review: briefed.review,
     posts: params.posts,
     imageSpecs: params.imageSpecs,
     triggerType: 'scheduled',

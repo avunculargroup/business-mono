@@ -9,6 +9,7 @@ import { BRAND_VISUAL_ROW } from '../../../test/fixtures/brandVisual.js';
 const fakeSupabase: FakeSupabaseClient = createFakeSupabase();
 const charlieGenerate = vi.fn();
 const lexGenerate = vi.fn();
+const editorGenerate = vi.fn();
 const generateImage = vi.fn();
 
 const bucket = {
@@ -21,6 +22,7 @@ const bucket = {
 vi.mock('@platform/db', () => ({ get supabase() { return fakeSupabase; } }));
 vi.mock('../../agents/contentCreator/index.js', () => ({ charlie: { generate: charlieGenerate } }));
 vi.mock('../../agents/compliance/index.js', () => ({ lex: { generate: lexGenerate } }));
+vi.mock('../../agents/editorial/index.js', () => ({ editor: { generate: editorGenerate } }));
 vi.mock('../../config/model.js', () => ({
   stepRequestContext: vi.fn((k: string) => ({ k })),
   resolveImageModelId: vi.fn(async () => 'google/gemini-2.5-flash-image'),
@@ -53,7 +55,7 @@ const GATE = {
   layout: 'diagonal',
   alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, concepts: [STAMP, LIGHTHOUSE, GATE] };
+const BRIEF = { skip: false, skip_reason: null, hook: 'Twenty years', concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const PARAMS = {
   accountIds: ['acc-li', 'acc-x'],
@@ -88,6 +90,8 @@ beforeEach(async () => {
   fakeSupabase.__setResponse('brand_visual', { data: BRAND_VISUAL_ROW, error: null });
   fakeSupabase.__setResponse('content_images', { data: [], error: null });
   charlieGenerate.mockResolvedValue({ object: BRIEF });
+  // No usable review by default: the shortlist is the brief's order.
+  editorGenerate.mockResolvedValue({ object: null });
   lexGenerate.mockResolvedValue({
     object: { classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'describes' },
   });
@@ -161,7 +165,7 @@ describe('runImageStep', () => {
       expect(rows.every((r) => r['is_selected'] === false)).toBe(true); // selection is made after all settle
       expect(rows.map((r) => r['candidate_index']).sort()).toEqual([0, 0, 1, 1, 2, 2]);
       const stampRow = rows.find((r) => r['candidate_index'] === 0)!;
-      expect(stampRow['image_brief']).toEqual(STAMP);
+      expect(stampRow['image_brief']).toEqual({ ...STAMP, hook: 'Twenty years', review: null });
 
       // The lowest index is selected; the morning run's pick marks nothing not_chosen.
       const stampGroup = stampRow['generation_group_id'];
@@ -317,7 +321,7 @@ describe('runImageStep', () => {
   });
 
   it('skips cleanly when the brief chooses not to illustrate', async () => {
-    charlieGenerate.mockResolvedValue({ object: { skip: true, skip_reason: 'No honest visual.', concepts: [] } });
+    charlieGenerate.mockResolvedValue({ object: { skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] } });
     const { outcome } = await runImageStep(PARAMS);
     expect(outcome).toEqual({ status: 'skipped', reason: 'No honest visual.' });
     expect(generateImage).not.toHaveBeenCalled();
@@ -377,6 +381,71 @@ describe('runImageStep', () => {
     const verdict = insertedImageRows()[0]!['alt_text_verdict'] as { classification: string; rationale: string };
     expect(verdict.classification).toBe('general_advice');
     expect(verdict.rationale).toMatch(/unavailable/);
+  });
+
+  it('renders the reviewer\'s top pick as candidate 0 and selects it, storing the hook and review', async () => {
+    const SCALE = { ...STAMP, symbol: 'A balance scale', twist: 'The weighted pan sits higher', subject: 'A balance scale, weighted pan high' };
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, hook: 'capital buffers', concepts: [SCALE, STAMP, LIGHTHOUSE, GATE] } });
+    editorGenerate.mockResolvedValue({
+      object: {
+        scores: [
+          { index: 1, recognisable: 5, twist_visible: 3, on_hook: 3, physics_ok: false, note: 'Weighted pan is high.' },
+          { index: 2, recognisable: 4, twist_visible: 4, on_hook: 3, physics_ok: true, note: 'Stamp, fine.' },
+          { index: 3, recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'Lands the hook.' },
+          { index: 4, recognisable: 4, twist_visible: 3, on_hook: 3, physics_ok: true, note: 'Queue reads.' },
+        ],
+      },
+    });
+    const restore = answerSetReadWithInsertedRows();
+    try {
+      const { outcome } = await runImageStep(PARAMS);
+      const rows = insertedImageRows();
+      const top = rows.find((r) => r['candidate_index'] === 0)!;
+      expect(top['image_brief']).toEqual({
+        ...LIGHTHOUSE,
+        hook: 'capital buffers',
+        review: { recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'Lands the hook.', total: 14, rank: 1 },
+      });
+      expect(rows.find((r) => r['candidate_index'] === 1)!['image_brief']).toMatchObject({ symbol: 'A rubber stamp' });
+      expect(rows.find((r) => r['candidate_index'] === 2)!['image_brief']).toMatchObject({ symbol: 'A turnstile' });
+      expect(rows.some((r) => (r['image_brief'] as { symbol: string }).symbol === 'A balance scale')).toBe(false);
+      expect(outcome).toMatchObject({ status: 'generated', generation_group_id: top['generation_group_id'], layout: 'against_gold' });
+      expect(editorGenerate.mock.calls[0]![1].requestContext).toEqual({ k: 'social_post.image_critic' });
+
+      // Every concept's scores and fate, dropped ones with their reason.
+      const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+      expect(actions['hook']).toBe('capital buffers');
+      expect(actions['review_fallback']).toBe(false);
+      expect(actions['review']).toEqual([
+        expect.objectContaining({ index: 1, symbol: 'A balance scale', outcome: 'dropped', reason: 'physics reads wrong', rank: null }),
+        expect.objectContaining({ index: 2, symbol: 'A rubber stamp', outcome: 'shortlisted', rank: 2, total: 11 }),
+        expect.objectContaining({ index: 3, symbol: 'A lighthouse', outcome: 'shortlisted', rank: 1, total: 14 }),
+        expect.objectContaining({ index: 4, symbol: 'A turnstile', outcome: 'shortlisted', rank: 3, total: 10 }),
+      ]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('renders in brief order when the reviewer throws, with review_fallback recorded', async () => {
+    editorGenerate.mockRejectedValue(new Error('editor down'));
+    const { outcome } = await runImageStep(PARAMS);
+    expect(outcome).toMatchObject({ status: 'generated', candidates: 3 });
+    const rows = insertedImageRows();
+    expect(rows.find((r) => r['candidate_index'] === 0)!['image_brief']).toEqual({ ...STAMP, hook: 'Twenty years', review: null });
+    expect(rows.find((r) => r['candidate_index'] === 2)!['image_brief']).toMatchObject({ symbol: 'A turnstile' });
+    const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+    expect(actions['review_fallback']).toBe(true);
+  });
+
+  it('shows the reviewer every lint-clean concept, up to six, with the hook', async () => {
+    const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, hook: 'capital buffers', concepts: six } });
+    await runImageStep(PARAMS);
+    const prompt = editorGenerate.mock.calls[0]![0][0].content as string;
+    expect(prompt).toContain('## The hook\ncapital buffers');
+    expect(prompt).toContain('6. Symbol: a sail');
+    expect(generateImage).toHaveBeenCalledTimes(3);
   });
 
   it('sends signed style-anchor URLs as references', async () => {
