@@ -33,38 +33,67 @@ import type { StoryCandidate } from './select.js';
 // still empty is filled with the best-scoring rejected idea. When the reviewer
 // itself fails, the shortlist is the brief's own order.
 
+/** Each concept field's stored limit, in characters. Enforced in code, never by the model's schema. */
+export const CONCEPT_LIMITS = { tension: 200, symbol: 200, twist: 200, subject: 200, alt_text: 300 } as const;
+export const HOOK_LIMIT = 120;
+export const SKIP_REASON_LIMIT = 200;
+
+/** The contract for one concept: what is stored and rendered. */
 const conceptSchema = z.object({
-  tension: z.string().max(200),
-  symbol: z.string().max(200), // a familiar, instantly recognisable object
-  twist: z.string().max(200), // the one visible change that ties it to the post
-  subject: z.string().max(200), // the symbol with its twist, as it will be drawn
+  tension: z.string().max(CONCEPT_LIMITS.tension),
+  symbol: z.string().max(CONCEPT_LIMITS.symbol), // a familiar, instantly recognisable object
+  twist: z.string().max(CONCEPT_LIMITS.twist), // the one visible change that ties it to the post
+  subject: z.string().max(CONCEPT_LIMITS.subject), // the symbol with its twist, as it will be drawn
   layout: z.string(), // validated against active layouts by the linter
-  alt_text: z.string().max(300),
+  alt_text: z.string().max(CONCEPT_LIMITS.alt_text),
+});
+
+/** One concept as the model may return it: the same fields, no length limits. */
+const lenientConceptSchema = z.object({
+  tension: z.string(),
+  symbol: z.string(),
+  twist: z.string(),
+  subject: z.string(),
+  layout: z.string(),
+  alt_text: z.string(),
 });
 
 /**
- * What the model is asked to return. It carries no minimum on purpose:
- * structured output with errorStrategy 'fallback' turns any schema failure
- * into the fallback brief, which is a skip, so enforcing six here would turn a
- * four-concept brief into no image at all. A short brief is reviewed as it is.
+ * What the model is asked to return: the brief's fields and types, with no
+ * length limits and no limit on the number of concepts. Any schema failure in
+ * structured output costs the whole brief, so one over-long twist or a seventh
+ * concept must not be one; normaliseBrief enforces the limits in code instead.
+ * (2026-11-10: a brief came back as "Brief generation failed." after 85
+ * seconds, most likely on one field over its limit.)
  */
 export const imageBriefOutputSchema = z.object({
   skip: z.boolean(),
-  skip_reason: z.string().max(200).nullable(),
-  hook: z.string().max(120), // the post's most specific, concrete phrase
-  concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
+  skip_reason: z.string().nullable(),
+  hook: z.string(), // the post's most specific, concrete phrase
+  concepts: z.array(lenientConceptSchema),
 });
 
-/** The brief's contract: a non-skip brief proposes exactly MIN_BRIEF_CONCEPTS concepts; a skip proposes none. */
-export const imageBriefSchema = imageBriefOutputSchema.superRefine((brief, ctx) => {
-  if (!brief.skip && brief.concepts.length < MIN_BRIEF_CONCEPTS) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['concepts'],
-      message: `A brief that does not skip proposes ${MIN_BRIEF_CONCEPTS} concepts; this one has ${brief.concepts.length}.`,
-    });
-  }
-});
+/**
+ * The brief's contract: limits on every field, and a non-skip brief proposes
+ * exactly MIN_BRIEF_CONCEPTS concepts; a skip proposes none. normaliseBrief's
+ * output meets the limits; a short brief is still reviewed as it is.
+ */
+export const imageBriefSchema = z
+  .object({
+    skip: z.boolean(),
+    skip_reason: z.string().max(SKIP_REASON_LIMIT).nullable(),
+    hook: z.string().max(HOOK_LIMIT),
+    concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
+  })
+  .superRefine((brief, ctx) => {
+    if (!brief.skip && brief.concepts.length < MIN_BRIEF_CONCEPTS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['concepts'],
+        message: `A brief that does not skip proposes ${MIN_BRIEF_CONCEPTS} concepts; this one has ${brief.concepts.length}.`,
+      });
+    }
+  });
 export type ImageBrief = z.infer<typeof imageBriefSchema>;
 export type ImageConcept = z.infer<typeof conceptSchema>;
 // The schema and the shared interface must describe the same shape: a drift
@@ -74,12 +103,101 @@ void _sameShape;
 
 export { lintImageBrief, lintImageConcept, imageBriefRewriteInstruction } from '@platform/shared';
 
-export const FALLBACK_IMAGE_BRIEF: ImageBrief = {
-  skip: true,
-  skip_reason: 'Brief generation failed.',
-  hook: '',
-  concepts: [],
-};
+/** Cut text to at most `max` characters, at the last word boundary when there is a sensible one. Pure. */
+export function truncateWords(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  // The cut already ends a word when the next character is a space.
+  if (/\s/.test(t[max]!)) return cut.replace(/[\s,;:–—-]+$/u, '').trimEnd();
+  const space = cut.lastIndexOf(' ');
+  const atWord = space >= max * 0.5 ? cut.slice(0, space) : cut;
+  return atWord.replace(/[\s,;:–—-]+$/u, '').trimEnd();
+}
+
+/** Zod issues as "path: message" pairs, joined. Paths and messages only: never the model's text. */
+export function summariseIssues(error: z.ZodError, max = 300): string {
+  const text = error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join('; ');
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/** The model's text as JSON, tolerating a fenced code block around it; undefined when it is not JSON. */
+export function parseModelJson(text: string | undefined | null): unknown {
+  if (!text?.trim()) return undefined;
+  const fenced = /^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/i.exec(text);
+  try {
+    return JSON.parse(fenced ? fenced[1]! : text);
+  } catch {
+    return undefined;
+  }
+}
+
+const briefShellSchema = z.object({
+  skip: z.boolean(),
+  skip_reason: z.string().nullable().optional(),
+  hook: z.string().optional(),
+  concepts: z.array(z.unknown()).optional(),
+});
+
+export type NormalisedBrief =
+  | {
+      ok: true;
+      brief: ImageBrief;
+      /** Concepts dropped because a field was missing or the wrong type. */
+      dropped: number;
+      /** Concepts beyond MAX_BRIEF_CONCEPTS, discarded. */
+      excess: number;
+      /** Fields cut to their limit, as "concept 2 twist" or "hook". */
+      truncated: string[];
+    }
+  | { ok: false; detail: string };
+
+/**
+ * Turn whatever the model returned into a brief that meets the contract's
+ * limits. Pure. Strings are cut at a word boundary to their limit, concepts
+ * past six are discarded, and a concept with a missing or mistyped field is
+ * dropped on its own instead of failing the brief. Only a response with no
+ * boolean `skip` (or not an object at all) fails. A skip passes through.
+ */
+export function normaliseBrief(raw: unknown): NormalisedBrief {
+  const shell = briefShellSchema.safeParse(raw);
+  if (!shell.success) return { ok: false, detail: summariseIssues(shell.error) };
+  const truncated: string[] = [];
+  const cut = (value: string, max: number, label: string) => {
+    const out = truncateWords(value, max);
+    if (out !== value.trim()) truncated.push(label);
+    return out;
+  };
+  const { skip } = shell.data;
+  const skipReason = shell.data.skip_reason == null ? null : cut(shell.data.skip_reason, SKIP_REASON_LIMIT, 'skip_reason');
+  const hook = cut(shell.data.hook ?? '', HOOK_LIMIT, 'hook');
+  if (skip) {
+    return { ok: true, brief: { skip, skip_reason: skipReason, hook, concepts: [] }, dropped: 0, excess: 0, truncated };
+  }
+  const rawConcepts = shell.data.concepts ?? [];
+  const concepts: ImageConcept[] = [];
+  let dropped = 0;
+  for (const item of rawConcepts) {
+    const parsed = lenientConceptSchema.safeParse(item);
+    if (!parsed.success) {
+      dropped++;
+      continue;
+    }
+    if (concepts.length >= MAX_BRIEF_CONCEPTS) continue;
+    const n = concepts.length + 1;
+    const c = parsed.data;
+    concepts.push({
+      tension: cut(c.tension, CONCEPT_LIMITS.tension, `concept ${n} tension`),
+      symbol: cut(c.symbol, CONCEPT_LIMITS.symbol, `concept ${n} symbol`),
+      twist: cut(c.twist, CONCEPT_LIMITS.twist, `concept ${n} twist`),
+      subject: cut(c.subject, CONCEPT_LIMITS.subject, `concept ${n} subject`),
+      layout: c.layout.trim(),
+      alt_text: cut(c.alt_text, CONCEPT_LIMITS.alt_text, `concept ${n} alt_text`),
+    });
+  }
+  const excess = Math.max(0, rawConcepts.length - dropped - MAX_BRIEF_CONCEPTS);
+  return { ok: true, brief: { skip, skip_reason: skipReason, hook, concepts }, dropped, excess, truncated };
+}
 
 /** At most this many concepts are rendered per run: the reviewer's shortlist. */
 export const MAX_CANDIDATES = 3;
@@ -223,7 +341,8 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - Strong: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
 
 ## Rules
-- Return exactly six concepts with six different symbols, using at least two different layouts. Breadth matters more than polish: a reviewer will shortlist them.
+- Return exactly six concepts with six different symbols, using at least two different layouts. Exactly six, no more. Breadth matters more than polish: a reviewer will shortlist them.
+- Keep it short: tension, symbol, twist and subject in 25 words or fewer each, and alt_text in 40 words or fewer. Short fields make better briefs.
 - Draw the six from at least four different domains (sport, home, nature, transport, building, kitchen, travel and so on), at most two from any one domain.
 - At least two concepts pun on the hook's literal words.
 - No symbol whose meaning depends on writing or letters: pens writing, type, documents, signs, newspapers, seals, books shown open. A closed book is fine.

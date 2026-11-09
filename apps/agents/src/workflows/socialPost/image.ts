@@ -14,7 +14,6 @@ import { editor } from '../../agents/editorial/index.js';
 import { generateImage, MAX_REFERENCE_IMAGES } from '../../lib/openrouterImage.js';
 import { lexVerdictSchema, type LexVerdict, type Platform } from '../variant/schemas.js';
 import {
-  FALLBACK_IMAGE_BRIEF,
   MAX_CANDIDATES,
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
@@ -24,6 +23,8 @@ import {
   imageBriefRewriteInstruction,
   imageBriefOutputSchema,
   lintImageBrief,
+  normaliseBrief,
+  parseModelJson,
   rankConcepts,
   recentImageHistory,
   reviewerRewriteInstruction,
@@ -115,22 +116,95 @@ export interface ImageStepResult {
   images: Map<string, EmailImage>;
 }
 
-export async function generateBrief(prompt: string): Promise<ImageBrief> {
+/** How a brief call went, recorded on the run so a failure can be diagnosed from the database. */
+export interface BriefAttemptMeta {
+  duration_ms: number;
+  /** 'stop', or 'length' when the output hit the token limit. */
+  finish_reason: string | null;
+  output_tokens: number | null;
+}
+
+export interface BriefFailure extends BriefAttemptMeta {
+  /**
+   * schema: the output did not parse into a brief (zod paths in detail);
+   * truncated: the output stopped at the token limit mid-JSON;
+   * exception: the call itself failed.
+   */
+  kind: 'schema' | 'truncated' | 'exception';
+  /** Zod issue paths and messages, or the error message. Never the model's output. */
+  detail: string;
+}
+
+export type BriefResult = ({ ok: true; brief: ImageBrief } & BriefAttemptMeta) | ({ ok: false } & BriefFailure);
+
+/**
+ * Ask Charlie for a brief. A technical failure is reported as one, never as a
+ * skip: only the model's own `skip: true` means "no honest visual".
+ *
+ * The model is given the lenient output schema with errorStrategy 'warn', so a
+ * validation failure leaves `object` undefined and the raw JSON in `text`;
+ * normaliseBrief then enforces the limits in code, dropping a malformed
+ * concept rather than the brief.
+ */
+export async function generateBrief(prompt: string): Promise<BriefResult> {
+  const started = Date.now();
   try {
     const response = await charlie.generate([{ role: 'user', content: prompt }], {
       requestContext: stepRequestContext('social_post.image_brief'),
-      // The lenient output schema: a short brief must be reviewed, not turned into a skip.
-      structuredOutput: { schema: imageBriefOutputSchema, errorStrategy: 'fallback', fallbackValue: FALLBACK_IMAGE_BRIEF },
+      structuredOutput: { schema: imageBriefOutputSchema, errorStrategy: 'warn' },
     });
-    const brief = imageBriefOutputSchema.parse(response.object ?? FALLBACK_IMAGE_BRIEF);
+    const meta: BriefAttemptMeta = {
+      duration_ms: Date.now() - started,
+      finish_reason: typeof response.finishReason === 'string' ? response.finishReason : null,
+      output_tokens: typeof response.usage?.outputTokens === 'number' ? response.usage.outputTokens : null,
+    };
+    const raw = response.object ?? parseModelJson(response.text);
+    const truncated = meta.finish_reason === 'length';
+    if (raw === undefined) {
+      return truncated
+        ? { ok: false, kind: 'truncated', detail: `output stopped at the token limit (${meta.output_tokens ?? '?'} tokens)`, ...meta }
+        : { ok: false, kind: 'schema', detail: 'output was not valid JSON', ...meta };
+    }
+    const normalised = normaliseBrief(raw);
+    if (!normalised.ok) {
+      return truncated
+        ? { ok: false, kind: 'truncated', detail: `output stopped at the token limit; ${normalised.detail}`, ...meta }
+        : { ok: false, kind: 'schema', detail: normalised.detail, ...meta };
+    }
+    const { brief, dropped, excess, truncated: cut } = normalised;
+    if (dropped > 0 || excess > 0 || cut.length > 0) {
+      log.info({ dropped, excess, truncated: cut }, 'brief normalised');
+    }
     if (!brief.skip && brief.concepts.length < MIN_BRIEF_CONCEPTS) {
       log.info({ count: brief.concepts.length }, 'brief returned fewer concepts than asked');
     }
-    return brief;
+    return { ok: true, brief, ...meta };
   } catch (err) {
-    log.warn({ err }, 'image brief generation failed');
-    return FALLBACK_IMAGE_BRIEF;
+    return {
+      ok: false,
+      kind: 'exception',
+      detail: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+      duration_ms: Date.now() - started,
+      finish_reason: null,
+      output_tokens: null,
+    };
   }
+}
+
+/**
+ * One brief, retried once on a technical failure with the same prompt (text:
+ * a fraction of a cent). Never more. Each failure is logged once.
+ */
+async function briefWithRetry(prompt: string): Promise<{ brief: ImageBrief } | { failed: BriefFailure[] }> {
+  const failures: BriefFailure[] = [];
+  for (const attempt of [1, 2]) {
+    const result = await generateBrief(prompt);
+    if (result.ok) return { brief: result.brief };
+    const { ok: _ok, ...failure } = result;
+    log.warn({ kind: failure.kind, detail: failure.detail, attempt }, 'image brief failed');
+    failures.push(failure);
+  }
+  return { failed: failures };
 }
 
 /**
@@ -278,12 +352,14 @@ export interface ReviewLog {
  * Visibility only: selection is unchanged.
  */
 export interface RoundTwoRecord {
-  status: 'not_needed' | 'ran' | 'brief_skipped' | 'no_fresh_concepts' | 'critique_unusable';
+  status: 'not_needed' | 'ran' | 'brief_skipped' | 'brief_failed' | 'no_fresh_concepts' | 'critique_unusable';
   reason?: string;
   /** Concepts the second brief returned, before lint and de-duplication. */
   concepts_returned?: number;
   /** Of those, how many were lint-clean and new. */
   fresh_clean?: number;
+  /** Status 'brief_failed': both attempts at the second brief. */
+  brief_attempts?: BriefFailure[];
 }
 
 /** What briefConcepts hands the renderer alongside the shortlisted concepts. */
@@ -655,19 +731,23 @@ export async function renderCandidateSet(params: {
 export async function briefConcepts(
   canon: BrandVisual,
   params: Omit<ImageBriefPromptParams, 'layouts' | 'prohibitedTerms' | 'rewriteInstruction'>,
-): Promise<{ concepts: ImageConcept[]; review: BriefReview } | { skip: string }> {
+): Promise<{ concepts: ImageConcept[]; review: BriefReview } | { skip: string; briefAttempts?: BriefFailure[] }> {
   const layouts = activeLayouts(canon);
   if (layouts.length === 0) return { skip: 'The brand visual canon has no active layouts.' };
   const briefParams = { ...params, layouts, prohibitedTerms: canon.prohibitedTerms };
   const lintOpts = { layouts, prohibitedTerms: canon.prohibitedTerms };
 
-  let brief: ImageBrief = await generateBrief(buildImageBriefPrompt(briefParams));
+  const first = await briefWithRetry(buildImageBriefPrompt(briefParams));
+  if ('failed' in first) return { skip: 'brief_failed', briefAttempts: first.failed };
+  let brief: ImageBrief = first.brief;
   if (brief.skip) return { skip: brief.skip_reason?.trim() || 'The brief chose not to illustrate this post.' };
   let lint = lintImageBrief(brief, lintOpts);
   if (lint.clean.length === 0) {
-    brief = await generateBrief(
+    const again = await briefWithRetry(
       buildImageBriefPrompt({ ...briefParams, rewriteInstruction: imageBriefRewriteInstruction(lint.flags) }),
     );
+    if ('failed' in again) return { skip: 'brief_failed', briefAttempts: again.failed };
+    brief = again.brief;
     if (brief.skip) return { skip: brief.skip_reason?.trim() || 'The brief chose not to illustrate this post.' };
     lint = lintImageBrief(brief, lintOpts);
   }
@@ -750,7 +830,14 @@ async function secondRound(
   const tried = round1.map((c) => c.symbol);
   const instruction = reviewerRewriteInstruction(rejected, tried);
 
-  const brief = await generateBrief(buildImageBriefPrompt({ ...briefParams, reviewerInstruction: instruction }));
+  const result = await briefWithRetry(buildImageBriefPrompt({ ...briefParams, reviewerInstruction: instruction }));
+  if ('failed' in result) {
+    const last = result.failed[result.failed.length - 1]!;
+    return {
+      record: { status: 'brief_failed', reason: `${last.kind}: ${last.detail}`, concepts_returned: 0, brief_attempts: result.failed },
+    };
+  }
+  const brief = result.brief;
   if (brief.skip) {
     return {
       record: { status: 'brief_skipped', reason: brief.skip_reason?.trim() || 'the second brief chose to skip', concepts_returned: 0 },
@@ -896,7 +983,15 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
         trigger_type: 'scheduled',
         entity_type: 'content_item',
         entity_id: primary.contentItemId,
-        proposed_actions: [{ type: 'social_image', skipped: true, reason: briefed.skip, story_id: params.story.id }],
+        proposed_actions: [
+          {
+            type: 'social_image',
+            skipped: true,
+            reason: briefed.skip,
+            story_id: params.story.id,
+            ...(briefed.briefAttempts ? { brief_attempts: briefed.briefAttempts } : {}),
+          },
+        ],
       },
     ]);
     return { outcome: { status: 'skipped', reason: briefed.skip }, images };

@@ -29,12 +29,13 @@ vi.mock('../../config/model.js', () => ({
 }));
 vi.mock('../../lib/openrouterImage.js', () => ({ generateImage, MAX_REFERENCE_IMAGES: 4 }));
 const logInfo = vi.fn();
+const logWarn = vi.fn();
 vi.mock('../../lib/logger.js', async (importActual) => {
   const actual = await importActual<typeof import('../../lib/logger.js')>();
-  return { ...actual, createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }) };
+  return { ...actual, createLogger: () => ({ info: logInfo, warn: logWarn, error: vi.fn(), debug: vi.fn() }) };
 });
 
-const { runImageStep } = await import('./image.js');
+const { runImageStep, generateBrief } = await import('./image.js');
 
 const STAMP = {
   tension: 'The rules are about to land, and everyone is waiting for the impact.',
@@ -398,10 +399,52 @@ describe('runImageStep', () => {
     expect(generateImage).not.toHaveBeenCalled();
   });
 
-  it('treats a brief call that throws as a skip', async () => {
+  it('retries a failed brief once, then skips as brief_failed with both attempts recorded', async () => {
     charlieGenerate.mockRejectedValue(new Error('model down'));
     const { outcome } = await runImageStep(PARAMS);
-    expect(outcome).toMatchObject({ status: 'skipped', reason: 'Brief generation failed.' });
+    expect(outcome).toEqual({ status: 'skipped', reason: 'brief_failed' });
+    expect(charlieGenerate).toHaveBeenCalledTimes(2);
+    expect(editorGenerate).not.toHaveBeenCalled();
+    const skipped = activityRows().find((r) => r.action === 'social_image_skipped')!.proposed_actions[0]!;
+    expect(skipped['reason']).toBe('brief_failed');
+    expect(skipped['brief_attempts']).toEqual([
+      { kind: 'exception', detail: 'model down', duration_ms: expect.any(Number), finish_reason: null, output_tokens: null },
+      { kind: 'exception', detail: 'model down', duration_ms: expect.any(Number), finish_reason: null, output_tokens: null },
+    ]);
+    expect(logWarn.mock.calls.filter((c) => c[1] === 'image brief failed')).toEqual([
+      [{ kind: 'exception', detail: 'model down', attempt: 1 }, 'image brief failed'],
+      [{ kind: 'exception', detail: 'model down', attempt: 2 }, 'image brief failed'],
+    ]);
+  });
+
+  it('reviews the retry\'s concepts when only the first attempt fails', async () => {
+    charlieGenerate
+      .mockResolvedValueOnce({ object: undefined, text: '{"skip": false, "hook": "x", "concepts": [{"tension"', finishReason: 'length', usage: { outputTokens: 16384 } })
+      .mockResolvedValueOnce({ object: BRIEF });
+    const { outcome } = await runImageStep(PARAMS);
+    expect(charlieGenerate).toHaveBeenCalledTimes(2);
+    expect(editorGenerate).toHaveBeenCalled();
+    expect(outcome.status).toBe('generated');
+  });
+
+  it('does not retry the model\'s own skip', async () => {
+    charlieGenerate.mockResolvedValue({ object: { skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] } });
+    const { outcome } = await runImageStep(PARAMS);
+    expect(outcome).toEqual({ status: 'skipped', reason: 'No honest visual.' });
+    expect(charlieGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a brief from the text when one concept fails structured validation', async () => {
+    const malformed = { ...STAMP, twist: undefined };
+    charlieGenerate.mockResolvedValueOnce({
+      object: undefined,
+      text: JSON.stringify({ ...BRIEF, concepts: [malformed, LIGHTHOUSE, GATE] }),
+      finishReason: 'stop',
+      usage: { outputTokens: 900 },
+    });
+    const { outcome } = await runImageStep(PARAMS);
+    expect(charlieGenerate).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ status: 'generated', candidates: 2 });
   });
 
   it('removes a candidate\'s uploads and writes none of its rows when an upload fails part-way', async () => {
@@ -516,11 +559,31 @@ describe('runImageStep', () => {
     });
 
     it('records a second brief that skipped', async () => {
-      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockRejectedValueOnce(new Error('brief down'));
+      charlieGenerate
+        .mockResolvedValueOnce({ object: BRIEF })
+        .mockResolvedValueOnce({ object: { skip: true, skip_reason: 'Nothing more to draw.', hook: '', concepts: [] } });
       editorGenerate.mockResolvedValueOnce({ object: ROUND1 });
       await runImageStep(PARAMS);
-      expect(roundTwoOf()).toEqual({ status: 'brief_skipped', reason: 'Brief generation failed.', concepts_returned: 0 });
+      expect(charlieGenerate).toHaveBeenCalledTimes(2);
+      expect(roundTwoOf()).toEqual({ status: 'brief_skipped', reason: 'Nothing more to draw.', concepts_returned: 0 });
       expect(activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!['review_rounds']).toBe(1);
+    });
+
+    it('records a second brief that failed twice as brief_failed, and keeps round one', async () => {
+      charlieGenerate
+        .mockResolvedValueOnce({ object: BRIEF })
+        .mockRejectedValueOnce(new Error('timeout'))
+        .mockRejectedValueOnce(new Error('timeout'));
+      editorGenerate.mockResolvedValueOnce({ object: ROUND1 });
+      const { outcome } = await runImageStep(PARAMS);
+      expect(charlieGenerate).toHaveBeenCalledTimes(3);
+      expect(roundTwoOf()).toMatchObject({
+        status: 'brief_failed',
+        reason: 'exception: timeout',
+        concepts_returned: 0,
+        brief_attempts: [expect.objectContaining({ kind: 'exception' }), expect.objectContaining({ kind: 'exception' })],
+      });
+      expect(outcome.status).toBe('generated');
     });
 
     it('records a second brief with nothing new: how many repeated round one', async () => {
@@ -678,5 +741,43 @@ describe('runImageStep', () => {
       'https://signed.example/social-images/anchors/a.png',
       'https://signed.example/social-images/anchors/b.png',
     ]);
+  });
+});
+
+describe('generateBrief', () => {
+  it('reports a schema failure with issue paths, not a skip', async () => {
+    charlieGenerate.mockResolvedValueOnce({ object: undefined, text: '{"hook": "x", "concepts": []}', finishReason: 'stop', usage: { outputTokens: 40 } });
+    const r = await generateBrief('prompt');
+    expect(r).toMatchObject({ ok: false, kind: 'schema', detail: 'skip: Required', finish_reason: 'stop', output_tokens: 40 });
+  });
+
+  it('reports output that is not JSON as a schema failure', async () => {
+    charlieGenerate.mockResolvedValueOnce({ object: undefined, text: 'Here are some ideas.', finishReason: 'stop' });
+    expect(await generateBrief('prompt')).toMatchObject({ ok: false, kind: 'schema', detail: 'output was not valid JSON' });
+  });
+
+  it('reports an exception', async () => {
+    charlieGenerate.mockRejectedValueOnce(new Error('Key limit exceeded'));
+    expect(await generateBrief('prompt')).toMatchObject({ ok: false, kind: 'exception', detail: 'Key limit exceeded' });
+  });
+
+  it('reports truncation when the output stopped at the token limit', async () => {
+    charlieGenerate.mockResolvedValueOnce({ object: undefined, text: '{"skip": false, "concepts": [{"tens', finishReason: 'length', usage: { outputTokens: 16384 } });
+    expect(await generateBrief('prompt')).toMatchObject({ ok: false, kind: 'truncated', output_tokens: 16384 });
+  });
+
+  it('never turns a failure into a skip brief', async () => {
+    charlieGenerate.mockRejectedValueOnce(new Error('x'));
+    const r = await generateBrief('prompt');
+    expect(r.ok).toBe(false);
+    expect('brief' in r).toBe(false);
+  });
+
+  it('asks for the lenient schema with errorStrategy warn', async () => {
+    charlieGenerate.mockResolvedValueOnce({ object: BRIEF });
+    const r = await generateBrief('prompt');
+    expect(r).toMatchObject({ ok: true, brief: { hook: 'Twenty years' } });
+    expect(charlieGenerate.mock.calls[0]![1].structuredOutput.errorStrategy).toBe('warn');
+    expect(charlieGenerate.mock.calls[0]![1].structuredOutput.fallbackValue).toBeUndefined();
   });
 });

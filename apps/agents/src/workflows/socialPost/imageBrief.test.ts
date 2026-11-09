@@ -6,8 +6,10 @@ import {
   buildAltTextLexPrompt,
   buildImageBriefPrompt,
   buildImageCriticPrompt,
-  FALLBACK_IMAGE_BRIEF,
   imageBriefOutputSchema,
+  normaliseBrief,
+  parseModelJson,
+  truncateWords,
   imageBriefRewriteInstruction,
   imageBriefSchema,
   layoutToRest,
@@ -63,10 +65,14 @@ describe('imageBriefSchema', () => {
     expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [...six, STAMP] }).success).toBe(false);
   });
 
-  it('lets a skip brief carry no concepts, and the fallback brief parse', () => {
+  it('lets a skip brief carry no concepts', () => {
     expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] }).success).toBe(true);
-    expect(imageBriefSchema.safeParse(FALLBACK_IMAGE_BRIEF).success).toBe(true);
-    expect(imageBriefOutputSchema.safeParse(FALLBACK_IMAGE_BRIEF).success).toBe(true);
+  });
+
+  it('asks the model for no length limits, so one long field cannot fail the brief', () => {
+    const long = { ...STAMP, twist: 'word '.repeat(80).trim() };
+    expect(imageBriefSchema.safeParse({ ...BRIEF, concepts: [long, ...six.slice(1)] }).success).toBe(false);
+    expect(imageBriefOutputSchema.safeParse({ ...BRIEF, concepts: [long, ...six, STAMP] }).success).toBe(true);
   });
 
   it('accepts a short brief from the model, so it is reviewed rather than turned into a skip', () => {
@@ -294,6 +300,12 @@ describe('buildImageBriefPrompt', () => {
     expect(p.indexOf('## First, the hook')).toBeLessThan(p.indexOf('1. tension:'));
   });
 
+  it('states the per-field word limits and exactly six', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('tension, symbol, twist and subject in 25 words or fewer each, and alt_text in 40 words or fewer');
+    expect(p).toContain('Exactly six, no more.');
+  });
+
   it('asks for physics that reads correctly', () => {
     expect(buildImageBriefPrompt(base)).toContain('A weighted pan sits lower; light comes from its source; water finds its level.');
   });
@@ -327,6 +339,7 @@ describe('buildImageBriefPrompt', () => {
   it('carries a reviewer re-brief under its own heading, still asking for exactly six', () => {
     const p = buildImageBriefPrompt({ ...base, reviewerInstruction: '- A wax seal: signals approval (lowest: on_hook 2)' });
     expect(p).toContain('Return exactly six concepts');
+    expect(p).toContain('Exactly six, no more.');
     expect(p).toContain('## Re-brief: a reviewer rejected these concepts\n- A wax seal: signals approval (lowest: on_hook 2)');
   });
 
@@ -534,5 +547,74 @@ describe('critiqueProblem', () => {
       const concepts = [STAMP, LIGHTHOUSE, GATE];
       expect(critiqueProblem(critique, 3) !== null).toBe(rankConcepts(concepts, critique as Critique | null).fallback);
     }
+  });
+});
+
+describe('truncateWords', () => {
+  it('leaves short text alone and cuts long text at a word boundary', () => {
+    expect(truncateWords('A gold whistle', 200)).toBe('A gold whistle');
+    expect(truncateWords('one two three four five', 13)).toBe('one two three');
+    expect(truncateWords('one two three, four', 15)).toBe('one two three');
+  });
+
+  it('cuts mid-word when there is no sensible boundary', () => {
+    expect(truncateWords('supercalifragilistic', 10)).toBe('supercalif');
+  });
+});
+
+describe('parseModelJson', () => {
+  it('reads plain or fenced JSON, and gives undefined for anything else', () => {
+    expect(parseModelJson('{"skip": true}')).toEqual({ skip: true });
+    expect(parseModelJson('```json\n{"skip": true}\n```')).toEqual({ skip: true });
+    expect(parseModelJson('{"skip": true, "concepts": [{"tension"')).toBeUndefined();
+    expect(parseModelJson('')).toBeUndefined();
+  });
+});
+
+describe('normaliseBrief', () => {
+  const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
+  const brief = (concepts: unknown[]) => ({ skip: false, skip_reason: null, hook: 'capital buffers', concepts });
+
+  it('cuts an over-long twist at a word boundary, and records it', () => {
+    const twist = `${'gold '.repeat(60)}beam`;
+    const r = normaliseBrief(brief([{ ...STAMP, twist }, ...six.slice(1)]));
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.brief.concepts[0]!.twist.length).toBeLessThanOrEqual(200);
+    expect(r.brief.concepts[0]!.twist).toMatch(/gold$/);
+    expect(r.truncated).toEqual(['concept 1 twist']);
+    expect(imageBriefSchema.safeParse(r.brief).success).toBe(true);
+  });
+
+  it('keeps the first six of eight concepts', () => {
+    const r = normaliseBrief(brief([...six, { ...STAMP, symbol: 'seventh' }, { ...STAMP, symbol: 'eighth' }]));
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.brief.concepts.map((c) => c.symbol)).toEqual(six.map((c) => c.symbol));
+    expect(r.excess).toBe(2);
+  });
+
+  it('drops one malformed concept and keeps the other five', () => {
+    const { twist: _twist, ...noTwist } = six[2]!;
+    const r = normaliseBrief(brief([six[0], six[1], noTwist, six[3], { ...six[4], layout: 7 }, six[5], six[0]]));
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.dropped).toBe(2);
+    expect(r.brief.concepts).toHaveLength(5);
+    expect(r.brief.concepts.map((c) => c.symbol)).toEqual(['a door', 'a bell', 'a well', 'a sail', 'a door']);
+  });
+
+  it('passes a skip brief through untouched', () => {
+    const skip = { skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] };
+    expect(normaliseBrief(skip)).toEqual({ ok: true, brief: skip, dropped: 0, excess: 0, truncated: [] });
+  });
+
+  it('fails only when there is no boolean skip, naming the path', () => {
+    expect(normaliseBrief({ concepts: [] })).toEqual({ ok: false, detail: 'skip: Required' });
+    expect(normaliseBrief('a sentence')).toMatchObject({ ok: false });
+  });
+
+  it('cuts an over-long hook', () => {
+    const r = normaliseBrief({ ...brief(six), hook: 'word '.repeat(40) });
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.brief.hook.length).toBeLessThanOrEqual(120);
+    expect(r.truncated).toContain('hook');
   });
 });
