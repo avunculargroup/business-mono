@@ -145,16 +145,9 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
-/** Per-channel median of the bottom-right sample of an image. */
-export async function samplePaper(image: Buffer): Promise<Rgb> {
-  const { width = 0, height = 0 } = await sharp(image).metadata();
-  const w = Math.max(1, Math.round(width * PAPER_SAMPLE_FRACTION));
-  const h = Math.max(1, Math.round(height * PAPER_SAMPLE_FRACTION));
-  const { data, info } = await sharp(image)
-    .extract({ left: width - w, top: height - h, width: w, height: h })
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+/** Per-channel median of one rectangle of an image. */
+async function sampleRegion(image: Buffer, region: { left: number; top: number; width: number; height: number }): Promise<Rgb> {
+  const { data, info } = await sharp(image).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const channels: [number[], number[], number[]] = [[], [], []];
   for (let i = 0; i < data.length; i += info.channels) {
     channels[0].push(data[i]!);
@@ -162,6 +155,14 @@ export async function samplePaper(image: Buffer): Promise<Rgb> {
     channels[2].push(data[i + 2]!);
   }
   return [median(channels[0]), median(channels[1]), median(channels[2])];
+}
+
+/** Per-channel median of the bottom-right sample of an image. */
+export async function samplePaper(image: Buffer): Promise<Rgb> {
+  const { width = 0, height = 0 } = await sharp(image).metadata();
+  const w = Math.max(1, Math.round(width * PAPER_SAMPLE_FRACTION));
+  const h = Math.max(1, Math.round(height * PAPER_SAMPLE_FRACTION));
+  return sampleRegion(image, { left: width - w, top: height - h, width: w, height: h });
 }
 
 /**
@@ -173,6 +174,73 @@ export async function correctPaper(master: Buffer, targetHex: string): Promise<{
   if (!correction.applied) return { image: master, correction };
   const image = await sharp(master).linear(correction.gains, [0, 0, 0]).png().toBuffer();
   return { image, correction };
+}
+
+// ── Corners: a print, not a photograph of one ───────────────────────────────
+// A render is meant to be the printed sheet itself, filling the frame. Some come
+// back as a photograph of a print: on the 2026-11-09 CP 392 run the railway
+// signal gantry lay on a wooden table (wood in the top-left corner, a paper
+// edge, perspective) and an earlier football pitch had a grey shadow at its
+// edge. Every corner of a real print is paper, ink or gold (close_crop subjects
+// run off the edge), so a corner far from all three is the table or the shadow.
+// Runs after the paper correction, so slightly cream paper has been pulled back.
+
+/** Each corner sample is a square this share of the shorter side. */
+export const CORNER_SAMPLE_FRACTION = 0.05;
+/**
+ * Largest RGB distance from the nearest palette colour a corner may sit at.
+ * Cream paper ([238, 237, 233], about 23 from #FAFAF8) passes; a wood-brown
+ * table ([150, 110, 70], about 77 from gold) and a grey shadow
+ * ([185, 182, 175], about 101 from gold) fail.
+ */
+export const CORNER_MAX_DISTANCE = 45;
+/** Paper, ink and gold: the corner check's palette when the canon carries none. */
+export const DEFAULT_CORNER_PALETTE = ['#FAFAF8', '#1A1915', '#C9A84C'];
+
+export interface CornerCheck {
+  pass: boolean;
+  /** Indexes of the corners that failed: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
+  failing: number[];
+  /** Each corner's distance from its nearest palette colour, rounded to 0.1. */
+  distances: number[];
+}
+
+function rgbDistance(a: Rgb, b: Rgb): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/**
+ * Whether every corner sits near a palette colour. Pure: the samples come from
+ * cornerSamples. A palette with no parseable colour falls back to the default.
+ */
+export function cornerCheck(samples: Rgb[], palette: string[]): CornerCheck {
+  const parsed = palette.map(hexToRgb).filter((c): c is Rgb => c !== null);
+  const colours = parsed.length > 0 ? parsed : DEFAULT_CORNER_PALETTE.map((h) => hexToRgb(h)!);
+  const distances = samples.map((s) => Number(Math.min(...colours.map((c) => rgbDistance(s, c))).toFixed(1)));
+  const failing = distances.flatMap((d, i) => (d > CORNER_MAX_DISTANCE ? [i] : []));
+  return { pass: failing.length === 0, failing, distances };
+}
+
+/** Per-channel medians of the four corners: top-left, top-right, bottom-left, bottom-right. */
+export async function cornerSamples(image: Buffer): Promise<Rgb[]> {
+  const { width = 0, height = 0 } = await sharp(image).metadata();
+  const side = Math.max(1, Math.round(Math.min(width, height) * CORNER_SAMPLE_FRACTION));
+  const right = width - side;
+  const bottom = height - side;
+  return Promise.all(
+    [
+      { left: 0, top: 0 },
+      { left: right, top: 0 },
+      { left: 0, top: bottom },
+      { left: right, top: bottom },
+    ].map((at) => sampleRegion(image, { ...at, width: side, height: side })),
+  );
+}
+
+/** The corner check on a master. */
+export async function corners(master: Buffer, palette: string[]): Promise<CornerCheck & { samples: Rgb[] }> {
+  const samples = await cornerSamples(master);
+  return { ...cornerCheck(samples, palette), samples };
 }
 
 // ── Letterbox bars ───────────────────────────────────────────────────────────

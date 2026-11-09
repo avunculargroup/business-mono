@@ -212,3 +212,29 @@ describe('security-definer functions', () => {
   });
 });
 
+
+/**
+ * The canon migrations update the one active brand_visual row in place, so
+ * each is guarded to run only over the version it was written against. A
+ * founder's save from /brand bumps the version, so an edited canon must never
+ * match. v1.3 is the first with a test of its guard; the v1.2 guard was
+ * rehearsed against production read-only instead.
+ */
+describe('brand_visual v1.3 canon migration', () => {
+  const sql = readFileSync(`${MIGRATIONS}/20261109300000_brand_visual_v1_3.sql`, 'utf8');
+  const where = sql.slice(sql.lastIndexOf('WHERE'));
+
+  it('only rewrites the active, unedited v1.2 canon', () => {
+    expect(where).toMatch(/is_active = true/);
+    expect(where).toMatch(/version = '1\.2'/);
+    expect(where).toMatch(/style_block LIKE 'A bold two-colour linocut%'/);
+  });
+
+  it('lands on v1.3, so it cannot match a second time', () => {
+    expect(sql).toMatch(/version = '1\.3'/);
+  });
+
+  it('appends to the prohibited block rather than replacing it', () => {
+    expect(sql).toMatch(/prohibited_block = prohibited_block \|\| E'\\n' \|\| /);
+  });
+});

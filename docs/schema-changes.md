@@ -6,6 +6,20 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-09 — Social post images: canon v1.3 (data only)
+
+`20261109300000_brand_visual_v1_3.sql` changes data, not schema: no column is added, dropped or
+renamed. It moves the active `brand_visual` row to v1.3 in place: the style block's opening now
+asks for "a flat, straight-on scan of the printed sheet that fills the whole frame", "a hand-pulled
+print" becomes "hand printing", and one line is appended to `prohibited_block` naming the
+photographed-print look (table, paper edges, perspective, shadows). Guarded to run once, and only
+over an unedited v1.2 canon (`version = '1.2'` and the v1.2 style block): a canon saved from
+`/brand` has a later version and is left alone. Why: a render came back as a linocut photographed
+on a wooden table. `agent_activity.proposed_actions` gains JSONB keys only (`corners`,
+`round_two`). Spec: `docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-11-09 — Social post images: `v_image_pick_agreement`
 
 `20261109200000_image_pick_agreement_view.sql` adds a view, `WITH (security_invoker = true)`, so
