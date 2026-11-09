@@ -15,7 +15,7 @@ Each morning the daily routine produces a LinkedIn draft and an X draft for each
 The hard part is not generating an image. It is making image #40 look like it belongs with image #1. Image models drift: each prompt is read fresh, and a model fills any gap in the prompt with its own defaults (gold coins, rocket ships, a blue gradient). This spec treats consistency as a data problem rather than a prompting trick. It has three layers:
 
 1. **A versioned brand visual canon.** This is the base prompt, the palette, layout presets and a prohibited list. It lives in a `brand_visual` table next to `brand_voice`, not in code.
-2. **A structured brief per post.** An LLM step names the post's **hook** (its most specific phrase), reads it for its **tension** (the uneasy or unresolved idea, not the topic) and proposes up to six concepts about the hook, each a familiar **symbol** with one visible **twist**. A text-only reviewer then shortlists three to render. The brief never writes the final prompt.
+2. **A structured brief per post.** An LLM step names the post's **hook** (its most specific phrase), reads it for its **tension** (the uneasy or unresolved idea, not the topic) and proposes six concepts about the hook, each a familiar **symbol** with one visible **twist**. A text-only reviewer then shortlists three to render. The brief never writes the final prompt.
 3. **Deterministic assembly.** A pure function joins the canon, the brief and the platform format into the exact prompt the image model receives. That prompt is stored with the image as its audit trail.
 
 **Style anchors** add to this: approved images go back into the model as reference images. The voice work taught us that showing an example beats describing it. The `voice_snippets` library exists because the `example_posts` JSONB described a voice without showing it. Style anchors apply the same lesson to images.
@@ -359,7 +359,7 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
 5  per platform: Charlie → AI-tell gate → Lex → persist content_items
 5b IMAGE (new, best-effort, once per run)
    5b.1  load active brand_visual + recent symbols and layouts
-   5b.2  image brief          (LLM, structured)      scope social_post.image_brief   the hook + up to six concepts
+   5b.2  image brief          (LLM, structured)      scope social_post.image_brief   the hook + six concepts
    5b.3  lint per concept     (pure)                 drop flagged; re-brief once if none clean, then skip
    5b.3b review + rank        (LLM, structured)      scope social_post.image_critic  editor scores; rankConcepts keeps the top three
          if fewer than three pass: one re-brief with the reviewer's notes → lint → review → rank both rounds
@@ -381,7 +381,7 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
 
 ### 5b.2 Image brief
 
-The input is the story (title, summary, key points) when known, the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active layouts, the canon's prohibited terms, and the recent symbols and layouts. The prompt opens with the half-second test. The brief first names the run's **hook** (see "Symbol and twist" above), then works out, in order, for each concept: the **tension** (the surprising, uneasy or unresolved idea, not the topic), a familiar **symbol**, one visible **twist**, the **subject** (the symbol with its twist, as printed), a **layout**, and **alt text**. It then checks each concept against the half-second test, using the worked examples in "Symbol and twist" above. It returns six concepts with six different symbols using at least two layouts: breadth over polish, because a reviewer shortlists them. It is told not to use a recent symbol again, and not to use a layout the last two runs both used.
+The input is the story (title, summary, key points) when known, the chosen `form`, the **persisted LinkedIn copy** (or X if LinkedIn is absent), the active layouts, the canon's prohibited terms, and the recent symbols and layouts. The prompt opens with the half-second test. The brief first names the run's **hook** (see "Symbol and twist" above), then works out, in order, for each concept: the **tension** (the surprising, uneasy or unresolved idea, not the topic), a familiar **symbol**, one visible **twist**, the **subject** (the symbol with its twist, as printed), a **layout**, and **alt text**. It then checks each concept against the half-second test, using the worked examples in "Symbol and twist" above. It asks for exactly six concepts with six different symbols using at least two layouts, in both rounds: breadth over polish, because a reviewer shortlists them. It is told not to use a recent symbol again, and not to use a layout the last two runs both used.
 
 Output schema (`socialPost/imageBrief.ts`; the shared `ImageBrief` interface matches it, guarded at compile time):
 
@@ -394,13 +394,18 @@ const conceptSchema = z.object({
   layout: z.string(),             // validated against active layouts by the linter
   alt_text: z.string().max(300),
 });
-export const imageBriefSchema = z.object({
+// What the model is asked to return: no minimum (see below).
+export const imageBriefOutputSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().max(200).nullable(),
   hook: z.string().max(120),      // the post's most specific, concrete phrase
   concepts: z.array(conceptSchema).max(6),
 });
+// The contract: a non-skip brief proposes exactly six; a skip proposes none.
+export const imageBriefSchema = imageBriefOutputSchema.superRefine(/* concepts.length >= 6 unless skip */);
 ```
+
+**Why two schemas.** Structured output with `errorStrategy: 'fallback'` turns any schema failure into the fallback brief, which is a skip. Enforcing six on the model's schema would turn a four-concept brief into no image at all. So the model gets `imageBriefOutputSchema`, and a short brief is linted and reviewed as it is, logged once (`brief returned fewer concepts than asked`) without a re-ask. `imageBriefSchema` records the contract; the shared `MIN_BRIEF_CONCEPTS` and `MAX_BRIEF_CONCEPTS` are both 6.
 
 The hook is never sent to the image model, so it is exempt from the no-digits lint: "140 applicants" is a fine hook.
 
@@ -544,6 +549,15 @@ Add **Download image**, which serves the platform's marked crop, with the alt te
 
 Next to Voice. Sections: Style, Palette (swatches with hex in mono), Composition, Prohibited (block + terms), Layouts (key, label, description, active; the retired motifs are hidden), Brand mark (enabled, size and margin, with a live preview on a sample crop), Style anchors (grid, with remove). Saving bumps `version` and asks "Save as v1.3?" (the next version). **Preview prompt** renders `buildImagePrompt` against a sample brief so edits can be checked without spending a render.
 
+**Reviewer agreement** (`ReviewerAgreement`, first panel of the tab, read-only). It reads the last 20 decided runs from `v_image_pick_agreement` and shows:
+
+- "Your pick matched the reviewer's top pick in X of N runs." N counts only runs where both the pick and the run had a reviewer verdict (`agreed` not null).
+- **When you chose differently**: the average Recognisable, Twist visible and On hook scores of your picks next to the reviewer's top picks, over the overrides only, in JetBrains Mono. "Your picks score higher on recognisable and lower on on-hook" would mean the reviewer weights the hook too heavily.
+- The last five overrides: date, your symbol, the reviewer's symbol.
+- Under five decided runs: "Not enough picks yet. This fills in as you choose images in Review."
+
+It changes nothing. A run counts as decided when one group is selected and marked `kept`: "Use this image", or keeping the selected image by editing its alt text. A run left on its default selection is not a pick. Checked at 375px and 320px.
+
 ### Draft email
 
 The email already shows each draft as a post-style card inside a 600px column (`socialDraftEmail.ts`). When 5b succeeded, each card shows **its own platform's crop at full card width**, between the post body and the Review link, where the image sits in a real post. The LinkedIn card shows the 1200×627 crop and the X card shows the 1600×900 crop, so the email previews what will actually be posted.
@@ -633,6 +647,7 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 - **Feedback distillation for images.** `review_outcome` collects the signal now. Folding it into standing guidance, as `distill_feedback` does for copy, comes later.
 - **Campaign reuse.** `buildImagePrompt`, the brief step and the client are written without routine-specific inputs, so the campaign variant workflow can call them later.
 - **Vision QA.** A vision model checking for rendered text or prohibited objects. Human review covers this for now.
+- **Re-weighting the reviewer from pick data.** The Reviewer agreement panel collects the evidence; nothing acts on it yet. Revisit once there are about 20 judged runs, if the founder's pick differs from the reviewer's top pick in more than about a third of them **and** the averages lean the same way (for instance, picks consistently higher on recognisable and lower on on_hook). Then adjust the reviewer's prompt or the total's weighting, not the thresholds alone, and say which in a dated decision.
 
 -----
 
@@ -667,6 +682,8 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **Four domains, at most two per domain.** The six "playbook" ideas all came from writing and printing tools. |
 | 2026-11-09 | **At least two hook puns.** "Playbook" and "the game" were in the post; a football on a kicking tee on a freshly marked pitch was there to be had, and none of the six used the words. |
 | 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` never fills a slot while any other concept can. If every idea has a physics or text fault, the best of them still render: a run always gets an image (Chris, 2026-11-09). |
+| 2026-11-09 | **The brief always asks for six ideas.** One CP 392 round returned four, leaving the reviewer less to choose from. The prompt says "exactly six" in both rounds and the contract schema requires six for a non-skip brief. A short brief is still reviewed, never re-asked or turned into a skip. |
+| 2026-11-09 | **Founder picks are compared with the reviewer's, read-only.** `v_image_pick_agreement` and the Reviewer agreement panel. On the CP 392 run Chris picked the football pitch (the reviewer's third) over its top pick, the blueprint tube. If that pattern holds, the reviewer's scoring changes; the evidence comes first. |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |
 
 -----

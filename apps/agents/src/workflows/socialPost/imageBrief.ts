@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   MAX_BRIEF_CONCEPTS,
+  MIN_BRIEF_CONCEPTS,
   readStoredBrief,
   type ConceptReview,
   type ImageBrief as SharedImageBrief,
@@ -10,7 +11,7 @@ import type { StoryCandidate } from './select.js';
 
 // The image brief: the only part of an image an LLM decides. It names the
 // post's hook (its most specific phrase), reads the post for its tension, then
-// proposes up to six concepts about that hook, each a familiar symbol everyone
+// proposes six concepts about that hook, each a familiar symbol everyone
 // already knows with one visible twist, and a layout. It never writes the
 // prompt the image model receives (buildImagePrompt does).
 //
@@ -41,11 +42,28 @@ const conceptSchema = z.object({
   alt_text: z.string().max(300),
 });
 
-export const imageBriefSchema = z.object({
+/**
+ * What the model is asked to return. It carries no minimum on purpose:
+ * structured output with errorStrategy 'fallback' turns any schema failure
+ * into the fallback brief, which is a skip, so enforcing six here would turn a
+ * four-concept brief into no image at all. A short brief is reviewed as it is.
+ */
+export const imageBriefOutputSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().max(200).nullable(),
   hook: z.string().max(120), // the post's most specific, concrete phrase
   concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
+});
+
+/** The brief's contract: a non-skip brief proposes exactly MIN_BRIEF_CONCEPTS concepts; a skip proposes none. */
+export const imageBriefSchema = imageBriefOutputSchema.superRefine((brief, ctx) => {
+  if (!brief.skip && brief.concepts.length < MIN_BRIEF_CONCEPTS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['concepts'],
+      message: `A brief that does not skip proposes ${MIN_BRIEF_CONCEPTS} concepts; this one has ${brief.concepts.length}.`,
+    });
+  }
 });
 export type ImageBrief = z.infer<typeof imageBriefSchema>;
 export type ImageConcept = z.infer<typeof conceptSchema>;
@@ -205,7 +223,7 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - Strong: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
 
 ## Rules
-- Return six concepts with six different symbols, using at least two different layouts. Breadth matters more than polish: a reviewer will shortlist them.
+- Return exactly six concepts with six different symbols, using at least two different layouts. Breadth matters more than polish: a reviewer will shortlist them.
 - Draw the six from at least four different domains (sport, home, nature, transport, building, kitchen, travel and so on), at most two from any one domain.
 - At least two concepts pun on the hook's literal words.
 - No symbol whose meaning depends on writing or letters: pens writing, type, documents, signs, newspapers, seals, books shown open. A closed book is fine.

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { supabase } from '@platform/db';
 import {
+  MIN_BRIEF_CONCEPTS,
   planCandidateSelection,
   type CandidateRow,
   type ConceptReview,
@@ -20,7 +21,7 @@ import {
   buildImageCriticPrompt,
   critiqueSchema,
   imageBriefRewriteInstruction,
-  imageBriefSchema,
+  imageBriefOutputSchema,
   lintImageBrief,
   rankConcepts,
   recentImageHistory,
@@ -115,9 +116,14 @@ export async function generateBrief(prompt: string): Promise<ImageBrief> {
   try {
     const response = await charlie.generate([{ role: 'user', content: prompt }], {
       requestContext: stepRequestContext('social_post.image_brief'),
-      structuredOutput: { schema: imageBriefSchema, errorStrategy: 'fallback', fallbackValue: FALLBACK_IMAGE_BRIEF },
+      // The lenient output schema: a short brief must be reviewed, not turned into a skip.
+      structuredOutput: { schema: imageBriefOutputSchema, errorStrategy: 'fallback', fallbackValue: FALLBACK_IMAGE_BRIEF },
     });
-    return imageBriefSchema.parse(response.object ?? FALLBACK_IMAGE_BRIEF);
+    const brief = imageBriefOutputSchema.parse(response.object ?? FALLBACK_IMAGE_BRIEF);
+    if (!brief.skip && brief.concepts.length < MIN_BRIEF_CONCEPTS) {
+      log.info({ count: brief.concepts.length }, 'brief returned fewer concepts than asked');
+    }
+    return brief;
   } catch (err) {
     log.warn({ err }, 'image brief generation failed');
     return FALLBACK_IMAGE_BRIEF;
