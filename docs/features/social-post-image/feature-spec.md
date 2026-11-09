@@ -3,7 +3,7 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; canon v1.2. The step 0 bake-off was dropped: tested in production (see Decisions)
-**Last updated:** 2026-11-09 (canon v1.3; the corner check and the round-two record)
+**Last updated:** 2026-11-10 (a failed brief is retried and recorded, never a skip)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
@@ -398,22 +398,25 @@ const conceptSchema = z.object({
   layout: z.string(),             // validated against active layouts by the linter
   alt_text: z.string().max(300),
 });
-// What the model is asked to return: no minimum (see below).
+// What the model is asked to return: the same fields and types, no limits at all.
 export const imageBriefOutputSchema = z.object({
   skip: z.boolean(),
-  skip_reason: z.string().max(200).nullable(),
-  hook: z.string().max(120),      // the post's most specific, concrete phrase
-  concepts: z.array(conceptSchema).max(6),
+  skip_reason: z.string().nullable(),
+  hook: z.string(),               // the post's most specific, concrete phrase
+  concepts: z.array(lenientConceptSchema),   // conceptSchema without .max()
 });
-// The contract: a non-skip brief proposes exactly six; a skip proposes none.
-export const imageBriefSchema = imageBriefOutputSchema.superRefine(/* concepts.length >= 6 unless skip */);
+// The contract: field limits, at most six, and a non-skip brief proposes exactly six.
+export const imageBriefSchema = z.object({ /* skip_reason ≤200, hook ≤120, concepts ≤6 of conceptSchema */ })
+  .superRefine(/* concepts.length >= 6 unless skip */);
 ```
 
-**Why two schemas.** Structured output with `errorStrategy: 'fallback'` turns any schema failure into the fallback brief, which is a skip. Enforcing six on the model's schema would turn a four-concept brief into no image at all. So the model gets `imageBriefOutputSchema`, and a short brief is linted and reviewed as it is, logged once (`brief returned fewer concepts than asked`) without a re-ask. `imageBriefSchema` records the contract; the shared `MIN_BRIEF_CONCEPTS` and `MAX_BRIEF_CONCEPTS` are both 6.
+**Why two schemas.** Any schema failure in structured output costs the whole brief. Enforcing six, or a 200-character twist, on the model's schema would turn one long field or a four-concept brief into no image at all. So the model gets `imageBriefOutputSchema`, with no limits, and the limits are enforced in code by `normaliseBrief` (pure): each string is cut at a word boundary to its limit, concepts past six are discarded, and a concept with a missing or mistyped field is dropped on its own rather than failing the brief. Only a response with no boolean `skip` fails. A short brief is linted and reviewed as it is, logged once (`brief returned fewer concepts than asked`) without a re-ask. `imageBriefSchema` records the contract; the shared `MIN_BRIEF_CONCEPTS` and `MAX_BRIEF_CONCEPTS` are both 6. The prompt asks for tension, symbol, twist and subject in 25 words or fewer and alt_text in 40, "exactly six, no more".
 
 The hook is never sent to the image model, so it is exempt from the no-digits lint: "140 applicants" is a fine hook.
 
-Structured output uses `errorStrategy: 'fallback'` with `{ skip: true, skip_reason: 'Brief generation failed.', hook: '', concepts: [] }`. This matches `generateDraft`.
+**A failure is not a skip.** Structured output uses `errorStrategy: 'warn'`: a validation failure leaves `object` undefined and the model's JSON in `text`, which `generateBrief` parses and normalises itself. `generateBrief` returns `{ ok: true, brief }` or `{ ok: false, kind, detail }`, where `kind` is `schema` (the output did not parse into a brief; `detail` is the zod paths and messages, never the model's text), `truncated` (`finishReason` was `length`: the output hit the token limit mid-JSON) or `exception` (the call failed). There is no fallback brief: only the model's own `skip: true` means "no honest visual". A failure is retried **once** with the same prompt (text, a fraction of a cent), each failure logged once as `image brief failed` with `{ kind, detail, attempt }`. If the retry also fails, the step is `skipped` with `reason: 'brief_failed'`, and `social_image_skipped` carries `brief_attempts: [{ kind, detail, duration_ms, finish_reason, output_tokens }]` for both, so the next failure is diagnosable from the database. The same retry applies to the lint re-brief and to round two's brief.
+
+The brief runs under Charlie's agent default of 16,384 output tokens (`agents/contentCreator/index.ts`); `model_configs` overrides the model only, not token limits, and no per-step override is needed at that size.
 
 ### 5b.3 Linter (pure: `lintImageConcept`, `lintImageBrief`, in `@platform/shared`)
 
@@ -449,7 +452,8 @@ The internal `editor` agent scores every lint-clean concept, text only, under th
 |---|---|---|
 | `not_needed` | Three or more passed round one, or round one's review was unusable (no notes to re-brief from) | `reason`: how many passed, or the round-one critique problem |
 | `ran` | The second review was usable and both rounds were ranked together | `concepts_returned`, `fresh_clean` |
-| `brief_skipped` | The second brief skipped or failed | `reason`: its skip reason |
+| `brief_skipped` | The second brief chose to skip | `reason`: its skip reason |
+| `brief_failed` | The second brief failed twice (schema, truncated or exception) | `reason`: the last failure's kind and detail; `brief_attempts` for both |
 | `no_fresh_concepts` | Nothing lint-clean and new came back | `reason`: how many repeated a round-one symbol, and the lint flags |
 | `critique_unusable` | The second review could not be ranked on | `reason` from `critiqueProblem`: no critique, malformed, no scores, `indices outside 1–n: …` (the reviewer carried on round one's numbering) or `scored twice: …` |
 
@@ -592,7 +596,8 @@ The email already shows each draft as a post-style card inside a 600px column (`
 |---|---|
 | `generate_image` set to `false` | Image status `disabled`; nothing runs |
 | No active `brand_visual` row | `disabled`; logged once per run |
-| Brief call errors | Fallback brief → `skipped` |
+| Brief fails (schema, truncated or exception) | One retry with the same prompt; if that fails too, `skipped` with `reason: 'brief_failed'` and both attempts in `brief_attempts`. Never treated as the model's own skip |
+| One concept malformed or over its length limit | That concept is dropped, or the field cut at a word boundary; the rest of the brief stands |
 | Brief returns `skip: true` | `skipped` with reason; logged as `social_image_skipped` |
 | Some concepts fail lint | They are dropped; the clean ones go to review, with no re-brief |
 | Reviewer errors or returns a malformed critique | The top three clean concepts render in brief order; `review_fallback` is recorded and `review` is stored as null. No re-brief |
@@ -700,6 +705,7 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **Four domains, at most two per domain.** The six "playbook" ideas all came from writing and printing tools. |
 | 2026-11-09 | **At least two hook puns.** "Playbook" and "the game" were in the post; a football on a kicking tee on a freshly marked pitch was there to be had, and none of the six used the words. |
 | 2026-11-09 | **No symbols that depend on writing; the reviewer flags `needs_text`.** The composing stick and fountain pen renders both came back with garbled pseudo-letters. Text-bearing symbols are linted in code (`TEXT_BEARING_SYMBOLS`), and a concept the reviewer marks `needs_text` never fills a slot while any other concept can. If every idea has a physics or text fault, the best of them still render: a run always gets an image (Chris, 2026-11-09). |
+| 2026-11-10 | **One bad field must not kill the whole brief; a failure is not a skip.** The 2026-11-10 morning run (activity row 2026-11-09 19:41:54 UTC) logged `social_image_skipped`, "Brief generation failed.", after an 85-second brief call. Railway had no `image brief generation failed` line, so it was not an exception but structured output's fallback: most likely one field over its `.max()`, or truncation. The fallback brief was a skip, so nothing retried and nothing recorded why. Now the model's schema has no limits, `normaliseBrief` enforces them per concept in code, a failure is retried once, and both attempts are recorded with `finish_reason` and token counts. |
 | 2026-11-09 | **A flat print, not a photo of a print (canon v1.3, corner check).** The CP 392 railway signal gantry came back as a linocut photographed on a wooden table (paper edge, wood in the top-left corner, perspective, shadow); an earlier football pitch was photographed at an angle with a grey shadow at its edge. The style now asks for a flat, straight-on scan of the sheet, the prohibited block names the look, and a render whose corner is not paper, ink or gold is rejected. |
 | 2026-11-09 | **Round two outcomes recorded.** The 10:50 UTC CP 392 run passed two ideas (whiteboard 15, gantry 12), so round two should have run, yet the row read `review_rounds: 1` and filled slot three with a stream scoring 1 on the hook. Three silent paths could explain it. `round_two` now records which, with counts and the reviewer's index problems; an unusable round two's concepts are logged though never ranked. Selection unchanged. |
 | 2026-11-09 | **The brief always asks for six ideas.** One CP 392 round returned four, leaving the reviewer less to choose from. The prompt says "exactly six" in both rounds and the contract schema requires six for a non-skip brief. A short brief is still reviewed, never re-asked or turned into a skip. |
