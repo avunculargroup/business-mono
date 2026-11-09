@@ -34,7 +34,7 @@ const { runImageStep } = await import('./image.js');
 const STAMP = {
   tension: 'The rules are about to land, and everyone is waiting for the impact.',
   symbol: 'A rubber stamp',
-  twist: 'Giant, poised just above a blank sheet, about to land',
+  twist: 'Giant, its fresh print in gold on a blank sheet',
   subject: 'A giant rubber stamp hovering just above a blank sheet of paper',
   layout: 'hero_left',
   alt_text: 'A linocut of a huge rubber stamp about to come down on a blank page.',
@@ -389,10 +389,10 @@ describe('runImageStep', () => {
     editorGenerate.mockResolvedValue({
       object: {
         scores: [
-          { index: 1, recognisable: 5, twist_visible: 3, on_hook: 3, physics_ok: false, note: 'Weighted pan is high.' },
-          { index: 2, recognisable: 4, twist_visible: 4, on_hook: 3, physics_ok: true, note: 'Stamp, fine.' },
-          { index: 3, recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'Lands the hook.' },
-          { index: 4, recognisable: 4, twist_visible: 3, on_hook: 3, physics_ok: true, note: 'Queue reads.' },
+          { index: 1, recognisable: 5, twist_visible: 3, on_hook: 3, physics_ok: false, needs_text: false, note: 'Weighted pan is high.' },
+          { index: 2, recognisable: 4, twist_visible: 4, on_hook: 3, physics_ok: true, needs_text: false, note: 'Stamp, fine.' },
+          { index: 3, recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, needs_text: false, note: 'Lands the hook.' },
+          { index: 4, recognisable: 4, twist_visible: 3, on_hook: 3, physics_ok: true, needs_text: false, note: 'Queue reads.' },
         ],
       },
     });
@@ -404,7 +404,7 @@ describe('runImageStep', () => {
       expect(top['image_brief']).toEqual({
         ...LIGHTHOUSE,
         hook: 'capital buffers',
-        review: { recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'Lands the hook.', total: 14, rank: 1 },
+        review: { recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, needs_text: false, note: 'Lands the hook.', total: 14, rank: 1 },
       });
       expect(rows.find((r) => r['candidate_index'] === 1)!['image_brief']).toMatchObject({ symbol: 'A rubber stamp' });
       expect(rows.find((r) => r['candidate_index'] === 2)!['image_brief']).toMatchObject({ symbol: 'A turnstile' });
@@ -416,6 +416,7 @@ describe('runImageStep', () => {
       const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
       expect(actions['hook']).toBe('capital buffers');
       expect(actions['review_fallback']).toBe(false);
+      expect(actions['review_rounds']).toBe(1);
       expect(actions['review']).toEqual([
         expect.objectContaining({ index: 1, symbol: 'A balance scale', outcome: 'dropped', reason: 'physics reads wrong', rank: null }),
         expect.objectContaining({ index: 2, symbol: 'A rubber stamp', outcome: 'shortlisted', rank: 2, total: 11 }),
@@ -425,6 +426,91 @@ describe('runImageStep', () => {
     } finally {
       restore();
     }
+  });
+
+  describe('acting on the reviewer', () => {
+    const SCORE = (index: number, r: number, t: number, h: number, extra: Record<string, unknown> = {}) => ({
+      index,
+      recognisable: r,
+      twist_visible: t,
+      on_hook: h,
+      physics_ok: true,
+      needs_text: false,
+      note: `note ${index}`,
+      ...extra,
+    });
+    const FOOTBALL = { ...STAMP, symbol: 'A football on a kicking tee', twist: 'The touchline painted in gold', subject: 'A football on a tee on a freshly marked pitch' };
+    const WHISTLE = { ...STAMP, symbol: "A referee's whistle", twist: 'Solid gold, on a black lanyard', subject: "A gold referee's whistle" };
+    // Round one: only the lighthouse passes.
+    const ROUND1 = { scores: [SCORE(1, 2, 4, 4), SCORE(2, 5, 4, 5), SCORE(3, 3, 2, 3)] };
+
+    it('re-briefs once with the reviewer\'s notes when fewer than three pass, and renders round two\'s survivors', async () => {
+      charlieGenerate
+        .mockResolvedValueOnce({ object: BRIEF })
+        .mockResolvedValueOnce({ object: { ...BRIEF, concepts: [FOOTBALL, WHISTLE, { ...LIGHTHOUSE, symbol: 'a lighthouse' }] } });
+      editorGenerate
+        .mockResolvedValueOnce({ object: ROUND1 })
+        .mockResolvedValueOnce({ object: { scores: [SCORE(1, 5, 4, 5), SCORE(2, 4, 4, 3)] } });
+
+      await runImageStep(PARAMS);
+
+      expect(charlieGenerate).toHaveBeenCalledTimes(2);
+      const rebrief = charlieGenerate.mock.calls[1]![0][0].content as string;
+      expect(rebrief).toContain('## Re-brief: a reviewer rejected these concepts');
+      expect(rebrief).toContain('- A rubber stamp: note 1 (lowest: recognisable 2)');
+      expect(rebrief).toContain('Do not reuse any of these symbols: A rubber stamp; A lighthouse; A turnstile.');
+      // The repeated lighthouse never reaches the second review.
+      const review2 = editorGenerate.mock.calls[1]![0][0].content as string;
+      expect(review2).toContain('1. Symbol: A football on a kicking tee');
+      expect(review2).not.toContain('a lighthouse');
+
+      const rows = insertedImageRows();
+      const byIndex = (i: number) => (rows.find((r) => r['candidate_index'] === i)!['image_brief'] as { symbol: string }).symbol;
+      // Lighthouse and football both total 14: brief order (round one first) breaks the tie.
+      expect([byIndex(0), byIndex(1), byIndex(2)]).toEqual(['A lighthouse', 'A football on a kicking tee', "A referee's whistle"]);
+
+      const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+      expect(actions['review_rounds']).toBe(2);
+      const review = actions['review'] as Array<Record<string, unknown>>;
+      expect(review.map((c) => [c['round'], c['symbol'], c['outcome'], c['filled_from_rejected']])).toEqual([
+        [1, 'A rubber stamp', 'dropped', false],
+        [1, 'A lighthouse', 'shortlisted', false],
+        [1, 'A turnstile', 'dropped', false],
+        [2, 'A football on a kicking tee', 'shortlisted', false],
+        [2, "A referee's whistle", 'shortlisted', false],
+      ]);
+    });
+
+    it('keeps round one, filling from its best soft rejects, when the second review fails', async () => {
+      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockResolvedValueOnce({ object: { ...BRIEF, concepts: [FOOTBALL] } });
+      editorGenerate.mockResolvedValueOnce({ object: ROUND1 }).mockRejectedValueOnce(new Error('editor down'));
+
+      await runImageStep(PARAMS);
+
+      const rows = insertedImageRows();
+      const byIndex = (i: number) => (rows.find((r) => r['candidate_index'] === i)!['image_brief'] as { symbol: string }).symbol;
+      expect([byIndex(0), byIndex(1), byIndex(2)]).toEqual(['A lighthouse', 'A rubber stamp', 'A turnstile']);
+      const actions = activityRows().find((r) => r.action === 'social_image_generated')!.proposed_actions[0]!;
+      expect(actions['review_rounds']).toBe(1);
+      expect(actions['review_fallback']).toBe(false);
+      expect((actions['review'] as Array<Record<string, unknown>>).filter((c) => c['filled_from_rejected']).map((c) => c['symbol'])).toEqual([
+        'A rubber stamp',
+        'A turnstile',
+      ]);
+    });
+
+    it('never fills a slot with a concept that needs text or gets its physics wrong', async () => {
+      charlieGenerate.mockResolvedValueOnce({ object: BRIEF }).mockRejectedValueOnce(new Error('brief down'));
+      editorGenerate.mockResolvedValueOnce({
+        object: { scores: [SCORE(1, 5, 5, 5, { needs_text: true }), SCORE(2, 5, 4, 5), SCORE(3, 5, 5, 5, { physics_ok: false })] },
+      });
+
+      const { outcome } = await runImageStep(PARAMS);
+
+      expect(generateImage).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ status: 'generated', candidates: 1, layout: 'against_gold' });
+      expect((insertedImageRows()[0]!['image_brief'] as { symbol: string }).symbol).toBe('A lighthouse');
+    });
   });
 
   it('renders in brief order when the reviewer throws, with review_fallback recorded', async () => {

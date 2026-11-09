@@ -284,7 +284,7 @@ export function contentImageRows(anchor: Date): Record<string, FixtureImageRow[]
     alt_text: `A linocut of ${symbol.toLowerCase()}.`,
   });
   const bridge = concept('A lighthouse', 'One solid gold beam cuts through the fog', 'against_gold', 'After years of fog, clarity is coming.');
-  const pier = concept('A rubber stamp', 'Giant, poised just above a blank sheet', 'hero_left', 'The rules are about to land.');
+  const pier = concept('A rubber stamp', 'Giant, its fresh print in gold on a blank sheet', 'hero_left', 'The rules are about to land.');
   return {
     'cnt-flagged': [
       imageRow(anchor, { id: 'img-flagged-bridge', generationGroupId: 'grp-bridge', candidateIndex: 1, brief: bridge, tension: bridge.tension, layout: bridge.layout }),

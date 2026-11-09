@@ -27,8 +27,10 @@ import type { StoryCandidate } from './select.js';
 //
 // Then a text-only reviewer (the editor) scores the clean concepts, and
 // rankConcepts shortlists the top three to render. Judging an idea costs a
-// fraction of a cent; a render costs cents. The reviewer is advisory, like Lex:
-// when it fails, the shortlist is the brief's own order.
+// fraction of a cent; a render costs cents. The reviewer is acted on: when
+// fewer than three ideas pass, one re-brief carries its notes, and any slot
+// still empty is filled with the best-scoring rejected idea. When the reviewer
+// itself fails, the shortlist is the brief's own order.
 
 const conceptSchema = z.object({
   tension: z.string().max(200),
@@ -129,6 +131,8 @@ export interface ImageBriefPromptParams {
   prohibitedTerms: string[];
   /** Linter flags from a first attempt, for the single re-brief. */
   rewriteInstruction?: string | null;
+  /** The reviewer's notes on rejected concepts, for the single reviewer-driven re-brief. */
+  reviewerInstruction?: string | null;
 }
 
 export function buildImageBriefPrompt(p: ImageBriefPromptParams): string {
@@ -158,6 +162,9 @@ ${p.story.key_points.length > 0 ? p.story.key_points.map((k) => `- ${k}`).join('
   const rewrite = p.rewriteInstruction
     ? `\n\n## Re-brief: none of your concepts could be used, for these reasons\n${p.rewriteInstruction}`
     : '';
+  const reviewer = p.reviewerInstruction
+    ? `\n\n## Re-brief: a reviewer rejected these concepts\n${p.reviewerInstruction}`
+    : '';
 
   return `Propose an image to sit beside a founder's social post. You are not writing an image prompt: the house style (a bold two-colour linocut), palette and prohibitions are fixed elsewhere. Your job is to find the idea worth printing.
 
@@ -183,6 +190,8 @@ ${layoutList}
 
 Then test each concept: would someone scrolling past at phone size recognise the symbol and get the twist without reading the post? If not, pick a simpler symbol.
 
+The twist is a visible physical state, never a moment in time. "About to", "not yet", "paused", "poised", "mid-stroke" and "waiting" cannot be seen in a still image. Half-finished is fine when the half can be seen: half the pitch lined, half the shelf full.
+
 Physics: if the twist involves weight, balance, light, motion or water, describe it so it reads correctly. A weighted pan sits lower; light comes from its source; water finds its level.
 
 ## Examples
@@ -190,15 +199,20 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - Weak, no symbol: a half-drawn bridge pier for a regulator's consultation paper. It needs explaining.
 - Weak, the topic and not the hook: "capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.
 - Weak, the topic and not the hook: "capital buffers" became a closed farm gate.
-- Strong: a regulator's consultation paper became a giant rubber stamp poised just above a blank sheet, about to land. Or a lighthouse throwing one solid gold beam through fog, for "clarity's coming".
-- Strong, the hook with a pun: "capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.
+- Weak, generic writing and a pause nobody can see: "the playbook" became a fountain pen lifted mid-stroke.
+- Strong, a pun on the hook's words: "capital buffers" became a heavy railway buffer stop printed in gold, a black rail running straight into it.
+- Strong, a pun on "the game": "writing the playbook, not banning the game" became a football on a kicking tee on a freshly marked pitch, its touchline painted in gold.
+- Strong: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
 
 ## Rules
 - Return six concepts with six different symbols, using at least two different layouts. Breadth matters more than polish: a reviewer will shortlist them.
+- Draw the six from at least four different domains (sport, home, nature, transport, building, kitchen, travel and so on), at most two from any one domain.
+- At least two concepts pun on the hook's literal words.
+- No symbol whose meaning depends on writing or letters: pens writing, type, documents, signs, newspapers, seals, books shown open. A closed book is fine.
 - No text, letters, numbers or figures anywhere in the picture. Images cannot carry them.
 - No coins, currency symbols, charts, arrows or anything that implies a price going up or down. No people's faces.${avoid}
 - Keep the bottom-right corner of the picture empty.
-- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}`;
+- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}${reviewer}`;
 }
 
 // ── The reviewer: shortlist before any render is paid for ──────────────────────
@@ -213,6 +227,7 @@ export const critiqueSchema = z.object({
       twist_visible: scoreSchema, // the twist is in the picture, not in words
       on_hook: scoreSchema, // about the hook, not the general topic
       physics_ok: z.boolean(),
+      needs_text: z.boolean(), // the picture needs visible letters, numbers or writing to read
       note: z.string().max(160),
     }),
   ),
@@ -251,6 +266,7 @@ ${list}
 - twist_visible: is the twist in the picture itself, not in words or a caption? A plain symbol with no twist scores 1.
 - on_hook: is it about the hook, not the post's general topic? A picture of the general topic scores 1.
 - physics_ok: false if the picture would get weight, balance, light, motion or water visibly wrong.
+- needs_text: true if the picture needs visible letters, numbers or writing to read.
 - note: one short line on the idea's strength or flaw, under 160 characters.
 
 Return one entry per idea, with index set to the idea's number above.
@@ -258,7 +274,8 @@ Return one entry per idea, with index set to the idea's number above.
 ## Calibration (hook: "capital buffers")
 - A balance scale with the weighted pan sitting higher: recognisable 5, twist_visible 1, on_hook 1, physics_ok false. It says "regulation", and the weighted pan should sit lower.
 - A closed farm gate: recognisable 5, twist_visible 1, on_hook 1, physics_ok true. A picture of the topic.
-- A heavy railway buffer stop in gold, a black rail running straight into it: recognisable 5, twist_visible 4, on_hook 5, physics_ok true. A pun on the exact words, read in half a second.`;
+- A heavy railway buffer stop in gold, a black rail running straight into it: recognisable 5, twist_visible 4, on_hook 5, physics_ok true. A pun on the exact words, read in half a second.
+- A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible: a still image cannot show it.`;
 }
 
 export interface RankedConcept {
@@ -269,34 +286,52 @@ export interface RankedConcept {
   rank: number;
   /** The reviewer's scores, when it scored this concept and the ranking did not fall back. */
   score: ConceptScore | null;
+  /** A rejected concept rendered because too few passed. */
+  filled: boolean;
 }
 
 export interface Ranking {
+  /** Survivors first, best first; then, if too few survived, the best soft rejects. */
   ranked: RankedConcept[];
-  /** Concepts the filter removed, by their 1-based number; empty on a fallback. */
+  /** Concepts the filter rejected, by their 1-based number; empty on a fallback. */
   dropped: Array<{ index: number; reason: string }>;
+  /** How many concepts passed the filter (not counting fills). */
+  passed: number;
   /** True when the reviewer's output could not be used: the ranking is the brief's order. */
   fallback: boolean;
 }
 
-/** Why the filter drops a scored concept, or null to keep it. */
-function dropReason(s: ConceptScore): string | null {
+/** Faults no score can outweigh: such a concept is never rendered, not even to fill a slot. */
+function hardFault(s: ConceptScore): string | null {
   if (!s.physics_ok) return 'physics reads wrong';
+  if (s.needs_text) return 'needs visible text to read';
+  return null;
+}
+
+/** Why the filter rejects a scored concept, or null to keep it. */
+function dropReason(s: ConceptScore): string | null {
+  const hard = hardFault(s);
+  if (hard) return hard;
   const low = (['recognisable', 'twist_visible', 'on_hook'] as const).filter((k) => s[k] <= 2);
   return low.length > 0 ? `scored 2 or less on ${low.join(', ')}` : null;
 }
 
+const totalOf = (s: ConceptScore) => s.recognisable + s.twist_visible + s.on_hook;
+
 /**
  * Shortlist the concepts to render from the reviewer's scores. Pure.
- * Drops a concept with physics_ok false or any score of 2 or less, orders the
- * rest by total (brief order breaks ties), unscored concepts after every scored
- * one, and takes the top `max`. Advisory: a missing or malformed critique, or
- * nothing surviving the filter, falls back to the brief's own order.
+ * Rejects a concept with physics_ok false, needs_text true or any score of 2
+ * or less. Survivors are ordered by total (brief order breaks ties), unscored
+ * ones after every scored one, and the top `max` taken. If fewer than `max`
+ * survive, the remaining slots are filled with the highest-total soft rejects
+ * (never a physics or needs-text fault). Only a missing or malformed critique
+ * falls back to the brief's own order.
  */
 export function rankConcepts(concepts: ImageConcept[], critique: Critique | null, max = MAX_CANDIDATES): Ranking {
   const fallback = (): Ranking => ({
-    ranked: concepts.slice(0, max).map((concept, i) => ({ concept, total: null, rank: i + 1, score: null })),
+    ranked: concepts.slice(0, max).map((concept, i) => ({ concept, total: null, rank: i + 1, score: null, filled: false })),
     dropped: [],
+    passed: 0,
     fallback: true,
   });
   const parsed = critiqueSchema.safeParse(critique);
@@ -308,30 +343,39 @@ export function rankConcepts(concepts: ImageConcept[], critique: Critique | null
     byIndex.set(s.index, s);
   }
 
+  type Entry = { concept: ImageConcept; order: number; score: ConceptScore | null; total: number | null };
   const dropped: Ranking['dropped'] = [];
-  const kept: Array<{ concept: ImageConcept; order: number; score: ConceptScore | null; total: number | null }> = [];
+  const passed: Entry[] = [];
+  const softRejects: Entry[] = [];
   concepts.forEach((concept, i) => {
     const score = byIndex.get(i + 1) ?? null;
+    const entry = { concept, order: i, score, total: score ? totalOf(score) : null };
     const reason = score ? dropReason(score) : null;
-    if (reason) {
-      dropped.push({ index: i + 1, reason });
+    if (!reason) {
+      passed.push(entry);
       return;
     }
-    const total = score ? score.recognisable + score.twist_visible + score.on_hook : null;
-    kept.push({ concept, order: i, score, total });
+    dropped.push({ index: i + 1, reason });
+    if (score && !hardFault(score)) softRejects.push(entry);
   });
-  if (kept.length === 0) return fallback();
 
-  kept.sort((a, b) => {
+  const byTotal = (a: Entry, b: Entry) => {
     if (a.total === null || b.total === null) {
       if (a.total !== b.total) return a.total === null ? 1 : -1;
       return a.order - b.order;
     }
     return b.total - a.total || a.order - b.order;
-  });
+  };
+  passed.sort(byTotal);
+  softRejects.sort(byTotal);
+  const picks = [
+    ...passed.slice(0, max).map((e) => ({ ...e, filled: false })),
+    ...softRejects.slice(0, Math.max(0, max - passed.length)).map((e) => ({ ...e, filled: true })),
+  ];
   return {
-    ranked: kept.slice(0, max).map((k, i) => ({ concept: k.concept, total: k.total, rank: i + 1, score: k.score })),
+    ranked: picks.map((e, i) => ({ concept: e.concept, total: e.total, rank: i + 1, score: e.score, filled: e.filled })),
     dropped,
+    passed: passed.length,
     fallback: false,
   };
 }
@@ -339,8 +383,43 @@ export function rankConcepts(concepts: ImageConcept[], critique: Critique | null
 /** The review to store beside a rendered concept, or null when it was unscored or the ranking fell back. */
 export function storedReview(r: RankedConcept): ConceptReview | null {
   if (!r.score) return null;
-  const { recognisable, twist_visible, on_hook, physics_ok, note } = r.score;
-  return { recognisable, twist_visible, on_hook, physics_ok, note, total: r.total, rank: r.rank };
+  const { recognisable, twist_visible, on_hook, physics_ok, needs_text, note } = r.score;
+  return { recognisable, twist_visible, on_hook, physics_ok, needs_text, note, total: r.total, rank: r.rank };
+}
+
+export interface RejectedConcept {
+  symbol: string;
+  note: string;
+  scores: Pick<ConceptScore, 'recognisable' | 'twist_visible' | 'on_hook' | 'physics_ok' | 'needs_text'>;
+}
+
+/** What a rejected concept fell down on most: a hard fault, else its lowest score. */
+function weakest(scores: RejectedConcept['scores']): string {
+  if (!scores.physics_ok) return 'physics reads wrong';
+  if (scores.needs_text) return 'needs visible text';
+  const dims = [
+    ['recognisable', scores.recognisable],
+    ['twist_visible', scores.twist_visible],
+    ['on_hook', scores.on_hook],
+  ] as const;
+  const [name, value] = dims.reduce((lo, d) => (d[1] < lo[1] ? d : lo));
+  return `lowest: ${name} ${value}`;
+}
+
+/**
+ * The single reviewer-driven re-brief: each rejected symbol with the
+ * reviewer's note and what it fell down on, the symbols already tried (never
+ * to be reused), and a push to other domains, since a rejected set usually
+ * shares one. Pure.
+ */
+export function reviewerRewriteInstruction(rejected: RejectedConcept[], tried: string[] = []): string {
+  const lines = rejected.map((r) => `- ${r.symbol}: ${r.note || 'no note'} (${weakest(r.scores)})`);
+  const all = [...new Set([...tried, ...rejected.map((r) => r.symbol)])];
+  return [
+    ...lines,
+    `Do not reuse any of these symbols: ${all.join('; ')}.`,
+    'Find symbols from different domains than these: if they were all tools of one trade, look to sport, home, nature, transport, building, kitchen or travel instead.',
+  ].join('\n');
 }
 
 /**

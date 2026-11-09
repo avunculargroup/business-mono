@@ -24,9 +24,11 @@ import {
   lintImageBrief,
   rankConcepts,
   recentImageHistory,
+  reviewerRewriteInstruction,
   storedReview,
   type Critique,
   type ImageBrief,
+  type Ranking,
   type ImageBriefPromptParams,
   type ImageConcept,
 } from './imageBrief.js';
@@ -53,7 +55,9 @@ const log = createLogger('social-post-image');
 //
 //   load canon + recent symbols/layouts → brief (LLM: the hook, up to six concepts)
 //   → lint per concept (one re-brief if none are clean, then skip)
-//   → review (editor, text only, advisory) → rank: the top three, best first
+//   → review (editor, text only) → rank; if fewer than three pass, one
+//     re-brief carrying the reviewer's notes → review → rank both rounds
+//     together → the top three, best first (best soft rejects fill any gap)
 //   → for each shortlisted concept, in parallel:
 //       buildImagePrompt (pure) → render (OpenRouter) → paper correction
 //       → crop + mark + upload → Lex on alt text (advisory) → content_images rows
@@ -233,19 +237,27 @@ export interface RenderParams {
 /** Every concept the reviewer saw and what became of it, for the run's activity rows. */
 export interface ReviewLog {
   hook: string;
+  /** True when the reviewer's output was unusable and the brief's order was rendered. */
   review_fallback: boolean;
+  /** 2 when the reviewer's notes drove a second brief. */
+  review_rounds: 1 | 2;
   concepts: Array<{
+    /** Across both rounds, from 1. */
     index: number;
+    round: 1 | 2;
     symbol: string;
     recognisable: number | null;
     twist_visible: number | null;
     on_hook: number | null;
     physics_ok: boolean | null;
+    needs_text: boolean | null;
     note: string | null;
     total: number | null;
     rank: number | null;
     outcome: 'shortlisted' | 'dropped' | 'not_shortlisted';
     reason: string | null;
+    /** Rendered although the filter rejected it, because too few passed. */
+    filled_from_rejected: boolean;
   }>;
 }
 
@@ -415,7 +427,12 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             paper,
             coverage: legible.coverage,
             ...(params.review
-              ? { hook: params.review.hook, review_fallback: params.review.log.review_fallback, review: params.review.log.concepts }
+              ? {
+                  hook: params.review.hook,
+                  review_fallback: params.review.log.review_fallback,
+                  review_rounds: params.review.log.review_rounds,
+                  review: params.review.log.concepts,
+                }
               : {}),
           },
         ],
@@ -604,41 +621,124 @@ export async function briefConcepts(
 
   // ── Review → rank: shortlist before any render is paid for ────────────────
   const hook = brief.hook.trim();
-  const critique = await generateCritique(buildImageCriticPrompt({ postCopy: params.postCopy, hook, concepts: lint.clean }));
-  const ranking = rankConcepts(lint.clean, critique, MAX_CANDIDATES);
-  if (ranking.fallback) log.warn({ hadCritique: critique !== null }, 'image idea review unusable — rendering in brief order');
+  const round1 = lint.clean;
+  const critique1 = await generateCritique(buildImageCriticPrompt({ postCopy: params.postCopy, hook, concepts: round1 }));
+  let concepts = round1;
+  let critique = critique1;
+  let ranking = rankConcepts(round1, critique1, MAX_CANDIDATES);
+  let rounds: 1 | 2 = 1;
+  if (ranking.fallback) log.warn({ hadCritique: critique1 !== null }, 'image idea review unusable — rendering in brief order');
+
+  // ── One reviewer-driven re-brief when too few ideas pass ──────────────────
+  if (!ranking.fallback && ranking.passed < MAX_CANDIDATES && critique1) {
+    const second = await secondRound(briefParams, lintOpts, params.postCopy, hook, round1, critique1, ranking);
+    if (second) {
+      concepts = [...round1, ...second.concepts];
+      critique = second.critique;
+      ranking = rankConcepts(concepts, critique, MAX_CANDIDATES);
+      rounds = 2;
+    }
+  }
+
+  if (ranking.ranked.length === 0) {
+    return { skip: 'The reviewer found that every idea needs visible text or gets its physics wrong.' };
+  }
   return {
     concepts: ranking.ranked.map((r) => r.concept),
-    review: { hook, reviews: ranking.ranked.map(storedReview), log: reviewLog(hook, lint.clean, critique, ranking) },
+    review: {
+      hook,
+      reviews: ranking.ranked.map(storedReview),
+      log: reviewLog(hook, concepts, round1.length, critique, ranking, rounds),
+    },
   };
 }
 
-/** Every clean concept with its scores and fate, so the activity row shows why an idea did not make it. */
+/** Lower-case letters and digits only, so "A Lighthouse." and "a lighthouse" are one symbol. */
+function symbolKey(symbol: string): string {
+  return symbol.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * The single re-brief driven by the reviewer: its notes on every rejected
+ * concept and every symbol already tried. Returns the second round's clean,
+ * new concepts with a critique covering both rounds (round two's indices
+ * shifted past round one's), or null whenever the second round cannot be
+ * used, in which case the first round stands.
+ */
+async function secondRound(
+  briefParams: ImageBriefPromptParams,
+  lintOpts: { layouts: ReturnType<typeof activeLayouts>; prohibitedTerms: string[] },
+  postCopy: string,
+  hook: string,
+  round1: ImageConcept[],
+  critique1: Critique,
+  ranking: Ranking,
+): Promise<{ concepts: ImageConcept[]; critique: Critique } | null> {
+  const scores = new Map(critique1.scores.map((sc) => [sc.index, sc]));
+  const rejected = ranking.dropped.flatMap((d) => {
+    const sc = scores.get(d.index);
+    const concept = round1[d.index - 1];
+    return sc && concept ? [{ symbol: concept.symbol, note: sc.note, scores: sc }] : [];
+  });
+  const tried = round1.map((c) => c.symbol);
+  const instruction = reviewerRewriteInstruction(rejected, tried);
+
+  const brief = await generateBrief(buildImageBriefPrompt({ ...briefParams, reviewerInstruction: instruction }));
+  if (brief.skip) return null;
+  const seen = new Set(tried.map(symbolKey));
+  const fresh = lintImageBrief(brief, lintOpts).clean.filter((c) => !seen.has(symbolKey(c.symbol)));
+  if (fresh.length === 0) {
+    log.info('reviewer re-brief produced no new clean concepts — keeping round one');
+    return null;
+  }
+  const critique2 = await generateCritique(buildImageCriticPrompt({ postCopy, hook, concepts: fresh }));
+  // Unusable second review: round one stands rather than ranking half-blind.
+  if (!critique2 || rankConcepts(fresh, critique2).fallback) {
+    log.warn('second image idea review unusable — keeping round one');
+    return null;
+  }
+  const offset = round1.length;
+  return {
+    concepts: fresh,
+    critique: { scores: [...critique1.scores, ...critique2.scores.map((sc) => ({ ...sc, index: sc.index + offset }))] },
+  };
+}
+
+/** Every reviewed concept, both rounds, with its scores and fate, so the activity row shows why an idea did not make it. */
 function reviewLog(
   hook: string,
-  concepts: ImageConcept[], critique: Critique | null, ranking: ReturnType<typeof rankConcepts>): ReviewLog {
-  const scores = new Map((critique?.scores ?? []).map((s) => [s.index, s]));
+  concepts: ImageConcept[],
+  round1Count: number,
+  critique: Critique | null,
+  ranking: Ranking,
+  rounds: 1 | 2,
+): ReviewLog {
+  const scores = new Map((critique?.scores ?? []).map((sc) => [sc.index, sc]));
   const ranked = new Map(ranking.ranked.map((r) => [r.concept, r]));
   const dropped = new Map(ranking.dropped.map((d) => [d.index, d.reason]));
   return {
     hook,
     review_fallback: ranking.fallback,
+    review_rounds: rounds,
     concepts: concepts.map((concept, i) => {
-      const s = scores.get(i + 1);
+      const sc = scores.get(i + 1);
       const r = ranked.get(concept);
       const reason = dropped.get(i + 1) ?? null;
       return {
         index: i + 1,
+        round: i < round1Count ? 1 : 2,
         symbol: concept.symbol,
-        recognisable: s?.recognisable ?? null,
-        twist_visible: s?.twist_visible ?? null,
-        on_hook: s?.on_hook ?? null,
-        physics_ok: s?.physics_ok ?? null,
-        note: s?.note ?? null,
-        total: s ? s.recognisable + s.twist_visible + s.on_hook : null,
+        recognisable: sc?.recognisable ?? null,
+        twist_visible: sc?.twist_visible ?? null,
+        on_hook: sc?.on_hook ?? null,
+        physics_ok: sc?.physics_ok ?? null,
+        needs_text: sc?.needs_text ?? null,
+        note: sc?.note ?? null,
+        total: sc ? sc.recognisable + sc.twist_visible + sc.on_hook : null,
         rank: r?.rank ?? null,
         outcome: r ? 'shortlisted' : reason ? 'dropped' : 'not_shortlisted',
         reason,
+        filled_from_rejected: r?.filled ?? false,
       };
     }),
   };

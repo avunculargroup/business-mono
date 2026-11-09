@@ -13,6 +13,7 @@ import {
   lintImageConcept,
   rankConcepts,
   recentImageHistory,
+  reviewerRewriteInstruction,
   storedReview,
   type Critique,
   type ImageConcept,
@@ -24,7 +25,7 @@ const opts = { layouts: canon.layouts, prohibitedTerms: canon.prohibitedTerms };
 const STAMP: ImageConcept = {
   tension: 'The rules are about to land, and everyone is waiting for the impact.',
   symbol: 'A rubber stamp',
-  twist: 'Giant, poised just above a blank sheet, about to land',
+  twist: 'Giant, its fresh print in gold on a blank sheet',
   subject: 'A giant rubber stamp hovering just above a blank sheet of paper',
   layout: 'hero_left',
   alt_text: 'A linocut of a huge rubber stamp about to come down on a blank page.',
@@ -72,6 +73,20 @@ describe('imageBriefSchema', () => {
 describe('lintImageConcept', () => {
   it('passes a clean concept', () => {
     expect(lintImageConcept(STAMP, opts)).toEqual([]);
+  });
+
+  it('flags a twist that leans on a moment in time, and passes a visible half', () => {
+    for (const twist of ['Poised above the sheet', 'About to land', 'not yet snapped', "The line hasn't been drawn", 'lifted mid-stroke', 'Waiting at the gate']) {
+      expect(lintImageConcept({ ...STAMP, twist }, opts).join(' ')).toMatch(/twist leans on a moment in time/);
+    }
+    expect(lintImageConcept({ ...STAMP, symbol: 'A football pitch', twist: 'Half the pitch lined in gold' }, opts)).toEqual([]);
+  });
+
+  it('flags text-bearing symbols in symbol or subject, and lets a closed book through', () => {
+    expect(lintImageConcept({ ...STAMP, symbol: 'A composing stick' }, opts).join(' ')).toMatch(/symbol depends on writing \(composing stick\)/);
+    expect(lintImageConcept({ ...STAMP, subject: 'An open book on a desk' }, opts).join(' ')).toMatch(/subject depends on writing \(open book\)/);
+    expect(lintImageConcept({ ...STAMP, symbol: 'A newspaper' }, opts).join(' ')).toMatch(/newspaper/);
+    expect(lintImageConcept({ ...STAMP, symbol: 'A closed book', subject: 'A closed book bound in gold' }, opts)).toEqual([]);
   });
 
   it('requires symbol, twist, subject, tension and alt text', () => {
@@ -272,14 +287,37 @@ describe('buildImageBriefPrompt', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).toContain('"capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.');
     expect(p).toContain('"capital buffers" became a closed farm gate.');
-    expect(p).toContain('"capital buffers" became a heavy railway buffer stop in gold, a black rail running straight into it.');
+    expect(p).toContain('"capital buffers" became a heavy railway buffer stop printed in gold, a black rail running straight into it.');
+  });
+
+  it('drops the "about to land" stamp for examples whose twist can be seen, and names the pen as weak', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).not.toContain('rubber stamp');
+    expect(p).not.toMatch(/about to land/);
+    expect(p).toContain('"writing the playbook, not banning the game" became a football on a kicking tee on a freshly marked pitch, its touchline painted in gold.');
+    expect(p).toContain('"the playbook" became a fountain pen lifted mid-stroke.');
+  });
+
+  it('carries the four rules: visible state, four domains, two hook puns, no writing', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('The twist is a visible physical state, never a moment in time.');
+    expect(p).toContain('Half-finished is fine when the half can be seen');
+    expect(p).toContain('at least four different domains');
+    expect(p).toContain('at most two from any one domain');
+    expect(p).toContain('At least two concepts pun on the hook\'s literal words.');
+    expect(p).toContain('No symbol whose meaning depends on writing or letters');
+    expect(p).toContain('A closed book is fine.');
+  });
+
+  it('carries a reviewer re-brief under its own heading', () => {
+    const p = buildImageBriefPrompt({ ...base, reviewerInstruction: '- A wax seal: signals approval (lowest: on_hook 2)' });
+    expect(p).toContain('## Re-brief: a reviewer rejected these concepts\n- A wax seal: signals approval (lowest: on_hook 2)');
   });
 
   it('carries the worked examples, weak and strong', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).toContain('Weak, a symbol with no twist: "Twenty years" became an hourglass.');
     expect(p).toContain('Weak, no symbol: a half-drawn bridge pier');
-    expect(p).toContain('a giant rubber stamp poised just above a blank sheet');
     expect(p).toContain('a lighthouse throwing one solid gold beam through fog');
   });
 
@@ -317,23 +355,27 @@ describe('buildImageCriticPrompt', () => {
     expect(p).toContain('A balance scale with the weighted pan sitting higher');
     expect(p).toContain('A closed farm gate');
     expect(p).toContain('A heavy railway buffer stop in gold');
+    expect(p).toContain('needs_text: true if the picture needs visible letters, numbers or writing to read.');
+    expect(p).toContain('A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible');
   });
 });
 
-function score(index: number, r: number, t: number, h: number, physics_ok = true): Critique['scores'][number] {
-  return { index, recognisable: r, twist_visible: t, on_hook: h, physics_ok, note: `note ${index}` };
+function score(index: number, r: number, t: number, h: number, physics_ok = true, needs_text = false): Critique['scores'][number] {
+  return { index, recognisable: r, twist_visible: t, on_hook: h, physics_ok, needs_text, note: `note ${index}` };
 }
 
 describe('rankConcepts', () => {
   const four = [SCALE, FARM_GATE, BUFFER, LIGHTHOUSE];
 
-  it('drops a physics failure and any score of 2 or less, and puts the best first', () => {
+  it('rejects a physics failure and any score of 2 or less, puts the best first, and fills from the best soft reject', () => {
     const critique = { scores: [score(1, 5, 3, 3, false), score(2, 5, 1, 1), score(3, 5, 4, 5), score(4, 4, 3, 3)] };
     const r = rankConcepts(four, critique);
     expect(r.fallback).toBe(false);
-    expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.rank])).toEqual([
-      ['A railway buffer stop', 14, 1],
-      ['A lighthouse', 10, 2],
+    expect(r.passed).toBe(2);
+    expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.rank, x.filled])).toEqual([
+      ['A railway buffer stop', 14, 1, false],
+      ['A lighthouse', 10, 2, false],
+      ['A farm gate', 7, 3, true],
     ]);
     expect(r.dropped).toEqual([
       { index: 1, reason: 'physics reads wrong' },
@@ -377,16 +419,62 @@ describe('rankConcepts', () => {
     }
   });
 
-  it('falls back when nothing survives the filter', () => {
-    const r = rankConcepts(four, { scores: [score(1, 1, 1, 1), score(2, 2, 2, 2), score(3, 5, 5, 5, false), score(4, 5, 2, 5)] });
-    expect(r.fallback).toBe(true);
-    expect(r.ranked.map((x) => x.concept.symbol)).toEqual(['A balance scale', 'A farm gate', 'A railway buffer stop']);
-    expect(r.dropped).toEqual([]);
+  it('orders by total, not brief order, when a valid critique passes nothing, skipping physics and text faults', () => {
+    // The "playbook" run: every idea rejected, and the chalk line (5/15) rendered anyway in brief order.
+    const six = ['composing stick', 'fountain pen', 'chalk line', 'wax seal', 'galley tray', 'anvil'].map((symbol) => ({ ...STAMP, symbol }));
+    const critique = {
+      scores: [score(1, 2, 4, 4), score(2, 4, 4, 2), score(3, 2, 2, 1), score(4, 3, 4, 2, true, true), score(5, 1, 3, 4), score(6, 4, 3, 1, false)],
+    };
+    const r = rankConcepts(six, critique);
+    expect(r.fallback).toBe(false);
+    expect(r.passed).toBe(0);
+    expect(r.ranked.map((x) => [x.concept.symbol, x.total, x.filled])).toEqual([
+      ['composing stick', 10, true],
+      ['fountain pen', 10, true],
+      ['galley tray', 8, true],
+    ]);
+    expect(r.dropped.find((d) => d.index === 4)).toEqual({ index: 4, reason: 'needs visible text to read' });
+  });
+
+  it('drops a concept that needs visible text, however well it scores', () => {
+    const r = rankConcepts([SCALE, BUFFER], { scores: [score(1, 5, 5, 5, true, true), score(2, 4, 4, 4)] });
+    expect(r.ranked.map((x) => x.concept.symbol)).toEqual(['A railway buffer stop']);
+    expect(r.dropped).toEqual([{ index: 1, reason: 'needs visible text to read' }]);
+  });
+
+  it('renders nothing when every concept has a hard fault', () => {
+    const r = rankConcepts([SCALE, BUFFER], { scores: [score(1, 5, 5, 5, false), score(2, 5, 5, 5, true, true)] });
+    expect(r).toMatchObject({ ranked: [], passed: 0, fallback: false });
   });
 
   it('stores the review beside a ranked concept', () => {
     const r = rankConcepts([BUFFER], { scores: [score(1, 5, 4, 5)] });
-    expect(storedReview(r.ranked[0]!)).toEqual({ recognisable: 5, twist_visible: 4, on_hook: 5, physics_ok: true, note: 'note 1', total: 14, rank: 1 });
+    expect(storedReview(r.ranked[0]!)).toEqual({
+      recognisable: 5,
+      twist_visible: 4,
+      on_hook: 5,
+      physics_ok: true,
+      needs_text: false,
+      note: 'note 1',
+      total: 14,
+      rank: 1,
+    });
+  });
+});
+
+describe('reviewerRewriteInstruction', () => {
+  it('lists each rejected symbol with its note and weakest point, bans reuse, and asks for other domains', () => {
+    const text = reviewerRewriteInstruction(
+      [
+        { symbol: 'Chalk line', note: 'A taut string could be anything', scores: { recognisable: 2, twist_visible: 2, on_hook: 1, physics_ok: true, needs_text: false } },
+        { symbol: 'Wax seal', note: 'Signals approval, not the playbook', scores: { recognisable: 3, twist_visible: 4, on_hook: 2, physics_ok: true, needs_text: true } },
+      ],
+      ['Composing stick', 'Chalk line'],
+    );
+    expect(text).toContain('- Chalk line: A taut string could be anything (lowest: on_hook 1)');
+    expect(text).toContain('- Wax seal: Signals approval, not the playbook (needs visible text)');
+    expect(text).toContain('Do not reuse any of these symbols: Composing stick; Chalk line; Wax seal.');
+    expect(text).toContain('Find symbols from different domains');
   });
 });
 
