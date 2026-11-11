@@ -313,7 +313,9 @@ The image is seen at phone size by someone scrolling past. In half a second they
 ## First, the hook
 hook: the single most specific, concrete phrase in the post. It is the thing a reader would quote back, not the topic: "capital buffers", not "regulation"; "Twenty years", not "US debt". Prefer a noun phrase. Copy it from the post.
 
-Every concept must be about the hook, not the post's general topic. Visual puns on the hook's words are welcome, and often the strongest option: "capital buffers" can be railway buffer stops.
+The hook tells you what the post is about. It is not a word puzzle. Show what the hook **means** in the post: the situation, the feeling, the consequence.
+
+Prefer the literal and concrete: an everyday object or scene from the situation the post describes. A pun is welcome only when it works on the whole idea of the phrase and is obvious at a glance. Never draw one word split off from a phrase: 'sheet' from 'balance sheet' or 'level' from 'confidence level' is a riddle, not a picture.
 
 ## Then work it out in this order, for each concept
 1. tension: the surprising or uneasy idea in this post, in one sentence. Not its topic.
@@ -336,15 +338,17 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - Weak, the topic and not the hook: "capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.
 - Weak, the topic and not the hook: "capital buffers" became a closed farm gate.
 - Weak, generic writing and a pause nobody can see: "the playbook" became a fountain pen lifted mid-stroke.
-- Strong, a pun on the hook's words: "capital buffers" became a heavy railway buffer stop printed in gold, a black rail running straight into it.
-- Strong, a pun on "the game": "writing the playbook, not banning the game" became a football on a kicking tee on a freshly marked pitch, its touchline painted in gold.
-- Strong: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
+- Weak, a pun on one word of the phrase: "balance sheets" became a warped baking tray. It reads as a bent tray, and the news (confidence falling, orders drying up) is missing entirely.
+- Strong, literal: "writing the playbook" became a coach's whiteboard on a sideline, half covered in plays, the other half blank.
+- Strong, literal: "the logistics of staying safe" became a giant key strapped to a furniture hand truck.
+- Strong, literal: "clarity's coming" became a lighthouse throwing one solid gold beam through fog.
+- Strong, a pun on the whole idea: "capital buffers" became a heavy railway buffer stop. "Buffer" is the idea of the phrase, not a fragment of it.
 
 ## Rules
 - Return exactly six concepts with six different symbols, using at least two different layouts. Exactly six, no more. Breadth matters more than polish: a reviewer will shortlist them.
 - Keep it short: tension, symbol, twist and subject in 25 words or fewer each, and alt_text in 40 words or fewer. Short fields make better briefs.
 - Draw the six from at least four different domains (sport, home, nature, transport, building, kitchen, travel and so on), at most two from any one domain.
-- At least two concepts pun on the hook's literal words.
+- At least three of the six concepts show the post's situation literally: the thing, the place or the moment it describes, as one strong everyday object or scene.
 - No symbol whose meaning depends on writing or letters: pens writing, type, documents, signs, newspapers, seals, books shown open. A closed book is fine.
 - No text, letters, numbers or figures anywhere in the picture. Images cannot carry them.
 - No coins, currency symbols, charts, arrows or anything that implies a price going up or down. No people's faces.${avoid}
@@ -401,17 +405,19 @@ ${list}
 ## Score every idea, 1 to 5
 - recognisable: would someone recognise the symbol in half a second at phone size?
 - twist_visible: is the twist in the picture itself, not in words or a caption? A plain symbol with no twist scores 1.
-- on_hook: is it about the hook, not the post's general topic? A picture of the general topic scores 1.
+- on_hook: does the picture show what the post is about (its situation, feeling or consequence), so that someone who has just read the post gets the link instantly? A picture of the general topic scores 1. A pun on one word split off from a phrase scores 2 or less, however clever.
 - physics_ok: false if the picture would get weight, balance, light, motion or water visibly wrong.
 - needs_text: true if the picture needs visible letters, numbers or writing to read.
 - note: one short line on the idea's strength or flaw, under 160 characters.
 
 Return one entry per idea, with index set to the idea's number above.
 
-## Calibration (hook: "capital buffers")
-- A balance scale with the weighted pan sitting higher: recognisable 5, twist_visible 1, on_hook 1, physics_ok false. It says "regulation", and the weighted pan should sit lower.
-- A closed farm gate: recognisable 5, twist_visible 1, on_hook 1, physics_ok true. A picture of the topic.
-- A heavy railway buffer stop in gold, a black rail running straight into it: recognisable 5, twist_visible 4, on_hook 5, physics_ok true. A pun on the exact words, read in half a second.
+## Calibration
+- A balance scale with the weighted pan sitting higher, for "capital buffers": recognisable 5, twist_visible 1, on_hook 1, physics_ok false. It says "regulation", and the weighted pan should sit lower.
+- A closed farm gate, for "capital buffers": recognisable 5, twist_visible 1, on_hook 1, physics_ok true. A picture of the topic.
+- A heavy railway buffer stop in gold, a black rail running straight into it, for "capital buffers": recognisable 5, twist_visible 4, on_hook 5, physics_ok true. It works because "buffer" is the whole idea of the phrase, not one word split off from it.
+- A warped baking tray for 'balance sheets': recognisable 4, twist_visible 3, on_hook 1. A pun on one word; it reads as a bent tray.
+- A coach's whiteboard half covered in plays for 'writing the playbook': recognisable 5, twist_visible 5, on_hook 5. Literal, and obvious in half a second.
 - A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible: a still image cannot show it.`;
 }
 
@@ -591,6 +597,7 @@ export function reviewerRewriteInstruction(rejected: RejectedConcept[], tried: s
   return [
     ...lines,
     `Do not reuse any of these symbols: ${all.join('; ')}.`,
+    "Start the new concepts from the post's literal situation before looking for metaphors.",
     'Find symbols from different domains than these: if they were all tools of one trade, look to sport, home, nature, transport, building, kitchen or travel instead.',
   ].join('\n');
 }
