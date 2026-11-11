@@ -291,11 +291,17 @@ describe('buildImageBriefPrompt', () => {
     expect(p).not.toContain('left_third');
   });
 
-  it('names the hook first, before the tension, and welcomes puns on it', () => {
+  it('names the hook first, as what the post is about, and asks for the literal before any pun', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).toContain('hook: the single most specific, concrete phrase in the post.');
     expect(p).toContain('"capital buffers", not "regulation"; "Twenty years", not "US debt"');
-    expect(p).toContain('Visual puns on the hook\'s words are welcome');
+    expect(p).toContain('The hook tells you what the post is about. It is not a word puzzle.');
+    expect(p).toContain('Show what the hook **means** in the post: the situation, the feeling, the consequence.');
+    expect(p).toContain('Prefer the literal and concrete: an everyday object or scene from the situation the post describes.');
+    expect(p).toContain('A pun is welcome only when it works on the whole idea of the phrase and is obvious at a glance.');
+    expect(p).toContain("Never draw one word split off from a phrase: 'sheet' from 'balance sheet'");
+    expect(p).not.toContain('often the strongest option');
+    expect(p).not.toContain('Visual puns on the hook');
     expect(p.indexOf('## First, the hook')).toBeGreaterThan(-1);
     expect(p.indexOf('## First, the hook')).toBeLessThan(p.indexOf('1. tension:'));
   });
@@ -314,24 +320,33 @@ describe('buildImageBriefPrompt', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).toContain('"capital buffers" became a balance scale. It says "regulation", and this one had the weighted pan sitting higher.');
     expect(p).toContain('"capital buffers" became a closed farm gate.');
-    expect(p).toContain('"capital buffers" became a heavy railway buffer stop printed in gold, a black rail running straight into it.');
+    expect(p).toContain('Strong, a pun on the whole idea: "capital buffers" became a heavy railway buffer stop. "Buffer" is the idea of the phrase, not a fragment of it.');
+  });
+
+  it('leads the strong examples with literal ones, and names the baking tray as weak', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('Strong, literal: "writing the playbook" became a coach\'s whiteboard on a sideline, half covered in plays, the other half blank.');
+    expect(p).toContain('Strong, literal: "the logistics of staying safe" became a giant key strapped to a furniture hand truck.');
+    expect(p).toContain('Strong, literal: "clarity\'s coming" became a lighthouse throwing one solid gold beam through fog.');
+    expect(p.indexOf('Strong, literal:')).toBeLessThan(p.indexOf('Strong, a pun on the whole idea'));
+    expect(p).toContain('Weak, a pun on one word of the phrase: "balance sheets" became a warped baking tray.');
   });
 
   it('drops the "about to land" stamp for examples whose twist can be seen, and names the pen as weak', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).not.toContain('rubber stamp');
     expect(p).not.toMatch(/about to land/);
-    expect(p).toContain('"writing the playbook, not banning the game" became a football on a kicking tee on a freshly marked pitch, its touchline painted in gold.');
     expect(p).toContain('"the playbook" became a fountain pen lifted mid-stroke.');
   });
 
-  it('carries the four rules: visible state, four domains, two hook puns, no writing', () => {
+  it('carries the rules: visible state, four domains, three literal concepts, no writing', () => {
     const p = buildImageBriefPrompt(base);
     expect(p).toContain('The twist is a visible physical state, never a moment in time.');
     expect(p).toContain('Half-finished is fine when the half can be seen');
     expect(p).toContain('at least four different domains');
     expect(p).toContain('at most two from any one domain');
-    expect(p).toContain('At least two concepts pun on the hook\'s literal words.');
+    expect(p).toContain("At least three of the six concepts show the post's situation literally: the thing, the place or the moment it describes, as one strong everyday object or scene.");
+    expect(p).not.toContain('At least two concepts pun');
     expect(p).toContain('No symbol whose meaning depends on writing or letters');
     expect(p).toContain('A closed book is fine.');
   });
@@ -384,6 +399,15 @@ describe('buildImageCriticPrompt', () => {
     expect(p).toContain('A balance scale with the weighted pan sitting higher');
     expect(p).toContain('A closed farm gate');
     expect(p).toContain('A heavy railway buffer stop in gold');
+    expect(p).toContain('It works because "buffer" is the whole idea of the phrase');
+    expect(p).toContain(
+      'on_hook: does the picture show what the post is about (its situation, feeling or consequence), so that someone who has just read the post gets the link instantly? A picture of the general topic scores 1. A pun on one word split off from a phrase scores 2 or less, however clever.',
+    );
+    expect(p).toContain("A warped baking tray for 'balance sheets': recognisable 4, twist_visible 3, on_hook 1. A pun on one word; it reads as a bent tray.");
+    expect(p).toContain(
+      "A coach's whiteboard half covered in plays for 'writing the playbook': recognisable 5, twist_visible 5, on_hook 5. Literal, and obvious in half a second.",
+    );
+    expect(p).not.toContain('is it about the hook, not the post');
     expect(p).toContain('needs_text: true if the picture needs visible letters, numbers or writing to read.');
     expect(p).toContain('A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible');
   });
@@ -516,6 +540,7 @@ describe('reviewerRewriteInstruction', () => {
     expect(text).toContain('- Wax seal: Signals approval, not the playbook (needs visible text)');
     expect(text).toContain('Do not reuse any of these symbols: Composing stick; Chalk line; Wax seal.');
     expect(text).toContain('Find symbols from different domains');
+    expect(text).toContain("Start the new concepts from the post's literal situation before looking for metaphors.");
   });
 });
 
