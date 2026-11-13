@@ -22,6 +22,9 @@ const ACTIVE_STATUSES = ['running', 'suspended_gate1', 'suspended_gate2', 'suspe
 // ones are filtered out by a 24h window in the query (the realtime sub refreshes).
 const NOTICE_STATUSES = ['failed', 'no_stories'];
 const NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+// A run still "waiting for review" after this long is almost certainly wedged
+// (the July 2026 run sat here for three months). Stop it owning the page.
+const ACTIVE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 const STATUS_LABEL: Record<string, string> = {
   running: 'Newsletter starting…',
@@ -62,14 +65,15 @@ export function NewsletterRunStatus() {
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    // Active runs always show; terminal notices only if recent so old failures
-    // don't haunt the page forever.
+    // Active runs show for two weeks; terminal notices only for a day, so
+    // neither an old failure nor a stuck gate haunts the page forever.
     const cutoff = new Date(Date.now() - NOTICE_WINDOW_MS).toISOString();
+    const activeCutoff = new Date(Date.now() - ACTIVE_WINDOW_MS).toISOString();
     const { data } = await supabase
       .from('newsletter_runs')
       .select('workflow_run_id, status, time_range, started_at, gate_message, gate_draft_markdown, notes')
       .or(
-        `status.in.(${ACTIVE_STATUSES.join(',')}),and(status.in.(${NOTICE_STATUSES.join(',')}),started_at.gt.${cutoff})`,
+        `and(status.in.(${ACTIVE_STATUSES.join(',')}),started_at.gt.${activeCutoff}),and(status.in.(${NOTICE_STATUSES.join(',')}),started_at.gt.${cutoff})`,
       )
       .order('started_at', { ascending: false })
       .limit(1)
@@ -196,7 +200,7 @@ function GatePanel({ run }: { run: NewsletterRun }) {
       {run.gate_message && <pre className={styles.gateMessage}>{run.gate_message}</pre>}
 
       {run.gate_draft_markdown && (
-        <details className={styles.draft} open>
+        <details className={styles.draft}>
           <summary className={styles.draftSummary}>Full draft</summary>
           <div className={styles.draftBody}>
             <MarkdownRecordDisplay content={run.gate_draft_markdown} />

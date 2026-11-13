@@ -319,9 +319,16 @@ export function gateStepForStatus(status: string): GateStepId {
  * snapshot isn't persisted). Exported for testing.
  */
 export async function inspectSuspendedGate(runId: string): Promise<GateStepId | null> {
+  return gateFromSnapshot(await readRunSnapshot(runId));
+}
+
+async function readRunSnapshot(runId: string): Promise<unknown> {
   const mastra = await loadMastra();
   const workflow = mastra.getWorkflow('newsletter');
-  const state = await workflow.getWorkflowRunById(runId);
+  return workflow.getWorkflowRunById(runId);
+}
+
+function gateFromSnapshot(state: unknown): GateStepId | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const steps = ((state as any)?.steps ?? {}) as Record<string, unknown>;
   for (const id of ['gate1', 'gate2'] as const) {
@@ -331,6 +338,18 @@ export async function inspectSuspendedGate(runId: string): Promise<GateStepId | 
     if ((last as { status?: string } | undefined)?.status === 'suspended') return id;
   }
   return null;
+}
+
+/** Engine states a run can never be resumed from. A snapshot that is missing
+ *  altogether (lost storage, redeploy) is unresumable too. A `running` run is
+ *  not on this list: a second decision can land while the first resume is still
+ *  advancing, and that run must be left alone. */
+const UNRESUMABLE_RUN_STATUSES = ['success', 'failed', 'canceled', 'bailed'];
+
+function isUnresumable(state: unknown): boolean {
+  if (!state) return true;
+  const status = (state as { status?: string }).status;
+  return status !== undefined && UNRESUMABLE_RUN_STATUSES.includes(status);
 }
 
 /**
@@ -372,10 +391,28 @@ export async function resumeNewsletterRun(args: {
   // resuming the row's step throws "step X was not suspended" and wedges the run.
   // Reconcile the row to the snapshot instead of resuming a payload the real gate
   // can't accept; the director then re-decides against the correct gate.
-  const actualStep = await inspectSuspendedGate(runId);
+  const snapshot = await readRunSnapshot(runId);
+  const actualStep = gateFromSnapshot(snapshot);
   if (!actualStep) {
-    log.warn({ runId }, 'resume requested but run is not suspended at a gate');
-    return { status: 'not_suspended' };
+    if (!isUnresumable(snapshot)) {
+      log.warn({ runId }, 'resume requested but run is not suspended at a gate');
+      return { status: 'not_suspended' };
+    }
+    // The row still offers a gate the engine can never resume, so the /content
+    // panel would sit there forever and every decision would vanish. Close the
+    // row; the draft stays on it in case anyone needs it.
+    log.warn({ runId }, 'resume requested but the run cannot be resumed: closing it');
+    await clearWorkflowProgress(runId);
+    await db
+      .from('newsletter_runs')
+      .update({
+        status: 'failed',
+        notes:
+          "This newsletter could no longer be picked up where it stopped, so it was closed. Start a new one when you're ready.",
+        pending_decision: null,
+      })
+      .eq('workflow_run_id', runId);
+    return { status: 'unresumable' };
   }
   if (actualStep !== step) {
     log.warn(
