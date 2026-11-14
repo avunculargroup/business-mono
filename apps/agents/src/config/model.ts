@@ -4,7 +4,7 @@ import type { LanguageModelV4, LanguageModelV4CallOptions } from '@ai-sdk/provid
 import { RequestContext } from '@mastra/core/request-context';
 import { DEFAULT_IMAGE_MODEL, DEFAULT_MODEL, MODEL_SCOPES } from '@platform/shared';
 import { supabase } from '@platform/db';
-import { isKeyLimitError } from '../lib/llmErrors.js';
+import { isAuthError, shouldFailOverProvider } from '../lib/llmErrors.js';
 import { createLogger } from '../lib/logger.js';
 
 const log = createLogger('model');
@@ -22,13 +22,19 @@ const ENV_DEFAULT_MODEL_ID =
 /**
  * Wraps a primary model so that calls failing `shouldFallback(err)` are retried
  * against a fallback model. Used to fail over from OpenRouter to the direct
- * Anthropic API when OpenRouter rejects with a key/credit limit error (a 403
- * that is non-retryable on the same key). Provider-identity fields are taken
+ * Anthropic API when OpenRouter rejects the key itself: a key/credit limit
+ * (403) or an unrecognised key (401 "User not found."), both non-retryable on
+ * the same key. Provider-identity fields are taken
  * from the primary so telemetry still reflects the model that's normally used.
  *
- * Key-limit 403s occur on the initial request, before any stream chunk, so
+ * Both occur on the initial request, before any stream chunk, so
  * catching at the `doStream` call site is sufficient — no mid-stream replay.
  */
+function logFailover(err: unknown): void {
+  const reason = isAuthError(err) ? 'key rejected' : 'key limit';
+  log.warn({ reason }, 'OpenRouter unusable — falling back to Anthropic');
+}
+
 function createFallbackModel(
   primary: LanguageModelV4,
   fallback: LanguageModelV4,
@@ -44,7 +50,7 @@ function createFallbackModel(
         return await primary.doGenerate(options);
       } catch (err) {
         if (!shouldFallback(err)) throw err;
-        log.warn('OpenRouter key limit hit — falling back to Anthropic');
+        logFailover(err);
         return fallback.doGenerate(options);
       }
     },
@@ -53,7 +59,7 @@ function createFallbackModel(
         return await primary.doStream(options);
       } catch (err) {
         if (!shouldFallback(err)) throw err;
-        log.warn('OpenRouter key limit hit — falling back to Anthropic');
+        logFailover(err);
         return fallback.doStream(options);
       }
     },
@@ -68,7 +74,7 @@ function createFallbackModel(
  *    endpoint. Must use `openai.chat()` rather than `openai()` because
  *    `@ai-sdk/openai` v4 defaults to the Responses API, which OpenRouter rejects.
  *    When ANTHROPIC_API_KEY is also set, the OpenRouter model is wrapped so a
- *    key/credit-limit 403 transparently fails over to the direct Anthropic API.
+ *    key/credit-limit 403 or rejected-key 401 transparently fails over to the direct Anthropic API.
  * 2. Anthropic SDK (if only ANTHROPIC_API_KEY is set) → direct Anthropic API.
  * 3. Fail fast.
  */
@@ -85,7 +91,7 @@ function buildModel(modelId: string): LanguageModelV4 {
     if (anthropicApiKey) {
       const cleanModelName = modelId.replace(/^anthropic\//, '');
       const anthropic = createAnthropic({ apiKey: anthropicApiKey });
-      return createFallbackModel(primary, anthropic(cleanModelName), isKeyLimitError);
+      return createFallbackModel(primary, anthropic(cleanModelName), shouldFailOverProvider);
     }
     return primary;
   }

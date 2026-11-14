@@ -27,3 +27,18 @@ export function isKeyLimitError(err: unknown): boolean {
   if (rec['statusCode'] !== 403) return false;
   return /key limit exceeded/i.test(errorText(err));
 }
+
+/**
+ * True when the provider rejected the API key itself — a 401. OpenRouter
+ * answers "User not found." when it can't map the key to an account (key
+ * deleted, rotated, or an OpenRouter-side auth fault). Like a key limit, this
+ * is non-retryable on the same key, so it is also a reason to fail over.
+ */
+export function isAuthError(err: unknown): boolean {
+  return asRecord(err)?.['statusCode'] === 401;
+}
+
+/** Errors on which the OpenRouter key is unusable and another provider should be tried. */
+export function shouldFailOverProvider(err: unknown): boolean {
+  return isKeyLimitError(err) || isAuthError(err);
+}

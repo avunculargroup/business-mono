@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isKeyLimitError } from './llmErrors.js';
+import { isAuthError, isKeyLimitError, shouldFailOverProvider } from './llmErrors.js';
 
 describe('isKeyLimitError', () => {
   it('matches a 403 with the OpenRouter key-limit message', () => {
@@ -41,5 +41,25 @@ describe('isKeyLimitError', () => {
     expect(isKeyLimitError(null)).toBe(false);
     expect(isKeyLimitError(undefined)).toBe(false);
     expect(isKeyLimitError('Key limit exceeded')).toBe(false);
+  });
+});
+
+describe('isAuthError', () => {
+  it('matches the OpenRouter "User not found." 401', () => {
+    expect(isAuthError({ statusCode: 401, message: 'User not found.' })).toBe(true);
+  });
+
+  it('does not match other statuses or non-objects', () => {
+    expect(isAuthError({ statusCode: 403, message: 'User not found.' })).toBe(false);
+    expect(isAuthError(new Error('User not found.'))).toBe(false);
+    expect(isAuthError(null)).toBe(false);
+  });
+});
+
+describe('shouldFailOverProvider', () => {
+  it('fails over on a key limit or a rejected key, not on a server error', () => {
+    expect(shouldFailOverProvider({ statusCode: 403, message: 'Key limit exceeded' })).toBe(true);
+    expect(shouldFailOverProvider({ statusCode: 401, message: 'User not found.' })).toBe(true);
+    expect(shouldFailOverProvider({ statusCode: 500, message: 'boom' })).toBe(false);
   });
 });

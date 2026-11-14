@@ -105,6 +105,11 @@ describe('buildModel via getModelConfig', () => {
     expect(fallback.doGenerate).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ provider: 'anthropic' });
 
+    // Rejected-key 401 ("User not found.") → fail over too.
+    primary.doStream.mockRejectedValueOnce({ statusCode: 401, message: 'User not found.' });
+    await model.doStream({});
+    expect(fallback.doStream).toHaveBeenCalledTimes(1);
+
     // Any other error propagates without touching the fallback.
     primary.doGenerate.mockRejectedValueOnce({ statusCode: 500, message: 'boom' });
     await expect(model.doGenerate({})).rejects.toMatchObject({ statusCode: 500 });
