@@ -260,8 +260,8 @@ describe('resumeNewsletterRun', () => {
     });
   });
 
-  it('does nothing when the run is no longer suspended at a gate', async () => {
-    getWorkflowRunById.mockResolvedValueOnce({ steps: {} });
+  it('leaves a run alone that is still advancing from an earlier resume', async () => {
+    getWorkflowRunById.mockResolvedValueOnce({ status: 'running', steps: {} });
 
     const out = await resumeNewsletterRun({
       runId: 'run-1',
@@ -271,5 +271,28 @@ describe('resumeNewsletterRun', () => {
 
     expect(resume).not.toHaveBeenCalled();
     expect(out.status).toBe('not_suspended');
+  });
+
+  it.each([
+    ['the snapshot is gone', null],
+    ['the run already ended', { status: 'failed', steps: {} }],
+  ])('closes the row when %s, so the review panel cannot get stuck', async (_label, snapshot) => {
+    getWorkflowRunById.mockResolvedValueOnce(snapshot);
+
+    const out = await resumeNewsletterRun({
+      runId: 'run-1',
+      resumeData: { decision: 'publish' },
+      step: 'gate2',
+    });
+
+    expect(resume).not.toHaveBeenCalled();
+    expect(out.status).toBe('unresumable');
+    const lastUpdate = fakeSupabase
+      .__buildersFor('newsletter_runs')
+      .filter((b) => b.update.mock.calls.length > 0)
+      .at(-1);
+    expect(lastUpdate?.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', pending_decision: null }),
+    );
   });
 });
