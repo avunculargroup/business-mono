@@ -58,6 +58,13 @@ export interface IngestNewsItemInput {
   precomputedEmbedding?: number[] | null;
   /** Persisted news_items.status. Defaults to 'new'; callers pass 'extraction_failed' when metadata extraction failed. */
   status?: 'new' | 'extraction_failed';
+  /**
+   * Freshness problems extraction could not fix (extractNewsMetadata's flags).
+   * Stored in rex_metadata.extraction_flags, force needs_human_review and add
+   * a line to curator_notes, so an item with no `new` point is visible rather
+   * than passed on silently. The status stays 'new'.
+   */
+  extractionFlags?: string[];
   /** Extra keys merged into rex_metadata alongside the rubric output. */
   rexMetadataExtra?: Record<string, unknown>;
   /** Model scope key for the rubric call, so an ingestion path can be configured separately. */
@@ -75,6 +82,11 @@ export interface IngestNewsItemResult {
   scoringFailed?: boolean;
   reason?: string;
 }
+
+const EXTRACTION_FLAG_NOTES: Record<string, string> = {
+  no_new_key_points: 'no key point is marked new, so this item is not eligible as a post hook.',
+  lead_has_no_new_key_point: "the roundup's lead story yielded no new key point.",
+};
 
 /** Merge extractor + rubric topics, deduped, lowercase, order-preserving. */
 export function mergeTopics(...lists: ReadonlyArray<readonly string[]>): string[] {
@@ -157,6 +169,11 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     scopeKey: input.rubricScopeKey,
   });
 
+  const flags = input.extractionFlags ?? [];
+  const flagNote = flags.length > 0 ? `Extraction: ${flags.map((f) => EXTRACTION_FLAG_NOTES[f] ?? f).join(' ')}` : null;
+  const curatorNotes = [scored?.suggestedCuratorNotes, flagNote].filter(Boolean).join('\n\n') || null;
+  const flagMeta = flags.length > 0 ? { extraction_flags: flags, needs_human_review: true } : {};
+
   // 6. persist. news_items gained source_id/ingestion_ref/rubric columns in
   // 20260617000000; the generated types lag until post-migration regen, so the
   // row is cast at the insert boundary (the existing pipeline does the same).
@@ -180,7 +197,7 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
     australian_relevance: input.australianRelevance,
     relevance_score: scored?.relevanceScore ?? null,
     relevance_reasoning: scored?.relevanceReasoning ?? null,
-    curator_notes: scored?.suggestedCuratorNotes ?? null,
+    curator_notes: curatorNotes,
     rex_metadata: scored
       ? {
           ...input.rexMetadataExtra,
@@ -188,8 +205,9 @@ export async function ingestNewsItem(input: IngestNewsItemInput): Promise<Ingest
           flags: scored.flags,
           needs_human_review: scored.needsHumanReview,
           rubric_version: scored.rubricVersion,
+          ...flagMeta,
         }
-      : { ...input.rexMetadataExtra, rubric_version: RUBRIC_VERSION, scoring_failed: true },
+      : { ...input.rexMetadataExtra, rubric_version: RUBRIC_VERSION, scoring_failed: true, ...flagMeta },
     has_pdf_attachment: input.hasPdfAttachment ?? false,
     attachment_count: input.attachmentCount ?? 0,
     embedding: embedding as unknown as string,

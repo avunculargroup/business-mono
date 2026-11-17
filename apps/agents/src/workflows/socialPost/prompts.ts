@@ -40,7 +40,9 @@ const PLATFORM_LABEL: Record<Platform, string> = {
 
 /** One candidate rendered for the editor's selection prompt. */
 function candidateLine(c: StoryCandidate, index: number): string {
-  const points = c.key_points.length ? `\n   key points: ${c.key_points.slice(0, 4).join(' · ')}` : '';
+  const fresh = c.new_points.length ? `\n   new: ${c.new_points.slice(0, 3).join(' · ')}` : '';
+  const context = c.context_points.length ? `\n   context: ${c.context_points.slice(0, 2).join(' · ')}` : '';
+  const points = fresh + context;
   const tags = c.topic_tags.length ? `\n   topics: ${c.topic_tags.join(', ')}` : '';
   return `${index}. ${c.title}\n   source: ${c.source_name} | category: ${c.category} | published: ${
     c.published_at ?? 'unknown'
@@ -141,10 +143,15 @@ export function buildSocialPostPrompt(params: {
       }), and a one-line lead in \`body\`; do not number segments yourself. For a single post, set is_thread = false, leave \`segments\` empty, and put the full copy in \`body\` at or under ${platformSpec.max_chars} characters.`
     : `Format: a SINGLE ${label} post. Set is_thread = false, leave \`segments\` empty, and put the full copy in \`body\`, at or under ${platformSpec.max_chars} characters.`;
 
-  const points = story.key_points.length ? `\nKey points:\n- ${story.key_points.join('\n- ')}` : '';
+  const points =
+    (story.new_points.length ? `\nNew in this story:\n- ${story.new_points.join('\n- ')}` : '') +
+    (story.context_points.length ? `\nContext (earlier facts and views):\n- ${story.context_points.join('\n- ')}` : '');
+
+  const hookBlock = `## Hook — open on what is new
+The opening line must state one of the points under "New in this story". Context points are older facts or someone's view: they may explain or support the post, but never open it and never present them as today's news.`;
 
   const groundingBlock = `## Grounding (make it concrete)
-Anchor the post in at least one hard specific from the story — a number, name, date, or figure from the key points above. Concrete beats general: avoid vague filler like "many Australian businesses are exploring…".`;
+Anchor the post in at least one hard specific from the story — a number, name, date, or figure from the points above. Concrete beats general: avoid vague filler like "many Australian businesses are exploring…".`;
 
   const rewriteBlock = rewriteInstruction
     ? `## Rewrite — fix these AI-tells
@@ -169,6 +176,8 @@ ${lengthNudge ? `\n${lengthNudge}\n` : ''}
 ## ${label} formatting (platform mechanics)
 ${platformFormatRules(platform, platformSpec, allowThread && form === 'teach', formatConfig ?? null)}
 ${repetitionBlock ? `\n${repetitionBlock}\n` : ''}${guidelinesBlock ? `\n${guidelinesBlock}\n` : ''}
+${hookBlock}
+
 ${groundingBlock}
 
 ## Sourcing

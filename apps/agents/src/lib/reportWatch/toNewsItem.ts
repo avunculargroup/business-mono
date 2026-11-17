@@ -67,10 +67,11 @@ export const REPORT_RUBRIC_SCOPE = 'report_watch.rubric_score';
 export async function reportToNewsItem(input: ToNewsItemInput): Promise<ToNewsItemResult> {
   const excerpt = input.body.slice(0, EXTRACT_CHAR_LIMIT);
 
-  const { data: extracted, reason } = await extractNewsMetadata({
+  const { data: extracted, reason, flags: extractionFlags } = await extractNewsMetadata({
     title: input.title,
     source: input.sourceName,
     content: excerpt,
+    publishedAt: input.publishedAt,
     scopeKey: REPORT_EXTRACT_SCOPE,
   });
 
@@ -90,6 +91,7 @@ export async function reportToNewsItem(input: ToNewsItemInput): Promise<ToNewsIt
     topicTags: extracted?.topic_tags ?? [],
     australianRelevance: extracted?.australian_relevance ?? false,
     publishedAt: input.publishedAt,
+    extractionFlags,
     url: input.url,
     canonicalUrl: input.canonicalUrl,
     status: extracted ? 'new' : 'extraction_failed',

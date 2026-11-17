@@ -1226,11 +1226,12 @@ async function runNewsIngest(
       // Structured extraction (summary, key_points, topic_tags, AU relevance).
       const extractionInput = bodyMarkdown ?? item.summary;
       const truncated = extractionInput.slice(0, 12000);
-      const { data: extracted, reason: extractionReason } = await extractNewsMetadata({
+      const { data: extracted, reason: extractionReason, flags: extractionFlags } = await extractNewsMetadata({
         title: item.title,
         source: item.source,
         category,
         content: truncated,
+        publishedAt: item.published_at,
       });
       const extractionOk = extracted !== null;
       if (!extractionOk) {
@@ -1275,6 +1276,7 @@ async function runNewsIngest(
         topicTags: extracted?.topic_tags ?? [],
         australianRelevance: extracted?.australian_relevance ?? true,
         publishedAt: item.published_at,
+        extractionFlags,
         url: item.url,
         imageUrl,
         paywalled,
@@ -1535,10 +1537,11 @@ async function runNewsSourceScan(
       const paywalled = await resolvePaywalled({ url: item.url, page: pagePaywalled, body: fetchedBody });
 
       const extractionInput = (bodyMarkdown ?? item.summary).slice(0, 12000);
-      const { data: extracted, reason: extractionReason } = await extractNewsMetadata({
+      const { data: extracted, reason: extractionReason, flags: extractionFlags } = await extractNewsMetadata({
         title: item.title,
         source: item.source,
         content: extractionInput,
+        publishedAt: item.published_at,
         // category omitted — the extractor classifies the article itself.
       });
       const extractionOk = extracted !== null;
@@ -1570,6 +1573,7 @@ async function runNewsSourceScan(
         topicTags: extracted?.topic_tags ?? [],
         australianRelevance: extracted?.australian_relevance ?? false,
         publishedAt: item.published_at,
+        extractionFlags,
         url: item.url,
         imageUrl,
         paywalled,

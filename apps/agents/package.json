@@ -17,7 +17,8 @@
     "backfill:rechunk": "tsx src/scripts/rechunkTranscripts.ts",
     "backfill:newsletter": "tsx src/scripts/backfillNewsletterContent.ts",
     "backfill:papers": "tsx src/scripts/paperBackfill.ts",
-    "backfill:key-point-kinds": "tsx src/scripts/backfillKeyPointKinds.ts"
+    "backfill:key-point-kinds": "tsx src/scripts/backfillKeyPointKinds.ts",
+    "backfill:key-point-asof": "tsx src/scripts/normalizeKeyPointAsOf.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.24",

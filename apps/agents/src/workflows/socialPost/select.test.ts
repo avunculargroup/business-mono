@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
+import { isHookEligible, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
 
 function candidate(n: number): StoryCandidate {
   return {
@@ -10,6 +10,8 @@ function candidate(n: number): StoryCandidate {
     source_name: `Source ${n}`,
     category: 'regulatory',
     key_points: [],
+    new_points: [],
+    context_points: [],
     topic_tags: [],
     relevance_score: 0.9 - n * 0.1,
     published_at: '2026-06-26T06:00:00Z',
@@ -51,13 +53,44 @@ describe('mapNewsRowToCandidate', () => {
     ]);
   });
 
+  it('splits new points from context, and validates asOf against published_at', () => {
+    // The shape of the 17 Nov Fear & Greed item: model-invented asOf on every point.
+    const c = mapNewsRowToCandidate({
+      id: 'n4',
+      title: 'T',
+      url: 'https://x/4',
+      published_at: '2026-11-17T18:52:35Z',
+      key_points: [
+        { text: 'The RBA lifted the cash rate to 4.85% in a 6–3 vote', kind: 'background', asOf: '2023-11-07' },
+        { text: 'Minutes show three members dissented', kind: 'new', asOf: 'present' },
+        { text: 'Rates may stay on hold', kind: 'opinion', asOf: '2026-12' },
+      ],
+    });
+    expect(c.new_points).toEqual(['Minutes show three members dissented']);
+    // 2023-11-07 is a valid date before publication, so it survives — but it is
+    // only ever context. A future month does not survive.
+    expect(c.context_points).toEqual([
+      '[background, as of 2023-11-07] The RBA lifted the cash rate to 4.85% in a 6–3 vote',
+      '[opinion] Rates may stay on hold',
+    ]);
+    expect(c.key_points.join(' ')).not.toContain('present');
+  });
+
   it('tolerates null/missing fields', () => {
     const c = mapNewsRowToCandidate({ id: 'n2', title: 'T', url: 'https://x/2' });
     expect(c.summary).toBe('');
     expect(c.source_name).toBe('News');
     expect(c.key_points).toEqual([]);
+    expect(c.new_points).toEqual([]);
     expect(c.topic_tags).toEqual([]);
     expect(c.relevance_score).toBeNull();
+  });
+});
+
+describe('isHookEligible', () => {
+  it('admits a story only when it has a new point', () => {
+    expect(isHookEligible({ ...candidate(0), new_points: ['Minutes reveal the dissent'] })).toBe(true);
+    expect(isHookEligible({ ...candidate(0), context_points: ['[background] 6–3 vote'] })).toBe(false);
   });
 });
 

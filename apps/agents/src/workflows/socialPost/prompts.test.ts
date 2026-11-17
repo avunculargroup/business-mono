@@ -11,6 +11,8 @@ const STORY: StoryCandidate = {
   source_name: 'AFR',
   category: 'macro',
   key_points: ['Rate held at 4.35%', 'Services inflation sticky'],
+  new_points: ['Rate held at 4.35%', 'Services inflation sticky'],
+  context_points: [],
   topic_tags: ['monetary-policy', 'rba'],
   relevance_score: 0.82,
   published_at: '2026-06-26T03:00:00Z',
@@ -114,6 +116,38 @@ describe('buildSocialPostPrompt', () => {
       founderName: 'Chris',
     });
     expect(p).toContain('Rate held at 4.35%');
+  });
+
+  it('separates new points from context and requires the opening line to come from a new one', () => {
+    const p = buildSocialPostPrompt({
+      story: {
+        ...STORY,
+        new_points: ['Minutes show three members dissented over rising unemployment'],
+        context_points: ['[background, as of 2026-11-03] The RBA lifted the cash rate to 4.85% in a 6–3 vote'],
+      },
+      form: 'teach',
+      platform: 'linkedin',
+      platformSpec: LINKEDIN_SPEC,
+      voiceBlock: 'V',
+      founderName: 'Chris',
+    });
+    const newAt = p.indexOf('New in this story:');
+    const contextAt = p.indexOf('Context (earlier facts and views):');
+    expect(newAt).toBeGreaterThan(-1);
+    expect(contextAt).toBeGreaterThan(newAt);
+    expect(p.slice(newAt, contextAt)).toContain('three members dissented');
+    expect(p.slice(contextAt)).toContain('6–3 vote');
+    expect(p).toContain('The opening line must state one of the points under "New in this story"');
+  });
+
+  it('shows the editor each candidate\'s new points apart from its context', () => {
+    const p = buildEditorSelectionPrompt(
+      [{ ...STORY, new_points: ['Minutes reveal the dissent'], context_points: ['[background] 6–3 vote'] }],
+      'V',
+      'Chris',
+    );
+    expect(p).toContain('new: Minutes reveal the dissent');
+    expect(p).toContain('context: [background] 6–3 vote');
   });
 
   it('renders the generate instruction for every form in the vocabulary', () => {

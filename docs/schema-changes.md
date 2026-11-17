@@ -6,6 +6,23 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-17 — News: `news_sources.multi_story`
+
+`20261117200000_news_sources_multi_story.sql` adds `news_sources.multi_story BOOLEAN NOT NULL
+DEFAULT false` and sets it on the Fear & Greed source. A multi-story source's emails are split into
+sections (`apps/agents/src/lib/roundupSections.ts`) and key points are extracted per section, still
+into one `news_items` row per email. Why: the 17 Nov Fear & Greed lead story (RBA minutes revealing
+why three members dissented) never became a key point; extraction over the whole roundup kept only
+the 3 Nov vote it restated, and the social-post routine hooked on that.
+
+No column changes for `news_items`, but two JSONB shapes change. In `key_points[].asOf`, code now
+sets the value: a `new` point gets the Melbourne date of `published_at`, and other points keep a
+valid `YYYY[-MM[-DD]]` no later than publication or get `null`. It used to be free text from the
+model. `rex_metadata` gains `extraction_flags` (`no_new_key_points`, `lead_has_no_new_key_point`)
+for a fresh item still without a `new` point after a retry, with `needs_human_review = true`.
+
+---
+
 ## 2026-11-09 — Social post images: canon v1.3 (data only)
 
 `20261109300000_brand_visual_v1_3.sql` changes data, not schema: no column is added, dropped or

@@ -1536,6 +1536,7 @@ CREATE TABLE news_sources (
   link_allow_patterns       TEXT[]      NOT NULL DEFAULT '{}',  -- host or host+path prefixes; non-empty = must match one
   link_deny_patterns        TEXT[]      NOT NULL DEFAULT '{}',  -- same syntax; after the global deny lists
   link_extract_config       JSONB       NOT NULL DEFAULT '{}',  -- Jina options: { targetSelector?, removeSelector? }
+  multi_story               BOOLEAN     NOT NULL DEFAULT false, -- roundup newsletter: key points extracted per section (migration: 20261117200000)
   is_active                 BOOLEAN     NOT NULL DEFAULT true,
   last_scanned_at           TIMESTAMPTZ,
   last_status               TEXT        CHECK (last_status IN ('success','failed')),
