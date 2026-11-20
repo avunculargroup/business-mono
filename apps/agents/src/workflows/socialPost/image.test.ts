@@ -35,6 +35,23 @@ vi.mock('../../lib/logger.js', async (importActual) => {
   return { ...actual, createLogger: () => ({ info: logInfo, warn: logWarn, error: vi.fn(), debug: vi.fn() }) };
 });
 
+// The card fonts and composer run for real unless a test switches a failure on.
+const cardFailure = { fonts: false, compose: false };
+vi.mock('./headlineCard.js', async (importActual) => {
+  const actual = await importActual<typeof import('./headlineCard.js')>();
+  return {
+    ...actual,
+    loadCardFonts: vi.fn(() => {
+      if (cardFailure.fonts) throw new Error('ENOENT: card fonts');
+      return actual.loadCardFonts();
+    }),
+    composeHeadlineCard: vi.fn((...args: Parameters<typeof actual.composeHeadlineCard>) => {
+      if (cardFailure.compose) throw new Error('SVG render threw');
+      return actual.composeHeadlineCard(...args);
+    }),
+  };
+});
+
 const { runImageStep, generateBrief } = await import('./image.js');
 
 const STAMP = {
@@ -82,6 +99,8 @@ let faint: Buffer;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  cardFailure.fonts = false;
+  cardFailure.compose = false;
   fakeSupabase.__responses.clear();
   process.env['OPENROUTER_API_KEY'] = 'test-key';
   if (!parchment) {
@@ -779,5 +798,128 @@ describe('generateBrief', () => {
     expect(r).toMatchObject({ ok: true, brief: { hook: 'Twenty years' } });
     expect(charlieGenerate.mock.calls[0]![1].structuredOutput.errorStrategy).toBe('warn');
     expect(charlieGenerate.mock.calls[0]![1].structuredOutput.fallbackValue).toBeUndefined();
+  });
+});
+
+describe('runImageStep: headline cards', () => {
+  const POST = 'Twenty years. The trigger? Nobody knows. Discipline beats conviction.';
+  const WITH_HEADLINES = { ...BRIEF, headlines: ['Discipline beats conviction.', 'The best trigger!', 'Nobody knows the trigger.'] };
+  const params = { ...PARAMS, postCopy: POST, story: { ...PARAMS.story, category: 'macro' } };
+  const review = (headline: { index: number; note: string } | null) => ({
+    object: {
+      scores: [1, 2, 3].map((index) => ({ index, recognisable: 4, twist_visible: 4, on_hook: 4, physics_ok: true, needs_text: false, note: 'n' })),
+      headline,
+    },
+  });
+  const sizeOf = async (suffix: string) => {
+    const call = bucket.upload.mock.calls.find((c) => (c[0] as string).endsWith(suffix))!;
+    const meta = await sharp(call[1] as Buffer).metadata();
+    return [meta.width, meta.height];
+  };
+
+  it("renders square art for the reviewer's headline and composes headline cards", async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    // Only lint-clean headlines are shown, so "Nobody knows the trigger." is number 2.
+    editorGenerate.mockResolvedValue(review({ index: 2, note: 'clearest' }));
+    const restore = answerSetReadWithInsertedRows();
+    try {
+      const { outcome } = await runImageStep(params);
+      expect(outcome).toMatchObject({ status: 'generated', card_type: 'headline' });
+
+      expect(generateImage.mock.calls.every((c) => c[0].aspectRatio === '1:1')).toBe(true);
+      const prompt = generateImage.mock.calls[0]![0].prompt as string;
+      expect(prompt).toContain('Format: 1:1 square.');
+
+      expect(editorGenerate.mock.calls[0]![0][0].content).toContain('1. Discipline beats conviction.\n2. Nobody knows the trigger.');
+
+      const rows = insertedImageRows();
+      expect(rows.every((r) => r['card_type'] === 'headline')).toBe(true);
+      expect(rows[0]).toMatchObject({ headline: 'Nobody knows the trigger.', kicker: 'MACRO' });
+      expect(rows[0]!['alt_text']).toBe(`“Nobody knows the trigger.” — ${(rows[0]!['image_brief'] as { alt_text: string }).alt_text}`);
+      expect(rows[0]!['headline_verdict']).toMatchObject({ classification: 'educational' });
+      expect(rows[0]!['master_path']).toMatch(/master-1x1\.png$/);
+      expect(rows[0]!['image_brief']).toMatchObject({ headline: 'Nobody knows the trigger.' });
+
+      expect(await sizeOf('linkedin-1200x627.png')).toEqual([1200, 627]);
+      expect(await sizeOf('x-1600x900.png')).toEqual([1600, 900]);
+      expect(bucket.upload.mock.calls.some((c) => (c[0] as string).endsWith('master-1x1.png'))).toBe(true);
+
+      const generated = activityRows().find((r) => r.action === 'social_image_generated')!;
+      expect(generated.proposed_actions[0]).toMatchObject({
+        card_type: 'headline',
+        headline: 'Nobody knows the trigger.',
+        headline_choice: 'reviewer',
+        kicker: 'MACRO',
+        hook_repeat: false,
+      });
+      const logged = generated.proposed_actions[0]!['headlines'] as Array<{ text: string; flags: string[] }>;
+      expect(logged).toHaveLength(3);
+      expect(logged[1]!.flags.length).toBeGreaterThan(0);
+      // Lex checked the headline as well as the alt text.
+      const lexed = activityRows().find((r) => r.action === 'compliance_checked')!;
+      expect(lexed.proposed_actions.map((a) => a['type'])).toEqual(['image_alt_text', 'image_headline']);
+    } finally {
+      restore();
+    }
+  });
+
+  it('takes the first clean headline when the reviewer chooses none', async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    editorGenerate.mockResolvedValue(review(null));
+    await runImageStep(params);
+    expect(insertedImageRows()[0]).toMatchObject({ card_type: 'headline', headline: 'Discipline beats conviction.' });
+    const generated = activityRows().find((r) => r.action === 'social_image_generated')!;
+    expect(generated.proposed_actions[0]).toMatchObject({ headline_choice: 'first_clean' });
+  });
+
+  it('renders a 16:9 image-only card when no headline is clean', async () => {
+    charlieGenerate.mockResolvedValue({ object: { ...BRIEF, headlines: ['The best trigger!'] } });
+    const { outcome } = await runImageStep(params);
+    expect(outcome).toMatchObject({ status: 'generated', card_type: 'image_only' });
+    expect(generateImage.mock.calls.every((c) => c[0].aspectRatio === '16:9')).toBe(true);
+    const rows = insertedImageRows();
+    expect(rows.every((r) => r['card_type'] === 'image_only' && r['headline'] === null && r['headline_verdict'] === null)).toBe(true);
+    expect(rows[0]!['master_path']).toMatch(/master-16x9\.png$/);
+    const generated = activityRows().find((r) => r.action === 'social_image_generated')!;
+    expect(generated.proposed_actions[0]).toMatchObject({ headline_choice: 'none', card_reason: 'no lint-clean headline' });
+  });
+
+  it('renders image-only when the canon turns headline cards off', async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    fakeSupabase.__setResponse('brand_visual', { data: { ...BRAND_VISUAL_ROW, card: { enabled: false } }, error: null });
+    await runImageStep(params);
+    expect(generateImage.mock.calls.every((c) => c[0].aspectRatio === '16:9')).toBe(true);
+  });
+
+  it('falls back to a 16:9 image-only card when the fonts fail, and the run succeeds', async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    cardFailure.fonts = true;
+    const { outcome } = await runImageStep(params);
+    expect(outcome).toMatchObject({ status: 'generated', card_type: 'image_only' });
+    expect(generateImage.mock.calls.every((c) => c[0].aspectRatio === '16:9')).toBe(true);
+  });
+
+  it('composes an image-only card from the square art when composition fails after the render', async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    cardFailure.compose = true;
+    const { outcome } = await runImageStep(params);
+    expect(outcome).toMatchObject({ status: 'generated', card_type: 'image_only' });
+    expect(generateImage.mock.calls.every((c) => c[0].aspectRatio === '1:1')).toBe(true);
+    const rows = insertedImageRows();
+    expect(rows.every((r) => r['card_type'] === 'image_only' && r['headline'] === null)).toBe(true);
+    expect(rows[0]!['master_path']).toMatch(/master-1x1\.png$/);
+    expect(await sizeOf('linkedin-1200x627.png')).toEqual([1200, 627]);
+  });
+
+  it('logs a hook that repeats a recent run', async () => {
+    charlieGenerate.mockResolvedValue({ object: WITH_HEADLINES });
+    fakeSupabase.__setResponse('content_images', {
+      data: [{ candidate_set_id: 'old', is_selected: true, image_brief: { ...LIGHTHOUSE, hook: 'twenty years' } }],
+      error: null,
+    });
+    await runImageStep(params);
+    expect(charlieGenerate.mock.calls[0]![0][0].content).toContain("Recent hooks, don't reuse them or their central noun: twenty years.");
+    const generated = activityRows().find((r) => r.action === 'social_image_generated')!;
+    expect(generated.proposed_actions[0]).toMatchObject({ hook_repeat: true });
   });
 });

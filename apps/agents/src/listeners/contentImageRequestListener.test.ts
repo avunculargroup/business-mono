@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import sharp from 'sharp';
 import { createFakeSupabase, type FakeSupabaseClient } from '../../test/mocks/supabase.js';
 import { BRAND_VISUAL_ROW } from '../../test/fixtures/brandVisual.js';
 import { toBrandVisual } from '@platform/shared';
@@ -9,7 +10,12 @@ const briefConcepts = vi.fn();
 const loadCanon = vi.fn();
 const loadImageHistory = vi.fn();
 const classifyAltText = vi.fn();
+const classifyHeadline = vi.fn();
 const logActivity = vi.fn();
+const planCard = vi.fn();
+const generateImage = vi.fn();
+const bucket = { upload: vi.fn(), remove: vi.fn(), download: vi.fn() };
+(fakeSupabase as unknown as { storage: unknown }).storage = { from: vi.fn(() => bucket) };
 
 vi.mock('@platform/db', () => ({
   get supabase() {
@@ -23,12 +29,25 @@ vi.mock('../workflows/socialPost/image.js', () => ({
   loadCanon,
   loadImageHistory,
   classifyAltText,
+  classifyHeadline,
   logActivity,
+  planCard,
+  headlineCandidates: vi.fn(() => ['Nobody knows the trigger.']),
+  cropsFor: vi.fn(() => []),
+  storedVerdict: (v: { classification: string; rationale: string }) => ({ classification: v.classification, rationale: v.rationale }),
 }));
+// A recompose must never reach the image model.
+vi.mock('../lib/openrouterImage.js', () => ({ generateImage, MAX_REFERENCE_IMAGES: 4 }));
 
-const { handleImageRequestRow, normaliseFounderConcept, platformOfCrop, reconcileImageRequests } = await import(
-  './contentImageRequestListener.js'
-);
+const {
+  cropFromKey,
+  handleImageRequestRow,
+  masterPathOf,
+  normaliseFounderConcept,
+  normaliseRecomposeCard,
+  platformOfCrop,
+  reconcileImageRequests,
+} = await import('./contentImageRequestListener.js');
 
 const PIER = {
   tension: 'After years of fog, clarity is coming.',
@@ -52,6 +71,13 @@ function row(overrides: Record<string, unknown>) {
     alt_text: PIER.alt_text,
     review_outcome: null,
     created_at: '2026-11-08T00:00:00Z',
+    storage_path: `social-images/2026-11-08/${String(overrides['generation_group_id'] ?? 'g-a')}/${
+      String(overrides['platform_crop'] ?? 'linkedin_1200x627') === 'x_1600x900' ? 'x-1600x900.png' : 'linkedin-1200x627.png'
+    }`,
+    card_type: null as string | null,
+    headline: null as string | null,
+    kicker: null as string | null,
+    master_path: null as string | null,
     ...overrides,
   };
 }
@@ -64,9 +90,9 @@ const SET = [
   row({ id: 'b-x', generation_group_id: 'g-b', candidate_index: 1, is_selected: false, content_item_id: 'ci-x', platform_crop: 'x_1600x900' }),
 ];
 
-function claim(action: string, brief: unknown = null) {
+function claim(action: string, brief: unknown = null, card: unknown = null) {
   fakeSupabase.__setResponses('content_image_requests', [
-    { data: [{ id: 'req-1', content_item_id: 'ci-li', action, brief }], error: null },
+    { data: [{ id: 'req-1', content_item_id: 'ci-li', action, brief, card }], error: null },
   ]);
 }
 
@@ -101,10 +127,23 @@ beforeEach(() => {
   fakeSupabase.__setResponse('platform_specs', { data: [], error: null });
   loadCanon.mockResolvedValue(toBrandVisual(BRAND_VISUAL_ROW));
   loadImageHistory.mockResolvedValue({ subjects: [], layouts: [] });
-  briefConcepts.mockResolvedValue({ concepts: [PIER] });
+  briefConcepts.mockResolvedValue({
+    concepts: [PIER],
+    review: { headlines: { headlines: [], choice: { headline: null, source: 'none', note: null }, hook_repeat: false } },
+  });
   renderCandidateSet.mockResolvedValue(OK);
   classifyAltText.mockResolvedValue({ classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'plain' });
+  classifyHeadline.mockResolvedValue({ classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'states' });
+  planCard.mockReturnValue({ type: 'image_only', reason: 'test' });
+  bucket.upload.mockResolvedValue({ data: {}, error: null });
+  bucket.remove.mockResolvedValue({ data: [], error: null });
 });
+
+/** A stored master of the given size, as storage's download returns it. */
+async function storedArt(width: number, height: number) {
+  const png = await sharp({ create: { width, height, channels: 3, background: { r: 250, g: 250, b: 248 } } }).png().toBuffer();
+  bucket.download.mockResolvedValue({ data: new Blob([new Uint8Array(png)]), error: null });
+}
 
 describe('handleImageRequestRow', () => {
   it('ignores rows that are not pending, and requests another handler already claimed', async () => {
@@ -135,8 +174,11 @@ describe('handleImageRequestRow', () => {
       expect(loadImageHistory).toHaveBeenCalledWith(['acc-li']);
 
       const params = renderCandidateSet.mock.calls[0]![0];
-      expect(params).toMatchObject({ concepts: [PIER], triggerType: 'manual' });
+      expect(params).toMatchObject({ concepts: [PIER], triggerType: 'manual', card: { type: 'image_only' } });
       expect(params.candidateSetId).toBeUndefined(); // a new set
+      // The card is planned before the render, with the story's kicker.
+      expect(planCard.mock.calls[0]![1]).toEqual(['Nobody knows the trigger.']);
+      expect(planCard.mock.calls[0]![2]).toBe('MACRO');
       expect(params.posts).toEqual([
         { contentItemId: 'ci-li', platform: 'linkedin' },
         { contentItemId: 'ci-x', platform: 'twitter_x' },
@@ -188,6 +230,15 @@ describe('handleImageRequestRow', () => {
       expect(resolution()).toMatchObject({ status: 'done' });
     });
 
+    it('keeps the selected card\'s headline on the new art', async () => {
+      wireSet(SET.map((r) => (r.is_selected ? { ...r, card_type: 'headline', headline: 'Old words.', kicker: 'MACRO' } : r)));
+      planCard.mockReturnValue({ type: 'headline', headline: 'Old words.', kicker: 'MACRO' });
+      claim('render_brief', PIER);
+      await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+      expect(planCard.mock.calls[0]!.slice(1, 3)).toEqual([['Old words.'], 'MACRO']);
+      expect(renderCandidateSet.mock.calls[0]![0]).toMatchObject({ card: { type: 'headline', headline: 'Old words.' } });
+    });
+
     it('fails a concept that names a finance cliché, without rendering', async () => {
       claim('render_brief', { ...PIER, twist: 'A rocket launches from the rock' });
       await handleImageRequestRow({ id: 'req-1', status: 'pending' });
@@ -227,6 +278,91 @@ describe('handleImageRequestRow', () => {
   });
 });
 
+describe('recompose', () => {
+  const SQUARE_SET = SET.map((r) => ({
+    ...r,
+    card_type: 'headline',
+    headline: 'Old words.',
+    kicker: 'MACRO',
+    alt_text: `“Old words.” — ${PIER.alt_text}`,
+    master_path: `social-images/2026-11-08/${r.generation_group_id}/master-1x1.png`,
+  }));
+
+  beforeEach(() => {
+    fakeSupabase.__setResponse('content_items', { data: { title: null, body: 'Twenty years. Nobody knows the trigger.' }, error: null });
+  });
+
+  it('rebuilds the selected group from the stored square art with the new words, without a render', async () => {
+    wireSet(SQUARE_SET);
+    await storedArt(1024, 1024);
+    claim('recompose', null, { show_headline: true, headline: "Nobody knows the trigger.", kicker: 'treasury' });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+
+    expect(resolution()).toMatchObject({ status: 'done', error: null });
+    expect(generateImage).not.toHaveBeenCalled();
+    expect(renderCandidateSet).not.toHaveBeenCalled();
+    expect(bucket.download).toHaveBeenCalledWith('social-images/2026-11-08/g-a/master-1x1.png');
+
+    const uploads = bucket.upload.mock.calls.map((c) => c[0] as string);
+    expect(uploads).toHaveLength(2);
+    expect(uploads.every((p) => /\/g-a\/(linkedin-1200x627|x-1600x900)-\d+\.png$/.test(p))).toBe(true);
+    const li = await sharp(bucket.upload.mock.calls.find((c) => (c[0] as string).includes('linkedin'))![1] as Buffer).metadata();
+    expect([li.width, li.height]).toEqual([1200, 627]);
+
+    const writes = imageUpdates();
+    expect(writes).toHaveLength(2);
+    expect(writes[0]!.patch).toMatchObject({
+      card_type: 'headline',
+      headline: 'Nobody knows the trigger.',
+      kicker: 'TREASURY',
+      alt_text: `“Nobody knows the trigger.” — ${PIER.alt_text}`,
+      headline_verdict: { classification: 'educational' },
+    });
+    expect(classifyHeadline).toHaveBeenCalledWith('Nobody knows the trigger.');
+    expect(bucket.remove).toHaveBeenCalledWith(['social-images/2026-11-08/g-a/linkedin-1200x627.png', 'social-images/2026-11-08/g-a/x-1600x900.png']);
+  });
+
+  it('turns the headline off: an image-only card from the square art, the headline gone from the alt text', async () => {
+    wireSet(SQUARE_SET);
+    await storedArt(1024, 1024);
+    claim('recompose', null, { show_headline: false, headline: 'Old words.', kicker: 'MACRO' });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+    expect(resolution()).toMatchObject({ status: 'done' });
+    expect(imageUpdates()[0]!.patch).toMatchObject({ card_type: 'image_only', headline: null, kicker: null, headline_verdict: null, alt_text: PIER.alt_text });
+    expect(classifyHeadline).not.toHaveBeenCalled();
+  });
+
+  it('refuses a headline on 16:9 art and leaves the rows unchanged', async () => {
+    await storedArt(1344, 768);
+    claim('recompose', null, { show_headline: true, headline: 'Nobody knows the trigger.', kicker: null });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+    expect(String(resolution()!['error'])).toMatch(/Needs a new image to add a headline/);
+    expect(bucket.download).toHaveBeenCalledWith('social-images/2026-11-08/g-a/master-16x9.png');
+    expect(bucket.upload).not.toHaveBeenCalled();
+    expect(imageUpdates()).toEqual([]);
+  });
+
+  it('refuses a headline that fails the lint, naming the flags', async () => {
+    wireSet(SQUARE_SET);
+    await storedArt(1024, 1024);
+    claim('recompose', null, { show_headline: true, headline: 'The best trigger!', kicker: null });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+    expect(String(resolution()!['error'])).toMatch(/The headline needs changes: .*exclamation/);
+    expect(imageUpdates()).toEqual([]);
+  });
+
+  it('removes its new files and leaves the rows when an upload fails', async () => {
+    wireSet(SQUARE_SET);
+    await storedArt(1024, 1024);
+    bucket.upload.mockResolvedValueOnce({ data: {}, error: null }).mockResolvedValueOnce({ data: null, error: { message: 'quota' } });
+    claim('recompose', null, { show_headline: true, headline: 'Nobody knows the trigger.', kicker: null });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+    expect(resolution()).toMatchObject({ status: 'failed' });
+    expect(imageUpdates()).toEqual([]);
+    expect(bucket.remove.mock.calls[0]![0]).toHaveLength(1);
+  });
+});
+
 describe('reconcileImageRequests', () => {
   it('fails stale working requests and runs pending ones', async () => {
     fakeSupabase.__setResponses('content_image_requests', [
@@ -261,5 +397,26 @@ describe('pure helpers', () => {
       layout: 'hero_left',
       alt_text: '',
     });
+  });
+
+  it('reads a crop key back to its platform crop', () => {
+    expect(cropFromKey('linkedin_1200x627')).toEqual({ platform: 'linkedin', width: 1200, height: 627, cropKey: 'linkedin_1200x627', fileName: 'linkedin-1200x627.png' });
+    expect(cropFromKey('x_1600x900')).toMatchObject({ platform: 'twitter_x', fileName: 'x-1600x900.png' });
+    expect(cropFromKey('square')).toBeNull();
+  });
+
+  it('finds the stored master, or the 16:9 one beside an older row', () => {
+    expect(masterPathOf({ master_path: 'a/master-1x1.png', storage_path: 'a/linkedin.png' })).toBe('a/master-1x1.png');
+    expect(masterPathOf({ master_path: null, storage_path: 'a/b/linkedin.png' })).toBe('a/b/master-16x9.png');
+  });
+
+  it('normalises a recompose payload', () => {
+    expect(normaliseRecomposeCard({ show_headline: true, headline: '  Rates   held. ', kicker: ' macro ' })).toEqual({
+      generation_group_id: null,
+      show_headline: true,
+      headline: 'Rates held.',
+      kicker: 'MACRO',
+    });
+    expect(normaliseRecomposeCard(null)).toMatchObject({ show_headline: false, headline: null, kicker: null });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BRAND_VISUAL_ROW } from '../../../test/fixtures/brandVisual.js';
 import { activeLayouts, buildImagePrompt, toBrandVisual, DEFAULT_BRAND_MARK } from './imagePrompt.js';
+import { DEFAULT_CARD_SETTINGS } from '@platform/shared';
 import type { ImageConcept } from './imageBrief.js';
 
 const LIGHTHOUSE: ImageConcept = {
@@ -66,6 +67,27 @@ describe('buildImagePrompt', () => {
     expect(buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9' })).toBe(EXPECTED_V1_3_PROMPT);
   });
 
+  it('adds the headline composition paragraph and asks for square art only for a headline card', () => {
+    const headline = buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '1:1', cardType: 'headline' });
+    expect(headline).toContain('This picture sits beside a headline.');
+    expect(headline).toContain('Format: 1:1 square.');
+    expect(headline.indexOf(canon.compositionBlock)).toBeLessThan(headline.indexOf('This picture sits beside a headline.'));
+    expect(headline.indexOf('This picture sits beside a headline.')).toBeLessThan(headline.indexOf('Subject:'));
+    // The image-only prompt is unchanged by v1.4.
+    expect(buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9', cardType: 'image_only' })).toBe(EXPECTED_V1_3_PROMPT);
+    // A canon before v1.4 has no paragraph to add.
+    const old = toBrandVisual({ ...BRAND_VISUAL_ROW, headline_composition_block: undefined });
+    expect(buildImagePrompt(old, LIGHTHOUSE, { aspectRatio: '1:1', cardType: 'headline' })).not.toContain('beside a headline');
+  });
+
+  it('reads the card settings with tolerant defaults', () => {
+    expect(canon.card).toEqual(DEFAULT_CARD_SETTINGS);
+    expect(toBrandVisual({ ...BRAND_VISUAL_ROW, card: null }).card).toEqual(DEFAULT_CARD_SETTINGS);
+    expect(
+      toBrandVisual({ ...BRAND_VISUAL_ROW, card: { enabled: false, headline_size_max: 40, headline_size_min: 60, max_lines: 'x', kicker: false } }).card,
+    ).toEqual({ enabled: false, headline_size_max: 60, headline_size_min: 40, max_lines: 4, kicker: false });
+  });
+
   it('puts the blocks in order: style, palette, composition, subject, prohibited', () => {
     const p = buildImagePrompt(canon, LIGHTHOUSE, { aspectRatio: '16:9' });
     const at = (s: string) => p.indexOf(s);
@@ -86,9 +108,9 @@ describe('buildImagePrompt', () => {
 });
 
 describe('toBrandVisual', () => {
-  it('maps the v1.3 row: three colours, the v1.2 layouts active, v1.1 layouts kept inactive', () => {
+  it('maps the v1.4 row: three colours, the v1.2 layouts active, v1.1 layouts kept inactive', () => {
     const canon = toBrandVisual(BRAND_VISUAL_ROW);
-    expect(canon.version).toBe('1.3');
+    expect(canon.version).toBe('1.4');
     expect(canon.palette.map((p) => p.hex)).toEqual(['#FAFAF8', '#1A1915', '#C9A84C']);
     expect(activeLayouts(canon).map((l) => l.key)).toEqual(['hero_left', 'close_crop', 'diagonal', 'against_gold']);
     expect(canon.layouts.filter((l) => !l.is_active).map((l) => l.key)).toEqual(['left_third', 'low_horizon', 'close_detail', 'small_in_space']);

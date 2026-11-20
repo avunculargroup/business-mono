@@ -3,7 +3,7 @@
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** An image generation step for `social_post_from_news` (see `docs/daily-social-posts.md`)
 **Status:** Sessions 1–3 built; canon v1.2. The step 0 bake-off was dropped: tested in production (see Decisions)
-**Last updated:** 2026-11-11 (ideas start literal; puns only on a phrase's whole idea)
+**Last updated:** 2026-11-20 (headline cards: square art beside a headline set by code, canon v1.4)
 **Suggested repo path:** `docs/features/social-post-image/feature-spec.md`
 
 -----
@@ -25,6 +25,8 @@ The style is a **bold two-colour linocut**: black ink and one flat gold on brigh
 **Canon v1.1 (2026-11-08)** replaced v1.0's closed motif list after the first real post. "Twenty years ... The trigger? Nobody knows ... rethinking what 'safe' means" came back as a pencil hourglass with gold sand, centred in a wide frame on yellowed paper. The motif list mapped the post's topic to a stock symbol and ignored its point. The fix was art direction, not a better model: a better model would only draw a nicer hourglass.
 
 **Canon v1.2 (2026-11-09)** corrected v1.1's overcorrection. Its first three images, for the ASIC CP 392 post ("140 businesses have applied ... Clarity's coming. April 2027."), were a half-drawn bridge pier, fence posts trailing into guidelines, and pipe stumps under scaffolding lines. Each was a clever concept sketch, and each needed a caption to make sense. In a feed nobody reads the caption. v1.2 sets the bar at the **half-second test**: someone scrolling past on a phone recognises the subject and gets the idea without reading the post. So it uses a familiar symbol (stock symbols are allowed again) with one twist, printed big as a linocut.
+
+**Headline cards (canon v1.4, 2026-11-20)** are the default card. The images printed well under v1.3, but most ideas were still riddles. The posts are abstract finance (buybacks, index exclusion, real wages, a split RBA vote), and our rules forbid the literal picture (no text, coins, charts or faces), so the brief fell back on **allegory**: "a compass set on a sinking boat gives direction without seaworthiness"; a snapped dipstick, a rusted tape measure and a tailor's tape cut short for the hook "measuring stick" three days running; a tree whose roots "barely hold the ground", which rendered as a healthy tree of life. The viewer had to recognise the object, decode the fable and connect it to the post: three steps, where a feed allows one. Nearly every concept was also "familiar object, but broken". The fix magazines use is a short headline beside the picture: the picture sets the mood, and three to six words carry the meaning. The headline is **set in real type by code, never drawn by the model**, so the no-text rule for the model stands. See [Headline cards](#headline-cards-canon-v14).
 
 The step is **best-effort**. It runs after both drafts are persisted, and no image failure can sink the routine.
 
@@ -51,7 +53,7 @@ The step is **best-effort**. It runs after both drafts are persisted, and no ima
 
 - Images in the campaign variant workflow. The building blocks here are written so campaigns can reuse them later; wiring that up is a separate change.
 - Text, logos or wordmarks rendered by the image model (see "Text policy"). The BTS mark is composited by code, never generated.
-- A wordmark or any text alongside the mark
+- A wordmark alongside the mark. The headline card's headline and kicker, set by code, are the only text on a card
 - Automated posting with images (LinkedIn `/rest/images` upload, X media upload). This belongs to the posting phase in `docs/features/linkedin-posting/feature-spec.md`.
 - Vision-model QA of rendered output → deferred. Human review is the gate.
 - Video or animated output
@@ -112,6 +114,60 @@ Each decision traces back to existing evidence or an existing principle.
 | BTS mark composited by code, never generated | Image models redraw logos inaccurately. Placing the real SVG by code gives the exact mark at the exact size and position every time. | Text policy, same reasoning |
 | Style anchors stored **without** the mark | If anchors carried the logo, the model would learn to draw its own version of it | Reference images are imitated closely |
 | Prompt, brief, model, canon version and cost stored per image | Provenance-first: any image can be explained later | `generated_documents.variable_values` audit pattern |
+
+-----
+
+## Headline cards (canon v1.4)
+
+One render per run, as before. When the run has a lint-clean headline that fits, the art is **square** and code composes it into each platform card; otherwise the run renders the image-only 16:9 card as before. The card type is decided **before** the render, because it sets the art's aspect ratio (`aspect_ratio: "1:1"` for a headline card).
+
+### Layout: LinkedIn, 1200 × 627
+
+| Element | Spec |
+|---|---|
+| Ground | Paper `#FAFAF8`, whole card |
+| Art panel | Square art, **627 × 627**, flush right (x = 573) |
+| Text panel | Left 573px. Padding: 56 left, 36 right (text 481 wide). Text block vertically centred |
+| Kicker | DM Sans SemiBold (600), 20px, uppercase, letter-spacing 0.08em, `#9A7A2E` (`--color-accent-dark`). 16px gap to the headline |
+| Headline | Playfair Display Bold (700), sentence case, `#1A1915`. Fit by size: start at **64px**, step down 4px to a **44px** minimum, until it fits in **≤ 4 lines** across 481px. Line height 1.1 |
+| Mark | Bottom-right, `markPlacement` as before: the art panel's bottom-right corner, which the canon keeps as empty paper |
+
+### Layout: X, 1600 × 900
+
+The same layout scaled by 900 / 627: art 900 × 900 flush right, text panel 700px, every size and padding × 1.435 (headline 92 → 63px, kicker 29px, padding 80 / 52).
+
+Sizes and line count come from `brand_visual.card` (`headline_size_max`, `headline_size_min`, `max_lines`, `kicker`, `enabled`), editable in `/brand` → Visual → Headline cards. `cardLayout()` in `apps/agents/src/workflows/socialPost/headlineCard.ts` holds every number in one place.
+
+### Typesetting
+
+- **Bundled static TTFs**: Playfair Display Bold and DM Sans SemiBold (Google Fonts static instances) with their OFL licences, in `apps/agents/assets/fonts/`, copied to `/app/assets` by the Dockerfile.
+- **Measured and drawn with `opentype.js`** (1.3.4: no dependencies, reads TTF, measures with kerning and emits glyph paths). Every glyph becomes an SVG `<path>`; the SVG carries no `<text>` and no font name, so sharp/librsvg rasterises it with no font lookup and Railway needs no fontconfig.
+- **Pure, unit-tested**: `wrapHeadline` (greedy, never breaks inside a word), `fitHeadline` (largest size that fits the line limit), `cardLayout` (geometry per platform).
+- **Composition**: `composeHeadlineCard(art, { kicker, headline }, crop, mark)`: paper canvas → art resized into the panel → text SVG → mark.
+- **Typographic quotes** (`’`, `“ ”`) in the printed headline: straight ones are converted.
+- **Seam**: `correctPaper` runs on the square art before composing, so the art's paper meets the card's. The headline composition paragraph keeps the art's left 8% as empty paper, so no ink draws a hard cut down the card.
+
+### Image-only fallback
+
+No valid headline, or `brand_visual.card.enabled` false: the image-only full-bleed card from a **separate 16:9 render**. The square art is never stretched. If the type cannot be set after a square render (composition throws), the square art is centred on paper at the platform size, with the mark.
+
+### The brief, the review and the kicker
+
+- **Headlines**: the brief writes three, best first: the post's point in three to six words, a statement or a short question, sentence case, ending with `.` or `?`, only facts and figures that appear word for word in the post, stating never advising.
+- **`lintHeadline`** (`@platform/shared`, pure): 2–7 words and ≤ 48 characters; ends with `.` or `?`, no `!`; sentence case (acronyms of ≤ 5 letters allowed; Title Case flagged unless the post capitalises the words); `HEADLINE_PROHIBITED_TERMS` from `naming.md` → Words to avoid; every number-like token must appear in the post (minus signs, thin spaces and `$` normalised).
+- **The reviewer chooses** among the lint-clean headlines on the same call that scores the concepts (no extra LLM call). `chooseHeadline`: the reviewer's valid choice, else the first clean one, else none. On a round-two run, round one's headlines are used when it has a clean one.
+- **Fit**: a chosen headline that does not fit at the minimum size within the line limit gives way to the next clean one; if none fits, image-only.
+- **Kicker**: `kickerFor(story.category)`, deterministic: `regulatory` → REGULATION, `corporate` → TREASURY, `macro` → MACRO, `international` → GLOBAL, anything else none. The labels are a constant (`KICKER_LABELS`).
+- **The picture's job changes**: with a headline beside it, it needs to be recognised in half a second and feel right. One strong everyday object or scene, shown plainly; a twist when it is simple and visible, never a fable.
+- **At most one broken object**: the brief is told so, and `lintImageBrief` keeps the first concept matching `BROKEN_OBJECT_TERMS` and drops the rest. Round two drops a broken concept if round one already has one.
+- **No repeated hooks**: the last five runs' hooks go into the prompt ("don't reuse them or their central noun"). A repeat (exact, or one inside the other after normalising) is logged as `hook_repeat: true`; it never blocks.
+
+### Lex, alt text and storage
+
+- **Lex** classifies the headline on a second advisory call beside the alt-text one (`classifyHeadline`). Same treatment: never blocks; a chip when the verdict is not `educational`; a fail-safe verdict when the call fails.
+- **Alt text** leads with the headline, built in code: `“{headline}” — {alt_text}`.
+- **Storage**: the unmarked art master (`master-1x1.png` for a headline card's render, `master-16x9.png` otherwise) is kept beside the composed, marked platform cards, so text edits recompose without a render. `storage_path` stays the composed card.
+- **Recompose** (`content_image_requests.action = 'recompose'`): rebuilds the selected group's cards from the stored master with the founder's headline and kicker, or none, with no model call; re-runs Lex on the headline; writes new card files under fresh names and points the rows at them.
 
 -----
 
@@ -252,7 +308,7 @@ v1.0 asked the brief to pick one of ten motifs (`ledger`, `vault`, `balance`, `a
 
 ### Text policy
 
-The image model never renders text. If a post needs a typographic card (a quote or a figure), that is a deterministic HTML/SVG-to-PNG job using the real fonts. It is a separate feature, not this one.
+The image model never renders text. The headline card's type (2026-11-20) is that deterministic job: the real fonts, measured and drawn by code into SVG paths beside the art (see [Headline cards](#headline-cards-canon-v14)). A quote card or a figure card would be the same kind of job, and is not built.
 
 ### Brand mark
 
@@ -315,6 +371,11 @@ The table already exists (`20260622000000_add_campaigns_schema.sql`) with `sourc
 | `is_style_anchor` | BOOLEAN | Default `false`. Set when promoted. Mirrors `brand_visual.style_anchor_paths`. |
 | `review_outcome` | TEXT | `kept`, `regenerated`, `removed`, `not_chosen`, NULL while pending. `not_chosen` marks candidates a founder passed over when picking another. Feeds a later distil step (deferred). |
 | `alt_text_verdict` | JSONB | Lex's verdict on the alt text: `{ classification, needs_disclaimer, rationale, checked_at }`. Advisory only. |
+| `card_type` | TEXT | `headline` or `image_only` (2026-11-20). NULL on older rows, which are image-only. |
+| `headline` | TEXT | The headline printed on the card, with typographic quotes. NULL on an image-only card. |
+| `kicker` | TEXT | The label above it (`REGULATION`, `TREASURY`, `MACRO`, `GLOBAL`), or NULL. |
+| `headline_verdict` | JSONB | Lex's advisory verdict on the headline, the same shape as `alt_text_verdict`. NULL without a headline. |
+| `master_path` | TEXT | The unmarked art the cards were composed from (`master-1x1.png` or `master-16x9.png`). NULL on older rows: their master is `master-16x9.png` beside the cards. |
 
 `created_by` stays NULL for agent-generated rows.
 
@@ -371,13 +432,16 @@ The new step sits between the current step 5 (draft → Lex → persist, per pla
    5b.2  image brief          (LLM, structured)      scope social_post.image_brief   the hook + six concepts
    5b.3  lint per concept     (pure)                 drop flagged; re-brief once if none clean, then skip
    5b.3b review + rank        (LLM, structured)      scope social_post.image_critic  editor scores; rankConcepts keeps the top three
+         and chooses a lint-clean headline (chooseHeadline)
          if fewer than three pass: one re-brief with the reviewer's notes → lint → review → rank both rounds
          gaps filled with the best soft rejects (never a physics or needs-text fault)
+   5b.3c card type            (pure + fonts)         planCard(): headline card (1:1 art) if a clean headline fits, else image-only (16:9)
    per shortlisted concept, in parallel (Promise.allSettled), each its own generation group, best first:
    5b.4  assemble prompt      (pure)                 buildImagePrompt()
    5b.5  render               (OpenRouter Image API) scope social_post.image_render
-   5b.6  strip bars, paper correction, corner check, legibility gate, crop + mark + upload (sharp → Storage)
-   5b.7  Lex on alt text      (LLM, structured)      scope social_post.compliance_check
+   5b.6  strip bars, paper correction, corner check, legibility gate, compose cards + mark + upload (sharp → Storage)
+         headline card: art flush right, headline and kicker set by code; image-only: crop
+   5b.7  Lex on alt text and headline (LLM, structured) scope social_post.compliance_check
    5b.8  persist content_images rows (unselected) + agent_activity
    then: select the lowest successful candidate (the reviewer's top pick, when it rendered)
 6  email founder (each post preview now shows its image when 5b succeeded)
@@ -562,6 +626,7 @@ Below the copy editor, for any item with `content_images`:
 - **Remove image** sets `review_outcome = 'removed'` and deletes the rows and objects.
 - **Use as style anchor** copies the **unmarked master** to `anchors/` and appends to `brand_visual.style_anchor_paths` (max 8 stored, 4 sent). It asks "Use this image to guide future images?" as a conversational confirm, per the design skill.
 - Caption-style metadata line: `layout · model · canon v1.2 · $0.04` (v1.0 images show their motif instead of a layout).
+- **Card** (2026-11-20): **Headline** and **Kicker** (may be empty) fields and a **Show headline** toggle (off means an image-only card). **Save card** runs `lintHeadline` in the browser and shows the flags inline, then queues a `recompose` request: the agents server rebuilds the cards from the stored art with no model call and re-runs Lex on the headline, which shows as a chip when it is not `educational`. Turning the headline on for an image-only (16:9) run shows "Needs a new image to add a headline" with **Regenerate image**.
 
 Regenerate and edit-brief call the agents server, following the existing web → agents on-demand pattern. They log `agent_activity` with `trigger_type = 'manual'`.
 
@@ -569,11 +634,11 @@ Mobile: actions and candidates sit in their own rows (nothing hover-revealed), w
 
 ### `/content/[id]/copy`: copy-out
 
-Add **Download image**, which serves the platform's marked crop, with the alt text shown beside it and a copy button.
+Add **Download image**, which serves the platform's marked crop, with the alt text shown beside it and a copy button. A headline card also shows its headline with a **Copy headline** button.
 
 ### `/brand`: new Visual tab
 
-Next to Voice. Sections: Style, Palette (swatches with hex in mono), Composition, Prohibited (block + terms), Layouts (key, label, description, active; the retired motifs are hidden), Brand mark (enabled, size and margin, with a live preview on a sample crop), Style anchors (grid, with remove). Saving bumps `version` and asks "Save as v1.3?" (the next version). **Preview prompt** renders `buildImagePrompt` against a sample brief so edits can be checked without spending a render.
+Next to Voice. Sections: Style, Palette (swatches with hex in mono), Composition, Prohibited (block + terms), Layouts (key, label, description, active; the retired motifs are hidden), Brand mark (enabled, size and margin, with a live preview on a sample crop), Headline cards (make headline cards, show a kicker, largest and smallest headline size, most lines, and the paragraph sent with square art; no live preview), Style anchors (grid, with remove). Saving bumps `version` and asks "Save as v1.3?" (the next version). **Preview prompt** renders `buildImagePrompt` against a sample brief so edits can be checked without spending a render.
 
 **Reviewer agreement** (`ReviewerAgreement`, first panel of the tab, read-only). It reads the last 20 decided runs from `v_image_pick_agreement` and shows:
 
@@ -619,6 +684,13 @@ The email already shows each draft as a post-style card inside a 600px column (`
 | Reference images unsupported by endpoint | Render prompt-only; noted in `proposed_actions` |
 | Crop, mark composite or upload fails | `failed`; no partial `content_images` rows (insert only after all three objects upload). An unmarked image never reaches a founder. |
 | Lex alt-text check errors | Fail-safe verdict (`general_advice`, "check unavailable"); image still persists with a chip |
+| No lint-clean headline, or the reviewer returns none and none is clean | Image-only card, 16:9 render. Logged (`headline_choice: 'none'`, `card_reason`) |
+| Card fonts fail to load | Decided before the render: image-only card from a 16:9 render. Logged. Never blocks the run |
+| Headline card composition throws after a square render | Image-only composite of the square art (centred on paper at each platform size, with the mark). Logged |
+| Headline doesn't fit at the minimum size in the line limit | The next clean headline is tried; if none fits, image-only |
+| Lex headline check fails | Fail-safe verdict, chip shown, card still composed |
+| Recompose request fails | Rows unchanged (new files removed), error shown in the image slot |
+| Founder turns the headline on for an image-only (16:9) run | "Needs a new image to add a headline", with Regenerate. The 16:9 art cannot sit in the square panel |
 | Every image path fails | Run still **succeeds**. Image failure never changes run status. |
 
 -----
@@ -716,6 +788,10 @@ Images are **on for both founders from launch**. Step 0 was dropped in favour of
 | 2026-11-09 | **Round two outcomes recorded.** The 10:50 UTC CP 392 run passed two ideas (whiteboard 15, gantry 12), so round two should have run, yet the row read `review_rounds: 1` and filled slot three with a stream scoring 1 on the hook. Three silent paths could explain it. `round_two` now records which, with counts and the reviewer's index problems; an unusable round two's concepts are logged though never ranked. Selection unchanged. |
 | 2026-11-09 | **The brief always asks for six ideas.** One CP 392 round returned four, leaving the reviewer less to choose from. The prompt says "exactly six" in both rounds and the contract schema requires six for a non-skip brief. A short brief is still reviewed, never re-asked or turned into a skip. |
 | 2026-11-09 | **Founder picks are compared with the reviewer's, read-only.** `v_image_pick_agreement` and the Reviewer agreement panel. On the CP 392 run Chris picked the football pitch (the reviewer's third) over its top pick, the blueprint tube. If that pattern holds, the reviewer's scoring changes; the evidence comes first. |
+| 2026-11-20 | **Headline cards are the default card** (Chris). Square art beside a headline set in Playfair Display by code, a DM Sans kicker above it. The picture sets the mood; three to six words carry the meaning. Allegory needed three steps to read; a feed allows one. |
+| 2026-11-20 | **At most one broken object per run** (Chris). A week of concepts were nearly all "familiar object, but broken". Linted in code (`BROKEN_OBJECT_TERMS`), first kept. |
+| 2026-11-20 | **Don't repeat a hook** used in the last few runs (Chris). "Measuring stick" ran three days. The last five hooks are in the prompt; a repeat is logged as `hook_repeat`, never blocked. |
+| 2026-11-20 | **Kicker from the story's category**, deterministic, never model-written. Four labels in a constant; an unknown category has none. |
 | 2026-11-09 | **Bake-off dropped; tested in production.** Chris prefers to test live unless told otherwise for a given change. The default render model is unchanged; real runs are the evidence. Recorded as a standing preference in `CLAUDE.md`. |
 
 -----
@@ -743,6 +819,12 @@ Where the build departs from this spec, and why.
 | v1.2: a new canon row | The migration updates the active row in place and bumps its version, guarded on the v1.1 style block so it never overwrites a founder's edits | Same as v1.1 |
 | v1.2: symbol history | A pre-v1.2 image has no symbol; its subject stands in | So the last five runs still count from the first v1.2 run |
 | Reviewer-driven re-brief: "if the second brief or review fails, use what the first round produced" | Also when the second brief lints to nothing new. Fills exclude physics and needs-text faults except when every reviewed concept has one: then the best of them render by total | Chris chose 2026-11-09 that a run always renders rather than skip |
+| v1.4: four new `content_images` columns (`card_type`, `headline`, `kicker`, `headline_verdict`) | Also `master_path` | An image-only card can be composed from either a square or a 16:9 master, so the master's file cannot be derived from `card_type`; recompose and promote-to-anchor both need it. Older rows read as `master-16x9.png` beside their cards |
+| v1.4: "one OFL.txt" | One licence file per family (`OFL-PlayfairDisplay.txt`, `OFL-DMSans.txt`) | The two fonts carry different copyright lines |
+| v1.4: composition paragraph added to the canon | A new `headline_composition_block` column, set by the guarded v1.4 migration and editable in `/brand` | It is sent only for square art, so it cannot live in `composition_block`; an empty value omits it |
+| v1.4: a request kind "such as `recompose`" | `recompose`, with its payload in a new `content_image_requests.card` column | `brief` holds a concept; the card payload is a different shape |
+| v1.4: Lex "one call or two" | Two calls in parallel (`classifyAltText`, `classifyHeadline`) | Reuses the existing verdict schema and the advisory pattern unchanged |
+| v1.4: the alt-text field limit | 360 characters in the web app (was 300) | The stored alt text now carries the quoted headline before the 300-character description |
 | v1.2: legibility rejections are logged | One `social_image_rejected` activity per run, listing each rejected candidate's index, reason and coverage | Rejections are invisible otherwise: a rejected candidate leaves no `content_images` row |
 
 -----

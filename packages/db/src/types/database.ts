@@ -387,9 +387,11 @@ export type Database = {
       brand_visual: {
         Row: {
           brand_mark: Json
+          card: Json
           composition_block: string
           created_at: string
           default_aspect_ratio: string
+          headline_composition_block: string
           id: string
           is_active: boolean
           layouts: Json
@@ -406,9 +408,11 @@ export type Database = {
         }
         Insert: {
           brand_mark?: Json
+          card?: Json
           composition_block: string
           created_at?: string
           default_aspect_ratio?: string
+          headline_composition_block?: string
           id?: string
           is_active?: boolean
           layouts?: Json
@@ -425,9 +429,11 @@ export type Database = {
         }
         Update: {
           brand_mark?: Json
+          card?: Json
           composition_block?: string
           created_at?: string
           default_aspect_ratio?: string
+          headline_composition_block?: string
           id?: string
           is_active?: boolean
           layouts?: Json
@@ -2043,6 +2049,7 @@ export type Database = {
         Row: {
           action: string
           brief: Json | null
+          card: Json | null
           completed_at: string | null
           content_item_id: string
           created_at: string
@@ -2055,6 +2062,7 @@ export type Database = {
         Insert: {
           action: string
           brief?: Json | null
+          card?: Json | null
           completed_at?: string | null
           content_item_id: string
           created_at?: string
@@ -2067,6 +2075,7 @@ export type Database = {
         Update: {
           action?: string
           brief?: Json | null
+          card?: Json | null
           completed_at?: string | null
           content_item_id?: string
           created_at?: string
@@ -2115,16 +2124,21 @@ export type Database = {
           brand_visual_version: string | null
           candidate_index: number | null
           candidate_set_id: string | null
+          card_type: string | null
           content_item_id: string
           cost_usd: number | null
           created_at: string
           created_by: string | null
           generation_group_id: string | null
           generation_ref: string | null
+          headline: string | null
+          headline_verdict: Json | null
           id: string
           image_brief: Json | null
           is_selected: boolean
           is_style_anchor: boolean
+          kicker: string | null
+          master_path: string | null
           model_id: string | null
           platform_crop: string | null
           review_outcome: string | null
@@ -2140,16 +2154,21 @@ export type Database = {
           brand_visual_version?: string | null
           candidate_index?: number | null
           candidate_set_id?: string | null
+          card_type?: string | null
           content_item_id: string
           cost_usd?: number | null
           created_at?: string
           created_by?: string | null
           generation_group_id?: string | null
           generation_ref?: string | null
+          headline?: string | null
+          headline_verdict?: Json | null
           id?: string
           image_brief?: Json | null
           is_selected?: boolean
           is_style_anchor?: boolean
+          kicker?: string | null
+          master_path?: string | null
           model_id?: string | null
           platform_crop?: string | null
           review_outcome?: string | null
@@ -2165,16 +2184,21 @@ export type Database = {
           brand_visual_version?: string | null
           candidate_index?: number | null
           candidate_set_id?: string | null
+          card_type?: string | null
           content_item_id?: string
           cost_usd?: number | null
           created_at?: string
           created_by?: string | null
           generation_group_id?: string | null
           generation_ref?: string | null
+          headline?: string | null
+          headline_verdict?: Json | null
           id?: string
           image_brief?: Json | null
           is_selected?: boolean
           is_style_anchor?: boolean
+          kicker?: string | null
+          master_path?: string | null
           model_id?: string | null
           platform_crop?: string | null
           review_outcome?: string | null

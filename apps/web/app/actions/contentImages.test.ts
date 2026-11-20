@@ -20,6 +20,7 @@ import {
   getImageDownloadUrl,
   promoteImageToStyleAnchor,
   removeImage,
+  requestImageRecompose,
   requestImageRegenerate,
   requestImageRender,
   saveImageAltText,
@@ -76,7 +77,7 @@ describe('requestImageRegenerate', () => {
     supabase.__setResponses('content_image_requests', [{ data: [], error: null }, { data: null, error: null }]);
     expect(await requestImageRegenerate(ITEM)).toEqual({ success: true });
     expect(inserts('content_image_requests')).toEqual([
-      { content_item_id: ITEM, action: 'regenerate', brief: null, requested_by: 'director-1' },
+      { content_item_id: ITEM, action: 'regenerate', brief: null, card: null, requested_by: 'director-1' },
     ]);
     expect(revalidatePath).toHaveBeenCalledWith(`/content/${ITEM}`);
   });
@@ -131,6 +132,43 @@ describe('requestImageRender', () => {
   });
 });
 
+describe('requestImageRecompose', () => {
+  const POST = { title: null, body: 'Twenty years. Nobody knows the trigger.' };
+  const input = { contentItemId: ITEM, generationGroupId: GROUP, showHeadline: true, headline: ' Nobody knows the trigger. ', kicker: 'macro' };
+
+  it('lints the headline against the post, then queues a recompose with no render', async () => {
+    supabase.__setResponse('content_items', { data: POST, error: null });
+    supabase.__setResponses('content_image_requests', [{ data: [], error: null }, { data: null, error: null }]);
+    expect(await requestImageRecompose(input)).toEqual({ success: true });
+    expect(inserts('content_image_requests')).toEqual([
+      {
+        content_item_id: ITEM,
+        action: 'recompose',
+        brief: null,
+        card: { generation_group_id: GROUP, show_headline: true, headline: 'Nobody knows the trigger.', kicker: 'MACRO' },
+        requested_by: 'director-1',
+      },
+    ]);
+  });
+
+  it('names the lint flags instead of queuing', async () => {
+    supabase.__setResponse('content_items', { data: POST, error: null });
+    const result = await requestImageRecompose({ ...input, headline: 'It took 30 years!' });
+    expect('error' in result ? result.error : null).toMatch(/^Change the headline first: .*No exclamation marks\. .*Figure not in the post: 30\./);
+    expect(inserts('content_image_requests')).toEqual([]);
+  });
+
+  it('turns the headline off without linting it', async () => {
+    supabase.__setResponses('content_image_requests', [{ data: [], error: null }, { data: null, error: null }]);
+    expect(await requestImageRecompose({ ...input, showHeadline: false, headline: '', kicker: '' })).toEqual({ success: true });
+    expect(inserts('content_image_requests')[0]!['card']).toEqual({ generation_group_id: GROUP, show_headline: false, headline: null, kicker: null });
+  });
+
+  it('rejects a malformed id', async () => {
+    expect(await requestImageRecompose({ ...input, generationGroupId: 'nope' })).toHaveProperty('error');
+  });
+});
+
 describe('saveImageAltText', () => {
   it('updates the whole group, clears the verdict, and asks Lex to check again', async () => {
     const res = await saveImageAltText({ contentItemId: ITEM, generationGroupId: GROUP, altText: ' A new description. ' });
@@ -149,6 +187,15 @@ describe('removeImage', () => {
     expect(await removeImage({ contentItemId: ITEM, generationGroupId: GROUP })).toEqual({ success: true });
     expect(updates('content_images')).toEqual([{ review_outcome: 'removed' }]);
     expect(bucket.remove).toHaveBeenCalledWith([...CROPS.map((c) => c.storage_path), `social-images/2026-11-08/${GROUP}/master-16x9.png`]);
+  });
+});
+
+describe('removeImage of a headline card', () => {
+  it('deletes the stored square master', async () => {
+    const square = `social-images/2026-11-20/${GROUP}/master-1x1.png`;
+    supabase.__setResponses('content_images', [{ data: CROPS.map((c) => ({ ...c, master_path: square })), error: null }, { data: null, error: null }]);
+    await removeImage({ contentItemId: ITEM, generationGroupId: GROUP });
+    expect(bucket.remove).toHaveBeenCalledWith([...CROPS.map((c) => c.storage_path), square]);
   });
 });
 

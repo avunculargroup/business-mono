@@ -49,6 +49,8 @@ src/
                    #   no LLM; dry run unless --apply)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
+assets/fonts/      # Bundled static TTFs + OFL licences for social image headline cards
+                   #   (Playfair Display Bold, DM Sans SemiBold), read at runtime
 ```
 
 ## Agents, workflows, listeners — which is which
@@ -184,7 +186,7 @@ being sent to a guessed address.
 | `complianceRecheck` | Realtime | Re-runs Lex when a variant's copy is edited |
 | `feedbackDistillListener` | Realtime | Distils director feedback into reusable guidance |
 | `marketReportFeedbackListener` | Realtime | The same loop for market reports |
-| `contentImageRequestListener` | Realtime + 5-min sweep | Founder image actions from `/content/[id]` (`content_image_requests`): regenerate, render with an edited brief, re-check alt text. Fails requests left `working` |
+| `contentImageRequestListener` | Realtime + 5-min sweep | Founder image actions from `/content/[id]` (`content_image_requests`): regenerate, render with an edited brief, re-check alt text, and `recompose` (rebuild a headline card's platform cards from the stored art with new words: no render, Lex re-checks the headline). Fails requests left `working` |
 
 ## Webhooks
 
@@ -269,3 +271,10 @@ around 256 MB, which is where the recurring OOM crashes hit. Keep it below the c
 memory limit or the OS OOM-killer replaces a recoverable heap error with a SIGKILL.
 `railway.toml` carries the full reasoning, as does the `bundler` block in
 `src/mastra/index.ts` for the packages that must stay external to the bundle.
+
+`mastra build` bundles source only, so loose files are copied by the `Dockerfile`: `docs/`
+(brand voice) and `apps/agents/assets/` → `/app/assets`. The social image headline cards
+(`workflows/socialPost/headlineCard.ts`) read their fonts from `assets/fonts/` beside the
+source in development and from `/app/assets/fonts` in production. The type is drawn as SVG
+paths with `opentype.js`, so the container needs no fontconfig or system fonts. If the fonts
+cannot be read, the run renders the image-only card instead; it never fails on them.

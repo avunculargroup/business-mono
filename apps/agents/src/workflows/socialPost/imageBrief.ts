@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   MAX_BRIEF_CONCEPTS,
   MIN_BRIEF_CONCEPTS,
+  lintHeadline,
   readStoredBrief,
   type ConceptReview,
   type ImageBrief as SharedImageBrief,
@@ -32,10 +33,19 @@ import type { StoryCandidate } from './select.js';
 // fewer than three ideas pass, one re-brief carries its notes, and any slot
 // still empty is filled with the best-scoring rejected idea. When the reviewer
 // itself fails, the shortlist is the brief's own order.
+//
+// Headline cards (2026-11-20): the brief also writes three short headlines,
+// lintHeadline drops any that fail, and the same review picks one (no extra
+// call). With a headline beside it, the picture needs only to be recognised
+// and feel right; the words carry the meaning.
 
 /** Each concept field's stored limit, in characters. Enforced in code, never by the model's schema. */
 export const CONCEPT_LIMITS = { tension: 200, symbol: 200, twist: 200, subject: 200, alt_text: 300 } as const;
 export const HOOK_LIMIT = 120;
+/** At most this many headlines are kept from a brief, best first. */
+export const MAX_HEADLINES = 3;
+/** A headline is lint-limited to 48 characters; this only bounds what is stored. */
+export const HEADLINE_LIMIT = 120;
 export const SKIP_REASON_LIMIT = 200;
 
 /** The contract for one concept: what is stored and rendered. */
@@ -70,6 +80,7 @@ export const imageBriefOutputSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().nullable(),
   hook: z.string(), // the post's most specific, concrete phrase
+  headlines: z.array(z.string()), // three short headlines for the card, best first
   concepts: z.array(lenientConceptSchema),
 });
 
@@ -83,6 +94,7 @@ export const imageBriefSchema = z
     skip: z.boolean(),
     skip_reason: z.string().max(SKIP_REASON_LIMIT).nullable(),
     hook: z.string().max(HOOK_LIMIT),
+    headlines: z.array(z.string().max(HEADLINE_LIMIT)).max(MAX_HEADLINES),
     concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
   })
   .superRefine((brief, ctx) => {
@@ -136,6 +148,7 @@ const briefShellSchema = z.object({
   skip: z.boolean(),
   skip_reason: z.string().nullable().optional(),
   hook: z.string().optional(),
+  headlines: z.array(z.unknown()).optional(),
   concepts: z.array(z.unknown()).optional(),
 });
 
@@ -172,8 +185,13 @@ export function normaliseBrief(raw: unknown): NormalisedBrief {
   const skipReason = shell.data.skip_reason == null ? null : cut(shell.data.skip_reason, SKIP_REASON_LIMIT, 'skip_reason');
   const hook = cut(shell.data.hook ?? '', HOOK_LIMIT, 'hook');
   if (skip) {
-    return { ok: true, brief: { skip, skip_reason: skipReason, hook, concepts: [] }, dropped: 0, excess: 0, truncated };
+    return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines: [], concepts: [] }, dropped: 0, excess: 0, truncated };
   }
+  // Headlines are lenient too: non-strings and blanks dropped, at most three kept.
+  const headlines = (shell.data.headlines ?? [])
+    .filter((h): h is string => typeof h === 'string' && h.trim().length > 0)
+    .slice(0, MAX_HEADLINES)
+    .map((h, i) => cut(h, HEADLINE_LIMIT, `headline ${i + 1}`));
   const rawConcepts = shell.data.concepts ?? [];
   const concepts: ImageConcept[] = [];
   let dropped = 0;
@@ -196,7 +214,7 @@ export function normaliseBrief(raw: unknown): NormalisedBrief {
     });
   }
   const excess = Math.max(0, rawConcepts.length - dropped - MAX_BRIEF_CONCEPTS);
-  return { ok: true, brief: { skip, skip_reason: skipReason, hook, concepts }, dropped, excess, truncated };
+  return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines, concepts }, dropped, excess, truncated };
 }
 
 /** At most this many concepts are rendered per run: the reviewer's shortlist. */
@@ -213,6 +231,8 @@ export interface ImageHistory {
   symbols: string[];
   /** Layouts of recent runs' selected images, most recent first. v1.0 rows have none. */
   layouts: string[];
+  /** Hooks of recent runs, most recent first. Rows made before the reviewer have none. */
+  hooks: string[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,7 +246,7 @@ type Row = Record<string, any>;
  * null/non-array read (degrades to no history).
  */
 export function recentImageHistory(rows: unknown, maxRuns = RECENT_RUNS): ImageHistory {
-  const history: ImageHistory = { symbols: [], layouts: [] };
+  const history: ImageHistory = { symbols: [], layouts: [], hooks: [] };
   if (!Array.isArray(rows)) return history;
   const seenRuns = new Set<string>();
   for (const r of rows as Row[]) {
@@ -244,9 +264,29 @@ export function recentImageHistory(rows: unknown, maxRuns = RECENT_RUNS): ImageH
     const symbol = brief.symbol ?? brief.subject;
     if (symbol) history.symbols.push(symbol);
     if (brief.layout) history.layouts.push(brief.layout);
+    if (brief.hook) history.hooks.push(brief.hook);
     if (seenRuns.size >= maxRuns) break;
   }
   return history;
+}
+
+/** Lower-case words only, for comparing hooks. */
+function hookKey(hook: string): string {
+  return hook.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Whether a hook repeats a recent one: the same after normalising, or one
+ * contained in the other ("measuring stick" and "the measuring stick moved").
+ * Visibility only: a repeat is logged, never blocked. Pure.
+ */
+export function hookRepeats(hook: string, recent: string[]): boolean {
+  const key = hookKey(hook);
+  if (!key) return false;
+  return recent.some((r) => {
+    const other = hookKey(r);
+    return other.length > 0 && (key === other || key.includes(other) || other.includes(key));
+  });
 }
 
 /** The layout the last two runs both used, which the next run may not use a third time. */
@@ -292,6 +332,9 @@ ${p.story.key_points.length > 0 ? p.story.key_points.map((k) => `- ${k}`).join('
   if (rest) {
     historyLines.push(`The last two images both used the ${rest} layout. Do not use ${rest} in any concept.`);
   }
+  if (p.history.hooks.length > 0) {
+    historyLines.push(`Recent hooks, don't reuse them or their central noun: ${p.history.hooks.join('; ')}.`);
+  }
   const history = historyLines.length > 0 ? `\n\n## Recent images\n${historyLines.join('\n')}` : '';
   const avoid =
     p.prohibitedTerms.length > 0 ? `\n- Never use these, anywhere: ${p.prohibitedTerms.join(', ')}.` : '';
@@ -308,7 +351,7 @@ ${p.story.key_points.length > 0 ? p.story.key_points.map((k) => `- ${k}`).join('
 ${p.postCopy}
 
 ${story}## The half-second test
-The image is seen at phone size by someone scrolling past. In half a second they must recognise the subject and get the idea, without reading the post. A clever image that needs a caption fails.
+The image is seen at phone size by someone scrolling past, beside a short headline. With a headline beside it, the picture does not need to explain. It needs to be **recognised in half a second and feel right**. Prefer one strong everyday object or scene from the post's world, shown plainly. A twist is welcome when it's simple and visible, never a fable that needs decoding.
 
 ## First, the hook
 hook: the single most specific, concrete phrase in the post. It is the thing a reader would quote back, not the topic: "capital buffers", not "regulation"; "Twenty years", not "US debt". Prefer a noun phrase. Copy it from the post.
@@ -316,6 +359,19 @@ hook: the single most specific, concrete phrase in the post. It is the thing a r
 The hook tells you what the post is about. It is not a word puzzle. Show what the hook **means** in the post: the situation, the feeling, the consequence.
 
 Prefer the literal and concrete: an everyday object or scene from the situation the post describes. A pun is welcome only when it works on the whole idea of the phrase and is obvious at a glance. Never draw one word split off from a phrase: 'sheet' from 'balance sheet' or 'level' from 'confidence level' is a riddle, not a picture.
+
+## Then the headlines
+headlines: three options for a short headline printed beside the picture. Each one says the post's point in **three to six words**, so that someone who sees only the card gets it.
+- Write it as a plain statement or a short question, in sentence case, ending with a full stop or a question mark.
+- Use only facts and figures that appear **word for word** in the post. A figure not in the post is invented.
+- It states, never advises. No advice, recommend, should, best, guarantee, outperform, and no exclamation marks.
+- Australian English. Bitcoin with a capital B for the network, lowercase for the unit.
+- Examples, from real posts:
+  - "Discipline beats conviction."
+  - "Direction isn't seaworthiness."
+  - "Confidence just hit −15."
+  - "Who moved the measuring stick?"
+Put the best first.
 
 ## Then work it out in this order, for each concept
 1. tension: the surprising or uneasy idea in this post, in one sentence. Not its topic.
@@ -349,11 +405,12 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - Keep it short: tension, symbol, twist and subject in 25 words or fewer each, and alt_text in 40 words or fewer. Short fields make better briefs.
 - Draw the six from at least four different domains (sport, home, nature, transport, building, kitchen, travel and so on), at most two from any one domain.
 - At least three of the six concepts show the post's situation literally: the thing, the place or the moment it describes, as one strong everyday object or scene.
+- At most one of the six concepts may show something broken, damaged, snapped, cracked, rusted, cut, leaking or failing. Bad news doesn't need a broken object.
 - No symbol whose meaning depends on writing or letters: pens writing, type, documents, signs, newspapers, seals, books shown open. A closed book is fine.
 - No text, letters, numbers or figures anywhere in the picture. Images cannot carry them.
 - No coins, currency symbols, charts, arrows or anything that implies a price going up or down. No people's faces.${avoid}
 - Keep the bottom-right corner of the picture empty.
-- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}${reviewer}`;
+- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook, no headlines and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}${reviewer}`;
 }
 
 // ── The reviewer: shortlist before any render is paid for ──────────────────────
@@ -372,6 +429,9 @@ export const critiqueSchema = z.object({
       note: z.string().max(160),
     }),
   ),
+  // The headline the reviewer chose, by its number in the prompt (1–3), or
+  // null for none. Optional, so a review that leaves it out still ranks.
+  headline: z.object({ index: z.number().int(), note: z.string() }).nullable().optional(),
 });
 export type Critique = z.infer<typeof critiqueSchema>;
 export type ConceptScore = Critique['scores'][number];
@@ -381,6 +441,8 @@ export interface ImageCriticPromptParams {
   hook: string;
   /** Lint-clean concepts, in brief order; numbered from 1 in the prompt. */
   concepts: ImageConcept[];
+  /** Lint-clean headlines, best first; numbered from 1. None: the headline question is not asked. */
+  headlines?: string[];
 }
 
 export function buildImageCriticPrompt(p: ImageCriticPromptParams): string {
@@ -391,6 +453,19 @@ export function buildImageCriticPrompt(p: ImageCriticPromptParams): string {
    Subject: ${c.subject}`,
     )
     .join('\n');
+  const headlines = p.headlines ?? [];
+  const headlineBlock =
+    headlines.length > 0
+      ? `
+
+## The headlines
+One is printed beside the picture.
+${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}
+
+Choose the headline (1–${headlines.length}) that says the post's point most clearly at a glance, is true to the post, and states rather than advises. Return headline null if none is good enough. Set headline.index to its number above and give a one-line note.`
+      : `
+
+Return headline null: there are no headlines to choose from.`;
   return `You review image ideas for a founder's social post before any are printed. Each idea will be a bold two-colour linocut seen at phone size by someone scrolling past. Be strict: most ideas should not score well, and a polite middle score helps nobody.
 
 ## The post
@@ -418,7 +493,43 @@ Return one entry per idea, with index set to the idea's number above.
 - A heavy railway buffer stop in gold, a black rail running straight into it, for "capital buffers": recognisable 5, twist_visible 4, on_hook 5, physics_ok true. It works because "buffer" is the whole idea of the phrase, not one word split off from it.
 - A warped baking tray for 'balance sheets': recognisable 4, twist_visible 3, on_hook 1. A pun on one word; it reads as a bent tray.
 - A coach's whiteboard half covered in plays for 'writing the playbook': recognisable 5, twist_visible 5, on_hook 5. Literal, and obvious in half a second.
-- A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible: a still image cannot show it.`;
+- A twist that is a moment in time ("about to", "paused", "poised") scores 2 or less on twist_visible: a still image cannot show it.${headlineBlock}`;
+}
+
+// ── Headlines: lint, then the reviewer's choice ──────────────────────────────
+
+export interface LintedHeadline {
+  text: string;
+  flags: string[];
+}
+
+/** Every headline with its lint flags, in brief order. Pure. */
+export function lintHeadlines(headlines: string[], postCopy: string): LintedHeadline[] {
+  return headlines.map((text) => ({ text, flags: lintHeadline(text, postCopy).flags }));
+}
+
+export type HeadlineChoiceSource = 'reviewer' | 'first_clean' | 'none';
+
+export interface HeadlineChoice {
+  /** The chosen headline, or null for an image-only card. */
+  headline: string | null;
+  source: HeadlineChoiceSource;
+  /** The reviewer's note on its choice, when it made a valid one. */
+  note: string | null;
+}
+
+/**
+ * Which headline goes on the card. Pure. The reviewer's choice when its index
+ * names one of the clean headlines; otherwise the first clean one; otherwise
+ * none, and the run renders an image-only card.
+ */
+export function chooseHeadline(clean: string[], critique: Pick<Critique, 'headline'> | null): HeadlineChoice {
+  const pick = critique?.headline;
+  if (pick && Number.isInteger(pick.index) && pick.index >= 1 && pick.index <= clean.length) {
+    return { headline: clean[pick.index - 1]!, source: 'reviewer', note: pick.note?.trim() || null };
+  }
+  if (clean.length > 0) return { headline: clean[0]!, source: 'first_clean', note: null };
+  return { headline: null, source: 'none', note: null };
 }
 
 export interface RankedConcept {
@@ -623,4 +734,28 @@ Alt text never carries a disclaimer: set needs_disclaimer = false and disclaimer
 
 ## Rationale
 Give a one-breath rationale naming the specific phrase that moved your verdict. Do not rewrite the alt text.`;
+}
+
+/**
+ * Lex prompt for a card's headline. Advisory, like the alt text: the headline
+ * sits beside the post, so the question is whether it reads as a statement of
+ * fact or as advice. A headline never carries a disclaimer.
+ */
+export function buildHeadlineLexPrompt(headline: string): string {
+  return `Classify this social image headline for financial-advice risk. You are advisory — you never block; your verdict is data the founder reviews.
+
+A headline is printed beside the image. It should state a fact or ask a question from the post. It must not imply returns, a direction for a price, or an action a reader should take.
+
+## The headline
+${headline}
+
+## Classify (exactly one)
+- educational — states a fact or asks a question; no claim about outcomes, no recommendation.
+- general_advice — implies an outcome, a direction for a price, or an action a reader could take.
+- personal_opinion — reads as a personal recommendation or a founder's individual take.
+
+A headline never carries a disclaimer: set needs_disclaimer = false and disclaimer_key = null.
+
+## Rationale
+Give a one-breath rationale naming the specific phrase that moved your verdict. Do not rewrite the headline.`;
 }

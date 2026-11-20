@@ -44,9 +44,9 @@ function isUuid(value: string): boolean {
 }
 
 const IMAGE_COLUMNS =
-  'id, source, storage_path, generation_group_id, candidate_set_id, candidate_index, is_selected, alt_text, platform_crop, image_brief, assembled_prompt, brand_visual_version, model_id, cost_usd, is_style_anchor, alt_text_verdict, review_outcome, created_at' as const;
+  'id, source, storage_path, generation_group_id, candidate_set_id, candidate_index, is_selected, alt_text, platform_crop, image_brief, assembled_prompt, brand_visual_version, model_id, cost_usd, is_style_anchor, alt_text_verdict, review_outcome, created_at, card_type, headline, kicker, headline_verdict, master_path' as const;
 
-/** The unmarked master sits beside its crops, under the group's folder. */
+/** Before master_path was stored, the unmarked master sat beside its crops as a 16:9 file. */
 const MASTER_FILE = 'master-16x9.png';
 
 type ImageRow = {
@@ -68,19 +68,43 @@ type ImageRow = {
   alt_text_verdict: unknown;
   review_outcome: string | null;
   created_at: string;
+  card_type: string | null;
+  headline: string | null;
+  kicker: string | null;
+  headline_verdict: unknown;
+  master_path: string | null;
 };
+
+function toVerdict(v: unknown): ContentImage['altTextVerdict'] {
+  const verdict = v as { classification?: unknown; rationale?: unknown; checked_at?: unknown } | null;
+  return verdict && typeof verdict.classification === 'string'
+    ? {
+        classification: verdict.classification,
+        rationale: typeof verdict.rationale === 'string' ? verdict.rationale : '',
+        checkedAt: typeof verdict.checked_at === 'string' ? verdict.checked_at : null,
+      }
+    : null;
+}
 
 function toContentImage(row: ImageRow): ContentImage {
   const ai = row.source === 'ai_generated';
-  const verdict = row.alt_text_verdict as { classification?: unknown; rationale?: unknown; checked_at?: unknown } | null;
   const slash = row.storage_path.lastIndexOf('/');
+  const masterPath =
+    ai && row.generation_group_id
+      ? (row.master_path ?? (slash > 0 ? `${row.storage_path.slice(0, slash)}/${MASTER_FILE}` : null))
+      : null;
   // Two stored shapes: one concept (canon v1.1+) or a v1.0 motif brief.
   const brief = readStoredBrief(row.image_brief);
   return {
     id: row.id,
     source: ai ? 'ai_generated' : 'upload',
     storagePath: row.storage_path,
-    masterPath: ai && row.generation_group_id && slash > 0 ? `${row.storage_path.slice(0, slash)}/${MASTER_FILE}` : null,
+    masterPath,
+    artAspect: masterPath ? (masterPath.endsWith('master-1x1.png') ? '1:1' : '16:9') : null,
+    cardType: row.card_type === 'headline' || row.card_type === 'image_only' ? row.card_type : null,
+    headline: row.headline ?? null,
+    kicker: row.kicker ?? null,
+    headlineVerdict: toVerdict(row.headline_verdict),
     generationGroupId: row.generation_group_id,
     altText: row.alt_text,
     platformCrop: row.platform_crop,
@@ -98,14 +122,7 @@ function toContentImage(row: ImageRow): ContentImage {
     // NUMERIC can arrive as a string from PostgREST.
     costUsd: row.cost_usd === null ? null : Number(row.cost_usd),
     isStyleAnchor: row.is_style_anchor,
-    altTextVerdict:
-      verdict && typeof verdict.classification === 'string'
-        ? {
-            classification: verdict.classification,
-            rationale: typeof verdict.rationale === 'string' ? verdict.rationale : '',
-            checkedAt: typeof verdict.checked_at === 'string' ? verdict.checked_at : null,
-          }
-        : null,
+    altTextVerdict: toVerdict(row.alt_text_verdict),
     createdAt: row.created_at,
   };
 }
@@ -357,7 +374,9 @@ export function createContentRepository(adapter: SupabaseAdapterContext): Conten
         isThread: item.is_thread ?? false,
         segments: (segments.data ?? []).map((segment) => segment.body),
         disclaimerText: disclaimer.data?.body ?? null,
-        image: image.image ? { storagePath: image.image.storagePath, altText: image.image.altText } : null,
+        image: image.image
+          ? { storagePath: image.image.storagePath, altText: image.image.altText, headline: image.image.headline }
+          : null,
       };
     },
 

@@ -2,8 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { supabase } from '@platform/db';
 import {
   MIN_BRIEF_CONCEPTS,
+  cardAspectRatio,
+  headlineAltText,
+  isBrokenConcept,
+  kickerFor,
   planCandidateSelection,
+  typographicQuotes,
   type CandidateRow,
+  type CardType,
   type ConceptReview,
   type SocialPostImageOutcome,
 } from '@platform/shared';
@@ -16,6 +22,10 @@ import { lexVerdictSchema, type LexVerdict, type Platform } from '../variant/sch
 import {
   MAX_CANDIDATES,
   buildAltTextLexPrompt,
+  buildHeadlineLexPrompt,
+  chooseHeadline,
+  hookRepeats,
+  lintHeadlines,
   buildImageBriefPrompt,
   buildImageCriticPrompt,
   critiqueProblem,
@@ -34,6 +44,8 @@ import {
   type Ranking,
   type ImageBriefPromptParams,
   type ImageConcept,
+  type HeadlineChoice,
+  type LintedHeadline,
 } from './imageBrief.js';
 import { activeLayouts, buildImagePrompt, toBrandVisual, type BrandVisual } from './imagePrompt.js';
 import {
@@ -48,7 +60,9 @@ import {
   platformCrop,
   toPngMaster,
   type PaperCorrection,
+  type PlatformCrop,
 } from './imageCompose.js';
+import { cardLayout, composeHeadlineCard, composeSquareImageOnly, fitCardHeadline, loadCardFonts } from './headlineCard.js';
 import type { StoryCandidate } from './select.js';
 import { createLogger } from '../../lib/logger.js';
 
@@ -63,9 +77,13 @@ const log = createLogger('social-post-image');
 //   → review (editor, text only) → rank; if fewer than three pass, one
 //     re-brief carrying the reviewer's notes → review → rank both rounds
 //     together → the top three, best first (best soft rejects fill any gap)
+//   → card type, before any render: a headline card (square art) when the
+//     review chose a lint-clean headline that fits, else image-only (16:9)
 //   → for each shortlisted concept, in parallel:
 //       buildImagePrompt (pure) → render (OpenRouter) → paper correction
-//       → crop + mark + upload → Lex on alt text (advisory) → content_images rows
+//       → compose each platform card + mark + upload (headline card: art flush
+//         right, headline set by code; image-only: crop) → Lex on alt text and
+//         headline (advisory) → content_images rows
 //   → select the lowest successful candidate (the reviewer's top pick when it
 //     rendered); the founder can pick another
 //
@@ -94,7 +112,7 @@ export interface PersistedPost {
 
 export interface ImageStepParams {
   accountIds: string[];
-  story: Pick<StoryCandidate, 'id' | 'title' | 'summary' | 'key_points'>;
+  story: Pick<StoryCandidate, 'id' | 'title' | 'summary' | 'key_points'> & Partial<Pick<StoryCandidate, 'category'>>;
   form: string;
   /** Persisted copy the image sits beside (LinkedIn, else X). */
   postCopy: string;
@@ -243,6 +261,89 @@ export async function classifyAltText(altText: string): Promise<LexVerdict> {
   }
 }
 
+/**
+ * Lex on a card's headline. Advisory, like the alt text: it never blocks, and
+ * a failure is the same fail-safe verdict, shown to the founder as a chip.
+ */
+export async function classifyHeadline(headline: string): Promise<LexVerdict> {
+  const fallback: LexVerdict = {
+    classification: 'general_advice',
+    needs_disclaimer: false,
+    disclaimer_key: null,
+    rationale: 'Headline compliance check unavailable — flagged for review (fail-safe).',
+  };
+  try {
+    const response = await lex.generate([{ role: 'user', content: buildHeadlineLexPrompt(headline) }], {
+      requestContext: stepRequestContext('social_post.compliance_check'),
+      structuredOutput: { schema: lexVerdictSchema, errorStrategy: 'fallback', fallbackValue: fallback },
+    });
+    return lexVerdictSchema.parse(response.object ?? fallback);
+  } catch (err) {
+    log.warn({ err }, 'headline compliance check failed');
+    return fallback;
+  }
+}
+
+/** A Lex verdict as content_images stores it (alt_text_verdict, headline_verdict). */
+export function storedVerdict(verdict: LexVerdict) {
+  return {
+    classification: verdict.classification,
+    needs_disclaimer: false,
+    rationale: verdict.rationale,
+    checked_at: new Date().toISOString(),
+  };
+}
+
+// ── Card type: decided before the render, because it sets the art's aspect ──
+
+/** What a run renders: a headline card (square art, the type set by code) or the image-only 16:9 card. */
+export type CardPlan =
+  | { type: 'headline'; headline: string; kicker: string | null }
+  | { type: 'image_only'; reason: string };
+
+/**
+ * The card a run renders. A headline card needs the canon's cards on, a
+ * headline, the bundled fonts, and the headline to fit every platform's card
+ * at the minimum size within the line limit; a headline that does not fit
+ * gives way to the next one in `headlines`. Anything else is image-only. Never
+ * throws: a font failure is a reason, logged, not an error.
+ */
+export function planCard(
+  canon: BrandVisual,
+  headlines: Array<string | null>,
+  kicker: string | null,
+  crops: PlatformCrop[],
+): CardPlan {
+  if (!canon.card.enabled) return { type: 'image_only', reason: 'headline cards are turned off in the canon' };
+  const candidates = [...new Set(headlines.filter((h): h is string => typeof h === 'string' && h.trim().length > 0))];
+  if (candidates.length === 0) return { type: 'image_only', reason: 'no lint-clean headline' };
+  let fonts;
+  try {
+    fonts = loadCardFonts();
+  } catch (err) {
+    log.error({ err }, 'card fonts failed to load — image-only card');
+    return { type: 'image_only', reason: `fonts failed to load: ${summariseError(err)}` };
+  }
+  for (const candidate of candidates) {
+    const headline = typographicQuotes(candidate.trim());
+    const fits = crops.every((crop) =>
+      fitCardHeadline(headline, cardLayout(crop.platform, canon.card, { width: crop.width, height: crop.height }), fonts) !== null,
+    );
+    if (fits) return { type: 'headline', headline, kicker: canon.card.kicker ? kicker : null };
+  }
+  return { type: 'image_only', reason: 'no headline fits the card at the minimum size' };
+}
+
+/** Each post's platform crop, from its platform_specs. */
+export function cropsFor(posts: PersistedPost[], imageSpecs: Map<Platform, unknown>): PlatformCrop[] {
+  return posts.map((p) => platformCrop(p.platform, imageSpecs.get(p.platform)));
+}
+
+/** The stored master's file name: the unmarked art a recompose rebuilds from. */
+export function masterFileName(aspectRatio: string): string {
+  return aspectRatio === '1:1' ? 'master-1x1.png' : 'master-16x9.png';
+}
+
 export async function loadCanon(): Promise<BrandVisual | null> {
   const { data, error } = await db
     .from('brand_visual')
@@ -314,7 +415,18 @@ export interface RenderParams {
   candidateSetId: string;
   candidateIndex: number;
   /** The run's review: stored with the concept and logged on its activity. Absent for a founder's own brief. */
-  review?: { hook: string; concept: ConceptReview | null; log: ReviewLog };
+  review?: { hook: string; concept: ConceptReview | null; log: ReviewLog; headlines?: HeadlineReview };
+  /** The card to compose. Absent: image-only, as before headline cards. */
+  card?: CardPlan;
+}
+
+/** The headlines a brief wrote and which one the review chose, for the run's activity row. */
+export interface HeadlineReview {
+  /** Every headline the brief wrote, with its lint flags. */
+  headlines: LintedHeadline[];
+  choice: HeadlineChoice;
+  /** The hook repeats one of the last few runs'. Visibility only. */
+  hook_repeat: boolean;
 }
 
 /** Every concept the reviewer saw and what became of it, for the run's activity rows. */
@@ -368,6 +480,7 @@ export interface BriefReview {
   /** Aligned with the shortlisted concepts: each one's stored review. */
   reviews: Array<ConceptReview | null>;
   log: ReviewLog;
+  headlines: HeadlineReview;
 }
 
 export type RenderResult =
@@ -377,6 +490,7 @@ export type RenderResult =
       candidateIndex: number;
       layout: string;
       altText: string;
+      cardType: CardType;
       costUsd: number | null;
       cropPaths: Map<string, string>;
       paper: PaperCorrection;
@@ -426,14 +540,15 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
   const { canon, concept, candidateIndex } = params;
   const primary = params.posts.find((p) => p.platform === 'linkedin') ?? params.posts[0]!;
   const layout = concept.layout;
-  const altText = concept.alt_text.trim();
+  const plan: CardPlan = params.card ?? { type: 'image_only', reason: 'no card requested' };
   const groupId = randomUUID();
   const uploaded: string[] = [];
 
   try {
     // ── 5b.4–5b.5: assemble + render ─────────────────────────────────────────
-    const aspectRatio = canon.defaultAspectRatio;
-    const prompt = buildImagePrompt(canon, concept, { aspectRatio });
+    // The card type was decided before this: a headline card's art is square.
+    const aspectRatio = cardAspectRatio(canon, plan.type);
+    const prompt = buildImagePrompt(canon, concept, { aspectRatio, cardType: plan.type });
     const apiKey = process.env['OPENROUTER_API_KEY'];
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set; the image render needs OpenRouter.');
     const model = await resolveImageModelId(RENDER_SCOPE);
@@ -463,16 +578,42 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
     const legible = await legibility(master);
     if (!legible.pass) throw new CandidateRejected(legible.reason, legible.coverage);
     const folder = `social-images/${new Date().toISOString().slice(0, 10)}/${groupId}`;
-    const objects: Array<{ path: string; bytes: Buffer }> = [{ path: `${folder}/master-16x9.png`, bytes: master }];
+    // The unmarked art is kept beside the cards, so a text edit recomposes without a new render.
+    const masterPath = `${folder}/${masterFileName(aspectRatio)}`;
+    const objects: Array<{ path: string; bytes: Buffer }> = [{ path: masterPath, bytes: master }];
     const cropPaths = new Map<string, { path: string; cropKey: string }>();
+    const crops = new Map<string, PlatformCrop>();
     for (const post of params.posts) {
       const crop = platformCrop(post.platform, params.imageSpecs.get(post.platform));
-      const path = `${folder}/${crop.fileName}`;
-      if (!objects.some((o) => o.path === path)) {
-        objects.push({ path, bytes: await composePlatformImage(master, crop, canon.brandMark) });
-      }
-      cropPaths.set(post.contentItemId, { path, cropKey: crop.cropKey });
+      cropPaths.set(post.contentItemId, { path: `${folder}/${crop.fileName}`, cropKey: crop.cropKey });
+      crops.set(`${folder}/${crop.fileName}`, crop);
     }
+    // A headline card that cannot be composed (fonts, SVG) becomes an image-only
+    // card of the same square art: the run never fails on the type.
+    let card: CardPlan = plan;
+    let composed: Array<{ path: string; bytes: Buffer }>;
+    try {
+      composed = await Promise.all(
+        [...crops].map(async ([path, crop]) => ({
+          path,
+          bytes:
+            card.type === 'headline'
+              ? await composeHeadlineCard(master, { kicker: card.kicker, headline: card.headline }, crop, canon.brandMark, {
+                  card: canon.card,
+                  paperHex: paperHex(canon),
+                })
+              : await composePlatformImage(master, crop, canon.brandMark),
+        })),
+      );
+    } catch (err) {
+      if (card.type !== 'headline') throw err;
+      log.error({ err, groupId, candidateIndex }, 'headline card composition failed — image-only card from the square art');
+      card = { type: 'image_only', reason: `composition failed: ${summariseError(err)}` };
+      composed = await Promise.all(
+        [...crops].map(async ([path, crop]) => ({ path, bytes: await composeSquareImageOnly(master, crop, canon.brandMark, paperHex(canon)) })),
+      );
+    }
+    objects.push(...composed);
     for (const obj of objects) {
       const { error } = await db.storage
         .from(BUCKET)
@@ -481,14 +622,17 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       uploaded.push(obj.path);
     }
 
-    // ── 5b.7: Lex on the alt text (advisory, never blocks) ───────────────────
-    const verdict = await classifyAltText(altText);
-    const altTextVerdict = {
-      classification: verdict.classification,
-      needs_disclaimer: false,
-      rationale: verdict.rationale,
-      checked_at: new Date().toISOString(),
-    };
+    // ── 5b.7: Lex on the alt text and the headline (advisory, never block) ───
+    // The concept's description is classified; the stored alt text leads with
+    // the headline, built in code, so a screen reader hears what the card says.
+    const headline = card.type === 'headline' ? card.headline : null;
+    const kicker = card.type === 'headline' ? card.kicker : null;
+    const altText = headlineAltText(headline, concept.alt_text.trim());
+    const [verdict, headlineVerdict] = await Promise.all([
+      classifyAltText(concept.alt_text.trim()),
+      headline ? classifyHeadline(headline) : Promise.resolve(null),
+    ]);
+    const altTextVerdict = storedVerdict(verdict);
 
     // ── 5b.8: persist ────────────────────────────────────────────────────────
     const rows = params.posts.map((post) => ({
@@ -504,13 +648,22 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       candidate_set_id: params.candidateSetId,
       candidate_index: candidateIndex,
       is_selected: false,
-      image_brief: params.review ? { ...concept, hook: params.review.hook, review: params.review.concept } : concept,
+      image_brief: {
+        ...concept,
+        ...(params.review ? { hook: params.review.hook, review: params.review.concept } : {}),
+        ...(headline ? { headline } : {}),
+      },
       assembled_prompt: prompt,
       brand_visual_version: canon.version,
       model_id: model,
       generation_ref: rendered.generationRef,
       cost_usd: rendered.costUsd,
       alt_text_verdict: altTextVerdict,
+      card_type: card.type,
+      headline,
+      kicker,
+      headline_verdict: headlineVerdict ? storedVerdict(headlineVerdict) : null,
+      master_path: masterPath,
     }));
     const { error: insErr } = await db.from('content_images').insert(rows);
     if (insErr) throw new Error(`content_images insert failed: ${insErr.message}`);
@@ -541,6 +694,17 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
             paper,
             corners: cornerRecord.distances,
             coverage: legible.coverage,
+            card_type: card.type,
+            ...(card.type === 'image_only' ? { card_reason: card.reason } : {}),
+            headline,
+            kicker,
+            ...(params.review?.headlines
+              ? {
+                  headlines: params.review.headlines.headlines,
+                  headline_choice: params.review.headlines.choice.source,
+                  hook_repeat: params.review.headlines.hook_repeat,
+                }
+              : {}),
             ...(params.review
               ? {
                   hook: params.review.hook,
@@ -562,6 +726,9 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
         entity_id: primary.contentItemId,
         proposed_actions: [
           { type: 'image_alt_text', generation_group_id: groupId, classification: verdict.classification },
+          ...(headlineVerdict
+            ? [{ type: 'image_headline', generation_group_id: groupId, classification: headlineVerdict.classification }]
+            : []),
         ],
       },
     ]);
@@ -572,6 +739,7 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
       candidateIndex,
       layout,
       altText,
+      cardType: card.type,
       costUsd: rendered.costUsd,
       cropPaths: new Map([...cropPaths].map(([id, c]) => [id, c.path])),
       paper,
@@ -656,6 +824,8 @@ export async function renderCandidateSet(params: {
   founderChoice?: boolean;
   /** The reviewer's shortlist for these concepts, from briefConcepts. */
   review?: BriefReview;
+  /** The run's card, decided before the render; every candidate shares it. */
+  card?: CardPlan;
 }): Promise<CandidateSetResult> {
   const candidateSetId = params.candidateSetId ?? randomUUID();
   const startIndex = params.startIndex ?? 0;
@@ -669,8 +839,16 @@ export async function renderCandidateSet(params: {
         triggerType: params.triggerType,
         candidateSetId,
         candidateIndex: startIndex + i,
+        ...(params.card ? { card: params.card } : {}),
         ...(params.review
-          ? { review: { hook: params.review.hook, concept: params.review.reviews[i] ?? null, log: params.review.log } }
+          ? {
+              review: {
+                hook: params.review.hook,
+                concept: params.review.reviews[i] ?? null,
+                log: params.review.log,
+                headlines: params.review.headlines,
+              },
+            }
           : {}),
       }),
     ),
@@ -757,7 +935,11 @@ export async function briefConcepts(
   // ── Review → rank: shortlist before any render is paid for ────────────────
   const hook = brief.hook.trim();
   const round1 = lint.clean;
-  const critique1 = await generateCritique(buildImageCriticPrompt({ postCopy: params.postCopy, hook, concepts: round1 }));
+  const headlines1 = lintHeadlines(brief.headlines ?? [], params.postCopy);
+  const clean1 = headlines1.filter((h) => h.flags.length === 0).map((h) => h.text);
+  const critique1 = await generateCritique(
+    buildImageCriticPrompt({ postCopy: params.postCopy, hook, concepts: round1, headlines: clean1 }),
+  );
   let concepts = round1;
   let critique = critique1;
   let ranking = rankConcepts(round1, critique1, MAX_CANDIDATES);
@@ -770,9 +952,12 @@ export async function briefConcepts(
     : { status: 'not_needed', reason: `${ranking.passed} of ${round1.length} passed in round one` };
   /** Round two's concepts when its review was unusable: logged, never ranked. */
   let unranked: { concepts: ImageConcept[]; critique: Critique | null } | null = null;
+  let headlineSource: { headlines: LintedHeadline[]; critique: Critique | null } = { headlines: headlines1, critique: critique1 };
   if (!ranking.fallback && ranking.passed < MAX_CANDIDATES && critique1) {
     const second = await secondRound(briefParams, lintOpts, params.postCopy, hook, round1, critique1, ranking);
     roundTwo = second.record;
+    // Round one's headlines win when it has a clean one; otherwise round two's.
+    if (clean1.length === 0 && second.headlines) headlineSource = second.headlines;
     log.info({ round_two: second.record }, 'image review round two');
     if (second.record.status === 'ran' && second.merged) {
       concepts = [...round1, ...second.merged.concepts];
@@ -784,14 +969,29 @@ export async function briefConcepts(
     }
   }
 
+  const clean = headlineSource.headlines.filter((h) => h.flags.length === 0).map((h) => h.text);
+  const choice = chooseHeadline(clean, headlineSource.critique);
+  const hookRepeat = hookRepeats(hook, params.history.hooks ?? []);
+  if (hookRepeat) log.info({ hook }, 'hook repeats a recent run');
+
   return {
     concepts: ranking.ranked.map((r) => r.concept),
     review: {
       hook,
       reviews: ranking.ranked.map(storedReview),
       log: reviewLog(hook, concepts, round1.length, critique, ranking, rounds, roundTwo, unranked),
+      headlines: { headlines: headlineSource.headlines, choice, hook_repeat: hookRepeat },
     },
   };
+}
+
+/**
+ * The headlines a card may try, best first: the review's choice, then the
+ * other clean ones, so one that does not fit gives way to the next.
+ */
+export function headlineCandidates(review: HeadlineReview): string[] {
+  const clean = review.headlines.filter((h) => h.flags.length === 0).map((h) => h.text);
+  return review.choice.headline ? [review.choice.headline, ...clean.filter((h) => h !== review.choice.headline)] : [];
 }
 
 /** Lower-case letters and digits only, so "A Lighthouse." and "a lighthouse" are one symbol. */
@@ -805,6 +1005,8 @@ interface SecondRound {
   merged?: { concepts: ImageConcept[]; critique: Critique };
   /** Status 'critique_unusable': round two's concepts and whatever its reviewer returned, for the log only. */
   unranked?: { concepts: ImageConcept[]; critique: Critique | null };
+  /** The second brief's headlines and the review that saw them, when it got that far. */
+  headlines?: { headlines: LintedHeadline[]; critique: Critique | null };
 }
 
 /**
@@ -846,7 +1048,11 @@ async function secondRound(
   const returned = brief.concepts.length;
   const seen = new Set(tried.map(symbolKey));
   const lint = lintImageBrief(brief, lintOpts);
-  const fresh = lint.clean.filter((c) => !seen.has(symbolKey(c.symbol)));
+  // At most one broken object across both rounds: round one's comes first.
+  const brokenInRound1 = round1.some(isBrokenConcept);
+  const fresh = lint.clean.filter((c) => !seen.has(symbolKey(c.symbol)) && !(brokenInRound1 && isBrokenConcept(c)));
+  const headlines2 = lintHeadlines(brief.headlines ?? [], postCopy);
+  const clean2 = headlines2.filter((h) => h.flags.length === 0).map((h) => h.text);
   if (fresh.length === 0) {
     const duplicates = lint.clean.length;
     const parts = [
@@ -857,7 +1063,7 @@ async function secondRound(
       record: { status: 'no_fresh_concepts', reason: parts.join('; ') || 'no concepts came back', concepts_returned: returned, fresh_clean: 0 },
     };
   }
-  const critique2 = await generateCritique(buildImageCriticPrompt({ postCopy, hook, concepts: fresh }));
+  const critique2 = await generateCritique(buildImageCriticPrompt({ postCopy, hook, concepts: fresh, headlines: clean2 }));
   // Unusable second review: round one stands rather than ranking half-blind,
   // but what came back is kept for the record.
   const problem = critiqueProblem(critique2, fresh.length);
@@ -866,6 +1072,7 @@ async function secondRound(
     return {
       record: { status: 'critique_unusable', reason: problem, concepts_returned: returned, fresh_clean: fresh.length },
       unranked: { concepts: fresh, critique: parsed.success ? parsed.data : null },
+      headlines: { headlines: headlines2, critique: parsed.success ? parsed.data : null },
     };
   }
   const offset = round1.length;
@@ -875,6 +1082,7 @@ async function secondRound(
       concepts: fresh,
       critique: { scores: [...critique1.scores, ...critique2!.scores.map((sc) => ({ ...sc, index: sc.index + offset }))] },
     },
+    headlines: { headlines: headlines2, critique: critique2 },
   };
 }
 
@@ -997,11 +1205,21 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
     return { outcome: { status: 'skipped', reason: briefed.skip }, images };
   }
 
+  // ── Card type, before any render: it decides the art's aspect ratio ──────
+  const card = planCard(
+    canon,
+    headlineCandidates(briefed.review.headlines),
+    kickerFor(params.story.category),
+    cropsFor(params.posts, params.imageSpecs),
+  );
+  if (card.type === 'image_only') log.info({ reason: card.reason }, 'image-only card');
+
   // ── Render the candidates in parallel; select the first that succeeds ──────
   const set = await renderCandidateSet({
     canon,
     concepts: briefed.concepts,
     review: briefed.review,
+    card,
     posts: params.posts,
     imageSpecs: params.imageSpecs,
     triggerType: 'scheduled',
@@ -1030,6 +1248,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
       candidate_set_id: set.candidateSetId,
       candidates: succeeded.length,
       layout: set.selected.layout,
+      card_type: set.selected.cardType,
       ...(succeeded.some((r) => r.ok && r.costUsd !== null) ? { cost_usd: Number(cost.toFixed(4)) } : {}),
     },
     images,

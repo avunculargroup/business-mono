@@ -7,12 +7,14 @@ import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { StatusChip } from '@platform/ui/StatusChip';
 import { useToast } from '@platform/ui/ToastProvider';
-import type { BrandVisual } from '@platform/shared';
+import { FormField } from '@platform/ui/FormField';
+import { lintHeadline, type BrandVisual } from '@platform/shared';
 import type { ContentImage, ContentImageRequest } from '@platform/data';
 import {
   getImageDownloadUrl,
   promoteImageToStyleAnchor,
   removeImage,
+  requestImageRecompose,
   requestImageRegenerate,
   saveImageAltText,
   selectImageCandidate,
@@ -28,6 +30,8 @@ export interface ImageSlotProps {
   candidates?: Array<ContentImage & { url: string | null }>;
   request: ContentImageRequest | null;
   canon: BrandVisual | null;
+  /** The draft's copy, which a headline's figures are checked against. */
+  postCopy?: string;
 }
 
 /** While a request is open the page re-reads itself on this cadence. */
@@ -36,6 +40,18 @@ const REFRESH_MS = 5000;
 const VERDICT_CHIP: Record<string, { label: string; color: 'warning' | 'destructive' }> = {
   general_advice: { label: 'Alt text implies an outcome', color: 'warning' },
   personal_opinion: { label: 'Alt text reads as opinion', color: 'warning' },
+};
+
+const HEADLINE_CHIP: Record<string, { label: string; color: 'warning' | 'destructive' }> = {
+  general_advice: { label: 'Headline implies an outcome', color: 'warning' },
+  personal_opinion: { label: 'Headline reads as opinion', color: 'warning' },
+};
+
+const PROGRESS: Record<ContentImageRequest['action'], string> = {
+  recheck_alt_text: 'Lex is checking the alt text.',
+  regenerate: 'Rendering a new set of images. This can take a couple of minutes.',
+  render_brief: 'Rendering the image. This can take a couple of minutes.',
+  recompose: 'Updating the card.',
 };
 
 function isOpen(request: ContentImageRequest | null): boolean {
@@ -52,7 +68,7 @@ function formatCost(cost: number): string {
  * candidates to choose from. Regenerate and render-with-brief run on the agents
  * server; the slot shows their progress and re-reads the page until they resolve.
  */
-export function ImageSlot({ contentItemId, image, candidates = [], request, canon }: ImageSlotProps) {
+export function ImageSlot({ contentItemId, image, candidates = [], request, canon, postCopy = '' }: ImageSlotProps) {
   const router = useRouter();
   const { success, error } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -77,6 +93,18 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
   };
 
   useEffect(() => setAltText(image?.altText ?? ''), [image?.id, image?.altText]);
+
+  // The card's words: edited here, recomposed on the agents server from the stored art.
+  const [headline, setHeadline] = useState(image?.headline ?? '');
+  const [kicker, setKicker] = useState(image?.kicker ?? '');
+  const [showHeadline, setShowHeadline] = useState(image?.cardType === 'headline');
+  const [headlineFlags, setHeadlineFlags] = useState<string[]>([]);
+  useEffect(() => {
+    setHeadline(image?.headline ?? '');
+    setKicker(image?.kicker ?? '');
+    setShowHeadline(image?.cardType === 'headline');
+    setHeadlineFlags([]);
+  }, [image?.id, image?.headline, image?.kicker, image?.cardType]);
 
   useEffect(() => {
     if (!busy) return;
@@ -114,6 +142,26 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
     : [];
   const chip = image?.altTextVerdict ? VERDICT_CHIP[image.altTextVerdict.classification] : undefined;
   const altDirty = altText.trim() !== (image?.altText ?? '').trim();
+  const headlineChip = image?.headlineVerdict ? HEADLINE_CHIP[image.headlineVerdict.classification] : undefined;
+  // A headline sits beside square art; an image-only render is 16:9 and cannot take one.
+  const needsNewImage = showHeadline && image?.artAspect !== '1:1';
+  const cardDirty =
+    showHeadline !== (image?.cardType === 'headline') ||
+    (showHeadline && (headline.trim() !== (image?.headline ?? '') || kicker.trim().toUpperCase() !== (image?.kicker ?? '')));
+
+  const saveCard = () => {
+    if (showHeadline) {
+      const lint = lintHeadline(headline, postCopy);
+      setHeadlineFlags(lint.flags);
+      if (!lint.ok) return;
+    } else {
+      setHeadlineFlags([]);
+    }
+    run(
+      () => requestImageRecompose({ contentItemId, generationGroupId: groupId, showHeadline, headline, kicker }),
+      'Updating the card on every draft that shares it.',
+    );
+  };
 
   return (
     <section className={styles.slot} aria-labelledby="image-slot-title">
@@ -123,11 +171,7 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
 
       {busy && (
         <p className={styles.progress} role="status">
-          {request!.action === 'recheck_alt_text'
-            ? 'Lex is checking the alt text.'
-            : request!.action === 'regenerate'
-              ? 'Rendering a new set of images. This can take a couple of minutes.'
-              : 'Rendering the image. This can take a couple of minutes.'}
+          {PROGRESS[request!.action] ?? PROGRESS.render_brief}
         </p>
       )}
       {request?.status === 'failed' && request.error && (
@@ -149,6 +193,85 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
           {image.reviewNote && <p className={styles.caption}>{image.reviewNote}</p>}
           {meta.length > 0 && <p className={styles.caption}>{meta.join(' · ')}</p>}
 
+          {ai && (
+            <fieldset className={styles.cardFields}>
+              <legend className={styles.label}>Card</legend>
+              <label className={styles.toggle}>
+                <input
+                  type="checkbox"
+                  checked={showHeadline}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setShowHeadline(e.target.checked);
+                    setHeadlineFlags([]);
+                  }}
+                />
+                Show headline
+              </label>
+              {needsNewImage ? (
+                <div className={styles.needsImage}>
+                  <p>Needs a new image to add a headline.</p>
+                  <Button
+                    variant="secondary"
+                    disabled={busy || !canon}
+                    onClick={() => run(() => requestImageRegenerate(contentItemId), 'Rendering a new set of images.')}
+                  >
+                    Regenerate image
+                  </Button>
+                </div>
+              ) : (
+                showHeadline && (
+                  <>
+                    <FormField
+                      name="headline"
+                      label="Headline"
+                      hint="Three to six words, in sentence case, ending with a full stop or a question mark."
+                      value={headline}
+                      maxLength={120}
+                      disabled={busy}
+                      onChange={(e) => setHeadline(e.target.value)}
+                    />
+                    <FormField
+                      name="kicker"
+                      label="Kicker"
+                      hint="Optional. Shown in capitals above the headline."
+                      value={kicker}
+                      maxLength={24}
+                      disabled={busy}
+                      onChange={(e) => setKicker(e.target.value)}
+                    />
+                  </>
+                )
+              )}
+              {headlineFlags.length > 0 && (
+                <ul className={styles.flags} role="alert" aria-label="Headline changes needed">
+                  {headlineFlags.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              )}
+              <div className={styles.altRow}>
+                {image.cardType === 'headline' && image.headlineVerdict === null && <StatusChip label="Checking headline" />}
+                {headlineChip && <StatusChip label={headlineChip.label} color={headlineChip.color} />}
+                {!needsNewImage && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className={styles.altSave}
+                    disabled={!cardDirty || busy}
+                    loading={isPending}
+                    onClick={saveCard}
+                  >
+                    Save card
+                  </Button>
+                )}
+              </div>
+              {headlineChip && image.headlineVerdict?.rationale && (
+                <p className={styles.rationale}>{image.headlineVerdict.rationale}</p>
+              )}
+            </fieldset>
+          )}
+
           <div className={styles.altField}>
             <label htmlFor="image-alt-text" className={styles.label}>
               Alt text
@@ -157,7 +280,7 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
               id="image-alt-text"
               className={styles.textarea}
               rows={3}
-              maxLength={300}
+              maxLength={360}
               value={altText}
               onChange={(e) => setAltText(e.target.value)}
               disabled={!ai}

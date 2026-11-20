@@ -69,7 +69,7 @@ export function markPlacement(cropWidth: number, cropHeight: number, mark: Brand
   return { width, height, left: cropWidth - margin - width, top: cropHeight - margin - height };
 }
 
-async function rasteriseMark(placement: MarkPlacement, opacity: number): Promise<Buffer> {
+export async function rasteriseMark(placement: MarkPlacement, opacity: number): Promise<Buffer> {
   const svg = opacity < 1 ? BTS_MARK_SVG.replace('<svg ', `<svg opacity="${opacity}" `) : BTS_MARK_SVG;
   // High density so librsvg rasterises the gradient crisply before downsizing.
   return sharp(Buffer.from(svg), { density: 600 })

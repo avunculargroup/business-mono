@@ -1,14 +1,16 @@
 // The active brand_visual row as production holds it: the v1.0 seed in
 // supabase/migrations/20261108000000_add_brand_visual.sql, updated in place to
 // v1.1 by 20261108100000_brand_visual_v1_1.sql, to v1.2 by
-// 20261109100000_brand_visual_v1_2.sql and to v1.3 by
-// 20261109300000_brand_visual_v1_3.sql. Mirrored here so the image-step tests
+// 20261109100000_brand_visual_v1_2.sql, to v1.3 by
+// 20261109300000_brand_visual_v1_3.sql and to v1.4 (headline cards: the card
+// settings and the square-art composition paragraph) by
+// 20261120100000_brand_visual_v1_4.sql. Mirrored here so the image-step tests
 // exercise the canon that actually ships. If a migration changes the canon,
 // change this too. `motifs` (v1.0) and the inactive v1.1 layouts stay on the
 // row because old images reference them.
 export const BRAND_VISUAL_ROW = {
   id: 'bv-1',
-  version: '1.3',
+  version: '1.4',
   is_active: true,
   style_block: `A bold two-colour linocut print, shown as a flat, straight-on scan of the printed
 sheet that fills the whole frame: black ink and one flat gold on bright off-white
@@ -180,4 +182,9 @@ edges or corners, no perspective or tilt, no shadows or lighting on the paper.`,
   style_anchor_paths: [] as string[],
   default_aspect_ratio: '16:9',
   brand_mark: { enabled: true, position: 'bottom_right', height_pct: 9, margin_pct: 4, opacity: 1 },
+  card: { enabled: true, headline_size_max: 64, headline_size_min: 44, max_lines: 4, kicker: true },
+  headline_composition_block: `This picture sits beside a headline. Its job is mood and recognition, not
+explanation: one strong, simple, everyday object or scene, big and instantly
+recognisable. Keep the left edge (roughly the leftmost 8 percent) and the
+bottom-right corner as empty paper.`,
 };

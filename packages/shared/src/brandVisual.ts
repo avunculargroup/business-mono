@@ -18,6 +18,8 @@
 //         for the half-second phone test.
 // From 2026-11-09 the brief also names the post's hook and proposes up to six
 // concepts, and a text-only reviewer shortlists three before any render.
+//   v1.4  headline cards (2026-11-20): square art beside a headline set by code.
+//         The picture sets the mood; three to six words carry the meaning.
 // Spec: docs/features/social-post-image/feature-spec.md
 
 /** How many concepts a brief may propose; a reviewer shortlists the ones rendered. */
@@ -58,6 +60,12 @@ export interface ImageBrief {
    * it. Exempt from the no-digits lint: it is never sent to the image model.
    */
   hook: string;
+  /**
+   * Up to three short headlines for the card, best first (2026-11-20). Set in
+   * real type by code beside the picture, never drawn by the model. Linted by
+   * lintHeadline before the reviewer sees them.
+   */
+  headlines: string[];
   concepts: ImageConcept[];
 }
 
@@ -111,6 +119,31 @@ export interface BrandMark {
   opacity: number;
 }
 
+/**
+ * Headline card settings (canon v1.4): tuned from /brand without a deploy.
+ * Sizes are for the LinkedIn card (627px tall); the X card scales them.
+ */
+export interface CardSettings {
+  /** False: every run renders the image-only 16:9 card. */
+  enabled: boolean;
+  headline_size_max: number;
+  headline_size_min: number;
+  max_lines: number;
+  /** False: no kicker above the headline, whatever the story's category. */
+  kicker: boolean;
+}
+
+export const DEFAULT_CARD_SETTINGS: CardSettings = {
+  enabled: true,
+  headline_size_max: 64,
+  headline_size_min: 44,
+  max_lines: 4,
+  kicker: true,
+};
+
+/** What kind of card a run renders. Decided before the render: it sets the art's aspect ratio. */
+export type CardType = 'headline' | 'image_only';
+
 export interface BrandVisual {
   id: string;
   version: string;
@@ -126,6 +159,12 @@ export interface BrandVisual {
   styleAnchorPaths: string[];
   defaultAspectRatio: string;
   brandMark: BrandMark;
+  card: CardSettings;
+  /**
+   * Sent only for headline cards (square art), after the composition block.
+   * Empty on a canon older than v1.4: the headline prompt then omits it.
+   */
+  headlineCompositionBlock: string;
 }
 
 export const DEFAULT_BRAND_MARK: BrandMark = {
@@ -145,6 +184,22 @@ function asArray(v: unknown): Row[] {
 
 function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+function toCardSettings(v: unknown): CardSettings {
+  const c = (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Row;
+  const d = DEFAULT_CARD_SETTINGS;
+  const size = (x: unknown, fallback: number) => Math.round(Math.min(Math.max(num(x, fallback), 12), 200));
+  let max = size(c['headline_size_max'], d.headline_size_max);
+  let min = size(c['headline_size_min'], d.headline_size_min);
+  if (min > max) [min, max] = [max, min];
+  return {
+    enabled: c['enabled'] !== false,
+    headline_size_max: max,
+    headline_size_min: min,
+    max_lines: Math.round(Math.min(Math.max(num(c['max_lines'], d.max_lines), 1), 6)),
+    kicker: c['kicker'] !== false,
+  };
 }
 
 /**
@@ -193,6 +248,8 @@ export function toBrandVisual(row: Row): BrandVisual {
       margin_pct: num(mark['margin_pct'], DEFAULT_BRAND_MARK.margin_pct),
       opacity: Math.min(Math.max(num(mark['opacity'], 1), 0), 1),
     },
+    card: toCardSettings(row['card']),
+    headlineCompositionBlock: String(row['headline_composition_block'] ?? '').trim(),
   };
 }
 
@@ -207,16 +264,27 @@ ${lines.join('\n')}
 No other colour. No gradients or soft shading: tone comes only from carved lines. No glow, no metallic sheen, no drop shadows.`;
 }
 
+/** The aspect ratio a card type's art is rendered at. Headline cards are square art beside the type. */
+export function cardAspectRatio(canon: Pick<BrandVisual, 'defaultAspectRatio'>, cardType: CardType): string {
+  return cardType === 'headline' ? '1:1' : canon.defaultAspectRatio;
+}
+
 /**
  * The exact prompt the image model receives. Order is style, palette,
  * composition, subject, prohibited — the prohibited block goes last because it
  * is the part a model most often loses when it weights the subject heavily.
+ * A headline card adds the canon's headline composition paragraph after the
+ * composition block and asks for square art; an image-only card is unchanged.
  * The concept's tension is not sent: it is the reasoning, and the subject,
  * symbol and twist are how it reaches the picture. Throws if the concept
  * names a layout the canon does not have; the linter runs first, so that is a
  * programming error, not a runtime path.
  */
-export function buildImagePrompt(canon: BrandVisual, concept: ImageConcept, format: { aspectRatio: string }): string {
+export function buildImagePrompt(
+  canon: BrandVisual,
+  concept: ImageConcept,
+  format: { aspectRatio: string; cardType?: CardType },
+): string {
   const layout = canon.layouts.find((l) => l.key === concept.layout);
   if (!layout) throw new Error(`buildImagePrompt: unknown layout "${concept.layout}"`);
 
@@ -225,10 +293,11 @@ export function buildImagePrompt(canon: BrandVisual, concept: ImageConcept, form
     `The symbol: ${concept.symbol}`,
     `The twist: ${concept.twist}`,
     `Layout: ${layout.label}: ${layout.description}`,
-    `Format: ${format.aspectRatio} landscape.`,
+    `Format: ${format.aspectRatio} ${format.aspectRatio === '1:1' ? 'square' : 'landscape'}.`,
   ].join('\n');
 
-  return [canon.styleBlock, buildPaletteBlock(canon.palette), canon.compositionBlock, subject, canon.prohibitedBlock]
+  const headline = format.cardType === 'headline' ? canon.headlineCompositionBlock : '';
+  return [canon.styleBlock, buildPaletteBlock(canon.palette), canon.compositionBlock, headline, subject, canon.prohibitedBlock]
     .filter((b) => b.length > 0)
     .join('\n\n');
 }
@@ -295,6 +364,36 @@ export const TEXT_BEARING_SYMBOLS = [
   'open book',
 ] as const;
 
+/**
+ * Words that make a concept a "broken object". Nearly every concept in the
+ * week to 2026-11-20 was a familiar object, broken (a snapped dipstick, a
+ * rusted tape measure, a tailor's tape cut short), which got repetitive: bad
+ * news doesn't need a broken object. At most one concept per brief may match;
+ * the first in brief order is kept and the rest are dropped by the linter.
+ */
+export const BROKEN_OBJECT_TERMS = [
+  'broken',
+  'damaged',
+  'snapped',
+  'cracked',
+  'rusted',
+  'rust',
+  'cut',
+  'leaking',
+  'leak',
+  'hole',
+  'shattered',
+  'failing',
+  'collapsed',
+  'sinking',
+] as const;
+
+/** Whether a concept shows something broken, by its symbol, twist or subject. */
+export function isBrokenConcept(concept: Pick<ImageConcept, 'symbol' | 'twist' | 'subject'>): boolean {
+  const text = [concept.symbol, concept.twist, concept.subject].filter((v) => typeof v === 'string').join(' ');
+  return BROKEN_OBJECT_TERMS.some((t) => containsTerm(text, t));
+}
+
 /** Lower-case, letters and digits only: enough to catch a twist that just repeats its symbol. */
 function normalise(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -356,18 +455,24 @@ export interface BriefLint {
 
 /**
  * Lint a brief concept by concept. A flagged concept is dropped, not the
- * brief; so is one that repeats an earlier clean concept's symbol. A skip
- * brief is clean with nothing to render — the quiet path needs no concepts.
+ * brief; so is one that repeats an earlier clean concept's symbol, and every
+ * broken-object concept after the first clean one. A skip brief is clean with
+ * nothing to render — the quiet path needs no concepts.
  */
 export function lintImageBrief(brief: ImageBrief, opts: LintOptions): BriefLint {
   if (brief.skip) return { clean: [], flags: [] };
   const clean: ImageConcept[] = [];
   const flags: string[] = [];
   const symbols = new Set<string>();
+  let broken = false;
   (brief.concepts ?? []).slice(0, MAX_BRIEF_CONCEPTS).forEach((concept, i) => {
     const own = lintImageConcept(concept, opts);
     const key = normalise(concept.symbol ?? '');
     if (own.length === 0 && symbols.has(key)) own.push('symbol repeats an earlier concept; each concept needs its own symbol.');
+    if (own.length === 0 && isBrokenConcept(concept)) {
+      if (broken) own.push('a second broken object; at most one concept per brief may show something broken.');
+      else broken = true;
+    }
     if (own.length > 0) {
       flags.push(...own.map((f) => `Concept ${i + 1}: ${f}`));
       return;
@@ -394,6 +499,8 @@ export interface StoredBriefSummary {
   concept: ImageConcept | null;
   /** The brief's hook, on rows rendered after the reviewer was added. */
   hook: string | null;
+  /** The headline printed on the card, on headline-card rows (2026-11-20+). */
+  headline: string | null;
   /** The reviewer's scores; null when it was not run or its ranking fell back. */
   review: ConceptReview | null;
 }
@@ -426,13 +533,14 @@ function readReview(v: unknown): ConceptReview | null {
  *   v1.2  { tension, symbol, twist, subject, layout, alt_text }
  *         + { hook, review } once the reviewer ran (review null on a fallback);
  *         a founder's Edit brief render carries neither
+ *         + { headline } on a headline card (2026-11-20+), null on image-only
  * Anything else reads as null.
  */
 export function readStoredBrief(json: unknown): StoredBriefSummary | null {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
   const r = json as Row;
   const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const base = { tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']), hook: str(r['hook']), review: readReview(r['review']) };
+  const base = { tension: str(r['tension']), subject: str(r['subject']), layout: str(r['layout']), hook: str(r['hook']), headline: str(r['headline']), review: readReview(r['review']) };
   if (typeof r['symbol'] === 'string' || typeof r['twist'] === 'string') {
     const concept: ImageConcept = {
       tension: base.tension ?? '',

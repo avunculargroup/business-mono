@@ -44,6 +44,16 @@ const canonSchema = z.object({
     height_pct: z.number().min(3, 'Mark height is between 3% and 20%').max(20, 'Mark height is between 3% and 20%'),
     margin_pct: z.number().min(0, 'Margin is between 0% and 10%').max(10, 'Margin is between 0% and 10%'),
   }),
+  card: z
+    .object({
+      enabled: z.boolean(),
+      headline_size_max: z.number().int('Headline sizes are whole pixels').min(24, 'Headline sizes are between 24 and 120px').max(120, 'Headline sizes are between 24 and 120px'),
+      headline_size_min: z.number().int('Headline sizes are whole pixels').min(24, 'Headline sizes are between 24 and 120px').max(120, 'Headline sizes are between 24 and 120px'),
+      max_lines: z.number().int('Lines are a whole number').min(1, 'Allow between 1 and 6 lines').max(6, 'Allow between 1 and 6 lines'),
+      kicker: z.boolean(),
+    })
+    .refine((c) => c.headline_size_min <= c.headline_size_max, 'The smallest headline cannot be larger than the largest'),
+  headline_composition_block: z.string().trim(),
   notes: z.string().trim().optional().default(''),
 });
 export type BrandVisualInput = z.input<typeof canonSchema>;
@@ -79,6 +89,8 @@ export async function saveBrandVisual(input: BrandVisualInput) {
       layouts: d.layouts,
       // Position and opacity are not editable; keep whatever the row holds.
       brand_mark: { ...((existing.brand_mark as Record<string, unknown>) ?? {}), ...d.brand_mark, position: 'bottom_right' },
+      card: d.card,
+      headline_composition_block: d.headline_composition_block,
       notes: d.notes || null,
       updated_by: user.id,
     })

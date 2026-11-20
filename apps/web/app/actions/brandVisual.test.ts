@@ -21,6 +21,8 @@ const INPUT: BrandVisualInput = {
   palette: [{ role: 'Paper', hex: '#FAFAF8', usage: 'warm off-white' }],
   layouts: [{ key: 'left_third', label: 'Left third', description: 'Subject in the left third.', is_active: true }],
   brand_mark: { enabled: true, height_pct: 9, margin_pct: 4 },
+  card: { enabled: true, headline_size_max: 64, headline_size_min: 44, max_lines: 4, kicker: true },
+  headline_composition_block: 'This picture sits beside a headline.',
 };
 
 function updates() {
@@ -47,6 +49,8 @@ describe('saveBrandVisual', () => {
       updated_by: 'director-1',
       notes: null,
       layouts: INPUT.layouts,
+      card: INPUT.card,
+      headline_composition_block: 'This picture sits beside a headline.',
     });
     // The retired v1.0 motifs stay on the row untouched.
     expect(updates()[0]).not.toHaveProperty('motifs');
@@ -58,6 +62,8 @@ describe('saveBrandVisual', () => {
     [{ layouts: [INPUT.layouts[0]!, INPUT.layouts[0]!] }, /unique/],
     [{ layouts: [{ ...INPUT.layouts[0]!, key: 'Left Third' }] }, /lowercase/],
     [{ brand_mark: { enabled: true, height_pct: 40, margin_pct: 4 } }, /between 3% and 20%/],
+    [{ card: { ...INPUT.card, headline_size_min: 70 } }, /smallest headline cannot be larger/],
+    [{ card: { ...INPUT.card, max_lines: 9 } }, /between 1 and 6 lines/],
   ])('rejects %j', async (patch, message) => {
     const res = await saveBrandVisual({ ...INPUT, ...patch } as BrandVisualInput);
     expect(res).toEqual({ error: expect.stringMatching(message) });

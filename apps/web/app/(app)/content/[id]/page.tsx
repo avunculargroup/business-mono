@@ -37,6 +37,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
               candidates={slot.candidates}
               request={item.latestImageRequest}
               canon={slot.canon}
+              postCopy={[item.title, item.body].filter((v) => typeof v === 'string' && v.trim()).join('\n\n')}
             />
           )
         }
