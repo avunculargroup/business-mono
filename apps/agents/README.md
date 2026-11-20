@@ -44,7 +44,9 @@ src/
                    #   backfill:newsletter — newsletter body and link clean;
                    #   backfill:papers — seed the library papers register;
                    #   backfill:key-point-kinds — re-extract recent news key points
-                   #   as new/background/opinion; dry run unless --apply)
+                   #   as new/background/opinion; dry run unless --apply;
+                   #   backfill:key-point-asof — normalise key point asOf dates,
+                   #   no LLM; dry run unless --apply)
 evals/             # LLM-touching evals — real model calls, on demand, never in CI
 test/              # Shared Vitest helpers: setup.ts, mocks/supabase.ts, factories.ts
 ```

@@ -161,6 +161,33 @@ describe('runSocialPost', () => {
     expect(sendSocialDraft).not.toHaveBeenCalled();
   });
 
+  it('drafts nothing when every fresh item has only background or opinion points', async () => {
+    wireHappyPath();
+    fakeSupabase.__setResponse('news_items', {
+      data: [
+        {
+          id: 'news-0',
+          title: 'RBA split over rates',
+          url: 'https://news.example.com/0',
+          summary: 'Minutes reveal the dissent.',
+          key_points: [{ text: 'The RBA lifted the cash rate to 4.85% in a 6–3 vote', kind: 'background' }],
+          source_name: 'Newsletter',
+          category: 'macro',
+          relevance_score: 0.9,
+          topic_tags: ['rba'],
+          published_at: '2026-11-17T18:52:35Z',
+        },
+      ],
+      error: null,
+    });
+
+    const outcome = await runSocialPost(ROUTINE);
+
+    expect(outcome.status).toBe('success');
+    expect(outcome.result?.summary).toMatch(/no item .* has a new key point/i);
+    expect(charlieGenerate).not.toHaveBeenCalled();
+  });
+
   it('feeds recent openers and forms into the editor + Charlie prompts', async () => {
     wireHappyPath();
     // from('content_items') order: read(linkedin), read(twitter_x), insert(li), insert(x).

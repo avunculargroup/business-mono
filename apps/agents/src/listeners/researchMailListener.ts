@@ -82,6 +82,8 @@ export interface EmailSource {
   link_allow_patterns?: string[];
   link_deny_patterns?: string[];
   link_extract_config?: NewsLinkExtractConfig | null;
+  /** A roundup of several stories: key points are extracted per section. */
+  multi_story?: boolean;
 }
 
 /** Mutable per-poll-cycle allowance, shared across accounts and sources. */
@@ -136,7 +138,7 @@ async function runPollCycle(): Promise<void> {
       (supabase
         .from('news_sources')
         .select(
-          'id, name, slug, tier, sender_allowlist, follow_links, max_followed_links, link_allow_patterns, link_deny_patterns, link_extract_config, is_active, source_type',
+          'id, name, slug, tier, sender_allowlist, follow_links, max_followed_links, link_allow_patterns, link_deny_patterns, link_extract_config, multi_story, is_active, source_type',
         )
         .eq('source_type' as any, 'email')
         .eq('is_active', true) as any),
@@ -296,10 +298,12 @@ export async function processResearchEmail(
 
   // 4. Structural metadata (category, key points, tags) — the rubric scores
   //    separately inside ingestNewsItem.
-  const { data: extracted } = await extractNewsMetadata({
+  const { data: extracted, flags: extractionFlags } = await extractNewsMetadata({
     title,
     source: source.name,
     content: body.slice(0, 12000),
+    publishedAt: email.receivedAt,
+    multiStory: source.multi_story ?? false,
   });
 
   const result = await ingestNewsItem({
@@ -313,6 +317,7 @@ export async function processResearchEmail(
     australianRelevance: extracted?.australian_relevance ?? false,
     author,
     publishedAt: email.receivedAt,
+    extractionFlags,
     url,
     canonicalUrl,
     ingestionRef,
@@ -515,10 +520,13 @@ export async function ingestNewsletterLinks(args: {
       const imageUrl = page.imageUrl;
       const paywalled = await resolvePaywalled({ url, page: page.paywalled, body: markdown });
 
-      const { data: extracted } = await extractNewsMetadata({
+      // A followed article's own date is unknown (stored as null), so it is
+      // treated as fresh: it was linked from a newsletter that just arrived.
+      const { data: extracted, flags: extractionFlags } = await extractNewsMetadata({
         title,
         source: source.name,
         content: markdown.slice(0, 12000),
+        publishedAt: null,
         scopeKey: LINK_EXTRACT_SCOPE,
       });
 
@@ -532,6 +540,7 @@ export async function ingestNewsletterLinks(args: {
         topicTags: extracted?.topic_tags ?? [],
         australianRelevance: extracted?.australian_relevance ?? false,
         publishedAt: null,
+        extractionFlags,
         url,
         imageUrl,
         paywalled,

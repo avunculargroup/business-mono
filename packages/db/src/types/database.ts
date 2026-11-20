@@ -4496,6 +4496,7 @@ export type Database = {
           max_candidates_per_run: number
           max_episode_age_days: number | null
           max_followed_links: number
+          multi_story: boolean
           name: string
           ocr_enabled: boolean
           ocr_page_limit: number
@@ -4537,6 +4538,7 @@ export type Database = {
           max_candidates_per_run?: number
           max_episode_age_days?: number | null
           max_followed_links?: number
+          multi_story?: boolean
           name: string
           ocr_enabled?: boolean
           ocr_page_limit?: number
@@ -4578,6 +4580,7 @@ export type Database = {
           max_candidates_per_run?: number
           max_episode_age_days?: number | null
           max_followed_links?: number
+          multi_story?: boolean
           name?: string
           ocr_enabled?: boolean
           ocr_page_limit?: number

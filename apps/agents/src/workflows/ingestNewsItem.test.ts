@@ -196,6 +196,33 @@ describe('ingestNewsItem', () => {
     expect(row['rex_metadata']).toEqual({ rubric_version: 'v1', scoring_failed: true });
   });
 
+  it('records extraction flags: rex_metadata, needs_human_review and a curator note after the rubric\'s', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-4' }, error: null },
+    ];
+    await ingestNewsItem({ ...baseInput(), extractionFlags: ['no_new_key_points'] });
+    const row = insertedRows[0]!;
+    expect(row['status']).toBe('new');
+    expect(row['rex_metadata']).toMatchObject({ extraction_flags: ['no_new_key_points'], needs_human_review: true });
+    const notes = row['curator_notes'] as string;
+    expect(notes.startsWith(SCORED.suggestedCuratorNotes)).toBe(true);
+    expect(notes).toContain('not eligible as a post hook');
+  });
+
+  it('leaves rex_metadata and curator_notes untouched when there are no flags', async () => {
+    responseQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: { id: 'news-5' }, error: null },
+    ];
+    await ingestNewsItem({ ...baseInput(), extractionFlags: [] });
+    const row = insertedRows[0]!;
+    expect(row['curator_notes']).toBe(SCORED.suggestedCuratorNotes);
+    expect(row['rex_metadata']).not.toHaveProperty('extraction_flags');
+  });
+
   it('merges rexMetadataExtra into rex_metadata without clobbering the rubric output', async () => {
     responseQueue = [
       { data: [], error: null },

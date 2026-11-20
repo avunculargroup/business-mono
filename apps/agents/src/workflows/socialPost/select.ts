@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { formatKeyPointsForPrompt, normalizeKeyPoints } from '@platform/shared';
+import { formatKeyPointsForPrompt, newKeyPoints, normalizeKeyPoints } from '@platform/shared';
 import { SOCIAL_POST_FORM_VALUES, type SocialPostForm } from './forms.js';
 
 // Pure story-selection helpers for the social_post_from_news routine. A founder's
@@ -18,6 +18,10 @@ export interface StoryCandidate {
   category: string;
   /** Prompt-ready lines: background and opinion points carry a `[kind]` label. */
   key_points: string[];
+  /** The kind='new' points — what this item reports for the first time. The only lines a post may open on. */
+  new_points: string[];
+  /** Background and opinion points, labelled — context a post may use but never lead with. */
+  context_points: string[];
   topic_tags: string[];
   relevance_score: number | null;
   published_at: string | null;
@@ -49,11 +53,31 @@ export function mapNewsRowToCandidate(row: Row): StoryCandidate {
     summary: (row.summary as string | null) ?? '',
     source_name: (row.source_name as string | null) ?? 'News',
     category: (row.category as string | null) ?? 'news',
-    key_points: formatKeyPointsForPrompt(normalizeKeyPoints(row.key_points)),
+    ...splitPoints(row.key_points, (row.published_at as string | null) ?? null),
     topic_tags: Array.isArray(row.topic_tags) ? (row.topic_tags as string[]) : [],
     relevance_score: (row.relevance_score as number | null) ?? null,
     published_at: (row.published_at as string | null) ?? null,
   };
+}
+
+function splitPoints(raw: unknown, publishedAt: string | null): Pick<StoryCandidate, 'key_points' | 'new_points' | 'context_points'> {
+  // Read with publishedAt so asOf is the validated, code-stamped value — never
+  // the free text older rows hold.
+  const points = normalizeKeyPoints(raw, publishedAt);
+  return {
+    key_points: formatKeyPointsForPrompt(points),
+    new_points: newKeyPoints(points).map((p) => p.text),
+    context_points: formatKeyPointsForPrompt(points.filter((p) => p.kind !== 'new')),
+  };
+}
+
+/**
+ * A story can be a post's hook only if it reports something new. An item with
+ * only background and opinion points (a roundup whose news was missed, an
+ * explainer) is not a candidate at all — background cannot be the hook.
+ */
+export function isHookEligible(c: StoryCandidate): boolean {
+  return c.new_points.length > 0;
 }
 
 export interface ResolvedSelection {

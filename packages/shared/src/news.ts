@@ -7,6 +7,7 @@ import type {
   ReportDetectionConfig,
   ReportRedistribution,
 } from './reportWatch.js';
+import { DEFAULT_TIMEZONE } from './constants.js';
 
 export const NewsCategory = {
   REGULATORY:    'regulatory',    // ASIC, ATO, APRA, government policy
@@ -42,31 +43,103 @@ export type KeyPointKind = (typeof KeyPointKind)[keyof typeof KeyPointKind];
 export interface KeyPoint {
   text: string;
   kind: KeyPointKind;
-  // ISO date the fact refers to, when the article states or implies one.
-  asOf?: string;
+  // The date the fact refers to: YYYY-MM-DD, YYYY-MM or YYYY, never later than
+  // the item's published_at. For `new` points code stamps the Melbourne date of
+  // published_at; for background/opinion it is the model's date if it passes
+  // normalizeAsOf, else null. Never free text — see stampKeyPointAsOf.
+  asOf?: string | null;
 }
 
 const KEY_POINT_KINDS = new Set<string>(Object.values(KeyPointKind));
+
+// YYYY, YYYY-MM or YYYY-MM-DD. Calendar validity is checked separately.
+const AS_OF_RE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/;
+
+/** YYYY-MM-DD of an instant in Australia/Melbourne, or null for a missing/unparseable timestamp. */
+export function melbourneDate(timestamp: string | null | undefined): string | null {
+  if (!timestamp) return null;
+  const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return null;
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: DEFAULT_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** True for a real calendar date in one of the three accepted precisions. */
+export function isValidAsOf(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const m = AS_OF_RE.exec(value);
+  if (!m) return false;
+  const year = Number(m[1]);
+  if (year < 1900) return false;
+  if (m[2] === undefined) return true;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return false;
+  if (m[3] === undefined) return true;
+  const day = Number(m[3]);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
+/**
+ * A model-supplied asOf, made safe to filter on: a valid date not later than
+ * the item's publication date (compared at the asOf's own precision, so
+ * '2026-11' is fine for an item published 17 Nov 2026), else null.
+ */
+export function normalizeAsOf(raw: unknown, publishedAt?: string | null): string | null {
+  if (!isValidAsOf(raw)) return null;
+  const published = melbourneDate(publishedAt);
+  if (published && raw > published.slice(0, raw.length)) return null;
+  return raw;
+}
+
+/**
+ * Sets every point's asOf in code. `new` points take the Melbourne date of
+ * published_at — a new point is, by definition, news as of the item — and
+ * the model's value for them is ignored. Background/opinion keep only a
+ * value normalizeAsOf accepts.
+ */
+export function stampKeyPointAsOf(points: KeyPoint[], publishedAt: string | null | undefined): KeyPoint[] {
+  const published = melbourneDate(publishedAt);
+  return points.map((p) => ({
+    ...p,
+    asOf: p.kind === 'new' ? published : normalizeAsOf(p.asOf, publishedAt),
+  }));
+}
 
 /**
  * Reads news_items.key_points (JSONB) into KeyPoint[]. Rows extracted before
  * the kinds existed hold bare strings; those read as `new`, which is exactly
  * how every consumer treated them before, so an un-backfilled row behaves as
  * it always did. Anything unrecognisable is dropped rather than guessed at.
+ *
+ * asOf is validated on the way in, so a consumer never sees the free text
+ * older rows hold ('present', '2023-11-07' on a 2026 item). With publishedAt,
+ * the full stampKeyPointAsOf rule applies.
  */
-export function normalizeKeyPoints(raw: unknown): KeyPoint[] {
+export function normalizeKeyPoints(raw: unknown, publishedAt?: string | null): KeyPoint[] {
   if (!Array.isArray(raw)) return [];
   const out: KeyPoint[] = [];
   for (const entry of raw) {
     if (typeof entry === 'string') {
-      if (entry.trim()) out.push({ text: entry, kind: 'new' });
+      if (entry.trim()) {
+        const stamped = publishedAt === undefined ? null : melbourneDate(publishedAt);
+        out.push({ text: entry, kind: 'new', ...(stamped ? { asOf: stamped } : {}) });
+      }
       continue;
     }
     if (!entry || typeof entry !== 'object') continue;
     const { text, kind, asOf } = entry as Record<string, unknown>;
     if (typeof text !== 'string' || !text.trim()) continue;
     if (typeof kind !== 'string' || !KEY_POINT_KINDS.has(kind)) continue;
-    out.push({ text, kind: kind as KeyPointKind, ...(typeof asOf === 'string' && asOf ? { asOf } : {}) });
+    const k = kind as KeyPointKind;
+    // With publishedAt, the full stamping rule; without it, format checks only.
+    const stamped = k === 'new' && publishedAt !== undefined ? melbourneDate(publishedAt) : normalizeAsOf(asOf, publishedAt);
+    out.push({ text, kind: k, ...(stamped ? { asOf: stamped } : {}) });
   }
   return out;
 }

@@ -16,7 +16,7 @@ import { applyThreadStyle, buildLexPrompt, variantCopyText } from '../variant/pr
 import { charlieVariantSchema, lexVerdictSchema, type Platform, type CharlieVariant, type LexVerdict } from '../variant/schemas.js';
 import { buildSocialPostRow, buildThreadSegmentRows, type DisclaimerRef } from './persist.js';
 import { buildEditorSelectionPrompt, buildSocialPostPrompt, type PlatformSpecLite, type LengthTarget } from './prompts.js';
-import { editorSelectionSchema, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
+import { editorSelectionSchema, isHookEligible, mapNewsRowToCandidate, resolveSelection, type StoryCandidate } from './select.js';
 import { toRecentPosts, extractOpeningLines, recentForms, type RecentPost } from './history.js';
 import { toGuidelines, buildGuidelinesBlock } from './guidelines.js';
 import { scoreAiTells, aiTellRewriteInstruction } from './aiTell.js';
@@ -178,14 +178,15 @@ export async function runSocialPost(routine: RoutineInput): Promise<RoutineOutco
     .limit(CANDIDATE_LIMIT);
   if (newsErr) return fail(`news_items query failed: ${newsErr.message}`);
 
-  const candidates: StoryCandidate[] = (newsRows ?? []).map(mapNewsRowToCandidate);
+  const fetched: StoryCandidate[] = (newsRows ?? []).map(mapNewsRowToCandidate);
+  // The hook must be something new, so an item with no kind='new' point is
+  // not offered to the editor at all.
+  const candidates = fetched.filter(isHookEligible);
   if (candidates.length === 0) {
-    return {
-      ...base,
-      status: 'success',
-      error: null,
-      result: { summary: `No fresh news in the last ${lookbackHours}h to draft posts for ${founderName}.`, sources: [] },
-    };
+    const summary = fetched.length === 0
+      ? `No fresh news in the last ${lookbackHours}h to draft posts for ${founderName}.`
+      : `No item in the last ${lookbackHours}h has a new key point to hook a post on for ${founderName} (${fetched.length} had only background or opinion).`;
+    return { ...base, status: 'success', error: null, result: { summary, sources: [] } };
   }
 
   // ── Recent drafts per account: openers to avoid + forms to rotate away from ─
