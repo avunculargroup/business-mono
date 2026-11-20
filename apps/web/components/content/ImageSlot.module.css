@@ -91,6 +91,52 @@
   margin-left: auto;
 }
 
+/* The card's words. Fields stack at every width; the toggle is a full tap target. */
+.cardFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cardFields legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.needsImage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.needsImage p {
+  margin: 0;
+}
+
 /* Actions sit in their own row, never hover-revealed, so they work on touch. */
 .actions {
   display: flex;

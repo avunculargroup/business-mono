@@ -1,14 +1,31 @@
+import sharp from 'sharp';
 import { createRealtimeClient, supabase } from '@platform/db';
-import { activeLayouts, lintImageConcept, type ImageConcept } from '@platform/shared';
+import {
+  activeLayouts,
+  headlineAltText,
+  kickerFor,
+  lintHeadline,
+  lintImageConcept,
+  typographicQuotes,
+  type ImageConcept,
+} from '@platform/shared';
 import {
   briefConcepts,
   classifyAltText,
+  classifyHeadline,
+  cropsFor,
+  headlineCandidates,
   loadCanon,
   loadImageHistory,
   logActivity,
+  planCard,
   renderCandidateSet,
+  storedVerdict,
+  type CardPlan,
   type PersistedPost,
 } from '../workflows/socialPost/image.js';
+import { cardLayout, composeHeadlineCard, composeSquareImageOnly, fitCardHeadline, loadCardFonts } from '../workflows/socialPost/headlineCard.js';
+import { DEFAULT_PAPER_HEX, composePlatformImage, type PlatformCrop } from '../workflows/socialPost/imageCompose.js';
 import { mapNewsRowToCandidate } from '../workflows/socialPost/select.js';
 import type { Platform } from '../workflows/variant/schemas.js';
 import { subscribeWithReconnect } from './lib/realtimeChannel.js';
@@ -29,6 +46,11 @@ const log = createLogger('content-image-request');
 // Render-with-brief adds one candidate to the current set and selects it, which
 // marks the others 'not_chosen'. Old rows are kept, because review_outcome is
 // the signal a later distil step reads.
+//
+// Recompose (2026-11-20) changes a card's words without a render: it rebuilds
+// the selected group's platform cards from the stored unmarked art with the
+// founder's headline and kicker (or none), re-runs Lex on the headline, and
+// points the rows at the new cards. No model call.
 
 const realtime = createRealtimeClient();
 
@@ -41,7 +63,15 @@ const db = supabase as any;
 const STALE_WORKING_MS = 15 * 60 * 1000;
 const RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
 
-export type ImageRequestAction = 'regenerate' | 'render_brief' | 'recheck_alt_text';
+export type ImageRequestAction = 'regenerate' | 'render_brief' | 'recheck_alt_text' | 'recompose';
+
+/** A recompose request's payload (content_image_requests.card). */
+export interface RecomposeCard {
+  generation_group_id?: string | null;
+  show_headline: boolean;
+  headline: string | null;
+  kicker: string | null;
+}
 
 export interface ImageRequestRow {
   id: string;
@@ -53,6 +83,7 @@ interface ClaimedRequest {
   content_item_id: string;
   action: ImageRequestAction;
   brief: Partial<ImageConcept> | null;
+  card: Partial<RecomposeCard> | null;
 }
 
 interface SetRow {
@@ -67,10 +98,16 @@ interface SetRow {
   alt_text: string | null;
   review_outcome: string | null;
   created_at: string;
+  storage_path: string;
+  card_type: string | null;
+  headline: string | null;
+  kicker: string | null;
+  master_path: string | null;
 }
 
 const SET_COLUMNS =
-  'id, content_item_id, generation_group_id, candidate_set_id, candidate_index, is_selected, platform_crop, image_brief, alt_text, review_outcome, created_at';
+  'id, content_item_id, generation_group_id, candidate_set_id, candidate_index, is_selected, platform_crop, image_brief, alt_text, review_outcome, created_at, storage_path, card_type, headline, kicker, master_path';
+const BUCKET = 'platform-files';
 
 /** The platform a crop belongs to, from its platform_crop key. Pure. */
 export function platformOfCrop(cropKey: string | null): Platform | null {
@@ -78,6 +115,35 @@ export function platformOfCrop(cropKey: string | null): Platform | null {
   if (cropKey.startsWith('linkedin_')) return 'linkedin';
   if (cropKey.startsWith('x_')) return 'twitter_x';
   return null;
+}
+
+/** A platform crop from its stored platform_crop key ("linkedin_1200x627"). Pure. */
+export function cropFromKey(cropKey: string | null): PlatformCrop | null {
+  const platform = platformOfCrop(cropKey);
+  const m = cropKey ? /_(\d{2,5})x(\d{2,5})$/.exec(cropKey) : null;
+  if (!platform || !m) return null;
+  const slug = platform === 'linkedin' ? 'linkedin' : 'x';
+  const width = Number(m[1]);
+  const height = Number(m[2]);
+  return { platform, width, height, cropKey: cropKey!, fileName: `${slug}-${width}x${height}.png` };
+}
+
+/** The unmarked art behind a group: its stored path, or the 16:9 master beside its cards for rows made before it was stored. Pure. */
+export function masterPathOf(row: Pick<SetRow, 'master_path' | 'storage_path'>): string | null {
+  if (row.master_path) return row.master_path;
+  const slash = row.storage_path.lastIndexOf('/');
+  return slash > 0 ? `${row.storage_path.slice(0, slash)}/master-16x9.png` : null;
+}
+
+/** A founder's recompose payload, normalised. Pure. */
+export function normaliseRecomposeCard(input: Partial<RecomposeCard> | null): RecomposeCard {
+  const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ') : null);
+  return {
+    generation_group_id: text(input?.generation_group_id),
+    show_headline: input?.show_headline === true,
+    headline: text(input?.headline),
+    kicker: text(input?.kicker)?.toUpperCase() ?? null,
+  };
 }
 
 /** A founder's edited concept, normalised to a renderable one. Pure. */
@@ -194,7 +260,7 @@ async function briefContext(contentItemId: string) {
 
   const accountIds = item.social_account_id ? [item.social_account_id as string] : [];
   return {
-    story,
+    story: story as ReturnType<typeof mapNewsRowToCandidate> | null,
     form,
     postCopy: [item.title, item.body].filter((v: unknown) => typeof v === 'string' && v.trim()).join('\n\n'),
     history: await loadImageHistory(accountIds),
@@ -217,16 +283,25 @@ async function regenerate(req: ClaimedRequest): Promise<void> {
   const canon = await loadCanon();
   if (!canon) throw new Error('There is no active brand visual canon. Set one up in Brand → Visual.');
 
-  const briefed = await briefConcepts(canon, await briefContext(req.content_item_id));
+  const context = await briefContext(req.content_item_id);
+  const briefed = await briefConcepts(canon, context);
   if ('skip' in briefed) throw new Error(`No new images: ${briefed.skip}`);
 
   const posts = await postsFor(req.content_item_id, set);
+  const imageSpecs = await imageSpecsFor(posts);
+  const card = planCard(
+    canon,
+    headlineCandidates(briefed.review.headlines),
+    kickerFor(context.story?.category),
+    cropsFor(posts, imageSpecs),
+  );
   const result = await renderCandidateSet({
     canon,
     concepts: briefed.concepts,
     review: briefed.review,
+    card,
     posts,
-    imageSpecs: await imageSpecsFor(posts),
+    imageSpecs,
     triggerType: 'manual',
   });
   if (!result.selected) {
@@ -248,11 +323,18 @@ async function renderBrief(req: ClaimedRequest): Promise<void> {
   // A pre-set image has no set id; the new candidate starts one, and the old
   // group is retired once the new one is in, as a regenerate would.
   const startIndex = set?.setId ? Math.max(-1, ...set.rows.map((r) => r.candidate_index ?? 0)) + 1 : 0;
+  const imageSpecs = await imageSpecsFor(posts);
+  // The new art keeps the selected card's words: a headline card stays one.
+  const current = set?.selected.find((r) => r.card_type === 'headline' && r.headline);
+  const card: CardPlan | undefined = current
+    ? planCard(canon, [current.headline], current.kicker, cropsFor(posts, imageSpecs))
+    : undefined;
   const result = await renderCandidateSet({
     canon,
     concepts: [concept],
+    ...(card ? { card } : {}),
     posts,
-    imageSpecs: await imageSpecsFor(posts),
+    imageSpecs,
     triggerType: 'manual',
     candidateSetId: set?.setId ?? undefined,
     startIndex,
@@ -296,6 +378,145 @@ async function recheckAltText(req: ClaimedRequest): Promise<void> {
   ]);
 }
 
+async function downloadObject(path: string): Promise<Buffer> {
+  const { data, error } = await db.storage.from(BUCKET).download(path);
+  if (error || !data) throw new Error(`The stored image could not be read: ${error?.message ?? 'not found'}`);
+  return Buffer.from(await (data as Blob).arrayBuffer());
+}
+
+/** Within 2% of square: a headline card's art. */
+function isSquare(width: number, height: number): boolean {
+  return width > 0 && height > 0 && Math.abs(width - height) / Math.max(width, height) < 0.02;
+}
+
+/**
+ * Rebuild the group's platform cards from its stored unmarked art with the
+ * founder's words: no render, no image model. A headline needs square art and
+ * must pass lintHeadline and fit the card; turning it off composes the
+ * image-only card from whichever art the group has. New card files are
+ * written beside the old ones (a fresh name, so no cached copy is shown), the
+ * rows are pointed at them, then the old files go. On any failure before the
+ * rows change, the new files are removed and the rows are left as they were.
+ */
+async function recompose(req: ClaimedRequest): Promise<void> {
+  const card = normaliseRecomposeCard(req.card);
+  const set = await currentSet(req.content_item_id);
+  const groupId = card.generation_group_id ?? set?.selected[0]?.generation_group_id;
+  const group = (set?.rows ?? []).filter((r) => r.generation_group_id === groupId);
+  if (!groupId || group.length === 0) throw new Error('There is no image to change.');
+  const canon = await loadCanon();
+  if (!canon) throw new Error('There is no active brand visual canon. Set one up in Brand → Visual.');
+
+  const masterPath = masterPathOf(group[0]!);
+  if (!masterPath) throw new Error('The stored image could not be found.');
+  const art = await downloadObject(masterPath);
+  const { width = 0, height = 0 } = await sharp(art).metadata();
+  const square = isSquare(width, height);
+  const paper = canon.palette.find((p) => p.role.toLowerCase() === 'paper')?.hex ?? DEFAULT_PAPER_HEX;
+
+  let headline: string | null = null;
+  const kicker = card.show_headline ? card.kicker : null;
+  if (card.show_headline) {
+    if (!square) throw new Error('Needs a new image to add a headline. Regenerate to make one.');
+    if (!card.headline) throw new Error('Write a headline, or turn the headline off.');
+    const { data: item } = await db.from('content_items').select('title, body').eq('id', req.content_item_id).maybeSingle();
+    const postCopy = [item?.title, item?.body].filter((v: unknown) => typeof v === 'string' && v.trim()).join('\n\n');
+    const lint = lintHeadline(card.headline, postCopy);
+    if (!lint.ok) throw new Error(`The headline needs changes: ${lint.flags.join(' ')}`);
+    headline = typographicQuotes(card.headline);
+  }
+
+  // One card per distinct crop path: drafts on the same platform share a file.
+  const byPath = new Map<string, { crop: PlatformCrop; rows: SetRow[] }>();
+  for (const row of group) {
+    const crop = cropFromKey(row.platform_crop);
+    if (!crop) throw new Error(`Unknown platform crop: ${row.platform_crop ?? 'none'}`);
+    const entry = byPath.get(row.storage_path) ?? { crop, rows: [] };
+    entry.rows.push(row);
+    byPath.set(row.storage_path, entry);
+  }
+  if (headline) {
+    const fonts = loadCardFonts();
+    for (const { crop } of byPath.values()) {
+      const geometry = cardLayout(crop.platform, canon.card, { width: crop.width, height: crop.height });
+      if (!fitCardHeadline(headline, geometry, fonts)) throw new Error('The headline is too long for the card. Shorten it.');
+    }
+  }
+
+  const stamp = Date.now();
+  const uploaded: string[] = [];
+  const moves = new Map<string, string>();
+  try {
+    for (const [oldPath, { crop }] of byPath) {
+      const bytes = headline
+        ? await composeHeadlineCard(art, { kicker, headline }, crop, canon.brandMark, { card: canon.card, paperHex: paper })
+        : square
+          ? await composeSquareImageOnly(art, crop, canon.brandMark, paper)
+          : await composePlatformImage(art, crop, canon.brandMark);
+      const newPath = `${oldPath.slice(0, oldPath.lastIndexOf('/'))}/${crop.fileName.replace(/\.png$/, `-${stamp}.png`)}`;
+      const { error } = await db.storage.from(BUCKET).upload(newPath, bytes, { contentType: 'image/png', upsert: false });
+      if (error) throw new Error(`upload of ${newPath} failed: ${error.message}`);
+      uploaded.push(newPath);
+      moves.set(oldPath, newPath);
+    }
+  } catch (err) {
+    if (uploaded.length > 0) await db.storage.from(BUCKET).remove(uploaded);
+    throw err;
+  }
+
+  const verdict = headline ? await classifyHeadline(headline) : null;
+  const cardType = headline ? 'headline' : 'image_only';
+  for (const [oldPath, { rows }] of byPath) {
+    const first = rows[0]!;
+    const brief = first.image_brief && typeof first.image_brief === 'object' ? { ...(first.image_brief as Record<string, unknown>) } : null;
+    if (brief) {
+      if (headline) brief['headline'] = headline;
+      else delete brief['headline'];
+    }
+    const { error } = await db
+      .from('content_images')
+      .update({
+        storage_path: moves.get(oldPath),
+        card_type: cardType,
+        headline,
+        kicker,
+        headline_verdict: verdict ? storedVerdict(verdict) : null,
+        alt_text: headlineAltText(headline, first.alt_text ?? ''),
+        master_path: masterPath,
+        ...(brief ? { image_brief: brief } : {}),
+      })
+      .in('id', rows.map((r) => r.id));
+    if (error) throw new Error(`content_images update failed: ${error.message}`);
+  }
+  // The rows point at the new cards; the old files are no longer referenced.
+  await db.storage.from(BUCKET).remove([...moves.keys()]);
+
+  await logActivity([
+    {
+      agent_name: 'charlie',
+      action: 'social_image_recomposed',
+      status: 'pending',
+      trigger_type: 'manual',
+      entity_type: 'content_item',
+      entity_id: req.content_item_id,
+      proposed_actions: [{ type: 'social_image', generation_group_id: groupId, card_type: cardType, headline, kicker }],
+    },
+    ...(verdict
+      ? [
+          {
+            agent_name: 'lex',
+            action: 'compliance_checked',
+            status: 'pending',
+            trigger_type: 'manual',
+            entity_type: 'content_item',
+            entity_id: req.content_item_id,
+            proposed_actions: [{ type: 'image_headline', generation_group_id: groupId, classification: verdict.classification }],
+          },
+        ]
+      : []),
+  ]);
+}
+
 async function resolve(id: string, error: string | null): Promise<void> {
   const { error: updErr } = await db
     .from('content_image_requests')
@@ -317,7 +538,7 @@ export async function handleImageRequestRow(row: ImageRequestRow): Promise<void>
     .update({ status: 'working' })
     .eq('id', row.id)
     .eq('status', 'pending')
-    .select('id, content_item_id, action, brief');
+    .select('id, content_item_id, action, brief, card');
   const req = (claimed as ClaimedRequest[] | null)?.[0];
   if (!req) return;
 
@@ -326,6 +547,7 @@ export async function handleImageRequestRow(row: ImageRequestRow): Promise<void>
     if (req.action === 'recheck_alt_text') await recheckAltText(req);
     else if (req.action === 'regenerate') await regenerate(req);
     else if (req.action === 'render_brief') await renderBrief(req);
+    else if (req.action === 'recompose') await recompose(req);
     else throw new Error(`Unknown image action: ${String(req.action)}`);
     await resolve(req.id, null);
   } catch (err) {

@@ -87,6 +87,8 @@ describe('VisualTab', () => {
       palette: CANON.palette,
       layouts: CANON.layouts,
       brand_mark: { enabled: true, height_pct: 9, margin_pct: 4 },
+      card: { enabled: true, headline_size_max: 64, headline_size_min: 44, max_lines: 4, kicker: true },
+      headline_composition_block: '',
       notes: 'Why.',
     });
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('v1.3'));
@@ -119,6 +121,33 @@ describe('VisualTab', () => {
   it('explains when there is no canon', () => {
     render(<VisualTab canon={null} notes={null} anchors={[]} />);
     expect(screen.getByText(/There is no visual canon yet/)).toBeInTheDocument();
+  });
+});
+
+describe('VisualTab headline cards', () => {
+  it('edits the card settings and the square-art paragraph, and saves them with the canon', async () => {
+    const user = userEvent.setup();
+    render(<VisualTab canon={CANON} notes={null} anchors={[]} />);
+    expect(screen.getByRole('heading', { name: 'Headline cards' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Make headline cards' })).toBeChecked();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show a kicker above the headline' }));
+    const smallest = screen.getByLabelText('Smallest headline, px');
+    await user.clear(smallest);
+    await user.type(smallest, '48');
+    const lines = screen.getByLabelText('Most lines');
+    await user.clear(lines);
+    await user.type(lines, '3');
+    await user.type(screen.getByLabelText('Headline composition block'), 'Keep the left edge empty.');
+
+    await user.click(screen.getByRole('button', { name: 'Save canon' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Save as v/ }));
+    expect(saveBrandVisual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        card: { enabled: true, headline_size_max: 64, headline_size_min: 48, max_lines: 3, kicker: false },
+        headline_composition_block: 'Keep the left edge empty.',
+      }),
+    );
   });
 });
 

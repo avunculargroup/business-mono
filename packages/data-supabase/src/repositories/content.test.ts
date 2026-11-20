@@ -420,6 +420,35 @@ describe('getDetail', () => {
     expect(await content().getDetail(ctx, 'nope')).toBeNull();
   });
 
+  it('reads a headline card: its words, Lex on the headline, and the square master', async () => {
+    client.__setResponse('content_items', { data: detailRow(), error: null });
+    client.__setResponse('content_images', {
+      data: [
+        imageRow({
+          id: 'img-card',
+          card_type: 'headline',
+          headline: 'Discipline beats conviction.',
+          kicker: 'MACRO',
+          headline_verdict: { classification: 'educational', rationale: 'states', checked_at: '2026-11-20T00:00:00Z' },
+          master_path: 'social-images/2026-11-20/g1/master-1x1.png',
+        }),
+      ],
+      error: null,
+    });
+    client.__setResponse('content_image_requests', { data: null, error: null });
+
+    const detail = await content().getDetail(ctx, 'c1');
+
+    expect(detail?.image).toMatchObject({
+      cardType: 'headline',
+      headline: 'Discipline beats conviction.',
+      kicker: 'MACRO',
+      headlineVerdict: { classification: 'educational', rationale: 'states', checkedAt: '2026-11-20T00:00:00Z' },
+      masterPath: 'social-images/2026-11-20/g1/master-1x1.png',
+      artAspect: '1:1',
+    });
+  });
+
   it('returns the newest image not retired by a regenerate or remove, with its provenance', async () => {
     client.__setResponse('content_items', { data: detailRow(), error: null });
     client.__setResponse('content_images', {
@@ -438,6 +467,11 @@ describe('getDetail', () => {
       source: 'ai_generated',
       storagePath: 'social-images/2026-11-08/g1/linkedin-1200x627.png',
       masterPath: 'social-images/2026-11-08/g1/master-16x9.png',
+      artAspect: '16:9',
+      cardType: null,
+      headline: null,
+      kicker: null,
+      headlineVerdict: null,
       generationGroupId: 'g1',
       altText: 'A sketch of a scale.',
       platformCrop: 'linkedin_1200x627',
@@ -558,7 +592,7 @@ describe('getSocialDraftCopy', () => {
     });
 
     const copy = await content().getSocialDraftCopy(ctx, 'c1');
-    expect(copy?.image).toEqual({ storagePath: 'social-images/2026-11-08/g1/linkedin-1200x627.png', altText: 'A sketch of a scale.' });
+    expect(copy?.image).toEqual({ storagePath: 'social-images/2026-11-08/g1/linkedin-1200x627.png', altText: 'A sketch of a scale.', headline: null });
   });
 });
 

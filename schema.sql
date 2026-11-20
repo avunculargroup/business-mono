@@ -357,6 +357,9 @@ CREATE TABLE brand_visual (
   style_anchor_paths    TEXT[]      NOT NULL DEFAULT '{}',
   default_aspect_ratio  TEXT        NOT NULL DEFAULT '16:9',
   brand_mark            JSONB       NOT NULL DEFAULT '{"enabled": true, "position": "bottom_right", "height_pct": 9, "margin_pct": 4, "opacity": 1}'::jsonb,
+  -- Headline cards (v1.4): card settings, and the paragraph sent only for square art.
+  card                  JSONB       NOT NULL DEFAULT '{"enabled": true, "headline_size_max": 64, "headline_size_min": 44, "max_lines": 4, "kicker": true}'::jsonb,
+  headline_composition_block TEXT   NOT NULL DEFAULT '',
   notes                 TEXT,
   updated_by            UUID        REFERENCES team_members(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2183,7 +2186,13 @@ CREATE TABLE content_images (
   -- Candidates (canon v1.1): up to three groups per run share a set; one is selected.
   candidate_set_id     UUID,
   candidate_index      SMALLINT,      -- concept order from the brief
-  is_selected          BOOLEAN NOT NULL DEFAULT true  -- consumers read selected rows only
+  is_selected          BOOLEAN NOT NULL DEFAULT true,  -- consumers read selected rows only
+  -- Headline cards (2026-11-20): square art beside a headline set by code. NULL card_type = image-only.
+  card_type            TEXT CHECK (card_type IN ('headline', 'image_only')),
+  headline             TEXT,          -- printed on the card
+  kicker               TEXT,          -- label above the headline, from the story's category
+  headline_verdict     JSONB,         -- Lex on the headline, same shape as alt_text_verdict
+  master_path          TEXT           -- unmarked art the cards were composed from (1x1 or 16x9); NULL = master-16x9.png beside them
 );
 
 CREATE INDEX idx_content_images_item    ON content_images(content_item_id);
@@ -2196,15 +2205,17 @@ CREATE INDEX idx_content_images_candidate_set ON content_images(candidate_set_id
 CREATE TABLE content_image_requests (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   content_item_id  UUID        NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
-  action           TEXT        NOT NULL CHECK (action IN ('regenerate', 'render_brief', 'recheck_alt_text')),
+  action           TEXT        NOT NULL CHECK (action IN ('regenerate', 'render_brief', 'recheck_alt_text', 'recompose')),
   brief            JSONB,      -- render_brief only
+  card             JSONB,      -- recompose only: { generation_group_id, show_headline, headline, kicker }
   status           TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'working', 'done', 'failed')),
   error            TEXT,
   requested_by     UUID        REFERENCES team_members(id),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at     TIMESTAMPTZ,
-  CONSTRAINT content_image_requests_brief_present CHECK (action <> 'render_brief' OR brief IS NOT NULL)
+  CONSTRAINT content_image_requests_brief_present CHECK (action <> 'render_brief' OR brief IS NOT NULL),
+  CONSTRAINT content_image_requests_card_present CHECK (action <> 'recompose' OR card IS NOT NULL)
 );
 
 -- Manual post-hoc metrics, one row per published variant (UNIQUE), updated in place.

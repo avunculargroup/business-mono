@@ -16,6 +16,10 @@ import {
   lintImageBrief,
   lintImageConcept,
   critiqueProblem,
+  critiqueSchema,
+  chooseHeadline,
+  hookRepeats,
+  lintHeadlines,
   rankConcepts,
   recentImageHistory,
   reviewerRewriteInstruction,
@@ -51,7 +55,7 @@ const GATE: ImageConcept = {
   layout: 'diagonal',
   alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", concepts: [STAMP, LIGHTHOUSE, GATE] };
+const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", headlines: [] as string[], concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const CP392 =
   "140 businesses have applied to offer digital asset services in Australia.\n\nASIC just dropped Consultation Paper 392 — the rulebook for custody, settlement, and capital requirements under the new Digital Assets Framework Act.\n\nClarity's coming. April 2027.\n\nNot nothing.";
@@ -66,7 +70,7 @@ describe('imageBriefSchema', () => {
   });
 
   it('lets a skip brief carry no concepts', () => {
-    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] }).success).toBe(true);
+    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], concepts: [] }).success).toBe(true);
   });
 
   it('asks the model for no length limits, so one long field cannot fail the brief', () => {
@@ -155,8 +159,8 @@ describe('lintImageBrief', () => {
   });
 
   it('says so when the brief returned no concepts, and treats a skip as clean', () => {
-    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
-    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
+    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', headlines: [], concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
+    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', headlines: [], concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
   });
 
   it('allows digits in the hook only', () => {
@@ -190,6 +194,7 @@ describe('readStoredBrief', () => {
       motifKey: null,
       concept: STAMP,
       hook: null,
+      headline: null,
       review: null,
     });
   });
@@ -212,6 +217,7 @@ describe('readStoredBrief', () => {
       motifKey: null,
       concept: null,
       hook: null,
+      headline: null,
       review: null,
     });
   });
@@ -227,6 +233,7 @@ describe('readStoredBrief', () => {
       motifKey: 'timepiece',
       concept: null,
       hook: null,
+      headline: null,
       review: null,
     });
   });
@@ -253,18 +260,19 @@ describe('recentImageHistory', () => {
     expect(recentImageHistory(rows)).toEqual({
       symbols: ['A rubber stamp', 'A half-drawn bridge pier', 'An hourglass'],
       layouts: ['hero_left', 'left_third'],
+      hooks: [],
     });
   });
 
   it('stops at five runs and degrades to no history on a bad read', () => {
     const rows = Array.from({ length: 8 }, (_, i) => ({ candidate_set_id: `s${i}`, is_selected: true, image_brief: { ...STAMP, symbol: `Symbol ${i}` } }));
     expect(recentImageHistory(rows).symbols).toHaveLength(5);
-    expect(recentImageHistory(null)).toEqual({ symbols: [], layouts: [] });
+    expect(recentImageHistory(null)).toEqual({ symbols: [], layouts: [], hooks: [] });
   });
 
   it('names the layout to rest only after two runs in a row used it', () => {
-    expect(layoutToRest({ symbols: [], layouts: ['hero_left', 'hero_left'] })).toBe('hero_left');
-    expect(layoutToRest({ symbols: [], layouts: ['hero_left', 'diagonal'] })).toBeNull();
+    expect(layoutToRest({ symbols: [], layouts: ['hero_left', 'hero_left'], hooks: [] })).toBe('hero_left');
+    expect(layoutToRest({ symbols: [], layouts: ['hero_left', 'diagonal'], hooks: [] })).toBeNull();
   });
 });
 
@@ -274,7 +282,7 @@ describe('buildImageBriefPrompt', () => {
     form: 'flat_observation',
     postCopy: CP392,
     layouts: activeLayouts(canon),
-    history: { symbols: [], layouts: [] },
+    history: { symbols: [], layouts: [], hooks: [] },
     prohibitedTerms: canon.prohibitedTerms,
   };
 
@@ -366,7 +374,7 @@ describe('buildImageBriefPrompt', () => {
   });
 
   it('tells it not to reuse recent symbols, and to rest a layout used twice in a row', () => {
-    const p = buildImageBriefPrompt({ ...base, history: { symbols: ['A rubber stamp', 'A lighthouse'], layouts: ['diagonal', 'diagonal'] } });
+    const p = buildImageBriefPrompt({ ...base, history: { symbols: ['A rubber stamp', 'A lighthouse'], layouts: ['diagonal', 'diagonal'], hooks: [] } });
     expect(p).toContain('Recent images used: A rubber stamp; A lighthouse. Do not use any of these symbols again.');
     expect(p).toContain('Do not use diagonal in any concept.');
   });
@@ -598,7 +606,7 @@ describe('parseModelJson', () => {
 
 describe('normaliseBrief', () => {
   const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
-  const brief = (concepts: unknown[]) => ({ skip: false, skip_reason: null, hook: 'capital buffers', concepts });
+  const brief = (concepts: unknown[]) => ({ skip: false, skip_reason: null, hook: 'capital buffers', headlines: [] as unknown[], concepts });
 
   it('cuts an over-long twist at a word boundary, and records it', () => {
     const twist = `${'gold '.repeat(60)}beam`;
@@ -627,7 +635,7 @@ describe('normaliseBrief', () => {
   });
 
   it('passes a skip brief through untouched', () => {
-    const skip = { skip: true, skip_reason: 'No honest visual.', hook: '', concepts: [] };
+    const skip = { skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], concepts: [] };
     expect(normaliseBrief(skip)).toEqual({ ok: true, brief: skip, dropped: 0, excess: 0, truncated: [] });
   });
 
@@ -641,5 +649,94 @@ describe('normaliseBrief', () => {
     if (!r.ok) throw new Error(r.detail);
     expect(r.brief.hook.length).toBeLessThanOrEqual(120);
     expect(r.truncated).toContain('hook');
+  });
+});
+
+describe('headline cards', () => {
+  const base = {
+    story: { title: 'ASIC releases CP 392', summary: 'The rulebook.', key_points: [] },
+    form: 'flat_observation',
+    postCopy: CP392,
+    layouts: [{ key: 'hero_left', label: 'Hero left', description: 'd', is_active: true }],
+    history: { symbols: [], layouts: [], hooks: [] },
+    prohibitedTerms: [],
+  };
+
+  it('asks for three headlines, stated not advised, with figures from the post only', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('headlines: three options for a short headline printed beside the picture.');
+    expect(p).toContain('Use only facts and figures that appear **word for word** in the post.');
+    expect(p).toContain('"Who moved the measuring stick?"');
+    expect(p).toContain('It needs to be **recognised in half a second and feel right**.');
+    expect(p).toContain('At most one of the six concepts may show something broken');
+  });
+
+  it('names recent hooks so the brief does not reuse them', () => {
+    const p = buildImageBriefPrompt({ ...base, history: { symbols: [], layouts: [], hooks: ['measuring stick', 'real wages'] } });
+    expect(p).toContain("Recent hooks, don't reuse them or their central noun: measuring stick; real wages.");
+    expect(buildImageBriefPrompt(base)).not.toContain('Recent hooks');
+  });
+
+  it('reads recent hooks from stored briefs', () => {
+    const rows = [
+      { candidate_set_id: 'A', is_selected: true, image_brief: { ...STAMP, hook: 'measuring stick' } },
+      { candidate_set_id: 'B', is_selected: true, image_brief: STAMP },
+    ];
+    expect(recentImageHistory(rows).hooks).toEqual(['measuring stick']);
+  });
+
+  it('flags a repeated hook: exact, or one inside the other', () => {
+    expect(hookRepeats('Measuring stick', ['measuring stick'])).toBe(true);
+    expect(hookRepeats('the measuring stick moved', ['measuring stick'])).toBe(true);
+    expect(hookRepeats('stick', ['the measuring stick'])).toBe(true);
+    expect(hookRepeats('real wages', ['measuring stick'])).toBe(false);
+    expect(hookRepeats('', ['measuring stick'])).toBe(false);
+  });
+
+  it('keeps at most three non-empty headlines from the model', () => {
+    const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
+    const r = normaliseBrief({ skip: false, skip_reason: null, hook: 'h', headlines: ['One.', '', 7, 'Two.', 'Three.', 'Four.'], concepts: six });
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.brief.headlines).toEqual(['One.', 'Two.', 'Three.']);
+    expect(normaliseBrief({ skip: false, skip_reason: null, hook: 'h', concepts: six })).toMatchObject({ ok: true, brief: { headlines: [] } });
+  });
+
+  it('lints each headline against the post', () => {
+    const linted = lintHeadlines(['Clarity is coming.', 'The best rulebook!'], CP392);
+    expect(linted[0]!.flags).toEqual([]);
+    expect(linted[1]!.flags.join(' ')).toMatch(/exclamation/);
+  });
+
+  it('shows the reviewer only the clean headlines, numbered, or tells it there are none', () => {
+    const p = buildImageCriticPrompt({ postCopy: CP392, hook: 'h', concepts: [STAMP], headlines: ['Clarity is coming.', 'Rules first.'] });
+    expect(p).toContain('## The headlines');
+    expect(p).toContain('1. Clarity is coming.\n2. Rules first.');
+    expect(p).toContain('Choose the headline (1–2)');
+    expect(buildImageCriticPrompt({ postCopy: CP392, hook: 'h', concepts: [STAMP] })).toContain('Return headline null');
+  });
+
+  it('accepts a review with or without a headline choice', () => {
+    const scores = [{ index: 1, recognisable: 4, twist_visible: 4, on_hook: 4, physics_ok: true, needs_text: false, note: 'n' }];
+    expect(critiqueSchema.safeParse({ scores }).success).toBe(true);
+    expect(critiqueSchema.safeParse({ scores, headline: null }).success).toBe(true);
+    expect(critiqueSchema.safeParse({ scores, headline: { index: 2, note: 'clearest' } }).success).toBe(true);
+  });
+});
+
+describe('chooseHeadline', () => {
+  const clean = ['Discipline beats conviction.', 'Roots matter.', 'Shallow roots.'];
+
+  it("uses the reviewer's choice when it is valid", () => {
+    expect(chooseHeadline(clean, { headline: { index: 2, note: 'clearest' } })).toEqual({ headline: 'Roots matter.', source: 'reviewer', note: 'clearest' });
+  });
+
+  it('falls back to the first clean headline on an invalid index or no choice', () => {
+    expect(chooseHeadline(clean, { headline: { index: 4, note: 'x' } })).toEqual({ headline: clean[0], source: 'first_clean', note: null });
+    expect(chooseHeadline(clean, { headline: null })).toMatchObject({ source: 'first_clean' });
+    expect(chooseHeadline(clean, null)).toMatchObject({ headline: clean[0], source: 'first_clean' });
+  });
+
+  it('returns none when nothing is clean', () => {
+    expect(chooseHeadline([], { headline: { index: 1, note: 'x' } })).toEqual({ headline: null, source: 'none', note: null });
   });
 });

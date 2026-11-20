@@ -8,6 +8,7 @@ const actions = {
   selectImageCandidate: vi.fn(),
   getImageDownloadUrl: vi.fn(),
   requestImageRegenerate: vi.fn(),
+  requestImageRecompose: vi.fn(),
   requestImageRender: vi.fn(),
   saveImageAltText: vi.fn(),
   removeImage: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('@/app/actions/contentImages', () => ({
   getImageDownloadUrl: (...a: unknown[]) => actions.getImageDownloadUrl(...a),
   selectImageCandidate: (...a: unknown[]) => actions.selectImageCandidate(...a),
   requestImageRegenerate: (...a: unknown[]) => actions.requestImageRegenerate(...a),
+  requestImageRecompose: (...a: unknown[]) => actions.requestImageRecompose(...a),
   requestImageRender: (...a: unknown[]) => actions.requestImageRender(...a),
   saveImageAltText: (...a: unknown[]) => actions.saveImageAltText(...a),
   removeImage: (...a: unknown[]) => actions.removeImage(...a),
@@ -78,6 +80,11 @@ function image(overrides: Partial<ContentImage & { url: string | null }> = {}): 
     source: 'ai_generated',
     storagePath: `social-images/2026-11-08/${GROUP}/linkedin-1200x627.png`,
     masterPath: `social-images/2026-11-08/${GROUP}/master-16x9.png`,
+    artAspect: '16:9',
+    cardType: null,
+    headline: null,
+    kicker: null,
+    headlineVerdict: null,
     generationGroupId: GROUP,
     altText: 'A linocut of a lighthouse with a gold beam through fog.',
     platformCrop: 'linkedin_1200x627',
@@ -332,5 +339,101 @@ describe('ImageSlot', () => {
 
     rerender(<ImageSlot contentItemId={ITEM} image={null} request={null} canon={null} />);
     expect(screen.getByRole('link', { name: 'Brand Hub → Visual' })).toHaveAttribute('href', '/brand');
+  });
+
+  describe('headline card', () => {
+    const POST = 'Twenty years. Nobody knows the trigger. Discipline beats conviction.';
+    const card = (overrides: Partial<ContentImage> = {}) =>
+      image({
+        artAspect: '1:1',
+        masterPath: `social-images/2026-11-20/${GROUP}/master-1x1.png`,
+        cardType: 'headline',
+        headline: 'Discipline beats conviction.',
+        kicker: 'MACRO',
+        headlineVerdict: { classification: 'educational', rationale: 'states', checkedAt: '2026-11-20T00:00:00Z' },
+        ...overrides,
+      });
+
+    it('shows the headline and kicker for editing, with the toggle on', () => {
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      expect(screen.getByRole('checkbox', { name: 'Show headline' })).toBeChecked();
+      expect(screen.getByLabelText('Headline')).toHaveValue('Discipline beats conviction.');
+      expect(screen.getByLabelText('Kicker')).toHaveValue('MACRO');
+      expect(screen.getByRole('button', { name: 'Save card' })).toBeDisabled();
+    });
+
+    it('shows the lint flags inline and queues nothing when the headline fails', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      const field = screen.getByLabelText('Headline');
+      await user.clear(field);
+      await user.type(field, 'The best trigger!');
+      await user.click(screen.getByRole('button', { name: 'Save card' }));
+      const flags = screen.getByRole('alert', { name: 'Headline changes needed' });
+      expect(within(flags).getByText('No exclamation marks.')).toBeInTheDocument();
+      expect(within(flags).getByText(/Avoid these words: best/)).toBeInTheDocument();
+      expect(actions.requestImageRecompose).not.toHaveBeenCalled();
+    });
+
+    it('queues a recompose with the edited words', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      const field = screen.getByLabelText('Headline');
+      await user.clear(field);
+      await user.type(field, 'Nobody knows the trigger.');
+      await user.clear(screen.getByLabelText('Kicker'));
+      await user.type(screen.getByLabelText('Kicker'), 'treasury');
+      await user.click(screen.getByRole('button', { name: 'Save card' }));
+      expect(actions.requestImageRecompose).toHaveBeenCalledWith({
+        contentItemId: ITEM,
+        generationGroupId: GROUP,
+        showHeadline: true,
+        headline: 'Nobody knows the trigger.',
+        kicker: 'treasury',
+      });
+    });
+
+    it('turns the headline off without linting it', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      await user.click(screen.getByRole('checkbox', { name: 'Show headline' }));
+      expect(screen.queryByLabelText('Headline')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Save card' }));
+      expect(actions.requestImageRecompose).toHaveBeenCalledWith(expect.objectContaining({ showHeadline: false }));
+    });
+
+    it('says an image-only run needs a new image to take a headline, and offers Regenerate', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={image({ cardType: 'image_only' })} request={null} canon={CANON} postCopy={POST} />);
+      const toggle = screen.getByRole('checkbox', { name: 'Show headline' });
+      expect(toggle).not.toBeChecked();
+      await user.click(toggle);
+      expect(screen.getByText('Needs a new image to add a headline.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument();
+      const fieldset = screen.getByRole('group', { name: 'Card' });
+      await user.click(within(fieldset).getByRole('button', { name: 'Regenerate image' }));
+      expect(actions.requestImageRegenerate).toHaveBeenCalledWith(ITEM);
+    });
+
+    it("shows Lex's chip on a headline, and 'checking' while it is pending", () => {
+      const { rerender } = render(
+        <ImageSlot
+          contentItemId={ITEM}
+          image={card({ headlineVerdict: { classification: 'general_advice', rationale: '"beats" implies an outcome', checkedAt: null } })}
+          request={null}
+          canon={CANON}
+          postCopy={POST}
+        />,
+      );
+      expect(screen.getByText('Headline implies an outcome')).toBeInTheDocument();
+      expect(screen.getByText('"beats" implies an outcome')).toBeInTheDocument();
+      rerender(<ImageSlot contentItemId={ITEM} image={card({ headlineVerdict: null })} request={null} canon={CANON} postCopy={POST} />);
+      expect(screen.getByText('Checking headline')).toBeInTheDocument();
+    });
+
+    it('shows progress while a recompose runs', () => {
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={request({ action: 'recompose' })} canon={CANON} postCopy={POST} />);
+      expect(screen.getByRole('status')).toHaveTextContent('Updating the card.');
+    });
   });
 });

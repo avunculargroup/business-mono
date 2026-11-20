@@ -163,6 +163,8 @@ There is **no stock photography** in this product. No hero images, no finance cl
 
 **Generated social post images** follow the linocut canon held in the `brand_visual` table (v1.3: a bold two-colour linocut, shown as a flat scan of the printed sheet, black ink and one flat muted gold on bright near-white paper; one big familiar symbol with one twist, readable in half a second on a phone; layout presets; full-bleed, no borders; no text). The BTS mark is composited bottom-right by code and is never drawn by the image model. Edit the canon in the table, not here — see `docs/features/social-post-image/feature-spec.md`.
 
+From canon v1.4 (2026-11-20) social images are **headline cards** by default: the square linocut art flush right, and on paper to its left a short sentence-case headline in Playfair Display Bold (`--color-text-primary`) with a DM Sans SemiBold uppercase kicker (`--color-accent-dark`, letter-spacing 0.08em) above it. The type is set by code from the real fonts, never by the image model. Layout numbers live in the spec's [Headline cards](../../../docs/features/social-post-image/feature-spec.md#headline-cards-canon-v14) section.
+
 ### Cards
 
 - `--color-surface` background, 1px `--color-border`, `12px` radius, `--shadow-sm` default.

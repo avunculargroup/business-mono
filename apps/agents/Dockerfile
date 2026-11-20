@@ -37,6 +37,8 @@ WORKDIR /app
 
 COPY --from=builder /repo/apps/agents/.mastra/output ./.mastra/output
 COPY --from=builder /repo/docs ./docs
+# Headline card fonts (OFL), read at runtime from /app/assets/fonts.
+COPY --from=builder /repo/apps/agents/assets ./assets
 
 ENV NODE_ENV=production
 

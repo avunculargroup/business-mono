@@ -89,6 +89,8 @@ function VisualCanonForm({
   const [terms, setTerms] = useState<string[]>(canon.prohibitedTerms);
   const [layouts, setLayouts] = useState<Layout[]>(canon.layouts);
   const [mark, setMark] = useState(canon.brandMark);
+  const [card, setCard] = useState(canon.card);
+  const [headlineComposition, setHeadlineComposition] = useState(canon.headlineCompositionBlock);
   const [notes, setNotes] = useState(initialNotes ?? '');
 
   const nextVersion = nextBrandVisualVersion(canon.version);
@@ -102,6 +104,8 @@ function VisualCanonForm({
     prohibitedTerms: terms,
     layouts,
     brandMark: mark,
+    card,
+    headlineCompositionBlock: headlineComposition.trim(),
   };
   const previewLayout = layouts.find((l) => l.is_active && l.key.trim());
   const prompt = useMemo(
@@ -127,6 +131,8 @@ function VisualCanonForm({
         palette,
         layouts,
         brand_mark: { enabled: mark.enabled, height_pct: mark.height_pct, margin_pct: mark.margin_pct },
+        card,
+        headline_composition_block: headlineComposition,
         notes,
       });
       if ('error' in result) {
@@ -333,6 +339,69 @@ function VisualCanonForm({
             />
           )}
         </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Headline cards</h2>
+        <p className={styles.hint}>
+          Square art beside a short headline set in Playfair Display, with a DM Sans kicker above it. The type is set by
+          code; the model never draws it. Sizes are for the LinkedIn card; the X card scales them.
+        </p>
+        <div className={styles.markControls}>
+          <label className={styles.check}>
+            <input type="checkbox" checked={card.enabled} onChange={(e) => setCard({ ...card, enabled: e.target.checked })} />
+            Make headline cards
+          </label>
+          <label className={styles.check}>
+            <input type="checkbox" checked={card.kicker} onChange={(e) => setCard({ ...card, kicker: e.target.checked })} />
+            Show a kicker above the headline
+          </label>
+          <label className={styles.numberField}>
+            Largest headline, px
+            <input
+              type="number"
+              className={`${styles.input} ${styles.mono}`}
+              min={24}
+              max={120}
+              step={1}
+              value={card.headline_size_max}
+              onChange={(e) => setCard({ ...card, headline_size_max: Number(e.target.value) })}
+            />
+          </label>
+          <label className={styles.numberField}>
+            Smallest headline, px
+            <input
+              type="number"
+              className={`${styles.input} ${styles.mono}`}
+              min={24}
+              max={120}
+              step={1}
+              value={card.headline_size_min}
+              onChange={(e) => setCard({ ...card, headline_size_min: Number(e.target.value) })}
+            />
+          </label>
+          <label className={styles.numberField}>
+            Most lines
+            <input
+              type="number"
+              className={`${styles.input} ${styles.mono}`}
+              min={1}
+              max={6}
+              step={1}
+              value={card.max_lines}
+              onChange={(e) => setCard({ ...card, max_lines: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+        <textarea
+          aria-label="Headline composition block"
+          className={styles.textarea}
+          rows={4}
+          value={headlineComposition}
+          placeholder="Sent with the square art only, after the composition block"
+          onChange={(e) => setHeadlineComposition(e.target.value)}
+        />
+        <p className={styles.hint}>Sent to the model only for a headline card&rsquo;s square art, after the composition block.</p>
       </section>
 
       <section className={styles.section}>

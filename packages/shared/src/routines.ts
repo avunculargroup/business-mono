@@ -300,6 +300,8 @@ export interface SocialPostImageOutcome {
   candidates?: number;
   // The selected candidate's layout (canon v1.1+).
   layout?: string;
+  // 'headline' (square art beside a headline set by code) or 'image_only' (2026-11-20+).
+  card_type?: 'headline' | 'image_only';
   // Canon v1.0 only; kept so old run results still type-check.
   motif_key?: string;
   // Skip reason or error summary.

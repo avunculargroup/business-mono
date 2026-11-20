@@ -17,3 +17,4 @@ export * from './complianceDocument.js';
 export * from './papers.js';
 export * from './newsUrl.js';
 export * from './brandVisual.js';
+export * from './headline.js';

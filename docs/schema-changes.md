@@ -6,6 +6,34 @@ Add an entry here whenever you create a new migration file. Format: date, what c
 
 ---
 
+## 2026-11-20 — Social post images: headline cards (canon v1.4)
+
+`20261120100000_brand_visual_v1_4.sql` adds two columns to `brand_visual`: `card JSONB NOT NULL`
+(default `{ enabled: true, headline_size_max: 64, headline_size_min: 44, max_lines: 4, kicker: true }`),
+the headline card settings, read through `toBrandVisual` with tolerant defaults; and
+`headline_composition_block TEXT NOT NULL DEFAULT ''`, the paragraph `buildImagePrompt` sends only
+for a headline card's square art. It then moves the active row to v1.4 in place with that paragraph,
+guarded on `version = '1.3'`, so a canon saved from `/brand` is left alone (paste the paragraph into
+Brand → Visual → Headline cards instead). No other canon text changes.
+
+`20261120100001_content_images_headline_cards.sql` is additive. `content_images` gains `card_type`
+(`'headline' | 'image_only'`, NULL on older rows), `headline`, `kicker`, `headline_verdict` (Lex on
+the headline, the shape of `alt_text_verdict`) and `master_path` (the unmarked art the cards were
+composed from, `master-1x1.png` or `master-16x9.png`; NULL on older rows, whose master is
+`master-16x9.png` beside their cards). `content_image_requests.action` admits `'recompose'`, and a new
+`card JSONB` column carries its payload (`{ generation_group_id, show_headline, headline, kicker }`),
+required by `content_image_requests_card_present` when the action is `recompose`.
+`agent_activity.proposed_actions` gains JSONB keys only (`card_type`, `card_reason`, `headline`,
+`headlines`, `headline_choice`, `kicker`, `hook_repeat`), and `social_image_recomposed` is a new
+action value (`agent_activity.action` has no CHECK).
+
+Why: most image ideas were riddles. Abstract finance cannot be drawn literally under the no-text
+rule, so the brief fell back on allegory a feed has no time to decode. A short headline set in real
+type by code beside the picture carries the meaning; the picture only has to be recognised. Chris
+made headline cards the default on 2026-11-20. Spec: `docs/features/social-post-image/feature-spec.md`.
+
+---
+
 ## 2026-11-17 — News: `news_sources.multi_story`
 
 `20261117200000_news_sources_multi_story.sql` adds `news_sources.multi_story BOOLEAN NOT NULL

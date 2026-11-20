@@ -2,14 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { activeLayouts, lintImageConcept, planCandidateSelection, toBrandVisual } from '@platform/shared';
+import { activeLayouts, lintHeadline, lintImageConcept, planCandidateSelection, toBrandVisual } from '@platform/shared';
 import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
 // The image slot on /content/[id]. Two kinds of action live here:
 //
 //   * Ones the agents server does — regenerate, render with an edited brief,
-//     and re-check alt text after an edit. These INSERT a content_image_requests
+//     re-check alt text after an edit, and recompose a card with new words
+//     (from the stored art, no render). These INSERT a content_image_requests
 //     row; contentImageRequestListener claims it via Realtime and the page shows
 //     its progress from the row's status.
 //   * Ones that need no model — choosing between candidates, saving alt text,
@@ -56,8 +57,9 @@ async function openRequest(supabase: Supabase, contentItemId: string): Promise<b
 
 async function queue(
   contentItemId: string,
-  action: 'regenerate' | 'render_brief',
+  action: 'regenerate' | 'render_brief' | 'recompose',
   brief: Record<string, unknown> | null,
+  card: Record<string, unknown> | null = null,
 ): Promise<{ error: string } | { success: true }> {
   const auth = await getAuthedClient();
   if (!auth.ok) return { error: auth.error };
@@ -68,7 +70,7 @@ async function queue(
   }
   const { error } = await supabase
     .from('content_image_requests')
-    .insert({ content_item_id: contentItemId, action, brief: brief as never, requested_by: user.id });
+    .insert({ content_item_id: contentItemId, action, brief: brief as never, card: card as never, requested_by: user.id });
   if (error) return { error: humanizeError(error) };
 
   revalidate(contentItemId);
@@ -108,6 +110,44 @@ export async function requestImageRender(contentItemId: string, input: ImageConc
   if (flags.length > 0) return { error: `Change the brief before rendering: ${flags.join(' ')}` };
 
   return queue(contentItemId, 'render_brief', concept);
+}
+
+const cardSchema = z.object({
+  contentItemId: uuid,
+  generationGroupId: uuid,
+  showHeadline: z.boolean(),
+  headline: z.string().trim().max(120, 'Keep the headline short'),
+  kicker: z.string().trim().max(24, 'Keep the kicker to one or two words'),
+});
+export type ImageCardInput = z.input<typeof cardSchema>;
+
+/**
+ * Change a card's words without paying for a render: the agents server
+ * rebuilds the selected image's platform cards from its stored art with this
+ * headline and kicker (or none), then Lex checks the headline. The headline is
+ * linted against the post here too, so a flag is named on the page before
+ * anything is queued.
+ */
+export async function requestImageRecompose(input: ImageCardInput) {
+  const parsed = cardSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  const { contentItemId, generationGroupId, showHeadline, headline, kicker } = parsed.data;
+
+  if (showHeadline) {
+    const auth = await getAuthedClient();
+    if (!auth.ok) return { error: auth.error };
+    const { data: item } = await auth.supabase.from('content_items').select('title, body').eq('id', contentItemId).maybeSingle();
+    const postCopy = [item?.title, item?.body].filter((v) => typeof v === 'string' && v.trim()).join('\n\n');
+    const lint = lintHeadline(headline, postCopy);
+    if (!lint.ok) return { error: `Change the headline first: ${lint.flags.join(' ')}` };
+  }
+
+  return queue(contentItemId, 'recompose', null, {
+    generation_group_id: generationGroupId,
+    show_headline: showHeadline,
+    headline: headline || null,
+    kicker: kicker ? kicker.toUpperCase() : null,
+  });
 }
 
 const choiceSchema = z.object({ contentItemId: uuid, generationGroupId: uuid });
@@ -165,7 +205,8 @@ export async function selectImageCandidate(input: { contentItemId: string; gener
 const altTextSchema = z.object({
   contentItemId: uuid,
   generationGroupId: uuid,
-  altText: z.string().trim().min(1, 'Alt text cannot be empty').max(300, 'Keep the alt text under 300 characters'),
+  // 300 for the description plus room for a headline card's quoted headline.
+  altText: z.string().trim().min(1, 'Alt text cannot be empty').max(360, 'Keep the alt text under 360 characters'),
 });
 
 /**
@@ -202,11 +243,13 @@ const groupSchema = z.object({ contentItemId: uuid, generationGroupId: uuid });
 async function groupPaths(supabase: Supabase, generationGroupId: string): Promise<{ crops: string[]; master: string | null }> {
   const { data } = await supabase
     .from('content_images')
-    .select('storage_path')
+    .select('storage_path, master_path')
     .eq('generation_group_id', generationGroupId);
   const crops = (data ?? []).map((r) => r.storage_path);
   const first = crops[0];
-  const master = first && first.includes('/') ? `${first.slice(0, first.lastIndexOf('/'))}/master-16x9.png` : null;
+  // A headline card's master is square and recorded; older rows' is the 16:9 file beside the cards.
+  const stored = (data ?? []).find((r) => r.master_path)?.master_path ?? null;
+  const master = stored ?? (first && first.includes('/') ? `${first.slice(0, first.lastIndexOf('/'))}/master-16x9.png` : null);
   return { crops, master };
 }
 

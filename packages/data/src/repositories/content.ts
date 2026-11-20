@@ -80,8 +80,18 @@ export interface ContentImage {
   source: 'upload' | 'ai_generated';
   /** The platform crop, marked. What gets posted. */
   storagePath: string;
-  /** The unmarked render, for promoting to a style anchor. Null for uploads. */
+  /** The unmarked render, for promoting to a style anchor and recomposing. Null for uploads. */
   masterPath: string | null;
+  /** The unmarked render's shape: '1:1' for a headline card's square art. Null for uploads. */
+  artAspect: '1:1' | '16:9' | null;
+  /** 'headline' (square art beside a headline set by code) or 'image_only'. Null for older rows and uploads. */
+  cardType: 'headline' | 'image_only' | null;
+  /** The headline printed on the card, or null. */
+  headline: string | null;
+  /** The label above the headline (REGULATION, TREASURY, ...), or null. */
+  kicker: string | null;
+  /** Lex's advisory verdict on the headline; null with no headline, or while it is checked. */
+  headlineVerdict: ContentImageVerdict | null;
   /** Shared by every crop of one render; regenerate and remove act on it. */
   generationGroupId: string | null;
   altText: string | null;
@@ -112,7 +122,7 @@ export interface ContentImage {
 /** The newest founder image action on a draft, so the page can show progress. */
 export interface ContentImageRequest {
   id: string;
-  action: 'regenerate' | 'render_brief' | 'recheck_alt_text';
+  action: 'regenerate' | 'render_brief' | 'recheck_alt_text' | 'recompose';
   status: 'pending' | 'working' | 'done' | 'failed';
   error: string | null;
   createdAt: string;
@@ -159,7 +169,7 @@ export interface SocialDraftCopy {
   segments: string[];
   disclaimerText: string | null;
   /** The selected image's marked platform crop to download, when the draft has one. */
-  image: { storagePath: string; altText: string | null } | null;
+  image: { storagePath: string; altText: string | null; headline: string | null } | null;
 }
 
 export interface NewContentItem {

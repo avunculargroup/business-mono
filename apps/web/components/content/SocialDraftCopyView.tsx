@@ -14,8 +14,8 @@ export interface SocialDraftCopyViewProps {
   isThread: boolean;
   segments: string[];
   disclaimerText: string | null;
-  /** The marked platform crop, with a short-lived preview URL. */
-  image?: { storagePath: string; altText: string | null; previewUrl: string | null } | null;
+  /** The marked platform card, with a short-lived preview URL, and its headline when it has one. */
+  image?: { storagePath: string; altText: string | null; headline?: string | null; previewUrl: string | null } | null;
 }
 
 export function SocialDraftCopyView({
@@ -76,6 +76,13 @@ export function SocialDraftCopyView({
             // Signed, short-lived storage URL: next/image would cache it past expiry.
             // eslint-disable-next-line @next/next/no-img-element
             <img className={styles.imagePreview} src={image.previewUrl} alt={image.altText ?? ''} />
+          )}
+          {image.headline && (
+            <div className={styles.altText}>
+              <span className={styles.disclaimerTag}>Headline</span>
+              <p className={styles.disclaimerText}>{image.headline}</p>
+              <CopyButton text={image.headline} label="Copy headline" />
+            </div>
           )}
           {image.altText && (
             <div className={styles.altText}>
