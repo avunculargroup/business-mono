@@ -8,8 +8,9 @@ import {
 } from './brandVisual.js';
 import {
   headlineAltText,
-  kickerFor,
   lintHeadline,
+  lintKicker,
+  numberWordsToDigits,
   stripHeadlineFromAlt,
   typographicQuotes,
 } from './headline.js';
@@ -78,18 +79,92 @@ describe('lintHeadline', () => {
   });
 });
 
-describe('kickerFor', () => {
-  it('maps the four categories', () => {
-    expect(kickerFor('regulatory')).toBe('REGULATION');
-    expect(kickerFor('corporate')).toBe('TREASURY');
-    expect(kickerFor('macro')).toBe('MACRO');
-    expect(kickerFor('international')).toBe('GLOBAL');
+describe('lintHeadline: figures first, spelled-out numbers (2026-11-21 run)', () => {
+  const NETWORK = '$1.3 trillion sitting there for 18 years. Nobody has forged a block. The Bitcoin network keeps running.';
+
+  it('checks the capital on the first letter, so a headline may open on a figure', () => {
+    expect(lintHeadline('$1.3 trillion. No reversal.', NETWORK)).toEqual({ ok: true, flags: [] });
+    expect(lintHeadline('18 years. No forgery.', NETWORK).ok).toBe(true);
+    expect(lintHeadline('−15 and falling.', POST).ok).toBe(true);
+    expect(lintHeadline('"Safe" moved.', POST).flags).not.toContain('Start with a capital letter.');
   });
 
-  it('has no kicker for an unknown or missing category', () => {
-    expect(kickerFor('news')).toBeNull();
-    expect(kickerFor(null)).toBeNull();
-    expect(kickerFor(undefined)).toBeNull();
+  it('still flags a lowercase first letter behind a quote', () => {
+    expect(lintHeadline('"safe" isn\'t safe.', POST).flags).toContain('Start with a capital letter.');
+  });
+
+  it('a figure-first headline is still held to the figure check', () => {
+    expect(lintHeadline('$2.1 trillion. No reversal.', NETWORK).flags.join()).toMatch(/Figure not in the post: \$2.1/);
+  });
+
+  it('matches a spelled-out number against digits in the post', () => {
+    expect(lintHeadline('Almost eighteen years. No forgery.', NETWORK)).toEqual({ ok: true, flags: [] });
+  });
+
+  it('flags a spelled-out number the post does not have', () => {
+    expect(lintHeadline('Twenty years. No forgery.', NETWORK).flags).toContain('Figure not in the post: Twenty.');
+  });
+
+  it('matches digits in the headline against words in the post', () => {
+    expect(lintHeadline('18 years. No forgery.', 'Eighteen years and no forgery.').ok).toBe(true);
+  });
+});
+
+describe('numberWordsToDigits', () => {
+  it('normalises units, tens, hyphenated forms and scales', () => {
+    expect(numberWordsToDigits('twenty-one')).toBe('21');
+    expect(numberWordsToDigits('Eighteen years')).toBe('18 years');
+    expect(numberWordsToDigits('two hundred and five')).toBe('205');
+    expect(numberWordsToDigits('three thousand')).toBe('3000');
+    expect(numberWordsToDigits('a dozen')).toBe('a 12');
+    expect(numberWordsToDigits('eighteen million')).toBe('18 million');
+  });
+
+  it('leaves a scale word after digits alone', () => {
+    expect(numberWordsToDigits('$1.3 trillion')).toBe('$1.3 trillion');
+    expect(numberWordsToDigits('18 million')).toBe('18 million');
+  });
+
+  it('only matches whole words', () => {
+    expect(numberWordsToDigits('someone often tends')).toBe('someone often tends');
+  });
+});
+
+describe('lintKicker', () => {
+  it('passes a plain-English subject', () => {
+    for (const k of ['Bitcoin security', 'Business confidence', 'Interest rates', 'Digital asset rules', 'Self-custody', 'Macro outlook']) {
+      expect(lintKicker(k)).toEqual({ ok: true, flags: [] });
+    }
+  });
+
+  it('fails an internal category on its own', () => {
+    expect(lintKicker('Macro').flags).toContain('Name the subject, not an internal category.');
+    for (const k of ['regulatory', 'Corporate', 'INTERNATIONAL', 'general']) expect(lintKicker(k).ok).toBe(false);
+  });
+
+  it('fails more than three words, or more than 24 characters', () => {
+    expect(lintKicker('Bitcoin network security budget').flags.join()).toMatch(/1 to 3 words; this has 4/);
+    expect(lintKicker('Extraordinarily disproportionate').flags.join()).toMatch(/24 characters/);
+  });
+
+  it('fails digits and symbols', () => {
+    expect(lintKicker('2024 halving').flags).toContain('Use letters, spaces and hyphens only.');
+    expect(lintKicker('Rates & wages').flags).toContain('Use letters, spaces and hyphens only.');
+    expect(lintKicker('Rates.').ok).toBe(false);
+  });
+
+  it('fails prohibited terms', () => {
+    expect(lintKicker('Crypto rules').flags.join()).toMatch(/Avoid these words: crypto/);
+    expect(lintKicker('Best practice').flags.join()).toMatch(/best/);
+  });
+
+  it('fails the company name in any register', () => {
+    expect(lintKicker('BTS view').flags).toContain('Name the subject, not the company.');
+    expect(lintKicker('Treasury Solutions').ok).toBe(false);
+  });
+
+  it('fails an empty kicker', () => {
+    expect(lintKicker('  ').ok).toBe(false);
   });
 });
 
@@ -136,6 +211,7 @@ describe('broken objects', () => {
       skip_reason: null,
       hook: 'measuring stick',
       headlines: [],
+      kicker: '',
       concepts: [
         concept({ symbol: 'a dipstick', twist: 'snapped at the line', subject: 'a snapped dipstick' }),
         concept({ symbol: 'a lighthouse' }),

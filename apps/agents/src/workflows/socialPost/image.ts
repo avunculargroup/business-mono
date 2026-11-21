@@ -5,7 +5,7 @@ import {
   cardAspectRatio,
   headlineAltText,
   isBrokenConcept,
-  kickerFor,
+  lintKicker,
   planCandidateSelection,
   typographicQuotes,
   type CandidateRow,
@@ -427,6 +427,10 @@ export interface HeadlineReview {
   choice: HeadlineChoice;
   /** The hook repeats one of the last few runs'. Visibility only. */
   hook_repeat: boolean;
+  /** The brief's kicker when it passes lintKicker, else null: no kicker, never a category. */
+  kicker: string | null;
+  /** lintKicker's flags on what the brief wrote (empty when clean or when it wrote none). */
+  kicker_flags: string[];
 }
 
 /** Every concept the reviewer saw and what became of it, for the run's activity rows. */
@@ -703,6 +707,7 @@ export async function renderAndPersistImage(params: RenderParams): Promise<Rende
                   headlines: params.review.headlines.headlines,
                   headline_choice: params.review.headlines.choice.source,
                   hook_repeat: params.review.headlines.hook_repeat,
+                  kicker_flags: params.review.headlines.kicker_flags,
                 }
               : {}),
             ...(params.review
@@ -973,6 +978,7 @@ export async function briefConcepts(
   const choice = chooseHeadline(clean, headlineSource.critique);
   const hookRepeat = hookRepeats(hook, params.history.hooks ?? []);
   if (hookRepeat) log.info({ hook }, 'hook repeats a recent run');
+  const kicker = briefKicker(brief.kicker);
 
   return {
     concepts: ranking.ranked.map((r) => r.concept),
@@ -980,9 +986,20 @@ export async function briefConcepts(
       hook,
       reviews: ranking.ranked.map(storedReview),
       log: reviewLog(hook, concepts, round1.length, critique, ranking, rounds, roundTwo, unranked),
-      headlines: { headlines: headlineSource.headlines, choice, hook_repeat: hookRepeat },
+      headlines: { headlines: headlineSource.headlines, choice, hook_repeat: hookRepeat, ...kicker },
     },
   };
+}
+
+/**
+ * The brief's kicker, linted. Pure. A missing or failing kicker is no kicker:
+ * the headline sits alone, and nothing falls back to the story's category.
+ */
+export function briefKicker(text: string | null | undefined): { kicker: string | null; kicker_flags: string[] } {
+  const t = typeof text === 'string' ? text.trim().replace(/\s+/g, ' ') : '';
+  if (!t) return { kicker: null, kicker_flags: [] };
+  const { ok, flags } = lintKicker(t);
+  return ok ? { kicker: t, kicker_flags: [] } : { kicker: null, kicker_flags: flags };
 }
 
 /**
@@ -1209,7 +1226,7 @@ export async function runImageStep(params: ImageStepParams): Promise<ImageStepRe
   const card = planCard(
     canon,
     headlineCandidates(briefed.review.headlines),
-    kickerFor(params.story.category),
+    briefed.review.headlines.kicker,
     cropsFor(params.posts, params.imageSpecs),
   );
   if (card.type === 'image_only') log.info({ reason: card.reason }, 'image-only card');

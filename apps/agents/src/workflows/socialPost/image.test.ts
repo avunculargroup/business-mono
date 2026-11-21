@@ -803,7 +803,11 @@ describe('generateBrief', () => {
 
 describe('runImageStep: headline cards', () => {
   const POST = 'Twenty years. The trigger? Nobody knows. Discipline beats conviction.';
-  const WITH_HEADLINES = { ...BRIEF, headlines: ['Discipline beats conviction.', 'The best trigger!', 'Nobody knows the trigger.'] };
+  const WITH_HEADLINES = {
+    ...BRIEF,
+    headlines: ['Discipline beats conviction.', 'The best trigger!', 'Nobody knows the trigger.'],
+    kicker: 'Bitcoin security',
+  };
   const params = { ...PARAMS, postCopy: POST, story: { ...PARAMS.story, category: 'macro' } };
   const review = (headline: { index: number; note: string } | null) => ({
     object: {
@@ -834,7 +838,8 @@ describe('runImageStep: headline cards', () => {
 
       const rows = insertedImageRows();
       expect(rows.every((r) => r['card_type'] === 'headline')).toBe(true);
-      expect(rows[0]).toMatchObject({ headline: 'Nobody knows the trigger.', kicker: 'MACRO' });
+      // The brief's kicker, not the story's category ('macro').
+      expect(rows[0]).toMatchObject({ headline: 'Nobody knows the trigger.', kicker: 'Bitcoin security' });
       expect(rows[0]!['alt_text']).toBe(`“Nobody knows the trigger.” — ${(rows[0]!['image_brief'] as { alt_text: string }).alt_text}`);
       expect(rows[0]!['headline_verdict']).toMatchObject({ classification: 'educational' });
       expect(rows[0]!['master_path']).toMatch(/master-1x1\.png$/);
@@ -849,7 +854,8 @@ describe('runImageStep: headline cards', () => {
         card_type: 'headline',
         headline: 'Nobody knows the trigger.',
         headline_choice: 'reviewer',
-        kicker: 'MACRO',
+        kicker: 'Bitcoin security',
+        kicker_flags: [],
         hook_repeat: false,
       });
       const logged = generated.proposed_actions[0]!['headlines'] as Array<{ text: string; flags: string[] }>;
@@ -861,6 +867,22 @@ describe('runImageStep: headline cards', () => {
     } finally {
       restore();
     }
+  });
+
+  it('prints no kicker when the brief\'s fails lint, and never falls back to the category', async () => {
+    charlieGenerate.mockResolvedValue({ object: { ...WITH_HEADLINES, kicker: 'Macro' } });
+    editorGenerate.mockResolvedValue(review(null));
+    await runImageStep(params);
+    expect(insertedImageRows()[0]).toMatchObject({ card_type: 'headline', kicker: null });
+    const generated = activityRows().find((r) => r.action === 'social_image_generated')!;
+    expect(generated.proposed_actions[0]).toMatchObject({ kicker: null, kicker_flags: ['Name the subject, not an internal category.'] });
+  });
+
+  it('prints no kicker when the brief wrote none', async () => {
+    charlieGenerate.mockResolvedValue({ object: { ...WITH_HEADLINES, kicker: '' } });
+    editorGenerate.mockResolvedValue(review(null));
+    await runImageStep(params);
+    expect(insertedImageRows()[0]).toMatchObject({ card_type: 'headline', kicker: null });
   });
 
   it('takes the first clean headline when the reviewer chooses none', async () => {

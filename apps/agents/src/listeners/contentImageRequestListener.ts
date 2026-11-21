@@ -3,8 +3,8 @@ import { createRealtimeClient, supabase } from '@platform/db';
 import {
   activeLayouts,
   headlineAltText,
-  kickerFor,
   lintHeadline,
+  lintKicker,
   lintImageConcept,
   typographicQuotes,
   type ImageConcept,
@@ -135,6 +135,11 @@ export function masterPathOf(row: Pick<SetRow, 'master_path' | 'storage_path'>):
   return slash > 0 ? `${row.storage_path.slice(0, slash)}/master-16x9.png` : null;
 }
 
+/** A stored kicker carried onto new art, only while it passes lintKicker: a category label from before 2026-11-21 is dropped. Pure. */
+export function keptKicker(kicker: string | null): string | null {
+  return kicker && lintKicker(kicker).ok ? kicker : null;
+}
+
 /** A founder's recompose payload, normalised. Pure. */
 export function normaliseRecomposeCard(input: Partial<RecomposeCard> | null): RecomposeCard {
   const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ') : null);
@@ -142,7 +147,7 @@ export function normaliseRecomposeCard(input: Partial<RecomposeCard> | null): Re
     generation_group_id: text(input?.generation_group_id),
     show_headline: input?.show_headline === true,
     headline: text(input?.headline),
-    kicker: text(input?.kicker)?.toUpperCase() ?? null,
+    kicker: text(input?.kicker),
   };
 }
 
@@ -292,7 +297,7 @@ async function regenerate(req: ClaimedRequest): Promise<void> {
   const card = planCard(
     canon,
     headlineCandidates(briefed.review.headlines),
-    kickerFor(context.story?.category),
+    briefed.review.headlines.kicker,
     cropsFor(posts, imageSpecs),
   );
   const result = await renderCandidateSet({
@@ -327,7 +332,7 @@ async function renderBrief(req: ClaimedRequest): Promise<void> {
   // The new art keeps the selected card's words: a headline card stays one.
   const current = set?.selected.find((r) => r.card_type === 'headline' && r.headline);
   const card: CardPlan | undefined = current
-    ? planCard(canon, [current.headline], current.kicker, cropsFor(posts, imageSpecs))
+    ? planCard(canon, [current.headline], keptKicker(current.kicker), cropsFor(posts, imageSpecs))
     : undefined;
   const result = await renderCandidateSet({
     canon,
@@ -424,6 +429,10 @@ async function recompose(req: ClaimedRequest): Promise<void> {
     const lint = lintHeadline(card.headline, postCopy);
     if (!lint.ok) throw new Error(`The headline needs changes: ${lint.flags.join(' ')}`);
     headline = typographicQuotes(card.headline);
+    if (kicker) {
+      const kickerLint = lintKicker(kicker);
+      if (!kickerLint.ok) throw new Error(`The kicker needs changes: ${kickerLint.flags.join(' ')}`);
+    }
   }
 
   // One card per distinct crop path: drafts on the same platform share a file.

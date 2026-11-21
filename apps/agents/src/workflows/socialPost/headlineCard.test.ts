@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { DEFAULT_CARD_SETTINGS } from '@platform/shared';
 import {
   CARD_INK_HEX,
+  CARD_KICKER_HEX,
   cardLayout,
   composeHeadlineCard,
   composeSquareImageOnly,
@@ -96,6 +97,25 @@ describe('headline card composition (bundled fonts)', () => {
   it('draws no kicker path when there is no kicker', () => {
     const svg = headlineCardSvg({ kicker: null, headline: 'Discipline beats conviction.' }, cardLayout('linkedin'), fonts);
     expect(svg.match(/<path /g)).toHaveLength(1);
+  });
+
+  it('prints the brief\'s sentence-case kicker in capitals', () => {
+    const layout = cardLayout('linkedin');
+    const headline = 'Almost eighteen years. No forgery.';
+    const kickerPath = (kicker: string) => headlineCardSvg({ kicker, headline }, layout, fonts).match(/<path [^>]*>/)![0];
+    expect(kickerPath('Bitcoin security')).toBe(kickerPath('BITCOIN SECURITY'));
+    expect(kickerPath('Bitcoin security')).toContain(`fill="${CARD_KICKER_HEX}"`);
+  });
+
+  it('re-centres the text block when there is no kicker', () => {
+    const layout = cardLayout('linkedin');
+    const headline = 'Discipline beats conviction.';
+    const firstY = (svg: string) => Number(/fill="#[0-9A-Fa-f]{6}" d="M[\d.-]+ ([\d.-]+)/.exec(svg.match(/<path [^>]*>/g)!.at(-1)!)![1]);
+    const withKicker = firstY(headlineCardSvg({ kicker: 'Bitcoin security', headline }, layout, fonts));
+    const alone = firstY(headlineCardSvg({ kicker: null, headline }, layout, fonts));
+    // The kicker's line and gap are shared above and below: the headline sits half of it higher alone.
+    const kickerHeight = layout.kicker.size * 1.2 + layout.kicker.gap;
+    expect(withKicker - alone).toBeCloseTo(kickerHeight / 2, 1);
   });
 
   it('fits a real headline and refuses one that cannot fit', () => {

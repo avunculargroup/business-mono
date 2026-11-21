@@ -129,7 +129,9 @@ beforeEach(() => {
   loadImageHistory.mockResolvedValue({ subjects: [], layouts: [] });
   briefConcepts.mockResolvedValue({
     concepts: [PIER],
-    review: { headlines: { headlines: [], choice: { headline: null, source: 'none', note: null }, hook_repeat: false } },
+    review: {
+      headlines: { headlines: [], choice: { headline: null, source: 'none', note: null }, hook_repeat: false, kicker: null, kicker_flags: [] },
+    },
   });
   renderCandidateSet.mockResolvedValue(OK);
   classifyAltText.mockResolvedValue({ classification: 'educational', needs_disclaimer: false, disclaimer_key: null, rationale: 'plain' });
@@ -163,6 +165,12 @@ describe('handleImageRequestRow', () => {
         data: { id: 'news-0', title: 'Penn Wharton', url: 'https://x', summary: 'Twenty years.', key_points: ['20 years'], source_name: 'S', category: 'macro', relevance_score: 1, topic_tags: [], published_at: null },
         error: null,
       });
+      briefConcepts.mockResolvedValue({
+        concepts: [PIER],
+        review: {
+          headlines: { headlines: [], choice: { headline: null, source: 'none', note: null }, hook_repeat: false, kicker: 'Bitcoin security', kicker_flags: [] },
+        },
+      });
       claim('regenerate');
 
       await handleImageRequestRow({ id: 'req-1', status: 'pending' });
@@ -176,9 +184,9 @@ describe('handleImageRequestRow', () => {
       const params = renderCandidateSet.mock.calls[0]![0];
       expect(params).toMatchObject({ concepts: [PIER], triggerType: 'manual', card: { type: 'image_only' } });
       expect(params.candidateSetId).toBeUndefined(); // a new set
-      // The card is planned before the render, with the story's kicker.
+      // The card is planned before the render, with the brief's kicker: never the story's category.
       expect(planCard.mock.calls[0]![1]).toEqual(['Nobody knows the trigger.']);
-      expect(planCard.mock.calls[0]![2]).toBe('MACRO');
+      expect(planCard.mock.calls[0]![2]).toBe('Bitcoin security');
       expect(params.posts).toEqual([
         { contentItemId: 'ci-li', platform: 'linkedin' },
         { contentItemId: 'ci-x', platform: 'twitter_x' },
@@ -231,12 +239,19 @@ describe('handleImageRequestRow', () => {
     });
 
     it('keeps the selected card\'s headline on the new art', async () => {
-      wireSet(SET.map((r) => (r.is_selected ? { ...r, card_type: 'headline', headline: 'Old words.', kicker: 'MACRO' } : r)));
-      planCard.mockReturnValue({ type: 'headline', headline: 'Old words.', kicker: 'MACRO' });
+      wireSet(SET.map((r) => (r.is_selected ? { ...r, card_type: 'headline', headline: 'Old words.', kicker: 'Interest rates' } : r)));
+      planCard.mockReturnValue({ type: 'headline', headline: 'Old words.', kicker: 'Interest rates' });
       claim('render_brief', PIER);
       await handleImageRequestRow({ id: 'req-1', status: 'pending' });
-      expect(planCard.mock.calls[0]!.slice(1, 3)).toEqual([['Old words.'], 'MACRO']);
+      expect(planCard.mock.calls[0]!.slice(1, 3)).toEqual([['Old words.'], 'Interest rates']);
       expect(renderCandidateSet.mock.calls[0]![0]).toMatchObject({ card: { type: 'headline', headline: 'Old words.' } });
+    });
+
+    it('drops a stored category kicker from before 2026-11-21 rather than carry it onto new art', async () => {
+      wireSet(SET.map((r) => (r.is_selected ? { ...r, card_type: 'headline', headline: 'Old words.', kicker: 'MACRO' } : r)));
+      claim('render_brief', PIER);
+      await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+      expect(planCard.mock.calls[0]!.slice(1, 3)).toEqual([['Old words.'], null]);
     });
 
     it('fails a concept that names a finance cliché, without rendering', async () => {
@@ -295,7 +310,7 @@ describe('recompose', () => {
   it('rebuilds the selected group from the stored square art with the new words, without a render', async () => {
     wireSet(SQUARE_SET);
     await storedArt(1024, 1024);
-    claim('recompose', null, { show_headline: true, headline: "Nobody knows the trigger.", kicker: 'treasury' });
+    claim('recompose', null, { show_headline: true, headline: "Nobody knows the trigger.", kicker: 'Company treasuries' });
     await handleImageRequestRow({ id: 'req-1', status: 'pending' });
 
     expect(resolution()).toMatchObject({ status: 'done', error: null });
@@ -314,12 +329,21 @@ describe('recompose', () => {
     expect(writes[0]!.patch).toMatchObject({
       card_type: 'headline',
       headline: 'Nobody knows the trigger.',
-      kicker: 'TREASURY',
+      kicker: 'Company treasuries',
       alt_text: `“Nobody knows the trigger.” — ${PIER.alt_text}`,
       headline_verdict: { classification: 'educational' },
     });
     expect(classifyHeadline).toHaveBeenCalledWith('Nobody knows the trigger.');
     expect(bucket.remove).toHaveBeenCalledWith(['social-images/2026-11-08/g-a/linkedin-1200x627.png', 'social-images/2026-11-08/g-a/x-1600x900.png']);
+  });
+
+  it('refuses a kicker that fails lintKicker, without composing', async () => {
+    wireSet(SQUARE_SET);
+    await storedArt(1024, 1024);
+    claim('recompose', null, { show_headline: true, headline: 'Nobody knows the trigger.', kicker: 'Macro' });
+    await handleImageRequestRow({ id: 'req-1', status: 'pending' });
+    expect(String(resolution()!['error'])).toMatch(/The kicker needs changes: Name the subject, not an internal category/);
+    expect(bucket.upload).not.toHaveBeenCalled();
   });
 
   it('turns the headline off: an image-only card from the square art, the headline gone from the alt text', async () => {
@@ -411,11 +435,11 @@ describe('pure helpers', () => {
   });
 
   it('normalises a recompose payload', () => {
-    expect(normaliseRecomposeCard({ show_headline: true, headline: '  Rates   held. ', kicker: ' macro ' })).toEqual({
+    expect(normaliseRecomposeCard({ show_headline: true, headline: '  Rates   held. ', kicker: ' Interest   rates ' })).toEqual({
       generation_group_id: null,
       show_headline: true,
       headline: 'Rates held.',
-      kicker: 'MACRO',
+      kicker: 'Interest rates',
     });
     expect(normaliseRecomposeCard(null)).toMatchObject({ show_headline: false, headline: null, kicker: null });
   });
