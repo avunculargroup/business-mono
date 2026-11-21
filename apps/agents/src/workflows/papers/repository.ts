@@ -114,12 +114,14 @@ export function parseEprintsExport(payload: unknown, asOf: Date): RepositoryReco
     if (d.date_embargo && new Date(d.date_embargo).getTime() > asOf.getTime()) continue;
     if (!best || RANK[version] > RANK[best.version]) best = { version, licence: fromEprints(d.license), raw: d };
   }
-  if (!best) return { version: null, isOa: false, licence: null, recordUrl: null, evidence: 'no public, unembargoed file' };
+  // The record's own URL, which also replaces any garbled URL OpenAlex gave the copy.
+  const recordUrl = (payload as EprintsRecord).uri ?? null;
+  if (!best) return { version: null, isOa: false, licence: null, recordUrl, evidence: 'no public, unembargoed file' };
   return {
     version: best.version,
     isOa: true,
     licence: best.licence,
-    recordUrl: null,
+    recordUrl,
     evidence: `content: ${best.raw.content}, security: public, license: ${best.raw.license ?? 'none'}`,
   };
 }

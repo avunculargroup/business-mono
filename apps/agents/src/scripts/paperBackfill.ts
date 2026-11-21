@@ -19,6 +19,9 @@ const log = createLogger('backfill:papers');
  * budget-limited pass resolves only what is left. --no-rex skips the Rex
  * confirmation and keeps each work's deterministic band (recorded as
  * rex_status 'unavailable'), for a cheap first pass a later run can confirm.
+ * --refresh re-resolves works already held as well, which is how a classifier
+ * fix reaches papers that have landed (only untouched candidates are
+ * reclassified).
  *
  * Requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENALEX_API_KEY, and
  * ANTHROPIC_API_KEY unless --no-rex, with 20261025000000_paper_resolve applied.
@@ -26,6 +29,7 @@ const log = createLogger('backfill:papers');
  *   pnpm --filter @platform/agents backfill:papers --dry-run
  *   pnpm --filter @platform/agents backfill:papers --limit 200 --no-rex
  *   pnpm --filter @platform/agents backfill:papers --watch <paper_watches.id>
+ *   pnpm --filter @platform/agents backfill:papers --limit 200 --no-rex --refresh
  */
 
 function arg(name: string): string | null {
@@ -38,6 +42,7 @@ async function main() {
   const limit = Number(arg('limit') ?? 500);
   const watchId = arg('watch');
   const noRex = flag('no-rex');
+  const refresh = flag('refresh');
 
   if (flag('dry-run')) {
     for (const w of await defaultWatchDeps.loadWatches()) {
@@ -55,10 +60,10 @@ async function main() {
 
   const resolveDeps = noRex ? { ...defaultDeps, confirmRelevance: async () => null } : defaultDeps;
   const result = await runWatches(
-    { maxResolve: limit, ignoreHighWater: true, watchId: watchId ?? undefined },
+    { maxResolve: limit, ignoreHighWater: true, watchId: watchId ?? undefined, refresh },
     { ...defaultWatchDeps, resolve: (target) => resolvePaper(target, resolveDeps) },
   );
-  log.info({ ...result, limit, noRex }, 'backfill pass done');
+  log.info({ ...result, limit, noRex, refresh }, 'backfill pass done');
   if (result.deferred) log.info('more works remain: run again to continue');
 }
 
