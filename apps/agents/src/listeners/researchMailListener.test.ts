@@ -124,7 +124,9 @@ describe('processResearchEmail', () => {
     expect(ingestNewsItem).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { id: 'src-gromen', name: 'Gromen Tree Rings', tier: 'tier_1' },
-        title: 'Tree Rings — Issue 42',
+        // "Tree Rings" is the newsletter's name, not a headline; with no model
+        // headline in this mock, the cleaned subject is kept.
+        title: 'Tree Rings',
         author: 'Luke Gromen',
         category: 'macro',
         keyPoints: [{ text: 'point a', kind: 'new' }, { text: 'point b', kind: 'background' }],
@@ -203,6 +205,39 @@ describe('processResearchEmail extraction', () => {
     expect(arg.body).toBe('Fiscal dominance and treasury issuance dynamics in detail.');
   });
 
+  it('asks the model for a headline when the subject is generic, and records where it came from', async () => {
+    extractNewsMetadata.mockResolvedValueOnce({
+      data: {
+        category: 'macro',
+        summary: 'Gromen on treasury issuance.',
+        key_points: [{ text: 'point a', kind: 'new' }, { text: 'point b', kind: 'background' }],
+        topic_tags: ['macro', 'treasury-issuance'],
+        australian_relevance: false,
+        bitcoin_relevance: true,
+        headline: 'Treasury issuance points to fiscal dominance',
+      },
+      reason: null,
+    });
+    await processResearchEmail(newsletterEmail(), sources(GROMEN));
+
+    expect(extractNewsMetadata.mock.calls[0][0]).toMatchObject({ title: 'Tree Rings', needsHeadline: true });
+    const arg = ingestNewsItem.mock.calls[0][0];
+    expect(arg.title).toBe('Treasury issuance points to fiscal dominance');
+    expect(arg.ingestionRef).toBe('issue-42@gromen.com');
+    expect(arg.rexMetadataExtra.title_source).toEqual({
+      from: 'model',
+      rejected: [{ kind: 'subject', title: 'Tree Rings', reason: 'too_short' }],
+    });
+  });
+
+  it('keeps a subject another issue from the same source already used, unless the model offers better', async () => {
+    fakeSupabase.__setResponses('news_items', [{ data: [{ title: 'Weekly notes on the treasury market' }], error: null }]);
+    await processResearchEmail(newsletterEmail({ subject: 'Weekly notes on the treasury market' }), sources(GROMEN));
+
+    expect(extractNewsMetadata.mock.calls[0][0]).toMatchObject({ needsHeadline: true });
+    expect(ingestNewsItem.mock.calls[0][0].rexMetadataExtra.title_source.rejected[0]).toMatchObject({ reason: 'taken' });
+  });
+
   it('keeps no canonical_url it cannot clean', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     try {
@@ -240,7 +275,7 @@ describe('processResearchEmail link following', () => {
   beforeEach(() => {
     fetchUrlExecute.mockReset();
     fetchUrlExecute.mockResolvedValue({
-      title: 'Fetched headline',
+      title: 'RBA holds the cash rate at 4.35%',
       markdown: ARTICLE_BODY,
       resolved_url: undefined,
     });
@@ -267,7 +302,7 @@ describe('processResearchEmail link following', () => {
     expect(child).toMatchObject({
       source: { id: 'src-gromen', name: 'Gromen Tree Rings', tier: 'tier_1' },
       url: 'https://afr.com/rba-holds',
-      title: 'Fetched headline',
+      title: 'RBA holds the cash rate at 4.35%',
       ingestionRef: 'issue-42@gromen.com#link:https://afr.com/rba-holds',
       rubricScopeKey: 'newsletterLinks.rubric_score',
       rexMetadataExtra: {
@@ -383,7 +418,10 @@ describe('processResearchEmail link following', () => {
   });
 
   it('skips a link already in news_items, and spends no budget on it', async () => {
-    fakeSupabase.__setResponses('news_items', [{ data: [{ id: 'existing' }], error: null }]);
+    fakeSupabase.__setResponses('news_items', [
+      { data: [], error: null }, // the parent's taken-title lookup
+      { data: [{ id: 'existing' }], error: null },
+    ]);
     const budget = { remaining: 5 };
     await processResearchEmail(roundupEmail(), sources(ROUNDUP), budget);
     expect(fetchUrlExecute.mock.calls.map((c) => c[0].url)).toEqual(['https://wsj.com/fed-pivot']);

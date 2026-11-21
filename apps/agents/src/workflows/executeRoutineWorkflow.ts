@@ -38,7 +38,7 @@ import type {
   ReportWatchScanConfig,
   ReportWatchScanResult,
 } from '@platform/shared';
-import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, defaultRelevanceFilter, newKeyPoints, normalizeKeyPoints } from '@platform/shared';
+import { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, cleanNewsTitle, defaultRelevanceFilter, isGenericTitle, newKeyPoints, normalizeKeyPoints } from '@platform/shared';
 import { runIndicatorPoll } from '../lib/indicators/runIndicatorPoll.js';
 import { runOnchainPoll } from '../lib/onchain/runOnchainPoll.js';
 import { runMarketReport } from '../lib/report/runMarketReport.js';
@@ -58,7 +58,8 @@ import { checkIntroCashRate, loadStoredCashRate } from '../lib/introCashRate.js'
 import { extractNewsMetadata } from './newsExtract.js';
 import { ingestNewsItem } from './ingestNewsItem.js';
 import { normalizeNewsUrl, dedupeShortlistIndices, isListingPageUrl } from './newsDedup.js';
-import { fetchOgImage, fetchPageMeta } from '../lib/fetchOgImage.js';
+import { fetchOgImage, fetchPageMeta, type PageTitles } from '../lib/fetchOgImage.js';
+import { finaliseHeadline, hostnameOf, pageCandidates, resolveNewsHeadline } from '../lib/newsTitle.js';
 import { resolvePaywalled } from '../lib/paywalledDomains.js';
 import { decodeHtmlEntities, isEmailSafeImage } from '../lib/emailImage.js';
 import { deliverNewsDigest } from '../lib/sendNewsDigest.js';
@@ -1203,6 +1204,8 @@ async function runNewsIngest(
       let imageUrl: string | null = null;
       let pagePaywalled: boolean | null = null;
       let fetchedBody: string | null = null;
+      let pageTitles: PageTitles | null = null;
+      let fetchedTitle: string | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
@@ -1211,8 +1214,10 @@ async function runNewsIngest(
           fetchPageMeta(item.url).then((meta) => {
             imageUrl = meta.imageUrl;
             pagePaywalled = meta.paywalled;
+            pageTitles = meta.titles;
           }),
         ]);
+        fetchedTitle = fetched?.title ?? null;
         const md = fetched?.markdown?.trim();
         fetchedBody = md ?? null;
         if (md && md.length > 200) bodyMarkdown = md;
@@ -1223,22 +1228,38 @@ async function runNewsIngest(
       // the site blocks the page fetch).
       const paywalled = await resolvePaywalled({ url: item.url, page: pagePaywalled, body: fetchedBody });
 
+      // The stored headline: Tavily's title is the page's <title>, often a
+      // template ("Firm > Australia | Legal 500 law firm profiles"). The ranking
+      // judge above still saw the Tavily title; everything from here uses this.
+      const headline = await resolveNewsHeadline({
+        candidates: [
+          ...pageCandidates(pageTitles),
+          { kind: 'search', title: item.title },
+          { kind: 'fetched', title: fetchedTitle },
+        ],
+        sourceName: item.source,
+        url: item.url,
+        siteName: (pageTitles as PageTitles | null)?.siteName,
+      });
+
       // Structured extraction (summary, key_points, topic_tags, AU relevance).
       const extractionInput = bodyMarkdown ?? item.summary;
       const truncated = extractionInput.slice(0, 12000);
       const { data: extracted, reason: extractionReason, flags: extractionFlags } = await extractNewsMetadata({
-        title: item.title,
+        title: headline.resolution.title,
         source: item.source,
         category,
         content: truncated,
         publishedAt: item.published_at,
+        needsHeadline: headline.resolution.needsModelHeadline,
       });
+      const { title, titleSource } = finaliseHeadline(headline, extracted?.headline);
       const extractionOk = extracted !== null;
       if (!extractionOk) {
         extractionFailures += 1;
         failedUrls.push(item.url);
         ingestLog.warn(
-          { title: item.title, url: item.url, reason: extractionReason },
+          { title, url: item.url, reason: extractionReason },
           'extraction failed — inserting with extraction_failed status',
         );
       }
@@ -1248,7 +1269,7 @@ async function runNewsIngest(
       // keeps everything the judge curated.
       if (extracted && shouldDropForRelevance(relevanceFilter, extracted)) {
         itemsFilteredIrrelevant += 1;
-        ingestLog.warn({ url: item.url, title: item.title }, 'filtered as irrelevant');
+        ingestLog.warn({ url: item.url, title }, 'filtered as irrelevant');
         continue;
       }
 
@@ -1256,7 +1277,7 @@ async function runNewsIngest(
       const finalSummary = extracted?.summary ?? item.summary;
       const finalEmbRes = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
-        input: `${item.title}\n${finalSummary}`.trim(),
+        input: `${title}\n${finalSummary}`.trim(),
         dimensions: EMBEDDING_DIMENSIONS,
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
@@ -1268,7 +1289,7 @@ async function runNewsIngest(
       // have no news_sources row, so source.id is null.
       const ingest = await ingestNewsItem({
         source: { id: null, name: item.source, tier: null },
-        title: item.title,
+        title,
         body: bodyMarkdown ?? finalSummary,
         fallbackSummary: finalSummary,
         category: category as NewsCategory,
@@ -1284,6 +1305,7 @@ async function runNewsIngest(
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,
         status: extractionOk ? 'new' : 'extraction_failed',
+        ...(titleSource ? { rexMetadataExtra: { title_source: titleSource } } : {}),
       });
       // A duplicate or failed insert (e.g. a UNIQUE(url) collision from a
       // late-detected duplicate) must not be counted as stored or surfaced in the
@@ -1294,14 +1316,14 @@ async function runNewsIngest(
       }
       if (ingest.status === 'failed') {
         itemsInsertFailed += 1;
-        ingestLog.warn({ url: item.url, title: item.title, error: ingest.reason }, 'insert skipped');
+        ingestLog.warn({ url: item.url, title, error: ingest.reason }, 'insert skipped');
         continue;
       }
       itemsStored += 1;
       if (extractionOk) {
         storedSources.push({
           url: item.url,
-          title: item.title,
+          title,
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
@@ -1516,6 +1538,7 @@ async function runNewsSourceScan(
       let imageUrl: string | null = null;
       let pagePaywalled: boolean | null = null;
       let fetchedBody: string | null = null;
+      let pageTitles: PageTitles | null = null;
       try {
         const [fetched] = await Promise.all([
           fetchUrl.execute!({ url: item.url } as never, {} as never) as Promise<
@@ -1524,6 +1547,7 @@ async function runNewsSourceScan(
           fetchPageMeta(item.url).then((meta) => {
             imageUrl = meta.imageUrl;
             pagePaywalled = meta.paywalled;
+            pageTitles = meta.titles;
           }),
         ]);
         const md = fetched?.markdown?.trim();
@@ -1536,19 +1560,38 @@ async function runNewsSourceScan(
       // the site blocks the page fetch).
       const paywalled = await resolvePaywalled({ url: item.url, page: pagePaywalled, body: fetchedBody });
 
+      // Feed titles are usually the headline: clean and check them only, and
+      // fall back to the page meta already fetched above when one is generic.
+      const siteName = (pageTitles as PageTitles | null)?.siteName ?? null;
+      const titleCtx = { sourceName: item.source, siteName, hostname: hostnameOf(item.url) };
+      const headline = isGenericTitle(item.title, titleCtx).generic
+        ? await resolveNewsHeadline({
+            candidates: [...pageCandidates(pageTitles), { kind: 'search', title: item.title }],
+            sourceName: item.source,
+            sourceId: item.sourceId,
+            url: item.url,
+            siteName,
+          })
+        : null;
+      const resolvedTitle = headline ? headline.resolution.title : cleanNewsTitle(item.title, titleCtx);
+
       const extractionInput = (bodyMarkdown ?? item.summary).slice(0, 12000);
       const { data: extracted, reason: extractionReason, flags: extractionFlags } = await extractNewsMetadata({
-        title: item.title,
+        title: resolvedTitle,
         source: item.source,
         content: extractionInput,
         publishedAt: item.published_at,
+        needsHeadline: headline?.resolution.needsModelHeadline,
         // category omitted — the extractor classifies the article itself.
       });
+      const { title, titleSource } = headline
+        ? finaliseHeadline(headline, extracted?.headline)
+        : { title: resolvedTitle, titleSource: null };
       const extractionOk = extracted !== null;
       if (!extractionOk) {
         extractionFailures += 1;
         scanLog.warn(
-          { title: item.title, url: item.url, reason: extractionReason },
+          { title, url: item.url, reason: extractionReason },
           'extraction failed — inserting with extraction_failed status',
         );
       }
@@ -1556,7 +1599,7 @@ async function runNewsSourceScan(
       const finalSummary = extracted?.summary ?? item.summary;
       const finalEmbRes = await openai.embeddings.create({
         model: EMBEDDING_MODEL,
-        input: `${item.title}\n${finalSummary}`.trim(),
+        input: `${title}\n${finalSummary}`.trim(),
         dimensions: EMBEDDING_DIMENSIONS,
       });
       const finalEmbedding = finalEmbRes.data[0]?.embedding ?? item.dedupEmbedding;
@@ -1565,7 +1608,7 @@ async function runNewsSourceScan(
       // (relevance_score + rex_metadata), just like email newsletters.
       const ingest = await ingestNewsItem({
         source: { id: item.sourceId, name: item.source, tier: item.sourceTier },
-        title: item.title,
+        title,
         body: bodyMarkdown ?? finalSummary,
         fallbackSummary: finalSummary,
         category: (extracted?.category ?? 'international') as NewsCategory,
@@ -1581,6 +1624,7 @@ async function runNewsSourceScan(
         ingestedBy: 'rex',
         precomputedEmbedding: finalEmbedding,
         status: extractionOk ? 'new' : 'extraction_failed',
+        ...(titleSource ? { rexMetadataExtra: { title_source: titleSource } } : {}),
       });
 
       if (ingest.status === 'duplicate') {
@@ -1595,7 +1639,7 @@ async function runNewsSourceScan(
       if (extractionOk) {
         storedSources.push({
           url: item.url,
-          title: item.title,
+          title,
           excerpt: finalSummary,
           retrieved_at: new Date().toISOString(),
           source: item.source,
@@ -2110,7 +2154,7 @@ async function archiveSources(outcome: RoutineOutcome): Promise<number> {
       if (!fetched?.markdown) continue;
 
       const source = outcome.result?.sources.find((s) => s.url === url);
-      const title = source?.title ?? fetched.title ?? url;
+      const title = cleanNewsTitle(source?.title ?? fetched.title ?? url);
 
       await supabase.from('knowledge_items').insert({
         title,

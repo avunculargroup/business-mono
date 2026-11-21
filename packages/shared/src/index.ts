@@ -18,3 +18,4 @@ export * from './papers.js';
 export * from './newsUrl.js';
 export * from './brandVisual.js';
 export * from './headline.js';
+export * from './newsTitle.js';

@@ -44,6 +44,7 @@ import { extractNewsletterLinks, linkDenyReason, type NewsletterLink } from '../
 import { cleanUrl, dedupKey, resolveRedirect, stripTrackingParams } from '../lib/urlClean.js';
 import { fetchUrl } from '../agents/researcher/tools.js';
 import { fetchPageMeta, isPaywallStub } from '../lib/fetchOgImage.js';
+import { finaliseHeadline, pageCandidates, resolveNewsHeadline } from '../lib/newsTitle.js';
 import { resolvePaywalled } from '../lib/paywalledDomains.js';
 import { extractNewsMetadata } from '../workflows/newsExtract.js';
 import { ingestNewsItem } from '../workflows/ingestNewsItem.js';
@@ -296,19 +297,32 @@ export async function processResearchEmail(
   // canonical_url) so news_items.url never collides on a shared "view online" base.
   const url = synthesizeEmailUrl(slug, ingestionRef);
 
+  // The stored headline: the subject, unless it is generic or repeats every
+  // issue ("DECA Bulletin") — then the model's headline. The source badge
+  // already says who sent it. The raw subject stays in ingestionRef above.
+  const headline = await resolveNewsHeadline({
+    candidates: [{ kind: 'subject', title }],
+    sourceName: source.name,
+    sourceId: source.id,
+    url,
+    includeSlug: false,
+  });
+
   // 4. Structural metadata (category, key points, tags) — the rubric scores
   //    separately inside ingestNewsItem.
   const { data: extracted, flags: extractionFlags } = await extractNewsMetadata({
-    title,
+    title: headline.resolution.title,
     source: source.name,
     content: body.slice(0, 12000),
     publishedAt: email.receivedAt,
     multiStory: source.multi_story ?? false,
+    needsHeadline: headline.resolution.needsModelHeadline,
   });
+  const { title: storedTitle, titleSource } = finaliseHeadline(headline, extracted?.headline);
 
   const result = await ingestNewsItem({
     source: { id: source.id, name: source.name, tier: source.tier },
-    title,
+    title: storedTitle,
     body,
     fallbackSummary: extracted?.summary ?? title,
     category: (extracted?.category ?? 'macro') as NewsCategory,
@@ -325,6 +339,7 @@ export async function processResearchEmail(
     attachmentCount: attachmentCount(email),
     ingestedBy: 'rex',
     bodyTruncated: html ? html.length > MAX_HTML_CHARS : false,
+    ...(titleSource ? { rexMetadataExtra: { title_source: titleSource } } : {}),
   });
 
   if (result.status === 'duplicate') return { status: 'duplicate', reason: result.reason };
@@ -515,20 +530,34 @@ export async function ingestNewsletterLinks(args: {
         continue;
       }
 
-      const title = fetched?.title?.trim() || link.anchorText || url;
       const page = await fetchPageMeta(url);
       const imageUrl = page.imageUrl;
       const paywalled = await resolvePaywalled({ url, page: page.paywalled, body: markdown });
+      const headline = await resolveNewsHeadline({
+        candidates: [
+          ...pageCandidates(page.titles),
+          { kind: 'fetched', title: fetched?.title },
+          { kind: 'anchor', title: link.anchorText },
+        ],
+        sourceName: source.name,
+        sourceId: source.id,
+        url,
+        siteName: page.titles?.siteName,
+        // The parent's subject may be this very headline (single-article newsletters).
+        relatedIds: parentNewsItemId ? [parentNewsItemId] : [],
+      });
 
       // A followed article's own date is unknown (stored as null), so it is
       // treated as fresh: it was linked from a newsletter that just arrived.
       const { data: extracted, flags: extractionFlags } = await extractNewsMetadata({
-        title,
+        title: headline.resolution.title,
         source: source.name,
         content: markdown.slice(0, 12000),
         publishedAt: null,
         scopeKey: LINK_EXTRACT_SCOPE,
+        needsHeadline: headline.resolution.needsModelHeadline,
       });
+      const { title, titleSource } = finaliseHeadline(headline, extracted?.headline);
 
       const result = await ingestNewsItem({
         source: { id: source.id, name: source.name, tier: source.tier },
@@ -550,6 +579,7 @@ export async function ingestNewsletterLinks(args: {
         rexMetadataExtra: {
           from_newsletter_item_id: parentNewsItemId,
           from_newsletter_anchor_text: link.anchorText || null,
+          ...(titleSource ? { title_source: titleSource } : {}),
         },
         status: extracted ? 'new' : 'extraction_failed',
         bodyTruncated: fetched?.truncated ?? false,

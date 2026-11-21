@@ -39,6 +39,12 @@ const keyPointSchema = z.object({
     .describe('Background and opinion points only: the date the fact refers to as YYYY-MM-DD, YYYY-MM or YYYY, and only when the article states it. Never later than the publication date. Leave empty for "new" points and whenever unsure — do not guess a year.'),
 });
 
+/** The headline instruction, shared by the schema, the prompt line and the backfill. */
+export const HEADLINE_INSTRUCTION =
+  "The article's own headline, or if none is evident a plain factual headline under 90 characters, sentence case, no source name, no hype.";
+
+const headlineField = z.string().optional().describe(HEADLINE_INSTRUCTION);
+
 export const newsExtractionSchema = z.object({
   category: z.enum(['regulatory', 'corporate', 'macro', 'international'])
     .describe('The single best-fit category: "regulatory" (ASIC/ATO/APRA/government policy), "corporate" (ASX/company treasury announcements), "macro" (RBA rates, AUD, inflation), or "international" (US/EU/global developments with AU implications).'),
@@ -58,6 +64,9 @@ export const newsExtractionSchema = z.object({
     .describe('true only if the article is about Australia, Australian entities, or has clear direct implications for Australian regulation, markets, or businesses.'),
   bitcoin_relevance: z.boolean()
     .describe('true if the article meaningfully discusses Bitcoin, cryptocurrency, blockchain, digital assets, treasury strategy, or directly relevant macro/regulatory context. false for unrelated content (sports, entertainment, unrelated politics, etc.) even if a Bitcoin keyword appears in passing.'),
+  // Asked for only when the page offered no usable title (needsHeadline), so
+  // the fallback costs no extra call. See resolveHeadline in @platform/shared.
+  headline: headlineField,
 });
 
 export type NewsExtraction = z.infer<typeof newsExtractionSchema>;
@@ -166,6 +175,14 @@ function headerLines(input: { title: string; source: string; publishedAt?: strin
     `Published: ${published ? `${published} (Australia/Melbourne)` : 'unknown'}\n`;
 }
 
+/** Appended to the prompt when the caller's title is a page template (needsHeadline). */
+function headlineLine(needsHeadline: boolean | undefined): string {
+  return needsHeadline
+    ? `\n\nThe Title given above is a page template or site name, not this article's headline — do not reuse it. ` +
+      `Also return headline: ${HEADLINE_INSTRUCTION}`
+    : '';
+}
+
 const AS_OF_INSTRUCTION =
   'asOf only on background/opinion points, only when the article states the date, as YYYY-MM-DD, YYYY-MM or YYYY ' +
   'and never later than the publication date; leave it empty on "new" points';
@@ -185,6 +202,11 @@ export async function extractNewsMetadata(input: {
   publishedAt?: string | null;
   /** news_sources.multi_story: extract key points per section of a roundup. */
   multiStory?: boolean;
+  /**
+   * The title is a page template (resolveHeadline found nothing usable): ask
+   * the model for a `headline` in the same call, and tell it not to reuse the title.
+   */
+  needsHeadline?: boolean;
   /**
    * Model scope key for this call, so an ingestion path can be configured
    * separately in /settings/models. Defaults to the shared extractor scope.
@@ -221,7 +243,8 @@ export async function extractNewsMetadata(input: {
     `Extract: category (best-fit of the four values), summary (2–3 sentences, at least 40 characters, up to about 500), ` +
     `key_points (2–7 factual points, each with kind new/background/opinion; ${AS_OF_INSTRUCTION}), ` +
     `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
-    `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).`;
+    `bitcoin_relevance (boolean — be honest; false if the article is unrelated even if a Bitcoin keyword appears in passing).` +
+    headlineLine(input.needsHeadline);
 
   const first = await generateValidated(newsExtractionSchema, basePrompt, scopeKey);
   if (!first.data) {
@@ -256,7 +279,7 @@ export async function extractNewsMetadata(input: {
  * whole-item path.
  */
 async function extractRoundup(
-  input: { title: string; source: string; category?: NewsCategory; content: string; publishedAt?: string | null },
+  input: { title: string; source: string; category?: NewsCategory; content: string; publishedAt?: string | null; needsHeadline?: boolean },
   sections: RoundupSection[],
   scopeKey: string,
   fresh: boolean,
@@ -271,7 +294,8 @@ async function extractRoundup(
     `This is a newsletter roundup of several stories.\n\nNewsletter:\n${input.content}\n\n` +
     `Extract: category (best-fit of the four values, by the lead story), summary (2–3 sentences, at least 40 characters, up to about 500, leading with the lead story), ` +
     `topic_tags (2–8 lowercase hyphenated tags), australian_relevance (boolean), ` +
-    `bitcoin_relevance (boolean — be honest; false if no story meaningfully touches Bitcoin or directly relevant macro/regulatory context).`;
+    `bitcoin_relevance (boolean — be honest; false if no story meaningfully touches Bitcoin or directly relevant macro/regulatory context).` +
+    headlineLine(input.needsHeadline);
 
   const flags: ExtractionFlag[] = [];
   const [meta, ...perSection] = await Promise.all([
@@ -302,4 +326,25 @@ async function extractRoundup(
     reason: null,
     flags,
   };
+}
+
+const headlineOnlySchema = z.object({ headline: z.string().min(1).describe(HEADLINE_INSTRUCTION) });
+
+/**
+ * One small call for a headline alone, over a stored body. For the title
+ * backfill, where nothing else is being extracted; ingest gets its headline
+ * from extractNewsMetadata (needsHeadline) instead, at no extra cost.
+ */
+export async function generateHeadline(input: {
+  title: string;
+  source: string;
+  content: string;
+  scopeKey?: string;
+}): Promise<string | null> {
+  const prompt =
+    `Title: ${input.title}\nSource: ${input.source}\n\nArticle:\n${input.content}\n\n` +
+    `The Title above is a page template or site name, not this article's headline — do not reuse it. ` +
+    `Return headline: ${HEADLINE_INSTRUCTION}`;
+  const { data } = await generateValidated(headlineOnlySchema, prompt, input.scopeKey ?? 'executeRoutine.news_extractor');
+  return data?.headline?.trim() || null;
 }

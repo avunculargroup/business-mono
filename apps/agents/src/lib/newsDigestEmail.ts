@@ -8,7 +8,7 @@
  * blocks and don't honour CSS custom properties or web fonts reliably.
  */
 
-import type { NewsCurationStory, RoutineResult } from '@platform/shared';
+import { cleanNewsTitle, type NewsCurationStory, type RoutineResult } from '@platform/shared';
 
 // ── BTS palette (mirrors bts-design colors_and_type.css; inlined for email) ────
 const C = {
@@ -67,27 +67,6 @@ interface DigestItem {
   paywalled?: boolean;
 }
 
-/**
- * Strips a trailing " - / | / – / — <Publication>" source suffix from a headline.
- * Mirrors apps/web/lib/news/cleanTitle.ts (not importable from agents) so the
- * email reads the same as the dashboard tile.
- */
-const SOURCE_SUFFIX = /\s+[-–—|]\s+([^-–—|]{1,60})$/;
-function cleanTitle(title: string): string {
-  let current = title.trim();
-  for (;;) {
-    const match = SOURCE_SUFFIX.exec(current);
-    if (!match) break;
-    const suffix = match[1]!.trim();
-    if (suffix.split(/\s+/).length > 6) break;
-    if (/[.!?]$/.test(suffix)) break;
-    const stripped = current.slice(0, match.index).trim();
-    if (stripped.length < 3) break;
-    current = stripped;
-  }
-  return current;
-}
-
 /** Badge text for a story whose article sits behind a paywall. */
 const PAYWALL_LABEL = 'Paywall';
 
@@ -124,7 +103,7 @@ function digestItems(result: RoutineResult): DigestItem[] {
   const meta = (result.metadata ?? {}) as { stories?: NewsCurationStory[] };
   if (meta.stories && meta.stories.length > 0) {
     return meta.stories.map((s) => ({
-      title: cleanTitle(s.title),
+      title: cleanNewsTitle(s.title),
       url: s.url,
       source: s.source_name,
       id: s.id,
@@ -134,7 +113,7 @@ function digestItems(result: RoutineResult): DigestItem[] {
   }
   // Fall back to the action-agnostic sources[] the tile also reads from.
   return (result.sources ?? []).map((s) => ({
-    title: cleanTitle(s.title ?? s.url),
+    title: cleanNewsTitle(s.title ?? s.url),
     url: s.url,
     source: s.source ?? '',
     paywalled: s.paywalled,

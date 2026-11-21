@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { fetchOgImage, fetchPageMeta, detectPaywall, isPaywallStub, hasPaywallMarker } from './fetchOgImage.js';
+import { fetchOgImage, fetchPageMeta, findJsonLdHeadline, detectPaywall, isPaywallStub, hasPaywallMarker } from './fetchOgImage.js';
 
 function response(body: string, ok = true, status = 200): Response {
   return { ok, status, text: async () => body } as Response;
@@ -91,7 +91,7 @@ describe('fetchPageMeta', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await fetchPageMeta('https://example.com/story')).toEqual({
+    expect(await fetchPageMeta('https://example.com/story')).toMatchObject({
       imageUrl: 'https://cdn.example.com/a.jpg',
       paywalled: true,
     });
@@ -101,13 +101,65 @@ describe('fetchPageMeta', () => {
   it('reports paywalled:false for a fetched page with no signal', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(page('<title>Open</title>'))));
 
-    expect(await fetchPageMeta('https://example.com/story')).toEqual({ imageUrl: null, paywalled: false });
+    expect(await fetchPageMeta('https://example.com/story')).toMatchObject({ imageUrl: null, paywalled: false });
   });
 
   it('reports paywalled:null when the page cannot be fetched', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
-    expect(await fetchPageMeta('https://example.com/story')).toEqual({ imageUrl: null, paywalled: null });
+    expect(await fetchPageMeta('https://example.com/story')).toEqual({
+      imageUrl: null,
+      paywalled: null,
+      titles: { og: null, jsonld: null, h1: null, twitter: null, siteName: null, htmlTitle: null },
+    });
+  });
+
+  it('returns every title candidate the page offers', async () => {
+    const html =
+      '<html><head>' +
+      '<title>Piper Alderman &gt; Australia | Legal 500</title>' +
+      `<meta property="og:title" content="Saylor's bet &amp; the market">` +
+      '<meta content="Twitter headline here" name="twitter:title">' +
+      '<meta property="og:site_name" content="Legal 500">' +
+      '</head><body><header><h1 class="t">Crossing the <em>Pacific</em>:&nbsp;Key considerations</h1></header>' +
+      '<script type="application/ld+json">{"@type":"NewsArticle","headline":"From JSON-LD"}</script>' +
+      '</body></html>';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(html)));
+
+    expect((await fetchPageMeta('https://example.com/story')).titles).toEqual({
+      og: "Saylor's bet & the market",
+      jsonld: 'From JSON-LD',
+      h1: 'Crossing the Pacific: Key considerations',
+      twitter: 'Twitter headline here',
+      siteName: 'Legal 500',
+      htmlTitle: 'Piper Alderman > Australia | Legal 500',
+    });
+  });
+});
+
+describe('findJsonLdHeadline', () => {
+  const ld = (json: string) => `<script type="application/ld+json">${json}</script>`;
+
+  it('reads a headline from an @graph, preferring the article node', () => {
+    const html = ld(JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebPage', headline: 'Site page' },
+        { '@type': ['BlogPosting'], headline: 'Undercut &amp; out' },
+      ],
+    }));
+    expect(findJsonLdHeadline(html)).toBe('Undercut & out');
+  });
+
+  it('skips malformed JSON and keeps looking', () => {
+    const html = ld('{"@type":"NewsArticle","headline":"broken",}') + ld('[{"@type":"Article","headline":"Second block"}]');
+    expect(findJsonLdHeadline(html)).toBe('Second block');
+  });
+
+  it('falls back to an untyped headline, or null when there is none', () => {
+    expect(findJsonLdHeadline(ld('{"headline":"Untyped"}'))).toBe('Untyped');
+    expect(findJsonLdHeadline(ld('not json at all'))).toBeNull();
+    expect(findJsonLdHeadline('<p>no json-ld</p>')).toBeNull();
   });
 });
 

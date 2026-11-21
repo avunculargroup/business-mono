@@ -302,3 +302,25 @@ describe('extractNewsMetadata — rba-minutes-roundup regression', () => {
     expect(promptOf(0)).toContain('Article:\n');
   });
 });
+
+describe('extractNewsMetadata headline fallback', () => {
+  beforeEach(() => generateMock.mockReset());
+
+  const promptOf = (call: number) => (generateMock.mock.calls[call]![0] as Array<{ content: string }>)[0]!.content;
+
+  it('asks for a headline only when needsHeadline is set', async () => {
+    generateMock.mockResolvedValue({ object: { ...validExtraction('x'.repeat(100)), headline: 'A plain headline' } });
+
+    await extractNewsMetadata({ title: 'Real headline here', source: 'S', content: 'body' });
+    expect(promptOf(0)).not.toContain('do not reuse it');
+
+    const { data } = await extractNewsMetadata({ title: 'X', source: 'S', content: 'body', needsHeadline: true });
+    expect(promptOf(1)).toContain('page template or site name');
+    expect(promptOf(1)).toContain('headline: ');
+    expect(data?.headline).toBe('A plain headline');
+  });
+
+  it('accepts an extraction without a headline', () => {
+    expect(newsExtractionSchema.safeParse(validExtraction('x'.repeat(100))).success).toBe(true);
+  });
+});

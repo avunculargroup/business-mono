@@ -18,7 +18,8 @@
     "backfill:newsletter": "tsx src/scripts/backfillNewsletterContent.ts",
     "backfill:papers": "tsx src/scripts/paperBackfill.ts",
     "backfill:key-point-kinds": "tsx src/scripts/backfillKeyPointKinds.ts",
-    "backfill:key-point-asof": "tsx src/scripts/normalizeKeyPointAsOf.ts"
+    "backfill:key-point-asof": "tsx src/scripts/normalizeKeyPointAsOf.ts",
+    "backfill:news-titles": "tsx src/scripts/backfillNewsTitles.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.24",
