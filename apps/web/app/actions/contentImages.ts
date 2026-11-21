@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { activeLayouts, lintHeadline, lintImageConcept, planCandidateSelection, toBrandVisual } from '@platform/shared';
+import { activeLayouts, lintHeadline, lintImageConcept, lintKicker, planCandidateSelection, toBrandVisual } from '@platform/shared';
 import { getAuthedClient } from '@/lib/action';
 import { humanizeError } from '@/lib/errors';
 
@@ -117,7 +117,7 @@ const cardSchema = z.object({
   generationGroupId: uuid,
   showHeadline: z.boolean(),
   headline: z.string().trim().max(120, 'Keep the headline short'),
-  kicker: z.string().trim().max(24, 'Keep the kicker to one or two words'),
+  kicker: z.string().trim().max(24, 'Keep the kicker to one to three words'),
 });
 export type ImageCardInput = z.input<typeof cardSchema>;
 
@@ -140,13 +140,15 @@ export async function requestImageRecompose(input: ImageCardInput) {
     const postCopy = [item?.title, item?.body].filter((v) => typeof v === 'string' && v.trim()).join('\n\n');
     const lint = lintHeadline(headline, postCopy);
     if (!lint.ok) return { error: `Change the headline first: ${lint.flags.join(' ')}` };
+    const kickerLint = kicker ? lintKicker(kicker) : null;
+    if (kickerLint && !kickerLint.ok) return { error: `Change the kicker first: ${kickerLint.flags.join(' ')}` };
   }
 
   return queue(contentItemId, 'recompose', null, {
     generation_group_id: generationGroupId,
     show_headline: showHeadline,
     headline: headline || null,
-    kicker: kicker ? kicker.toUpperCase() : null,
+    kicker: kicker || null,
   });
 }
 

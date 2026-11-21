@@ -55,7 +55,7 @@ const GATE: ImageConcept = {
   layout: 'diagonal',
   alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", headlines: [] as string[], concepts: [STAMP, LIGHTHOUSE, GATE] };
+const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", headlines: [] as string[], kicker: "", concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const CP392 =
   "140 businesses have applied to offer digital asset services in Australia.\n\nASIC just dropped Consultation Paper 392 — the rulebook for custody, settlement, and capital requirements under the new Digital Assets Framework Act.\n\nClarity's coming. April 2027.\n\nNot nothing.";
@@ -70,7 +70,7 @@ describe('imageBriefSchema', () => {
   });
 
   it('lets a skip brief carry no concepts', () => {
-    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], concepts: [] }).success).toBe(true);
+    expect(imageBriefSchema.safeParse({ skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], kicker: '', concepts: [] }).success).toBe(true);
   });
 
   it('asks the model for no length limits, so one long field cannot fail the brief', () => {
@@ -159,8 +159,8 @@ describe('lintImageBrief', () => {
   });
 
   it('says so when the brief returned no concepts, and treats a skip as clean', () => {
-    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', headlines: [], concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
-    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', headlines: [], concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
+    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', headlines: [], kicker: "", concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
+    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', headlines: [], kicker: "", concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
   });
 
   it('allows digits in the hook only', () => {
@@ -635,7 +635,7 @@ describe('normaliseBrief', () => {
   });
 
   it('passes a skip brief through untouched', () => {
-    const skip = { skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], concepts: [] };
+    const skip = { skip: true, skip_reason: 'No honest visual.', hook: '', headlines: [], kicker: '', concepts: [] };
     expect(normaliseBrief(skip)).toEqual({ ok: true, brief: skip, dropped: 0, excess: 0, truncated: [] });
   });
 
@@ -699,6 +699,24 @@ describe('headline cards', () => {
     if (!r.ok) throw new Error(r.detail);
     expect(r.brief.headlines).toEqual(['One.', 'Two.', 'Three.']);
     expect(normaliseBrief({ skip: false, skip_reason: null, hook: 'h', concepts: six })).toMatchObject({ ok: true, brief: { headlines: [] } });
+  });
+
+  it('asks for the kicker as a plain-English subject, with the examples', () => {
+    const p = buildImageBriefPrompt(base);
+    expect(p).toContain('kicker: the subject of the post in **one to three plain words**, as a reader would name it.');
+    expect(p).toContain('It is not a section name, a category or a slogan.');
+    for (const k of ['Bitcoin security', 'Business confidence', 'Interest rates', 'Company treasuries', 'Digital asset rules', 'Real wages', 'Self-custody']) {
+      expect(p).toContain(`"${k}"`);
+    }
+  });
+
+  it('keeps the model\'s kicker, and reads a missing or mistyped one as none', () => {
+    const six = ['a door', 'a bell', 'a kite', 'a well', 'a drum', 'a sail'].map((symbol) => ({ ...STAMP, symbol }));
+    const r = normaliseBrief({ skip: false, skip_reason: null, hook: 'h', headlines: [], kicker: ' Digital asset rules ', concepts: six });
+    if (!r.ok) throw new Error(r.detail);
+    expect(r.brief.kicker).toBe('Digital asset rules');
+    expect(normaliseBrief({ skip: false, skip_reason: null, hook: 'h', concepts: six })).toMatchObject({ ok: true, brief: { kicker: '' } });
+    expect(normaliseBrief({ skip: false, skip_reason: null, hook: 'h', kicker: 7, concepts: six })).toMatchObject({ ok: true, brief: { kicker: '' } });
   });
 
   it('lints each headline against the post', () => {

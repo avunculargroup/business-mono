@@ -134,7 +134,7 @@ describe('requestImageRender', () => {
 
 describe('requestImageRecompose', () => {
   const POST = { title: null, body: 'Twenty years. Nobody knows the trigger.' };
-  const input = { contentItemId: ITEM, generationGroupId: GROUP, showHeadline: true, headline: ' Nobody knows the trigger. ', kicker: 'macro' };
+  const input = { contentItemId: ITEM, generationGroupId: GROUP, showHeadline: true, headline: ' Nobody knows the trigger. ', kicker: ' Bitcoin security ' };
 
   it('lints the headline against the post, then queues a recompose with no render', async () => {
     supabase.__setResponse('content_items', { data: POST, error: null });
@@ -145,7 +145,7 @@ describe('requestImageRecompose', () => {
         content_item_id: ITEM,
         action: 'recompose',
         brief: null,
-        card: { generation_group_id: GROUP, show_headline: true, headline: 'Nobody knows the trigger.', kicker: 'MACRO' },
+        card: { generation_group_id: GROUP, show_headline: true, headline: 'Nobody knows the trigger.', kicker: 'Bitcoin security' },
         requested_by: 'director-1',
       },
     ]);
@@ -155,6 +155,13 @@ describe('requestImageRecompose', () => {
     supabase.__setResponse('content_items', { data: POST, error: null });
     const result = await requestImageRecompose({ ...input, headline: 'It took 30 years!' });
     expect('error' in result ? result.error : null).toMatch(/^Change the headline first: .*No exclamation marks\. .*Figure not in the post: 30\./);
+    expect(inserts('content_image_requests')).toEqual([]);
+  });
+
+  it('names the kicker lint instead of queuing', async () => {
+    supabase.__setResponse('content_items', { data: POST, error: null });
+    const result = await requestImageRecompose({ ...input, kicker: 'macro' });
+    expect('error' in result ? result.error : null).toBe('Change the kicker first: Name the subject, not an internal category.');
     expect(inserts('content_image_requests')).toEqual([]);
   });
 

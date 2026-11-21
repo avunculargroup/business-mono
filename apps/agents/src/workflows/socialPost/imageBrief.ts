@@ -46,6 +46,8 @@ export const HOOK_LIMIT = 120;
 export const MAX_HEADLINES = 3;
 /** A headline is lint-limited to 48 characters; this only bounds what is stored. */
 export const HEADLINE_LIMIT = 120;
+/** A kicker is lint-limited to 24 characters; this only bounds what is stored. */
+export const KICKER_LIMIT = 60;
 export const SKIP_REASON_LIMIT = 200;
 
 /** The contract for one concept: what is stored and rendered. */
@@ -81,6 +83,7 @@ export const imageBriefOutputSchema = z.object({
   skip_reason: z.string().nullable(),
   hook: z.string(), // the post's most specific, concrete phrase
   headlines: z.array(z.string()), // three short headlines for the card, best first
+  kicker: z.string(), // the post's subject in one to three plain words, for readers
   concepts: z.array(lenientConceptSchema),
 });
 
@@ -95,6 +98,7 @@ export const imageBriefSchema = z
     skip_reason: z.string().max(SKIP_REASON_LIMIT).nullable(),
     hook: z.string().max(HOOK_LIMIT),
     headlines: z.array(z.string().max(HEADLINE_LIMIT)).max(MAX_HEADLINES),
+    kicker: z.string().max(KICKER_LIMIT),
     concepts: z.array(conceptSchema).max(MAX_BRIEF_CONCEPTS),
   })
   .superRefine((brief, ctx) => {
@@ -149,6 +153,7 @@ const briefShellSchema = z.object({
   skip_reason: z.string().nullable().optional(),
   hook: z.string().optional(),
   headlines: z.array(z.unknown()).optional(),
+  kicker: z.unknown().optional(),
   concepts: z.array(z.unknown()).optional(),
 });
 
@@ -185,13 +190,15 @@ export function normaliseBrief(raw: unknown): NormalisedBrief {
   const skipReason = shell.data.skip_reason == null ? null : cut(shell.data.skip_reason, SKIP_REASON_LIMIT, 'skip_reason');
   const hook = cut(shell.data.hook ?? '', HOOK_LIMIT, 'hook');
   if (skip) {
-    return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines: [], concepts: [] }, dropped: 0, excess: 0, truncated };
+    return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines: [], kicker: '', concepts: [] }, dropped: 0, excess: 0, truncated };
   }
   // Headlines are lenient too: non-strings and blanks dropped, at most three kept.
   const headlines = (shell.data.headlines ?? [])
     .filter((h): h is string => typeof h === 'string' && h.trim().length > 0)
     .slice(0, MAX_HEADLINES)
     .map((h, i) => cut(h, HEADLINE_LIMIT, `headline ${i + 1}`));
+  // A missing or mistyped kicker is no kicker, never a failed brief.
+  const kicker = typeof shell.data.kicker === 'string' ? cut(shell.data.kicker, KICKER_LIMIT, 'kicker') : '';
   const rawConcepts = shell.data.concepts ?? [];
   const concepts: ImageConcept[] = [];
   let dropped = 0;
@@ -214,7 +221,7 @@ export function normaliseBrief(raw: unknown): NormalisedBrief {
     });
   }
   const excess = Math.max(0, rawConcepts.length - dropped - MAX_BRIEF_CONCEPTS);
-  return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines, concepts }, dropped, excess, truncated };
+  return { ok: true, brief: { skip, skip_reason: skipReason, hook, headlines, kicker, concepts }, dropped, excess, truncated };
 }
 
 /** At most this many concepts are rendered per run: the reviewer's shortlist. */
@@ -373,6 +380,17 @@ headlines: three options for a short headline printed beside the picture. Each o
   - "Who moved the measuring stick?"
 Put the best first.
 
+## Then the kicker
+kicker: the subject of the post in **one to three plain words**, as a reader would name it. It is printed in small capitals above the headline. It is not a section name, a category or a slogan. Write it in sentence case, letters only: no numbers or symbols, and never the company's name.
+- Examples:
+  - "Bitcoin security"
+  - "Business confidence"
+  - "Interest rates"
+  - "Company treasuries"
+  - "Digital asset rules"
+  - "Real wages"
+  - "Self-custody"
+
 ## Then work it out in this order, for each concept
 1. tension: the surprising or uneasy idea in this post, in one sentence. Not its topic.
 2. symbol: an object, place or tool everyone already knows. Instant recognition matters more than originality.
@@ -410,7 +428,7 @@ Physics: if the twist involves weight, balance, light, motion or water, describe
 - No text, letters, numbers or figures anywhere in the picture. Images cannot carry them.
 - No coins, currency symbols, charts, arrows or anything that implies a price going up or down. No people's faces.${avoid}
 - Keep the bottom-right corner of the picture empty.
-- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook, no headlines and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}${reviewer}`;
+- If the post has no honest visual, set skip = true with a short skip_reason, an empty hook, no headlines, an empty kicker and no concepts. Skipping is a good outcome, not a failure.${history}${rewrite}${reviewer}`;
 }
 
 // ── The reviewer: shortlist before any render is paid for ──────────────────────

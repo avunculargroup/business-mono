@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { StatusChip } from '@platform/ui/StatusChip';
 import { useToast } from '@platform/ui/ToastProvider';
 import { FormField } from '@platform/ui/FormField';
-import { lintHeadline, type BrandVisual } from '@platform/shared';
+import { lintHeadline, lintKicker, type BrandVisual } from '@platform/shared';
 import type { ContentImage, ContentImageRequest } from '@platform/data';
 import {
   getImageDownloadUrl,
@@ -99,11 +99,13 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
   const [kicker, setKicker] = useState(image?.kicker ?? '');
   const [showHeadline, setShowHeadline] = useState(image?.cardType === 'headline');
   const [headlineFlags, setHeadlineFlags] = useState<string[]>([]);
+  const [kickerFlags, setKickerFlags] = useState<string[]>([]);
   useEffect(() => {
     setHeadline(image?.headline ?? '');
     setKicker(image?.kicker ?? '');
     setShowHeadline(image?.cardType === 'headline');
     setHeadlineFlags([]);
+    setKickerFlags([]);
   }, [image?.id, image?.headline, image?.kicker, image?.cardType]);
 
   useEffect(() => {
@@ -147,15 +149,19 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
   const needsNewImage = showHeadline && image?.artAspect !== '1:1';
   const cardDirty =
     showHeadline !== (image?.cardType === 'headline') ||
-    (showHeadline && (headline.trim() !== (image?.headline ?? '') || kicker.trim().toUpperCase() !== (image?.kicker ?? '')));
+    (showHeadline && (headline.trim() !== (image?.headline ?? '') || kicker.trim() !== (image?.kicker ?? '')));
 
   const saveCard = () => {
     if (showHeadline) {
       const lint = lintHeadline(headline, postCopy);
       setHeadlineFlags(lint.flags);
-      if (!lint.ok) return;
+      // The kicker is optional: an empty one is no kicker, not a flag.
+      const kickerLint = kicker.trim() ? lintKicker(kicker) : { ok: true, flags: [] };
+      setKickerFlags(kickerLint.flags);
+      if (!lint.ok || !kickerLint.ok) return;
     } else {
       setHeadlineFlags([]);
+      setKickerFlags([]);
     }
     run(
       () => requestImageRecompose({ contentItemId, generationGroupId: groupId, showHeadline, headline, kicker }),
@@ -204,6 +210,7 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
                   onChange={(e) => {
                     setShowHeadline(e.target.checked);
                     setHeadlineFlags([]);
+                    setKickerFlags([]);
                   }}
                 />
                 Show headline
@@ -234,7 +241,8 @@ export function ImageSlot({ contentItemId, image, candidates = [], request, cano
                     <FormField
                       name="kicker"
                       label="Kicker"
-                      hint="Optional. Shown in capitals above the headline."
+                      hint="Optional. The post's subject in one to three plain words, like Bitcoin security. Shown in capitals above the headline."
+                      error={kickerFlags.length > 0 ? kickerFlags.join(' ') : undefined}
                       value={kicker}
                       maxLength={24}
                       disabled={busy}

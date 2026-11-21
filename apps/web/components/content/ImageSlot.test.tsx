@@ -349,7 +349,7 @@ describe('ImageSlot', () => {
         masterPath: `social-images/2026-11-20/${GROUP}/master-1x1.png`,
         cardType: 'headline',
         headline: 'Discipline beats conviction.',
-        kicker: 'MACRO',
+        kicker: 'Bitcoin security',
         headlineVerdict: { classification: 'educational', rationale: 'states', checkedAt: '2026-11-20T00:00:00Z' },
         ...overrides,
       });
@@ -358,7 +358,7 @@ describe('ImageSlot', () => {
       render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
       expect(screen.getByRole('checkbox', { name: 'Show headline' })).toBeChecked();
       expect(screen.getByLabelText('Headline')).toHaveValue('Discipline beats conviction.');
-      expect(screen.getByLabelText('Kicker')).toHaveValue('MACRO');
+      expect(screen.getByLabelText('Kicker')).toHaveValue('Bitcoin security');
       expect(screen.getByRole('button', { name: 'Save card' })).toBeDisabled();
     });
 
@@ -382,15 +382,34 @@ describe('ImageSlot', () => {
       await user.clear(field);
       await user.type(field, 'Nobody knows the trigger.');
       await user.clear(screen.getByLabelText('Kicker'));
-      await user.type(screen.getByLabelText('Kicker'), 'treasury');
+      await user.type(screen.getByLabelText('Kicker'), 'Company treasuries');
       await user.click(screen.getByRole('button', { name: 'Save card' }));
       expect(actions.requestImageRecompose).toHaveBeenCalledWith({
         contentItemId: ITEM,
         generationGroupId: GROUP,
         showHeadline: true,
         headline: 'Nobody knows the trigger.',
-        kicker: 'treasury',
+        kicker: 'Company treasuries',
       });
+    });
+
+    it('shows the kicker lint inline and queues nothing when the kicker is a category', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      await user.clear(screen.getByLabelText('Kicker'));
+      await user.type(screen.getByLabelText('Kicker'), 'Macro');
+      await user.click(screen.getByRole('button', { name: 'Save card' }));
+      expect(screen.getByText('Name the subject, not an internal category.')).toBeInTheDocument();
+      expect(screen.getByLabelText('Kicker')).toHaveAttribute('aria-invalid', 'true');
+      expect(actions.requestImageRecompose).not.toHaveBeenCalled();
+    });
+
+    it('saves with the kicker cleared: no kicker is not a flag', async () => {
+      const user = userEvent.setup();
+      render(<ImageSlot contentItemId={ITEM} image={card()} request={null} canon={CANON} postCopy={POST} />);
+      await user.clear(screen.getByLabelText('Kicker'));
+      await user.click(screen.getByRole('button', { name: 'Save card' }));
+      expect(actions.requestImageRecompose).toHaveBeenCalledWith(expect.objectContaining({ kicker: '' }));
     });
 
     it('turns the headline off without linting it', async () => {

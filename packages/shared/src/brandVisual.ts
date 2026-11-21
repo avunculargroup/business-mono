@@ -66,6 +66,12 @@ export interface ImageBrief {
    * lintHeadline before the reviewer sees them.
    */
   headlines: string[];
+  /**
+   * The post's subject in one to three plain words, as a reader would name it
+   * ("Bitcoin security"), printed uppercase over the headline (2026-11-21).
+   * Never a category. Linted by lintKicker; a failing one is not printed.
+   */
+  kicker: string;
   concepts: ImageConcept[];
 }
 
@@ -129,7 +135,7 @@ export interface CardSettings {
   headline_size_max: number;
   headline_size_min: number;
   max_lines: number;
-  /** False: no kicker above the headline, whatever the story's category. */
+  /** False: no kicker above the headline, whatever the brief wrote. */
   kicker: boolean;
 }
 
