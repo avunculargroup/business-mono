@@ -55,7 +55,7 @@ const GATE: ImageConcept = {
   layout: 'diagonal',
   alt_text: 'A linocut of a locked turnstile with briefcases queued behind it.',
 };
-const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", headlines: [] as string[], kicker: "", concepts: [STAMP, LIGHTHOUSE, GATE] };
+const BRIEF = { skip: false, skip_reason: null, hook: "Clarity's coming", headlines: [] as string[], kicker: '', concepts: [STAMP, LIGHTHOUSE, GATE] };
 
 const CP392 =
   "140 businesses have applied to offer digital asset services in Australia.\n\nASIC just dropped Consultation Paper 392 — the rulebook for custody, settlement, and capital requirements under the new Digital Assets Framework Act.\n\nClarity's coming. April 2027.\n\nNot nothing.";
@@ -159,8 +159,8 @@ describe('lintImageBrief', () => {
   });
 
   it('says so when the brief returned no concepts, and treats a skip as clean', () => {
-    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', headlines: [], kicker: "", concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
-    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', headlines: [], kicker: "", concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
+    expect(lintImageBrief({ skip: false, skip_reason: null, hook: '', headlines: [], kicker: '', concepts: [] }, opts).flags).toEqual(['The brief returned no concepts.']);
+    expect(lintImageBrief({ skip: true, skip_reason: 'quiet', hook: '', headlines: [], kicker: '', concepts: [] }, opts)).toEqual({ clean: [], flags: [] });
   });
 
   it('allows digits in the hook only', () => {

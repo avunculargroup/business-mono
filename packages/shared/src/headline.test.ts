@@ -211,6 +211,7 @@ describe('broken objects', () => {
       skip_reason: null,
       hook: 'measuring stick',
       headlines: [],
+      kicker: '',
       concepts: [
         concept({ symbol: 'a dipstick', twist: 'snapped at the line', subject: 'a snapped dipstick' }),
         concept({ symbol: 'a lighthouse' }),
