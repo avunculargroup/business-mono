@@ -118,7 +118,7 @@ describe('renderSocialDraftEmail', () => {
       company: COMPANY,
     });
     expect(html).toContain(
-      '<img src="https://signed.example/li.png?token=a&amp;b=1" alt="A sketch of a &quot;level&quot; scale." width="100%" style="display:block;width:100%;height:auto;border-radius:8px;">',
+      '<img src="https://signed.example/li.png?token=a&amp;b=1" alt="A sketch of a &quot;level&quot; scale." width="502" style="display:block;width:100%;max-width:502px;height:auto;border-radius:8px;">',
     );
     expect(html).toContain('src="https://signed.example/x.png"');
     expect(text).toContain('Image: A sketch of a scale.');

@@ -11,27 +11,33 @@
  * honour CSS custom properties or web fonts reliably.
  */
 
-import type { CompanyFooter, RenderedEmail } from './newsDigestEmail.js';
+import {
+  C as BTS,
+  CONTENT_WIDTH,
+  FONT_BODY,
+  T,
+  button,
+  emailShell,
+  escapeHtml,
+  eyebrowRow,
+  footerText,
+  safeHref,
+  titleRow,
+  type CompanyFooter,
+  type RenderedEmail,
+} from './emailLayout.js';
 
-// ── BTS palette (mirrors newsDigestEmail.ts; inlined for email) ────────────────
+// BTS palette plus X "dark chrome" so the X card reads as X at a glance.
 const C = {
-  bg: '#FAFAF8',
-  surface: '#FFFFFF',
-  border: '#E8E6E0',
-  textPrimary: '#1A1915',
-  textSecondary: '#6B6860',
-  textTertiary: '#9E9C96',
-  accent: '#C9A84C',
-  accentDark: '#9A7A2E',
-  // X "dark chrome" so the card reads as X at a glance.
+  ...BTS,
   xBg: '#15181B',
   xSurface: '#1E2226',
   xText: '#E7E9EA',
   xMuted: '#8B98A5',
 } as const;
 
-const FONT_DISPLAY = "Georgia, 'Times New Roman', serif";
-const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+/** Inner width of a preview card: content column less the card's border and 20px padding. */
+const CARD_CONTENT_WIDTH = CONTENT_WIDTH - 42;
 
 type Platform = 'linkedin' | 'twitter_x';
 type Classification = 'educational' | 'general_advice' | 'personal_opinion';
@@ -64,19 +70,6 @@ export interface SocialDraftEmailInput {
   /** Absolute base URL of the internal app — makes the review CTA clickable. */
   webAppUrl?: string;
   company: CompanyFooter;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function safeHref(url: string): string | null {
-  return /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
 }
 
 /** Codepoint count — closer to how platforms count than UTF-16 `.length`. */
@@ -124,13 +117,13 @@ function bodyHtml(post: SocialDraftPost, dark: boolean): string {
         (seg, i) =>
           `<tr><td style="padding:${i === 0 ? '0' : '12px'} 0 12px 0;border-top:${
             i === 0 ? 'none' : `1px solid ${divider}`
-          };font-family:${FONT_BODY};font-size:15px;line-height:1.5;color:${color};white-space:pre-wrap;"><span style="color:${numColor};font-weight:600;">${
+          };font-family:${FONT_BODY};font-size:${T.base};line-height:1.5;color:${color};white-space:pre-wrap;"><span style="color:${numColor};font-weight:600;">${
             i + 1
           }/</span> ${escapeHtml(seg)}</td></tr>`,
       )
       .join('');
   }
-  return `<tr><td style="font-family:${FONT_BODY};font-size:15px;line-height:1.55;color:${color};white-space:pre-wrap;">${escapeHtml(
+  return `<tr><td style="font-family:${FONT_BODY};font-size:${T.base};line-height:1.55;color:${color};white-space:pre-wrap;">${escapeHtml(
     post.body,
   )}</td></tr>`;
 }
@@ -152,12 +145,12 @@ function imageHtml(post: SocialDraftPost): string {
   const dark = post.platform === 'twitter_x';
   const more = moreImageOptionsLine(post.image.moreOptions);
   const moreRow = more
-    ? `<tr><td style="padding:8px 0 0 0;font-family:${FONT_BODY};font-size:12px;color:${dark ? C.xMuted : C.textTertiary};">${escapeHtml(more)}</td></tr>`
+    ? `<tr><td style="padding:8px 0 0 0;font-family:${FONT_BODY};font-size:${T.sm};line-height:1.5;color:${dark ? C.xMuted : C.textTertiary};">${escapeHtml(more)}</td></tr>`
     : '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
           <tr><td><img src="${escapeHtml(src)}" alt="${escapeHtml(
             post.image.altText,
-          )}" width="100%" style="display:block;width:100%;height:auto;border-radius:8px;"></td></tr>
+          )}" width="${CARD_CONTENT_WIDTH}" style="display:block;width:100%;max-width:${CARD_CONTENT_WIDTH}px;height:auto;border-radius:8px;"></td></tr>
           ${moreRow}
         </table>`;
 }
@@ -175,19 +168,16 @@ function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
   const href = reviewUrl(post.contentItemId, input.webAppUrl);
   const copyHref = copyTextUrl(post.contentItemId, input.webAppUrl);
   const cta = href
-    ? `<tr><td style="padding:16px 0 0 0;"><a href="${escapeHtml(
-        href,
-      )}" style="display:inline-block;background:${C.accent};color:#1A1915;font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Review &amp; approve on the web</a><a href="${escapeHtml(
+    ? `<tr><td style="padding:8px 0 0 0;">${button(href, 'Review & approve on the web')}${button(
         copyHref!,
-      )}" style="display:inline-block;margin-left:8px;background:transparent;color:${
-        dark ? C.xMuted : C.textSecondary
-      };font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border:1px solid ${
-        dark ? C.xSurface : C.border
-      };border-radius:8px;">Copy text</a></td></tr>`
+        'Copy text',
+        'secondary',
+        dark ? { text: C.xMuted, border: C.xSurface } : undefined,
+      )}</td></tr>`
     : '';
 
   const disclaimer = post.needsDisclaimer
-    ? `<tr><td style="padding:10px 0 0 0;font-family:${FONT_BODY};font-size:12px;line-height:1.4;color:${metaColor};font-style:italic;">Disclaimer to be attached by Lex.</td></tr>`
+    ? `<tr><td style="padding:10px 0 0 0;font-family:${FONT_BODY};font-size:${T.sm};line-height:1.4;color:${metaColor};font-style:italic;">Disclaimer to be attached by Lex.</td></tr>`
     : '';
 
   return `<tr><td style="padding:0 0 20px 0;">
@@ -196,15 +186,15 @@ function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td width="44" style="vertical-align:top;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="40" height="40" align="center" style="width:40px;height:40px;background:${avatarBg};border-radius:50%;font-family:${FONT_BODY};font-size:14px;font-weight:700;color:${avatarText};">${escapeHtml(
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="40" height="40" align="center" style="width:40px;height:40px;background:${avatarBg};border-radius:50%;font-family:${FONT_BODY};font-size:${T.sm};font-weight:700;color:${avatarText};">${escapeHtml(
                 initials(post.accountName),
               )}</td></tr></table>
             </td>
             <td style="vertical-align:top;padding-left:10px;">
-              <div style="font-family:${FONT_BODY};font-size:15px;font-weight:600;color:${nameColor};">${escapeHtml(
+              <div style="font-family:${FONT_BODY};font-size:${T.base};line-height:1.4;font-weight:600;color:${nameColor};">${escapeHtml(
                 post.accountName,
               )}</div>
-              <div style="font-family:${FONT_BODY};font-size:12px;color:${metaColor};">${PLATFORM_LABEL[post.platform]} · draft</div>
+              <div style="font-family:${FONT_BODY};font-size:${T.sm};line-height:1.4;color:${metaColor};">${PLATFORM_LABEL[post.platform]} · draft</div>
             </td>
           </tr>
         </table>
@@ -213,7 +203,7 @@ function cardHtml(post: SocialDraftPost, input: SocialDraftEmailInput): string {
         </table>
         ${imageHtml(post)}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr><td style="padding:10px 0 0 0;font-family:${FONT_BODY};font-size:12px;color:${metaColor};">${charCount(
+          <tr><td style="padding:10px 0 0 0;font-family:${FONT_BODY};font-size:${T.sm};line-height:1.5;color:${metaColor};">${charCount(
             previewText,
           )} characters · ${escapeHtml(COMPLIANCE_NOTE[post.classification])}</td></tr>
           ${disclaimer}
@@ -259,8 +249,7 @@ export function renderSocialDraftEmail(input: SocialDraftEmailInput): RenderedEm
     if (href) textLines.push(`Review: ${href}`);
     textLines.push('');
   }
-  const footerBits = [company.name, company.abn ? `ABN ${company.abn}` : '', company.website ?? ''].filter(Boolean);
-  textLines.push(footerBits.join(' · '));
+  textLines.push(footerText(company));
   const text = textLines.join('\n');
 
   // ── HTML part ───────────────────────────────────────────────────────────────
@@ -272,55 +261,17 @@ export function renderSocialDraftEmail(input: SocialDraftEmailInput): RenderedEm
 
   const cards = posts.map((p) => cardHtml(p, input)).join('');
 
-  const footerLine = [
-    company.abn ? `ABN ${escapeHtml(company.abn)}` : '',
-    company.website && safeHref(company.website)
-      ? `<a href="${escapeHtml(company.website)}" style="color:${C.accentDark};text-decoration:none;">${escapeHtml(
-          company.website.replace(/^https?:\/\//, ''),
-        )}</a>`
-      : '',
-  ]
-    .filter(Boolean)
-    .join(' &nbsp;·&nbsp; ');
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:${C.bg};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};">
-  <tr>
-    <td align="center" style="padding:24px 12px;">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${C.surface};border:1px solid ${C.border};border-radius:12px;">
-        <tr>
-          <td style="padding:28px 28px 0 28px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="font-family:${FONT_BODY};font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${C.textTertiary};padding-bottom:6px;">Social drafts for review</td></tr>
-              <tr><td style="font-family:${FONT_DISPLAY};font-size:22px;line-height:1.3;color:${C.textPrimary};padding-bottom:10px;">Hi ${escapeHtml(
-                firstName,
-              )}, ${posts.length === 1 ? 'a draft is' : 'your drafts are'} ready</td></tr>
-              <tr><td style="font-family:${FONT_BODY};font-size:14px;line-height:1.5;color:${C.textSecondary};padding-bottom:20px;">From today's news, in your voice: ${storyLine}${
+  const html = emailShell({
+    subject,
+    preheader: `${posts.length === 1 ? 'A draft' : `${posts.length} drafts`} from today's news: ${story.title}`,
+    company,
+    rows: `${eyebrowRow('Social drafts for review')}
+              ${titleRow(`Hi ${firstName}, ${posts.length === 1 ? 'a draft is' : 'your drafts are'} ready`, 10)}
+              <tr><td style="font-family:${FONT_BODY};font-size:${T.base};line-height:1.5;color:${C.textSecondary};padding-bottom:20px;">From today's news, in your voice: ${storyLine}${
                 story.source_name ? ` <span style="color:${C.textTertiary};">(${escapeHtml(story.source_name)})</span>` : ''
               }. Review, tweak, and approve when you're happy.</td></tr>
-              ${cards}
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 28px 24px 28px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:${C.textTertiary};">
-            <div style="font-weight:600;color:${C.textSecondary};">${escapeHtml(company.name)}</div>
-            ${footerLine ? `<div style="margin-top:2px;">${footerLine}</div>` : ''}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-</body>
-</html>`;
+              ${cards}`,
+  });
 
   return { subject, html, text };
 }
