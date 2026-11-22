@@ -1065,10 +1065,9 @@ ordering removed from the fact reader — each takes the suite red on its own.
   and no longer a deed to read — it is a question about whether whoever advised saw a narrated
   brief, a register of named entities and provider monitoring, or saw the education and
   consulting business.
-- **The Service Statement.** **Active since 2026-09-16** (v0.1), so it no longer blocks first
-  login. The row's `notes` still read "Not reviewed", and nothing in the database records
-  whether sections 2, 4 and 6 went in front of whoever advised on the position. If they did,
-  update the note; if they did not, that review is still owed. Changing the text now means
+- **The Service Statement — resolved.** **Active since 2026-09-16** (v0.1), and reviewed
+  before it went live (confirmed by Chris, 2026-11-22). The row's `notes` field on
+  `bts-internal` still reads "Not reviewed" and is out of date. Changing the text now means
   cutting a new version from `/compliance`, which sends every subscriber back to the gate.
 - **The Supabase redirect allow-list.** Sign-in links still land on `localhost:3000`, and the
   app is no longer the reason: both send paths pass `emailRedirectTo` through

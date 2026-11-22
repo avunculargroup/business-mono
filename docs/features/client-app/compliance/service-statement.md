@@ -2,8 +2,9 @@
 
 **Document type:** `service_statement` (new value for `compliance_documents.document_type`)
 **For:** Minute, by Bitcoin Treasury Solutions
-**Status:** `draft`
-**Last updated:** 2026-09-11
+**Status:** `active` — v0.1 reviewed and published, effective 2026-09-16. The live text is the
+seeded body in the migration, and a published body is immutable: changes mean a new version.
+**Last updated:** 2026-11-22
 
 ---
 
