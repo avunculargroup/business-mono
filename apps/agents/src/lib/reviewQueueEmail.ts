@@ -9,22 +9,19 @@
  * place for unreviewed numbers to start circulating.
  */
 
-import type { CompanyFooter, RenderedEmail } from './newsDigestEmail.js';
-
-// BTS palette, mirrored from newsDigestEmail.ts and inlined for email clients.
-const C = {
-  bg: '#FAFAF8',
-  surface: '#FFFFFF',
-  border: '#E8E6E0',
-  textPrimary: '#1A1915',
-  textSecondary: '#6B6860',
-  textTertiary: '#9E9C96',
-  accent: '#C9A84C',
-  accentDark: '#9A7A2E',
-} as const;
-
-const FONT_DISPLAY = "Georgia, 'Times New Roman', serif";
-const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+import {
+  C,
+  FONT_BODY,
+  T,
+  button,
+  emailShell,
+  escapeHtml,
+  eyebrowRow,
+  footerText,
+  titleRow,
+  type CompanyFooter,
+  type RenderedEmail,
+} from './emailLayout.js';
 
 /** One record with draft rows waiting from this run. */
 export interface ReviewQueueEntry {
@@ -38,15 +35,6 @@ export interface ReviewQueueEmailInput {
   /** Absolute base URL of the internal app; links are omitted when unset. */
   webAppUrl?: string;
   company: CompanyFooter;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function rows(n: number): string {
@@ -76,9 +64,7 @@ export function renderReviewQueueEmail(input: ReviewQueueEmailInput): RenderedEm
     'Draft rows reach no subscriber until someone approves them.',
     queueHref ? `Review queue: ${queueHref}` : '',
     '',
-    [company.name, company.abn ? `ABN ${company.abn}` : '', company.website ?? '']
-      .filter(Boolean)
-      .join(' · '),
+    footerText(company),
   ]
     .filter((line, index, all) => line !== '' || all[index - 1] !== '')
     .join('\n');
@@ -90,49 +76,24 @@ export function renderReviewQueueEmail(input: ReviewQueueEmailInput): RenderedEm
       const name = href
         ? `<a href="${escapeHtml(href)}" style="color:${C.accentDark};text-decoration:none;font-weight:600;">${escapeHtml(entry.legalName)}</a>`
         : `<span style="font-weight:600;color:${C.textPrimary};">${escapeHtml(entry.legalName)}</span>`;
-      return `<tr><td style="padding:10px 0;border-top:1px solid ${C.border};font-family:${FONT_BODY};font-size:15px;line-height:1.4;">${name}</td><td align="right" style="padding:10px 0;border-top:1px solid ${C.border};font-family:${FONT_BODY};font-size:13px;color:${C.textSecondary};white-space:nowrap;">${rows(entry.queuedRows)}</td></tr>`;
+      return `<tr><td style="padding:10px 12px 10px 0;border-top:1px solid ${C.border};font-family:${FONT_BODY};font-size:${T.base};line-height:1.4;">${name}</td><td align="right" style="padding:10px 0;border-top:1px solid ${C.border};font-family:${FONT_BODY};font-size:${T.sm};line-height:1.4;color:${C.textSecondary};white-space:nowrap;">${rows(entry.queuedRows)}</td></tr>`;
     })
     .join('');
 
   const cta = queueHref
-    ? `<tr><td style="padding:20px 0 0 0;"><a href="${escapeHtml(queueHref)}" style="display:inline-block;background:${C.accent};color:#1A1915;font-family:${FONT_BODY};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Open the review queue</a></td></tr>`
+    ? `<tr><td style="padding:12px 0 0 0;">${button(queueHref, 'Open the review queue')}</td></tr>`
     : '';
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:${C.bg};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};">
-  <tr>
-    <td align="center" style="padding:24px 12px;">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${C.surface};border:1px solid ${C.border};border-radius:12px;">
-        <tr>
-          <td style="padding:28px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td colspan="2" style="font-family:${FONT_BODY};font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${C.textTertiary};padding-bottom:6px;">Corporate research</td></tr>
-              <tr><td colspan="2" style="font-family:${FONT_DISPLAY};font-size:22px;line-height:1.3;color:${C.textPrimary};padding-bottom:10px;">${rows(total)} to review on ${records}</td></tr>
-              <tr><td colspan="2" style="font-family:${FONT_BODY};font-size:14px;line-height:1.5;color:${C.textSecondary};padding-bottom:16px;">The weekly ingest wrote new or changed rows. They are drafts, and reach no subscriber until someone approves them.</td></tr>
-              ${list}
-              ${cta}
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:0 28px 24px 28px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:${C.textTertiary};">
-            <div style="font-weight:600;color:${C.textSecondary};">${escapeHtml(company.name)}</div>
-            ${company.abn ? `<div style="margin-top:2px;">ABN ${escapeHtml(company.abn)}</div>` : ''}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-</body>
-</html>`;
+  const html = emailShell({
+    subject,
+    preheader: `The weekly corporate research ingest left ${rows(total)} waiting for review.`,
+    company,
+    rows: `${eyebrowRow('Corporate research')}
+              ${titleRow(`${rows(total)} to review on ${records}`, 10)}
+              <tr><td style="font-family:${FONT_BODY};font-size:${T.base};line-height:1.5;color:${C.textSecondary};padding-bottom:16px;">The weekly ingest wrote new or changed rows. They are drafts, and reach no subscriber until someone approves them.</td></tr>
+              <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${list}</table></td></tr>
+              ${cta}`,
+  });
 
   return { subject, html, text };
 }

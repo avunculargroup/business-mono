@@ -19,7 +19,8 @@
 import { supabase } from '@platform/db';
 import type { RoutineResult } from '@platform/shared';
 import { FastmailJmapClient, type JmapAddress } from './fastmailJmap.js';
-import { renderNewsDigestEmail, type CompanyFooter } from './newsDigestEmail.js';
+import { renderNewsDigestEmail } from './newsDigestEmail.js';
+import type { CompanyFooter } from './emailLayout.js';
 import { loadCompanyIdentity } from './companyProfile.js';
 import { createLogger } from './logger.js';
 
