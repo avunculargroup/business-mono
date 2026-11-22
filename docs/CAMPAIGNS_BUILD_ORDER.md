@@ -2,12 +2,20 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** Social Media Campaigns (incl. Brand Voice migration)
-**Status:** In progress — Steps 0–2 done & merged; Step 3 seeded (parity gate pending); Step 4 written (gated on merge)
-**Last updated:** 2026-06-22
+**Status:** Steps 0–2 and 4–10 built and merged to `main`; migrations applied. Step 3's parity gate is still pending, and no campaign has been run end to end to a published post (publishing is blocked on LinkedIn Phase 0 — see `docs/features/linkedin-posting/feature-spec.md`).
+**Last updated:** 2026-11-22
 
 -----
 
 ## ▶ Current state — resume here
+
+> **Update, 2026-11-22.** The branch notes below are from June and are superseded: every step's
+> code is on `main`, and the campaign migrations (`20260622000000` through `20260624000000`) are
+> applied on `bts-internal`, where three campaigns are `active`. Margot is on Simon's roster
+> (`agent-margot`). The founder-snippet embed follow-up is done (`voiceEmbeddingListener`; no
+> `voice_snippets` row has a null embedding). What is still open: the Step 3 parity gate, and so
+> retiring `docs/brand-voice.md`; and the live passes the table marks ⚠️, which cannot finish with
+> a published post until LinkedIn accounts are connected.
 
 Steps 0–3 code merged to `main` via **PR #232** (`claude/social-campaigns-preflight-csqIF`),
 so the voice foundations migrations are **applied to prod** (`social_accounts` seeded;
@@ -21,8 +29,8 @@ migrations apply to prod **on merge to `main`**.
 | 1 — Schema foundations | ✅ done, **applied to prod** (PR #232) | `supabase/migrations/20260605120000_add_voice_foundations.sql` (+ `…130000_add_match_voice_snippets.sql`); `social_accounts` seeded (6 rows). Commit `a52280d` |
 | 2 — `packages/voice` | ✅ done | resolver + `match_voice_snippets` RPC + embed-on-save, unit-tested. Commit `6164829` |
 | 3 — Voice milestone | ⚠️ **seeded; parity gate + doc retirement pending** | agents wiring `a751423`, Brand Hub Voice UI `3d16d0e`. `seed:voice` run (founder confirmed `brand_voice` + canon `voice_snippets` populated). |
-| 4 — Campaigns schema | ✅ **written, gated on merge** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
-| 5 — Agents (Margot, Lex) | ✅ **written, gated on merge** | spec `docs/agents/margot.md`; agent `apps/agents/src/agents/margot/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`). **Lex converged on the existing shared compliance agent** (`agents/compliance/`, added by the on-chain feature on `main`) rather than a second `lex` — the variant workflow reuses it with a campaign-specific prompt + classification/disclaimer schema (see `docs/agents/compliance.md`). Migration `20260622010000` adds `margot` to the `agent_name` CHECKs (+ `VALID_AGENT_NAMES`) and re-affirms `lex`. Charlie confirmed reading `packages/voice`. |
+| 4 — Campaigns schema | ✅ **merged, applied to prod** | `supabase/migrations/20260622000000_add_campaigns_schema.sql`; `schema.sql` + `schema-changes.md` updated. On branch `claude/social-campaigns-build-order-xDKFW` |
+| 5 — Agents (Margot, Lex) | ✅ **merged** | spec `docs/agents/margot.md`; agent `apps/agents/src/agents/margot/index.ts` (registered in Mastra `agents:` map + `MODEL_SCOPES`). **Lex converged on the existing shared compliance agent** (`agents/compliance/`, added by the on-chain feature on `main`) rather than a second `lex` — the variant workflow reuses it with a campaign-specific prompt + classification/disclaimer schema (see `docs/agents/compliance.md`). Migration `20260622010000` adds `margot` to the `agent_name` CHECKs (+ `VALID_AGENT_NAMES`) and re-affirms `lex`. Charlie confirmed reading `packages/voice`. |
 | 6 — Variant Generation Workflow | ⚠️ **built end-to-end; needs a live pass** | Workflow `apps/agents/src/workflows/variant/` (resolve-context → Charlie → Lex → persist → **Gate 3**, threads + single-variant regen). Web gate plumbing: migration `20260622020000` (content_items `workflow_run_id`/`gate_state`/`pending_decision`), `variantGateWeb` listener + `resumeVariantRun`. UI: `apps/web/components/campaigns/VariantEditor.tsx` (platform-mimic preview, live char counter, Lex chip, approve / request-change) + `app/(app)/campaigns/variants/[id]/page.tsx` + `submitVariantGateDecision` action. agents + web typecheck clean, 282 agents tests green. **Remaining:** live end-to-end verification (needs secrets + a stub campaign/beat); image slot + alt text and inline copy-edit are deferred (Step 9). |
 | 10 — Optional branches | ⚠️ **built; needs a live pass** | Rex (research) + Bruno (audience) wired as conditional steps BEFORE strategy synthesis (`research`, `audience` in `workflows/strategy/index.ts`). Conditions are pure heuristics (`shouldRunResearch` = current-events/competitor/trend/recent-year signal in the objective; `shouldRunAudienceAnalysis` = a real industry/pipeline segment), so no LLM gate and no cost when not warranted. Both branches are best-effort (failure → '' , run continues) and their output folds into the synthesis prompt; Bruno gets a light CRM company lookup by industry. Step outputs are cached in the run snapshot, so gate resumes never re-run them. `strategy.research` (fallback rex) + `strategy.audience` (fallback bruno) added to `MODEL_SCOPES`. 551 agents tests green. **Remaining:** live pass. |
 | 9 — Loops & polish | ⚠️ **built end-to-end; needs a live pass** | **Compliance re-run on edit** (application layer): `editVariantCopy` action resets a variant to `compliance_status='pending'` + patches the suspended `gate_state` preview; the `complianceRecheck` listener (atomic claim on `compliance_checked_at IS NULL`) re-invokes Lex via the variant classifier and rewrites the compliance fields + preview. Inline copy editing added to the variant editor (single post + thread segments). **Metrics entry**: `savePostMetrics` upsert + inline platform-aware fields on published posts (`PublishedPosts`). **Promote-from-post**: `promotePostToSnippet` → `voice_snippets` (`source=promoted_from_post`, `source_content_item_id`, founder curator note) on published posts. No new migration (reuses `post_metrics`, `voice_snippets`). Typecheck/lint clean; 543 agents + 125 web tests green. **Remaining:** live pass (edit a cleared variant → Lex re-runs; log metrics; promote a post → it appears in Brand Hub snippets once embedded). |

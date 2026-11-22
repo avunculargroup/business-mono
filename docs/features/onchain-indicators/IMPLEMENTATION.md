@@ -1,7 +1,9 @@
 # On-Chain Indicators — Implementation Summary
 
 **Branch:** `claude/onchain-metrics-dashboard-ky1j2g`
-**Status:** Implemented across four commits (Sessions 1–4). Not yet merged; no PR opened.
+**Status:** Implemented across four commits (Sessions 1–4), merged to `main` and live. On
+2026-11-22, all 28 on-chain indicators were active and the daily `onchain_poll` routine had run
+the day before. The rest of this file is the June build record.
 **Date:** 2026-06-21
 
 This records what was built against the drafts in this folder, how it differs from

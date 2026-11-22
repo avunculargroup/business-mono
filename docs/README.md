@@ -4,7 +4,7 @@ Around 70 documents live here, and they are not all the same kind of thing. Some
 current because code depends on them; others are a snapshot of a build that finished months
 ago. This index says which is which.
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-11-22
 
 **Start elsewhere if you are new:** the root [`../README.md`](../README.md) for the shape of
 the system, [`../CLAUDE.md`](../CLAUDE.md) for the conventions,
@@ -72,12 +72,16 @@ behaviour is documented in the header comment of their own `index.ts`.
 |---|---|
 | [`news-source-email-spec.md`](./news-source-email-spec.md) | Research feed — RSS, YouTube, podcast and email-newsletter ingestion |
 | [`podcast-ingestion-spec.md`](./podcast-ingestion-spec.md) | Podcast ingestion, the transcript waterfall, and the RAG library |
+| [`features/podcast-transcripts/`](./features/podcast-transcripts/README.md) | Turn-aware transcript chunking and speaker labels |
+| [`news-source-email-extraction-spec.md`](./news-source-email-extraction-spec.md) | Newsletter body extraction, tracking-link unwrapping and link following |
 | [`newsletter-workflow-spec.md`](./newsletter-workflow-spec.md) | The newsletter workflow and its two suspend/resume gates |
 | [`daily-social-posts.md`](./daily-social-posts.md) | `social_post_from_news` — the daily per-founder LinkedIn/X draft routine (live) |
 | [`social-campaigns-spec.md`](./social-campaigns-spec.md) | Campaigns → beats → variants data model, agents, UI |
 | [`social-campaign-workflows-flow.md`](./social-campaign-workflows-flow.md) | The strategy and variant workflows, gates and fan-out |
 | [`features/linkedin-posting/feature-spec.md`](./features/linkedin-posting/feature-spec.md) | LinkedIn scheduling and posting |
-| [`features/social-post-improve/social-post-improvements.md`](./features/social-post-improve/social-post-improvements.md) | Proposal — making daily posts sound less like an AI |
+| [`features/social-post-improve/social-post-improvements.md`](./features/social-post-improve/social-post-improvements.md) | Making daily posts sound less like an AI (all six proposals shipped) |
+| [`features/social-post-image/feature-spec.md`](./features/social-post-image/feature-spec.md) | Images and headline cards for the daily social posts, and the brand visual canon (live) |
+| [`features/social-campaigns/`](./features/social-campaigns/README.md) | Social campaigns feature workspace |
 
 ### Brand voice
 
@@ -93,7 +97,8 @@ behaviour is documented in the header comment of their own `index.ts`.
 | [`features/economic-indicators/`](./features/economic-indicators/README.md) | Macro series — money supply, inflation, policy rates |
 | [`features/onchain-indicators/`](./features/onchain-indicators/README.md) | Bitcoin network and on-chain metrics |
 | [`features/findings-engine-spec.md`](./features/findings-engine-spec.md) | The market-report insight layer — what gets narrated, and what gets held |
-| [`features/html-pdf-monitoring/html-pdf-monitoring.md`](./features/html-pdf-monitoring/html-pdf-monitoring.md) | Report ingestion — watching publisher pages for new PDF/HTML reports |
+| [`features/html-pdf-monitoring/html-pdf-monitoring.md`](./features/html-pdf-monitoring/html-pdf-monitoring.md) | Report ingestion — watching publisher pages for new PDF/HTML reports (live) |
+| [`features/corporate-holdings/`](./features/corporate-holdings/README.md) | Corporate research register — company bitcoin holdings, the ingest workflow and its review queue |
 | [`features/ecosystem/ecosystem-signal-feature.md`](./features/ecosystem/ecosystem-signal-feature.md) | Ecosystem signals — watches, change detection, the `/signals` feed |
 
 ### CRM, discovery and operations
@@ -117,7 +122,15 @@ unusually complete and are the best worked examples of the house page pattern.
 | [`../apps/web/app/(app)/news/podcasts/README.md`](<../apps/web/app/(app)/news/podcasts/README.md>) | The whole `/news/podcasts` tree — file map, transcript lifecycle, cost model |
 | [`features/ecosystem/README.md`](./features/ecosystem/README.md) | `/products` and `/advisors` |
 
-### Portfolio demo (not built)
+### Minute, the client app
+
+[`features/client-app/`](./features/client-app/README.md) specs Minute, the invite-only
+subscription app in `apps/client`, including `/prepare`, the Service Statement and library
+papers ([`library-papers-spec.md`](./features/client-app/library-papers-spec.md)). Read
+[`build-progress.md`](./features/client-app/build-progress.md) first: it was checked against
+the repository and the database, and the specs were not.
+
+### Portfolio demo (built, not deployed)
 
 [`features/demo-app/`](./features/demo-app/README.md) specs a public, fixture-backed demo of
 this platform for technical evaluators. **`apps/demo` now exists and builds** — phases 0–9 of
@@ -139,6 +152,11 @@ current.
 | [`news-source-email-build-progress.md`](./news-source-email-build-progress.md) | Email newsletter ingestion progress |
 | [`features/ecosystem/build-progress.md`](./features/ecosystem/build-progress.md) | Ecosystem signals progress |
 | [`features/html-pdf-monitoring/build-progress.md`](./features/html-pdf-monitoring/build-progress.md) | Report ingestion progress |
+| [`news-source-email-extraction-build-progress.md`](./news-source-email-extraction-build-progress.md) | Newsletter extraction and link following progress |
+| [`features/client-app/build-progress.md`](./features/client-app/build-progress.md) | Minute — verification pass and build progress |
+| [`features/client-app/library-papers-build-progress.md`](./features/client-app/library-papers-build-progress.md) | Library papers progress |
+| [`features/corporate-holdings/build-progress.md`](./features/corporate-holdings/build-progress.md) | Corporate research register progress |
+| [`features/demo-app/build-progress.md`](./features/demo-app/build-progress.md) | Demo app progress; [`deploy-checklist.md`](./features/demo-app/deploy-checklist.md) holds what is left |
 | [`features/onchain-indicators/IMPLEMENTATION.md`](./features/onchain-indicators/IMPLEMENTATION.md) | On-chain indicators implementation summary |
 | [`CHANGE_REQUEST_SIGNAL_CLI.md`](./CHANGE_REQUEST_SIGNAL_CLI.md) | The Signal CLI integration change request |
 

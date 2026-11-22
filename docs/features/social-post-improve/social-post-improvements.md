@@ -2,8 +2,8 @@
 
 **Platform:** Bitcoin Treasury Solutions Internal Platform
 **Feature:** `social_post_from_news` (see `docs/daily-social-posts.md`)
-**Status:** Proposal
-**Last updated:** 2026-07-12
+**Status:** Shipped. All six proposals are in `apps/agents/src/workflows/socialPost/` (checked 2026-11-22): six forms in `forms.ts` (1), opener and form history in `history.ts` (2), the hard-specific instruction in `prompts.ts`, fed by the story's extracted key points rather than a new extraction step (3), cadence exemplars via `formatCadenceExemplars` (4), the linter in `aiTell.ts` (5), and a rotating `short` / `standard` / `punchy` length target (6). The text below is the original proposal.
+**Last updated:** 2026-11-22
 
 ---
 

@@ -8,8 +8,10 @@ The other four source shapes (RSS, podcast, YouTube, email) hand the platform a 
 signal for free. Report publishers do not, which is the whole reason this feature exists:
 the discovery layer has to manufacture the signal that the others get from a feed.
 
-**Status:** All nine planned sessions implemented; not yet exercised against a live
-publisher. · **Last updated:** 2026-08-11
+**Status:** All nine planned sessions implemented and running live: the daily
+`report_watch_scan` routine is active, and 30 reports from 6 sources were stored between
+2026-08-05 and 2026-11-03 (checked 2026-11-22). Only one arrived in the 30 days to that check,
+so watch health is worth a look. · **Last updated:** 2026-11-22
 
 ## Documents in this folder
 

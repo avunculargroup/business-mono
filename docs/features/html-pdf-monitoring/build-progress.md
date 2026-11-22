@@ -5,8 +5,8 @@ Running record of what has shipped against
 Same purpose as `docs/features/ecosystem/build-progress.md` and
 `docs/news-source-email-build-progress.md`.
 
-**Status:** all nine planned sessions implemented. Not yet exercised against a
-real publisher — see **Not verified against live sources** below.
+**Status:** all nine planned sessions implemented and running live since August —
+see **Not verified against live sources** below for what that has and has not settled.
 
 ---
 
@@ -122,7 +122,16 @@ shipped code:
 
 ## Not verified against live sources
 
-Everything below is implemented and unit-tested against fixtures, but has not
+> **Update, 2026-11-22.** The feature has since run against real publishers. The daily
+> `report_watch_scan` routine is active, `v_report_watch_health` lists 17 watched sources,
+> and `reports` holds 30 rows from 6 of them, the first on 2026-08-05 and the latest on
+> 2026-11-03. So detection works on at least six live pages, and the "no source is seeded"
+> bullet below no longer holds. Not checked here: which adapters and which of the 17 sources
+> have never produced a report, and whether LlamaParse has been called live. One report in the
+> 30 days to this check is low enough to read the watch-health tab before assuming publishers
+> went quiet.
+
+When written, everything below is implemented and unit-tested against fixtures, but has not
 been run against a real publisher. Same caveat as the BGeometrics adapter in
 `docs/schema-changes.md`: no network egress was available while writing it.
 

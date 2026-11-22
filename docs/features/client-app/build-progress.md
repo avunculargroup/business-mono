@@ -8,10 +8,14 @@ the live database, and what has been built since. Same purpose and same shape as
 premise the first build rested on) and again for **0.5.0** (which supplied the Service
 Statement the gate had been waiting on) — see
 [What 0.4.0 changed](#what-040-changed-and-what-it-cost) and
-[What 0.5.0 added](#what-050-added-the-statement). Sessions 1–3 are built. Every migration is
-**written and not applied** — see [Applying the migrations](#applying-the-migrations). Three of
-the bundle's twelve assumptions were wrong, one of them by an order of magnitude.
-**Last updated:** 2026-09-16
+[What 0.5.0 added](#what-050-added-the-statement). Sessions 1–5 are built. Three of the
+bundle's twelve assumptions were wrong, one of them by an order of magnitude.
+**Live state, checked against `bts-internal` on 2026-11-22:** every migration below is
+applied. The Service Statement v0.1 is **active**, effective 2026-09-16, and `company_profile`
+has no blank fields, so the gate can admit subscribers. Two client accounts and one seat
+exist, with one acknowledgement on record and no `/prepare` packs generated yet. The
+[Applying the migrations](#applying-the-migrations) section is kept for its history.
+**Last updated:** 2026-11-22
 
 ---
 
@@ -1061,11 +1065,11 @@ ordering removed from the fact reader — each takes the suite red on its own.
   and no longer a deed to read — it is a question about whether whoever advised saw a narrated
   brief, a register of named entities and provider monitoring, or saw the education and
   consulting business.
-- **The Service Statement.** Drafted and seeded; **not reviewed and not active**, and it
-  blocks first login. Sections 2, 4 and 6 need the eye of whoever advised on the position;
-  section 8's terms and the privacy URL came from conversation. Reviewing it is still a human
-  act, but publishing it is no longer a hand-written `UPDATE` — `/compliance` in `apps/web` does
-  it, and refuses while the document cannot fully resolve.
+- **The Service Statement.** **Active since 2026-09-16** (v0.1), so it no longer blocks first
+  login. The row's `notes` still read "Not reviewed", and nothing in the database records
+  whether sections 2, 4 and 6 went in front of whoever advised on the position. If they did,
+  update the note; if they did not, that review is still owed. Changing the text now means
+  cutting a new version from `/compliance`, which sends every subscriber back to the gate.
 - **The Supabase redirect allow-list.** Sign-in links still land on `localhost:3000`, and the
   app is no longer the reason: both send paths pass `emailRedirectTo` through
   [`lib/siteUrl.ts`](../../../apps/client/lib/siteUrl.ts), and both have since the fix. What
@@ -1082,7 +1086,9 @@ ordering removed from the fact reader — each takes the suite red on its own.
   shape of problem that costs a day: every artefact in the diff is correct and the feature is
   still broken. That one was fixable by moving the value into the database. This one is not.
 
-- **`company_profile` is eight fields short.** It was thirteen. Migration
+- **`company_profile` — resolved.** As of 2026-11-22 every column is filled on
+  `bts-internal`, including `privacy_policy_url`. The history below is kept for why the fields
+  moved. **`company_profile` was eight fields short.** It was thirteen. Migration
   `20260916000000_consolidate_company_identity.sql` copied the five that already existed as
   `company_records` rows — legal name, trading name, ABN, ACN, website — and retired those
   record types, so the company's legal identity now has one home rather than two. The other
@@ -1098,7 +1104,8 @@ ordering removed from the fact reader — each takes the suite red on its own.
   the other thirteen. Nothing reads the variable now; delete it wherever it is still set. Note
   that no SQL can backfill it, so a project that already had the variable starts with an empty
   column — the value has to be typed in once.
-- **`is_financial_product` backfill.** 24 rows, human judgement each. A reading pass over all
+- **`is_financial_product` backfill.** 24 rows, human judgement each. **Still 23 of 24 blank
+  on 2026-11-22.** A reading pass over all
   twenty-four is drafted in
   [`compliance/directory-classification-worksheet.md`](./compliance/directory-classification-worksheet.md)
   — eleven proposed `true`, thirteen `false`, five flagged as genuinely arguable — but nothing
