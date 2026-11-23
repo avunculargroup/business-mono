@@ -90,6 +90,15 @@ describe('runWatches', () => {
     expect(d.listWorks).toHaveBeenCalledWith('title_and_abstract.search:bitcoin', '*');
   });
 
+  it('re-resolves works already held when refreshing', async () => {
+    const { d, saved } = deps([[work(1), work(2)]]);
+    const result = await runWatches({ maxResolve: 10, refresh: true }, d);
+    expect(d.resolve).toHaveBeenCalledTimes(2);
+    // W2 was already held: re-resolved, but not counted as a new hit.
+    expect(result).toMatchObject({ new_works: 1, resolved: 2 });
+    expect(saved[0].values).toMatchObject({ hits_total: 1, promoted_total: 1 });
+  });
+
   it('reports a watch type it cannot run', async () => {
     const { d } = deps([], { loadWatches: vi.fn(async () => [watch({ name: 'arXiv q-fin', watch_type: 'arxiv_category' })]) });
     expect(await runWatches({ maxResolve: 10 }, d)).toMatchObject({ watches_run: 0, skipped_watches: ['arXiv q-fin'] });

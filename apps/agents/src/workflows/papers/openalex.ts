@@ -105,11 +105,28 @@ export function shortOpenAlexId(id: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
-/** "https://doi.org/10.X/Y" → "10.x/y"; null when not a DOI. Lowercased, as papers.doi requires. */
+/**
+ * "https://doi.org/10.X/Y" → "10.x/y"; null when not a DOI. Lowercased, as
+ * papers.doi requires. OpenAlex sometimes carries a URL copied out of running
+ * text, like "http://doi.org/10.2139/ssrn.3550842>).": everything from an angle
+ * bracket or quote is cut, then trailing punctuation, and a closing parenthesis
+ * only when it has no opening one (DOIs such as 10.1016/S0140-6736(20)30183-5
+ * keep theirs).
+ */
 export function normaliseDoi(doi: string | null | undefined): string | null {
   if (!doi) return null;
   const m = /(10\.\d{4,9}\/\S+)$/i.exec(doi.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, ''));
-  return m ? m[1].toLowerCase() : null;
+  if (!m) return null;
+  let d = m[1].split(/[<>"']/)[0];
+  for (;;) {
+    const trimmed = d.replace(/[.,;:]+$/, '');
+    const open = (trimmed.match(/\(/g) ?? []).length;
+    const close = (trimmed.match(/\)/g) ?? []).length;
+    const next = trimmed.endsWith(')') && close > open ? trimmed.slice(0, -1) : trimmed;
+    if (next === d) break;
+    d = next;
+  }
+  return /^10\.\d{4,9}\/.+/.test(d) ? d.toLowerCase() : null;
 }
 
 /**

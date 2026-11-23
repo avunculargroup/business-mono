@@ -27,8 +27,13 @@ export interface PeerReviewResult {
 const NEVER_REFEREED = new Set([
   'editorial', 'letter', 'erratum', 'paratext', 'retraction', 'peer-review', 'libguides',
   'supplementary-materials', 'dataset', 'report', 'dissertation', 'standard', 'grant', 'other',
+  // A monograph is outside the register's scope (journal articles, refereed
+  // proceedings, refereed chapters), whoever published it.
+  'book',
 ]);
-const REFEREED_TYPES = new Set(['article', 'review', 'book-chapter']);
+// OpenAlex types proceedings papers 'conference-paper' (LNCS, IEEE S&P in the
+// first backfill sample); in computer science the conferences are the journals.
+const REFEREED_TYPES = new Set(['article', 'review', 'book-chapter', 'conference-paper']);
 const REFEREED_VENUES = new Set<VenueType>(['journal', 'conference', 'book_series']);
 
 export function classifyPeerReview(input: PeerReviewInput): PeerReviewResult {
